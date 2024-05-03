@@ -455,7 +455,7 @@ export class Deployer {
   ): Promise<ethers.ContractReceipt> {
     if (useGovernance) {
       const cdata = contract.interface.encodeFunctionData(fname, fargs);
-      return this.executeUpgrade(contract.address, value, cdata, overrides, printFileName);
+      return this.executeUpgrade(contract.address, value, cdata, printFileName);
     } else {
       const tx: ethers.ContractTransaction = await contract[fname](...fargs, ...(overrides ? [overrides] : []));
       return await tx.wait();
@@ -463,13 +463,7 @@ export class Deployer {
   }
 
   /// this should be only use for local testing
-  public async executeUpgrade(
-    targetAddress: string,
-    value: BigNumberish,
-    callData: string,
-    overrides?: Overrides,
-    printFileName?: string
-  ) {
+  public async executeUpgrade(targetAddress: string, value: BigNumberish, callData: string, printFileName?: string) {
     const governance = IGovernanceFactory.connect(this.addresses.Governance, this.deployWallet);
     const operation = {
       calls: [{ target: targetAddress, value: value, data: callData }],
@@ -493,7 +487,7 @@ export class Deployer {
     if (this.verbose) {
       console.log("Upgrade scheduled");
     }
-    const executeTX = await governance.execute(operation, { ...overrides, value: value });
+    const executeTX = await governance.execute(operation, { value: value });
     const receipt = await executeTX.wait();
     if (this.verbose) {
       console.log(
