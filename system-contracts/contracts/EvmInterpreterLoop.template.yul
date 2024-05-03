@@ -468,7 +468,7 @@ for { } true { } {
         // minimum_word_size = (size + 31) / 32
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
         let minWordSize := shr(5, add(len, 31))
-        let dynamicGas := add(mul(3, minWordSize), expandMemory(add(offset, len)))
+        let dynamicGas := add(mul(3, minWordSize), expandMemory(add(dest, len)))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         copyActivePtrData(add(MEM_OFFSET_INNER(), dest), offset, len)
