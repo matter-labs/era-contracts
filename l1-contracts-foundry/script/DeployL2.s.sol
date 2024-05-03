@@ -1,12 +1,12 @@
 pragma solidity ^0.8.24;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Utils} from "./Utils.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
@@ -16,6 +16,7 @@ import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 contract DeployL2Script is Script {
     using stdToml for string;
 
+    uint constant MAX_PRIORITY_TX_GAS = 72000000;
     address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     address constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
     Config config;
@@ -34,17 +35,17 @@ contract DeployL2Script is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-l2.toml");
         string memory toml = vm.readFile(path);
-        config.bridgehubAddress = toml.readAddress("$.bridgehubAddress");
+        config.bridgehubAddress = toml.readAddress("$.bridgehub");
         config.governance = toml.readAddress("$.governance");
-        config.l1SharedBridgeProxy = toml.readAddress("$.l1sharedBridgeProxy");
-        config.chainId = toml.readUint("$.chainId");
-        config.erc20BridgeProxy = toml.readAddress("$.erc20BridgeProxy");
+        config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
+        config.erc20BridgeProxy = toml.readAddress("$.erc20_bridge");
+        config.chainId = toml.readUint("$.chain_id");
     }
 
     function run() public {
         initializeConfig();
-        deployFactoryDeps();
-        deploySharedBridge();
+//        deployFactoryDeps();
+//        deploySharedBridge();
         deploySharedBridgeProxy();
         saveOutput();
     }
@@ -61,7 +62,7 @@ contract DeployL2Script is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, artifactPath);
         string memory json = vm.readFile(path);
-        bytes memory bytecode = vm.parseJson(json, ".bytecode");
+        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode");
         return bytecode;
     }
 
@@ -93,7 +94,8 @@ contract DeployL2Script is Script {
         );
         bytes[] memory factoryDeps = new bytes[](1);
 
-        bytes memory constructorData = abi.encode("(uint256)", 0);
+        // TODO set to era_chain_id
+        bytes memory constructorData = abi.encode(270);
 
         config.l2SharedBridgeImplementation = L2ContractHelper.computeCreate2Address(
             msg.sender,
@@ -102,12 +104,13 @@ contract DeployL2Script is Script {
             keccak256(constructorData)
         );
 
+        console.logBytes32(L2ContractHelper.hashL2Bytecode(l2SharedBridgeBytecode));
         factoryDeps[0] = beaconProxy;
         deployThroughL1({
             bytecode: l2SharedBridgeBytecode,
             constructorargs: constructorData,
             create2salt: "",
-            l2GasLimit: MAX_GAS_PER_TRANSACTION,
+            l2GasLimit: MAX_PRIORITY_TX_GAS,
             factoryDeps: factoryDeps
         });
     }
@@ -127,7 +130,7 @@ contract DeployL2Script is Script {
         address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
 
         bytes memory l2SharedBridgeProxyConstructorData = abi.encode(
-            "(address, address, bytes)",
+            "(address,address,bytes)",
             config.l2SharedBridgeImplementation,
             l2GovernorAddress,
             proxyInitializationParams
@@ -149,13 +152,13 @@ contract DeployL2Script is Script {
             bytecode: l2SharedBridgeProxyBytecode,
             constructorargs: l2SharedBridgeProxyConstructorData,
             create2salt: "",
-            l2GasLimit: MAX_GAS_PER_TRANSACTION,
+            l2GasLimit: MAX_PRIORITY_TX_GAS,
             factoryDeps: new bytes[](0)
         });
     }
 
     function publishBytecodes(bytes[] memory factoryDeps) public {
-        runL1L2Transaction("", MAX_GAS_PER_TRANSACTION, factoryDeps, 0x0000000000000000000000000000000000000000);
+        runL1L2Transaction("", MAX_PRIORITY_TX_GAS, factoryDeps, 0x0000000000000000000000000000000000000000);
     }
 
     function deployThroughL1(
@@ -168,7 +171,7 @@ contract DeployL2Script is Script {
         bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(bytecode);
 
         bytes memory deployData = abi.encodeWithSignature(
-            "create2(bytes32, bytes32, bytes calldata)",
+            "create2(bytes32,bytes32,bytes)",
             create2salt,
             bytecodeHash,
             constructorargs
@@ -211,6 +214,16 @@ contract DeployL2Script is Script {
             factoryDeps: factoryDeps,
             refundRecipient: msg.sender
         });
+
+        vm.serializeUint("root", "requiredValueToDeploy", requiredValueToDeploy);
+        vm.serializeAddress("root", "l2Contract", dstAddress);
+
+        string memory toml = vm.serializeBytes("root", "l2Calldata", l2Calldata);
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/script-out/output-test.toml");
+        vm.writeToml(toml, path);
+
+//    console.log("Generating Merkle Proof for %s", l2Calldata);
 
         vm.startBroadcast();
         address baseTokenAddress = bridgehub.baseToken(config.chainId);
