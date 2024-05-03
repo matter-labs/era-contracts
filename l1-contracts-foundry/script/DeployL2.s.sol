@@ -16,7 +16,7 @@ import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 contract DeployL2Script is Script {
     using stdToml for string;
 
-    uint constant MAX_PRIORITY_TX_GAS = 72000000;
+    uint256 constant MAX_PRIORITY_TX_GAS = 72000000;
     address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     address constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
     Config config;
@@ -121,6 +121,8 @@ contract DeployL2Script is Script {
         );
         address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
         bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(l2StandardErc20Bytecode);
+
+        // solhint-disable-next-line func-named-parameters
         bytes memory proxyInitializationParams = abi.encodeWithSignature(
             "initialize(address,address,bytes32,address)",
             config.l1SharedBridgeProxy,
@@ -221,7 +223,6 @@ contract DeployL2Script is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-test.toml");
         vm.writeToml(toml, path);
-
 
         vm.startBroadcast();
         address baseTokenAddress = bridgehub.baseToken(config.chainId);
