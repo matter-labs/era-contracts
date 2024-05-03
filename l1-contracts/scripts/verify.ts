@@ -1,7 +1,7 @@
 // hardhat import should be the first import in the file
 import * as hardhat from "hardhat";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-import { isLocalNetwork } from "../src.ts/utils";
+import { isCurrentNetworkLocal } from "../src.ts/utils";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function verifyPromise(address: string, constructorArguments?: Array<any>, libraries?: object): Promise<any> {
@@ -14,7 +14,7 @@ function verifyPromise(address: string, constructorArguments?: Array<any>, libra
 }
 
 async function main() {
-  if (isLocalNetwork()) {
+  if (isCurrentNetworkLocal()) {
     console.log("Skip contract verification on localhost");
     return;
   }

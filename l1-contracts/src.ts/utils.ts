@@ -182,11 +182,11 @@ export function ethersWalletToZkWallet(wallet: ethers.Wallet): ZkWallet {
 }
 
 export function isZKMode(): boolean {
-  return process.env.ETH_CLIENT_CHAIN_ID === "270";
+  return process.env.CONTRACTS_BASE_NETWORK_ZKSYNC === "true";
 }
 
 const LOCAL_NETWORKS = ["localhost", "hardhat", "localhostL2"];
 
-export function isLocalNetwork(): boolean {
+export function isCurrentNetworkLocal(): boolean {
   return LOCAL_NETWORKS.includes(process.env.CHAIN_ETH_NETWORK);
 }

@@ -9,14 +9,14 @@ import { ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
 import { web3Provider } from "./utils";
-import { isLocalNetwork } from "../src.ts/utils";
+import { isCurrentNetworkLocal } from "../src.ts/utils";
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 async function main() {
   try {
-    if (!isLocalNetwork()) {
+    if (!isCurrentNetworkLocal()) {
       console.error("This deploy script is only for localhost-test network");
       process.exit(1);
     }

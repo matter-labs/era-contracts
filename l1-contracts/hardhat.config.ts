@@ -27,11 +27,19 @@ function getZksolcUrl(): string {
 }
 
 // These are L2/ETH networks defined by environment in `dev.env` of zksync-era default development environment
-const DEFAULT_L2_NETWORK = "http://127.0.0.1:3050";
+// const DEFAULT_L2_NETWORK = "http://127.0.0.1:3050";
 const DEFAULT_ETH_NETWORK = "http://127.0.0.1:8545";
 
+const zkSyncBaseNetworkEnv =
+  process.env.CONTRACTS_BASE_NETWORK_ZKSYNC === "true"
+    ? {
+        ethNetwork: "localL1",
+        zksync: true,
+      }
+    : {};
+
 export default {
-  defaultNetwork: process.env.ETH_CLIENT_CHAIN_ID === "270" ? "localL2" : "env",
+  defaultNetwork: "env",
   solidity: {
     version: "0.8.24",
     settings: {
@@ -64,6 +72,7 @@ export default {
   networks: {
     env: {
       url: process.env.ETH_CLIENT_WEB3_URL?.split(",")[0],
+      ...zkSyncBaseNetworkEnv,
     },
     hardhat: {
       allowUnlimitedContractSize: false,
@@ -71,13 +80,6 @@ export default {
         url: "https://eth-goerli.g.alchemy.com/v2/" + process.env.ALCHEMY_KEY,
         enabled: process.env.TEST_CONTRACTS_FORK === "1",
       },
-    },
-    localL2: {
-      // Just to keep the config working
-      url: DEFAULT_L2_NETWORK,
-      // For now, we just support localhost
-      ethNetwork: "localL1",
-      zksync: true,
     },
     localL1: {
       url: DEFAULT_ETH_NETWORK,

@@ -12,7 +12,7 @@ import type { FacetCut } from "./diamondCut";
 import type { Deployer } from "./deploy";
 import { getTokens } from "./deploy-token";
 
-import { ADDRESS_ONE, isLocalNetwork } from "../src.ts/utils";
+import { ADDRESS_ONE, isCurrentNetworkLocal } from "../src.ts/utils";
 
 export const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000";
 export const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
@@ -29,7 +29,7 @@ export async function initialBridgehubDeployment(
   create2Salt = create2Salt || ethers.utils.hexlify(ethers.utils.randomBytes(32));
 
   // Create2 factory already deployed on the public networks, only deploy it on local node
-  if (isLocalNetwork()) {
+  if (isCurrentNetworkLocal()) {
     if (!deployer.zkMode) {
       await deployer.deployCreate2Factory({ gasPrice, nonce });
       nonce++;

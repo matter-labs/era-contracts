@@ -250,3 +250,9 @@ export async function getL1TxInfo(
     value: neededValue.toString(),
   };
 }
+
+const LOCAL_NETWORKS = ["localhost", "hardhat", "localhostL2"];
+
+export function isCurrentNetworkLocal(): boolean {
+  return LOCAL_NETWORKS.includes(process.env.CHAIN_ETH_NETWORK);
+}
