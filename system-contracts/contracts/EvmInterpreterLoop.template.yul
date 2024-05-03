@@ -1089,6 +1089,7 @@ for { } true { } {
         log1(add(offset, MEM_OFFSET_INNER()), size, topic1)
     }
     case 0xA2 { // OP_LOG2
+        evmGasLeft := chargeGas(evmGasLeft, 375)
         if isStatic {
             revert(0, 0)
         }
