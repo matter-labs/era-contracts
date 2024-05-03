@@ -27,6 +27,7 @@ contract DeployL2Script is Script {
         address governance;
         address erc20BridgeProxy;
         uint256 chainId;
+        uint256 eraChainId;
         address l2SharedBridgeImplementation;
         address l2SharedBridgeProxy;
     }
@@ -44,8 +45,8 @@ contract DeployL2Script is Script {
 
     function run() public {
         initializeConfig();
-//        deployFactoryDeps();
-//        deploySharedBridge();
+        deployFactoryDeps();
+        deploySharedBridge();
         deploySharedBridgeProxy();
         saveOutput();
     }
@@ -94,8 +95,7 @@ contract DeployL2Script is Script {
         );
         bytes[] memory factoryDeps = new bytes[](1);
 
-        // TODO set to era_chain_id
-        bytes memory constructorData = abi.encode(270);
+        bytes memory constructorData = abi.encode(config.eraChainId);
 
         config.l2SharedBridgeImplementation = L2ContractHelper.computeCreate2Address(
             msg.sender,
@@ -104,7 +104,6 @@ contract DeployL2Script is Script {
             keccak256(constructorData)
         );
 
-        console.logBytes32(L2ContractHelper.hashL2Bytecode(l2SharedBridgeBytecode));
         factoryDeps[0] = beaconProxy;
         deployThroughL1({
             bytecode: l2SharedBridgeBytecode,
@@ -119,15 +118,16 @@ contract DeployL2Script is Script {
         bytes memory l2StandardErc20Bytecode = readHardheadBytecode(
             "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
         );
+        address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
         bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(l2StandardErc20Bytecode);
         bytes memory proxyInitializationParams = abi.encodeWithSignature(
             "initialize(address,address,bytes32,address)",
             config.l1SharedBridgeProxy,
             config.erc20BridgeProxy,
-            l2StandardErc20BytecodeHash
+            l2StandardErc20BytecodeHash,
+            l2GovernorAddress
         );
 
-        address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
 
         bytes memory l2SharedBridgeProxyConstructorData = abi.encode(
             "(address,address,bytes)",
@@ -223,7 +223,6 @@ contract DeployL2Script is Script {
         string memory path = string.concat(root, "/script-out/output-test.toml");
         vm.writeToml(toml, path);
 
-//    console.log("Generating Merkle Proof for %s", l2Calldata);
 
         vm.startBroadcast();
         address baseTokenAddress = bridgehub.baseToken(config.chainId);
