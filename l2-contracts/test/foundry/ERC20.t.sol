@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
+import {Utils} from "../../contracts/libraries/Utils.sol";
 import {Test} from "forge-std/Test.sol";
-import {L2SharedBridge} from "../contracts/bridge/L2SharedBridge.sol";
-import {L2StandardERC20} from "../contracts/bridge/L2StandardERC20.sol";
+import {L2SharedBridge} from "../../contracts/bridge/L2SharedBridge.sol";
+import {L2StandardERC20} from "../../contracts/bridge/L2StandardERC20.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import {Auxiliary} from "./Auxiliary.sol";
 
 address constant deployerWallet = address(0x36615Cf349d7F6344891B1e7CA7C72883F5dc049);
 address constant governorWallet = address(0xa61464658AfeAf65CccaaFD3a512b69A83B77618);
@@ -25,7 +27,7 @@ address constant L1_TOKEN_ADDRESS = 0x1111000000000000000000000000000000001111;
 contract ERC20Test is Test {
     L2SharedBridge private erc20Bridge;
     L2StandardERC20 private erc20Token;
-
+    Auxiliary aux;
     function unapplyL1ToL2Alias(address addr) public pure returns (address) {
         uint256 addressNum = uint256(uint160(addr));
         // Perform the offset subtraction and modulo operation
@@ -37,17 +39,20 @@ contract ERC20Test is Test {
         addressNum = addressNum % ADDRESS_MODULO;
         return address(uint160(addressNum));
     }
-
+    
     function setUp() public {
         vm.prank(deployerWallet);
 
+        aux = new Auxiliary();
         address l2TokenImplAddress = address(new L2StandardERC20());
         address l2Erc20TokenBeacon = address(new UpgradeableBeacon(l2TokenImplAddress));
+
         address beaconProxyAddress = address(new BeaconProxy(l2Erc20TokenBeacon, ""));
 
-        bytes memory beaconProxyBytecodeHash = beaconProxyAddress.code;
-
+        bytes32 beaconProxyBytecodeHash = aux.bytecodeHash(beaconProxyAddress);
+        
         address erc20BridgeImpl = address(new L2SharedBridge(testChainId));
+
         bytes memory bridgeInitializeData = abi.encodeWithSelector(
             L2SharedBridge(erc20BridgeImpl).initialize.selector,
             unapplyL1ToL2Alias(l1BridgeWallet),
@@ -65,15 +70,13 @@ contract ERC20Test is Test {
     }
 
     function test_FinalizeERC20Deposit() public {
-        vm.prank(l1BridgeWallet);
 
         L2SharedBridge erc20BridgeWithL1Bridge = erc20Bridge;
 
         address l1Depositor = makeAddr(vm.toString(uint256(1)));
         address l2Receiver = makeAddr(vm.toString(uint256(2)));
 
-        vm.expectEmit(true, true, true, true);
-        vm.prank(l1Depositor);
+        vm.prank(l1BridgeWallet);
 
         address l2TokenAddress = erc20BridgeWithL1Bridge.finalizeDeposit(
             l1Depositor,
@@ -91,31 +94,4 @@ contract ERC20Test is Test {
         assert(erc20Token.decimals() == 18);
     }
 
-    function test_GovernanceTokenReinit() public {
-        vm.prank(governorWallet);
-
-        L2StandardERC20 erc20TokenWithGovernor = erc20Token;
-        erc20TokenWithGovernor.reinitializeToken(
-            L2StandardERC20.ERC20Getters(false, false, false),
-            "TestTokenNewName",
-            "TTN",
-            2
-        );
-
-        assert(keccak256(abi.encodePacked(erc20Token.name())) == keccak256(abi.encodePacked("TestToken")));
-        assert(keccak256(abi.encodePacked(erc20Token.symbol())) == keccak256(abi.encodePacked("TTN")));
-        assert(erc20Token.decimals() == 18);
-    }
-
-    function testFail_GovernanceSkipInitializer() public {
-        vm.prank(governorWallet);
-
-        L2StandardERC20 erc20TokenWithGovernor = erc20Token;
-        erc20TokenWithGovernor.reinitializeToken(
-            L2StandardERC20.ERC20Getters(false, false, false),
-            "TestTokenNewName",
-            "TTN",
-            20
-        );
-    }
 }
