@@ -467,7 +467,7 @@ contract DeployL1Script is Script {
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(0),
-            initCalldata: hex""
+            initCalldata: ""
         });
         bytes memory bytecode = abi.encodePacked(
             type(DiamondProxy).creationCode,
