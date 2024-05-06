@@ -100,7 +100,7 @@ async function main() {
       await checkTokenAddress(baseTokenAddress);
       console.log(`Using base token address: ${baseTokenAddress}`);
 
-      const useGovernance = cmd.useGovernance ? cmd.useGovernance == "true" : false;
+      const useGovernance = !!cmd.useGovernance && cmd.useGovernance === "true";
 
       if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
         await deployer.registerToken(baseTokenAddress, useGovernance);

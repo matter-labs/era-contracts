@@ -451,11 +451,11 @@ export class Deployer {
     fargs: any[],
     value: BigNumberish,
     overrides?: Overrides,
-    printFileName?: string
+    printOperation: boolean = false
   ): Promise<ethers.ContractReceipt> {
     if (useGovernance) {
       const cdata = contract.interface.encodeFunctionData(fname, fargs);
-      return this.executeUpgrade(contract.address, value, cdata, printFileName);
+      return this.executeUpgrade(contract.address, value, cdata, printOperation);
     } else {
       const tx: ethers.ContractTransaction = await contract[fname](...fargs, ...(overrides ? [overrides] : []));
       return await tx.wait();
@@ -463,14 +463,19 @@ export class Deployer {
   }
 
   /// this should be only use for local testing
-  public async executeUpgrade(targetAddress: string, value: BigNumberish, callData: string, printFileName?: string) {
+  public async executeUpgrade(
+    targetAddress: string,
+    value: BigNumberish,
+    callData: string,
+    printOperation: boolean = false
+  ) {
     const governance = IGovernanceFactory.connect(this.addresses.Governance, this.deployWallet);
     const operation = {
       calls: [{ target: targetAddress, value: value, data: callData }],
       predecessor: ethers.constants.HashZero,
       salt: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
     };
-    if (printFileName) {
+    if (printOperation) {
       console.log("Operation:", operation);
       console.log(
         "Schedule operation: ",
