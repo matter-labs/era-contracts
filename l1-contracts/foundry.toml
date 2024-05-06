@@ -15,4 +15,12 @@ ignored_warnings_from = [
     "contracts/dev-contracts"
 ]
 
+fs_permissions = [
+    { access = "read", path = "../system-contracts/bootloader/build/artifacts"},
+    { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed"},
+    { access = "read", path = "./scripts-rs/script-config/" },
+    { access = "read-write", path = "./scripts-rs/script-out/" },
+    { access = "read", path = "./out" }
+]
+
 # See more config options https://github.com/foundry-rs/foundry/tree/master/crates/config
