@@ -9,6 +9,7 @@ import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol"
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
@@ -49,6 +50,7 @@ contract DeployL2Script is Script {
         deployFactoryDeps();
         deploySharedBridge();
         deploySharedBridgeProxy();
+        initialize_chain();
         saveOutput();
     }
 
@@ -235,5 +237,11 @@ contract DeployL2Script is Script {
         bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
 
         vm.stopBroadcast();
+    }
+
+    function initialize_chain() public {
+        L1SharedBridge bridge = L1SharedBridge(config.l1SharedBridgeProxy);
+        vm.broadcast();
+        bridge.initializeChainGovernance(config.chainId, config.l2SharedBridgeProxy);
     }
 }
