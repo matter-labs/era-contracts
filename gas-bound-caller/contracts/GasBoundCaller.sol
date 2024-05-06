@@ -64,6 +64,15 @@ contract GasBoundCaller {
             _isSystem: false
         });
 
+        // We will calculate the length of the returndata to be used at the end of the function.
+        // We need additional `96` bytes to encode the offset `0x40` for the entire pubdata, 
+        // the gas spent on pubdata as well as the length of the original returndata. 
+        // Note, that it has to be padded to the 32 bytes to adhere to proper ABI encoding.
+        uint256 paddedReturndataLen = returnData.length + 96;
+        if (paddedReturndataLen % 32 != 0) {
+            paddedReturndataLen += 32 - (paddedReturndataLen % 32);
+        }
+
         uint256 pubdataPublishedAfter = SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
 
         // It is possible that pubdataPublishedAfter < pubdataPublishedBefore if the call, e.g. removes
@@ -94,9 +103,7 @@ contract GasBoundCaller {
             // It is assumed that the position of returndata is >= 0x40, since 0x40 is the free memory pointer location.
             mstore(sub(returnData, 0x40), 0x40)
             mstore(sub(returnData, 0x20), pubdataGas)
-            let returndataLen := add(mload(returnData), 0x60)
-
-            return(sub(returnData, 0x40), returndataLen)
+            return(sub(returnData, 0x40), paddedReturndataLen)
         }
     }
 }

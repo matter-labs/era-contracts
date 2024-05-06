@@ -40,6 +40,10 @@ uint256 computeGasAfter = gasleft();
 uint256 totalGasConsumed = computeGasBefore - computeGasAfter + pubdataGasSpent;
 ```
 
+### Preserving `msg.sender`
+
+Since `GasBoundCaller` would be the contract that calls the `_to` contract, the `msg.sender` will be equal to the `GasBoundCaller`'s address. To preserve the current `msg.sender`, this contract can be inherited from and used the same way, but instead of calling `GasBoundCaller.gasBoundCall`, `this.gasBoundCall` could be called.
+
 ## Deployed Address
 
 It should be deployed via a built-in CREATE2 factory on each individual chain.
