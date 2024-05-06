@@ -1,6 +1,7 @@
 // hardhat import should be the first import in the file
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
+import * as path from "path";
 
 import "@nomiclabs/hardhat-ethers";
 
@@ -14,7 +15,7 @@ import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUp
 import { StateTransitionManagerFactory, L1SharedBridgeFactory, ValidatorTimelockFactory } from "../typechain";
 
 import { Interface } from "ethers/lib/utils";
-import { ADDRESS_ONE, getAddressFromEnv } from "./utils";
+import { ADDRESS_ONE, getAddressFromEnv, readBytecode } from "./utils";
 
 import {
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -24,7 +25,10 @@ import {
 } from "../../l2-contracts/src/utils";
 import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
 
-const BEACON_PROXY_BYTECODE = ethers.constants.HashZero;
+const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/l2-contracts/artifacts-zk/");
+const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@openzeppelin/contracts/proxy/beacon");
+export const BEACON_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
+
 
 /// In the hardhat tests we do the upgrade all at once.
 /// On localhost/stage/.. we will call the components and send the calldata to Governance manually
@@ -246,6 +250,11 @@ async function upgradeL2Bridge(deployer: Deployer, gasPrice: BigNumberish, print
   const l2BridgeAbi = ["function initialize(address, address, bytes32, address)"];
   const l2BridgeContract = new ethers.Contract(ADDRESS_ONE, l2BridgeAbi, deployer.deployWallet);
   const l2Bridge = l2BridgeContract.interface; //L2_SHARED_BRIDGE_INTERFACE;
+  // console.log("kl todo 1",  deployer.addresses.Bridges.SharedBridgeProxy,
+  // deployer.addresses.Bridges.ERC20BridgeProxy,
+  // hashL2Bytecode(BEACON_PROXY_BYTECODE),
+  // applyL1ToL2Alias(deployer.addresses.Governance),)
+
   const l2BridgeCalldata = l2Bridge.encodeFunctionData("initialize", [
     deployer.addresses.Bridges.SharedBridgeProxy,
     deployer.addresses.Bridges.ERC20BridgeProxy,
@@ -262,10 +271,21 @@ async function upgradeL2Bridge(deployer: Deployer, gasPrice: BigNumberish, print
     l2BridgeImplementationAddress,
     l2BridgeCalldata,
   ]);
+  // console.log("kl todo", l2BridgeImplementationAddress, l2BridgeCalldata)
   const factoryDeps = [];
   const requiredValueForL2Tx = await deployer
     .bridgehubContract(deployer.deployWallet)
     .l2TransactionBaseCost(deployer.chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA); //"1000000000000000000";
+
+  // console.log("kl todo", 
+  //   process.env.CONTRACTS_L2_ERC20_BRIDGE_ADDR,
+  //   0,
+  //   l2ProxyCalldata,
+  //   priorityTxMaxGasLimit,
+  //   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  //   factoryDeps,
+  //   deployer.deployWallet.address
+  // )
 
   const mailboxFacet = new Interface(hardhat.artifacts.readArtifactSync("MailboxFacet").abi);
   const mailboxCalldata = mailboxFacet.encodeFunctionData("requestL2Transaction", [
