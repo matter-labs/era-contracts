@@ -468,7 +468,7 @@ for { } true { } {
         // minimum_word_size = (size + 31) / 32
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
         let minWordSize := shr(5, add(len, 31))
-        let dynamicGas := add(mul(3, minWordSize), expandMemory(add(offset, len)))
+        let dynamicGas := add(mul(3, minWordSize), expandMemory(add(dest, len)))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         copyActivePtrData(add(MEM_OFFSET_INNER(), dest), offset, len)
@@ -584,6 +584,10 @@ for { } true { } {
 
         value := sload(key)
 
+        if iszero(isSlotWarm(key)) {
+            let _wasW, _orgV := warmSlot(key, value)
+        }
+
         sp := pushStackItem(sp,value)
     }
     case 0x55 { // OP_SSTORE
@@ -610,9 +614,9 @@ for { } true { } {
             }
 
             if eq(originalValue, currentValue) {
-                gasSpent := 20000
+                gasSpent := 19900
                 if originalValue {
-                    gasSpent := 2900
+                    gasSpent := 2800
                 }
             }
 
@@ -1085,6 +1089,7 @@ for { } true { } {
         log1(add(offset, MEM_OFFSET_INNER()), size, topic1)
     }
     case 0xA2 { // OP_LOG2
+        evmGasLeft := chargeGas(evmGasLeft, 375)
         if isStatic {
             revert(0, 0)
         }
