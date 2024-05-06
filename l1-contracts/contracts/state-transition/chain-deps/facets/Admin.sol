@@ -130,6 +130,15 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         emit ExecuteUpgrade(_diamondCut);
     }
 
+    /// @inheritdoc IAdmin
+    function executeMigration(
+        Diamond.DiamondCutData calldata _diamondCut
+    ) external onlyStateTransitionManager {
+        Diamond.diamondCut(_diamondCut);
+        emit MigrationComplete(_diamondCut);
+    }
+
+
     /*//////////////////////////////////////////////////////////////
                             CONTRACT FREEZING
     //////////////////////////////////////////////////////////////*/

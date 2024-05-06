@@ -107,3 +107,26 @@ bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGE
 
 /// @dev https://eips.ethereum.org/EIPS/eip-1352
 address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint16).max));
+
+/// FIXME: move to a different fule
+
+struct StoredBatchHashInfo {
+    uint256 number;
+    bytes32 hash;
+}
+
+// Info that allows to restore a chain.
+struct HyperchainCommitment {
+    /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch
+    /// (batch 0 is genesis)
+    uint256 totalBatchesExecuted;
+    /// @notice Total number of proved batches i.e. batches[totalBatchesProved] points at the latest proved batch
+    uint256 totalBatchesVerified;
+    /// @notice Total number of committed batches i.e. batches[totalBatchesCommitted] points at the latest committed
+    /// batch
+    uint256 totalBatchesCommitted;
+
+    StoredBatchHashInfo[] batchHashes;
+
+    /// TODO: add priority queue here.    
+}

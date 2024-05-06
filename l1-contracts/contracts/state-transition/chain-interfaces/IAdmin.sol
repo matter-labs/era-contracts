@@ -56,6 +56,8 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @param _diamondCut The diamond cut parameters to be executed
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
+    function executeMigration(HyperchainCommitment calldata _hyperchainCommitment) external;
+
     /// @notice Instantly pause the functionality of all freezable facets & their selectors
     /// @dev Only the governance mechanism may freeze Diamond Proxy
     function freezeDiamond() external;
@@ -99,6 +101,8 @@ interface IAdmin is IZkSyncHyperchainBase {
 
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
+
+    event MigrationComplete(Diamond.DiamondCutData diamondCut);
 
     /// @notice Emitted when the contract is frozen.
     event Freeze();

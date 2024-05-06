@@ -65,6 +65,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The address to accept the admin role
     address private pendingAdmin;
 
+    address private migrationUpgrade;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(address _bridgehub, uint256 _maxNumberOfHyperchains) reentrancyGuardInitializer {
@@ -337,19 +339,14 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         _registerNewHyperchain(_chainId, _hyperchain);
     }
 
-    /// @notice called by Bridgehub when a chain registers
-    /// @param _chainId the chain's id
-    /// @param _baseToken the base token address used to pay for gas fees
-    /// @param _sharedBridge the shared bridge address, used as base token bridge
-    /// @param _admin the chain's admin address
-    /// @param _diamondCut the diamond cut data that initializes the chains Diamond Proxy
-    function createNewChain(
+    /// deploys a full set of chains contracts
+    function _deployNewChain(
         uint256 _chainId,
         address _baseToken,
         address _sharedBridge,
         address _admin,
         bytes calldata _diamondCut
-    ) external onlyBridgehub {
+    ) internal returns (address hyperchainAddress) {
         if (getHyperchain(_chainId) != address(0)) {
             // Hyperchain already registered
             return;
@@ -385,12 +382,89 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // slither-disable-next-line reentrancy-no-eth
         DiamondProxy hyperchainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
         // save data
-        address hyperchainAddress = address(hyperchainContract);
+        hyperchainAddress = address(hyperchainContract);
 
         _registerNewHyperchain(_chainId, hyperchainAddress);
+    }
+
+    /// @notice called by Bridgehub when a chain registers
+    /// @param _chainId the chain's id
+    /// @param _baseToken the base token address used to pay for gas fees
+    /// @param _sharedBridge the shared bridge address, used as base token bridge
+    /// @param _admin the chain's admin address
+    /// @param _diamondCut the diamond cut data that initializes the chains Diamond Proxy
+    function createNewChain(
+        uint256 _chainId,
+        address _baseToken,
+        address _sharedBridge,
+        address _admin,
+        bytes calldata _diamondCut
+    ) external onlyBridgehub {
+        _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut);
 
         // set chainId in VM
         _setChainIdUpgrade(_chainId, hyperchainAddress);
+    }
+
+    function _upgradeWithHyperchainCommitment() {
+
+    }
+
+    function getProtocolVersion(uint256 _chainId) public view returns (uint256) {
+        IZkSyncHyperchain(hyperchainMap.get(_chainId)).getProtocolVersion();
+    }
+
+    function _performMigration(IZkSyncHyperchain hyp) internal {
+
+    }
+
+    function finalizeMigration(
+        uint256 _chainId,
+        address _baseToken,
+        address _sharedBridge,
+        address _admin,
+        uint256 _expectedProtocolVersion,
+        HyperchainCommitment calldata commitment
+    ) external {
+        /// FIXME: adequate access rights
+        address currentAddress = getHyperchain(_chainId);
+
+        // We do not want to deal with inactive protocol versions during migration.
+        require(_expectedProtocolVersion == protocolVersion, "STM: not latest protocol version");
+        
+        // Just in case
+        require(protocolVersionIsActive(_expectedProtocolVersion), "STM: protocolVersion not active");
+
+        if(currentAddress == address(0)) {
+            require(protocolVersion == _expectedProtocolVersion, "STM: protocolVersion mismatch");
+
+            currentAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut);
+
+            // note that we do not need the genesis upgrade, it is expected that everything is already prepared on l2.
+        }
+
+        IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
+
+        uint256 currentProtocolVersion = hyperchain.getProtocolVersion();
+        // while it should be definitely the case when a chain is created, we double check just in case
+        require(currentProtocolVersion == _expectedProtocolVersion, "STM: protocolVersion mismatch");
+
+        FacetCut[] memory emptyArray;
+        Diamond.DiamondCutData memory data = new Diamond.DiamondCutData({
+            facetCuts: emptyArray,
+            initAddress: migrationUpgrade,
+            initCalldata: abi.encodeCall(MigrationUpgrade.migrate, (commitment))
+        });
+
+        // Now migrating the chain
+        hyperchain.executeMigration(data);
+    }
+
+    function startMigration(
+        uint256 _chainId,
+        address _newAdmin,
+    ) {
+
     }
 
     /// @dev This internal function is used to register a new hyperchain in the system.
