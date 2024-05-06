@@ -80,7 +80,7 @@ contract DeployErc20Script is Script {
                 mint: token.mint
             });
             console.log("Token deployed at:", tokenAddress);
-            token.addr = tokenAddress;
+            config.tokens[i].addr = tokenAddress;
         }
     }
 
