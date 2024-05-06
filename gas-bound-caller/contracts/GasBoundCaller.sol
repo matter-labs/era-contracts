@@ -65,8 +65,8 @@ contract GasBoundCaller {
         });
 
         // We will calculate the length of the returndata to be used at the end of the function.
-        // We need additional `96` bytes to encode the offset `0x40` for the entire pubdata, 
-        // the gas spent on pubdata as well as the length of the original returndata. 
+        // We need additional `96` bytes to encode the offset `0x40` for the entire pubdata,
+        // the gas spent on pubdata as well as the length of the original returndata.
         // Note, that it has to be padded to the 32 bytes to adhere to proper ABI encoding.
         uint256 paddedReturndataLen = returnData.length + 96;
         if (paddedReturndataLen % 32 != 0) {
