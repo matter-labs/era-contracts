@@ -19,7 +19,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @dev EVM requires us to be able to query the hashes of previous 256 blocks.
     /// We could either:
     /// - Store the latest 256 hashes (and strictly rely that we do not accidentally override the hash of the block 256 blocks ago)
-    /// - Store the latest 257 blocks's hashes.
+    /// - Store the latest 257 blocks' hashes.
     uint256 internal constant MINIBLOCK_HASHES_TO_STORE = 257;
 
     /// @notice The chainId of the network. It is set at the genesis.
@@ -34,7 +34,9 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     uint256 public gasPrice;
 
     /// @notice The current block's gasLimit.
-    uint256 public blockGasLimit = type(uint32).max;
+    /// @dev The same limit is used for both batches and L2 blocks. At this moment this limit is not explicitly
+    /// forced by the system, rather it is the responsibility of the operator to ensure that this value is never achieved.
+    uint256 public blockGasLimit = (1 << 50);
 
     /// @notice The `block.coinbase` in the current transaction.
     /// @dev For the support of coinbase, we will use the bootloader formal address for now
@@ -79,6 +81,12 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @notice The information about the virtual blocks upgrade, which tracks when the migration to the L2 blocks has started and finished.
     VirtualBlockUpgradeInfo internal virtualBlockUpgradeInfo;
 
+    /// @notice Set the chainId origin.
+    /// @param _newChainId The chainId
+    function setChainId(uint256 _newChainId) external onlyCallFromForceDeployer {
+        chainId = _newChainId;
+    }
+
     /// @notice Number of current transaction in block.
     uint16 public txNumberInBlock;
 
@@ -103,6 +111,8 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @notice Sets the number of L2 gas that is needed to pay a single byte of pubdata.
     /// @dev This value does not have any impact on the execution and purely serves as a way for users
     /// to access the current gas price for the pubdata.
+    /// @param _gasPerPubdataByte The amount L2 gas that the operator charge the user for single byte of pubdata.
+    /// @param _basePubdataSpent The number of pubdata spent as of the start of the transaction.
     function setPubdataInfo(uint256 _gasPerPubdataByte, uint256 _basePubdataSpent) external onlyCallFromBootloader {
         basePubdataSpent = _basePubdataSpent;
         gasPerPubdataByte = _gasPerPubdataByte;
@@ -128,7 +138,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
 
         VirtualBlockUpgradeInfo memory currentVirtualBlockUpgradeInfo = virtualBlockUpgradeInfo;
 
-        // Due to virtual blocks upgrade, we'll have to use the following logic for retreiving the blockhash:
+        // Due to virtual blocks upgrade, we'll have to use the following logic for retrieving the blockhash:
         // 1. If the block number is out of the 256-block supported range, return 0.
         // 2. If the block was created before the upgrade for the virtual blocks (i.e. there we used to use hashes of the batches),
         // we return the hash of the batch.
@@ -312,7 +322,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
         // It is always assumed in production that _l2BlockNumber > 0
         _setL2BlockHash(_l2BlockNumber - 1, _prevL2BlockHash);
 
-        // Reseting the rolling hash
+        // Resetting the rolling hash
         currentL2BlockTxsRollingHash = bytes32(0);
     }
 
@@ -443,7 +453,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     ) external onlyCallFromBootloader {
         (uint128 previousBatchNumber, uint128 previousBatchTimestamp) = getBatchNumberAndTimestamp();
         require(_newTimestamp > previousBatchTimestamp, "Timestamps should be incremental");
-        require(previousBatchNumber + 1 == _expectedNewNumber, "The provided block number is not correct");
+        require(previousBatchNumber + 1 == _expectedNewNumber, "The provided batch number is not correct");
 
         _ensureBatchConsistentWithL2Block(_newTimestamp);
 

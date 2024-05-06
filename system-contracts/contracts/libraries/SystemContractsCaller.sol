@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {MSG_VALUE_SYSTEM_CONTRACT, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT} from "../Constants.sol";
-import "./Utils.sol";
+import {Utils} from "./Utils.sol";
 
 // Addresses used for the compiler to be replaced with the
 // zkSync-specific opcodes during the compilation.
@@ -42,7 +42,7 @@ address constant PTR_DATA_COPY = address((1 << 16) - 29);
 address constant PTR_DATA_SIZE = address((1 << 16) - 30);
 
 // All the offsets are in bits
-uint256 constant META_GAS_PER_PUBDATA_BYTE_OFFSET = 0 * 8;
+uint256 constant META_PUBDATA_PUBLISHED_OFFSET = 0 * 8;
 uint256 constant META_HEAP_SIZE_OFFSET = 8 * 8;
 uint256 constant META_AUX_HEAP_SIZE_OFFSET = 12 * 8;
 uint256 constant META_SHARD_ID_OFFSET = 28 * 8;
@@ -86,18 +86,18 @@ library SystemContractsCaller {
         }
         uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
 
-        uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
-            0,
-            0,
-            dataStart,
-            dataLength,
-            gasLimit,
+        uint256 farCallAbi = SystemContractsCaller.getFarCallABI({
+            dataOffset: 0,
+            memoryPage: 0,
+            dataStart: dataStart,
+            dataLength: dataLength,
+            gasPassed: gasLimit,
             // Only rollup is supported for now
-            0,
-            CalldataForwardingMode.UseHeap,
-            false,
-            true
-        );
+            shardId: 0,
+            forwardingMode: CalldataForwardingMode.UseHeap,
+            isConstructorCall: false,
+            isSystemCall: true
+        });
 
         if (value == 0) {
             // Doing the system call directly
@@ -227,13 +227,14 @@ library SystemContractsCaller {
         bool isSystemCall
     ) internal pure returns (uint256 farCallAbi) {
         // Fill in the call parameter fields
-        farCallAbi = getFarCallABIWithEmptyFatPointer(
-            gasPassed,
-            shardId,
-            forwardingMode,
-            isConstructorCall,
-            isSystemCall
-        );
+        farCallAbi = getFarCallABIWithEmptyFatPointer({
+            gasPassed: gasPassed,
+            shardId: shardId,
+            forwardingMode: forwardingMode,
+            isConstructorCall: isConstructorCall,
+            isSystemCall: isSystemCall
+        });
+
         // Fill in the fat pointer fields
         farCallAbi |= dataOffset;
         farCallAbi |= (uint256(memoryPage) << 32);

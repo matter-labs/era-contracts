@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 /**
  * @author Matter Labs
@@ -34,7 +34,7 @@ library L2ContractHelper {
 
     /// @notice Validates the format of the given bytecode hash.
     /// @dev Due to the specification of the L2 bytecode hash, not every 32 bytes could be a legit bytecode hash.
-    /// @dev The function reverts on invalid bytecode hash formam.
+    /// @dev The function reverts on invalid bytecode hash format.
     /// @param _bytecodeHash The hash of the bytecode to validate.
     function validateBytecodeHash(bytes32 _bytecodeHash) internal pure {
         uint8 version = uint8(_bytecodeHash[0]);
@@ -65,6 +65,7 @@ library L2ContractHelper {
     ) internal pure returns (address) {
         bytes32 senderBytes = bytes32(uint256(uint160(_sender)));
         bytes32 data = keccak256(
+            // solhint-disable-next-line func-named-parameters
             bytes.concat(CREATE2_PREFIX, senderBytes, _salt, _bytecodeHash, _constructorInputHash)
         );
 

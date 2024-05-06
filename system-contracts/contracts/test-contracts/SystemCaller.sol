@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {SYSTEM_CALL_CALL_ADDRESS, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, SystemContractsCaller, CalldataForwardingMode} from "../libraries/SystemContractsCaller.sol";
-import "../libraries/Utils.sol";
+import {Utils} from "../libraries/Utils.sol";
 
 address constant REAL_MSG_VALUE_SYSTEM_CONTRACT = address(0x8009);
 
@@ -28,18 +28,18 @@ contract SystemCaller {
         }
         uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
 
-        uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
-            0,
-            0,
-            dataStart,
-            dataLength,
-            Utils.safeCastToU32(gasleft()),
+        uint256 farCallAbi = SystemContractsCaller.getFarCallABI({
+            dataOffset: 0,
+            memoryPage: 0,
+            dataStart: dataStart,
+            dataLength: dataLength,
+            gasPassed: Utils.safeCastToU32(gasleft()),
             // Only rollup is supported for now
-            0,
-            CalldataForwardingMode.UseHeap,
-            false,
-            true
-        );
+            shardId: 0,
+            forwardingMode: CalldataForwardingMode.UseHeap,
+            isConstructorCall: false,
+            isSystemCall: true
+        });
 
         bool success;
         if (msg.value == 0) {

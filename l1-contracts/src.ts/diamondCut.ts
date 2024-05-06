@@ -1,10 +1,10 @@
 import * as hardhat from "hardhat";
 import type { Interface } from "ethers/lib/utils";
 import "@nomiclabs/hardhat-ethers";
-import type { Wallet } from "ethers";
+import type { Wallet, BigNumberish } from "ethers";
 import { ethers } from "ethers";
-import { IZkSyncFactory } from "../typechain/IZkSyncFactory";
-import { IBaseFactory } from "../typechain/IBaseFactory";
+import { IZkSyncHyperchainFactory } from "../typechain/IZkSyncHyperchainFactory";
+import { IZkSyncHyperchainBaseFactory } from "../typechain/IZkSyncHyperchainBaseFactory";
 
 // Some of the facets are to be removed with the upcoming upgrade.
 const UNCONDITIONALLY_REMOVED_FACETS = ["DiamondCutFacet", "GovernanceFacet"];
@@ -26,6 +26,19 @@ export interface DiamondCut {
   facetCuts: FacetCut[];
   initAddress: string;
   initCalldata: string;
+}
+
+export interface InitializeData {
+  bridgehub: BigNumberish;
+  verifier: BigNumberish;
+  admin: BigNumberish;
+  genesisBatchHash: string;
+  genesisIndexRepeatedStorageChanges: BigNumberish;
+  genesisBatchCommitment: string;
+  allowList: BigNumberish;
+  l2BootloaderBytecodeHash: string;
+  l2DefaultAccountBytecodeHash: string;
+  priorityTxMaxGasLimit: BigNumberish;
 }
 
 export function facetCut(address: string, contract: Interface, action: Action, isFreezable: boolean): FacetCut {
@@ -61,7 +74,7 @@ export async function getCurrentFacetCutsForAdd(
 ) {
   const facetsCuts = {};
   // Some facets should always be available regardless of freezing: upgradability system, getters, etc.
-  // And for some facets there are should be possibility to freeze them by the governor if we found a bug inside.
+  // And for some facets there are should be possibility to freeze them by the admin if we found a bug inside.
   if (adminAddress) {
     // Should be unfreezable. The function to unfreeze contract is located on the admin facet.
     // That means if the admin facet will be freezable, the proxy can NEVER be unfrozen.
@@ -73,6 +86,7 @@ export async function getCurrentFacetCutsForAdd(
     const getters = await hardhat.ethers.getContractAt("GettersFacet", gettersAddress);
     facetsCuts["GettersFacet"] = facetCut(getters.address, getters.interface, Action.Add, false);
   }
+  // These contracts implement the logic without which we can get out of the freeze.
   // These contracts implement the logic without which we can get out of the freeze.
   if (mailboxAddress) {
     const mailbox = await hardhat.ethers.getContractAt("MailboxFacet", mailboxAddress);
@@ -87,12 +101,12 @@ export async function getCurrentFacetCutsForAdd(
 }
 
 export async function getDeployedFacetCutsForRemove(wallet: Wallet, zkSyncAddress: string, updatedFaceNames: string[]) {
-  const mainContract = IZkSyncFactory.connect(zkSyncAddress, wallet);
+  const mainContract = IZkSyncHyperchainFactory.connect(zkSyncAddress, wallet);
   const diamondCutFacets = await mainContract.facets();
   // We don't care about freezing, because we are removing the facets.
   const result = [];
   for (const { addr, selectors } of diamondCutFacets) {
-    const facet = IBaseFactory.connect(addr, wallet);
+    const facet = IZkSyncHyperchainBaseFactory.connect(addr, wallet);
     const facetName = await facet.getName();
     if (updatedFaceNames.includes(facetName)) {
       result.push({
@@ -103,6 +117,7 @@ export async function getDeployedFacetCutsForRemove(wallet: Wallet, zkSyncAddres
       });
     }
   }
+
   return result;
 }
 
@@ -112,10 +127,14 @@ export async function getFacetCutsForUpgrade(
   adminAddress: string,
   gettersAddress: string,
   mailboxAddress: string,
-  executorAddress: string
+  executorAddress: string,
+  namesOfFacetsToBeRemoved?: string[]
 ) {
   const newFacetCuts = await getCurrentFacetCutsForAdd(adminAddress, gettersAddress, mailboxAddress, executorAddress);
-  const namesOfFacetsToBeRemoved = [...UNCONDITIONALLY_REMOVED_FACETS, ...Object.keys(newFacetCuts)];
+  namesOfFacetsToBeRemoved = namesOfFacetsToBeRemoved || [
+    ...UNCONDITIONALLY_REMOVED_FACETS,
+    ...Object.keys(newFacetCuts),
+  ];
   const oldFacetCuts = await getDeployedFacetCutsForRemove(wallet, zkSyncAddress, namesOfFacetsToBeRemoved);
   return [...oldFacetCuts, ...Object.values(newFacetCuts)];
 }

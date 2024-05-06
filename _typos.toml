@@ -1,0 +1,24 @@
+[files]
+# Temporarily commenting a lot so that at least *.sol files are included.
+extend-exclude = [
+    "/l1-contracts/lib/",
+    "/l1-contracts/out/",
+    "/l1-contracts/node_modules/",
+    "/l1-contracts/artifacts",
+    "/l2-contracts/artifacts-zk",
+    "/l2-contracts/cache-zk",
+    "/l2-contracts/typechain",
+    "/system-contracts/artifacts-zk",
+    "/system-contracts/cache-zk",
+    "/system-contracts/contracts-preprocessed",
+    "/system-contracts/typechain",
+    "*.json",
+    "*.lock",
+    ".git/",
+    "SECURITY.md"
+]
+
+[default.extend-words]
+# Don't correct the surname "Teh"
+FOT = "FOT"
+ue = "ue"

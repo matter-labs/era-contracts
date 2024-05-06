@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, FORCE_DEPLOYER} from "../Constants.sol";
 
 /**
  * @author Matter Labs
@@ -46,6 +46,13 @@ abstract contract ISystemContract {
     /// can only be called from the bootloader.
     modifier onlyCallFromBootloader() {
         require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "Callable only by the bootloader");
+        _;
+    }
+
+    /// @notice Modifier that makes sure that the method
+    /// can only be called from the L1 force deployer.
+    modifier onlyCallFromForceDeployer() {
+        require(msg.sender == FORCE_DEPLOYER);
         _;
     }
 }

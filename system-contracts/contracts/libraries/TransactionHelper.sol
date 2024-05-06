@@ -2,14 +2,13 @@
 
 pragma solidity ^0.8.20;
 
-import "../openzeppelin/token/ERC20/IERC20.sol";
-import "../openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "../openzeppelin/token/ERC20/IERC20.sol";
+import {SafeERC20} from "../openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
-import "../interfaces/IPaymasterFlow.sol";
-import "../interfaces/IContractDeployer.sol";
-import {ETH_TOKEN_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
-import "./RLPEncoder.sol";
-import "./EfficientCall.sol";
+import {IPaymasterFlow} from "../interfaces/IPaymasterFlow.sol";
+import {BASE_TOKEN_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
+import {RLPEncoder} from "./RLPEncoder.sol";
+import {EfficientCall} from "./EfficientCall.sol";
 
 /// @dev The type id of zkSync's EIP-712-signed transaction.
 uint8 constant EIP_712_TX_TYPE = 0x71;
@@ -90,9 +89,9 @@ library TransactionHelper {
     /// @param _addr The address of the token
     /// @return `true` or `false` based on whether the token is Ether.
     /// @dev This method assumes that address is Ether either if the address is 0 (for convenience)
-    /// or if the address is the address of the L2EthToken system contract.
+    /// or if the address is the address of the L2BaseToken system contract.
     function isEthToken(uint256 _addr) internal pure returns (bool) {
-        return _addr == uint256(uint160(address(ETH_TOKEN_SYSTEM_CONTRACT))) || _addr == 0;
+        return _addr == uint256(uint160(address(BASE_TOKEN_SYSTEM_CONTRACT))) || _addr == 0;
     }
 
     /// @notice Calculate the suggested signed hash of the transaction,
@@ -117,6 +116,7 @@ library TransactionHelper {
     /// @return keccak256 hash of the EIP-712 encoded representation of transaction
     function _encodeHashEIP712Transaction(Transaction calldata _transaction) private view returns (bytes32) {
         bytes32 structHash = keccak256(
+            // solhint-disable-next-line func-named-parameters
             abi.encode(
                 EIP712_TRANSACTION_TYPE_HASH,
                 _transaction.txType,
@@ -203,6 +203,7 @@ library TransactionHelper {
 
         return
             keccak256(
+                // solhint-disable-next-line func-named-parameters
                 bytes.concat(
                     encodedListLength,
                     encodedNonce,
@@ -235,6 +236,7 @@ library TransactionHelper {
                 ? RLPEncoder.encodeAddress(address(uint160(_transaction.to)))
                 : bytes(hex"80");
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
+            // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(
                 encodedChainId,
                 encodedNonce,
@@ -277,6 +279,7 @@ library TransactionHelper {
 
         return
             keccak256(
+                // solhint-disable-next-line func-named-parameters
                 bytes.concat(
                     "\x01",
                     encodedListLength,
@@ -308,6 +311,7 @@ library TransactionHelper {
                 ? RLPEncoder.encodeAddress(address(uint160(_transaction.to)))
                 : bytes(hex"80");
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
+            // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(
                 encodedChainId,
                 encodedNonce,
@@ -351,6 +355,7 @@ library TransactionHelper {
 
         return
             keccak256(
+                // solhint-disable-next-line func-named-parameters
                 bytes.concat(
                     "\x02",
                     encodedListLength,

@@ -7,6 +7,10 @@ l1-contracts/cache-forge
 l1-contracts/lib
 l1-contracts/node_modules
 
+# l1-contracts-foundry
+l1-contracts-foundry/cache
+l1-contracts-foundry/lib
+
 # l2-contracts
 l2-contracts/cache-zk
 l2-contracts/node_modules

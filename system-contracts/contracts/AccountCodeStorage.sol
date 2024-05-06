@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.20;
 
-import "./interfaces/IAccountCodeStorage.sol";
-import "./libraries/Utils.sol";
+import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
+import {Utils} from "./libraries/Utils.sol";
 import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PRECOMPILE_ADDRESS} from "./Constants.sol";
 
 /**

@@ -1,19 +1,39 @@
+import * as hardhat from "hardhat";
 import type { BigNumberish, BytesLike } from "ethers";
 import { BigNumber, ethers } from "ethers";
-import type { Address } from "zksync-web3/build/src/types";
+import type { Address } from "zksync-ethers/build/src/types";
+import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-ethers/build/src/utils";
 
+import type { IBridgehub } from "../../typechain/IBridgehub";
+import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
+import type { IMailbox } from "../../typechain/IMailbox";
+
+import type { ExecutorFacet } from "../../typechain";
+
+import type { FeeParams, L2CanonicalTransaction } from "../../src.ts/utils";
+import { ADDRESS_ONE, PubdataPricingMode, EMPTY_STRING_KECCAK } from "../../src.ts/utils";
+
+export const CONTRACTS_GENESIS_PROTOCOL_VERSION = (21).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const IERC20_INTERFACE = require("@openzeppelin/contracts/build/contracts/IERC20");
 export const DEFAULT_REVERT_REASON = "VM did not revert";
 
-export const EMPTY_STRING_KECCAK = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
 export const DEFAULT_L2_LOGS_TREE_ROOT_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000";
 export const L2_SYSTEM_CONTEXT_ADDRESS = "0x000000000000000000000000000000000000800b";
 export const L2_BOOTLOADER_ADDRESS = "0x0000000000000000000000000000000000008001";
 export const L2_KNOWN_CODE_STORAGE_ADDRESS = "0x0000000000000000000000000000000000008004";
 export const L2_TO_L1_MESSENGER = "0x0000000000000000000000000000000000008008";
+export const L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR = "0x000000000000000000000000000000000000800a";
 export const L2_BYTECODE_COMPRESSOR_ADDRESS = "0x000000000000000000000000000000000000800e";
+export const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008006";
 export const PUBDATA_CHUNK_PUBLISHER_ADDRESS = "0x0000000000000000000000000000000000008011";
+const PUBDATA_HASH = "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563";
+
+export const SYSTEM_UPGRADE_TX_TYPE = 254;
+
+export function randomAddress() {
+  return ethers.utils.hexlify(ethers.utils.randomBytes(20));
+}
 
 export enum SYSTEM_LOG_KEYS {
   L2_TO_L1_LOGS_TREE_ROOT_KEY,
@@ -25,6 +45,10 @@ export enum SYSTEM_LOG_KEYS {
   NUMBER_OF_LAYER_1_TXS_KEY,
   BLOB_ONE_HASH_KEY,
   BLOB_TWO_HASH_KEY,
+  BLOB_THREE_HASH_KEY,
+  BLOB_FOUR_HASH_KEY,
+  BLOB_FIVE_HASH_KEY,
+  BLOB_SIX_HASH_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
 }
 
@@ -48,16 +72,42 @@ export async function getCallRevertReason(promise) {
     await promise;
   } catch (e) {
     try {
-      revertReason = e.reason.match(/reverted with reason string '(.*)'/)?.[1] || e.reason;
-    } catch (_) {
-      throw e;
+      await promise;
+    } catch (e) {
+      // kl to do. The error messages are messed up. So we need all these cases.
+      try {
+        revertReason = e.reason.match(/reverted with reason string '([^']*)'/)?.[1] || e.reason;
+        if (
+          revertReason === "cannot estimate gas; transaction may fail or may require manual gas limit" ||
+          revertReason === DEFAULT_REVERT_REASON
+        ) {
+          revertReason = e.error.toString().match(/revert with reason "([^']*)"/)[1] || "PLACEHOLDER_STRING";
+        }
+      } catch (_) {
+        try {
+          if (
+            revertReason === "cannot estimate gas; transaction may fail or may require manual gas limit" ||
+            revertReason === DEFAULT_REVERT_REASON
+          ) {
+            if (e.error) {
+              revertReason =
+                e.error.toString().match(/reverted with reason string '([^']*)'/)[1] || "PLACEHOLDER_STRING";
+            } else {
+              revertReason = e.toString().match(/reverted with reason string '([^']*)'/)[1] || "PLACEHOLDER_STRING";
+            }
+          }
+        } catch (_) {
+          throw e;
+        }
+      }
     }
   }
   return revertReason;
 }
 
 export async function requestExecute(
-  mailbox: ethers.Contract,
+  chainId: ethers.BigNumberish,
+  bridgehub: IBridgehub,
   to: Address,
   l2Value: ethers.BigNumber,
   calldata: ethers.BytesLike,
@@ -67,16 +117,58 @@ export async function requestExecute(
   overrides?: ethers.PayableOverrides
 ) {
   overrides ??= {};
-  overrides.gasPrice ??= mailbox.provider.getGasPrice();
-
+  overrides.gasPrice ??= bridgehub.provider.getGasPrice();
+  // overrides.gasLimit ??= 30000000;
   if (!overrides.value) {
-    const baseCost = await mailbox.l2TransactionBaseCost(
-      overrides.gasPrice,
+    const baseCost = await bridgehub.l2TransactionBaseCost(
+      chainId,
+      await overrides.gasPrice,
       l2GasLimit,
       REQUIRED_L2_GAS_PRICE_PER_PUBDATA
     );
     overrides.value = baseCost.add(l2Value);
   }
+
+  return await bridgehub.requestL2TransactionDirect(
+    {
+      chainId,
+      l2Contract: to,
+      mintValue: await overrides.value,
+      l2Value,
+      l2Calldata: calldata,
+      l2GasLimit,
+      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      factoryDeps,
+      refundRecipient,
+    },
+    overrides
+  );
+}
+
+// due to gas reasons we call the chains' contract directly, instead of the bridgehub.
+export async function requestExecuteDirect(
+  mailbox: IMailbox,
+  to: Address,
+  l2Value: ethers.BigNumber,
+  calldata: ethers.BytesLike,
+  l2GasLimit: ethers.BigNumber,
+  factoryDeps: BytesLike[],
+  refundRecipient: string,
+  value?: ethers.BigNumber
+) {
+  const gasPrice = await mailbox.provider.getGasPrice();
+
+  // we call bridgehubChain direcetly to avoid running out of gas.
+  const baseCost = await mailbox.l2TransactionBaseCost(
+    gasPrice,
+    ethers.BigNumber.from(100000),
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+  );
+
+  const overrides = {
+    gasPrice,
+    value: baseCost.add(value || ethers.BigNumber.from(0)),
+  };
 
   return await mailbox.requestL2Transaction(
     to,
@@ -100,15 +192,71 @@ export function constructL2Log(isService: boolean, sender: string, key: number |
   ]);
 }
 
-export function createSystemLogs() {
+export function createSystemLogs(
+  chainedPriorityTxHashKey?: BytesLike,
+  numberOfLayer1Txs?: BigNumberish,
+  previousBatchHash?: BytesLike
+) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
+    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY, PUBDATA_HASH),
+    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.STATE_DIFF_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
-      L2_TO_L1_MESSENGER,
-      SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY,
-      "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563"
+      L2_SYSTEM_CONTEXT_ADDRESS,
+      SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+      ethers.constants.HashZero
     ),
+    constructL2Log(
+      true,
+      L2_SYSTEM_CONTEXT_ADDRESS,
+      SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
+      previousBatchHash ? ethers.utils.hexlify(previousBatchHash) : ethers.constants.HashZero
+    ),
+    constructL2Log(
+      true,
+      L2_BOOTLOADER_ADDRESS,
+      SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY,
+      chainedPriorityTxHashKey ? chainedPriorityTxHashKey.toString() : EMPTY_STRING_KECCAK
+    ),
+    constructL2Log(
+      true,
+      L2_BOOTLOADER_ADDRESS,
+      SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
+      numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
+    ),
+    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
+    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
+    constructL2Log(
+      true,
+      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+      SYSTEM_LOG_KEYS.BLOB_THREE_HASH_KEY,
+      ethers.constants.HashZero
+    ),
+    constructL2Log(
+      true,
+      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+      SYSTEM_LOG_KEYS.BLOB_FOUR_HASH_KEY,
+      ethers.constants.HashZero
+    ),
+    constructL2Log(
+      true,
+      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+      SYSTEM_LOG_KEYS.BLOB_FIVE_HASH_KEY,
+      ethers.constants.HashZero
+    ),
+    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_SIX_HASH_KEY, ethers.constants.HashZero),
+  ];
+}
+
+export function createSystemLogsWithUpgrade(
+  chainedPriorityTxHashKey?: BytesLike,
+  numberOfLayer1Txs?: BigNumberish,
+  upgradeTxHash?: string
+) {
+  return [
+    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
+    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY, PUBDATA_HASH),
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.STATE_DIFF_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
@@ -117,10 +265,45 @@ export function createSystemLogs() {
       ethers.constants.HashZero
     ),
     constructL2Log(true, L2_SYSTEM_CONTEXT_ADDRESS, SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY, ethers.constants.HashZero),
-    constructL2Log(true, L2_BOOTLOADER_ADDRESS, SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY, EMPTY_STRING_KECCAK),
-    constructL2Log(true, L2_BOOTLOADER_ADDRESS, SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY, ethers.constants.HashZero),
+    constructL2Log(
+      true,
+      L2_BOOTLOADER_ADDRESS,
+      SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY,
+      chainedPriorityTxHashKey ? chainedPriorityTxHashKey.toString() : EMPTY_STRING_KECCAK
+    ),
+    constructL2Log(
+      true,
+      L2_BOOTLOADER_ADDRESS,
+      SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
+      numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
+    ),
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
+    constructL2Log(
+      true,
+      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+      SYSTEM_LOG_KEYS.BLOB_THREE_HASH_KEY,
+      ethers.constants.HashZero
+    ),
+    constructL2Log(
+      true,
+      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+      SYSTEM_LOG_KEYS.BLOB_FOUR_HASH_KEY,
+      ethers.constants.HashZero
+    ),
+    constructL2Log(
+      true,
+      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+      SYSTEM_LOG_KEYS.BLOB_FIVE_HASH_KEY,
+      ethers.constants.HashZero
+    ),
+    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_SIX_HASH_KEY, ethers.constants.HashZero),
+    constructL2Log(
+      true,
+      L2_BOOTLOADER_ADDRESS,
+      SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
+      upgradeTxHash
+    ),
   ];
 }
 
@@ -182,16 +365,116 @@ export interface CommitBatchInfo {
   pubdataCommitments: BytesLike;
 }
 
-export enum PubdataPricingMode {
-  Rollup,
-  Validium,
+export async function depositERC20(
+  bridge: IL1ERC20Bridge,
+  bridgehubContract: IBridgehub,
+  chainId: string,
+  l2Receiver: string,
+  l1Token: string,
+  amount: ethers.BigNumber,
+  l2GasLimit: number,
+  l2RefundRecipient = ethers.constants.AddressZero
+) {
+  const gasPrice = await bridge.provider.getGasPrice();
+  const gasPerPubdata = REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT;
+  const neededValue = await bridgehubContract.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
+  const ethIsBaseToken = (await bridgehubContract.baseToken(chainId)) == ADDRESS_ONE;
+
+  const deposit = await bridge["deposit(address,address,uint256,uint256,uint256,address)"](
+    l2Receiver,
+    l1Token,
+    amount,
+    l2GasLimit,
+    REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
+    l2RefundRecipient,
+    {
+      value: ethIsBaseToken ? neededValue : 0,
+    }
+  );
+  await deposit.wait();
 }
 
-export interface FeeParams {
-  pubdataPricingMode: PubdataPricingMode;
-  batchOverheadL1Gas: number;
-  maxPubdataPerBatch: number;
-  maxL2GasPerBatch: number;
-  priorityTxMaxPubdata: number;
-  minimalL2GasPrice: BigNumberish;
+export function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>): L2CanonicalTransaction {
+  return {
+    txType: SYSTEM_UPGRADE_TX_TYPE,
+    from: ethers.constants.AddressZero,
+    to: ethers.constants.AddressZero,
+    gasLimit: 5000000,
+    gasPerPubdataByteLimit: REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
+    maxFeePerGas: 0,
+    maxPriorityFeePerGas: 0,
+    paymaster: 0,
+    nonce: 0,
+    value: 0,
+    reserved: [0, 0, 0, 0],
+    data: "0x",
+    signature: "0x",
+    factoryDeps: [],
+    paymasterInput: "0x",
+    reservedDynamic: "0x",
+    ...tx,
+  };
+}
+
+export type CommitBatchInfoWithTimestamp = Partial<CommitBatchInfo> & {
+  batchNumber: BigNumberish;
+};
+
+export async function buildCommitBatchInfoWithUpgrade(
+  prevInfo: StoredBatchInfo,
+  info: CommitBatchInfoWithTimestamp,
+  upgradeTxHash: string
+): Promise<CommitBatchInfo> {
+  const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
+  const systemLogs = createSystemLogsWithUpgrade(info.priorityOperationsHash, info.numberOfLayer1Txs, upgradeTxHash);
+  systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+    true,
+    L2_SYSTEM_CONTEXT_ADDRESS,
+    SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+    packBatchTimestampAndBatchTimestamp(timestamp, timestamp)
+  );
+
+  return {
+    timestamp,
+    indexRepeatedStorageChanges: 0,
+    newStateRoot: ethers.utils.randomBytes(32),
+    numberOfLayer1Txs: 0,
+    priorityOperationsHash: EMPTY_STRING_KECCAK,
+    systemLogs: ethers.utils.hexConcat(systemLogs),
+    pubdataCommitments: `0x${"0".repeat(130)}`,
+    bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
+    eventsQueueStateHash: ethers.utils.randomBytes(32),
+    ...info,
+  };
+}
+
+export async function makeExecutedEqualCommitted(
+  proxyExecutor: ExecutorFacet,
+  prevBatchInfo: StoredBatchInfo,
+  batchesToProve: StoredBatchInfo[],
+  batchesToExecute: StoredBatchInfo[]
+) {
+  batchesToExecute = [...batchesToProve, ...batchesToExecute];
+
+  await (
+    await proxyExecutor.proveBatches(prevBatchInfo, batchesToProve, {
+      recursiveAggregationInput: [],
+      serializedProof: [],
+    })
+  ).wait();
+
+  await (await proxyExecutor.executeBatches(batchesToExecute)).wait();
+}
+
+export function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: string): StoredBatchInfo {
+  return {
+    batchNumber: commitInfo.batchNumber,
+    batchHash: commitInfo.newStateRoot,
+    indexRepeatedStorageChanges: commitInfo.indexRepeatedStorageChanges,
+    numberOfLayer1Txs: commitInfo.numberOfLayer1Txs,
+    priorityOperationsHash: commitInfo.priorityOperationsHash,
+    l2LogsTreeRoot: ethers.constants.HashZero,
+    timestamp: commitInfo.timestamp,
+    commitment: commitment,
+  };
 }

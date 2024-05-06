@@ -4,9 +4,9 @@ import { ethers } from "ethers";
 import * as hre from "hardhat";
 import { Provider, Wallet } from "zksync-web3";
 import { hashBytecode } from "zksync-web3/build/src/utils";
-import { unapplyL1ToL2Alias } from "../src/utils";
-import { L2ERC20BridgeFactory, L2StandardERC20Factory } from "../typechain";
-import type { L2ERC20Bridge, L2StandardERC20 } from "../typechain";
+import { unapplyL1ToL2Alias } from "./test-utils";
+import { L2SharedBridgeFactory, L2StandardERC20Factory } from "../typechain";
+import type { L2SharedBridge, L2StandardERC20 } from "../typechain";
 
 const richAccount = [
   {
@@ -35,7 +35,9 @@ describe("ERC20Bridge", function () {
   // We won't actually deploy an L1 token in these tests, but we need some address for it.
   const L1_TOKEN_ADDRESS = "0x1111000000000000000000000000000000001111";
 
-  let erc20Bridge: L2ERC20Bridge;
+  const testChainId = 9;
+
+  let erc20Bridge: L2SharedBridge;
   let erc20Token: L2StandardERC20;
 
   before("Deploy token and bridge", async function () {
@@ -50,9 +52,10 @@ describe("ERC20Bridge", function () {
 
     const beaconProxyBytecodeHash = hashBytecode((await deployer.loadArtifact("BeaconProxy")).bytecode);
 
-    const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2ERC20Bridge"));
+    const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [testChainId]);
     const bridgeInitializeData = erc20BridgeImpl.interface.encodeFunctionData("initialize", [
       unapplyL1ToL2Alias(l1BridgeWallet.address),
+      ethers.constants.AddressZero,
       beaconProxyBytecodeHash,
       governorWallet.address,
     ]);
@@ -63,11 +66,11 @@ describe("ERC20Bridge", function () {
       bridgeInitializeData,
     ]);
 
-    erc20Bridge = L2ERC20BridgeFactory.connect(erc20BridgeProxy.address, deployerWallet);
+    erc20Bridge = L2SharedBridgeFactory.connect(erc20BridgeProxy.address, deployerWallet);
   });
 
   it("Should finalize deposit ERC20 deposit", async function () {
-    const erc20BridgeWithL1Bridge = L2ERC20BridgeFactory.connect(erc20Bridge.address, l1BridgeWallet);
+    const erc20BridgeWithL1Bridge = L2SharedBridgeFactory.connect(erc20Bridge.address, l1BridgeWallet);
 
     const l1Depositor = ethers.Wallet.createRandom();
     const l2Receiver = ethers.Wallet.createRandom();

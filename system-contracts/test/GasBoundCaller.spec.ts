@@ -2,7 +2,6 @@ import type { SystemContext, GasBoundCallerTester } from "../typechain";
 import { GasBoundCallerTesterFactory, SystemContextFactory } from "../typechain";
 import { REAL_SYSTEM_CONTEXT_ADDRESS } from "./shared/constants";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
-import { ethers } from "hardhat";
 import { expect } from "chai";
 import { prepareEnvironment } from "./shared/mocks";
 
@@ -23,14 +22,14 @@ describe("GasBoundCaller tests", function () {
 
   it("Test entry overhead", async () => {
     await (
-      await tester.testEntryOverhead(ethers.constants.AddressZero, 1000000, 1000000, ethers.utils.randomBytes(10), {
+      await tester.testEntryOverhead(1000000, {
         gasLimit: 80_000_000,
       })
     ).wait();
     const smallBytecodeGas = await tester.lastRecordedGasLeft();
 
     await (
-      await tester.testEntryOverhead(ethers.constants.AddressZero, 1000000, 1000000, ethers.utils.randomBytes(100000), {
+      await tester.testEntryOverhead(1000000, {
         gasLimit: 80_000_000,
       })
     ).wait();
@@ -92,7 +91,7 @@ describe("GasBoundCaller tests", function () {
     const pubdataToSend = 5000;
     const gasSpentOnPubdata = (await systemContext.gasPerPubdataByte()).mul(pubdataToSend);
 
-    // Now while the execution gas wont be enoguh, we do allow to spend more just in case
+    // Now while the execution gas won't be enough, we do allow to spend more just in case
     await (
       await tester.gasBoundCallRelayer(
         gasSpentOnPubdata,

@@ -3,10 +3,8 @@ pragma solidity ^0.8.20;
 
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
-import {L1_MESSENGER_CONTRACT, BLOB_SIZE_BYTES, MAX_NUMBER_OF_BLOBS} from "./Constants.sol";
-import {EfficientCall} from "./libraries/EfficientCall.sol";
+import {L1_MESSENGER_CONTRACT, BLOB_SIZE_BYTES, MAX_NUMBER_OF_BLOBS, SystemLogKey} from "./Constants.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {SystemLogKey} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -17,9 +15,9 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
     /// @notice Chunks pubdata into pieces that can fit into blobs.
     /// @param _pubdata The total l2 to l1 pubdata that will be sent via L1 blobs.
     /// @dev Note: This is an early implementation, in the future we plan to support up to 16 blobs per l1 batch.
-    /// @dev We always publish 2 system logs even if our pubdata fits into a single blob. This makes processing logs on L1 easier.
+    /// @dev We always publish 6 system logs even if our pubdata fits into a single blob. This makes processing logs on L1 easier.
     function chunkAndPublishPubdata(bytes calldata _pubdata) external onlyCallFrom(address(L1_MESSENGER_CONTRACT)) {
-        require(_pubdata.length <= BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS, "pubdata should fit in 2 blobs");
+        require(_pubdata.length <= BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS, "pubdata should fit in 6 blobs");
 
         bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
 
@@ -36,7 +34,7 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
         for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
             uint256 start = BLOB_SIZE_BYTES * i;
 
-            // We break if the pubdata isn't enough to cover 2 blobs. On L1 it is expected that the hash
+            // We break if the pubdata isn't enough to cover all 6 blobs. On L1 it is expected that the hash
             // will be bytes32(0) if a blob isn't going to be used.
             if (start >= _pubdata.length) {
                 break;
@@ -52,7 +50,12 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
             blobHashes[i] = blobHash;
         }
 
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_ONE_HASH_KEY)), blobHashes[0]);
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_TWO_HASH_KEY)), blobHashes[1]);
+        for (uint8 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
+            SystemContractHelper.toL1(
+                true,
+                bytes32(uint256(SystemLogKey(i + uint256(SystemLogKey.BLOB_ONE_HASH_KEY)))),
+                blobHashes[i]
+            );
+        }
     }
 }

@@ -5,10 +5,10 @@ function TEST_safeSub() {
 
 function TEST_safeDiv() {
     testing_assertEq(safeDiv(4, 2, "err"), 2, "Simple division")
-    testing_assertEq(safeDiv(5, 2, "err"), 2, "Rouding")
-    testing_assertEq(safeDiv(5, 3, "err"), 1, "Rouding down")
-    testing_assertEq(safeDiv(4, 3, "err"), 1, "Rouding down")
-    testing_assertEq(safeDiv(0, 3, "err"), 0, "Rouding down")
+    testing_assertEq(safeDiv(5, 2, "err"), 2, "Rounding")
+    testing_assertEq(safeDiv(5, 3, "err"), 1, "Rounding down")
+    testing_assertEq(safeDiv(4, 3, "err"), 1, "Rounding down")
+    testing_assertEq(safeDiv(0, 3, "err"), 0, "Rounding down")
 }
 function TEST_safeDivAssert() {
     testing_testWillFailWith("divByZero")
@@ -63,7 +63,7 @@ function TEST_getTransactionUpfrontOverhead() {
 }
 
 function TEST_getFeeParams_HighPubdataPrice() {
-    // Under very large L1 gas price, the L2 base fee will start rising to ensure the 
+    // Under very large L1 gas price, the L2 base fee will start rising to ensure the
     // boundary on the gasLimit
 
     // 150k gwei L1 pubdata price
@@ -82,8 +82,8 @@ function TEST_getFeeParams_HighPubdataPrice() {
 }
 
 function TEST_getFeeParams_LowPubdataPrice() {
-    // Under low to medium pubdata price, the baseFee is equal to the fair gas price, 
-    // while the gas per pubdata pubdata is derived by strict division 
+    // Under low to medium pubdata price, the baseFee is equal to the fair gas price,
+    // while the gas per pubdata pubdata is derived by strict division
 
     // 0.2 gwei L1 pubdata price
     let veryLowL1GasPrice := 200000000
@@ -107,5 +107,5 @@ function TEST_systemLogKeys() {
 
     testing_assertEq(chainedPriorityTxnHashLogKey, 5, "Invalid priority txn hash log key")
     testing_assertEq(numberOfLayer1TxsLogKey, 6, "Invalid num layer 1 txns log key")
-    testing_assertEq(protocolUpgradeTxHashKey, 9, "Invalid protocol upgrade txn hash log key")
+    testing_assertEq(protocolUpgradeTxHashKey, 13, "Invalid protocol upgrade txn hash log key")
 }
