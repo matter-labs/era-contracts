@@ -83,8 +83,8 @@ contract DeployL2Script is Script {
         );
         bytes[] memory factoryDeps = new bytes[](3);
         factoryDeps[0] = l2StandardErc20FactoryBytecode;
-        factoryDeps[1] = beaconProxy;
-        factoryDeps[2] = l2StandardErc20Bytecode;
+        factoryDeps[1] = l2StandardErc20Bytecode;
+        factoryDeps[2] = beaconProxy;
         publishBytecodes(factoryDeps);
     }
 
@@ -218,19 +218,11 @@ contract DeployL2Script is Script {
             refundRecipient: msg.sender
         });
 
-        vm.serializeUint("root", "requiredValueToDeploy", requiredValueToDeploy);
-        vm.serializeAddress("root", "l2Contract", dstAddress);
-
-        string memory toml = vm.serializeBytes("root", "l2Calldata", l2Calldata);
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-out/output-test.toml");
-        vm.writeToml(toml, path);
-
         vm.startBroadcast();
         address baseTokenAddress = bridgehub.baseToken(config.chainId);
         if (ADDRESS_ONE != baseTokenAddress) {
             IERC20 baseToken = IERC20(baseTokenAddress);
-            baseToken.approve(config.l1SharedBridgeProxy, requiredValueToDeploy);
+            baseToken.approve(config.l1SharedBridgeProxy, requiredValueToDeploy * 2);
             requiredValueToDeploy = 0;
         }
 
