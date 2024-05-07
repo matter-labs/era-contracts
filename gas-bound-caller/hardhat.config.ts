@@ -56,13 +56,6 @@ export default {
       ethNetwork: "localhost",
       zksync: true,
     },
-    zkSyncStage: {
-      url: process.env.STAGE2,
-      ethNetwork: "sepolia",
-      zksync: true,
-      // contract verification endpoint
-      verifyURL: "https://goerli-beta.staging-scan-v2.zksync.dev/contract_verification",
-    },
     zkSyncTestnet: {
       url: "https://sepolia.era.zksync.dev",
       ethNetwork: "sepolia",
