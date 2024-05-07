@@ -3,13 +3,23 @@ pragma solidity 0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
 
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+
 library Utils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     // Create2Factory deterministic bytecode.
     // https://github.com/Arachnid/deterministic-deployment-proxy
     bytes internal constant CREATE2_FACTORY_BYTECODE =
-        hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
+    hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
+
+    address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+    uint256 constant MAX_PRIORITY_TX_GAS = 72000000;
 
     Vm internal constant vm = Vm(VM_ADDRESS);
 
@@ -101,7 +111,7 @@ library Utils {
      */
     function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
         string memory file = vm.readFile(
-            // solhint-disable-next-line func-named-parameters
+        // solhint-disable-next-line func-named-parameters
             string.concat(
                 "../system-contracts/artifacts-zk/contracts-preprocessed/",
                 filename,
@@ -151,5 +161,131 @@ library Utils {
         }
 
         return contractAddress;
+    }
+
+    /**
+     * @dev Deploy l2 contracts through l1
+    */
+    function deployThroughL1(
+        bytes memory bytecode,
+        bytes memory constructorargs,
+        bytes32 create2salt,
+        uint256 l2GasLimit,
+        bytes[] memory factoryDeps,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy
+    ) public returns (address) {
+        bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(bytecode);
+
+        bytes memory deployData = abi.encodeWithSignature(
+            "create2(bytes32,bytes32,bytes)",
+            create2salt,
+            bytecodeHash,
+            constructorargs
+        );
+
+        address contractAddress = L2ContractHelper.computeCreate2Address(
+            msg.sender,
+            create2salt,
+            bytecodeHash,
+            keccak256(constructorargs)
+        );
+
+        bytes[] memory _factoryDeps = new bytes[](factoryDeps.length + 1);
+
+        for (uint256 i = 0; i < factoryDeps.length; i++) {
+            _factoryDeps[i] = factoryDeps[i];
+        }
+        _factoryDeps[factoryDeps.length] = bytecode;
+
+        runL1L2Transaction({
+            l2Calldata: deployData,
+            l2GasLimit: l2GasLimit,
+            factoryDeps: _factoryDeps,
+            dstAddress: L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+            chainId: chainId,
+            bridgehubAddress: bridgehubAddress,
+            l1SharedBridgeProxy: l1SharedBridgeProxy
+        });
+        return contractAddress;
+    }
+
+    /**
+     * @dev Run the l2 l1 transaction
+    */
+    function runL1L2Transaction(
+        bytes memory l2Calldata,
+        uint256 l2GasLimit,
+        bytes[] memory factoryDeps,
+        address dstAddress,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy
+    ) public {
+        Bridgehub bridgehub = Bridgehub(bridgehubAddress);
+        uint256 gasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
+
+        uint256 requiredValueToDeploy = bridgehub.l2TransactionBaseCost(
+            chainId,
+            gasPrice,
+            l2GasLimit,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        );
+
+        L2TransactionRequestDirect memory l2TransactionRequestDirect = L2TransactionRequestDirect({
+            chainId: chainId,
+            mintValue: requiredValueToDeploy,
+            l2Contract: dstAddress,
+            l2Value: 0,
+            l2Calldata: l2Calldata,
+            l2GasLimit: l2GasLimit,
+            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            factoryDeps: factoryDeps,
+            refundRecipient: msg.sender
+        });
+
+        vm.startBroadcast();
+        address baseTokenAddress = bridgehub.baseToken(chainId);
+        if (ADDRESS_ONE != baseTokenAddress) {
+            IERC20 baseToken = IERC20(baseTokenAddress);
+            baseToken.approve(l1SharedBridgeProxy, requiredValueToDeploy * 2);
+            requiredValueToDeploy = 0;
+        }
+
+        bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
+
+        vm.stopBroadcast();
+    }
+
+    /**
+     * @dev Publish bytecodes to l2 through l1
+    */
+    function publishBytecodes(
+        bytes[] memory factoryDeps,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy
+    ) public {
+        runL1L2Transaction({
+            l2Calldata: "",
+            l2GasLimit: MAX_PRIORITY_TX_GAS,
+            factoryDeps: factoryDeps,
+            dstAddress: 0x0000000000000000000000000000000000000000,
+            chainId: chainId,
+            bridgehubAddress: bridgehubAddress,
+            l1SharedBridgeProxy: l1SharedBridgeProxy
+        });
+    }
+
+    /**
+ * @dev Read hardhat bytecodes
+    */
+    function readHardhatBytecode(string memory artifactPath) public returns (bytes memory) {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, artifactPath);
+        string memory json = vm.readFile(path);
+        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode");
+        return bytecode;
     }
 }
