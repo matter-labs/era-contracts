@@ -48,7 +48,7 @@ async function main() {
 
       const create2Salt = cmd.create2Salt
         ? cmd.create2Salt
-        : "0x0000000000000000000000000000000000000000000000000000000000000005";
+        : "0x0000000000000000000000000000000000000000000000000000000000000000";
 
       const deployer = new Deployer({
         deployWallet,
