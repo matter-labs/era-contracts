@@ -35,6 +35,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev used to accept the admin role
     address private pendingAdmin;
 
+
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {}
 

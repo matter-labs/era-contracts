@@ -4,6 +4,8 @@ pragma solidity 0.8.24;
 
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "../bridgehub/IBridgehub.sol";
+
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
 import {IAdmin} from "./chain-interfaces/IAdmin.sol";
@@ -15,7 +17,7 @@ import {ISystemContext} from "./l2-deps/ISystemContext.sol";
 import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
 import {FeeParams, SyncLayerState} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
-import {L2CanonicalTransaction} from "../common/Messaging.sol";
+import {L2CanonicalTransaction, TxStatus} from "../common/Messaging.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -68,7 +70,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     // address private migrationUpgrade;
 
     // Sync layer chain is expected to have ETH as the base token.
-    address public syncLayerChainId;
+    mapping(uint256 chainId => bool isWhitelistedSyncLayer) whitelistedSyncLayers;
+
+    mapping(uint256 chainId => bytes32 lastMigrationTxHash) lastMigrationTxHashes;
+    // mapping(uint256 chainId => bytes32 lastChainCommitment) lastMigratedCommitments;
+
+    mapping(uint256 chainId => address stmCounterPart) stmCounterParts;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -420,11 +427,23 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).getProtocolVersion();
     }
 
-    function _performMigration(IZkSyncHyperchain hyp) internal {
+    function registerSyncLayer(uint256 _newSyncLayerChainId) external onlyOwner {
+        require(_newSyncLayerChainId != 0, "Bad chain id");
+
+        // Currently, we require that the sync layer is deployed by the same STM.
+        address syncLayerAddress = hyperchainMap.get(_chainId);
+
+        // TODO: Maybe `get` already ensured its existance.
+        require(syncLayerAddress != address(0), "STM: sync layer not registered");
+
+        syncLayerChainId = _newSyncLayerChainId;
+    }
+
+    function registerTrustedCounterPart(uint256 _chainId, address _trustedCounterpart) external onlyOwner {
 
     }
 
-    function finalizeMigration(
+    function finalizeMigrationToSyncLayer(
         uint256 _chainId,
         address _baseToken,
         address _sharedBridge,
@@ -433,6 +452,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         HyperchainCommitment calldata commitment
     ) external {
         /// FIXME: adequate access rights
+
         address currentAddress = getHyperchain(_chainId);
 
         // We do not want to deal with inactive protocol versions during migration.
@@ -466,15 +486,76 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         hyperchain.executeMigration(commitment);
     }
 
+    function finalizeMigrationFromSyncLayer(
+        uint256 _chainId,
+    ) external {
+        // TODO: this method should check that a certain message was sent from the SL.
+    }
+
     function startMigrationToSyncLayer(
         uint256 _chainId,
+        uint256 _syncLayerChainId,
         address _newSyncLayerAdmin,
-    ) {
-        IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
-        
-        HyperchainCommitment calldata commitment = hyperchain.startMigrationToSyncLayer(_newSyncLayerAdmin);
+        L2TransactionRequestDirect memory _request
+    ) payable external {
+        // TODO: add requiremenet for it to be a admin of the chain
+        require(whitelistedSyncLayers[_syncLayerChainId], "sync layer not whitelisted");
 
+        // TODO: double check that get only returns when chain id is there.
+        IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
+
+        address chainBaseToken = hyperchain.getBaseToken();
+        uint256 currentProtocolVersion = hyperchain.getProtocolVersion();
+        require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
+
+        HyperchainCommitment calldata commitment = hyperchain.startMigrationToSyncLayer(_syncLayerChainId);
+
+        bytes memory migrationCalldata = abi.encodeCall(
+            this.finalizeMigration,
+            (_chainId, chainBaseToken, stmCounterParts[_syncLayerChainId], _newSyncLayerAdmin, currentProtocolVersion, commitment)
+        );
+
+        require(_request.chainId == syncLayer, "chain id incorrect");
+        // We assume that the sync layer always has eth as its base token.
+        require(_request.mintValue == msg.value, "Not enough value sent");
+
+        // It should be checked by the mailbox of the chain also, but just in case
+        require(_request.l2Value <= _request.mintValue, "L2 value too large");
+
+        _request.l2Calldata = migrationCalldata;
+
+        bytes32 canonicalHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(_request);
+
+        lastMigrationTxHashes[_chainId] = canonicalHash;
+        // lastMigratedCommitments[_chainId] = keccak256(abi.encode(commitment));
         // Now, we need to send an L1->L2 tx to the sync layer blockchain to the spawn the chain on SL.
+        // We just send it via a normal L-Z
+    }
+
+    function recoverFromFailedMigration(
+        uint256 _chainId,
+        uint256 _syncLayerChainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof,
+    ) {
+        // TODO: only callable by chain admin
+
+        require(whitelistedSyncLayers[_syncLayerChainId], "sync layer not whitelisted");
+
+        IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
+
+
+        bytes32 migrationHash = lastMigrationTxHashes[_chainId];
+        require(migrationHash != bytes32(0), "can not recover when there is no migration");
+        // Preventing reusing the same migration hash
+        lastMigrationTxHashes[_chainId] = bytes32(0);
+
+        require(BRIDGE_HUB.proveL1ToL2TransactionStatus(_syncLayerChainId, migrationHash, _l2BatchNumber, _l2MessageIndex, _l2TxNumberInBatch, _merkleProof, TxStatus.Failed), "Migration not failed");
+
+        // Now we can recover the chain.
+        hyperchain.recoverFromFailedMigrationToSyncLayer();
     }
 
     /// @dev This internal function is used to register a new hyperchain in the system.

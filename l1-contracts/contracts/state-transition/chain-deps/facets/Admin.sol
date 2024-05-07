@@ -159,9 +159,10 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         emit MigrationComplete(_diamondCut);
     }
 
-    function startMigrationToSyncLayer() external onlyStateTransitionManager returns (HyperchainCommitment memory commitment) {
+    function startMigrationToSyncLayer(uint256 _syncLayerChainId) external onlyStateTransitionManager returns (HyperchainCommitment memory commitment) {
         require(s.syncLayerState == SyncLayerState.ActiveL1, "not active L1");
         s.syncLayerState = SyncLayerState.MigratedL1;
+        s.syncLayerChainId = _syncLayerChainId;
 
         commitment.totalBatchesCommitted = s.totalBatchesCommitted;
         commitment.totalBatchesVerified = s.totalBatchesVerified;
@@ -182,6 +183,14 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         }
 
         commitment.batchHashes = batchHashes;
+    }
+
+    function recoverFromFailedMigrationToSyncLayer() external onlyStateTransitionManager {
+        // We do not need to perform any additional actions, since no changes related to the chain commitment can be performed
+        // while the chain is in the "migrated" state.
+        require(s.syncLayerState == SyncLayerState.MigratedL1, "not migrated L1");
+        s.syncLayerState = SyncLayerState.ActiveL1;
+        s.syncLayerChainId = 0;
     }
 
 

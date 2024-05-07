@@ -59,7 +59,9 @@ interface IAdmin is IZkSyncHyperchainBase {
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
     function finalizeMigration(HyperchainCommitment calldata _hyperchainCommitment) external;
-    function startMigrationToSyncLayer() external returns (HyperchainCommitment memory commitment);
+    function startMigrationToSyncLayer(uint256 _syncLayerChainId) external returns (HyperchainCommitment memory commitment);
+
+    function recoverFromFailedMigrationToSyncLayer() external;
 
     /// @notice Instantly pause the functionality of all freezable facets & their selectors
     /// @dev Only the governance mechanism may freeze Diamond Proxy

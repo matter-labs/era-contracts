@@ -164,4 +164,6 @@ struct ZkSyncHyperchainStorage {
 
     /// @dev 
     SyncLayerState syncLayerState;
+
+    uint256 syncLayerChainId;
 }
