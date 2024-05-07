@@ -13,19 +13,8 @@
     "no-complex-fallback": "off",
     "reason-string": "off",
     "func-name-mixedcase": "off",
-    "custom-errors": "off",
-    "no-unused-vars": "error",
+    "no-unused-vars": "off",
     "max-states-count": "off",
-    "no-global-import": "error",
-    "no-unused-import": "error",
-    "explicit-types": "error",
-    "modifier-name-mixedcase": "error",
-    "imports-on-top": "error",
-    "quotes": "error",
-    "use-forbidden-name": "error",
-    "visibility-modifier-order": "error",
-    "reentrancy": "error",
-    "func-named-parameters": ["error", 4],
-    "compiler-version": ["error", "^0.8.0"]
+    "compiler-version": ["warn", "^0.8.0"]
   }
 }

@@ -19,12 +19,12 @@ interface ICompressor {
     function publishCompressedBytecode(
         bytes calldata _bytecode,
         bytes calldata _rawCompressedData
-    ) external returns (bytes32 bytecodeHash);
+    ) external payable returns (bytes32 bytecodeHash);
 
     function verifyCompressedStateDiffs(
         uint256 _numberOfStateDiffs,
         uint256 _enumerationIndexSize,
         bytes calldata _stateDiffs,
         bytes calldata _compressedStateDiffs
-    ) external returns (bytes32 stateDiffHash);
+    ) external payable returns (bytes32 stateDiffHash);
 }

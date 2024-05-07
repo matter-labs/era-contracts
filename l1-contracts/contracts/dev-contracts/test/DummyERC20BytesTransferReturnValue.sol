@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 contract DummyERC20BytesTransferReturnValue {
-    // add this to be excluded from coverage report
-    function test() internal virtual {}
-
     bytes returnValue;
 
     constructor(bytes memory _returnValue) {

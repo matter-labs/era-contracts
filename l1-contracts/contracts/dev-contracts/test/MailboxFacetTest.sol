@@ -1,17 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
-import {FeeParams} from "../../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../common/Config.sol";
+import "../../zksync/facets/Mailbox.sol";
+import "../../zksync/Config.sol";
 
 contract MailboxFacetTest is MailboxFacet {
-    // add this to be excluded from coverage report
-    function test() internal virtual {}
-
-    constructor(uint256 _eraChainId) MailboxFacet(_eraChainId) {
-        s.admin = msg.sender;
+    constructor() {
+        s.governor = msg.sender;
     }
 
     function setFeeParams(FeeParams memory _feeParams) external {

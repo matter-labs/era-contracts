@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
-import {Verifier} from "../../state-transition/Verifier.sol";
+import "../../zksync/Verifier.sol";
 
 /// @author Matter Labs
 contract VerifierRecursiveTest is Verifier {
-    // add this to be excluded from coverage report
-    function test() internal virtual {}
-
     function _loadVerificationKey() internal pure override {
         assembly {
             // gate setup commitments

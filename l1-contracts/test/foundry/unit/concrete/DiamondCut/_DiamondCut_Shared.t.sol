@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
+
+// solhint-disable max-line-length
 
 import {Test} from "forge-std/Test.sol";
-import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {DiamondCutTestContract} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/DiamondCutTestContract.sol";
+import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
+
+// solhint-enable max-line-length
 
 contract DiamondCutTest is Test {
     DiamondCutTestContract internal diamondCutTestContract;

@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
-import {IExecutor} from "../../state-transition/chain-interfaces/IExecutor.sol";
+import "../../zksync/interfaces/IExecutor.sol";
 
 /// @title DummyExecutor
-/// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
+/// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing
+/// purposes.
 contract DummyExecutor is IExecutor {
-    // add this to be excluded from coverage report
-    function test() internal virtual {}
-
     address owner;
 
     // Flags to control if the contract should revert during commit, prove, and execute batch operations
@@ -34,14 +32,7 @@ contract DummyExecutor is IExecutor {
         _;
     }
 
-    function getAdmin() external view returns (address) {
-        return owner;
-    }
-
-    /// @notice Removing txs from the priority queue
-    function removePriorityQueueFront(uint256 _index) external {}
-
-    /// @notice Allows the owner to set whether the contract should revert during commit blocks operation
+    /// @notice Allows the owner to set whether the contract should revert during commit batches operation
     function setShouldRevertOnCommitBatches(bool _shouldRevert) external onlyOwner {
         shouldRevertOnCommitBatches = _shouldRevert;
     }
@@ -59,7 +50,7 @@ contract DummyExecutor is IExecutor {
     function commitBatches(
         StoredBatchInfo calldata _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
-    ) public {
+    ) external {
         require(!shouldRevertOnCommitBatches, "DummyExecutor: shouldRevertOnCommitBatches");
         require(
             _lastCommittedBatchData.batchNumber == getTotalBatchesCommitted,
@@ -74,26 +65,18 @@ contract DummyExecutor is IExecutor {
         getTotalBatchesCommitted += batchesLength;
     }
 
-    function commitBatchesSharedBridge(
-        uint256,
-        StoredBatchInfo calldata _lastCommittedBatchData,
-        CommitBatchInfo[] calldata _newBatchesData
-    ) external {
-        commitBatches(_lastCommittedBatchData, _newBatchesData);
-    }
-
     function proveBatches(
         StoredBatchInfo calldata _prevBatch,
         StoredBatchInfo[] calldata _committedBatches,
         ProofInput calldata
-    ) public {
+    ) external {
         require(!shouldRevertOnProveBatches, "DummyExecutor: shouldRevertOnProveBatches");
         require(_prevBatch.batchNumber == getTotalBatchesVerified, "DummyExecutor: Invalid previous batch number");
 
         require(_committedBatches.length == 1, "DummyExecutor: Can prove only one batch");
         require(
             _committedBatches[0].batchNumber == _prevBatch.batchNumber + 1,
-            "DummyExecutor 1: Can't prove batch out of order"
+            "DummyExecutor: Can't prove batch out of order"
         );
 
         getTotalBatchesVerified += 1;
@@ -103,16 +86,7 @@ contract DummyExecutor is IExecutor {
         );
     }
 
-    function proveBatchesSharedBridge(
-        uint256,
-        StoredBatchInfo calldata _prevBatch,
-        StoredBatchInfo[] calldata _committedBatches,
-        ProofInput calldata _proof
-    ) external {
-        proveBatches(_prevBatch, _committedBatches, _proof);
-    }
-
-    function executeBatches(StoredBatchInfo[] calldata _batchesData) public {
+    function executeBatches(StoredBatchInfo[] calldata _batchesData) external {
         require(!shouldRevertOnExecuteBatches, "DummyExecutor: shouldRevertOnExecuteBatches");
         uint256 nBatches = _batchesData.length;
         for (uint256 i = 0; i < nBatches; ++i) {
@@ -121,15 +95,11 @@ contract DummyExecutor is IExecutor {
         getTotalBatchesExecuted += nBatches;
         require(
             getTotalBatchesExecuted <= getTotalBatchesVerified,
-            "DummyExecutor 2: Can't execute batches more than committed and proven currently"
+            "DummyExecutor: Can't execute batches more than committed and proven currently"
         );
     }
 
-    function executeBatchesSharedBridge(uint256, StoredBatchInfo[] calldata _batchesData) external {
-        executeBatches(_batchesData);
-    }
-
-    function revertBatches(uint256 _newLastBatch) public {
+    function revertBatches(uint256 _newLastBatch) external {
         require(
             getTotalBatchesCommitted > _newLastBatch,
             "DummyExecutor: The last committed batch is less than new last batch"
@@ -140,10 +110,6 @@ contract DummyExecutor is IExecutor {
             getTotalBatchesVerified = newTotalBatchesCommitted;
         }
         getTotalBatchesCommitted = newTotalBatchesCommitted;
-    }
-
-    function revertBatchesSharedBridge(uint256, uint256 _newLastBatch) external {
-        revertBatches(_newLastBatch);
     }
 
     /// @notice Returns larger of two values

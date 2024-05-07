@@ -1,35 +1,38 @@
 /// Temporary script that generated the needed calldata for the migration of the governance.
 
 // hardhat import should be the first import in the file
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import * as hardhat from "hardhat";
+import * as hre from "hardhat";
 
 import { Command } from "commander";
 import { BigNumber, ethers, Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import { Deployer } from "../src.ts/deploy";
-import { applyL1ToL2Alias, getAddressFromEnv, getNumberFromEnv } from "../src.ts/utils";
-import { GAS_MULTIPLIER, web3Provider } from "./utils";
+import { applyL1ToL2Alias, getAddressFromEnv, getNumberFromEnv, web3Provider } from "./utils";
 
-import type { TxInfo } from "../../l2-contracts/src/utils";
 import { getL1TxInfo } from "../../l2-contracts/src/utils";
 
-import { Provider } from "zksync-ethers";
+import { Provider } from "zksync-web3";
 import { UpgradeableBeaconFactory } from "../../l2-contracts/typechain/UpgradeableBeaconFactory";
 
 const provider = web3Provider();
 const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"));
 
-const l2SharedBridgeABI = JSON.parse(
+const L2ERC20BridgeABI = JSON.parse(
   fs
-    .readFileSync("../l2-contracts/artifacts-zk/contracts-preprocessed/bridge/L2SharedBridge.sol/L2SharedBridge.json")
+    .readFileSync("../l2-contracts/artifacts-zk/contracts-preprocessed/bridge/L2ERC20Bridge.sol/L2ERC20Bridge.json")
     .toString()
 ).abi;
 
-async function getERC20BeaconAddress(l2SharedBridgeAddress: string) {
+interface TxInfo {
+  data: string;
+  to: string;
+  value?: string;
+}
+
+async function getERC20BeaconAddress(l2Erc20BridgeAddress: string) {
   const provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
-  const contract = new ethers.Contract(l2SharedBridgeAddress, l2SharedBridgeABI, provider);
+  const contract = new ethers.Contract(l2Erc20BridgeAddress, L2ERC20BridgeABI, provider);
   return await contract.l2TokenBeacon();
 }
 
@@ -48,9 +51,7 @@ async function main() {
     .option("--gas-price <gas-price>")
     .option("--refund-recipient <refund-recipient>")
     .action(async (cmd) => {
-      const gasPrice = cmd.gasPrice
-        ? parseUnits(cmd.gasPrice, "gwei")
-        : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
+      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
       const refundRecipient = cmd.refundRecipient;
@@ -78,7 +79,7 @@ async function main() {
         verbose: true,
       });
 
-      const expectedDeployedBytecode = hardhat.artifacts.readArtifactSync("Governance").deployedBytecode;
+      const expectedDeployedBytecode = hre.artifacts.readArtifactSync("Governance").deployedBytecode;
 
       const isBytecodeCorrect =
         (await provider.getCode(userProvidedAddress)).toLowerCase() === expectedDeployedBytecode.toLowerCase();
@@ -92,7 +93,7 @@ async function main() {
       // Step 1. Transfer ownership of all the contracts to the new governor.
 
       // Below we are preparing the calldata for the L1 transactions
-      const zkSync = deployer.stateTransitionContract(deployWallet);
+      const zkSync = deployer.zkSyncContract(deployWallet);
       const validatorTimelock = deployer.validatorTimelock(deployWallet);
 
       const l1Erc20Bridge = deployer.transparentUpgradableProxyContract(
@@ -103,15 +104,15 @@ async function main() {
       const erc20MigrationTx = l1Erc20Bridge.interface.encodeFunctionData("changeAdmin", [governanceAddressFromEnv]);
       displayTx("L1 ERC20 bridge migration calldata:", {
         data: erc20MigrationTx,
-        target: l1Erc20Bridge.address,
+        to: l1Erc20Bridge.address,
       });
 
-      const zkSyncSetPendingGovernor = zkSync.interface.encodeFunctionData("setPendingAdmin", [
+      const zkSyncSetPendingGovernor = zkSync.interface.encodeFunctionData("setPendingGovernor", [
         governanceAddressFromEnv,
       ]);
       displayTx("zkSync Diamond Proxy migration calldata:", {
         data: zkSyncSetPendingGovernor,
-        target: zkSync.address,
+        to: zkSync.address,
       });
 
       const validatorTimelockMigration = validatorTimelock.interface.encodeFunctionData("transferOwnership", [
@@ -119,7 +120,7 @@ async function main() {
       ]);
       displayTx("Validator timelock migration calldata:", {
         data: validatorTimelockMigration,
-        target: validatorTimelock.address,
+        to: validatorTimelock.address,
       });
 
       // Below, we prepare the transactions to migrate the L2 contracts.
@@ -128,15 +129,15 @@ async function main() {
       const aliasedNewGovernor = applyL1ToL2Alias(governanceAddressFromEnv);
 
       // L2 ERC20 bridge as well as Weth token are a transparent upgradable proxy.
-      const l2SharedBridge = deployer.transparentUpgradableProxyContract(
-        process.env.CONTRACTS_L2_SHARED_BRIDGE_ADDR!,
+      const l2ERC20Bridge = deployer.transparentUpgradableProxyContract(
+        process.env.CONTRACTS_L2_ERC20_BRIDGE_ADDR!,
         deployWallet
       );
-      const l2SharedBridgeCalldata = l2SharedBridge.interface.encodeFunctionData("changeAdmin", [aliasedNewGovernor]);
+      const l2Erc20BridgeCalldata = l2ERC20Bridge.interface.encodeFunctionData("changeAdmin", [aliasedNewGovernor]);
       const l2TxForErc20Bridge = await getL1TxInfo(
         deployer,
-        l2SharedBridge.address,
-        l2SharedBridgeCalldata,
+        l2ERC20Bridge.address,
+        l2Erc20BridgeCalldata,
         refundRecipient,
         gasPrice,
         priorityTxMaxGasLimit,
@@ -161,7 +162,7 @@ async function main() {
       displayTx("L2 Weth upgrade: ", l2TxForWethUpgrade);
 
       // L2 Tokens are BeaconProxies
-      const l2Erc20BeaconAddress: string = await getERC20BeaconAddress(l2SharedBridge.address);
+      const l2Erc20BeaconAddress: string = await getERC20BeaconAddress(l2ERC20Bridge.address);
       const l2Erc20TokenBeacon = UpgradeableBeaconFactory.connect(l2Erc20BeaconAddress, deployWallet);
       const l2Erc20BeaconCalldata = l2Erc20TokenBeacon.interface.encodeFunctionData("transferOwnership", [
         aliasedNewGovernor,
@@ -177,7 +178,7 @@ async function main() {
       );
       displayTx("L2 ERC20 beacon upgrade: ", l2TxForErc20BeaconUpgrade);
 
-      // Small delimiter for better readability.
+      // Small delimeter for better readability.
       console.log("\n\n\n", "-".repeat(20), "\n\n\n");
 
       console.log("Secondly, the new governor needs to accept all the roles where they need to be accepted.");
@@ -191,7 +192,7 @@ async function main() {
         {
           target: zkSync.address,
           value: 0,
-          data: zkSync.interface.encodeFunctionData("acceptAdmin"),
+          data: zkSync.interface.encodeFunctionData("acceptGovernor"),
         },
         {
           target: validatorTimelock.address,
@@ -214,13 +215,13 @@ async function main() {
       ]);
       displayTx("Schedule transparent calldata:\n", {
         data: scheduleTransparentCalldata,
-        target: governance.address,
+        to: governance.address,
       });
 
       const executeCalldata = governance.interface.encodeFunctionData("execute", [operation]);
       displayTx("Execute calldata:\n", {
         data: executeCalldata,
-        target: governance.address,
+        to: governance.address,
       });
     });
 

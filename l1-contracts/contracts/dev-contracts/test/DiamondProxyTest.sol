@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
-import {Diamond} from "../../state-transition/libraries/Diamond.sol";
-import {ZkSyncHyperchainBase} from "../../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
+import "../../zksync/libraries/Diamond.sol";
+import "../../zksync/facets/Base.sol";
 
-contract DiamondProxyTest is ZkSyncHyperchainBase {
-    // add this to be excluded from coverage report
-    function test() internal virtual {}
-
+contract DiamondProxyTest is Base {
     function setFreezability(bool _freeze) external returns (bytes32) {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
         diamondStorage.isFrozen = _freeze;

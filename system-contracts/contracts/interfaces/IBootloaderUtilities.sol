@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import {Transaction} from "../libraries/TransactionHelper.sol";
+import "../libraries/TransactionHelper.sol";
 
 interface IBootloaderUtilities {
     function getTransactionHashes(
