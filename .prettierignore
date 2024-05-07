@@ -6,6 +6,10 @@ system-contracts/contracts/Constants.sol
 system-contracts/artifacts-zk
 system-contracts/cache-zk
 system-contracts/contracts-preprocessed
+system-contracts/typechain
+gas-bound-caller/artifacts-zk
+gas-bound-caller/cache-zk
+gas-bound-caller/typechain
 l1-contracts/cache
 l1-contracts/cache-forge
 l1-contracts/artifacts

@@ -8,7 +8,8 @@
     "import/namespace": "off",
     "import/no-unresolved": "off",
     "import/order": "off",
-    "no-console": "off"
+    "no-console": "off",
+    "prettier/prettier": "off"
   },
   "ignorePatterns": [
     "**/lib/*"
