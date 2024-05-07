@@ -1,6 +1,7 @@
 // hardhat import should be the first import in the file
 import * as hardhat from "hardhat";
-import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
+
+import { deployedAddressesFromEnv } from "../scripts/utils";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function verifyPromise(address: string, constructorArguments?: Array<any>, libraries?: object): Promise<any> {
@@ -26,12 +27,12 @@ async function main() {
 
   // Contracts without constructor parameters
   for (const address of [
-    addresses.StateTransition.GettersFacet,
-    addresses.StateTransition.DiamondInit,
-    addresses.StateTransition.AdminFacet,
-    addresses.StateTransition.MailboxFacet,
-    addresses.StateTransition.ExecutorFacet,
-    addresses.StateTransition.Verifier,
+    addresses.ZkSync.GettersFacet,
+    addresses.ZkSync.DiamondInit,
+    addresses.ZkSync.AdminFacet,
+    addresses.ZkSync.MailboxFacet,
+    addresses.ZkSync.ExecutorFacet,
+    addresses.ZkSync.Verifier,
   ]) {
     const promise = verifyPromise(address);
     promises.push(promise);
@@ -55,7 +56,7 @@ async function main() {
   // }
 
   // Bridges
-  const promise = verifyPromise(addresses.Bridges.ERC20BridgeImplementation, [addresses.StateTransition.DiamondProxy]);
+  const promise = verifyPromise(addresses.Bridges.ERC20BridgeImplementation, [addresses.ZkSync.DiamondProxy]);
   promises.push(promise);
 
   const messages = await Promise.allSettled(promises);

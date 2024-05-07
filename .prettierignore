@@ -1,6 +1,5 @@
 tools/data
 l1-contracts/lib
-l1-contracts-foundry/lib
 system-contracts/contracts/openzeppelin
 system-contracts/contracts/Constants.sol
 system-contracts/artifacts-zk

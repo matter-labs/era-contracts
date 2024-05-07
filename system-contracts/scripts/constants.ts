@@ -15,13 +15,13 @@ export interface SystemContractDescription {
   codeName: string;
 }
 
-export interface YulContractDescription extends SystemContractDescription {
+export interface YulContractDescrption extends SystemContractDescription {
   lang: Language.Yul;
   path: string;
 }
 
 // Currently used only for the tests
-export interface ZasmContractDescription extends SystemContractDescription {
+export interface ZasmContractDescrption extends SystemContractDescription {
   lang: Language.Zasm;
   path: string;
 }
@@ -31,7 +31,7 @@ export interface SolidityContractDescription extends SystemContractDescription {
 }
 
 interface ISystemContracts {
-  [key: string]: YulContractDescription | SolidityContractDescription;
+  [key: string]: YulContractDescrption | SolidityContractDescription;
 }
 
 export const SYSTEM_CONTRACTS: ISystemContracts = {
@@ -62,12 +62,6 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
   ecMul: {
     address: "0x0000000000000000000000000000000000000007",
     codeName: "EcMul",
-    lang: Language.Yul,
-    path: "precompiles",
-  },
-  ecPairing: {
-    address: "0x0000000000000000000000000000000000000008",
-    codeName: "EcPairing",
     lang: Language.Yul,
     path: "precompiles",
   },
@@ -112,9 +106,9 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     codeName: "MsgValueSimulator",
     lang: Language.Solidity,
   },
-  L2BaseToken: {
+  l2EthToken: {
     address: "0x000000000000000000000000000000000000800a",
-    codeName: "L2BaseToken",
+    codeName: "L2EthToken",
     lang: Language.Solidity,
   },
   systemContext: {
@@ -164,14 +158,6 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
   pubdataChunkPublisher: {
     address: "0x0000000000000000000000000000000000008011",
     codeName: "PubdataChunkPublisher",
-    lang: Language.Solidity,
-  },
-  create2Factory: {
-    // This is explicitly a non-system-contract address.
-    // We do not use the same address as create2 factories on EVM, since
-    // this is a zkEVM create2 factory.
-    address: "0x0000000000000000000000000000000000010000",
-    codeName: "Create2Factory",
     lang: Language.Solidity,
   },
 } as const;
@@ -428,7 +414,7 @@ function getValidateTxStructure(
 }
 
 export function getTransactionUtils(): string {
-  let result = `///
+  let result = `/// 
             /// TransactionData utilities
             ///\n`;
 

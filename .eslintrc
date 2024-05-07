@@ -7,8 +7,7 @@
     "import/no-named-as-default-member": "off",
     "import/namespace": "off",
     "import/no-unresolved": "off",
-    "import/order": "off",
-    "no-console": "off"
+    "import/order": "off"
   },
   "ignorePatterns": [
     "**/lib/*"

@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
-import {Utils} from "../Utils/Utils.sol";
+// solhint-disable max-line-length
+
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
+import {DiamondCutTestContract} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/DiamondCutTestContract.sol";
+import {ExecutorFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Executor.sol";
+import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
+import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
+import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
+import {Utils} from "../Utils/Utils.sol";
 
-import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+// solhint-enable max-line-length
 
 contract FacetCutTest is DiamondCutTest {
     MailboxFacet private mailboxFacet;
     ExecutorFacet private executorFacet1;
     ExecutorFacet private executorFacet2;
-
-    uint256 eraChainId;
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
@@ -27,9 +28,8 @@ contract FacetCutTest is DiamondCutTest {
     }
 
     function setUp() public {
-        eraChainId = 9;
         diamondCutTestContract = new DiamondCutTestContract();
-        mailboxFacet = new MailboxFacet(eraChainId);
+        mailboxFacet = new MailboxFacet();
         gettersFacet = new GettersFacet();
         executorFacet1 = new ExecutorFacet();
         executorFacet2 = new ExecutorFacet();

@@ -120,7 +120,6 @@ contract BootloaderUtilities is IBootloaderUtilities {
 
         return
             keccak256(
-                // solhint-disable-next-line func-named-parameters
                 bytes.concat(
                     encodedListLength,
                     encodedNonce,
@@ -151,7 +150,6 @@ contract BootloaderUtilities is IBootloaderUtilities {
                 ? RLPEncoder.encodeAddress(address(uint160(_transaction.to)))
                 : bytes(hex"80");
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
-            // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(
                 encodedChainId,
                 encodedNonce,
@@ -215,7 +213,6 @@ contract BootloaderUtilities is IBootloaderUtilities {
 
         return
             keccak256(
-                // solhint-disable-next-line func-named-parameters
                 bytes.concat(
                     "\x01",
                     encodedListLength,
@@ -249,7 +246,6 @@ contract BootloaderUtilities is IBootloaderUtilities {
                 ? RLPEncoder.encodeAddress(address(uint160(_transaction.to)))
                 : bytes(hex"80");
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
-            // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(
                 encodedChainId,
                 encodedNonce,
@@ -314,7 +310,6 @@ contract BootloaderUtilities is IBootloaderUtilities {
 
         return
             keccak256(
-                // solhint-disable-next-line func-named-parameters
                 bytes.concat(
                     "\x02",
                     encodedListLength,

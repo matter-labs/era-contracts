@@ -1,35 +1,31 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
-import {AdminFacet} from "../../state-transition/chain-deps/facets/Admin.sol";
+import "../../zksync/facets/Admin.sol";
 
 contract AdminFacetTest is AdminFacet {
-    // add this to be excluded from coverage report
-    function test() internal virtual {}
-
     constructor() {
-        s.admin = msg.sender;
-        s.stateTransitionManager = msg.sender;
+        s.governor = msg.sender;
     }
 
     function getPorterAvailability() external view returns (bool) {
         return s.zkPorterIsAvailable;
     }
 
-    function isValidator(address _validator) external view returns (bool) {
-        return s.validators[_validator];
+    function isValidator(address _address) external view returns (bool) {
+        return s.validators[_address];
     }
 
     function getPriorityTxMaxGasLimit() external view returns (uint256) {
         return s.priorityTxMaxGasLimit;
     }
 
-    function getAdmin() external view returns (address) {
-        return s.admin;
+    function getGovernor() external view returns (address) {
+        return s.governor;
     }
 
-    function getPendingAdmin() external view returns (address) {
-        return s.pendingAdmin;
+    function getPendingGovernor() external view returns (address) {
+        return s.pendingGovernor;
     }
 }

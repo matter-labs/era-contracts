@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
-import {Merkle} from "../../state-transition/libraries/Merkle.sol";
+import "../../zksync/libraries/Merkle.sol";
 
 contract MerkleTest {
     function calculateRoot(

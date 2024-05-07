@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 /**
  * @author Matter Labs
- * @notice System smart contract that is responsible for deploying other smart contracts on a zkSync hyperchain.
+ * @notice System smart contract that is responsible for deploying other smart contracts on zkSync.
  */
 interface IL2ContractDeployer {
     /// @notice A struct that describes a forced deployment on an address.
