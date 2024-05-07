@@ -269,7 +269,7 @@ contract RegisterHyperchainsScript is Script {
         vm.recordLogs();
 
         for (uint256 i = 0; i < hyperchainsConfig.hyperchains.length; i++) {
-            HyperchainDescription description = hyperchainsConfig.hyperchains[i];
+            HyperchainDescription memory description = hyperchainsConfig.hyperchains[i];
 
             bridgehub.createNewChain({
                 _chainId: description.hyperchainChainId,
@@ -301,7 +301,7 @@ contract RegisterHyperchainsScript is Script {
         for (uint256 i = 0; i < diamondProxyAddresses.length; i++) {
             address newProxyAddress = diamondProxyAddresses[i];
 
-            if (diamondProxyAddress == address(0)) {
+            if (newProxyAddress == address(0)) {
                 revert("One of diamond proxy addresses not found");
             }
         }
@@ -313,7 +313,7 @@ contract RegisterHyperchainsScript is Script {
         vm.startBroadcast();
 
         for (uint256 i = 0; i < hyperchainsConfig.hyperchains.length; i++) {
-            HyperchainDescription description = hyperchainsConfig.hyperchains[i];
+            HyperchainDescription memory description = hyperchainsConfig.hyperchains[i];
             validatorTimelock.addValidator(description.hyperchainChainId, description.validatorSenderOperatorCommitEth);
             validatorTimelock.addValidator(description.hyperchainChainId, description.validatorSenderOperatorBlobsEth);
         }
@@ -323,12 +323,12 @@ contract RegisterHyperchainsScript is Script {
         console.log("Validators added");
     }
 
-    function configureZkSyncStatesTransition() internal {
+    function configureZkSyncStateTransitions() internal {
         vm.startBroadcast();
 
         for (uint256 i = 0; i < diamondProxyAddresses.length; i++) {
             IZkSyncHyperchain zkSyncStateTransition = IZkSyncHyperchain(diamondProxyAddresses[i]);
-            HyperchainDescription description = hyperchainsConfig.hyperchains[i];
+            HyperchainDescription memory description = hyperchainsConfig.hyperchains[i];
 
             zkSyncStateTransition.setTokenMultiplier(
                 description.baseTokenGasPriceMultiplierNominator,

@@ -12,11 +12,7 @@ import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamond
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
-import {
-    IBridgehub,
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
@@ -35,6 +31,7 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DE
 
 import {DeployErc20Script} from "../../../scripts-rs/script/DeployErc20.s.sol";
 import {DeployL1Script} from "../../../scripts-rs/script/DeployL1.s.sol";
+import {RegisterHyperchainsScript} from "../../../scripts-rs/script/RegisterHyperchains.s.sol";
 
 contract BridgeHubIntegration is Test {
     using stdStorage for StdStorage;
@@ -152,7 +149,9 @@ contract BridgeHubIntegration is Test {
 
         vm.prank(bridgeHubAddress);
         TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(
-            address(stm), admin, abi.encodeCall(StateTransitionManager.initialize, stmInitializeData)
+            address(stm),
+            admin,
+            abi.encodeCall(StateTransitionManager.initialize, stmInitializeData)
         );
 
         stmAddress = address(transparentUpgradeableProxy);
@@ -205,12 +204,18 @@ contract BridgeHubIntegration is Test {
         );
     }
 
-    function registerNewChain(uint256 _chainId, address _baseToken) internal returns (uint256 chainId) {
+    function registerNewChain(uint256 _chainId, address _baseToken) internal returns (uint256 _newchainId) {
         Diamond.DiamondCutData memory diamondCutData = getDiamondCutData(diamondAddress);
 
         vm.prank(bridgeHubOwner);
-        chainId =
-            bridgeHub.createNewChain(_chainId, stmAddress, _baseToken, uint256(12), admin, abi.encode(diamondCutData));
+        _newchainId = bridgeHub.createNewChain(
+            _chainId,
+            stmAddress,
+            _baseToken,
+            uint256(12),
+            admin,
+            abi.encode(diamondCutData)
+        );
     }
 
     function getDiamondCutData(address _diamondInit) internal returns (Diamond.DiamondCutData memory) {
@@ -222,10 +227,169 @@ contract BridgeHubIntegration is Test {
     }
 
     function setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
-        stdstore.target(address(sharedBridge)).sig(sharedBridge.chainBalance.selector).with_key(_chainId).with_key(
-            _token
-        ).checked_write(_value);
+        stdstore
+            .target(address(sharedBridge))
+            .sig(sharedBridge.chainBalance.selector)
+            .with_key(_chainId)
+            .with_key(_token)
+            .checked_write(_value);
     }
+}
+
+contract BridgehubDeployInterface is Test {
+    Bridgehub bridgeHub;
+}
+
+contract Tokens {
+    address[] internal tokens;
+
+    DeployErc20Script private deployScript;
+
+    constructor() {
+        deployScript = new DeployErc20Script();
+        deployScript.run();
+
+        tokens = deployScript.getTokensAddresses();
+    }
+}
+
+contract HyperchainDeploy is BridgehubDeployInterface {
+    RegisterHyperchainsScript deployScript;
+    HyperchainDeployInfo[] hyperchainsToDeploy;
+
+    struct HyperchainDeployInfo {
+        string name;
+        uint256 chainId;
+        address baseToken;
+    }
+
+    uint256 currentHyperChainId = 9;
+    uint256[] hyperchainIds;
+
+    constructor() {
+        deployScript = new RegisterHyperchainsScript();
+
+        hyperchainsToDeploy.push(HyperchainDeployInfo({name: "era", chainId: currentChainId, baseToken: ETH_TOKEN_ADDRESS}));
+
+        saveHyperchainConfig();
+
+        deployScript.run();
+    }
+
+
+    function saveHyperchainConfig() public {
+        string memory serialized;
+
+        for (uint256 i = 0; i < hyperchainsToDeploy.length; i++) {
+            HyperchainDeployInfo memory info = hyperchainsToDeploy[i];
+
+            RegisterHyperchainsScript.HyperchainDescription memory description = RegisterHyperchainsScript
+                .HyperchainDescription({
+                    hyperchainChainId: info.chainId,
+                    baseToken: info.baseToken,
+                    bridgehubCreateNewChainSalt: 0,
+                    validiumMode: false,
+                    validatorSenderOperatorCommitEth: address(0),
+                    validatorSenderOperatorBlobsEth: address(0),
+                    baseTokenGasPriceMultiplierNominator: uint128(1),
+                    baseTokenGasPriceMultiplierDenominator: uint128(1)
+                });
+
+            string memory hyperchainName = info.name;
+
+            vm.serializeUint(hyperchainName, "hyperchain_chain_id", description.hyperchainChainId);
+            vm.serializeAddress(hyperchainName, "base_token_addr", description.baseToken);
+            vm.serializeUint(
+                hyperchainName,
+                "bridgehub_create_new_chain_salt",
+                description.bridgehubCreateNewChainSalt
+            );
+
+            uint256 validiumMode = 0;
+
+            if (description.validiumMode) {
+                validiumMode = 1;
+            }
+
+            vm.serializeUint(hyperchainName, "validium_mode", validiumMode);
+
+            vm.serializeAddress(
+                hyperchainName,
+                "validator_sender_operator_commit_eth",
+                description.validatorSenderOperatorCommitEth
+            );
+            vm.serializeAddress(
+                hyperchainName,
+                "validator_sender_operator_blobs_eth",
+                description.validatorSenderOperatorBlobsEth
+            );
+            vm.serializeUint(
+                hyperchainName,
+                "base_token_gas_price_multiplier_nominator",
+                description.baseTokenGasPriceMultiplierNominator
+            );
+
+            string memory single_serialized = vm.serializeUint(
+                hyperchainName,
+                "base_token_gas_price_multiplier_nominator",
+                description.baseTokenGasPriceMultiplierDenominator
+            );
+
+            serialized = vm.serializeString("hyperchain", hyperchainName, single_serialized);
+        }
+
+        string memory toml = vm.serializeString("toml", "hyperchains", serialized);
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/scripts-rs/script-out/output-deploy-hyperchains.toml");
+        vm.writeToml(toml, path);
+    }
+
+    function registerNewChainScript() internal {
+        deployScript.run();
+    }
+
+    // function spawnHyperchain() public {
+    //     hyperchainIds.push(registerNewChain(minHyperchainId + hyperchainIds.length, ETH_TOKEN_ADDRESS));
+    // }
+
+    // function spawnHyperchain(address _token) public {
+    //     registerNewToken(_token);
+    //     hyperchainIds.push(registerNewChain(minHyperchainId + hyperchainIds.length, _token));
+    // }
+
+    // function spawnMultipleHyperchains(uint256 _numHyperchains) public {
+    //     for (uint256 i = 0; i < _numHyperchains; i++) {
+    //         spawnHyperchain();
+    //     }
+    // }
+
+    // function spawnMultipleHyperchainsWithToken(uint256 _numHyperchains, address _token) public {
+    //     for (uint256 i = 0; i < _numHyperchains; i++) {
+    //         spawnHyperchain(_token);
+    //     }
+    // }
+
+    // function getHyperchainAddress(uint256 _chainId) public view returns (address) {
+    //     return bridgeHub.getHyperchain(_chainId);
+    // }
+
+    // function getHyperchainBaseToken(uint256 _chainId) public view returns (address) {
+    //     return bridgeHub.baseToken(_chainId);
+    // }
+
+    // function clearSharedBridgeBalances(address _token) public {
+    //     for (uint256 i = 0; i < hyperchainIds.length; i++) {
+    //         setSharedBridgeChainBalance(hyperchainIds[i], ETH_TOKEN_ADDRESS, 0);
+    //         setSharedBridgeChainBalance(hyperchainIds[i], address(_token), 0);
+    //     }
+    // }
+
+    // function test_creationOfHyperchains() public {
+    //     for (uint256 i = minHyperchainId; i < hyperchainIds.length; i++) {
+    //         address newHyperchain = getHyperchainAddress(i);
+    //         assert(newHyperchain != address(0));
+    //     }
+    // }
 }
 
 contract HyperchainFactory is BridgeHubIntegration {
@@ -297,10 +461,11 @@ contract L2TxMocker is Test {
         mockFactoryDeps[0] = "11111111111111111111111111111111";
     }
 
-    function createMockL2TransactionRequestDirect(uint256 chainId, uint256 mintValue, uint256 l2Value)
-        internal
-        returns (L2TransactionRequestDirect memory request)
-    {
+    function createMockL2TransactionRequestDirect(
+        uint256 chainId,
+        uint256 mintValue,
+        uint256 l2Value
+    ) internal returns (L2TransactionRequestDirect memory request) {
         request.chainId = chainId;
         request.mintValue = mintValue;
         request.l2Value = l2Value;
@@ -379,10 +544,16 @@ contract IntegrationTests is BridgeHubIntegration, HyperchainFactory, L2TxMocker
         assertTrue(getHyperchainBaseToken(firstChainId) == ETH_TOKEN_ADDRESS);
         assertTrue(getHyperchainBaseToken(secondChainId) == ETH_TOKEN_ADDRESS);
 
-        L2TransactionRequestDirect memory aliceRequest =
-            createMockL2TransactionRequestDirect(firstChainId, 1 ether, 0.1 ether);
-        L2TransactionRequestDirect memory bobRequest =
-            createMockL2TransactionRequestDirect(secondChainId, 1 ether, 0.1 ether);
+        L2TransactionRequestDirect memory aliceRequest = createMockL2TransactionRequestDirect(
+            firstChainId,
+            1 ether,
+            0.1 ether
+        );
+        L2TransactionRequestDirect memory bobRequest = createMockL2TransactionRequestDirect(
+            secondChainId,
+            1 ether,
+            0.1 ether
+        );
 
         bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
         address firstHyperChainAddress = getHyperchainAddress(firstChainId);
@@ -437,10 +608,16 @@ contract IntegrationTests is BridgeHubIntegration, HyperchainFactory, L2TxMocker
         assertTrue(getHyperchainBaseToken(firstChainId) == address(baseToken));
         assertTrue(getHyperchainBaseToken(secondChainId) == address(baseToken));
 
-        L2TransactionRequestDirect memory aliceRequest =
-            createMockL2TransactionRequestDirect(firstChainId, 1 ether, 0.1 ether);
-        L2TransactionRequestDirect memory bobRequest =
-            createMockL2TransactionRequestDirect(secondChainId, 1 ether, 0.1 ether);
+        L2TransactionRequestDirect memory aliceRequest = createMockL2TransactionRequestDirect(
+            firstChainId,
+            1 ether,
+            0.1 ether
+        );
+        L2TransactionRequestDirect memory bobRequest = createMockL2TransactionRequestDirect(
+            secondChainId,
+            1 ether,
+            0.1 ether
+        );
 
         bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
         address firstHyperChainAddress = getHyperchainAddress(firstChainId);
@@ -529,7 +706,12 @@ contract IntegrationTests is BridgeHubIntegration, HyperchainFactory, L2TxMocker
         {
             bytes memory aliceSecondBridgeCalldata = abi.encode(tokenAddress, aliceDepositAmount, l2Receiver);
             L2TransactionRequestTwoBridgesOuter memory aliceRequest = createMockL2TransactionRequestTwoBridges(
-                firstChainId, mintValue, 0, l2Value, address(sharedBridge), aliceSecondBridgeCalldata
+                firstChainId,
+                mintValue,
+                0,
+                l2Value,
+                address(sharedBridge),
+                aliceSecondBridgeCalldata
             );
 
             vm.mockCall(
@@ -546,7 +728,12 @@ contract IntegrationTests is BridgeHubIntegration, HyperchainFactory, L2TxMocker
         {
             bytes memory bobSecondBridgeCalldata = abi.encode(tokenAddress, bobDepositAmount, l2Receiver);
             L2TransactionRequestTwoBridgesOuter memory bobRequest = createMockL2TransactionRequestTwoBridges(
-                secondChainId, mintValue, 0, l2Value, address(sharedBridge), bobSecondBridgeCalldata
+                secondChainId,
+                mintValue,
+                0,
+                l2Value,
+                address(sharedBridge),
+                bobSecondBridgeCalldata
             );
 
             vm.mockCall(
