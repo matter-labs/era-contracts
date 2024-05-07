@@ -22,12 +22,15 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
     function setUp() public {
         deployL1Contracts();
         deployTokens();
+
         registerNewTokens(tokens);
+        addNewHyperchainToDeploy("hyperchain1", tokens[0]);
         deployHyperchains();
     }
 
     function test_hyperchainTokenDirectDeposit_Eth_2() public {
         emit log_address(bridgeHub.getHyperchain(9));
+        emit log_address(bridgeHub.getHyperchain(10));
 
         assertTrue(true);
     }

@@ -15,14 +15,15 @@ contract HyperchainDeployer is L1ContractDeployer {
         address baseToken;
     }
 
-    uint256 currentHyperChainId = 9;
+    uint256 currentHyperChainId = 10;
+    uint256 eraHyperchainId = 9;
     uint256[] hyperchainIds;
 
     function deployHyperchains() internal {
         deployScript = new RegisterHyperchainsScript();
 
         hyperchainsToDeploy.push(
-            HyperchainDeployInfo({name: "era", chainId: currentHyperChainId, baseToken: ETH_TOKEN_ADDRESS})
+            HyperchainDeployInfo({name: "era", chainId: eraHyperchainId, baseToken: ETH_TOKEN_ADDRESS})
         );
 
         saveHyperchainConfig();
@@ -30,6 +31,12 @@ contract HyperchainDeployer is L1ContractDeployer {
         vm.setEnv("HYPERCHAINS_CONFIG", "/scripts-rs/script-out/output-deploy-hyperchains.toml");
 
         deployScript.run();
+    }
+
+    function addNewHyperchainToDeploy(string memory _name, address _baseToken) internal {
+        hyperchainsToDeploy.push(
+            HyperchainDeployInfo({name: _name, chainId: currentHyperChainId++, baseToken: _baseToken})
+        );
     }
 
     function saveHyperchainConfig() public {
