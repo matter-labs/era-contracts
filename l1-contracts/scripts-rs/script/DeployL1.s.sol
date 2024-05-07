@@ -345,7 +345,6 @@ contract DeployL1Script is Script {
         addresses.stateTransition.stateTransitionImplementation = contractAddress;
     }
 
-    // Note for now is mocked, as the real deployment is done via DiamondProxy
     function deployStateTransitionManagerProxy() internal {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
@@ -391,8 +390,8 @@ contract DeployL1Script is Script {
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(addresses.stateTransition.verifier),
             verifierParams: verifierParams,
-            l2BootloaderBytecodeHash: bytes32(""),
-            l2DefaultAccountBytecodeHash: bytes32(""),
+            l2BootloaderBytecodeHash: bytes32("0x"),
+            l2DefaultAccountBytecodeHash: bytes32("0x"),
             priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
             feeParams: feeParams,
             blobVersionedHashRetriever: addresses.blobVersionedHashRetriever
@@ -431,14 +430,13 @@ contract DeployL1Script is Script {
 
     function registerStateTransitionManager() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.broadcast();
+        vm.startBroadcast(bridgehub.owner());
         bridgehub.addStateTransitionManager(addresses.stateTransition.stateTransitionProxy);
         console.log("StateTransitionManager registered");
     }
 
     function setStateTransitionManagerInValidatorTimelock() internal {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
-        vm.broadcast();
         validatorTimelock.setStateTransitionManager(
             IStateTransitionManager(addresses.stateTransition.stateTransitionProxy)
         );
@@ -451,7 +449,7 @@ contract DeployL1Script is Script {
             facet: addresses.stateTransition.adminFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
+            selectors: Utils.getAdminSelectors()
         });
         Diamond.DiamondCutData memory diamondCut =
             Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: hex""});
@@ -497,10 +495,8 @@ contract DeployL1Script is Script {
 
     function registerSharedBridge() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.startBroadcast();
         bridgehub.addToken(ADDRESS_ONE);
         bridgehub.setSharedBridge(addresses.bridges.sharedBridgeProxy);
-        vm.stopBroadcast();
         console.log("SharedBridge registered");
     }
 
@@ -525,14 +521,11 @@ contract DeployL1Script is Script {
 
     function updateSharedBridge() internal {
         L1SharedBridge sharedBridge = L1SharedBridge(addresses.bridges.sharedBridgeProxy);
-        vm.broadcast();
         sharedBridge.setL1Erc20Bridge(addresses.bridges.erc20BridgeProxy);
         console.log("SharedBridge updated with ERC20Bridge address");
     }
 
     function updateOwners() internal {
-        vm.startBroadcast();
-
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
         validatorTimelock.transferOwnership(config.ownerAddress);
 
@@ -543,7 +536,6 @@ contract DeployL1Script is Script {
         sharedBridge.transferOwnership(addresses.governance);
 
         vm.stopBroadcast();
-
         console.log("Owners updated");
     }
 

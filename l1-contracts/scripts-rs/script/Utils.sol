@@ -214,7 +214,6 @@ library Utils {
             return contractAddress;
         }
 
-        vm.broadcast();
         (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
         contractAddress = Utils.bytesToAddress(data);
 

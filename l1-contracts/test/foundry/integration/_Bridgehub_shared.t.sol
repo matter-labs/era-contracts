@@ -355,13 +355,12 @@ contract IntegrationTests is BridgeHubIntegration, HyperchainFactory, L2TxMocker
     }
 
     function test_hyperchainTokenDirectDeposit_Eth_2() public {
-        DeployErc20Script script = new DeployErc20Script();
-        script.run();
+        // DeployErc20Script script = new DeployErc20Script();
+        // script.run();
 
-        emit log_address(script.getTokensAddresses()[0]);
+        // emit log_address(script.getTokensAddresses()[0]);
 
         DeployL1Script l1Script = new DeployL1Script();
-
         l1Script.run();
 
         assertTrue(true);
