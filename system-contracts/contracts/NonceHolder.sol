@@ -15,7 +15,7 @@ import {DEPLOYER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./
  * unique transaction hashes.
  * @dev The account allows for both ascending growth in nonces and mapping nonces to specific
  * stored values in them.
- * The users can either marked a range of nonces by increasing the `minNonce`. This way all the nonces
+ * The users can mark a range of nonces by increasing the `minNonce`. This way all the nonces
  * less than `minNonce` will become used. The other way to mark a certain 256-bit key as nonce is to set
  * some value under it in this contract.
  * @dev Apart from transaction nonces, this contract also stores the deployment nonce for accounts, that
@@ -26,7 +26,7 @@ import {DEPLOYER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./
  */
 contract NonceHolder is INonceHolder, ISystemContract {
     uint256 private constant DEPLOY_NONCE_MULTIPLIER = 2 ** 128;
-    /// The minNonce can be increased by at 2^32 at a time to prevent it from
+    /// The minNonce can be increased by 2^32 at a time to prevent it from
     /// overflowing beyond 2**128.
     uint256 private constant MAXIMAL_MIN_NONCE_INCREMENT = 2 ** 32;
 

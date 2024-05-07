@@ -99,10 +99,10 @@ contract EvmInterpreter {
         }
     }
 
-    function memSize() internal pure returns (uint256 memSize) {
+    function memSize() internal pure returns (uint256 _memSize) {
         uint256 memOffset = MEM_OFFSET;
         assembly {
-            memSize := shl(5, mload(memOffset))
+            _memSize := shl(5, mload(memOffset))
         }
     }
 
@@ -1887,7 +1887,7 @@ contract EvmInterpreter {
                         uint256 num = 0;
                         // TODO: this can be optimized by reading uint256 from code then shr by ((0x7f - opcode) * 8)
                         for (uint256 i = 0; i < len; i++) {
-                            (uint256 opcode, bool overflow) = readIP(ip + i);
+                            (uint256 _opcode, bool overflow) = readIP(ip + i);
 
                             if (overflow) {
                                 assembly {
@@ -1895,7 +1895,7 @@ contract EvmInterpreter {
                                 }
                             }
 
-                            num = (num << 8) | opcode;
+                            num = (num << 8) | _opcode;
                         }
 
                         tos = pushStackItem(tos, num);

@@ -20,7 +20,9 @@ See the [documentation](https://era.zksync.io/docs/dev/fundamentals/rollups.html
   addresses.
 - **Security council** - an address of the Gnosis multisig with the trusted owners that can decrease upgrade timelock.
 - **Validator/Operator** - a privileged address that can commit/verify/execute L2 batches.
-- **L2 batch (or just batch)** - An aggregation of multiple L2 blocks. Note, that while the API operates on L2 blocks, the prove system operates on batches, which represent a single proved VM execution, which typically contains multiple L2 blocks.
+- **L2 batch (or just batch)** - An aggregation of multiple L2 blocks. Note, that while the API operates on L2 blocks,
+  the prove system operates on batches, which represent a single proved VM execution, which typically contains multiple
+  L2 blocks.
 - **Facet** - implementation contract. The word comes from the EIP-2535.
 - **Gas** - a unit that measures the amount of computational effort required to execute specific operations on the
   zkSync Era network.
@@ -44,9 +46,8 @@ even an upgrade system is a separate facet that can be replaced.
 
 One of the differences from the reference implementation is access freezability. Each of the facets has an associated
 parameter that indicates if it is possible to freeze access to the facet. Privileged actors can freeze the **diamond**
-(not a specific facet!) and all facets with the marker `isFreezable` should be inaccessible until the governor or its owner
-unfreezes the diamond. Note that it is a very dangerous thing since the diamond proxy can freeze the upgrade system and then
-the diamond will be frozen forever.
+(not a specific facet!) and all facets with the marker `isFreezable` should be inaccessible until the admin or the state transition manager unfreezes the diamond. Note that it is a very dangerous thing since the diamond proxy can freeze the upgrade
+system and then the diamond will be frozen forever.
 
 #### DiamondInit
 
@@ -59,20 +60,20 @@ Implementation detail - function returns a magic value just like it is designed 
 #### GettersFacet
 
 Separate facet, whose only function is providing `view` and `pure` methods. It also implements
-[diamond loupe](https://eips.ethereum.org/EIPS/eip-2535#diamond-loupe) which makes managing facets easier.
-This contract must never be frozen.
+[diamond loupe](https://eips.ethereum.org/EIPS/eip-2535#diamond-loupe) which makes managing facets easier. This contract
+must never be frozen.
 
 #### AdminFacet
 
-Controls changing the privileged addresses such as governor and validators or one of the system parameters (L2
-bootloader bytecode hash, verifier address, verifier parameters, etc), and it also manages the freezing/unfreezing and execution of
-upgrades in the diamond proxy.
+Controls changing the privileged addresses such as admin and validators or one of the system parameters (L2
+bootloader bytecode hash, verifier address, verifier parameters, etc), and it also manages the freezing/unfreezing and
+execution of upgrades in the diamond proxy.
 
 #### Governance
 
-This contract manages operations (calls with preconditions) for governance tasks. The contract allows for operations to be scheduled,
-executed, and canceled with appropriate permissions and delays. It is used for managing and coordinating upgrades and changes in all
-zkSync Era governed contracts.
+This contract manages operations (calls with preconditions) for governance tasks. The contract allows for operations to
+be scheduled, executed, and canceled with appropriate permissions and delays. It is used for managing and coordinating
+upgrades and changes in all zkSync Era governed contracts.
 
 Each upgrade consists of two steps:
 
@@ -153,6 +154,15 @@ this trick:
 - The contract on L1 accepts all sent messages and if the message came from this system contract it requires that the
   preimage of `value` be provided.
 
+#### L1 -> L2 Transaction filtering
+
+There is a mechanism for applying custom filters to the L1 -> L2 communication. It is achieved by having an address of
+the `TransactionFilterer` contract in the `ZkSyncHyperchainStorage`. If the filterer exists, it is being called in
+the `Mailbox` facet with the tx details and has to return whether the transaction can be executed or not. The filterer
+has to implement the `ITransactionFilterer` interface. The ones intended to use this feature, have to deploy the
+contract that implements `ITransactionFilterer` and use `setTransactionFilterer` function of `AdminFacet` to set the
+address of the transaction filterer. The same function called with `0` address will disable the filtering.
+
 #### ExecutorFacet
 
 A contract that accepts L2 batches, enforces data availability and checks the validity of zk-proofs.
@@ -181,7 +191,7 @@ enum SystemLogKey {
 When a batch is committed, we process L2 -> L1 system logs. Here are the invariants that are expected there:
 
 - In a given batch there will be either 7 or 8 system logs. The 8th log is only required for a protocol upgrade.
-- There will be a single log for each key that is containted within `SystemLogKey`
+- There will be a single log for each key that is contained within `SystemLogKey`
 - Three logs from the `L2_TO_L1_MESSENGER` with keys:
 - `L2_TO_L1_LOGS_TREE_ROOT_KEY`
 - `TOTAL_L2_TO_L1_PUBDATA_KEY`
@@ -206,23 +216,23 @@ L1 <-> L2 communication.
 
 ##### L1ERC20Bridge
 
-The "standard" implementation of the ERC20 token bridge. Works only with regular ERC20 tokens, i.e. not with
+The legacy implementation of the ERC20 token bridge. Works only with regular ERC20 tokens, i.e. not with
+fee-on-transfer tokens or other custom logic for handling user balances. Only works for Era.
+
+- `deposit` - lock funds inside the contract and send a request to mint bridged assets on L2.
+- `claimFailedDeposit` - unlock funds if the deposit was initiated but then failed on L2.
+- `finalizeWithdrawal` - unlock funds for the valid withdrawal request from L2.
+
+##### L1SharedBridge
+
+The "standard" implementation of the ERC20 and WETH token bridge. Works only with regular ERC20 tokens, i.e. not with
 fee-on-transfer tokens or other custom logic for handling user balances.
 
 - `deposit` - lock funds inside the contract and send a request to mint bridged assets on L2.
 - `claimFailedDeposit` - unlock funds if the deposit was initiated but then failed on L2.
 - `finalizeWithdrawal` - unlock funds for the valid withdrawal request from L2.
 
-##### L2ERC20Bridge
-
-The L2 counterpart of the L1 ERC20 bridge.
-
-- `withdraw` - initiate a withdrawal by burning funds on the contract and sending a corresponding message to L1.
-- `finalizeDeposit` - finalize the deposit and mint funds on L2.
-
-##### L1WethBridge
-
-The custom bridge exclusively handles transfers of WETH tokens between the two domains. It is designed to streamline and
+The bridge also handles WETH token deposits between the two domains. It is designed to streamline and
 enhance the user experience for bridging WETH tokens by minimizing the number of transactions required and reducing
 liquidity fragmentation thus improving efficiency and user experience.
 
@@ -231,11 +241,14 @@ it is wrapped back into WETH and delivered to the L2 recipient.
 
 Thus, the deposit is made in one transaction, and the user receives L2 WETH that can be unwrapped to ETH.
 
-##### L2WethBridge
+##### L2SharedBridge
 
-The L2 counterpart of the L1 WETH bridge.
+The L2 counterpart of the L1 Shared bridge.
 
-For withdrawals, the contract receives ETH from the L2 WETH bridge contract, wraps it into WETH, and sends the WETH to
+- `withdraw` - initiate a withdrawal by burning funds on the contract and sending a corresponding message to L1.
+- `finalizeDeposit` - finalize the deposit and mint funds on L2.
+
+For WETH withdrawals, the contract receives ETH from the L2 WETH bridge contract, wraps it into WETH, and sends the WETH to
 the L1 recipient.
 
 #### ValidatorTimelock
@@ -248,15 +261,16 @@ investigation and mitigation before resuming normal operations.
 It is a temporary solution to prevent any significant impact of the validator hot key leakage, while the network is in
 the Alpha stage.
 
-This contract consists of four main functions `commitBatches`, `proveBatches`, `executeBatches`, and `revertBatches`, that
-can be called only by the validator.
+This contract consists of four main functions `commitBatches`, `proveBatches`, `executeBatches`, and `revertBatches`,
+that can be called only by the validator.
 
-When the validator calls `commitBatches`, the same calldata will be propogated to the zkSync contract (`DiamondProxy` through
-`call` where it invokes the `ExecutorFacet` through `delegatecall`), and also a timestamp is assigned to these batches to track
-the time these batches are commited by the validator to enforce a delay between committing and execution of batches. Then, the
-validator can prove the already commited batches regardless of the mentioned timestamp, and again the same calldata (related
-to the `proveBatches` function) will be propogated to the zkSync contract. After, the `delay` is elapsed, the validator
-is allowed to call `executeBatches` to propogate the same calldata to zkSync contract.
+When the validator calls `commitBatches`, the same calldata will be propagated to the zkSync contract (`DiamondProxy`
+through `call` where it invokes the `ExecutorFacet` through `delegatecall`), and also a timestamp is assigned to these
+batches to track the time these batches are committed by the validator to enforce a delay between committing and
+execution of batches. Then, the validator can prove the already committed batches regardless of the mentioned timestamp,
+and again the same calldata (related to the `proveBatches` function) will be propagated to the zkSync contract. After,
+the `delay` is elapsed, the validator is allowed to call `executeBatches` to propagate the same calldata to zkSync
+contract.
 
 ### L2 specifics
 

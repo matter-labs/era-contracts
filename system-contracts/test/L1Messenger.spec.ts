@@ -89,16 +89,16 @@ describe("L1Messenger tests", () => {
       await (
         await l1Messenger
           .connect(bootloaderAccount)
-          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs(), { gasLimit: 10000000 })
+          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs(), { gasLimit: 1000000000 })
       ).wait();
     });
 
     it("should revert Too many L2->L1 logs", async () => {
-      // set numberOfLogsBytes to 0x1100 to trigger the revert (max value is 0x1000)
+      // set numberOfLogsBytes to 0x4002 to trigger the revert (max value is 0x4000)
       await expect(
         l1Messenger
           .connect(bootloaderAccount)
-          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs({ numberOfLogs: 0x1100 }))
+          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs({ numberOfLogs: 0x4002 }))
       ).to.be.rejectedWith("Too many L2->L1 logs");
     });
 
@@ -247,7 +247,7 @@ describe("L1Messenger tests", () => {
       await expect(l1Messenger.requestBytecodeL1Publication(byteCodeHash)).to.be.rejectedWith("Inappropriate caller");
     });
 
-    it("shoud emit event, called by known code system contract", async () => {
+    it("should emit event, called by known code system contract", async () => {
       await expect(
         l1Messenger
           .connect(knownCodeStorageAccount)

@@ -7,8 +7,9 @@ import type { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import type { BigNumberish, BytesLike } from "ethers";
 import { BigNumber, ethers } from "ethers";
 import * as fs from "fs";
+import * as fsPr from "fs/promises";
 import { hashBytecode } from "zksync-web3/build/src/utils";
-import type { YulContractDescrption, ZasmContractDescrption } from "./constants";
+import type { YulContractDescription, ZasmContractDescription } from "./constants";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
 import { getCompilersDir } from "hardhat/internal/util/global-dir";
 import path from "path";
@@ -28,13 +29,13 @@ export interface DeployedDependency {
   address?: string;
 }
 
-export function readYulBytecode(description: YulContractDescrption) {
+export function readYulBytecode(description: YulContractDescription) {
   const contractName = description.codeName;
   const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.yul.zbin`;
   return ethers.utils.hexlify(fs.readFileSync(path));
 }
 
-export function readZasmBytecode(description: ZasmContractDescrption) {
+export function readZasmBytecode(description: ZasmContractDescription) {
   const contractName = description.codeName;
   const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.zasm.zbin`;
   return ethers.utils.hexlify(fs.readFileSync(path));
@@ -252,4 +253,76 @@ export function prepareCompilerPaths(path: string): CompilerPaths {
   const absolutePathArtifacts = `${__dirname}/../${path}/artifacts`;
 
   return new CompilerPaths(absolutePathSources, absolutePathArtifacts);
+}
+
+// Get the latest file modification time in the watched folder
+function getLatestModificationTime(folder: string): Date | null {
+  const files = fs.readdirSync(folder);
+  let latestTime: Date | null = null; // Initialize to null to avoid uninitialized variable
+
+  files.forEach((file) => {
+    const filePath = path.join(folder, file);
+    const stats = fs.statSync(filePath);
+    if (stats.isDirectory()) {
+      const dirLatestTime = getLatestModificationTime(filePath);
+      if (dirLatestTime && (!latestTime || dirLatestTime > latestTime)) {
+        latestTime = dirLatestTime;
+      }
+    } else if (stats.isFile()) {
+      if (!latestTime || stats.mtime > latestTime) {
+        latestTime = stats.mtime;
+      }
+    }
+  });
+
+  return latestTime;
+}
+
+// Read the last compilation timestamp from the file
+export function getLastCompilationTime(timestampFile: string): Date | null {
+  try {
+    if (fs.existsSync(timestampFile)) {
+      const timestamp = fs.readFileSync(timestampFile, "utf-8");
+      return new Date(parseInt(timestamp, 10));
+    }
+  } catch (error) {
+    const err = error as Error; // Cast `error` to `Error`
+    console.error(`Error reading timestamp: ${err.message}`);
+  }
+  return null;
+}
+
+// Write the current time to the timestamp file
+export function setCompilationTime(timestampFile: string) {
+  fs.writeFileSync(timestampFile, Date.now().toString());
+}
+
+// Determine if recompilation is needed
+export function needsRecompilation(folder: string, timestampFile: string): boolean {
+  const lastCompilationTime = getLastCompilationTime(timestampFile);
+  const latestModificationTime = getLatestModificationTime(folder);
+  if (!lastCompilationTime) {
+    return true; // If there's no history, always recompile
+  }
+
+  return latestModificationTime! > lastCompilationTime;
+}
+
+export function deleteDir(path: string): void {
+  try {
+    fs.rmSync(path, { recursive: true, force: true }); // 'recursive: true' deletes all contents, 'force: true' prevents errors if the directory doesn't exist
+    console.log(`Directory '${path}' deleted successfully.`);
+  } catch (error) {
+    console.error(`Error deleting directory '${path}':`, error);
+  }
+}
+
+export async function isFolderEmpty(folderPath: string): Promise<boolean> {
+  try {
+    const files = await fsPr.readdir(folderPath); // Get a list of files in the folder
+    return files.length === 0; // If there are no files, the folder is empty
+  } catch (error) {
+    console.error("No target folder with artifacts.");
+    return true; // Return true if an error, as folder doesn't exist.
+  }
 }

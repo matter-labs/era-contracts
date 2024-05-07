@@ -26,13 +26,13 @@ pub(crate) enum TestVmHook {
 
 // Number of 32-bytes slots that are reserved for test hooks (passing information between bootloader test code and the VM).
 const TEST_HOOKS: u32 = 5;
-const TEST_HOOK_ENUM_POSITON: u32 = VM_HOOK_PARAMS_START_POSITION - 1;
-const TEST_HOOK_START: u32 = TEST_HOOK_ENUM_POSITON - TEST_HOOKS;
+const TEST_HOOK_ENUM_POSITION: u32 = VM_HOOK_PARAMS_START_POSITION - 1;
+const TEST_HOOK_START: u32 = TEST_HOOK_ENUM_POSITION - TEST_HOOKS;
 
 pub fn get_vm_hook_params<H: HistoryMode>(memory: &SimpleMemory<H>) -> Vec<U256> {
     memory.dump_page_content_as_u256_words(
         BOOTLOADER_HEAP_PAGE,
-        TEST_HOOK_START..TEST_HOOK_ENUM_POSITON,
+        TEST_HOOK_START..TEST_HOOK_ENUM_POSITION,
     )
 }
 
@@ -55,7 +55,7 @@ fn test_hook_as_string(hook_param: U256) -> String {
 }
 
 fn test_hook_as_int_or_hex(hook_param: U256) -> String {
-    // For long data, it is better to use hex-encoding for greater readibility
+    // For long data, it is better to use hex-encoding for greater readability
     if hook_param > U256::from(u64::max_value()) {
         let mut bytes = [0u8; 32];
         hook_param.to_big_endian(&mut bytes);
@@ -88,7 +88,7 @@ impl TestVmHook {
         // Only UMA opcodes in the bootloader serve for vm hooks
         if !matches!(opcode_variant.opcode, Opcode::UMA(UMAOpcode::HeapWrite))
             || heap_page != BOOTLOADER_HEAP_PAGE
-            || fat_ptr.offset != TEST_HOOK_ENUM_POSITON * 32
+            || fat_ptr.offset != TEST_HOOK_ENUM_POSITION * 32
         {
             return Self::NoHook;
         }

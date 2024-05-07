@@ -18,10 +18,13 @@ copies or substantial portions of the Software.
 
 */
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 /// @title Multicall - Aggregate results from multiple read-only function calls
 contract Multicall {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     struct Call {
         address target;
         bytes callData;
@@ -32,7 +35,7 @@ contract Multicall {
         returnData = new bytes[](calls.length);
         for (uint256 i = 0; i < calls.length; ++i) {
             (bool success, bytes memory ret) = calls[i].target.call(calls[i].callData);
-            require(success);
+            require(success, "multicall 1");
             returnData[i] = ret;
         }
     }
@@ -55,7 +58,7 @@ contract Multicall {
     }
 
     function getCurrentBlockDifficulty() public view returns (uint256 difficulty) {
-        difficulty = block.difficulty;
+        difficulty = block.prevrandao;
     }
 
     function getCurrentBlockGasLimit() public view returns (uint256 gaslimit) {

@@ -11,7 +11,6 @@
     "@nomicfoundation/hardhat-verify": "^1.1.0",
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@nomiclabs/hardhat-etherscan": "^3.1.7",
-    "@nomiclabs/hardhat-solpp": "^2.0.0",
     "@openzeppelin/contracts": "4.9.5",
     "@openzeppelin/contracts-upgradeable": "4.9.5",
     "@typechain/ethers-v5": "^2.0.0",
@@ -36,12 +35,17 @@
     "clean": "hardhat clean",
     "test": "hardhat test",
     "verify": "hardhat run src/verify.ts",
-    "deploy-testnet-paymaster": "ts-node src/deployTestnetPaymaster.ts",
-    "deploy-force-deploy-upgrader": "ts-node src/deployForceDeployUpgrader.ts",
+    "deploy-testnet-paymaster": "ts-node src/deploy-testnet-paymaster.ts",
+    "deploy-testnet-paymaster-through-l1": "ts-node src/deploy-testnet-paymaster-through-l1.ts",
+    "deploy-force-deploy-upgrader": "ts-node src/deploy-force-deploy-upgrader.ts",
+    "deploy-force-deploy-upgrader-through-l1": "ts-node src/deploy-force-deploy-upgrader-through-l1.ts",
+    "deploy-shared-bridge-on-l2": "ts-node scripts/deploy-shared-bridge-on-l2.ts",
+    "deploy-shared-bridge-on-l2-through-l1": "ts-node src/deploy-shared-bridge-on-l2-through-l1.ts",
+    "deploy-shared-bridge-l2-implementation": "ts-node src/deploy-shared-bridge-implementation-legacy.ts",
     "publish-bridge-preimages": "ts-node src/publish-bridge-preimages.ts",
-    "deploy-l2-weth": "ts-node src/deployL2Weth.ts",
-    "upgrade-bridge-contracts": "ts-node src/upgradeBridgeImpl.ts",
-    "update-l2-erc20-metadata": "ts-node src/updateL2ERC20Metadata.ts"
+    "deploy-l2-weth": "ts-node src/deploy-l2-weth.ts",
+    "upgrade-bridge-contracts": "ts-node src/upgrade-bridge-impl.ts",
+    "update-l2-erc20-metadata": "ts-node src/update-l2-erc20-metadata.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3"

@@ -1,0 +1,98 @@
+[
+  {
+    "name": "DAI",
+    "symbol": "DAI",
+    "decimals": 18,
+    "address": "0x3202935CA01eADd2F0B4e7aA23EFA52315121172"
+  },
+  {
+    "name": "wBTC",
+    "symbol": "wBTC",
+    "decimals": 8,
+    "address": "0xe73a1c05498e492f182f9B3E3cd65b2F9f52eE94"
+  },
+  {
+    "name": "BAT",
+    "symbol": "BAT",
+    "decimals": 18,
+    "address": "0x7aAE2ee8317b384aDE246664933A147411b60045"
+  },
+  {
+    "name": "GNT",
+    "symbol": "GNT",
+    "decimals": 18,
+    "address": "0x02a344d1e31e92e39c2681937645F1d668C37d4e"
+  },
+  {
+    "name": "MLTT",
+    "symbol": "MLTT",
+    "decimals": 18,
+    "address": "0x28033f8EdB2F43747E55401C4a3E3b4b2cF5146C"
+  },
+  {
+    "name": "DAIK",
+    "symbol": "DAIK",
+    "decimals": 18,
+    "address": "0x147dCc3a8E99794C2Ec79EaF1a142324D6778255"
+  },
+  {
+    "name": "wBTCK",
+    "symbol": "wBTCK",
+    "decimals": 8,
+    "address": "0x74cA8715E29196Bfbcd7444B09203d22dDaF7d1a"
+  },
+  {
+    "name": "BATK",
+    "symbol": "BATS",
+    "decimals": 18,
+    "address": "0x2eAf3eac597d23db3A8427329482aE47935141d9"
+  },
+  {
+    "name": "GNTK",
+    "symbol": "GNTS",
+    "decimals": 18,
+    "address": "0x2B1b32d23f2be391280bFbD2B51daB8Ad2a69B9e"
+  },
+  {
+    "name": "MLTTK",
+    "symbol": "MLTTS",
+    "decimals": 18,
+    "address": "0xc2Ca10940Ad80Cd98512B767457bd44713232B5a"
+  },
+  {
+    "name": "DAIL",
+    "symbol": "DAIL",
+    "decimals": 18,
+    "address": "0xd6b4CDa9F0Ef6d9F6b35Ab5424df0dD95E6a6D1b"
+  },
+  {
+    "name": "wBTCL",
+    "symbol": "wBTCP",
+    "decimals": 8,
+    "address": "0x15CD4a1C10AE2D3727Dad680a1966947931588C9"
+  },
+  {
+    "name": "BATL",
+    "symbol": "BATW",
+    "decimals": 18,
+    "address": "0x45f430CFD5Bf38eCE39f1B9A2930B3fD494619e8"
+  },
+  {
+    "name": "GNTL",
+    "symbol": "GNTW",
+    "decimals": 18,
+    "address": "0x801Ab08819573537C0B256d139473eF13482B3Dd"
+  },
+  {
+    "name": "MLTTL",
+    "symbol": "MLTTW",
+    "decimals": 18,
+    "address": "0xf55F3af54B9a507Bd0260e5844C1648921214745"
+  },
+  {
+    "name": "Wrapped Ether",
+    "symbol": "WETH",
+    "decimals": 18,
+    "address": "0xed01DF970925Cc0BB427f9E8014449C8a529D303"
+  }
+]
