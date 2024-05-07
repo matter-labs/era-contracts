@@ -230,6 +230,7 @@ contract DefaultAccount is IAccount {
         assert(msg.sender != BOOTLOADER_FORMAL_ADDRESS);
 
         // If the contract is called directly, behave like an EOA
+
     }
 
     receive() external payable {

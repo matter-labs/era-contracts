@@ -56,8 +56,7 @@ yarn deploy-on-hyperchain --private-key <private-key> --l2-rpc <rpc>
 
 ### Deployed addresses
 
-| Network    | Address |
-| -------- | ------- |
-| Era Testnet  | [0xDaAD9137Deec2FCbB8C4aB3820553E0da60328b6](https://sepolia.explorer.zksync.io/address/0xDaAD9137Deec2FCbB8C4aB3820553E0da60328b6#contract)    |
-| Era Mainnet |  TODO   |
-
+| Network     | Address                                                                                                                                      |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Era Testnet | [0xDaAD9137Deec2FCbB8C4aB3820553E0da60328b6](https://sepolia.explorer.zksync.io/address/0xDaAD9137Deec2FCbB8C4aB3820553E0da60328b6#contract) |
+| Era Mainnet | TODO                                                                                                                                         |

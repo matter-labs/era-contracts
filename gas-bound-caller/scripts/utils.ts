@@ -16,9 +16,9 @@ export function readCanonicalArtifact() {
 }
 
 export interface Create2DeploymentInfo {
-  bytecode: string,
-  bytecodeHash: string,
-  expectedAddress: string,
+  bytecode: string;
+  bytecodeHash: string;
+  expectedAddress: string;
 }
 
 export function getCreate2DeploymentInfo(): Create2DeploymentInfo {

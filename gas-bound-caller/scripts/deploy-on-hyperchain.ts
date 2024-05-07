@@ -1,8 +1,8 @@
 // hardhat import should be the first import in the file
 import { ethers } from "ethers";
 import { Command } from "commander";
-import { PREDEPLOYED_CREATE2_ADDRESS, getCreate2DeploymentInfo, readCanonicalArtifact } from "./utils";
-import { Wallet, Provider, Contract, utils } from "zksync-ethers";
+import { PREDEPLOYED_CREATE2_ADDRESS, getCreate2DeploymentInfo } from "./utils";
+import { Wallet, Provider, Contract } from "zksync-ethers";
 
 const singletonFactoryAbi = [
   {

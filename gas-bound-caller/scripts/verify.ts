@@ -22,7 +22,7 @@ async function main() {
 
   const verificationMessage = await verifyPromise(expectedAddress);
 
-  if(verificationMessage.status == "fulfilled") {
+  if (verificationMessage.status == "fulfilled") {
     console.log(verificationMessage.value);
   } else {
     console.log(verificationMessage.reason);
