@@ -1,11 +1,8 @@
 // hardhat import should be the first import in the file
 import { ethers } from "ethers";
 import { Command } from "commander";
-import { readCanonicalArtifact } from "./utils";
+import { PREDEPLOYED_CREATE2_ADDRESS, getCreate2DeploymentInfo, readCanonicalArtifact } from "./utils";
 import { Wallet, Provider, Contract, utils } from "zksync-ethers";
-
-// This factory should be predeployed on each post-v24 zksync network
-const PREDEPLOYED_CREATE2_ADDRESS = "0x0000000000000000000000000000000000010000";
 
 const singletonFactoryAbi = [
   {
@@ -47,23 +44,16 @@ async function main() {
     .name("Deploy on hyperchain")
     .description("Deploys the GasBoundCaller on a predetermined Hyperchain network")
     .option("--private-key <private-key>")
-    .option("--l2Rpc <l2Rpc>")
+    .option("--l2-rpc <l2Rpc>")
     .action(async (cmd) => {
       console.log("Reading the canonical bytecode of the GasBoundCaller");
-      const bytecode = readCanonicalArtifact();
+
+      const { bytecode, bytecodeHash, expectedAddress } = getCreate2DeploymentInfo();
 
       const wallet = new Wallet(cmd.privateKey, new Provider(cmd.l2Rpc));
 
       const singleTonFactory = new Contract(PREDEPLOYED_CREATE2_ADDRESS, singletonFactoryAbi, wallet);
 
-      const bytecodeHash = ethers.utils.hexlify(utils.hashBytecode(bytecode));
-
-      const expectedAddress = utils.create2Address(
-        PREDEPLOYED_CREATE2_ADDRESS,
-        bytecodeHash,
-        ethers.constants.HashZero,
-        "0x"
-      );
       console.log("Expected address:", expectedAddress);
 
       const currentCode = await wallet.provider.getCode(expectedAddress);

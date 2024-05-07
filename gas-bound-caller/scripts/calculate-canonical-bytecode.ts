@@ -8,8 +8,8 @@ async function main() {
 
   program
     .version("0.1.0")
-    .name("check canonical bytecode")
-    .description("Checks that the locally built artifacts match the canonical bytecode");
+    .name("calculate canonical bytecode")
+    .description("A script that is used to check that the locally built artifacts match the canonical bytecode");
 
   program.command("check").action(async () => {
     const compiledBytecode = (await hre.artifacts.readArtifact("GasBoundCaller")).bytecode;
