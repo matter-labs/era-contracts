@@ -4,8 +4,8 @@ pragma solidity 0.8.24;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";
-import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
+import {MAX_GAS_PER_TRANSACTION, HyperchainCommitment} from "../../../common/Config.sol";
+import {FeeParams, PubdataPricingMode, SyncLayerState} from "../ZkSyncHyperchainStorage.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 
@@ -131,11 +131,57 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function executeMigration(
-        Diamond.DiamondCutData calldata _diamondCut
+    function finalizeMigration(
+        HyperchainCommitment memory _commitment
     ) external onlyStateTransitionManager {
-        Diamond.diamondCut(_diamondCut);
+        // TODO: limit state under which it can be perforemd
+        // require(s.syncLayerState == SyncLayerState.ActiveL1 || s.syncLayerState == SyncLayerState.ActiveSL, "not active");
+
+        uint256 batchesExecuted = _commitment.totalBatchesExecuted;
+        uint256 batchesVerified = _commitment.totalBatchesVerified;
+        uint256 batchesCommitted = _commitment.totalBatchesCommitted;
+
+        // Some consistency checks just in case.
+        require(batchesExecuted <= batchesVerified, "Executed is not consistent with verified");
+        require(batchesVerified <= batchesCommitted, "Verified is not consistent with committed");
+
+        // In the worst case, we may need to revert all the committed batches that were not executed. 
+        // This means that the stored batch hashes should be stored for [batchesExecuted; batchesCommitted] batches, i.e. 
+        // there should be batchesCommitted - batchesExecuted + 1 hashes.
+        require(_commitment.batchHashes.length == batchesCommitted - batchesExecuted + 1, "Invalid number of batch hashes");
+
+        // Note that this part is done in O(N), i.e. it is the reponsibility of the admin of the chain to ensure that the total number of 
+        // outstanding committed batches is not too long.
+        for(uint256 i = 0 ; i < _commitment.batchHashes.length; i++) {
+            s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];
+        }
+
         emit MigrationComplete(_diamondCut);
+    }
+
+    function startMigrationToSyncLayer() external onlyStateTransitionManager returns (HyperchainCommitment memory commitment) {
+        require(s.syncLayerState == SyncLayerState.ActiveL1, "not active L1");
+        s.syncLayerState = SyncLayerState.MigratedL1;
+
+        commitment.totalBatchesCommitted = s.totalBatchesCommitted;
+        commitment.totalBatchesVerified = s.totalBatchesVerified;
+        commitment.totalBatchesExecuted = s.totalBatchesExecuted;
+
+        // just in case
+        require(commitment.totalBatchesExecuted <= commitment.totalBatchesVerified, "Verified is not consistent with executed");
+        require(commitment.totalBatchesVerified <= commitment.totalBatchesCommitted, "Verified is not consistent with committed");
+
+        uint256 blocksToRemember = commitment.totalBatchesCommitted - commitment.totalBatchesExecuted + 1;
+
+        bytes32[] memory batchHashes = new bytes32[](blocksToRemember);
+
+        for(uint256 i = 0 ; i< blocksToRemember; i++) {
+            unchecked {  
+                batchHashes[i] = s.storedBatchHashes[commitment.totalBatchesExecuted + i];
+            } 
+        }
+
+        commitment.batchHashes = batchHashes;
     }
 
 

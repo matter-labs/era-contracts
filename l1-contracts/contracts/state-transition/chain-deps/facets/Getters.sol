@@ -194,6 +194,13 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
         return s.feeParams.pubdataPricingMode;
     }
 
+    /// @inheritdoc IGetters
+    function getSyncLayerState() external view returns (SyncLayerState) {
+        // TODO: consider making private so that noone relies on it
+
+        return s.syncLayerState;
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DIAMOND LOUPE
      //////////////////////////////////////////////////////////////*/

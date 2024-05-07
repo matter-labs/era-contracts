@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+import {HyperchainCommitment} from "../../common/Config.sol";
+
 import {IZkSyncHyperchainBase} from "../chain-interfaces/IZkSyncHyperchainBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
@@ -56,7 +58,8 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @param _diamondCut The diamond cut parameters to be executed
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
-    function executeMigration(HyperchainCommitment calldata _hyperchainCommitment) external;
+    function finalizeMigration(HyperchainCommitment calldata _hyperchainCommitment) external;
+    function startMigrationToSyncLayer() external returns (HyperchainCommitment memory commitment);
 
     /// @notice Instantly pause the functionality of all freezable facets & their selectors
     /// @dev Only the governance mechanism may freeze Diamond Proxy
@@ -109,4 +112,5 @@ interface IAdmin is IZkSyncHyperchainBase {
 
     /// @notice Emitted when the contract is unfrozen.
     event Unfreeze();
+
 }

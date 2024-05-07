@@ -13,7 +13,7 @@ import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager, StateTransitionManagerInitializeData} from "./IStateTransitionManager.sol";
 import {ISystemContext} from "./l2-deps/ISystemContext.sol";
 import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
-import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
+import {FeeParams, SyncLayerState} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
@@ -65,7 +65,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The address to accept the admin role
     address private pendingAdmin;
 
-    address private migrationUpgrade;
+    // address private migrationUpgrade;
+
+    // Sync layer chain is expected to have ETH as the base token.
+    address public syncLayerChainId;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -345,7 +348,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address _baseToken,
         address _sharedBridge,
         address _admin,
-        bytes calldata _diamondCut
+        bytes calldata _diamondCut,
+        SyncLayerState _syncLayerState
     ) internal returns (address hyperchainAddress) {
         if (getHyperchain(_chainId) != address(0)) {
             // Hyperchain already registered
@@ -400,7 +404,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address _admin,
         bytes calldata _diamondCut
     ) external onlyBridgehub {
-        _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut);
+        // TODO: only allow on L1.
+
+        _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut, SyncLayerState.ActiveL1);
 
         // set chainId in VM
         _setChainIdUpgrade(_chainId, hyperchainAddress);
@@ -441,7 +447,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             currentAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut);
 
             // note that we do not need the genesis upgrade, it is expected that everything is already prepared on l2.
-        }
+        } 
 
         IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
 
@@ -449,22 +455,26 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // while it should be definitely the case when a chain is created, we double check just in case
         require(currentProtocolVersion == _expectedProtocolVersion, "STM: protocolVersion mismatch");
 
-        FacetCut[] memory emptyArray;
-        Diamond.DiamondCutData memory data = new Diamond.DiamondCutData({
-            facetCuts: emptyArray,
-            initAddress: migrationUpgrade,
-            initCalldata: abi.encodeCall(MigrationUpgrade.migrate, (commitment))
-        });
+        // FacetCut[] memory emptyArray;
+        // Diamond.DiamondCutData memory data = new Diamond.DiamondCutData({
+        //     facetCuts: emptyArray,
+        //     initAddress: migrationUpgrade,
+        //     initCalldata: abi.encodeCall(MigrationUpgrade.migrate, (commitment))
+        // });
 
         // Now migrating the chain
-        hyperchain.executeMigration(data);
+        hyperchain.executeMigration(commitment);
     }
 
-    function startMigration(
+    function startMigrationToSyncLayer(
         uint256 _chainId,
-        address _newAdmin,
+        address _newSyncLayerAdmin,
     ) {
+        IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
+        
+        HyperchainCommitment calldata commitment = hyperchain.startMigrationToSyncLayer(_newSyncLayerAdmin);
 
+        // Now, we need to send an L1->L2 tx to the sync layer blockchain to the spawn the chain on SL.
     }
 
     /// @dev This internal function is used to register a new hyperchain in the system.
