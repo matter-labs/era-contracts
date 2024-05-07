@@ -16,7 +16,7 @@ library Utils {
     // Create2Factory deterministic bytecode.
     // https://github.com/Arachnid/deterministic-deployment-proxy
     bytes internal constant CREATE2_FACTORY_BYTECODE =
-        hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
+    hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
 
     address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     uint256 constant MAX_PRIORITY_TX_GAS = 72000000;
@@ -111,7 +111,7 @@ library Utils {
      */
     function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
         string memory file = vm.readFile(
-            // solhint-disable-next-line func-named-parameters
+        // solhint-disable-next-line func-named-parameters
             string.concat(
                 "../system-contracts/artifacts-zk/contracts-preprocessed/",
                 filename,
@@ -281,7 +281,7 @@ library Utils {
     /**
      * @dev Read hardhat bytecodes
      */
-    function readHardhatBytecode(string memory artifactPath) public returns (bytes memory) {
+    function readHardhatBytecode(string memory artifactPath) public view returns (bytes memory) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, artifactPath);
         string memory json = vm.readFile(path);
