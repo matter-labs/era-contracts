@@ -118,11 +118,11 @@ contract DeployL2Script is Script {
     }
 
     function deploySharedBridgeProxy() public {
-        bytes memory l2StandardErc20Bytecode = readHardheadBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
+        bytes memory beaconProxy = readHardheadBytecode(
+            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
         );
         address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
-        bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(l2StandardErc20Bytecode);
+        bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(beaconProxy);
 
         // solhint-disable-next-line func-named-parameters
         bytes memory proxyInitializationParams = abi.encodeWithSignature(
