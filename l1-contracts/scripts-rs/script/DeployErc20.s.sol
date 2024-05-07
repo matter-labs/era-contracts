@@ -105,12 +105,14 @@ contract DeployErc20Script is Script {
 
         bytes memory bytecode = abi.encodePacked(vm.getCode(implementation), args);
 
+        vm.broadcast();
         address tokenAddress = deployViaCreate2(bytecode);
 
         if (mint > 0) {
             vm.broadcast();
-            (bool success,) =
-                tokenAddress.call(abi.encodeWithSignature("mint(address,uint256)", config.deployerAddress, mint));
+            (bool success, ) = tokenAddress.call(
+                abi.encodeWithSignature("mint(address,uint256)", config.deployerAddress, mint)
+            );
             require(success, "Mint failed");
         }
 

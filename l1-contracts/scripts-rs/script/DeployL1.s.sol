@@ -26,8 +26,7 @@ import {StateTransitionManager} from "contracts/state-transition/StateTransition
 import {StateTransitionManagerInitializeData} from "contracts/state-transition/IStateTransitionManager.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from
-    "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
@@ -149,6 +148,15 @@ contract DeployL1Script is Script {
         saveOutput();
     }
 
+    function getBridgehubProxyAddress() public view returns (address) {
+        return addresses.bridgehub.bridgehubProxy;
+    }
+
+    function getBridgehubOwnerAddress() public view returns (address) {
+        Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
+        return bridgehub.owner();
+    }
+
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/scripts-rs/script-config/config-deploy-l1.toml");
@@ -163,16 +171,18 @@ contract DeployL1Script is Script {
         config.eraChainId = toml.readUint("$.era_chain_id");
         config.ownerAddress = toml.readAddress("$.owner_address");
 
-        config.contracts.governanceSecurityCouncilAddress =
-            toml.readAddress("$.contracts.governance_security_council_address");
+        config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
+            "$.contracts.governance_security_council_address"
+        );
         config.contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
         config.contracts.maxNumberOfHyperchains = toml.readUint("$.contracts.max_number_of_hyperchains");
         config.contracts.create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
         if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
             config.contracts.create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
         }
-        config.contracts.validatorTimelockExecutionDelay =
-            toml.readUint("$.contracts.validator_timelock_execution_delay");
+        config.contracts.validatorTimelockExecutionDelay = toml.readUint(
+            "$.contracts.validator_timelock_execution_delay"
+        );
         config.contracts.genesisRoot = toml.readBytes32("$.contracts.genesis_root");
         config.contracts.genesisRollupLeafIndex = toml.readUint("$.contracts.genesis_rollup_leaf_index");
         config.contracts.genesisBatchCommitment = toml.readBytes32("$.contracts.genesis_batch_commitment");
@@ -181,13 +191,19 @@ contract DeployL1Script is Script {
         config.contracts.recursionLeafLevelVkHash = toml.readBytes32("$.contracts.recursion_leaf_level_vk_hash");
         config.contracts.recursionCircuitsSetVksHash = toml.readBytes32("$.contracts.recursion_circuits_set_vks_hash");
         config.contracts.priorityTxMaxGasLimit = toml.readUint("$.contracts.priority_tx_max_gas_limit");
-        config.contracts.diamondInitPubdataPricingMode =
-            PubdataPricingMode(toml.readUint("$.contracts.diamond_init_pubdata_pricing_mode"));
-        config.contracts.diamondInitBatchOverheadL1Gas = toml.readUint("$.contracts.diamond_init_batch_overhead_l1_gas");
-        config.contracts.diamondInitMaxPubdataPerBatch = toml.readUint("$.contracts.diamond_init_max_pubdata_per_batch");
+        config.contracts.diamondInitPubdataPricingMode = PubdataPricingMode(
+            toml.readUint("$.contracts.diamond_init_pubdata_pricing_mode")
+        );
+        config.contracts.diamondInitBatchOverheadL1Gas = toml.readUint(
+            "$.contracts.diamond_init_batch_overhead_l1_gas"
+        );
+        config.contracts.diamondInitMaxPubdataPerBatch = toml.readUint(
+            "$.contracts.diamond_init_max_pubdata_per_batch"
+        );
         config.contracts.diamondInitMaxL2GasPerBatch = toml.readUint("$.contracts.diamond_init_max_l2_gas_per_batch");
-        config.contracts.diamondInitPriorityTxMaxPubdata =
-            toml.readUint("$.contracts.diamond_init_priority_tx_max_pubdata");
+        config.contracts.diamondInitPriorityTxMaxPubdata = toml.readUint(
+            "$.contracts.diamond_init_priority_tx_max_pubdata"
+        );
         config.contracts.diamondInitMinimalL2GasPrice = toml.readUint("$.contracts.diamond_init_minimal_l2_gas_price");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
@@ -248,7 +264,8 @@ contract DeployL1Script is Script {
     function deployValidatorTimelock() internal {
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
         bytes memory bytecode = abi.encodePacked(
-            type(ValidatorTimelock).creationCode, abi.encode(config.deployerAddress, executionDelay, config.eraChainId)
+            type(ValidatorTimelock).creationCode,
+            abi.encode(config.deployerAddress, executionDelay, config.eraChainId)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("ValidatorTimelock deployed at:", contractAddress);
@@ -320,8 +337,9 @@ contract DeployL1Script is Script {
         console.log("AdminFacet deployed at:", adminFacet);
         addresses.stateTransition.adminFacet = adminFacet;
 
-        address mailboxFacet =
-            deployViaCreate2(abi.encodePacked(type(MailboxFacet).creationCode, abi.encode(config.eraChainId)));
+        address mailboxFacet = deployViaCreate2(
+            abi.encodePacked(type(MailboxFacet).creationCode, abi.encode(config.eraChainId))
+        );
         console.log("MailboxFacet deployed at:", mailboxFacet);
         addresses.stateTransition.mailboxFacet = mailboxFacet;
 
@@ -451,10 +469,15 @@ contract DeployL1Script is Script {
             isFreezable: false,
             selectors: Utils.getAdminSelectors()
         });
-        Diamond.DiamondCutData memory diamondCut =
-            Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: hex""});
-        bytes memory bytecode =
-            abi.encodePacked(type(DiamondProxy).creationCode, abi.encode(config.l1ChainId, diamondCut));
+        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(0),
+            initCalldata: hex""
+        });
+        bytes memory bytecode = abi.encodePacked(
+            type(DiamondProxy).creationCode,
+            abi.encode(config.l1ChainId, diamondCut)
+        );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("DiamondProxy deployed at:", contractAddress);
         addresses.stateTransition.diamondProxy = contractAddress;
@@ -501,8 +524,10 @@ contract DeployL1Script is Script {
     }
 
     function deployErc20BridgeImplementation() internal {
-        bytes memory bytecode =
-            abi.encodePacked(type(L1ERC20Bridge).creationCode, abi.encode(addresses.bridges.sharedBridgeProxy));
+        bytes memory bytecode = abi.encodePacked(
+            type(L1ERC20Bridge).creationCode,
+            abi.encode(addresses.bridges.sharedBridgeProxy)
+        );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("Erc20BridgeImplementation deployed at:", contractAddress);
         addresses.bridges.erc20BridgeImplementation = contractAddress;
@@ -542,11 +567,15 @@ contract DeployL1Script is Script {
     function saveOutput() internal {
         vm.serializeAddress("l1.bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
         string memory l1Bridgehub = vm.serializeAddress(
-            "l1.bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation
+            "l1.bridgehub",
+            "bridgehub_implementation_addr",
+            addresses.bridgehub.bridgehubImplementation
         );
 
         vm.serializeAddress(
-            "l1.state_transition", "state_transition_proxy_addr", addresses.stateTransition.stateTransitionProxy
+            "l1.state_transition",
+            "state_transition_proxy_addr",
+            addresses.stateTransition.stateTransitionProxy
         );
         vm.serializeAddress(
             "l1.state_transition",
@@ -561,42 +590,71 @@ contract DeployL1Script is Script {
         vm.serializeAddress("l1.state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
         vm.serializeAddress("l1.state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("l1.state_transition", "default_upgrade_addr", addresses.stateTransition.defaultUpgrade);
-        string memory l1StateTransition =
-            vm.serializeAddress("l1.state_transition", "diamond_proxy_addr", addresses.stateTransition.diamondProxy);
+        string memory l1StateTransition = vm.serializeAddress(
+            "l1.state_transition",
+            "diamond_proxy_addr",
+            addresses.stateTransition.diamondProxy
+        );
 
         vm.serializeAddress(
-            "l1.bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation
+            "l1.bridges",
+            "erc20_bridge_implementation_addr",
+            addresses.bridges.erc20BridgeImplementation
         );
         vm.serializeAddress("l1.bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
         vm.serializeAddress(
-            "l1.bridges", "shared_bridge_implementation_addr", addresses.bridges.sharedBridgeImplementation
+            "l1.bridges",
+            "shared_bridge_implementation_addr",
+            addresses.bridges.sharedBridgeImplementation
         );
-        string memory l1Bridges =
-            vm.serializeAddress("l1.bridges", "shared_bridge_proxy_addr", addresses.bridges.sharedBridgeProxy);
+        string memory l1Bridges = vm.serializeAddress(
+            "l1.bridges",
+            "shared_bridge_proxy_addr",
+            addresses.bridges.sharedBridgeProxy
+        );
 
         vm.serializeUint(
-            "l1.config", "diamond_init_pubdata_pricing_mode", uint256(config.contracts.diamondInitPubdataPricingMode)
+            "l1.config",
+            "diamond_init_pubdata_pricing_mode",
+            uint256(config.contracts.diamondInitPubdataPricingMode)
         );
         vm.serializeUint(
-            "l1.config", "diamond_init_batch_overhead_l1_gas", config.contracts.diamondInitBatchOverheadL1Gas
+            "l1.config",
+            "diamond_init_batch_overhead_l1_gas",
+            config.contracts.diamondInitBatchOverheadL1Gas
         );
         vm.serializeUint(
-            "l1.config", "diamond_init_max_pubdata_per_batch", config.contracts.diamondInitMaxPubdataPerBatch
-        );
-        vm.serializeUint("l1.config", "diamond_init_max_l2_gas_per_batch", config.contracts.diamondInitMaxL2GasPerBatch);
-        vm.serializeUint(
-            "l1.config", "diamond_init_priority_tx_max_pubdata", config.contracts.diamondInitPriorityTxMaxPubdata
+            "l1.config",
+            "diamond_init_max_pubdata_per_batch",
+            config.contracts.diamondInitMaxPubdataPerBatch
         );
         vm.serializeUint(
-            "l1.config", "diamond_init_minimal_l2_gas_price", config.contracts.diamondInitMinimalL2GasPrice
+            "l1.config",
+            "diamond_init_max_l2_gas_per_batch",
+            config.contracts.diamondInitMaxL2GasPerBatch
+        );
+        vm.serializeUint(
+            "l1.config",
+            "diamond_init_priority_tx_max_pubdata",
+            config.contracts.diamondInitPriorityTxMaxPubdata
+        );
+        vm.serializeUint(
+            "l1.config",
+            "diamond_init_minimal_l2_gas_price",
+            config.contracts.diamondInitMinimalL2GasPrice
         );
         vm.serializeBytes32("l1.config", "recursion_node_level_vk_hash", config.contracts.recursionNodeLevelVkHash);
         vm.serializeBytes32("l1.config", "recursion_leaf_level_vk_hash", config.contracts.recursionLeafLevelVkHash);
         vm.serializeBytes32(
-            "l1.config", "recursion_circuits_set_vks_hash", config.contracts.recursionCircuitsSetVksHash
+            "l1.config",
+            "recursion_circuits_set_vks_hash",
+            config.contracts.recursionCircuitsSetVksHash
         );
-        string memory l1Config =
-            vm.serializeUint("l1.config", "priority_tx_max_gas_limit", config.contracts.priorityTxMaxGasLimit);
+        string memory l1Config = vm.serializeUint(
+            "l1.config",
+            "priority_tx_max_gas_limit",
+            config.contracts.priorityTxMaxGasLimit
+        );
 
         vm.serializeAddress("l1", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
         vm.serializeAddress("l1", "governance_addr", addresses.governance);

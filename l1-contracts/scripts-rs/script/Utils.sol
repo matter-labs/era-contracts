@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
-
+import {Script, console2 as console} from "forge-std/Script.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -179,7 +179,11 @@ library Utils {
         string memory file = vm.readFile(
             // solhint-disable-next-line func-named-parameters
             string.concat(
-                "../system-contracts/artifacts-zk/contracts-preprocessed/", filename, ".sol/", filename, ".json"
+                "../system-contracts/artifacts-zk/contracts-preprocessed/",
+                filename,
+                ".sol/",
+                filename,
+                ".json"
             )
         );
         bytes memory bytecode = vm.parseJson(file, "$.bytecode");
@@ -209,6 +213,7 @@ library Utils {
         if (_bytecode.length == 0) {
             revert("Bytecode is not set");
         }
+
         address contractAddress = vm.computeCreate2Address(_salt, keccak256(_bytecode), _factory);
         if (contractAddress.code.length != 0) {
             return contractAddress;

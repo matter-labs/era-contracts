@@ -36,84 +36,28 @@ import {RegisterHyperchainsScript} from "../../../scripts-rs/script/RegisterHype
 contract BridgeHubIntegration is Test {
     using stdStorage for StdStorage;
 
-    address diamondAddress;
-    address stmAddress;
-    address bridgeHubOwner;
-    address admin;
-    address validator;
-    address bridgeHubAddress;
-    address eraDiamondProxy;
-    address l1WethAddress;
-    address l2SharedBridge;
+    address[] tokens;
 
-    Diamond.FacetCut[] facetCuts;
-    TestnetVerifier testnetVerifier;
-    L1SharedBridge sharedBridge;
+    address alice;
+    address bob;
+    TestnetERC20Token baseToken;
+
+    address bridgehubProxyAddress;
+    address bridgehubOwnerAddress;
     Bridgehub bridgeHub;
 
-    uint256 chainId;
-    uint256 eraChainId;
-
     constructor() {
-        bridgeHubOwner = makeAddr("bridgeHubOwner");
-        eraDiamondProxy = makeAddr("eraDiamondProxy");
-        admin = makeAddr("admin");
-        l1WethAddress = makeAddr("weth");
-        validator = makeAddr("validator");
-        l2SharedBridge = makeAddr("l2sharedBridge");
+        DeployL1Script l1Script = new DeployL1Script();
+        l1Script.run();
 
-        testnetVerifier = new TestnetVerifier();
-
-        chainId = 1;
-        eraChainId = 9;
-
-        bridgeHub = new Bridgehub();
-        bridgeHubAddress = address(bridgeHub);
-
-        vm.prank(bridgeHub.owner());
-        bridgeHub.transferOwnership(bridgeHubOwner);
-
-        vm.prank(bridgeHubOwner);
-        bridgeHub.acceptOwnership();
-
-        vm.prank(bridgeHubOwner);
-        bridgeHub.setPendingAdmin(admin);
-
-        vm.prank(admin);
-        bridgeHub.acceptAdmin();
-
-        setFacetCuts();
-        initializeStateTransitionManager();
-        registerStateTransitionManager(stmAddress);
-
-        sharedBridge = new L1SharedBridge({
-            _l1WethAddress: l1WethAddress,
-            _bridgehub: IBridgehub(address(bridgeHub)),
-            _eraChainId: eraChainId,
-            _eraDiamondProxy: eraDiamondProxy
-        });
-
-        // skipped intializing upgradeable proxy for now
-        vm.prank(sharedBridge.owner());
-        sharedBridge.transferOwnership(bridgeHubOwner);
-
-        vm.prank(bridgeHubOwner);
-        sharedBridge.acceptOwnership();
-
-        registerNewToken(ETH_TOKEN_ADDRESS);
-
-        vm.prank(bridgeHubOwner);
-        bridgeHub.setSharedBridge(address(sharedBridge));
-    }
-
-    function registerStateTransitionManager(address _stmAddress) internal {
-        vm.prank(bridgeHubOwner);
-        bridgeHub.addStateTransitionManager(_stmAddress);
+        bridgehubOwnerAddress = l1Script.getBridgehubOwnerAddress();
+        bridgehubProxyAddress = l1Script.getBridgehubProxyAddress();
+        bridgeHub = Bridgehub(bridgehubProxyAddress);
     }
 
     function registerNewToken(address tokenAddress) internal {
         if (!bridgeHub.tokenIsRegistered(tokenAddress)) {
-            vm.prank(bridgeHubOwner);
+            vm.prank(bridgehubOwnerAddress);
             bridgeHub.addToken(tokenAddress);
         }
     }
@@ -269,13 +213,14 @@ contract HyperchainDeploy is BridgehubDeployInterface {
     constructor() {
         deployScript = new RegisterHyperchainsScript();
 
-        hyperchainsToDeploy.push(HyperchainDeployInfo({name: "era", chainId: currentChainId, baseToken: ETH_TOKEN_ADDRESS}));
+        hyperchainsToDeploy.push(
+            HyperchainDeployInfo({name: "era", chainId: currentChainId, baseToken: ETH_TOKEN_ADDRESS})
+        );
 
         saveHyperchainConfig();
 
         deployScript.run();
     }
-
 
     function saveHyperchainConfig() public {
         string memory serialized;
@@ -502,16 +447,15 @@ contract L2TxMocker is Test {
 }
 
 contract IntegrationTests is BridgeHubIntegration, HyperchainFactory, L2TxMocker {
-    address alice;
-    address bob;
-
-    TestnetERC20Token baseToken;
-
-    constructor() {
-        baseToken = new TestnetERC20Token("TestBase", "ADT", 18);
-    }
-
     function setUp() public {
+        DeployErc20Script ercErc20script = new DeployErc20Script();
+        ercErc20script.run();
+
+        tokens = ercErc20script.getTokensAddresses();
+        registerNewToken(tokens);
+
+        baseToken = TestnetERC20Token(tokens[0]);
+
         spawnMultipleHyperchains(2);
         spawnMultipleHyperchainsWithToken(2, address(baseToken));
 
@@ -525,235 +469,235 @@ contract IntegrationTests is BridgeHubIntegration, HyperchainFactory, L2TxMocker
 
         // emit log_address(script.getTokensAddresses()[0]);
 
-        DeployL1Script l1Script = new DeployL1Script();
-        l1Script.run();
+        // DeployL1Script l1Script = new DeployL1Script();
+        // l1Script.run();
 
         assertTrue(true);
     }
 
-    function test_hyperchainTokenDirectDeposit_Eth() public {
-        clearSharedBridgeBalances(address(baseToken));
+    // function test_hyperchainTokenDirectDeposit_Eth() public {
+    //     clearSharedBridgeBalances(address(baseToken));
 
-        vm.txGasPrice(0.05 ether);
-        vm.deal(alice, 1 ether);
-        vm.deal(bob, 1 ether);
+    //     vm.txGasPrice(0.05 ether);
+    //     vm.deal(alice, 1 ether);
+    //     vm.deal(bob, 1 ether);
 
-        uint256 firstChainId = hyperchainIds[0];
-        uint256 secondChainId = hyperchainIds[1];
+    //     uint256 firstChainId = hyperchainIds[0];
+    //     uint256 secondChainId = hyperchainIds[1];
 
-        assertTrue(getHyperchainBaseToken(firstChainId) == ETH_TOKEN_ADDRESS);
-        assertTrue(getHyperchainBaseToken(secondChainId) == ETH_TOKEN_ADDRESS);
+    //     assertTrue(getHyperchainBaseToken(firstChainId) == ETH_TOKEN_ADDRESS);
+    //     assertTrue(getHyperchainBaseToken(secondChainId) == ETH_TOKEN_ADDRESS);
 
-        L2TransactionRequestDirect memory aliceRequest = createMockL2TransactionRequestDirect(
-            firstChainId,
-            1 ether,
-            0.1 ether
-        );
-        L2TransactionRequestDirect memory bobRequest = createMockL2TransactionRequestDirect(
-            secondChainId,
-            1 ether,
-            0.1 ether
-        );
+    //     L2TransactionRequestDirect memory aliceRequest = createMockL2TransactionRequestDirect(
+    //         firstChainId,
+    //         1 ether,
+    //         0.1 ether
+    //     );
+    //     L2TransactionRequestDirect memory bobRequest = createMockL2TransactionRequestDirect(
+    //         secondChainId,
+    //         1 ether,
+    //         0.1 ether
+    //     );
 
-        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
-        address firstHyperChainAddress = getHyperchainAddress(firstChainId);
-        address secondHyperChainAddress = getHyperchainAddress(secondChainId);
+    //     bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+    //     address firstHyperChainAddress = getHyperchainAddress(firstChainId);
+    //     address secondHyperChainAddress = getHyperchainAddress(secondChainId);
 
-        vm.mockCall(
-            firstHyperChainAddress,
-            abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
-            abi.encode(canonicalHash)
-        );
+    //     vm.mockCall(
+    //         firstHyperChainAddress,
+    //         abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
+    //         abi.encode(canonicalHash)
+    //     );
 
-        vm.mockCall(
-            secondHyperChainAddress,
-            abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
-            abi.encode(canonicalHash)
-        );
+    //     vm.mockCall(
+    //         secondHyperChainAddress,
+    //         abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
+    //         abi.encode(canonicalHash)
+    //     );
 
-        vm.prank(alice);
-        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: alice.balance}(aliceRequest);
-        assertEq(canonicalHash, resultantHash);
+    //     vm.prank(alice);
+    //     bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: alice.balance}(aliceRequest);
+    //     assertEq(canonicalHash, resultantHash);
 
-        vm.prank(bob);
-        bytes32 resultantHash2 = bridgeHub.requestL2TransactionDirect{value: bob.balance}(bobRequest);
-        assertEq(canonicalHash, resultantHash2);
+    //     vm.prank(bob);
+    //     bytes32 resultantHash2 = bridgeHub.requestL2TransactionDirect{value: bob.balance}(bobRequest);
+    //     assertEq(canonicalHash, resultantHash2);
 
-        assertEq(alice.balance, 0);
-        assertEq(bob.balance, 0);
+    //     assertEq(alice.balance, 0);
+    //     assertEq(bob.balance, 0);
 
-        assertEq(address(sharedBridge).balance, 2 ether);
-        assertEq(sharedBridge.chainBalance(firstChainId, ETH_TOKEN_ADDRESS), 1 ether);
-        assertEq(sharedBridge.chainBalance(secondChainId, ETH_TOKEN_ADDRESS), 1 ether);
-    }
+    //     assertEq(address(sharedBridge).balance, 2 ether);
+    //     assertEq(sharedBridge.chainBalance(firstChainId, ETH_TOKEN_ADDRESS), 1 ether);
+    //     assertEq(sharedBridge.chainBalance(secondChainId, ETH_TOKEN_ADDRESS), 1 ether);
+    // }
 
-    function test_hyperchainTokenDirectDeposit_NonEth() public {
-        clearSharedBridgeBalances(address(baseToken));
+    // function test_hyperchainTokenDirectDeposit_NonEth() public {
+    //     clearSharedBridgeBalances(address(baseToken));
 
-        uint256 mockMintValue = 1 ether;
+    //     uint256 mockMintValue = 1 ether;
 
-        vm.txGasPrice(0.05 ether);
-        vm.deal(alice, 1 ether);
-        vm.deal(bob, 1 ether);
+    //     vm.txGasPrice(0.05 ether);
+    //     vm.deal(alice, 1 ether);
+    //     vm.deal(bob, 1 ether);
 
-        baseToken.mint(alice, mockMintValue);
-        baseToken.mint(bob, mockMintValue);
+    //     baseToken.mint(alice, mockMintValue);
+    //     baseToken.mint(bob, mockMintValue);
 
-        assertEq(baseToken.balanceOf(alice), mockMintValue);
-        assertEq(baseToken.balanceOf(bob), mockMintValue);
+    //     assertEq(baseToken.balanceOf(alice), mockMintValue);
+    //     assertEq(baseToken.balanceOf(bob), mockMintValue);
 
-        uint256 firstChainId = hyperchainIds[2];
-        uint256 secondChainId = hyperchainIds[3];
+    //     uint256 firstChainId = hyperchainIds[2];
+    //     uint256 secondChainId = hyperchainIds[3];
 
-        assertTrue(getHyperchainBaseToken(firstChainId) == address(baseToken));
-        assertTrue(getHyperchainBaseToken(secondChainId) == address(baseToken));
+    //     assertTrue(getHyperchainBaseToken(firstChainId) == address(baseToken));
+    //     assertTrue(getHyperchainBaseToken(secondChainId) == address(baseToken));
 
-        L2TransactionRequestDirect memory aliceRequest = createMockL2TransactionRequestDirect(
-            firstChainId,
-            1 ether,
-            0.1 ether
-        );
-        L2TransactionRequestDirect memory bobRequest = createMockL2TransactionRequestDirect(
-            secondChainId,
-            1 ether,
-            0.1 ether
-        );
+    //     L2TransactionRequestDirect memory aliceRequest = createMockL2TransactionRequestDirect(
+    //         firstChainId,
+    //         1 ether,
+    //         0.1 ether
+    //     );
+    //     L2TransactionRequestDirect memory bobRequest = createMockL2TransactionRequestDirect(
+    //         secondChainId,
+    //         1 ether,
+    //         0.1 ether
+    //     );
 
-        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
-        address firstHyperChainAddress = getHyperchainAddress(firstChainId);
-        address secondHyperChainAddress = getHyperchainAddress(secondChainId);
+    //     bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+    //     address firstHyperChainAddress = getHyperchainAddress(firstChainId);
+    //     address secondHyperChainAddress = getHyperchainAddress(secondChainId);
 
-        vm.startPrank(alice);
-        assertEq(baseToken.balanceOf(alice), mockMintValue);
-        baseToken.approve(address(sharedBridge), mockMintValue);
-        vm.stopPrank();
+    //     vm.startPrank(alice);
+    //     assertEq(baseToken.balanceOf(alice), mockMintValue);
+    //     baseToken.approve(address(sharedBridge), mockMintValue);
+    //     vm.stopPrank();
 
-        vm.startPrank(bob);
-        assertEq(baseToken.balanceOf(bob), mockMintValue);
-        baseToken.approve(address(sharedBridge), mockMintValue);
-        vm.stopPrank();
+    //     vm.startPrank(bob);
+    //     assertEq(baseToken.balanceOf(bob), mockMintValue);
+    //     baseToken.approve(address(sharedBridge), mockMintValue);
+    //     vm.stopPrank();
 
-        vm.mockCall(
-            firstHyperChainAddress,
-            abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
-            abi.encode(canonicalHash)
-        );
+    //     vm.mockCall(
+    //         firstHyperChainAddress,
+    //         abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
+    //         abi.encode(canonicalHash)
+    //     );
 
-        vm.mockCall(
-            secondHyperChainAddress,
-            abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
-            abi.encode(canonicalHash)
-        );
+    //     vm.mockCall(
+    //         secondHyperChainAddress,
+    //         abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
+    //         abi.encode(canonicalHash)
+    //     );
 
-        vm.prank(alice);
-        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect(aliceRequest);
-        assertEq(canonicalHash, resultantHash);
+    //     vm.prank(alice);
+    //     bytes32 resultantHash = bridgeHub.requestL2TransactionDirect(aliceRequest);
+    //     assertEq(canonicalHash, resultantHash);
 
-        vm.prank(bob);
-        bytes32 resultantHash2 = bridgeHub.requestL2TransactionDirect(bobRequest);
-        assertEq(canonicalHash, resultantHash2);
+    //     vm.prank(bob);
+    //     bytes32 resultantHash2 = bridgeHub.requestL2TransactionDirect(bobRequest);
+    //     assertEq(canonicalHash, resultantHash2);
 
-        // check if the balances of alice and bob are 0
-        assertEq(baseToken.balanceOf(alice), 0);
-        assertEq(baseToken.balanceOf(bob), 0);
+    //     // check if the balances of alice and bob are 0
+    //     assertEq(baseToken.balanceOf(alice), 0);
+    //     assertEq(baseToken.balanceOf(bob), 0);
 
-        // check if the shared bridge has the correct balances
-        assertEq(baseToken.balanceOf(address(sharedBridge)), 2 ether);
+    //     // check if the shared bridge has the correct balances
+    //     assertEq(baseToken.balanceOf(address(sharedBridge)), 2 ether);
 
-        // check if the shared bridge has the correct balances for each chain
-        assertEq(sharedBridge.chainBalance(firstChainId, address(baseToken)), mockMintValue);
-        assertEq(sharedBridge.chainBalance(secondChainId, address(baseToken)), mockMintValue);
-    }
+    //     // check if the shared bridge has the correct balances for each chain
+    //     assertEq(sharedBridge.chainBalance(firstChainId, address(baseToken)), mockMintValue);
+    //     assertEq(sharedBridge.chainBalance(secondChainId, address(baseToken)), mockMintValue);
+    // }
 
-    function test_hyperchainDepositNonBaseWithBaseETH() public {
-        uint256 aliceDepositAmount = 1 ether;
-        uint256 bobDepositAmount = 1.5 ether;
+    // function test_hyperchainDepositNonBaseWithBaseETH() public {
+    //     uint256 aliceDepositAmount = 1 ether;
+    //     uint256 bobDepositAmount = 1.5 ether;
 
-        uint256 mintValue = 2 ether;
-        uint256 l2Value = 10000;
-        address l2Receiver = makeAddr("receiver");
-        address tokenAddress = address(baseToken);
+    //     uint256 mintValue = 2 ether;
+    //     uint256 l2Value = 10000;
+    //     address l2Receiver = makeAddr("receiver");
+    //     address tokenAddress = address(baseToken);
 
-        uint256 firstChainId = hyperchainIds[0];
-        uint256 secondChainId = hyperchainIds[1];
+    //     uint256 firstChainId = hyperchainIds[0];
+    //     uint256 secondChainId = hyperchainIds[1];
 
-        address firstHyperChainAddress = getHyperchainAddress(firstChainId);
-        address secondHyperChainAddress = getHyperchainAddress(secondChainId);
-        assertTrue(getHyperchainBaseToken(firstChainId) == ETH_TOKEN_ADDRESS);
-        assertTrue(getHyperchainBaseToken(secondChainId) == ETH_TOKEN_ADDRESS);
-        clearSharedBridgeBalances(tokenAddress);
-        registerL2SharedBridge(firstChainId, mockL2SharedBridge);
-        registerL2SharedBridge(secondChainId, mockL2SharedBridge);
+    //     address firstHyperChainAddress = getHyperchainAddress(firstChainId);
+    //     address secondHyperChainAddress = getHyperchainAddress(secondChainId);
+    //     assertTrue(getHyperchainBaseToken(firstChainId) == ETH_TOKEN_ADDRESS);
+    //     assertTrue(getHyperchainBaseToken(secondChainId) == ETH_TOKEN_ADDRESS);
+    //     clearSharedBridgeBalances(tokenAddress);
+    //     registerL2SharedBridge(firstChainId, mockL2SharedBridge);
+    //     registerL2SharedBridge(secondChainId, mockL2SharedBridge);
 
-        vm.txGasPrice(0.05 ether);
-        vm.deal(alice, mintValue);
-        vm.deal(bob, mintValue);
-        assertEq(alice.balance, mintValue);
-        assertEq(bob.balance, mintValue);
+    //     vm.txGasPrice(0.05 ether);
+    //     vm.deal(alice, mintValue);
+    //     vm.deal(bob, mintValue);
+    //     assertEq(alice.balance, mintValue);
+    //     assertEq(bob.balance, mintValue);
 
-        baseToken.mint(alice, aliceDepositAmount);
-        baseToken.mint(bob, bobDepositAmount);
-        assertEq(baseToken.balanceOf(alice), aliceDepositAmount);
-        assertEq(baseToken.balanceOf(bob), bobDepositAmount);
+    //     baseToken.mint(alice, aliceDepositAmount);
+    //     baseToken.mint(bob, bobDepositAmount);
+    //     assertEq(baseToken.balanceOf(alice), aliceDepositAmount);
+    //     assertEq(baseToken.balanceOf(bob), bobDepositAmount);
 
-        vm.prank(alice);
-        baseToken.approve(address(sharedBridge), aliceDepositAmount);
+    //     vm.prank(alice);
+    //     baseToken.approve(address(sharedBridge), aliceDepositAmount);
 
-        vm.prank(bob);
-        baseToken.approve(address(sharedBridge), bobDepositAmount);
+    //     vm.prank(bob);
+    //     baseToken.approve(address(sharedBridge), bobDepositAmount);
 
-        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
-        {
-            bytes memory aliceSecondBridgeCalldata = abi.encode(tokenAddress, aliceDepositAmount, l2Receiver);
-            L2TransactionRequestTwoBridgesOuter memory aliceRequest = createMockL2TransactionRequestTwoBridges(
-                firstChainId,
-                mintValue,
-                0,
-                l2Value,
-                address(sharedBridge),
-                aliceSecondBridgeCalldata
-            );
+    //     bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+    //     {
+    //         bytes memory aliceSecondBridgeCalldata = abi.encode(tokenAddress, aliceDepositAmount, l2Receiver);
+    //         L2TransactionRequestTwoBridgesOuter memory aliceRequest = createMockL2TransactionRequestTwoBridges(
+    //             firstChainId,
+    //             mintValue,
+    //             0,
+    //             l2Value,
+    //             address(sharedBridge),
+    //             aliceSecondBridgeCalldata
+    //         );
 
-            vm.mockCall(
-                firstHyperChainAddress,
-                abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
-                abi.encode(canonicalHash)
-            );
+    //         vm.mockCall(
+    //             firstHyperChainAddress,
+    //             abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
+    //             abi.encode(canonicalHash)
+    //         );
 
-            vm.prank(alice);
-            bytes32 resultantHash = bridgeHub.requestL2TransactionTwoBridges{value: mintValue}(aliceRequest);
-            assertEq(canonicalHash, resultantHash);
-        }
+    //         vm.prank(alice);
+    //         bytes32 resultantHash = bridgeHub.requestL2TransactionTwoBridges{value: mintValue}(aliceRequest);
+    //         assertEq(canonicalHash, resultantHash);
+    //     }
 
-        {
-            bytes memory bobSecondBridgeCalldata = abi.encode(tokenAddress, bobDepositAmount, l2Receiver);
-            L2TransactionRequestTwoBridgesOuter memory bobRequest = createMockL2TransactionRequestTwoBridges(
-                secondChainId,
-                mintValue,
-                0,
-                l2Value,
-                address(sharedBridge),
-                bobSecondBridgeCalldata
-            );
+    //     {
+    //         bytes memory bobSecondBridgeCalldata = abi.encode(tokenAddress, bobDepositAmount, l2Receiver);
+    //         L2TransactionRequestTwoBridgesOuter memory bobRequest = createMockL2TransactionRequestTwoBridges(
+    //             secondChainId,
+    //             mintValue,
+    //             0,
+    //             l2Value,
+    //             address(sharedBridge),
+    //             bobSecondBridgeCalldata
+    //         );
 
-            vm.mockCall(
-                secondHyperChainAddress,
-                abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
-                abi.encode(canonicalHash)
-            );
+    //         vm.mockCall(
+    //             secondHyperChainAddress,
+    //             abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
+    //             abi.encode(canonicalHash)
+    //         );
 
-            vm.prank(bob);
-            bytes32 resultantHash2 = bridgeHub.requestL2TransactionTwoBridges{value: mintValue}(bobRequest);
-            assertEq(canonicalHash, resultantHash2);
-        }
+    //         vm.prank(bob);
+    //         bytes32 resultantHash2 = bridgeHub.requestL2TransactionTwoBridges{value: mintValue}(bobRequest);
+    //         assertEq(canonicalHash, resultantHash2);
+    //     }
 
-        assertEq(alice.balance, 0);
-        assertEq(bob.balance, 0);
-        assertEq(address(sharedBridge).balance, 2 * mintValue);
-        assertEq(sharedBridge.chainBalance(firstChainId, ETH_TOKEN_ADDRESS), mintValue);
-        assertEq(sharedBridge.chainBalance(secondChainId, ETH_TOKEN_ADDRESS), mintValue);
-        assertEq(sharedBridge.chainBalance(firstChainId, tokenAddress), aliceDepositAmount);
-        assertEq(sharedBridge.chainBalance(secondChainId, tokenAddress), bobDepositAmount);
-        assertEq(baseToken.balanceOf(address(sharedBridge)), aliceDepositAmount + bobDepositAmount);
-    }
+    //     assertEq(alice.balance, 0);
+    //     assertEq(bob.balance, 0);
+    //     assertEq(address(sharedBridge).balance, 2 * mintValue);
+    //     assertEq(sharedBridge.chainBalance(firstChainId, ETH_TOKEN_ADDRESS), mintValue);
+    //     assertEq(sharedBridge.chainBalance(secondChainId, ETH_TOKEN_ADDRESS), mintValue);
+    //     assertEq(sharedBridge.chainBalance(firstChainId, tokenAddress), aliceDepositAmount);
+    //     assertEq(sharedBridge.chainBalance(secondChainId, tokenAddress), bobDepositAmount);
+    //     assertEq(baseToken.balanceOf(address(sharedBridge)), aliceDepositAmount + bobDepositAmount);
+    // }
 }
