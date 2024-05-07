@@ -8,6 +8,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "./Utils.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
@@ -139,9 +140,12 @@ contract RegisterHyperchainsScript is Script {
 
         // get hyperchains config
         root = vm.projectRoot();
-        path = string.concat(root, "/scripts-rs/script-config/config-deploy-hyperchains.toml");
-        toml = vm.readFile(path);
 
+        string memory configKey = "HYPERCHAINS_CONFIG";
+        // TODO: handle default path "/scripts-rs/script-config/config-deploy-hyperchains.toml"
+
+        path = string.concat(root, vm.envString(configKey));
+        toml = vm.readFile(path);
         string[] memory hyperchains = vm.parseTomlKeys(toml, "$.hyperchains");
 
         for (uint256 i = 0; i < hyperchains.length; i++) {
@@ -211,25 +215,25 @@ contract RegisterHyperchainsScript is Script {
             facet: config.addresses.adminFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: Utils.getAllSelectors(config.addresses.adminFacet.code)
+            selectors: Utils.getAdminSelectors()
         });
         facetCuts[1] = Diamond.FacetCut({
             facet: config.addresses.gettersFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: Utils.getAllSelectors(config.addresses.gettersFacet.code)
+            selectors: Utils.getGettersSelectors()
         });
         facetCuts[2] = Diamond.FacetCut({
             facet: config.addresses.mailboxFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: Utils.getAllSelectors(config.addresses.mailboxFacet.code)
+            selectors: Utils.getMailboxSelectors()
         });
         facetCuts[3] = Diamond.FacetCut({
             facet: config.addresses.executorFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: Utils.getAllSelectors(config.addresses.executorFacet.code)
+            selectors: Utils.getExecutorSelectors()
         });
 
         VerifierParams memory verifierParams = VerifierParams({
@@ -250,8 +254,8 @@ contract RegisterHyperchainsScript is Script {
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(config.addresses.verifier),
             verifierParams: verifierParams,
-            l2BootloaderBytecodeHash: bytes32(Utils.getBatchBootloaderBytecodeHash()),
-            l2DefaultAccountBytecodeHash: bytes32(Utils.readSystemContractsBytecode("DefaultAccount")),
+            l2BootloaderBytecodeHash: bytes32("0x"),
+            l2DefaultAccountBytecodeHash: bytes32("0x"),
             priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
             feeParams: feeParams,
             blobVersionedHashRetriever: config.addresses.blobVersionedHashRetriever
@@ -263,14 +267,16 @@ contract RegisterHyperchainsScript is Script {
             initCalldata: abi.encode(initializeData)
         });
 
-        IBridgehub bridgehub = IBridgehub(config.addresses.bridgehub);
+        Bridgehub bridgehub = Bridgehub(config.addresses.bridgehub);
 
-        vm.broadcast();
+        // vm.broadcast();
         vm.recordLogs();
 
         for (uint256 i = 0; i < hyperchainsConfig.hyperchains.length; i++) {
             HyperchainDescription memory description = hyperchainsConfig.hyperchains[i];
 
+
+            vm.startPrank(bridgehub.owner());
             bridgehub.createNewChain({
                 _chainId: description.hyperchainChainId,
                 _stateTransitionManager: config.addresses.stateTransitionProxy,
@@ -310,21 +316,22 @@ contract RegisterHyperchainsScript is Script {
     function addValidators() internal {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(config.addresses.validatorTimelock);
 
-        vm.startBroadcast();
+        // vm.startBroadcast();
 
         for (uint256 i = 0; i < hyperchainsConfig.hyperchains.length; i++) {
             HyperchainDescription memory description = hyperchainsConfig.hyperchains[i];
+
             validatorTimelock.addValidator(description.hyperchainChainId, description.validatorSenderOperatorCommitEth);
             validatorTimelock.addValidator(description.hyperchainChainId, description.validatorSenderOperatorBlobsEth);
         }
 
-        vm.stopBroadcast();
+        // vm.stopBroadcast();
 
         console.log("Validators added");
     }
 
     function configureZkSyncStateTransitions() internal {
-        vm.startBroadcast();
+        // vm.startBroadcast();
 
         for (uint256 i = 0; i < diamondProxyAddresses.length; i++) {
             IZkSyncHyperchain zkSyncStateTransition = IZkSyncHyperchain(diamondProxyAddresses[i]);
@@ -341,7 +348,7 @@ contract RegisterHyperchainsScript is Script {
             // }
         }
 
-        vm.stopBroadcast();
+        vm.stopPrank();
         console.log("ZkSync State Transition configured");
     }
 }
