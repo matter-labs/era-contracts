@@ -11,6 +11,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
+import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 
 contract RegisterHyperchainScript is Script {
     using stdToml for string;
@@ -196,10 +197,9 @@ contract RegisterHyperchainScript is Script {
             config.baseTokenGasPriceMultiplierDenominator
         );
 
-        // TODO: support validium mode when available
-        // if (config.contractsMode) {
-        //     zkSyncStateTransition.setValidiumMode(PubdataPricingMode.Validium);
-        // }
+        if (config.validiumMode) {
+            hyperchain.setPubdataPricingMode(PubdataPricingMode.Validium);
+        }
 
         vm.stopBroadcast();
         console.log("ZkSync State Transition configured");
