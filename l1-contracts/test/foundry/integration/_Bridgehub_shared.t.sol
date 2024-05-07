@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {Test} from "forge-std/Test.sol";
+import {stdToml} from "forge-std/StdToml.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
@@ -193,24 +194,47 @@ contract Tokens {
 }
 
 contract HyperchainDeploy is BridgeHubIntegration {
+    using stdToml for string;
+
     RegisterHyperchainsScript deployScript;
     HyperchainDeployInfo[] hyperchainsToDeploy;
 
     struct HyperchainDeployInfo {
         string name;
-        uint256 chainId;
-        address baseToken;
+        RegisterHyperchainsScript.HyperchainDescription description;
     }
 
     uint256 currentHyperChainId = 9;
     uint256[] hyperchainIds;
 
+    function getDefaultDescription(
+        uint256 __chainId,
+        address __baseToken
+    ) internal returns (RegisterHyperchainsScript.HyperchainDescription memory description) {
+        description = RegisterHyperchainsScript.HyperchainDescription({
+            hyperchainChainId: __chainId,
+            baseToken: __baseToken,
+            bridgehubCreateNewChainSalt: 0,
+            validiumMode: false,
+            validatorSenderOperatorCommitEth: address(0),
+            validatorSenderOperatorBlobsEth: address(1),
+            baseTokenGasPriceMultiplierNominator: uint128(1),
+            baseTokenGasPriceMultiplierDenominator: uint128(1)
+        });
+    }
+
+    function getDefaultDescriptionWithName(
+        string memory __name,
+        uint256 __chainId,
+        address __baseToken
+    ) internal returns (HyperchainDeployInfo memory deployInfo) {
+        deployInfo = HyperchainDeployInfo({name: __name, description: getDefaultDescription(__chainId, __baseToken)});
+    }
+
     function deployHyperchains() internal {
         deployScript = new RegisterHyperchainsScript();
 
-        hyperchainsToDeploy.push(
-            HyperchainDeployInfo({name: "era", chainId: currentHyperChainId, baseToken: ETH_TOKEN_ADDRESS})
-        );
+        hyperchainsToDeploy.push(getDefaultDescriptionWithName("era", currentHyperChainId, ETH_TOKEN_ADDRESS));
 
         saveHyperchainConfig();
 
@@ -224,19 +248,7 @@ contract HyperchainDeploy is BridgeHubIntegration {
 
         for (uint256 i = 0; i < hyperchainsToDeploy.length; i++) {
             HyperchainDeployInfo memory info = hyperchainsToDeploy[i];
-
-            RegisterHyperchainsScript.HyperchainDescription memory description = RegisterHyperchainsScript
-                .HyperchainDescription({
-                    hyperchainChainId: info.chainId,
-                    baseToken: info.baseToken,
-                    bridgehubCreateNewChainSalt: 0,
-                    validiumMode: false,
-                    validatorSenderOperatorCommitEth: address(0),
-                    validatorSenderOperatorBlobsEth: address(1),
-                    baseTokenGasPriceMultiplierNominator: uint128(1),
-                    baseTokenGasPriceMultiplierDenominator: uint128(1)
-                });
-
+            RegisterHyperchainsScript.HyperchainDescription memory description = info.description;
             string memory hyperchainName = info.name;
 
             vm.serializeUint(hyperchainName, "hyperchain_chain_id", description.hyperchainChainId);
@@ -328,6 +340,44 @@ contract HyperchainDeploy is BridgeHubIntegration {
     //         assert(newHyperchain != address(0));
     //     }
     // }
+}
+
+contract TestHyperchainDeployConfig is HyperchainDeploy {
+    function test_saveAndReadHyperchainsConfig() public {
+        RegisterHyperchainsScript deployScript = new RegisterHyperchainsScript();
+        address someBaseAddress = makeAddr("baseToken");
+        hyperchainsToDeploy.push(getDefaultDescriptionWithName("era", currentHyperChainId, ETH_TOKEN_ADDRESS));
+        hyperchainsToDeploy.push(getDefaultDescriptionWithName("era2", currentHyperChainId + 1, someBaseAddress));
+
+        saveHyperchainConfig();
+
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/scripts-rs/script-out/output-deploy-hyperchains.toml");
+        string memory toml = vm.readFile(path);
+        string[] memory hyperchains = vm.parseTomlKeys(toml, "$.hyperchains");
+
+        vm.setEnv("HYPERCHAINS_CONFIG", "/scripts-rs/script-out/output-deploy-hyperchains.toml");
+
+        RegisterHyperchainsScript.HyperchainDescription[] memory descriptions = deployScript.readHyperchainsConfig();
+
+        for (uint256 i = 0; i < descriptions.length; i++) {
+            RegisterHyperchainsScript.HyperchainDescription memory description = descriptions[i];
+            RegisterHyperchainsScript.HyperchainDescription memory hyperchain = hyperchainsToDeploy[i].description;
+
+            assertEq(hyperchain.baseToken, description.baseToken);
+            assertEq(hyperchain.bridgehubCreateNewChainSalt, description.bridgehubCreateNewChainSalt);
+
+            assertEq(hyperchain.validiumMode, description.validiumMode);
+            assertEq(hyperchain.validatorSenderOperatorCommitEth, description.validatorSenderOperatorCommitEth);
+            assertEq(hyperchain.validatorSenderOperatorBlobsEth, description.validatorSenderOperatorBlobsEth);
+            assertEq(hyperchain.hyperchainChainId, description.hyperchainChainId);
+            assertEq(hyperchain.baseTokenGasPriceMultiplierNominator, description.baseTokenGasPriceMultiplierNominator);
+            assertEq(
+                hyperchain.baseTokenGasPriceMultiplierDenominator,
+                description.baseTokenGasPriceMultiplierDenominator
+            );
+        }
+    }
 }
 
 // contract HyperchainFactory is BridgeHubIntegration {

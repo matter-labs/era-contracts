@@ -85,7 +85,7 @@ contract RegisterHyperchainsScript is Script {
     HyperchainsConfig hyperchainsConfig;
 
     function run() public {
-        console.log("Deploying Hyperchain");
+        console.log("Deploying Hyperchains");
 
         initializeConfig();
         checkTokenAddresses();
@@ -138,15 +138,24 @@ contract RegisterHyperchainsScript is Script {
         config.contracts.recursionCircuitsSetVksHash = toml.readBytes32("$.l1.config.recursion_circuits_set_vks_hash");
         config.contracts.priorityTxMaxGasLimit = toml.readUint("$.l1.config.priority_tx_max_gas_limit");
 
-        // get hyperchains config
-        root = vm.projectRoot();
+        HyperchainDescription[] memory descriptions = readHyperchainsConfig();
+        for (uint i = 0; i < descriptions.length; i++) {
+            hyperchainsConfig.hyperchains.push(descriptions[i]);
+        }
+    }
 
+    function readHyperchainsConfig() public returns (HyperchainDescription[] memory) {
         string memory configKey = "HYPERCHAINS_CONFIG";
         // TODO: handle default path "/scripts-rs/script-config/config-deploy-hyperchains.toml"
 
-        path = string.concat(root, vm.envString(configKey));
-        toml = vm.readFile(path);
+        // get hyperchains config
+        string memory root = vm.projectRoot();
+
+        string memory path = string.concat(root, vm.envString(configKey));
+        string memory toml = vm.readFile(path);
         string[] memory hyperchains = vm.parseTomlKeys(toml, "$.hyperchains");
+
+        HyperchainDescription[] memory descriptions = new HyperchainDescription[](hyperchains.length);
 
         for (uint256 i = 0; i < hyperchains.length; i++) {
             HyperchainDescription memory hyperchain;
@@ -171,8 +180,10 @@ contract RegisterHyperchainsScript is Script {
                 toml.readUint(string.concat(key, ".base_token_gas_price_multiplier_denominator"))
             );
 
-            hyperchainsConfig.hyperchains.push(hyperchain);
+            descriptions[i] = hyperchain;
         }
+
+        return descriptions;
     }
 
     function checkTokenAddresses() internal {
@@ -275,7 +286,6 @@ contract RegisterHyperchainsScript is Script {
         for (uint256 i = 0; i < hyperchainsConfig.hyperchains.length; i++) {
             HyperchainDescription memory description = hyperchainsConfig.hyperchains[i];
 
-
             vm.startPrank(bridgehub.owner());
             bridgehub.createNewChain({
                 _chainId: description.hyperchainChainId,
@@ -285,7 +295,6 @@ contract RegisterHyperchainsScript is Script {
                 _admin: msg.sender,
                 _initData: abi.encode(initData)
             });
-            console.log("Hyperchain registered");
         }
 
         // Get new diamond proxy address from emitted events
@@ -306,6 +315,8 @@ contract RegisterHyperchainsScript is Script {
 
         for (uint256 i = 0; i < diamondProxyAddresses.length; i++) {
             address newProxyAddress = diamondProxyAddresses[i];
+
+            console.log("Hyperchain registered", newProxyAddress);
 
             if (newProxyAddress == address(0)) {
                 revert("One of diamond proxy addresses not found");
