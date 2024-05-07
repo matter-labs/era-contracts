@@ -13,10 +13,10 @@ import {REAL_SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
  * system contracts have and it can relay call to any contract, breaking potential trust in system contracts.
  */
 contract GasBoundCaller {
-    /// @notice We assume that no more than `CALL_ENTRY_OVERHEAD` ergs are used for the O(1) operations at the start
+    /// @notice We assume that no more than `CALL_ENTRY_OVERHEAD` gas are used for the O(1) operations at the start
     /// of execution of the contract, such as abi decoding the parameters, jumping to the correct function, etc.
     uint256 constant CALL_ENTRY_OVERHEAD = 800;
-    /// @notice We assume that no more than `CALL_RETURN_OVERHEAD` ergs are used for the O(1) operations at the end of the execution,
+    /// @notice We assume that no more than `CALL_RETURN_OVERHEAD` gas are used for the O(1) operations at the end of the execution,
     /// as such relaying the return.
     uint256 constant CALL_RETURN_OVERHEAD = 200;
 
