@@ -19,8 +19,8 @@ contract DeployL2Script is Script {
 
     uint256 constant MAX_PRIORITY_TX_GAS = 72000000;
     address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    address constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
     Config config;
+    ContractsBytecodes contracts;
 
     struct Config {
         address bridgehubAddress;
@@ -33,7 +33,50 @@ contract DeployL2Script is Script {
         address l2SharedBridgeProxy;
     }
 
-    function initializeConfig() public {
+    struct ContractsBytecodes {
+        bytes l2StandardErc20FactoryBytecode;
+        bytes beaconProxy;
+        bytes l2StandardErc20Bytecode;
+        bytes l2SharedBridgeBytecode;
+        bytes l2SharedBridgeProxyBytecode;
+    }
+
+
+    function run() public {
+        initializeConfig();
+        loadContracts();
+
+        deployFactoryDeps();
+        deploySharedBridge();
+        deploySharedBridgeProxy();
+        initialize_chain();
+
+        saveOutput();
+    }
+
+
+    function loadContracts() internal {
+        //HACK: Meanwhile we are not integrated foundry zksync we use contracts that has been built using hardhat
+        contracts.l2StandardErc20FactoryBytecode = readHardheadBytecode(
+            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
+        );
+        contracts.beaconProxy = readHardheadBytecode(
+            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
+        );
+        contracts.l2StandardErc20Bytecode = readHardheadBytecode(
+            "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
+        );
+
+        contracts.l2SharedBridgeBytecode = readHardheadBytecode(
+            "/../l2-contracts/artifacts-zk/contracts/bridge/L2SharedBridge.sol/L2SharedBridge.json"
+        );
+
+        contracts.l2SharedBridgeProxyBytecode = readHardheadBytecode(
+            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
+        );
+    }
+
+    function initializeConfig() internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-l2.toml");
         string memory toml = vm.readFile(path);
@@ -45,14 +88,6 @@ contract DeployL2Script is Script {
         config.eraChainId = toml.readUint("$.era_chain_id");
     }
 
-    function run() public {
-        initializeConfig();
-        deployFactoryDeps();
-        deploySharedBridge();
-        deploySharedBridgeProxy();
-        initialize_chain();
-        saveOutput();
-    }
 
     function saveOutput() internal {
         vm.serializeAddress("root", "l2_shared_bridge_implementation", config.l2SharedBridgeImplementation);
@@ -71,45 +106,27 @@ contract DeployL2Script is Script {
     }
 
     function deployFactoryDeps() public {
-        // HACK: We use the bytecode built by hardhat to deploy the contracts
-        bytes memory l2StandardErc20FactoryBytecode = readHardheadBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
-        );
-        bytes memory beaconProxy = readHardheadBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
-        );
-        bytes memory l2StandardErc20Bytecode = readHardheadBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
-        );
         bytes[] memory factoryDeps = new bytes[](3);
-        factoryDeps[0] = l2StandardErc20FactoryBytecode;
-        factoryDeps[1] = l2StandardErc20Bytecode;
-        factoryDeps[2] = beaconProxy;
+        factoryDeps[0] = contracts.l2StandardErc20FactoryBytecode;
+        factoryDeps[1] = contracts.l2StandardErc20Bytecode;
+        factoryDeps[2] = contracts.beaconProxy;
         publishBytecodes(factoryDeps);
     }
 
     function deploySharedBridge() public {
-        // HACK: We use the bytecode built by hardhat to deploy the contracts
-        bytes memory l2SharedBridgeBytecode = readHardheadBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/L2SharedBridge.sol/L2SharedBridge.json"
-        );
-        bytes memory beaconProxy = readHardheadBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
-        );
         bytes[] memory factoryDeps = new bytes[](1);
+        factoryDeps[0] = contracts.beaconProxy;
 
         bytes memory constructorData = abi.encode(config.eraChainId);
-
         config.l2SharedBridgeImplementation = L2ContractHelper.computeCreate2Address(
             msg.sender,
             "",
-            L2ContractHelper.hashL2Bytecode(l2SharedBridgeBytecode),
+            L2ContractHelper.hashL2Bytecode(contracts.l2SharedBridgeBytecode),
             keccak256(constructorData)
         );
 
-        factoryDeps[0] = beaconProxy;
         deployThroughL1({
-            bytecode: l2SharedBridgeBytecode,
+            bytecode: contracts.l2SharedBridgeBytecode,
             constructorargs: constructorData,
             create2salt: "",
             l2GasLimit: MAX_PRIORITY_TX_GAS,
@@ -118,11 +135,8 @@ contract DeployL2Script is Script {
     }
 
     function deploySharedBridgeProxy() public {
-        bytes memory beaconProxy = readHardheadBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
-        );
         address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
-        bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(beaconProxy);
+        bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(contracts.beaconProxy);
 
         // solhint-disable-next-line func-named-parameters
         bytes memory proxyInitializationParams = abi.encodeWithSignature(
@@ -139,11 +153,7 @@ contract DeployL2Script is Script {
             proxyInitializationParams
         );
 
-        /// loading TransparentUpgradeableProxy bytecode
-        bytes memory l2SharedBridgeProxyBytecode = readHardheadBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
-        );
-        bytes32 l2SharedBridgeProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(l2SharedBridgeProxyBytecode);
+        bytes32 l2SharedBridgeProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(contracts.l2SharedBridgeProxyBytecode);
         config.l2SharedBridgeProxy = L2ContractHelper.computeCreate2Address(
             msg.sender,
             "",
@@ -152,7 +162,7 @@ contract DeployL2Script is Script {
         );
 
         deployThroughL1({
-            bytecode: l2SharedBridgeProxyBytecode,
+            bytecode: contracts.l2SharedBridgeProxyBytecode,
             constructorargs: l2SharedBridgeProxyConstructorData,
             create2salt: "",
             l2GasLimit: MAX_PRIORITY_TX_GAS,
