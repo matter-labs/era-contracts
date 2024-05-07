@@ -102,7 +102,7 @@ contract InitializeL2WethTokenScript is Script {
         console.log("L2 WETH token initialized");
     }
 
-    function getL2Calldata() internal returns (bytes memory) {
+    function getL2Calldata() internal view returns (bytes memory) {
         // Low-level call is performed due to different solidity
         // compiler versions between L1 and L2
         // solhint-disable-next-line func-named-parameters

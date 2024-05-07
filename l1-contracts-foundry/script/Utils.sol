@@ -281,7 +281,7 @@ library Utils {
     /**
      * @dev Read hardhat bytecodes
      */
-    function readHardhatBytecode(string memory artifactPath) public returns (bytes memory) {
+    function readHardhatBytecode(string memory artifactPath) public view returns (bytes memory) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, artifactPath);
         string memory json = vm.readFile(path);

@@ -36,6 +36,12 @@ contract DeployPaymaster is Script {
     function run() external {
         initializeConfig();
 
+        deploy();
+
+        saveOutput();
+    }
+
+    function deploy() internal {
         bytes memory testnetPaymasterBytecode = Utils.readHardhatBytecode(
             "/../l2-contracts/artifacts-zk/contracts/TestnetPaymaster.sol/TestnetPaymaster.json"
         );
@@ -50,7 +56,5 @@ contract DeployPaymaster is Script {
             l1SharedBridgeProxy: config.l1SharedBridgeProxy,
             chainId: config.chainId
         });
-
-        saveOutput();
     }
 }
