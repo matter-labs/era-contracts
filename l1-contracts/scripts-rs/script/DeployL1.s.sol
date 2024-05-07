@@ -157,6 +157,10 @@ contract DeployL1Script is Script {
         return bridgehub.owner();
     }
 
+    function getSharedBridgeProxyAddress() public view returns (address) {
+        return addresses.bridges.sharedBridgeProxy;
+    }
+
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/scripts-rs/script-config/config-deploy-l1.toml");

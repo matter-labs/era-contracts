@@ -22,9 +22,8 @@ contract HyperchainDeployer is L1ContractDeployer {
     function deployHyperchains() internal {
         deployScript = new RegisterHyperchainsScript();
 
-        hyperchainsToDeploy.push(
-            HyperchainDeployInfo({name: "era", chainId: eraHyperchainId, baseToken: ETH_TOKEN_ADDRESS})
-        );
+        hyperchainsToDeploy.push(getDefaultHyperchainDeployInfo("era", eraHyperchainId, ETH_TOKEN_ADDRESS));
+        hyperchainIds.push(eraHyperchainId);
 
         saveHyperchainConfig();
 
@@ -34,9 +33,33 @@ contract HyperchainDeployer is L1ContractDeployer {
     }
 
     function addNewHyperchainToDeploy(string memory _name, address _baseToken) internal {
-        hyperchainsToDeploy.push(
-            HyperchainDeployInfo({name: _name, chainId: currentHyperChainId++, baseToken: _baseToken})
-        );
+        hyperchainsToDeploy.push(getDefaultHyperchainDeployInfo(_name, currentHyperChainId, _baseToken));
+        hyperchainIds.push(currentHyperChainId);
+        currentHyperChainId++;
+    }
+
+    function getDefaultDescription(
+        uint256 __chainId,
+        address __baseToken
+    ) internal returns (RegisterHyperchainsScript.HyperchainDescription memory description) {
+        description = RegisterHyperchainsScript.HyperchainDescription({
+            hyperchainChainId: __chainId,
+            baseToken: __baseToken,
+            bridgehubCreateNewChainSalt: 0,
+            validiumMode: false,
+            validatorSenderOperatorCommitEth: address(0),
+            validatorSenderOperatorBlobsEth: address(1),
+            baseTokenGasPriceMultiplierNominator: uint128(1),
+            baseTokenGasPriceMultiplierDenominator: uint128(1)
+        });
+    }
+
+    function getDefaultHyperchainDeployInfo(
+        string memory __name,
+        uint256 __chainId,
+        address __baseToken
+    ) internal returns (HyperchainDeployInfo memory deployInfo) {
+        deployInfo = HyperchainDeployInfo({name: __name, description: getDefaultDescription(__chainId, __baseToken)});
     }
 
     function saveHyperchainConfig() public {
