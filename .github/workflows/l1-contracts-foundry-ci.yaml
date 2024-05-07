@@ -126,7 +126,7 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
 
       - name: Run coverage
-        run: FOUNDRY_PROFILE=default yarn l1 test:foundry && FOUNDRY_PROFILE=default yarn l1 forge coverage:foundry --report summary --report lcov
+        run: FOUNDRY_PROFILE=default yarn l1 test:foundry && FOUNDRY_PROFILE=default yarn l1 coverage:foundry --report summary --report lcov
 
       # To ignore coverage for certain directories modify the paths in this step as needed. The
       # below default ignores coverage results for the test and script directories. Alternatively,
