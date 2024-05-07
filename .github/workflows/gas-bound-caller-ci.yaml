@@ -88,5 +88,10 @@ jobs:
         with:
           releaseTag: v0.0.1-vm1.5.0
 
+      # The tests of GasBoundCaller reuse utility methods of the system contracts tests,
+      # so we need to deploy those also.
+      - name: Build system contracts
+        run: yarn sc build
+
       - name: Run tests
         run: yarn gas-bound-caller test
