@@ -148,7 +148,6 @@ jobs:
       # not as useful, and this action cannot fail CI based on a minimum coverage threshold, which
       # is why we use both in this way.
       - name: Post coverage report
-        working-directory: ./l1-contracts
         if: github.event_name == 'pull_request' # This action fails when ran outside of a pull request.
         uses: romeovs/lcov-reporter-action@v0.3.1
         with:
