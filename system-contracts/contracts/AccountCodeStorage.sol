@@ -108,6 +108,10 @@ contract AccountCodeStorage is IAccountCodeStorage {
             codeHash = EMPTY_STRING_KECCAK;
         }
 
+        if (Utils.isCodeHashEVM(codeHash)) {
+            codeHash = DEPLOYER_SYSTEM_CONTRACT.evmCodeHash(account);
+        }
+
         return codeHash;
     }
 
