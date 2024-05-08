@@ -843,7 +843,7 @@ object "EVMInterpreter" {
             if lt(sub(_gas,shl(30,1)), requiredGas) {
                 // This cheks if enough zkevm gas was provided, we are substracting 2^30 since that's the stipend, 
                 // and we need to make sure that the gas provided over that is enough for security reasons
-                revert(0, 0)
+                // revert(0, 0)
             }
             evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
         }
@@ -913,14 +913,7 @@ object "EVMInterpreter" {
             }
         
             {
-                let maxExpand := add(retOffset, retSize)
-                switch lt(maxExpand,add(argsOffset, argsSize))  // Check if this makes sense
-                case 0 {
-                    maxExpand := expandMemory(add(argsOffset, argsSize))
-                }
-                default {
-                    maxExpand := expandMemory(maxExpand)
-                }
+                let maxExpand := getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize)
                 extraCost := add(extraCost,maxExpand)
             }
             let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
@@ -966,6 +959,18 @@ object "EVMInterpreter" {
                 gasToPass := maxGasToPass
             }
         }
+        
+        function getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize) -> maxExpand{
+            maxExpand := add(retOffset, retSize)
+            switch lt(maxExpand,add(argsOffset, argsSize)) 
+            case 0 {
+                maxExpand := expandMemory(maxExpand)
+            }
+            default {
+                maxExpand := expandMemory(add(argsOffset, argsSize))
+            }
+        }
+        
         function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
             let gasToPass,addr,value,argsOffset,argsSize,retOffset,retSize
         
@@ -998,14 +1003,7 @@ object "EVMInterpreter" {
                 extraCost := add(extraCost,25000)
             }
             {
-                let maxExpand := add(retOffset, retSize)
-                switch lt(maxExpand,add(argsOffset, argsSize)) 
-                case 0 {
-                    maxExpand := expandMemory(add(argsOffset, argsSize))
-                }
-                default {
-                    maxExpand := expandMemory(maxExpand)
-                }
+                let maxExpand := getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize)
                 extraCost := add(extraCost,maxExpand)
             }
             gasToPass := capGas(evmGasLeft,gasToPass)
@@ -1086,14 +1084,7 @@ object "EVMInterpreter" {
             }
         
             {
-                let maxExpand := add(retOffset, retSize)
-                switch lt(maxExpand,add(argsOffset, argsSize)) 
-                case 0 {
-                    maxExpand := expandMemory(add(argsOffset, argsSize))
-                }
-                default {
-                    maxExpand := expandMemory(maxExpand)
-                }
+                let maxExpand := getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize)
                 extraCost := add(extraCost,maxExpand)
             }
             gasToPass := capGas(evmGasLeft,gasToPass)
@@ -1769,7 +1760,7 @@ object "EVMInterpreter" {
                     // minimum_word_size = (size + 31) / 32
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                     let minWordSize := shr(5, add(len, 31))
-                    let dynamicGas := add(mul(3, minWordSize), expandMemory(add(offset, len)))
+                    let dynamicGas := add(mul(3, minWordSize), expandMemory(add(dest, len)))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
                     copyActivePtrData(add(MEM_OFFSET_INNER(), dest), offset, len)
@@ -1885,6 +1876,10 @@ object "EVMInterpreter" {
             
                     value := sload(key)
             
+                    if iszero(isSlotWarm(key)) {
+                        let _wasW, _orgV := warmSlot(key, value)
+                    }
+            
                     sp := pushStackItem(sp,value)
                 }
                 case 0x55 { // OP_SSTORE
@@ -1911,9 +1906,9 @@ object "EVMInterpreter" {
                         }
             
                         if eq(originalValue, currentValue) {
-                            gasSpent := 20000
+                            gasSpent := 19900
                             if originalValue {
-                                gasSpent := 2900
+                                gasSpent := 2800
                             }
                         }
             
@@ -2386,6 +2381,7 @@ object "EVMInterpreter" {
                     log1(add(offset, MEM_OFFSET_INNER()), size, topic1)
                 }
                 case 0xA2 { // OP_LOG2
+                    evmGasLeft := chargeGas(evmGasLeft, 375)
                     if isStatic {
                         revert(0, 0)
                     }
@@ -3423,7 +3419,7 @@ object "EVMInterpreter" {
                 if lt(sub(_gas,shl(30,1)), requiredGas) {
                     // This cheks if enough zkevm gas was provided, we are substracting 2^30 since that's the stipend, 
                     // and we need to make sure that the gas provided over that is enough for security reasons
-                    revert(0, 0)
+                    // revert(0, 0)
                 }
                 evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
             }
@@ -3493,14 +3489,7 @@ object "EVMInterpreter" {
                 }
             
                 {
-                    let maxExpand := add(retOffset, retSize)
-                    switch lt(maxExpand,add(argsOffset, argsSize))  // Check if this makes sense
-                    case 0 {
-                        maxExpand := expandMemory(add(argsOffset, argsSize))
-                    }
-                    default {
-                        maxExpand := expandMemory(maxExpand)
-                    }
+                    let maxExpand := getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize)
                     extraCost := add(extraCost,maxExpand)
                 }
                 let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
@@ -3546,6 +3535,18 @@ object "EVMInterpreter" {
                     gasToPass := maxGasToPass
                 }
             }
+            
+            function getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize) -> maxExpand{
+                maxExpand := add(retOffset, retSize)
+                switch lt(maxExpand,add(argsOffset, argsSize)) 
+                case 0 {
+                    maxExpand := expandMemory(maxExpand)
+                }
+                default {
+                    maxExpand := expandMemory(add(argsOffset, argsSize))
+                }
+            }
+            
             function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
                 let gasToPass,addr,value,argsOffset,argsSize,retOffset,retSize
             
@@ -3578,14 +3579,7 @@ object "EVMInterpreter" {
                     extraCost := add(extraCost,25000)
                 }
                 {
-                    let maxExpand := add(retOffset, retSize)
-                    switch lt(maxExpand,add(argsOffset, argsSize)) 
-                    case 0 {
-                        maxExpand := expandMemory(add(argsOffset, argsSize))
-                    }
-                    default {
-                        maxExpand := expandMemory(maxExpand)
-                    }
+                    let maxExpand := getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize)
                     extraCost := add(extraCost,maxExpand)
                 }
                 gasToPass := capGas(evmGasLeft,gasToPass)
@@ -3666,14 +3660,7 @@ object "EVMInterpreter" {
                 }
             
                 {
-                    let maxExpand := add(retOffset, retSize)
-                    switch lt(maxExpand,add(argsOffset, argsSize)) 
-                    case 0 {
-                        maxExpand := expandMemory(add(argsOffset, argsSize))
-                    }
-                    default {
-                        maxExpand := expandMemory(maxExpand)
-                    }
+                    let maxExpand := getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize)
                     extraCost := add(extraCost,maxExpand)
                 }
                 gasToPass := capGas(evmGasLeft,gasToPass)
@@ -4360,7 +4347,7 @@ object "EVMInterpreter" {
                     // minimum_word_size = (size + 31) / 32
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                     let minWordSize := shr(5, add(len, 31))
-                    let dynamicGas := add(mul(3, minWordSize), expandMemory(add(offset, len)))
+                    let dynamicGas := add(mul(3, minWordSize), expandMemory(add(dest, len)))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
                     copyActivePtrData(add(MEM_OFFSET_INNER(), dest), offset, len)
@@ -4476,6 +4463,10 @@ object "EVMInterpreter" {
             
                     value := sload(key)
             
+                    if iszero(isSlotWarm(key)) {
+                        let _wasW, _orgV := warmSlot(key, value)
+                    }
+            
                     sp := pushStackItem(sp,value)
                 }
                 case 0x55 { // OP_SSTORE
@@ -4502,9 +4493,9 @@ object "EVMInterpreter" {
                         }
             
                         if eq(originalValue, currentValue) {
-                            gasSpent := 20000
+                            gasSpent := 19900
                             if originalValue {
-                                gasSpent := 2900
+                                gasSpent := 2800
                             }
                         }
             
@@ -4977,6 +4968,7 @@ object "EVMInterpreter" {
                     log1(add(offset, MEM_OFFSET_INNER()), size, topic1)
                 }
                 case 0xA2 { // OP_LOG2
+                    evmGasLeft := chargeGas(evmGasLeft, 375)
                     if isStatic {
                         revert(0, 0)
                     }
