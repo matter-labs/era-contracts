@@ -16,61 +16,60 @@ import { getCurrentFacetCutsForAdd } from "../src.ts/diamondCut";
 // 2. Getter methods in STM.
 
 // List the contracts that should become the upgrade targets
-const genesisUpgrade = "0xDdc72e56A3b90793271FF0EA9a762294f163F992";
-const validatorTimelockDeployTx = "0x1ada4121db6e83bfe38f1f92e31c0931e2f0f2b830429841a7d264c56cceb8b0";
-const validatorTimelock = "0xc47CBbc601dbB65439e7b02B0d19bbA9Dba57442";
-const upgradeHyperchains = "0xc029cE1EB5C61C4a3B2a6EE920bb3B7b026bc00b";
+const genesisUpgrade = "0xc6aB8b3b93f3E47fb4163eB9Dc7A61E1a5D86369";
+const validatorTimelockDeployTx = "0x420e0dddae4a1565fee430ecafa8f5ddbc3eebee2666d0c91f97a47bf054eeb4";
+const validatorTimelock = "0xc2d7a7Bd59a548249e64C1a587220c0E4F6F439E";
+const upgradeHyperchains = "0xb2963DDc6694a989B527AED0B1E19f9F0675AE4d";
 
-const verifier = "0x82856fED36d36e1d4db24398bC2056C440cB45FC";
-const proxyAdmin = "0xCb7F8e556Ef02771eA32F54e767D6F9742ED31c2";
+const verifier = "0x9D6c59D9A234F585B367b4ba3C62e5Ec7A6179FD";
+const proxyAdmin = "0xf2c1d17441074FFb18E9A918db81A17dB1752146";
 
-const bridgeHubImpl = "0x22c456Cb8E657bD48e14E9a54CE20169d78CB0F7";
-const bridgeHub = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE";
+const bridgeHubImpl = "0xF9D2E98Ed518eC6Daac0579a9707d83da55D5f89";
+const bridgeHub = "0x5B5c82f4Da996e118B127880492a23391376F65c";
 
-const executorFacet = "0xd56f4696ecbE9ADc2e1539F5311ae6C92F4B2BAd";
-const adminFacet = "0x21924127192db478faDf6Ae07f57df928EBCA6AE";
-const mailboxFacetDeployTx = "0xad8028a8a1c7fe71e40fb6e32b80f5893b6b26af5475d9a014b9510faf460090";
-const mailboxFacet = "0x445aD49fC6d1845ec774783659aA5351381b0c49";
-const gettersFacet = "0xbF4C2dfBe9E722F0A87E104c3af5780d49872745";
+const executorFacet = "0x1a451d9bFBd176321966e9bc540596Ca9d39B4B1";
+const adminFacet = "0x342a09385E9BAD4AD32a6220765A6c333552e565";
+const mailboxFacetDeployTx = "0x2fa6af6e9317089be2734ffae73771c8099382d390d4edbb6c35e2db7f73b152";
+const mailboxFacet = "0x7814399116C17F2750Ca99cBFD2b75bA9a0793d7";
+const gettersFacet = "0x345c6ca2F3E08445614f4299001418F125AD330a";
 
-const diamondInit = "0x17384Fd6Cc64468b69df514A940caC89B602d01c";
+const diamondInit = "0x05D865AE297d236Bc5C7988328d02A00b3D38a4F";
 
-const stmImplDeployTx = "0x6dacf003368a922b9f916393f3c11c869c1f614c16345667cabd1d8b890ec0cb";
-const stmImpl = "0x91E088D2F36500c4826E5623c9C14Dd90912c23E";
-const stmDeployTx = "0x11ceebf3d0b95a4a49f798c937fd3e0085dc01a4e5d497b60b5072b13e58235a";
-const stm = "0x6F03861D12E6401623854E494beACd66BC46e6F0";
+const stmImplDeployTx = "0x7a077accd4ee39d14b6c23ef31ece4a84c87aff41cd64fd4d2ac23a3885dd4f8";
+const stmImpl = "0x3060D61538fC91B6580e34C5b5D09651CBB9c609";
+const stmDeployTx = "0x30138b826e8f8f855e7fe9e6153d49376b53bce71c34cb2a78e186b12156c966";
+const stm = "0x280372beAAf440C52a2ed893daa14CDACc0422b8";
 
-const sharedBridgeImplDeployTx = "0x6dacf003368a922b9f916393f3c11c869c1f614c16345667cabd1d8b890ec0cb";
-const sharedBridgeImpl = "0x91E088D2F36500c4826E5623c9C14Dd90912c23E";
-const sharedBridgeProxy = "0x6F03861D12E6401623854E494beACd66BC46e6F0";
+const sharedBridgeImplDeployTx = "0xd24d38cab0beb62f6de9a83cd0a5d7e339e985ba84ac6ef07a336efd79ae333a";
+const sharedBridgeImpl = "0x3819200C978d8A589a1e28A2e8fEb9a0CAD700F7";
+const sharedBridgeProxy = "0x241F19eA8CcD04515b309f1C9953A322F51891FC";
 
-const legacyBridgeImplDeployTx = "0xc0640213aa843f812c44d63723b5dc03064d8e5a32d85e94689e3273df6c3ef5";
-const legacyBridgeImpl = "0x8fE595B3f92AA34962d7A8aF106Fa50A3e4FC6fA";
+const legacyBridgeImplDeployTx = "0xd8cca5843318ca176afd1075ca6fbb941837a641324300d3719f9189e49fd62c";
+const legacyBridgeImpl = "0xbf3d4109D65A66c629D1999fb630bE2eE16d7038";
 
-const expectedL1WethAddress = "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9";
-const initialOwner = "0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7";
-const expectedOwner = "0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7";
+const expectedL1WethAddress = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+const initialOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438";
+const expectedOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438";
 const expectedDelay = 0;
-const eraChainId = 270;
-const expectedSalt = "0x0000000000000000000000000000000000000000000000000000000000000005";
-const expectedHyperchainAddr = "0x6d6e010A2680E2E5a3b097ce411528b36d880EF6";
+const eraChainId = 324;
+const expectedSalt = "0x0000000000000000000000000000000000000000000000000000000000000000";
+const expectedHyperchainAddr = "0x32400084c286cf3e17e7b677ea9583e60a000324";
 const maxNumberOfHyperchains = 100;
-const expectedStoredBatchHashZero = "0x53dc316f108d1b64412be840e0ab89193e94ba6c4af8b9ca57d39ad4d782e0f4";
-const expectedL2BridgeAddress = "0xCEB8d4888d2025aEaAD0272175281e0CaFC33152";
-const expectedL1LegacyBridge = "0x7303B5Ce64f1ADB0558572611a0b90620b6dd5F4";
-const expectedGenesisBatchCommitment = "0x49276362411c40c07ab01d3dfa9428abca95e361d8c980cd39f1ab6a9c561c0c";
+const expectedStoredBatchHashZero = "0x1574fa776dec8da2071e5f20d71840bfcbd82c2bca9ad68680edfedde1710bc4";
+const expectedL2BridgeAddress = "0x11f943b2c77b743AB90f4A0Ae7d5A4e7FCA3E102";
+const expectedL1LegacyBridge = "0x57891966931Eb4Bb6FB81430E6cE0A03AAbDe063";
+const expectedGenesisBatchCommitment = "0x2d00e5f8d77afcebf58a6b82ae56ba967566fe7dfbcb6760319fb0d215d18ffd";
 const expectedIndexRepeatedStorageChanges = BigNumber.from(54);
-const expectedProtocolVersion = 23;
+const expectedProtocolVersion = 24;
 const expectedGenesisRoot = "0xabdb766b18a479a5c783a4b80e12686bc8ea3cc2d8a3050491b701d72370ebb5";
 const expectedRecursionNodeLevelVkHash = "0xf520cd5b37e74e19fdb369c8d676a04dce8a19457497ac6686d2bb95d94109c8";
 const expectedRecursionLeafLevelVkHash = "0x435202d277dd06ef3c64ddd99fda043fc27c2bd8b7c66882966840202c27f4f6";
 const expectedRecursionCircuitsSetVksHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
-const expectedBootloaderHash = "0x010008e7f0f15ed191392960117f88fe371348982b28a033c7207ed2c09bc0f4";
+const expectedBootloaderHash = "0x010008e742608b21bf7eb23c1a9d0602047e3618b464c9b59c0fba3b3d7ab66e";
 const expectedDefaultAccountHash = "0x01000563374c277a2c1e34659a2a1e87371bb6d852ce142022d497bfb50b9e32";
 
-const expectedGovernance = "0xEE73438083629026FAfA1f5F5bBE2bBD6Bad6331";
-const validatorOne = "0x0000000000000000000000000000000000000000"; // to do find
-const validatorTwo = "0x0000000000000000000000000000000000000000"; // to do find
+const validatorOne = "0x0D3250c3D5FAcb74Ac15834096397a3Ef790ec99";
+const validatorTwo = "0x3527439923a63F8C13CF72b8Fe80a77f6e572092";
 
 const l1Provider = new ethers.providers.JsonRpcProvider(web3Url());
 
@@ -213,12 +212,10 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
 
   const [
     usedVerifier,
-
     // We just unpack verifier params here
     recursionNodeLevelVkHash,
     recursionLeafLevelVkHash,
     recursionCircuitsSetVksHash,
-
     l2BootloaderBytecodeHash,
     l2DefaultAccountBytecodeHash,
     // priorityTxMaxGasLimit,
@@ -362,46 +359,6 @@ async function checkMailbox() {
   console.log("Mailbox is correct!");
 }
 
-async function checkUpgradeHyperchainParams() {
-  const artifact = await hardhat.artifacts.readArtifact("GettersFacet");
-  const contract = new ethers.Contract(expectedHyperchainAddr, artifact.abi, l1Provider);
-
-  // Note: there is no getters for chainId
-  const setBridgehub = await contract.getBridgehub();
-  if (setBridgehub != bridgeHub) {
-    throw new Error("Bridgehub is not set in Era correctly");
-  }
-  const setStateTransitionManager = await contract.getStateTransitionManager();
-  if (setStateTransitionManager != stm) {
-    throw new Error("Bridgehub is not set in Era correctly");
-  }
-  const setBaseTokenBridge = await contract.getBaseTokenBridge();
-  if (setBaseTokenBridge != sharedBridgeProxy) {
-    throw new Error("Bridgehub is not set in Era correctly");
-  }
-  const setBaseToken = await contract.getBaseToken();
-  if (setBaseToken != utils.ETH_ADDRESS_IN_CONTRACTS) {
-    throw new Error("Bridgehub is not set in Era correctly");
-  }
-  const baseTokenGasPriceMultiplierNominator = await contract.baseTokenGasPriceMultiplierNominator();
-  if (baseTokenGasPriceMultiplierNominator != 1) {
-    throw new Error("baseTokenGasPriceMultiplierNominator is not set in Era correctly");
-  }
-  const baseTokenGasPriceMultiplierDenominator = await contract.baseTokenGasPriceMultiplierDenominator();
-  if (baseTokenGasPriceMultiplierDenominator != 1) {
-    throw new Error("baseTokenGasPriceMultiplierDenominator is not set in Era correctly");
-  }
-  const admin = await contract.getAdmin();
-  if (admin != expectedGovernance) {
-    throw new Error("admin is not set in Era correctly");
-  }
-  const validatorTimelockIsRegistered = await contract.isValidator(validatorTimelock);
-  if (!validatorTimelockIsRegistered) {
-    throw new Error("Bridgehub is not set in Era correctly");
-  }
-  console.log("Validator timelock and admin is set correctly in Era!");
-}
-
 async function checkSTMImpl() {
   const artifact = await hardhat.artifacts.readArtifact("StateTransitionManager");
   const contract = new ethers.Contract(stmImpl, artifact.abi, l1Provider);
@@ -498,7 +455,7 @@ async function checkProxyAdmin() {
 
   const currentOwner = await contract.owner();
   if (currentOwner.toLowerCase() != expectedOwner.toLowerCase()) {
-    throw new Error("ProxyAdmin owner is not correct");
+    throw new Error(`ProxyAdmin owner is not correct ${currentOwner}, ${expectedOwner}`);
   }
 
   console.log("ProxyAdmin is correct!");
@@ -519,11 +476,10 @@ async function main() {
     await checkIdenticalBytecode(gettersFacet, "GettersFacet");
     await checkIdenticalBytecode(adminFacet, "AdminFacet");
     await checkIdenticalBytecode(bridgeHubImpl, "Bridgehub");
-    await checkIdenticalBytecode(verifier, "TestnetVerifier");
+    await checkIdenticalBytecode(verifier, eraChainId == 324 ? "Verifier" : "TestnetVerifier");
     await checkIdenticalBytecode(diamondInit, "DiamondInit");
 
     await checkMailbox();
-    await checkUpgradeHyperchainParams();
 
     await checkProxyAdmin();
 

@@ -86,7 +86,7 @@ async function main() {
     .option("--tokens-per-signature <tokensPerSignature>")
     .option("--shared-bridge-addr <sharedBridgeAddr>")
     .option("--legacy-bridge-addr <legacyBridgeAddr>")
-    .option("--era-chain-address <eraChainAddress>")
+    .option("--era-chain-addr <eraChainAddress>")
     .option("--era-chain-id <eraChainId>")
     .option("--delay <delay>")
 
@@ -106,7 +106,7 @@ async function main() {
           tokens,
           cmd.sharedBridgeAddr,
           cmd.legacyBridgeAddr,
-          cmd.eraChainAddress,
+          cmd.eraChainAddr,
           cmd.eraChainId,
           +cmd.gasPerToken,
           +cmd.delay
