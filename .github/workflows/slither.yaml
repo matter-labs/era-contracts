@@ -44,5 +44,5 @@ jobs:
 
       - name: Run Slither
         run: |
-            cd l1-contracts
-            slither --config ./slither.config.json .
+          cd l1-contracts
+          slither --config ./slither.config.json .
