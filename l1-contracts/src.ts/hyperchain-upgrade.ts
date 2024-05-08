@@ -248,10 +248,6 @@ async function upgradeL2Bridge(deployer: Deployer, gasPrice: BigNumberish, print
   const l2BridgeAbi = ["function initialize(address, address, bytes32, address)"];
   const l2BridgeContract = new ethers.Contract(ADDRESS_ONE, l2BridgeAbi, deployer.deployWallet);
   const l2Bridge = l2BridgeContract.interface; //L2_SHARED_BRIDGE_INTERFACE;
-  // console.log("kl todo 1",  deployer.addresses.Bridges.SharedBridgeProxy,
-  // deployer.addresses.Bridges.ERC20BridgeProxy,
-  // hashL2Bytecode(BEACON_PROXY_BYTECODE),
-  // applyL1ToL2Alias(deployer.addresses.Governance),)
 
   const l2BridgeCalldata = l2Bridge.encodeFunctionData("initialize", [
     deployer.addresses.Bridges.SharedBridgeProxy,
@@ -274,16 +270,6 @@ async function upgradeL2Bridge(deployer: Deployer, gasPrice: BigNumberish, print
   const requiredValueForL2Tx = await deployer
     .bridgehubContract(deployer.deployWallet)
     .l2TransactionBaseCost(deployer.chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA); //"1000000000000000000";
-
-  // console.log("kl todo",
-  //   process.env.CONTRACTS_L2_ERC20_BRIDGE_ADDR,
-  //   0,
-  //   l2ProxyCalldata,
-  //   priorityTxMaxGasLimit,
-  //   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-  //   factoryDeps,
-  //   deployer.deployWallet.address
-  // )
 
   const mailboxFacet = new Interface(hardhat.artifacts.readArtifactSync("MailboxFacet").abi);
   const mailboxCalldata = mailboxFacet.encodeFunctionData("requestL2Transaction", [
