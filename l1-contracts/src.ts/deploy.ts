@@ -661,7 +661,7 @@ export class Deployer {
   public async registerStateTransitionManager() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
-    if (!await bridgehub.stateTransitionManagerIsRegistered(this.addresses.StateTransition.StateTransitionProxy)) {
+    if (!(await bridgehub.stateTransitionManagerIsRegistered(this.addresses.StateTransition.StateTransitionProxy))) {
       const tx = await bridgehub.addStateTransitionManager(this.addresses.StateTransition.StateTransitionProxy);
 
       const receipt = await tx.wait();

@@ -13,9 +13,9 @@ import { Provider } from "zksync-ethers";
 // 2. Getter methods in STM.
 
 // List the contracts that should become the upgrade targets
-const l2BridgeImplAddr = "0x16ef518222299b363519c39e5471487bcc243fe4";
+const l2BridgeImplAddr = "0x470afaacce2acdaefcc662419b74c79d76c914ae";
 
-const eraChainId = 271;
+const eraChainId = 324;
 
 const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
 
