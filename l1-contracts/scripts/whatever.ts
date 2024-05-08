@@ -89,11 +89,11 @@ main()
     process.exit(1);
   });
 
-const failedTokens = [
-  "0x97e3C21f27182498382f81e32fbe0ea3A0e3D79b",
-  "0x304645590f197d99fAD9fA1d05e7BcDc563E1378",
-  "0xfc448180d5254A55846a37c86146407Db48d2a36",
-];
+// const failedTokens = [
+//   "0x97e3C21f27182498382f81e32fbe0ea3A0e3D79b",
+//   "0x304645590f197d99fAD9fA1d05e7BcDc563E1378",
+//   "0xfc448180d5254A55846a37c86146407Db48d2a36",
+// ];
 
 const tokenList = [
   "0xA49d7499271aE71cd8aB9Ac515e6694C755d400c",

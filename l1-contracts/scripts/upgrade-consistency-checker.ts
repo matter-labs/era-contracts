@@ -68,7 +68,7 @@ const expectedRecursionCircuitsSetVksHash = "0x000000000000000000000000000000000
 const expectedBootloaderHash = "0x010008e742608b21bf7eb23c1a9d0602047e3618b464c9b59c0fba3b3d7ab66e";
 const expectedDefaultAccountHash = "0x01000563374c277a2c1e34659a2a1e87371bb6d852ce142022d497bfb50b9e32";
 
-const expectedGovernance = "0xbF4B985eACb623aAFd0B90D9F8C794fa8585edE9";
+// const expectedGovernance = "0xbF4B985eACb623aAFd0B90D9F8C794fa8585edE9";
 const validatorOne = "0x0D3250c3D5FAcb74Ac15834096397a3Ef790ec99";
 const validatorTwo = "0x3527439923a63F8C13CF72b8Fe80a77f6e572092";
 
