@@ -46,7 +46,6 @@ export default {
       },
     },
   },
-  defaultNetwork: "stage",
   networks: {
     hardhat: {
       zksync: true,
@@ -62,7 +61,7 @@ export default {
       zksync: true,
     },
     sepolia: {
-      url: "https://eth-sepolia.g.alchemy.com/v2/lJQd8kSLSrrfo6H99NXeWcwaw2zN-W0o",
+      url: "", // add your sepolia node url
     },
   },
   paths: {
