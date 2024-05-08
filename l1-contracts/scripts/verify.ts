@@ -16,7 +16,11 @@ const provider = web3Provider();
 function verifyPromise(address: string, constructorArguments?: Array<any>, libraries?: object): Promise<any> {
   return new Promise((resolve, reject) => {
     hardhat
-      .run("verify:verify", { address, constructorArguments, libraries })
+      .run("verify:verify", {
+        address,
+        constructorArguments,
+        libraries,
+      })
       .then(() => resolve(`Successfully verified ${address}`))
       .catch((e) => reject(`Failed to verify ${address}\nError: ${e.message}`));
   });
@@ -34,7 +38,7 @@ async function main() {
   const addresses = deployedAddressesFromEnv();
   const promises = [];
 
-  const deployWalletAddress = "0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7";
+  const deployWalletAddress = "0x71d84c3404a6ae258E6471d4934B96a2033F9438";
 
   const deployWallet = Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
   const deployer = new Deployer({

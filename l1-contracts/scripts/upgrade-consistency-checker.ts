@@ -360,45 +360,45 @@ async function checkMailbox() {
   console.log("Mailbox is correct!");
 }
 
-async function checkUpgradeHyperchainParams() {
-  const artifact = await hardhat.artifacts.readArtifact("GettersFacet");
-  const contract = new ethers.Contract(expectedHyperchainAddr, artifact.abi, l1Provider);
+// async function checkUpgradeHyperchainParams() {
+//   const artifact = await hardhat.artifacts.readArtifact("GettersFacet");
+//   const contract = new ethers.Contract(expectedHyperchainAddr, artifact.abi, l1Provider);
 
-  // Note: there is no getters for chainId
-  const setBridgehub = await contract.getBridgehub();
-  if (setBridgehub != bridgeHub) {
-    throw new Error("Bridgehub is not set in Era correctly");
-  }
-  const setStateTransitionManager = await contract.getStateTransitionManager();
-  if (setStateTransitionManager != stm) {
-    throw new Error("Bridgehub is not set in Era correctly");
-  }
-  const setBaseTokenBridge = await contract.getBaseTokenBridge();
-  if (setBaseTokenBridge != sharedBridgeProxy) {
-    throw new Error("Bridgehub is not set in Era correctly");
-  }
-  const setBaseToken = await contract.getBaseToken();
-  if (setBaseToken != utils.ETH_ADDRESS_IN_CONTRACTS) {
-    throw new Error("Bridgehub is not set in Era correctly");
-  }
-  const baseTokenGasPriceMultiplierNominator = await contract.baseTokenGasPriceMultiplierNominator();
-  if (baseTokenGasPriceMultiplierNominator != 1) {
-    throw new Error("baseTokenGasPriceMultiplierNominator is not set in Era correctly");
-  }
-  const baseTokenGasPriceMultiplierDenominator = await contract.baseTokenGasPriceMultiplierDenominator();
-  if (baseTokenGasPriceMultiplierDenominator != 1) {
-    throw new Error("baseTokenGasPriceMultiplierDenominator is not set in Era correctly");
-  }
-  const admin = await contract.getAdmin();
-  if (admin != expectedGovernance) {
-    throw new Error("admin is not set in Era correctly");
-  }
-  const validatorTimelockIsRegistered = await contract.isValidator(validatorTimelock);
-  if (!validatorTimelockIsRegistered) {
-    throw new Error("Bridgehub is not set in Era correctly");
-  }
-  console.log("Validator timelock and admin is set correctly in Era!");
-}
+//   // Note: there is no getters for chainId
+//   const setBridgehub = await contract.getBridgehub();
+//   if (setBridgehub != bridgeHub) {
+//     throw new Error("Bridgehub is not set in Era correctly");
+//   }
+//   const setStateTransitionManager = await contract.getStateTransitionManager();
+//   if (setStateTransitionManager != stm) {
+//     throw new Error("Bridgehub is not set in Era correctly");
+//   }
+//   const setBaseTokenBridge = await contract.getBaseTokenBridge();
+//   if (setBaseTokenBridge != sharedBridgeProxy) {
+//     throw new Error("Bridgehub is not set in Era correctly");
+//   }
+//   const setBaseToken = await contract.getBaseToken();
+//   if (setBaseToken != utils.ETH_ADDRESS_IN_CONTRACTS) {
+//     throw new Error("Bridgehub is not set in Era correctly");
+//   }
+//   const baseTokenGasPriceMultiplierNominator = await contract.baseTokenGasPriceMultiplierNominator();
+//   if (baseTokenGasPriceMultiplierNominator != 1) {
+//     throw new Error("baseTokenGasPriceMultiplierNominator is not set in Era correctly");
+//   }
+//   const baseTokenGasPriceMultiplierDenominator = await contract.baseTokenGasPriceMultiplierDenominator();
+//   if (baseTokenGasPriceMultiplierDenominator != 1) {
+//     throw new Error("baseTokenGasPriceMultiplierDenominator is not set in Era correctly");
+//   }
+//   const admin = await contract.getAdmin();
+//   if (admin != expectedGovernance) {
+//     throw new Error("admin is not set in Era correctly");
+//   }
+//   const validatorTimelockIsRegistered = await contract.isValidator(validatorTimelock);
+//   if (!validatorTimelockIsRegistered) {
+//     throw new Error("Bridgehub is not set in Era correctly");
+//   }
+//   console.log("Validator timelock and admin is set correctly in Era!");
+// }
 
 async function checkSTMImpl() {
   const artifact = await hardhat.artifacts.readArtifact("StateTransitionManager");
