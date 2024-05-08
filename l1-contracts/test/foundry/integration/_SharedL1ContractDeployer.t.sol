@@ -15,8 +15,9 @@ contract L1ContractDeployer is Test {
     address bridgehubOwnerAddress;
     Bridgehub bridgeHub;
 
-    address sharedBridgeProxyAddress;
-    L1SharedBridge sharedBridge;
+    address public sharedBridgeProxyAddress;
+    L1SharedBridge public sharedBridge; 
+
 
     function deployL1Contracts() internal {
         DeployL1Script l1Script = new DeployL1Script();
