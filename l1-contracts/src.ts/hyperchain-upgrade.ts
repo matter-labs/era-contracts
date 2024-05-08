@@ -29,7 +29,6 @@ const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "cont
 const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@openzeppelin/contracts/proxy/beacon");
 export const BEACON_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
 
-
 /// In the hardhat tests we do the upgrade all at once.
 /// On localhost/stage/.. we will call the components and send the calldata to Governance manually
 export async function upgradeToHyperchains(
@@ -130,6 +129,7 @@ export async function upgradeToHyperchains1(
     create2Salt,
     ethTxOptions
   );
+  console.log("Migration STM address", migrationSTMAddress);
 
   const validatorTimelock = ValidatorTimelockFactory.connect(
     deployer.addresses.ValidatorTimeLock,
@@ -219,21 +219,19 @@ async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, cr
     gasPrice,
     nonce,
   });
-  nonce++;
 
-  await deployer.deployValidatorTimelock(create2Salt, { gasPrice, nonce });
-  nonce++;
+  await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
 
   await deployer.deployHyperchainsUpgrade(create2Salt, {
     gasPrice,
-    nonce,
   });
-  nonce++;
-  await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
+  await deployer.deployVerifier(create2Salt, { gasPrice });
 
   if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
     await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   }
+  // console.log("Proxy admin is already deployed (not via Create2)", deployer.addresses.TransparentProxyAdmin);
+  // console.log("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR=0xf2c1d17441074FFb18E9A918db81A17dB1752146");
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
 
   await deployer.deployStateTransitionManagerContract(create2Salt, [], gasPrice);
@@ -277,7 +275,7 @@ async function upgradeL2Bridge(deployer: Deployer, gasPrice: BigNumberish, print
     .bridgehubContract(deployer.deployWallet)
     .l2TransactionBaseCost(deployer.chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA); //"1000000000000000000";
 
-  // console.log("kl todo", 
+  // console.log("kl todo",
   //   process.env.CONTRACTS_L2_ERC20_BRIDGE_ADDR,
   //   0,
   //   l2ProxyCalldata,
@@ -348,4 +346,17 @@ export async function transferERC20BridgeToProxyAdmin(
   if (deployer.verbose) {
     console.log("ERC20Bridge ownership transfer sent");
   }
+}
+
+export async function transferTokens(deployer: Deployer, token: string) {
+  const sharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
+  const tx = await sharedBridge.safeTransferFundsFromLegacy(
+    token,
+    deployer.addresses.Bridges.ERC20BridgeProxy,
+    "324",
+    "300000",
+    { gasLimit: 25_000_000 }
+  );
+  await tx.wait();
+  console.log("Receipt", tx.hash);
 }
