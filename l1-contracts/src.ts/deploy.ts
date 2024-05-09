@@ -333,7 +333,10 @@ export class Deployer {
       "StateTransitionManager",
       [this.addresses.Bridgehub.BridgehubProxy, getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_HYPERCHAINS")],
       create2Salt,
-      ethTxOptions
+      {
+        ...ethTxOptions,
+        gasLimit: 20_000_000
+      }
     );
 
     if (this.verbose) {

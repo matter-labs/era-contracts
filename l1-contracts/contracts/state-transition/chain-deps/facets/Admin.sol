@@ -3,11 +3,20 @@
 pragma solidity 0.8.24;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {MAX_GAS_PER_TRANSACTION, HyperchainCommitment, StoredBatchHashInfo} from "../../../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_GAS_PER_TRANSACTION, HyperchainCommitment, StoredBatchHashInfo, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode, SyncLayerState} from "../ZkSyncHyperchainStorage.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
+import {ISystemContext} from "../../l2-deps/ISystemContext.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {L2CanonicalTransaction, TxStatus} from "../../../common/Messaging.sol";
+import {ProposedUpgrade} from "../../../upgrades/BaseZkSyncUpgrade.sol";
+import {VerifierParams} from "../../chain-interfaces/IVerifier.sol";
+import {IDefaultUpgrade} from "../../../upgrades/IDefaultUpgrade.sol";
+
+
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -192,14 +201,86 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         commitment.batchHashes = batchHashes;
     }
 
-    function recoverFromFailedMigrationToSyncLayer() external onlyStateTransitionManager {
-        // We do not need to perform any additional actions, since no changes related to the chain commitment can be performed
-        // while the chain is in the "migrated" state.
+    function recoverFromFailedMigrationToSyncLayer(
+        uint256 _syncLayerChainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external onlyAdmin {
         require(s.syncLayerState == SyncLayerState.MigratedL1, "not migrated L1");
+
+        bytes32 migrationHash = s.syncLayerMigrationHash;
+        require(migrationHash != bytes32(0), "can not recover when there is no migration");
+
+        require(IBridgehub(s.bridgehub).proveL1ToL2TransactionStatus(_syncLayerChainId, migrationHash, _l2BatchNumber, _l2MessageIndex, _l2TxNumberInBatch, _merkleProof, TxStatus.Failure), "Migration not failed");
+
+        
         s.syncLayerState = SyncLayerState.ActiveL1;
         s.syncLayerChainId = 0;
+        s.syncLayerMigrationHash = bytes32(0);
+
+        // We do not need to perform any additional actions, since no changes related to the chain commitment can be performed
+        // while the chain is in the "migrated" state.
+
     }
 
+    /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
+    function setChainIdUpgrade(address _genesisUpgrade) external onlyStateTransitionManager {
+        uint256 currentProtocolVersion = s.protocolVersion;
+        uint256 chainId = s.chainId;
+
+        bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (chainId));
+        uint256[] memory uintEmptyArray;
+        bytes[] memory bytesEmptyArray;
+
+        L2CanonicalTransaction memory l2ProtocolUpgradeTx = L2CanonicalTransaction({
+            txType: SYSTEM_UPGRADE_L2_TX_TYPE,
+            from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
+            to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)),
+            gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
+            gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            maxFeePerGas: uint256(0),
+            maxPriorityFeePerGas: uint256(0),
+            paymaster: uint256(0),
+            // Note, that the protocol version is used as "nonce" for system upgrade transactions
+            nonce: currentProtocolVersion,
+            value: 0,
+            reserved: [uint256(0), 0, 0, 0],
+            data: systemContextCalldata,
+            signature: new bytes(0),
+            factoryDeps: uintEmptyArray,
+            paymasterInput: new bytes(0),
+            reservedDynamic: new bytes(0)
+        });
+
+        ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
+            l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
+            factoryDeps: bytesEmptyArray,
+            bootloaderHash: bytes32(0),
+            defaultAccountHash: bytes32(0),
+            verifier: address(0),
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            }),
+            l1ContractsUpgradeCalldata: new bytes(0),
+            postUpgradeCalldata: new bytes(0),
+            upgradeTimestamp: 0,
+            newProtocolVersion: currentProtocolVersion
+        });
+
+        Diamond.FacetCut[] memory emptyArray;
+        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
+            facetCuts: emptyArray,
+            initAddress: _genesisUpgrade,
+            initCalldata: abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
+        });
+
+        Diamond.diamondCut(cutData);
+        emit SetChainIdUpgrade(address(this), l2ProtocolUpgradeTx, currentProtocolVersion);
+    }
 
     /*//////////////////////////////////////////////////////////////
                             CONTRACT FREEZING

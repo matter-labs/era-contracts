@@ -166,4 +166,6 @@ struct ZkSyncHyperchainStorage {
     SyncLayerState syncLayerState;
 
     uint256 syncLayerChainId;
+
+    bytes32 syncLayerMigrationHash;
 }

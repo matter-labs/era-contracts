@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {HyperchainCommitment} from "../../common/Config.sol";
 
 import {IZkSyncHyperchainBase} from "../chain-interfaces/IZkSyncHyperchainBase.sol";
+import {L2CanonicalTransaction, TxStatus} from "../../common/Messaging.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
@@ -61,7 +62,13 @@ interface IAdmin is IZkSyncHyperchainBase {
     function finalizeMigration(HyperchainCommitment calldata _hyperchainCommitment) external;
     function startMigrationToSyncLayer(uint256 _syncLayerChainId) external returns (HyperchainCommitment memory commitment);
 
-    function recoverFromFailedMigrationToSyncLayer() external;
+    function recoverFromFailedMigrationToSyncLayer(
+        uint256 _syncLayerChainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external;
 
     /// @notice Instantly pause the functionality of all freezable facets & their selectors
     /// @dev Only the governance mechanism may freeze Diamond Proxy
@@ -70,6 +77,8 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice Unpause the functionality of all freezable facets & their selectors
     /// @dev Both the admin and the STM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
+
+    function setChainIdUpgrade(address _genesisUpgrade) external;
 
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
@@ -115,5 +124,12 @@ interface IAdmin is IZkSyncHyperchainBase {
 
     /// @notice Emitted when the contract is unfrozen.
     event Unfreeze();
+
+    /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
+    event SetChainIdUpgrade(
+        address indexed _hyperchain,
+        L2CanonicalTransaction _l2Transaction,
+        uint256 indexed _protocolVersion
+    );
 
 }

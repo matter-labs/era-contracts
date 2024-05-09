@@ -31,12 +31,12 @@ interface IStateTransitionManager {
     /// @dev Emitted when a new Hyperchain is added
     event NewHyperchain(uint256 indexed _chainId, address indexed _hyperchainContract);
 
-    /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
-    event SetChainIdUpgrade(
-        address indexed _hyperchain,
-        L2CanonicalTransaction _l2Transaction,
-        uint256 indexed _protocolVersion
-    );
+    // /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
+    // event SetChainIdUpgrade(
+    //     address indexed _hyperchain,
+    //     L2CanonicalTransaction _l2Transaction,
+    //     uint256 indexed _protocolVersion
+    // );
 
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address

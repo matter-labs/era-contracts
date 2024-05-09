@@ -67,8 +67,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The address to accept the admin role
     address private pendingAdmin;
 
-    // address private migrationUpgrade;
-
     // Sync layer chain is expected to have ETH as the base token.
     mapping(uint256 chainId => bool isWhitelistedSyncLayer) whitelistedSyncLayers;
 
@@ -286,60 +284,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// registration
 
-    /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
-    function _setChainIdUpgrade(uint256 _chainId, address _chainContract) internal {
-        bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (_chainId));
-        uint256[] memory uintEmptyArray;
-        bytes[] memory bytesEmptyArray;
-
-        L2CanonicalTransaction memory l2ProtocolUpgradeTx = L2CanonicalTransaction({
-            txType: SYSTEM_UPGRADE_L2_TX_TYPE,
-            from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
-            to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)),
-            gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
-            gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            maxFeePerGas: uint256(0),
-            maxPriorityFeePerGas: uint256(0),
-            paymaster: uint256(0),
-            // Note, that the protocol version is used as "nonce" for system upgrade transactions
-            nonce: protocolVersion,
-            value: 0,
-            reserved: [uint256(0), 0, 0, 0],
-            data: systemContextCalldata,
-            signature: new bytes(0),
-            factoryDeps: uintEmptyArray,
-            paymasterInput: new bytes(0),
-            reservedDynamic: new bytes(0)
-        });
-
-        ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
-            factoryDeps: bytesEmptyArray,
-            bootloaderHash: bytes32(0),
-            defaultAccountHash: bytes32(0),
-            verifier: address(0),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: new bytes(0),
-            upgradeTimestamp: 0,
-            newProtocolVersion: protocolVersion
-        });
-
-        Diamond.FacetCut[] memory emptyArray;
-        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
-            facetCuts: emptyArray,
-            initAddress: genesisUpgrade,
-            initCalldata: abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
-        });
-
-        IAdmin(_chainContract).executeUpgrade(cutData);
-        emit SetChainIdUpgrade(_chainContract, l2ProtocolUpgradeTx, protocolVersion);
-    }
-
     /// @dev used to register already deployed hyperchain contracts
     /// @param _chainId the chain's id
     /// @param _hyperchain the chain's contract address
@@ -425,7 +369,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address hyperchainAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut, SyncLayerState.ActiveL1);
 
         // set chainId in VM
-        _setChainIdUpgrade(_chainId, hyperchainAddress);
+        IAdmin(hyperchainAddress).setChainIdUpgrade(genesisUpgrade);
     }
 
 
@@ -449,9 +393,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // TODO: emit evengt
     }
 
-    function registerTrustedCounterPart(uint256 _chainId, address _trustedCounterpart) external onlyOwner {
+    // function registerTrustedCounterPart(uint256 _chainId, address _trustedCounterpart) external onlyOwner {
 
-    }
+    // }
 
     function finalizeMigrationToSyncLayer(
         uint256 _chainId,
@@ -532,7 +476,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     ) payable external {
         // TODO: Maybe check l2 diamond cut here for failing fast?
 
-        require(_newSyncLayerAdmin != address(0), "STM: admin zero");)
+        require(_newSyncLayerAdmin != address(0), "STM: admin zero");
 
         // TODO: add requiremenet for it to be a admin of the chain
         require(whitelistedSyncLayers[_syncLayerChainId], "sync layer not whitelisted");
@@ -569,32 +513,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // lastMigratedCommitments[_chainId] = keccak256(abi.encode(commitment));
         // Now, we need to send an L1->L2 tx to the sync layer blockchain to the spawn the chain on SL.
         // We just send it via a normal L-Z
-    }
-
-    function recoverFromFailedMigration(
-        uint256 _chainId,
-        uint256 _syncLayerChainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
-    ) external {
-        // TODO: only callable by chain admin
-
-        require(whitelistedSyncLayers[_syncLayerChainId], "sync layer not whitelisted");
-
-        IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
-
-
-        bytes32 migrationHash = lastMigrationTxHashes[_chainId];
-        require(migrationHash != bytes32(0), "can not recover when there is no migration");
-        // Preventing reusing the same migration hash
-        lastMigrationTxHashes[_chainId] = bytes32(0);
-
-        require(IBridgehub(BRIDGE_HUB).proveL1ToL2TransactionStatus(_syncLayerChainId, migrationHash, _l2BatchNumber, _l2MessageIndex, _l2TxNumberInBatch, _merkleProof, TxStatus.Failure), "Migration not failed");
-
-        // Now we can recover the chain.
-        hyperchain.recoverFromFailedMigrationToSyncLayer();
     }
 
     /// @dev This internal function is used to register a new hyperchain in the system.
