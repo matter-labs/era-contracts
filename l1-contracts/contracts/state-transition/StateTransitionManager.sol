@@ -530,8 +530,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         L2TransactionRequestDirect memory _request,
         bytes calldata _diamondCut
     ) payable external {
-        // Maybe check l2 diamond cut here for failing fast?
+        // TODO: Maybe check l2 diamond cut here for failing fast?
 
+        require(_newSyncLayerAdmin != address(0), "STM: admin zero");)
 
         // TODO: add requiremenet for it to be a admin of the chain
         require(whitelistedSyncLayers[_syncLayerChainId], "sync layer not whitelisted");
@@ -542,6 +543,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address chainBaseToken = hyperchain.getBaseToken();
         uint256 currentProtocolVersion = hyperchain.getProtocolVersion();
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
+
+        // FIXME: this will be removed once we support the migration of the priority queue also.
+        require(hyperchain.getPriorityQueueSize() == 0, "Migration is only allowed with empty priority queue");
 
         HyperchainCommitment memory commitment = hyperchain.startMigrationToSyncLayer(_syncLayerChainId);
 

@@ -165,6 +165,8 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     function startMigrationToSyncLayer(uint256 _syncLayerChainId) external onlyStateTransitionManager returns (HyperchainCommitment memory commitment) {
+        // TODO: add a check that there are no outstanding upgrades.
+
         require(s.syncLayerState == SyncLayerState.ActiveL1, "not active L1");
         s.syncLayerState = SyncLayerState.MigratedL1;
         s.syncLayerChainId = _syncLayerChainId;
