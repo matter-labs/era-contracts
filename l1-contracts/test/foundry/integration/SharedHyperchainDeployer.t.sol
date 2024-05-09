@@ -2,9 +2,8 @@
 pragma solidity 0.8.24;
 
 import {HyperchainDeployer} from "./_SharedHyperchainDeployer.t.sol";
-import {RegisterHyperchainsScript} from "../../../scripts-rs/script/RegisterHyperchains.s.sol";
+import {RegisterHyperchainsScript} from "./deploy-scripts/script/RegisterHyperchains.s.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-
 
 contract TestHyperchainDeployConfig is HyperchainDeployer {
     function test_saveAndReadHyperchainsConfig() public {
@@ -15,7 +14,10 @@ contract TestHyperchainDeployConfig is HyperchainDeployer {
 
         saveHyperchainConfig();
 
-        vm.setEnv("HYPERCHAINS_CONFIG", "/scripts-rs/script-out/output-deploy-hyperchains.toml");
+        vm.setEnv(
+            "HYPERCHAINS_CONFIG",
+            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-hyperchains.toml"
+        );
         RegisterHyperchainsScript.HyperchainDescription[] memory descriptions = deployScript.readHyperchainsConfig();
 
         for (uint256 i = 0; i < descriptions.length; i++) {

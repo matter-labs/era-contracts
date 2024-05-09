@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {DeployL1Script} from "../../../scripts-rs/script/DeployL1.s.sol";
+import {DeployL1Script} from "./deploy-scripts/script/DeployL1.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 

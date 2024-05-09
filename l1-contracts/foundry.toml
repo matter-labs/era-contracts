@@ -16,10 +16,8 @@ ignored_warnings_from = [
 ]
 
 fs_permissions = [
-    { access = "read", path = "../system-contracts/bootloader/build/artifacts"},
-    { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed"},
-    { access = "read", path = "./scripts-rs/script-config/" },
-    { access = "read-write", path = "./scripts-rs/script-out/" },
+    { access = "read", path = "./test/foundry/integration/deploy-scripts/script-config/" },
+    { access = "read-write", path = "./test/foundry/integration/deploy-scripts/script-out/" },
     { access = "read", path = "./out" }
 ]
 

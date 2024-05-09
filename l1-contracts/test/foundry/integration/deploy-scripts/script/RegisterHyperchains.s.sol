@@ -98,7 +98,7 @@ contract RegisterHyperchainsScript is Script {
     function initializeConfig() internal {
         // Grab config from output of l1 deployment
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/scripts-rs/script-out/output-deploy-l1.toml");
+        string memory path = string.concat(root, "/test/foundry/integration/deploy-scripts/script-out/output-deploy-l1.toml");
         string memory toml = vm.readFile(path);
 
         config.deployerAddress = msg.sender;

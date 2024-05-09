@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {RegisterHyperchainsScript} from "../../../scripts-rs/script/RegisterHyperchains.s.sol";
+import {RegisterHyperchainsScript} from "./deploy-scripts/script/RegisterHyperchains.s.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 contract HyperchainDeployer is L1ContractDeployer {
@@ -27,7 +27,10 @@ contract HyperchainDeployer is L1ContractDeployer {
 
         saveHyperchainConfig();
 
-        vm.setEnv("HYPERCHAINS_CONFIG", "/scripts-rs/script-out/output-deploy-hyperchains.toml");
+        vm.setEnv(
+            "HYPERCHAINS_CONFIG",
+            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-hyperchains.toml"
+        );
 
         deployScript.run();
     }
@@ -125,7 +128,10 @@ contract HyperchainDeployer is L1ContractDeployer {
 
         string memory toml = vm.serializeString("toml1", "hyperchains", serialized);
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/scripts-rs/script-out/output-deploy-hyperchains.toml");
+        string memory path = string.concat(
+            root,
+            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-hyperchains.toml"
+        );
         vm.writeToml(toml, path);
     }
 

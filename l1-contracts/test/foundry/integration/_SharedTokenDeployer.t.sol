@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {DeployErc20Script} from "../../../scripts-rs/script/DeployErc20.s.sol";
+import {DeployErc20Script} from "./deploy-scripts/script/DeployErc20.s.sol";
 
 contract TokenDeployer is Test {
     address[] tokens;

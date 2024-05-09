@@ -163,7 +163,10 @@ contract DeployL1Script is Script {
 
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/scripts-rs/script-config/config-deploy-l1.toml");
+        string memory path = string.concat(
+            root,
+            "/test/foundry/integration/deploy-scripts/script-config/config-deploy-l1.toml"
+        );
         string memory toml = vm.readFile(path);
 
         config.l1ChainId = block.chainid;
@@ -678,7 +681,10 @@ contract DeployL1Script is Script {
 
         string memory toml = vm.serializeString("toml", "l1", l1);
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/scripts-rs/script-out/output-deploy-l1.toml");
+        string memory path = string.concat(
+            root,
+            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-l1.toml"
+        );
         vm.writeToml(toml, path);
     }
 

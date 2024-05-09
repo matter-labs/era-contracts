@@ -49,7 +49,10 @@ contract DeployErc20Script is Script {
     function initializeConfig() internal {
         // Grab config from output of l1 deployment
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/scripts-rs/script-config/config-deploy-erc20.toml");
+        string memory path = string.concat(
+            root,
+            "/test/foundry/integration/deploy-scripts/script-config/config-deploy-erc20.toml"
+        );
         string memory toml = vm.readFile(path);
 
         config.deployerAddress = msg.sender;
@@ -138,7 +141,10 @@ contract DeployErc20Script is Script {
 
         string memory toml = vm.serializeString("root", "tokens", tokens);
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/scripts-rs/script-out/output-deploy-erc20.toml");
+        string memory path = string.concat(
+            root,
+            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-erc20.toml"
+        );
         vm.writeToml(toml, path);
     }
 
