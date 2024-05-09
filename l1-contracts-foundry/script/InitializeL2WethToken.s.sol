@@ -41,29 +41,17 @@ contract InitializeL2WethTokenScript is Script {
     function initializeConfig() internal {
         config.deployerAddress = msg.sender;
 
-        // Parse some config from output of l1 deployment
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
+        string memory path = string.concat(root, "/script-config/config-initialize-l2-weth-token.toml");
         string memory toml = vm.readFile(path);
 
+        config.l1WethTokenAddr = toml.readAddress("$.l1_weth_token_addr");
+        config.l1WethTokenName = toml.readString("$.l1_weth_token_name");
+        config.l1WethTokenSymbol = toml.readString("$.l1_weth_token_symbol");
         config.create2FactoryAddr = toml.readAddress("$.create2_factory_addr");
         config.create2FactorySalt = toml.readBytes32("$.create2_factory_salt");
         config.eraChainId = toml.readUint("$.era_chain_id");
-        config.bridgehubProxyAddr = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-
-        // Parse some config from output of erc20 tokens deployment
-        path = string.concat(root, "/script-out/output-deploy-erc20.toml");
-        toml = vm.readFile(path);
-
-        config.l1WethTokenAddr = toml.readAddress("$.tokens.WETH.address");
-        config.l1WethTokenName = toml.readString("$.tokens.WETH.name");
-        config.l1WethTokenSymbol = toml.readString("$.tokens.WETH.symbol");
-
-        // Parse some config from custom config
-        // TODO: read from L2 deployment output when available
-        path = string.concat(root, "/script-config/config-initialize-l2-weth-token.toml");
-        toml = vm.readFile(path);
-
+        config.bridgehubProxyAddr = toml.readAddress("$.bridgehub_proxy_addr");
         config.l2SharedBridgeAddr = toml.readAddress("$.l2_shared_bridge_addr");
         config.l2WethTokenProxyAddr = toml.readAddress("$.l2_weth_token_proxy_addr");
         config.l2WethTokenImplAddr = toml.readAddress("$.l2_weth_token_impl_addr");
