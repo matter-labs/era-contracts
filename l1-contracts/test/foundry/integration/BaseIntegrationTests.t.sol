@@ -31,12 +31,6 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
     mapping(address chain => mapping(address token => uint256 deposited)) public depositsBridge;
     mapping(address token => uint256 deposited) public tokenSumDeposit;
 
-    // /// OLD
-    // address alice;
-    // address bob;
-
-    // TestnetERC20Token baseToken;
-
     // helper modifier to get some random user
     modifier useUser(uint256 userIndexSeed) {
         currentUser = users[bound(userIndexSeed, 0, users.length - 1)];
@@ -49,6 +43,18 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
     modifier useHyperchain(uint256 chainIndexSeed) {
         currentChainId = hyperchainIds[bound(chainIndexSeed, 0, hyperchainIds.length - 1)];
         currentChainAddress = getHyperchainAddress(currentChainId);
+        _;
+    }
+
+    modifier useGivenToken(address tokenAddress) {
+        currentToken = TestnetERC20Token(tokenAddress);
+        currentTokenAddress = tokenAddress;
+        _;
+    }
+
+    modifier useRandomToken(uint256 tokenIndexSeed) {
+        currentTokenAddress = tokens[bound(tokenIndexSeed, 0, tokens.length - 1)];
+        currentToken = TestnetERC20Token(currentTokenAddress);
         _;
     }
 
@@ -69,14 +75,40 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
         }
     }
 
-    function depositEthToBridge(
-        uint256 userIndexSeed,
-        uint256 chainIndexSeed,
-        uint256 mintValue,
-        uint256 l2Value
-    ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) {
-        vm.txGasPrice(0.1 ether);
-        vm.deal(currentUser, 2 * mintValue);
+    // function depositEthToNonEthChain(
+    //     uint256 mintValue,
+    //     uint256 l2Value
+    // ) internal {
+    //     uint256 gas = 0.001 ether;
+    //     vm.txGasPrice(gas);
+    //     vm.deal(currentUser, mintValue + 10 * gas);
+
+    //     L2TransactionRequestDirect memory txRequest = createMockL2TransactionRequestDirect(
+    //         currentChainId,
+    //         mintValue,
+    //         l2Value
+    //     );
+
+    //     bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+
+    //     vm.mockCall(
+    //         currentChainAddress,
+    //         abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
+    //         abi.encode(canonicalHash)
+    //     );
+
+    //     bytes32 resultantHash = bridgeHub.requestL2TransactionDirect(txRequest);
+    //     assertEq(canonicalHash, resultantHash);
+
+    //     depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += mintValue;
+    //     depositsBridge[currentChainAddress][ETH_TOKEN_ADDRESS] += mintValue;
+    //     tokenSumDeposit[ETH_TOKEN_ADDRESS] += mintValue;
+    // }
+
+    function depositEthToEthChain(uint256 mintValue, uint256 l2Value) private {
+        uint256 gas = 0.001 ether;
+        vm.txGasPrice(gas);
+        vm.deal(currentUser, mintValue + gas);
 
         L2TransactionRequestDirect memory txRequest = createMockL2TransactionRequestDirect(
             currentChainId,
@@ -92,7 +124,7 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
             abi.encode(canonicalHash)
         );
 
-        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: currentUser.balance}(txRequest);
+        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: mintValue}(txRequest);
         assertEq(canonicalHash, resultantHash);
 
         depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += mintValue;
@@ -100,16 +132,17 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
         tokenSumDeposit[ETH_TOKEN_ADDRESS] += mintValue;
     }
 
-    function depositBaseTokenToBridge(
-        uint256 userIndexSeed,
-        uint256 chainIndexSeed,
+    // deposits base ERC20 token to the bridge
+    // uses token provided as a input
+    function depositBaseERC20Token(
         uint256 mintValue,
-        uint256 l2Value
-    ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) useBaseToken {
-        vm.txGasPrice(0.05 ether);
+        uint256 l2Value,
+        address tokenAddress
+    ) private useGivenToken(tokenAddress) {
+        uint256 gas = 0.05 ether;
 
-        // TODO: consider this changes balance of the user
-        vm.deal(currentUser, 0.05 ether);
+        vm.txGasPrice(gas);
+        vm.deal(currentUser, gas);
 
         currentToken.mint(currentUser, mintValue);
         assertEq(currentToken.balanceOf(currentUser), mintValue);
@@ -132,8 +165,55 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
         bytes32 resultantHash = bridgeHub.requestL2TransactionDirect(txRequest);
         assertEq(canonicalHash, resultantHash);
 
-        depositsUsers[currentUser][address(currentToken)] += mintValue;
-        depositsBridge[currentChainAddress][address(currentToken)] += l2Value;
+        depositsUsers[currentUser][currentTokenAddress] += mintValue;
+        depositsBridge[currentChainAddress][currentTokenAddress] += l2Value;
+        tokenSumDeposit[currentTokenAddress] += mintValue;
+    }
+
+    function depositEthToEthBridgeSuccess(
+        uint256 userIndexSeed,
+        uint256 chainIndexSeed,
+        uint256 mintValue,
+        uint256 l2Value
+    ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) {
+        if (getHyperchainBaseToken(currentChainId) == ETH_TOKEN_ADDRESS) {
+            depositEthToEthChain(mintValue, l2Value);
+        } else {
+            // idk
+            //depositEthToNonEthChain(mintValue, l2Value);
+        }
+    }
+
+    function depositEthToEthBridgeFails(
+        uint256 userIndexSeed,
+        uint256 chainIndexSeed,
+        uint256 mintValue,
+        uint256 l2Value
+    ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) {
+        if (getHyperchainBaseToken(currentChainId) == ETH_TOKEN_ADDRESS) {
+            // idk
+            //vm.expectRevert("Bridgehub: msg.value mismatch 1");
+            //depositEthToNonEthChain(mintValue, l2Value);
+        } else {
+            vm.expectRevert("Bridgehub: non-eth bridge with msg.value");
+            depositEthToEthChain(mintValue, l2Value);
+        }
+    }
+
+    function depositERC20TokenToBridgeSuccess(
+        uint256 userIndexSeed,
+        uint256 chainIndexSeed,
+        uint256 tokenIndexSeed,
+        uint256 mintValue,
+        uint256 l2Value
+    ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) useRandomToken(tokenIndexSeed) {
+        address token = getHyperchainBaseToken(currentChainId);
+
+        if (currentTokenAddress == token) {
+            depositBaseERC20Token(mintValue, l2Value, currentTokenAddress);
+        } else {
+            // 2 bridges deposit
+        }
     }
 
     function prepare() public {
@@ -198,17 +278,48 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
 }
 
 contract BoundedBaseIntegrationTests is BaseIntegrationTests {
-    function depositETH(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 mintValue, uint256 l2Value) external {
-        emit log_uint(mintValue);
-        vm.assume(mintValue != 0);
-        vm.assume(mintValue < l2Value);
+    function depositEthSuccess(
+        uint256 userIndexSeed,
+        uint256 chainIndexSeed,
+        uint256 mintValue,
+        uint256 l2Value
+    ) public {
+        uint64 MAX = 2 ** 64 - 1;
+        // vm.assume(mintValue != 0);
+        // vm.assume(mintValue < l2Value);
 
-        super.depositEthToBridge(userIndexSeed, chainIndexSeed, mintValue, l2Value);
+        uint256 mintValue = bound(mintValue, 0, MAX);
+        uint256 l2Value = bound(l2Value, 0, mintValue);
+
+        super.depositEthToEthBridgeSuccess(userIndexSeed, chainIndexSeed, mintValue, l2Value);
     }
 
-    function depositBase(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 mintValue, uint256 l2Value) external {
-        vm.assume(mintValue > l2Value);
-        super.depositBaseTokenToBridge(userIndexSeed, chainIndexSeed, mintValue, l2Value);
+    function depositEthFail(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 mintValue, uint256 l2Value) public {
+        uint64 MAX = 2 ** 64 - 1;
+        // vm.assume(mintValue != 0);
+        // vm.assume(mintValue < l2Value);
+
+        uint256 mintValue = bound(mintValue, 0, MAX);
+        uint256 l2Value = bound(l2Value, 0, mintValue);
+
+        super.depositEthToEthBridgeFails(userIndexSeed, chainIndexSeed, mintValue, l2Value);
+    }
+
+    function depositERC20Success(
+        uint256 userIndexSeed,
+        uint256 chainIndexSeed,
+        uint256 tokenIndexSeed,
+        uint256 mintValue,
+        uint256 l2Value
+    ) external {
+        uint64 MAX = 2 ** 64 - 1;
+        // vm.assume(mintValue != 0);
+        // vm.assume(mintValue < l2Value);
+
+        uint256 mintValue = bound(mintValue, 0, MAX);
+        uint256 l2Value = bound(l2Value, 0, mintValue);
+
+        super.depositERC20TokenToBridgeSuccess(userIndexSeed, chainIndexSeed, tokenIndexSeed, mintValue, l2Value);
     }
 }
 
@@ -219,23 +330,28 @@ contract InvariantTester is Test {
         tests = new BoundedBaseIntegrationTests();
         tests.prepare();
 
-        FuzzSelector memory selector = FuzzSelector({addr: address(tests), selectors: new bytes4[](1)});
+        FuzzSelector memory selector = FuzzSelector({addr: address(tests), selectors: new bytes4[](2)});
 
-        selector.selectors[0] = BoundedBaseIntegrationTests.depositETH.selector;
+        selector.selectors[0] = BoundedBaseIntegrationTests.depositEthSuccess.selector;
+        selector.selectors[1] = BoundedBaseIntegrationTests.depositERC20Success.selector;
 
         targetContract(address(tests));
         targetSelector(selector);
     }
 
-    function invariant_balanceStaysEqual() public {
+    /// forge-config: default.invariant.fail-on-revert = true
+    function invariant_ETHbalanceStaysEqual() public {
+        assertEq(tests.tokenSumDeposit(ETH_TOKEN_ADDRESS), tests.sharedBridgeProxyAddress().balance);
+    }
+
+    /// forge-config: default.invariant.fail-on-revert = true
+    function invariant_tokenbalanceStaysEqual() public {
         address tokenAddress = tests.currentTokenAddress();
-        TestnetERC20Token token = TestnetERC20Token(tokenAddress);
 
-        assertNotEq(tokenAddress, address(0));
-
-        // TODO: it shouldn't be zero, guess that test contract zeroed it
-
-        assertNotEq(0, tests.tokenSumDeposit(tokenAddress));
+        if (tokenAddress != ETH_TOKEN_ADDRESS) {
+            TestnetERC20Token token = TestnetERC20Token(tokenAddress);
+            assertEq(tests.tokenSumDeposit(tokenAddress), token.balanceOf(tests.sharedBridgeProxyAddress()));
+        }
     }
 }
 
