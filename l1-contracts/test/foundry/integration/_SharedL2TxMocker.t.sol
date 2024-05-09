@@ -26,6 +26,27 @@ contract L2TxMocker is Test {
         mockFactoryDeps[0] = "11111111111111111111111111111111";
     }
 
+    function createL2TransitionRequestDirectSecond(
+        uint256 _chainId,
+        uint256 _mintValue,
+        uint256 _l2Value,
+        uint256 _l2GasLimit,
+        uint256 _l2GasPerPubdataByteLimit
+    ) internal returns (L2TransactionRequestDirect memory request) {
+        request.chainId = _chainId;
+        request.mintValue = _mintValue;
+        request.l2Value = _l2Value;
+        request.l2GasLimit = _l2GasLimit;
+        request.l2GasPerPubdataByteLimit = _l2GasPerPubdataByteLimit;
+
+        // mocks
+        request.l2Contract = mockL2Contract;
+        request.l2Calldata = mockL2Calldata;
+        request.factoryDeps = mockFactoryDeps;
+        request.refundRecipient = mockRefundRecipient;
+    
+    }
+
     function createMockL2TransactionRequestDirect(
         uint256 chainId,
         uint256 mintValue,

@@ -3,8 +3,8 @@ pragma solidity 0.8.24;
 
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {IMailbox} from "contracts//state-transition/chain-interfaces/IMailbox.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
@@ -16,9 +16,21 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAdd
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker {
     uint constant TEST_USERS_COUNT = 10;
+
+    bytes32 constant NEW_PRIORITY_REQUEST_HASH = keccak256("NewHyperchain(uint256,address)");
+
+    // event NewPriorityRequest(
+    //     uint256 txId,
+    //     bytes32 txHash,
+    //     uint64 expirationTimestamp,
+    //     L2CanonicalTransaction transaction,
+    //     bytes[] factoryDeps
+    // );
 
     address[] users;
     address public currentUser;
@@ -75,38 +87,57 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
         }
     }
 
-    // function depositEthToNonEthChain(
-    //     uint256 mintValue,
-    //     uint256 l2Value
-    // ) internal {
-    //     uint256 gas = 0.001 ether;
-    //     vm.txGasPrice(gas);
-    //     vm.deal(currentUser, mintValue + 10 * gas);
+    function getMinRequiredGasPriceForChain(
+        uint256 _chainId,
+        uint256 _gasPrice,
+        uint256 _l2GasLimit,
+        uint256 _l2GasPerPubdataByteLimit
+    ) public view returns (uint256) {
+        MailboxFacet chainMailBox = MailboxFacet(getHyperchainAddress(_chainId));
 
-    //     L2TransactionRequestDirect memory txRequest = createMockL2TransactionRequestDirect(
-    //         currentChainId,
-    //         mintValue,
-    //         l2Value
-    //     );
+        return chainMailBox.l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
+    }
 
-    //     bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+    function depositEthToEthChainNoMock(uint256 l2Value) private {
+        uint256 gasPrice = 0.01 ether;
+        vm.txGasPrice(gasPrice);
 
-    //     vm.mockCall(
-    //         currentChainAddress,
-    //         abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
-    //         abi.encode(canonicalHash)
-    //     );
+        uint256 l2GasLimit = 70000000; // reverts with 8
+        uint256 minRequiredGas = getMinRequiredGasPriceForChain(
+            currentChainId,
+            gasPrice,
+            l2GasLimit,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        );
 
-    //     bytes32 resultantHash = bridgeHub.requestL2TransactionDirect(txRequest);
-    //     assertEq(canonicalHash, resultantHash);
+        uint256 mintValue = l2Value + minRequiredGas;
 
-    //     depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += mintValue;
-    //     depositsBridge[currentChainAddress][ETH_TOKEN_ADDRESS] += mintValue;
-    //     tokenSumDeposit[ETH_TOKEN_ADDRESS] += mintValue;
-    // }
+        vm.deal(currentUser, mintValue);
+
+        L2TransactionRequestDirect memory txRequest = createL2TransitionRequestDirectSecond(
+            currentChainId,
+            mintValue,
+            l2Value,
+            l2GasLimit,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        );
+
+        vm.recordLogs();
+
+        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: mintValue}(txRequest);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        for (uint i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == NEW_PRIORITY_REQUEST_HASH) {}
+        }
+        // assertEq(canonicalHash, resultantHash);
+
+        tokenSumDeposit[ETH_TOKEN_ADDRESS] += mintValue;
+    }
 
     function depositEthToEthChain(uint256 mintValue, uint256 l2Value) private {
-        uint256 gas = 0.001 ether;
+        uint256 gas = 0 ether;
         vm.txGasPrice(gas);
         vm.deal(currentUser, mintValue + gas);
 
@@ -216,6 +247,19 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
         }
     }
 
+    function depositEthToEthChainNoMockSuccess(
+        uint256 userIndexSeed,
+        uint256 chainIndexSeed,
+        uint256 l2Value
+    ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) {
+        if (getHyperchainBaseToken(currentChainId) == ETH_TOKEN_ADDRESS) {
+            depositEthToEthChainNoMock(l2Value);
+        } else {
+            // idk
+            //depositEthToNonEthChain(mintValue, l2Value);
+        }
+    }
+
     function prepare() public {
         generateUserAddresses();
 
@@ -311,7 +355,7 @@ contract BoundedBaseIntegrationTests is BaseIntegrationTests {
         uint256 tokenIndexSeed,
         uint256 mintValue,
         uint256 l2Value
-    ) external {
+    ) public {
         uint64 MAX = 2 ** 64 - 1;
         // vm.assume(mintValue != 0);
         // vm.assume(mintValue < l2Value);
@@ -320,6 +364,37 @@ contract BoundedBaseIntegrationTests is BaseIntegrationTests {
         uint256 l2Value = bound(l2Value, 0, mintValue);
 
         super.depositERC20TokenToBridgeSuccess(userIndexSeed, chainIndexSeed, tokenIndexSeed, mintValue, l2Value);
+    }
+
+    function depositEthNoMock(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 l2Value) public {
+        uint64 MAX = 2 ** 64 - 1;
+        // vm.assume(mintValue != 0);
+        // vm.assume(mintValue < l2Value);
+        // uint256 mintValue = bound(mintValue, 0, MAX);
+        uint256 l2Value = bound(l2Value, 0, MAX);
+
+        super.depositEthToEthChainNoMockSuccess(userIndexSeed, chainIndexSeed, l2Value);
+    }
+}
+
+contract InvariantTesterNoMock is Test {
+    BoundedBaseIntegrationTests tests;
+
+    function setUp() public {
+        tests = new BoundedBaseIntegrationTests();
+        tests.prepare();
+
+        FuzzSelector memory selector = FuzzSelector({addr: address(tests), selectors: new bytes4[](1)});
+
+        selector.selectors[0] = BoundedBaseIntegrationTests.depositEthNoMock.selector;
+
+        targetContract(address(tests));
+        targetSelector(selector);
+    }
+
+    /// forge-config: default.invariant.fail-on-revert = true
+    function invariant_ETHbalanceStaysEqual() public {
+        assertEq(tests.tokenSumDeposit(ETH_TOKEN_ADDRESS), tests.sharedBridgeProxyAddress().balance);
     }
 }
 
