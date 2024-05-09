@@ -5,6 +5,7 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
+import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
@@ -13,6 +14,7 @@ import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol"
 library Utils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+    Vm internal constant vm = Vm(VM_ADDRESS);
     // Create2Factory deterministic bytecode.
     // https://github.com/Arachnid/deterministic-deployment-proxy
     bytes internal constant CREATE2_FACTORY_BYTECODE =
@@ -20,8 +22,6 @@ library Utils {
 
     address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     uint256 constant MAX_PRIORITY_TX_GAS = 72000000;
-
-    Vm internal constant vm = Vm(VM_ADDRESS);
 
     /**
      * @dev Get all selectors from the bytecode.
@@ -287,5 +287,30 @@ library Utils {
         string memory json = vm.readFile(path);
         bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode");
         return bytecode;
+    }
+
+    function executeUpgrade(
+        address _governor,
+        bytes32 _salt,
+        address _target,
+        bytes calldata _data,
+        uint256 _value,
+        uint256 _delay
+    ) public {
+        IGovernance governance = IGovernance(_governor);
+
+        IGovernance.Call[] memory calls = new IGovernance.Call[](1);
+        calls[0] = IGovernance.Call({target: _target, value: _value, data: _data});
+
+        IGovernance.Operation memory operation = IGovernance.Operation({
+            calls: calls,
+            predecessor: bytes32(0),
+            salt: _salt
+        });
+        vm.broadcast();
+        governance.scheduleTransparent(operation, _delay);
+        if (_delay == 0) {
+            governance.execute{value: _value}(operation);
+        }
     }
 }

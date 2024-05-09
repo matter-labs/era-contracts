@@ -11,6 +11,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
+import {Utils} from "./Utils.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 
 contract RegisterHyperchainScript is Script {
@@ -31,6 +32,7 @@ contract RegisterHyperchainScript is Script {
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
         address bridgehub;
+        address bridgehubGovernance;
         address stateTransitionProxy;
         address validatorTimelock;
         bytes diamondCutData;
@@ -66,8 +68,15 @@ contract RegisterHyperchainScript is Script {
         string memory toml = vm.readFile(path);
         address diamondProxy = toml.readAddress("$.diamond_proxy_addr");
         IZkSyncHyperchain zkSyncStateTransition = IZkSyncHyperchain(diamondProxy);
-        vm.broadcast();
-        zkSyncStateTransition.acceptAdmin();
+        bytes memory data = abi.encodeCall(zkSyncStateTransition.acceptAdmin, ());
+        Utils.executeUpgrade({
+            _governor: config.bridgehubGovernance,
+            _salt: bytes32(config.bridgehubCreateNewChainSalt),
+            _target: config.bridgehub,
+            _data: data,
+            _value: 0,
+            _delay: 0
+        });
     }
 
     function initializeConfig() internal {
@@ -84,6 +93,7 @@ contract RegisterHyperchainScript is Script {
         config.ownerAddress = toml.readAddress("$.owner_address");
 
         config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
+        config.bridgehubGovernance = toml.readAddress("$.deployed_addresses.bridge_governance");
         config.stateTransitionProxy = toml.readAddress(
             "$.deployed_addresses.state_transition.state_transition_proxy_addr"
         );
@@ -130,8 +140,15 @@ contract RegisterHyperchainScript is Script {
         if (bridgehub.tokenIsRegistered(config.baseToken)) {
             console.log("Token already registered on Bridgehub");
         } else {
-            vm.broadcast();
-            bridgehub.addToken(config.baseToken);
+            bytes memory data = abi.encodeCall(bridgehub.addToken, (config.baseToken));
+            Utils.executeUpgrade({
+                _governor: config.bridgehubGovernance,
+                _salt: bytes32(config.bridgehubCreateNewChainSalt),
+                _target: config.bridgehub,
+                _data: data,
+                _value: 0,
+                _delay: 0
+            });
             console.log("Token registered on Bridgehub");
         }
     }
@@ -151,13 +168,25 @@ contract RegisterHyperchainScript is Script {
 
         vm.broadcast();
         vm.recordLogs();
-        bridgehub.createNewChain({
-            _chainId: config.hyperchainChainId,
-            _stateTransitionManager: config.stateTransitionProxy,
-            _baseToken: config.baseToken,
-            _salt: config.bridgehubCreateNewChainSalt,
-            _admin: msg.sender,
-            _initData: config.diamondCutData
+        bytes memory data = abi.encodeCall(
+            bridgehub.createNewChain,
+            (
+                config.hyperchainChainId,
+                config.stateTransitionProxy,
+                config.baseToken,
+                config.bridgehubCreateNewChainSalt,
+                msg.sender,
+                config.diamondCutData
+            )
+        );
+
+        Utils.executeUpgrade({
+            _governor: config.bridgehubGovernance,
+            _salt: bytes32(config.bridgehubCreateNewChainSalt),
+            _target: config.bridgehub,
+            _data: data,
+            _value: 0,
+            _delay: 0
         });
         console.log("Hyperchain registered");
 

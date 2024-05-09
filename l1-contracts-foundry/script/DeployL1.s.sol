@@ -568,7 +568,7 @@ contract DeployL1Script is Script {
         validatorTimelock.transferOwnership(config.ownerAddress);
 
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
-        bridgehub.transferOwnership(config.ownerAddress);
+        bridgehub.transferOwnership(addresses.governance);
 
         L1SharedBridge sharedBridge = L1SharedBridge(addresses.bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses.governance);
