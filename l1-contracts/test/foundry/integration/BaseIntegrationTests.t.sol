@@ -18,19 +18,23 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker {
     uint constant TEST_USERS_COUNT = 10;
 
-    bytes32 constant NEW_PRIORITY_REQUEST_HASH = keccak256("NewHyperchain(uint256,address)");
+    bytes32 constant NEW_PRIORITY_REQUEST_HASH =
+        keccak256(
+            "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])"
+        );
 
-    // event NewPriorityRequest(
-    //     uint256 txId,
-    //     bytes32 txHash,
-    //     uint64 expirationTimestamp,
-    //     L2CanonicalTransaction transaction,
-    //     bytes[] factoryDeps
-    // );
+    struct NewPriorityRequest {
+        uint256 txId;
+        bytes32 txHash;
+        uint64 expirationTimestamp;
+        L2CanonicalTransaction transaction;
+        bytes[] factoryDeps;
+    }
 
     address[] users;
     address public currentUser;
@@ -98,6 +102,22 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
         return chainMailBox.l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
     }
 
+    function getNewPriorityQueueFromLogs(Vm.Log[] memory logs) internal returns (NewPriorityRequest memory request) {
+        for (uint256 i = 0; i < logs.length; i++) {
+            Vm.Log memory log = logs[i];
+
+            if (log.topics[0] == NEW_PRIORITY_REQUEST_HASH) {
+                (
+                    request.txId,
+                    request.txHash,
+                    request.expirationTimestamp,
+                    request.transaction,
+                    request.factoryDeps
+                ) = abi.decode(log.data, (uint256, bytes32, uint64, L2CanonicalTransaction, bytes[]));
+            }
+        }
+    }
+
     function depositEthToEthChainNoMock(uint256 l2Value) private {
         uint256 gasPrice = 0.01 ether;
         vm.txGasPrice(gasPrice);
@@ -128,10 +148,9 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        for (uint i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == NEW_PRIORITY_REQUEST_HASH) {}
-        }
-        // assertEq(canonicalHash, resultantHash);
+        NewPriorityRequest memory request = getNewPriorityQueueFromLogs(logs);
+
+        assertNotEq(request.txHash, 0);
 
         tokenSumDeposit[ETH_TOKEN_ADDRESS] += mintValue;
     }
