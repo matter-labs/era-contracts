@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
-import {Script, console2 as console} from "forge-std/Script.sol";
+
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";

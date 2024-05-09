@@ -139,7 +139,7 @@ contract RegisterHyperchainsScript is Script {
         config.contracts.priorityTxMaxGasLimit = toml.readUint("$.l1.config.priority_tx_max_gas_limit");
 
         HyperchainDescription[] memory descriptions = readHyperchainsConfig();
-        for (uint i = 0; i < descriptions.length; i++) {
+        for (uint256 i = 0; i < descriptions.length; i++) {
             hyperchainsConfig.hyperchains.push(descriptions[i]);
         }
     }
