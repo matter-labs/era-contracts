@@ -31,6 +31,7 @@ struct InitializeData {
     address baseToken;
     address baseTokenBridge;
     bytes32 storedBatchZero;
+    SyncLayerState syncLayerState;
     IVerifier verifier;
     VerifierParams verifierParams;
     bytes32 l2BootloaderBytecodeHash;
@@ -38,7 +39,6 @@ struct InitializeData {
     uint256 priorityTxMaxGasLimit;
     FeeParams feeParams;
     address blobVersionedHashRetriever;
-    SyncLayerState syncLayerState;
 }
 
 /// @param verifier address of Verifier contract

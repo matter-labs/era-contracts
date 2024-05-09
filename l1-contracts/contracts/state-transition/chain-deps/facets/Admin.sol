@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {MAX_GAS_PER_TRANSACTION, HyperchainCommitment} from "../../../common/Config.sol";
+import {MAX_GAS_PER_TRANSACTION, HyperchainCommitment, StoredBatchHashInfo} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode, SyncLayerState} from "../ZkSyncHyperchainStorage.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
@@ -134,8 +134,13 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     function finalizeMigration(
         HyperchainCommitment memory _commitment
     ) external onlyStateTransitionManager {
-        // TODO: limit state under which it can be perforemd
-        // require(s.syncLayerState == SyncLayerState.ActiveL1 || s.syncLayerState == SyncLayerState.ActiveSL, "not active");
+        if(s.syncLayerState == SyncLayerState.MigratedL1) {
+            s.syncLayerState = SyncLayerState.ActiveL1;
+        } else if (s.syncLayerState == SyncLayerState.MigratedSL) {
+            s.syncLayerState = SyncLayerState.ActiveSL;
+        } else {
+            revert("Can not migrate when in active state");
+        }
 
         uint256 batchesExecuted = _commitment.totalBatchesExecuted;
         uint256 batchesVerified = _commitment.totalBatchesVerified;
@@ -156,7 +161,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
             s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];
         }
 
-        emit MigrationComplete(_diamondCut);
+        emit MigrationComplete();
     }
 
     function startMigrationToSyncLayer(uint256 _syncLayerChainId) external onlyStateTransitionManager returns (HyperchainCommitment memory commitment) {

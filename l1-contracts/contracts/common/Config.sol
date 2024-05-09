@@ -126,7 +126,7 @@ struct HyperchainCommitment {
     /// batch
     uint256 totalBatchesCommitted;
 
-    StoredBatchHashInfo[] batchHashes;
+    bytes32[] batchHashes;
 
     /// TODO: add priority queue here.    
 }

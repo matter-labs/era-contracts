@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "../bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "../bridgehub/IBridgehub.sol";
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
@@ -21,7 +21,7 @@ import {L2CanonicalTransaction, TxStatus} from "../common/Messaging.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT, HyperchainCommitment} from "../common/Config.sol";
 import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
 
 /// @title State Transition Manager contract
@@ -211,7 +211,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev check that the protocolVersion is active
-    function protocolVersionIsActive(uint256 _protocolVersion) external view override returns (bool) {
+    function protocolVersionIsActive(uint256 _protocolVersion) public view override returns (bool) {
         return block.timestamp <= protocolVersionDeadline[_protocolVersion];
     }
 
@@ -360,7 +360,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     ) internal returns (address hyperchainAddress) {
         if (getHyperchain(_chainId) != address(0)) {
             // Hyperchain already registered
-            return;
+            return getHyperchain(_chainId);
         }
 
         // check not registered
@@ -370,21 +370,30 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         bytes32 cutHashInput = keccak256(_diamondCut);
         require(cutHashInput == initialCutHash, "STM: initial cutHash mismatch");
 
+
+        bytes memory mandatoryInitData;
+        {
+            mandatoryInitData = bytes.concat(
+                bytes32(_chainId),
+                bytes32(uint256(uint160(BRIDGE_HUB))),
+                bytes32(uint256(uint160(address(this)))),
+                bytes32(uint256(protocolVersion)),
+                bytes32(uint256(uint160(_admin))),
+                bytes32(uint256(uint160(validatorTimelock))),
+                bytes32(uint256(uint160(_baseToken))),
+                bytes32(uint256(uint160(_sharedBridge))),
+                bytes32(storedBatchZero),
+                bytes32(uint256(_syncLayerState))
+            );
+        }
+
         // construct init data
         bytes memory initData;
         /// all together 4+9*32=292 bytes
         // solhint-disable-next-line func-named-parameters
         initData = bytes.concat(
             IDiamondInit.initialize.selector,
-            bytes32(_chainId),
-            bytes32(uint256(uint160(BRIDGE_HUB))),
-            bytes32(uint256(uint160(address(this)))),
-            bytes32(uint256(protocolVersion)),
-            bytes32(uint256(uint160(_admin))),
-            bytes32(uint256(uint160(validatorTimelock))),
-            bytes32(uint256(uint160(_baseToken))),
-            bytes32(uint256(uint160(_sharedBridge))),
-            bytes32(storedBatchZero),
+            mandatoryInitData,
             diamondCut.initCalldata
         );
 
@@ -413,30 +422,31 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     ) external onlyBridgehub {
         // TODO: only allow on L1.
 
-        _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut, SyncLayerState.ActiveL1);
+        address hyperchainAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut, SyncLayerState.ActiveL1);
 
         // set chainId in VM
         _setChainIdUpgrade(_chainId, hyperchainAddress);
     }
 
-    function _upgradeWithHyperchainCommitment() {
-
-    }
 
     function getProtocolVersion(uint256 _chainId) public view returns (uint256) {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).getProtocolVersion();
     }
 
-    function registerSyncLayer(uint256 _newSyncLayerChainId) external onlyOwner {
+    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external onlyOwner {
         require(_newSyncLayerChainId != 0, "Bad chain id");
 
         // Currently, we require that the sync layer is deployed by the same STM.
-        address syncLayerAddress = hyperchainMap.get(_chainId);
+        address syncLayerAddress = hyperchainMap.get(_newSyncLayerChainId);
 
         // TODO: Maybe `get` already ensured its existance.
         require(syncLayerAddress != address(0), "STM: sync layer not registered");
 
-        syncLayerChainId = _newSyncLayerChainId;
+
+        whitelistedSyncLayers[_newSyncLayerChainId] = _isWhitelisted;
+
+
+        // TODO: emit evengt
     }
 
     function registerTrustedCounterPart(uint256 _chainId, address _trustedCounterpart) external onlyOwner {
@@ -449,7 +459,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address _sharedBridge,
         address _admin,
         uint256 _expectedProtocolVersion,
-        HyperchainCommitment calldata commitment
+        HyperchainCommitment calldata _commitment,
+        bytes calldata _diamondCut
     ) external {
         /// FIXME: adequate access rights
 
@@ -464,7 +475,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         if(currentAddress == address(0)) {
             require(protocolVersion == _expectedProtocolVersion, "STM: protocolVersion mismatch");
 
-            currentAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut);
+            // We set "migrated L2 initially" as it will be reset later on in the `finalizeMigration` call.
+            currentAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut, SyncLayerState.MigratedSL);
 
             // note that we do not need the genesis upgrade, it is expected that everything is already prepared on l2.
         } 
@@ -475,29 +487,52 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // while it should be definitely the case when a chain is created, we double check just in case
         require(currentProtocolVersion == _expectedProtocolVersion, "STM: protocolVersion mismatch");
 
-        // FacetCut[] memory emptyArray;
-        // Diamond.DiamondCutData memory data = new Diamond.DiamondCutData({
-        //     facetCuts: emptyArray,
-        //     initAddress: migrationUpgrade,
-        //     initCalldata: abi.encodeCall(MigrationUpgrade.migrate, (commitment))
-        // });
-
         // Now migrating the chain
-        hyperchain.executeMigration(commitment);
+        hyperchain.finalizeMigration(_commitment);
     }
 
     function finalizeMigrationFromSyncLayer(
-        uint256 _chainId,
+        uint256 _chainId
     ) external {
-        // TODO: this method should check that a certain message was sent from the SL.
+        // FIXME: this method should check that a certain message was sent from the SL to L1.
+
+        require(false, "TODO");
+
+        // address currentAddress = getHyperchain(_chainId);
+        // // On L1 we do expect that the chain is already registered.
+        // require(currentAddress != address(0), "STM: chain not registered");
+
+        // _finalizeMigration(
+        //     _chainId,
+        //     _baseToken,
+        //     _sharedBridge,
+        //     _admin,
+        //     _expectedProtocolVersion,
+        //     commitment
+        // );
     }
+
+    // function _finalizeMigration(
+    //     uint256 _chainId,
+    //     address _baseToken,
+    //     address _sharedBridge,
+    //     address _admin,
+    //     uint256 _expectedProtocolVersion,
+    //     HyperchainCommitment calldata commitment
+    // ) {
+        
+    // }
 
     function startMigrationToSyncLayer(
         uint256 _chainId,
         uint256 _syncLayerChainId,
         address _newSyncLayerAdmin,
-        L2TransactionRequestDirect memory _request
+        L2TransactionRequestDirect memory _request,
+        bytes calldata _diamondCut
     ) payable external {
+        // Maybe check l2 diamond cut here for failing fast?
+
+
         // TODO: add requiremenet for it to be a admin of the chain
         require(whitelistedSyncLayers[_syncLayerChainId], "sync layer not whitelisted");
 
@@ -508,14 +543,14 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 currentProtocolVersion = hyperchain.getProtocolVersion();
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
 
-        HyperchainCommitment calldata commitment = hyperchain.startMigrationToSyncLayer(_syncLayerChainId);
+        HyperchainCommitment memory commitment = hyperchain.startMigrationToSyncLayer(_syncLayerChainId);
 
         bytes memory migrationCalldata = abi.encodeCall(
-            this.finalizeMigration,
-            (_chainId, chainBaseToken, stmCounterParts[_syncLayerChainId], _newSyncLayerAdmin, currentProtocolVersion, commitment)
+            this.finalizeMigrationToSyncLayer,
+            (_chainId, chainBaseToken, stmCounterParts[_syncLayerChainId], _newSyncLayerAdmin, currentProtocolVersion, commitment, _diamondCut)
         );
 
-        require(_request.chainId == syncLayer, "chain id incorrect");
+        require(_request.chainId == _syncLayerChainId, "chain id incorrect");
         // We assume that the sync layer always has eth as its base token.
         require(_request.mintValue == msg.value, "Not enough value sent");
 
@@ -524,7 +559,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         _request.l2Calldata = migrationCalldata;
 
-        bytes32 canonicalHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(_request);
+        bytes32 canonicalHash = IBridgehub(BRIDGE_HUB).requestL2TransactionDirect{value: msg.value}(_request);
 
         lastMigrationTxHashes[_chainId] = canonicalHash;
         // lastMigratedCommitments[_chainId] = keccak256(abi.encode(commitment));
@@ -538,8 +573,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof,
-    ) {
+        bytes32[] calldata _merkleProof
+    ) external {
         // TODO: only callable by chain admin
 
         require(whitelistedSyncLayers[_syncLayerChainId], "sync layer not whitelisted");
@@ -552,7 +587,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // Preventing reusing the same migration hash
         lastMigrationTxHashes[_chainId] = bytes32(0);
 
-        require(BRIDGE_HUB.proveL1ToL2TransactionStatus(_syncLayerChainId, migrationHash, _l2BatchNumber, _l2MessageIndex, _l2TxNumberInBatch, _merkleProof, TxStatus.Failed), "Migration not failed");
+        require(IBridgehub(BRIDGE_HUB).proveL1ToL2TransactionStatus(_syncLayerChainId, migrationHash, _l2BatchNumber, _l2MessageIndex, _l2TxNumberInBatch, _merkleProof, TxStatus.Failure), "Migration not failed");
 
         // Now we can recover the chain.
         hyperchain.recoverFromFailedMigrationToSyncLayer();

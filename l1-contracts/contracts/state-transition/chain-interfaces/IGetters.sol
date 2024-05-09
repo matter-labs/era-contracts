@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
-import {PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
+import {PubdataPricingMode, SyncLayerState} from "../chain-deps/ZkSyncHyperchainStorage.sol";
 import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
 
 /// @title The interface of the Getters Contract that implements functions for getting contract state from outside the blockchain.

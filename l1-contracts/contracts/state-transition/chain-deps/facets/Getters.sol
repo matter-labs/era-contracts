@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
+import {PubdataPricingMode, SyncLayerState} from "../ZkSyncHyperchainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
