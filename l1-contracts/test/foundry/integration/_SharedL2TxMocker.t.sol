@@ -16,6 +16,8 @@ contract L2TxMocker is Test {
     bytes mockL2Calldata;
     bytes[] mockFactoryDeps;
 
+    mapping(uint256 chainId => address l2MockContract) public chainContracts;
+
     constructor() {
         mockRefundRecipient = makeAddr("refundrecipient");
         mockL2Contract = makeAddr("mockl2contract");
@@ -24,6 +26,10 @@ contract L2TxMocker is Test {
         mockL2Calldata = "";
         mockFactoryDeps = new bytes[](1);
         mockFactoryDeps[0] = "11111111111111111111111111111111";
+    }
+
+    function addL2ChainContract(uint256 _chainId, address _chainContract) internal {
+        chainContracts[_chainId] = _chainContract;
     }
 
     function createL2TransitionRequestDirectSecond(
@@ -38,13 +44,12 @@ contract L2TxMocker is Test {
         request.l2Value = _l2Value;
         request.l2GasLimit = _l2GasLimit;
         request.l2GasPerPubdataByteLimit = _l2GasPerPubdataByteLimit;
+        request.l2Contract = chainContracts[_chainId];
 
-        // mocks
-        request.l2Contract = mockL2Contract;
+        //
         request.l2Calldata = mockL2Calldata;
         request.factoryDeps = mockFactoryDeps;
         request.refundRecipient = mockRefundRecipient;
-    
     }
 
     function createMockL2TransactionRequestDirect(

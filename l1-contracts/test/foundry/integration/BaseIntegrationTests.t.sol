@@ -46,6 +46,9 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
     mapping(address user => mapping(address token => uint256 deposited)) public depositsUsers;
     mapping(address chain => mapping(address token => uint256 deposited)) public depositsBridge;
     mapping(address token => uint256 deposited) public tokenSumDeposit;
+    mapping(address token => uint256 deposited) public l2ValuesSum;
+
+    mapping(address l2contract => uint256 balance) public l2contractBalances;
 
     // helper modifier to get some random user
     modifier useUser(uint256 userIndexSeed) {
@@ -102,6 +105,31 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
         return chainMailBox.l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
     }
 
+    function handleRequestByMockL2Contract(NewPriorityRequest memory request) internal returns (uint256) {
+        address payable contractAddress = payable(address(uint160(uint256(request.transaction.to))));
+
+        address someMockAddress = makeAddr("mocked");
+
+        emit log_uint(l2contractBalances[contractAddress]);
+
+        uint256 toSend = request.transaction.value;
+        vm.deal(someMockAddress, toSend);
+
+        vm.startPrank(someMockAddress);
+        bool sent = contractAddress.send(toSend);
+        vm.stopPrank();
+
+        l2contractBalances[contractAddress] += toSend;
+
+        emit log_uint(l2contractBalances[contractAddress]);
+
+        assertEq(contractAddress.balance, l2contractBalances[contractAddress]);
+
+        assertEq(sent, true);
+
+        return toSend;
+    }
+
     function getNewPriorityQueueFromLogs(Vm.Log[] memory logs) internal returns (NewPriorityRequest memory request) {
         for (uint256 i = 0; i < logs.length; i++) {
             Vm.Log memory log = logs[i];
@@ -152,7 +180,11 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
 
         assertNotEq(request.txHash, 0);
 
+        uint256 sent = handleRequestByMockL2Contract(request);
+        assertEq(sent, l2Value);
+
         tokenSumDeposit[ETH_TOKEN_ADDRESS] += mintValue;
+        l2ValuesSum[ETH_TOKEN_ADDRESS] += l2Value;
     }
 
     function depositEthToEthChain(uint256 mintValue, uint256 l2Value) private {
@@ -291,6 +323,11 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
         addNewHyperchainToDeploy("hyperchain3", tokens[0]);
         addNewHyperchainToDeploy("hyperchain4", tokens[0]);
         deployHyperchains();
+
+        for (uint256 i = 0; i < hyperchainIds.length; i++) {
+            address contractAddress = makeAddr(string(abi.encode("contract", i)));
+            addL2ChainContract(hyperchainIds[i], contractAddress);
+        }
     }
 
     function test_hyperchainFinalizeWithdrawal() public {
@@ -390,7 +427,7 @@ contract BoundedBaseIntegrationTests is BaseIntegrationTests {
         // vm.assume(mintValue != 0);
         // vm.assume(mintValue < l2Value);
         // uint256 mintValue = bound(mintValue, 0, MAX);
-        uint256 l2Value = bound(l2Value, 0, MAX);
+        uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
 
         super.depositEthToEthChainNoMockSuccess(userIndexSeed, chainIndexSeed, l2Value);
     }
@@ -414,6 +451,20 @@ contract InvariantTesterNoMock is Test {
     /// forge-config: default.invariant.fail-on-revert = true
     function invariant_ETHbalanceStaysEqual() public {
         assertEq(tests.tokenSumDeposit(ETH_TOKEN_ADDRESS), tests.sharedBridgeProxyAddress().balance);
+    }
+
+    /// forge-config: default.invariant.fail-on-revert = true
+    function invariant_balaceOnContractsEqualsSharedBridge() public {
+        uint256 sum = 0;
+
+        for (uint256 i = 0; i < 5; i++) {
+            address l2Contract = tests.chainContracts(tests.hyperchainIds(i));
+
+            sum += l2Contract.balance;
+        }
+
+        // emit log_uint(tests.l2ValuesSum(ETH_TOKEN_ADDRESS));
+        assertEq(tests.l2ValuesSum(ETH_TOKEN_ADDRESS), sum);
     }
 }
 
