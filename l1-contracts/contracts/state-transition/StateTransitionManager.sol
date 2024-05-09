@@ -389,13 +389,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         whitelistedSyncLayers[_newSyncLayerChainId] = _isWhitelisted;
 
-
-        // TODO: emit evengt
+        // TODO: emit event
     }
-
-    // function registerTrustedCounterPart(uint256 _chainId, address _trustedCounterpart) external onlyOwner {
-
-    // }
 
     function finalizeMigrationToSyncLayer(
         uint256 _chainId,
