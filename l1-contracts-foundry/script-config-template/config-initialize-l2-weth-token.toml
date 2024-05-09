@@ -1,8 +1,8 @@
 l1_weth_token_addr = "0x0b5026ED9Cb49981915EA448b801E416Da829315"
 l1_weth_token_name = "Wrapped Ether"
 l1_weth_token_symbol = "WETH"
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 create2_factory_salt = "0x00000000000000000000000000000000000000000000000000000000000000ff"
-create2_factory_addr = "0x0000000000000000000000000000000000000000"
 era_chain_id = "270"
 bridgehub_proxy_addr = "0x2437B508C490C0b65D53Fc6ef8F94A890A10a6b7"
 
