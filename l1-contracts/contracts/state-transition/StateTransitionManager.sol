@@ -457,17 +457,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // );
     }
 
-    // function _finalizeMigration(
-    //     uint256 _chainId,
-    //     address _baseToken,
-    //     address _sharedBridge,
-    //     address _admin,
-    //     uint256 _expectedProtocolVersion,
-    //     HyperchainCommitment calldata commitment
-    // ) {
-        
-    // }
-
     function startMigrationToSyncLayer(
         uint256 _chainId,
         uint256 _syncLayerChainId,

@@ -118,43 +118,81 @@ async function main() {
       : Wallet.fromMnemonic(
           process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
           "m/44'/60'/0'/0/1"
-        ).connect(provider); 
-
+        ).connect(provider);
+      
       const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
       console.log(`Using owner address: ${ownerAddress}`);
-  
-  
-      const stmOnSyncLayer = getAddressFromEnv('SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR');
-      const chainId = getNumberFromEnv('CHAIN_ETH_ZKSYNC_NETWORK_ID');
 
-      console.log(`STM on SyncLayer: ${stmOnSyncLayer}`);
-      console.log(`SyncLayer chain Id: ${chainId}`);
-
-      const deployer = new Deployer({
+      await registerSTMOnL1(new Deployer({
         deployWallet,
         addresses: deployedAddressesFromEnv(),
         ownerAddress,
         verbose: true,
-      });
-
-      const l1STM = deployer.stateTransitionManagerContract(deployWallet);
-      console.log(deployer.addresses.StateTransition.StateTransitionProxy);
-      // this script only works when owner is the deployer
-      console.log(`Registering SyncLayer chain id on the STM`);
-      console.log(await l1STM.owner());
-      return;
-      const registerChainIdTx = await l1STM.registerSyncLayer(chainId, true);
-      console.log(`Transaction hash: ${registerChainIdTx.hash}`);
-      await registerChainIdTx.wait();
-
-      console.log(`Registering STM counter part on the SyncLayer`);
-      const registerCounterpartTx = await l1STM.registerCounterpart(chainId, stmOnSyncLayer);
-      console.log(`Transaction hash: ${registerCounterpartTx.hash}`);
-      await registerCounterpartTx.wait();
-      console.log(`SyncLayer registration completed`);
+      }));
+  
     });
 
   await program.parseAsync(process.argv);
+}
+
+async function registerSTMOnL1(deployer: Deployer) {
+  const stmOnSyncLayer = getAddressFromEnv('SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR');
+  const chainId = getNumberFromEnv('CHAIN_ETH_ZKSYNC_NETWORK_ID');
+
+  console.log(`STM on SyncLayer: ${stmOnSyncLayer}`);
+  console.log(`SyncLayer chain Id: ${chainId}`);
+
+  const l1STM = deployer.stateTransitionManagerContract(deployer.deployWallet);
+  console.log(deployer.addresses.StateTransition.StateTransitionProxy);
+  // this script only works when owner is the deployer
+  console.log(`Registering SyncLayer chain id on the STM`);
+  await performViaGovernane(
+    deployer,
+    {
+      to: l1STM.address,
+      data: l1STM.interface.encodeFunctionData(
+        'registerSyncLayer',
+        [chainId, true]
+      )
+    }
+  )
+  
+  console.log(`Registering STM counter part on the SyncLayer`);
+  await performViaGovernane(
+    deployer,
+    {
+      to: l1STM.address,
+      data: l1STM.interface.encodeFunctionData(
+        'registerCounterpart',
+        [chainId, stmOnSyncLayer]
+      )
+    }
+  );
+  console.log(`SyncLayer registration completed`);
+
+}
+
+async function performViaGovernane(deployer: Deployer, params: {
+  to: string,
+  data: string,
+}) {
+  const governance = deployer.governanceContract(deployer.deployWallet);
+  const operation = {
+    calls: [
+      {
+        target: params.to,
+        data: params.data,
+        value: 0,
+      }
+    ],
+    predecessor: ethers.constants.HashZero,
+    salt: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
+  };
+  await (await governance.scheduleTransparent(operation, 0)).wait();
+    
+  await (
+    await governance.execute(operation)
+  ).wait();
 }
 
 main()
