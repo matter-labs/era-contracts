@@ -20,7 +20,7 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
-contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker {
+contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker {
     uint constant TEST_USERS_COUNT = 10;
 
     bytes32 constant NEW_PRIORITY_REQUEST_HASH =
@@ -345,7 +345,7 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
     }
 }
 
-contract BoundedBaseIntegrationTests is BaseIntegrationTests {
+contract BoundedBridgeHubInvariantTests is BridgeHubInvariantTests {
     function depositEthSuccess(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 l2Value) public {
         uint64 MAX = 2 ** 64 - 1;
         uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
@@ -374,17 +374,17 @@ contract BoundedBaseIntegrationTests is BaseIntegrationTests {
 }
 
 contract InvariantTester is Test {
-    BoundedBaseIntegrationTests tests;
+    BoundedBridgeHubInvariantTests tests;
 
     function setUp() public {
-        tests = new BoundedBaseIntegrationTests();
+        tests = new BoundedBridgeHubInvariantTests();
         tests.prepare();
 
         FuzzSelector memory selector = FuzzSelector({addr: address(tests), selectors: new bytes4[](2)});
 
-        selector.selectors[0] = BoundedBaseIntegrationTests.depositEthSuccess.selector;
-        // selector.selectors[1] = BoundedBaseIntegrationTests.depositEthFail.selector;
-        selector.selectors[1] = BoundedBaseIntegrationTests.depositERC20Success.selector;
+        selector.selectors[0] = BoundedBridgeHubInvariantTests.depositEthSuccess.selector;
+        // selector.selectors[1] = BoundedBridgeHubInvariantTests.depositEthFail.selector;
+        selector.selectors[1] = BoundedBridgeHubInvariantTests.depositERC20Success.selector;
 
         targetContract(address(tests));
         targetSelector(selector);
