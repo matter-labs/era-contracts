@@ -7,7 +7,7 @@ import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, GAS_MULTIPLIER } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-import { deployHyperchain, deployVerifier, initialBridgehubDeployment } from "../src.ts/deploy-process";
+import { deployStateTransitionManager, deployVerifier, initialBridgehubDeployment } from "../src.ts/deploy-process";
 import { ethTestConfig } from "../src.ts/utils";
 
 const provider = web3Provider();
@@ -59,7 +59,7 @@ async function main() {
       } else {
         await initialBridgehubDeployment(deployer, gasPrice, create2Salt, nonce);
         nonce = await deployWallet.getTransactionCount();
-        await deployHyperchain(deployer, [], gasPrice, create2Salt, nonce);
+        await deployStateTransitionManager(deployer, [], gasPrice, create2Salt, nonce);
       }
     });
 

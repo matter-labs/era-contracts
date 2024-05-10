@@ -7,7 +7,7 @@ import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, GAS_MULTIPLIER } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-import { deployHyperchain } from "../src.ts/deploy-process";
+import { deployStateTransitionManager } from "../src.ts/deploy-process";
 import { ethTestConfig } from "../src.ts/utils";
 
 const provider = web3Provider();
@@ -15,7 +15,7 @@ const provider = web3Provider();
 async function main() {
   const program = new Command();
 
-  program.version("0.1.0").name("deploy-hyperchain").description("deploy initial hyperchain contracts");
+  program.version("0.1.0").name("deploy-state-manager").description("deploy initial state transition manager contracts");
 
   program
     .option("--private-key <private-key>")
@@ -52,7 +52,7 @@ async function main() {
         verbose: true,
       });
 
-      await deployHyperchain(deployer, [], gasPrice, create2Salt, nonce);
+      await deployStateTransitionManager(deployer, [], gasPrice, create2Salt, nonce);
     });
 
   await program.parseAsync(process.argv);

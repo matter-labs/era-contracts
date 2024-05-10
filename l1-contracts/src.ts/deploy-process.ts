@@ -62,7 +62,7 @@ export async function deployVerifier(deployer: Deployer, gasPrice: BigNumberish,
   await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
 }
 
-export async function deployHyperchain(
+export async function deployStateTransitionManager(
   deployer: Deployer,
   extraFacets: FacetCut[],
   gasPrice: BigNumberish,

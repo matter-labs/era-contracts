@@ -18,7 +18,7 @@ import {
   initialBridgehubDeployment,
   registerHyperchain,
   deployVerifier,
-  deployHyperchain,
+  deployStateTransitionManager,
 } from "./deploy-process";
 import { deployTokens, getTokens } from "./deploy-token";
 
@@ -107,7 +107,7 @@ export async function initialTestnetDeploymentProcess(
   // deploy the verifier first
   await deployVerifier(deployer, gasPrice);
   await initialBridgehubDeployment(deployer, gasPrice);
-  await deployHyperchain(deployer, [], gasPrice);
+  await deployStateTransitionManager(deployer, [], gasPrice);
   await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName);
   return deployer;
 }
@@ -194,7 +194,7 @@ export async function initialEraTestnetDeploymentProcess(
   await deployer.deployDiamondProxy(extraFacets, {});
   // deploy normal contracts
   await initialBridgehubDeployment(deployer, gasPrice);
-  await deployHyperchain(deployer, extraFacets, gasPrice);
+  await deployStateTransitionManager(deployer, extraFacets, gasPrice);
   // for Era we first deploy the DiamondProxy manually, set the vars manually, and register it in the system via bridgehub.createNewChain(ERA_CHAIN_ID, ..)
   if (deployer.verbose) {
     console.log("Applying DiamondCut");
