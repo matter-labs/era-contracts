@@ -5,12 +5,14 @@ pragma solidity 0.8.24;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
+import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {Merkle} from "../../libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
-import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
+import {FeeParams, PubdataPricingMode, SyncLayerState} from "../ZkSyncHyperchainStorage.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
@@ -105,6 +107,16 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         });
         return _proveL2LogInclusion(_l2BatchNumber, _l2MessageIndex, l2Log, _merkleProof);
     }
+
+    // /// @inheritdoc IMailbox
+    function proveL1ToL2TransactionStatusViaSyncLayer(
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof,
+        TxStatus _status
+    ) public view returns (bool) {}
 
     /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
     function _proveL2LogInclusion(
@@ -234,6 +246,57 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         );
     }
 
+    function requestL2TransactionToSyncLayer(
+        uint256 _chainId,
+        BridgehubL2TransactionRequest calldata _request
+    ) external returns (bytes32 canonicalTxHash) {
+        require(IBridgehub(s.bridgehub).whitelistedSyncLayers(s.chainId), "Mailbox SL: not SL");
+        require(
+            IStateTransitionManager(s.stateTransitionManager).getHyperchain(_chainId) == msg.sender,
+            "Mailbox SL: not hyperchain"
+        );
+
+        BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest(_chainId, _request);
+        canonicalTxHash = _requestL2TransactionSender(wrappedRequest);
+    }
+
+    function requestL2TransactionOnSyncLayer(
+        uint256 _chainId,
+        BridgehubL2TransactionRequest calldata _request
+    ) external returns (bytes32 canonicalTxHash) {
+        require(IBridgehub(s.bridgehub).whitelistedSyncLayers(s.chainId), "Mailbox SL: not SL");
+        require(
+            IStateTransitionManager(s.stateTransitionManager).getHyperchain(_chainId) == msg.sender,
+            "Mailbox SL: not hyperchain"
+        );
+
+        BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest(_chainId, _request);
+        canonicalTxHash = _requestL2TransactionSender(wrappedRequest);
+    }
+
+    function _wrapRequest(
+        uint256 _chainId,
+        BridgehubL2TransactionRequest calldata _request
+    ) internal view returns (BridgehubL2TransactionRequest memory) {
+        return
+            BridgehubL2TransactionRequest({
+                sender: address(this),
+                contractL2: IBridgehub(s.stateTransitionManager).bridgehubCounterParts(s.chainId),
+                mintValue: 0,
+                l2Value: 0,
+                l2GasLimit: 0,
+                l2Calldata: abi.encodeWithSelector(
+                    // Todo
+                    IBridgehub(s.bridgehub).forwardTransactionSyncLayer.selector,
+                    _chainId,
+                    _request
+                ),
+                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
+                factoryDeps: _request.factoryDeps,
+                refundRecipient: _request.refundRecipient
+            });
+    }
+
     function _requestL2TransactionSender(
         BridgehubL2TransactionRequest memory _request
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
@@ -252,6 +315,12 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             );
         }
 
+        if (s.syncLayerState == SyncLayerState.MigratedL1) {
+            canonicalTxHash = IMailbox(
+                IStateTransitionManager(s.stateTransitionManager).getHyperchain(s.syncLayerChainId)
+            ).requestL2TransactionOnSyncLayer(s.chainId, _request);
+            return canonicalTxHash;
+        }
         // Enforcing that `_request.l2GasPerPubdataByteLimit` equals to a certain constant number. This is needed
         // to ensure that users do not get used to using "exotic" numbers for _request.l2GasPerPubdataByteLimit, e.g. 1-2, etc.
         // VERY IMPORTANT: nobody should rely on this constant to be fixed and every contract should give their users the ability to provide the

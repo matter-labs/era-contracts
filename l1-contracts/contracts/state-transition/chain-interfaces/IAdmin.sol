@@ -60,7 +60,9 @@ interface IAdmin is IZkSyncHyperchainBase {
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
     function finalizeMigration(HyperchainCommitment calldata _hyperchainCommitment) external;
-    function startMigrationToSyncLayer(uint256 _syncLayerChainId) external returns (HyperchainCommitment memory commitment);
+    function startMigrationToSyncLayer(
+        uint256 _syncLayerChainId
+    ) external returns (HyperchainCommitment memory commitment);
 
     function recoverFromFailedMigrationToSyncLayer(
         uint256 _syncLayerChainId,
@@ -131,5 +133,4 @@ interface IAdmin is IZkSyncHyperchainBase {
         L2CanonicalTransaction _l2Transaction,
         uint256 indexed _protocolVersion
     );
-
 }

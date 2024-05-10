@@ -99,6 +99,11 @@ interface IMailbox is IZkSyncHyperchainBase {
         BridgehubL2TransactionRequest calldata _request
     ) external returns (bytes32 canonicalTxHash);
 
+    function requestL2TransactionOnSyncLayer(
+        uint256 _chainId,
+        BridgehubL2TransactionRequest calldata _request
+    ) external returns (bytes32 canonicalTxHash);
+
     /// @notice Estimates the cost in Ether of requesting execution of an L2 transaction from L1
     /// @param _gasPrice expected L1 gas price at which the user requests the transaction execution
     /// @param _l2GasLimit Maximum amount of L2 gas that transaction can consume during execution on L2

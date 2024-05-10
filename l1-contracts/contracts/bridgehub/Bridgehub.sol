@@ -10,7 +10,7 @@ import {IBridgehub, IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, HyperchainCommitment} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
@@ -35,6 +35,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev used to accept the admin role
     address private pendingAdmin;
 
+    /// @dev used to indicate that the contract is deployed on synclayer
+    bool public syncLayerMode;
+
+    // Sync layer chain is expected to have .. as the base token.
+    mapping(uint256 chainId => bool isWhitelistedSyncLayer) public whitelistedSyncLayers;
+
+    /// @dev the address of the bridghub on other chains
+    mapping(uint256 chainId => address stmCounterPart) public bridgehubCounterParts;
 
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {}
@@ -46,6 +54,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     modifier onlyOwnerOrAdmin() {
         require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
+        _;
+    }
+
+    modifier onlyChainSTM(uint256 _chainId) {
+        require(msg.sender == stateTransitionManager[_chainId], "Bridgehub: not chain STM");
         _;
     }
 
@@ -324,6 +337,40 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             canonicalTxHash
         );
     }
+
+    function forwardTransactionSyncLayer(
+        uint256 _chainId,
+        BridgehubL2TransactionRequest calldata _request
+    ) external override {
+        require(syncLayerMode, "Bridgehub: not in sync layer mode");
+        address hyperchain = getHyperchain(_chainId);
+        IZkSyncHyperchain(hyperchain).requestL2TransactionOnSyncLayer(_chainId, _request);
+    }
+
+    function registerCounterpart(uint256 _chainId, address _counterPart) external onlyOwner {
+        require(_counterPart != address(0), "STM: counter part zero");
+
+        bridgehubCounterParts[_chainId] = _counterPart;
+    }
+
+    function registerSyncLayer(
+        uint256 _newSyncLayerChainId,
+        bool _isWhitelisted
+    ) external onlyChainSTM(_newSyncLayerChainId) {
+        whitelistedSyncLayers[_newSyncLayerChainId] = _isWhitelisted;
+
+        // TODO: emit event
+    }
+
+    function finalizeMigrationToSyncLayer(
+        uint256 _chainId,
+        address _baseToken,
+        address _sharedBridge,
+        address _admin,
+        uint256 _expectedProtocolVersion,
+        HyperchainCommitment calldata _commitment,
+        bytes calldata _diamondCut
+    ) external {}
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE

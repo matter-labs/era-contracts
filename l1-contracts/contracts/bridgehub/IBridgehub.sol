@@ -3,7 +3,8 @@
 pragma solidity 0.8.24;
 
 import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
-import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {HyperchainCommitment} from "../common/Config.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -129,4 +130,24 @@ interface IBridgehub {
     function setSharedBridge(address _sharedBridge) external;
 
     event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
+
+    function registerCounterpart(uint256 _chainId, address _counterPart) external;
+
+    function whitelistedSyncLayers(uint256 _chainId) external view returns (bool);
+
+    function bridgehubCounterParts(uint256 _chainId) external view returns (address);
+
+    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
+
+    function finalizeMigrationToSyncLayer(
+        uint256 _chainId,
+        address _baseToken,
+        address _sharedBridge,
+        address _admin,
+        uint256 _expectedProtocolVersion,
+        HyperchainCommitment calldata _commitment,
+        bytes calldata _diamondCut
+    ) external;
+
+    function forwardTransactionSyncLayer(uint256 _chainId, BridgehubL2TransactionRequest calldata _request) external;
 }

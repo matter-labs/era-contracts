@@ -16,8 +16,6 @@ import {ProposedUpgrade} from "../../../upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "../../chain-interfaces/IVerifier.sol";
 import {IDefaultUpgrade} from "../../../upgrades/IDefaultUpgrade.sol";
 
-
-
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
@@ -140,10 +138,8 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function finalizeMigration(
-        HyperchainCommitment memory _commitment
-    ) external onlyStateTransitionManager {
-        if(s.syncLayerState == SyncLayerState.MigratedL1) {
+    function finalizeMigration(HyperchainCommitment memory _commitment) external onlyStateTransitionManager {
+        if (s.syncLayerState == SyncLayerState.MigratedL1) {
             s.syncLayerState = SyncLayerState.ActiveL1;
         } else if (s.syncLayerState == SyncLayerState.MigratedSL) {
             s.syncLayerState = SyncLayerState.ActiveSL;
@@ -159,21 +155,26 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         require(batchesExecuted <= batchesVerified, "Executed is not consistent with verified");
         require(batchesVerified <= batchesCommitted, "Verified is not consistent with committed");
 
-        // In the worst case, we may need to revert all the committed batches that were not executed. 
-        // This means that the stored batch hashes should be stored for [batchesExecuted; batchesCommitted] batches, i.e. 
+        // In the worst case, we may need to revert all the committed batches that were not executed.
+        // This means that the stored batch hashes should be stored for [batchesExecuted; batchesCommitted] batches, i.e.
         // there should be batchesCommitted - batchesExecuted + 1 hashes.
-        require(_commitment.batchHashes.length == batchesCommitted - batchesExecuted + 1, "Invalid number of batch hashes");
+        require(
+            _commitment.batchHashes.length == batchesCommitted - batchesExecuted + 1,
+            "Invalid number of batch hashes"
+        );
 
-        // Note that this part is done in O(N), i.e. it is the reponsibility of the admin of the chain to ensure that the total number of 
+        // Note that this part is done in O(N), i.e. it is the reponsibility of the admin of the chain to ensure that the total number of
         // outstanding committed batches is not too long.
-        for(uint256 i = 0 ; i < _commitment.batchHashes.length; i++) {
+        for (uint256 i = 0; i < _commitment.batchHashes.length; i++) {
             s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];
         }
 
         emit MigrationComplete();
     }
 
-    function startMigrationToSyncLayer(uint256 _syncLayerChainId) external onlyStateTransitionManager returns (HyperchainCommitment memory commitment) {
+    function startMigrationToSyncLayer(
+        uint256 _syncLayerChainId
+    ) external onlyStateTransitionManager returns (HyperchainCommitment memory commitment) {
         // TODO: add a check that there are no outstanding upgrades.
 
         require(s.syncLayerState == SyncLayerState.ActiveL1, "not active L1");
@@ -185,17 +186,23 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         commitment.totalBatchesExecuted = s.totalBatchesExecuted;
 
         // just in case
-        require(commitment.totalBatchesExecuted <= commitment.totalBatchesVerified, "Verified is not consistent with executed");
-        require(commitment.totalBatchesVerified <= commitment.totalBatchesCommitted, "Verified is not consistent with committed");
+        require(
+            commitment.totalBatchesExecuted <= commitment.totalBatchesVerified,
+            "Verified is not consistent with executed"
+        );
+        require(
+            commitment.totalBatchesVerified <= commitment.totalBatchesCommitted,
+            "Verified is not consistent with committed"
+        );
 
         uint256 blocksToRemember = commitment.totalBatchesCommitted - commitment.totalBatchesExecuted + 1;
 
         bytes32[] memory batchHashes = new bytes32[](blocksToRemember);
 
-        for(uint256 i = 0 ; i< blocksToRemember; i++) {
-            unchecked {  
+        for (uint256 i = 0; i < blocksToRemember; i++) {
+            unchecked {
                 batchHashes[i] = s.storedBatchHashes[commitment.totalBatchesExecuted + i];
-            } 
+            }
         }
 
         commitment.batchHashes = batchHashes;
@@ -213,16 +220,25 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         bytes32 migrationHash = s.syncLayerMigrationHash;
         require(migrationHash != bytes32(0), "can not recover when there is no migration");
 
-        require(IBridgehub(s.bridgehub).proveL1ToL2TransactionStatus(_syncLayerChainId, migrationHash, _l2BatchNumber, _l2MessageIndex, _l2TxNumberInBatch, _merkleProof, TxStatus.Failure), "Migration not failed");
+        require(
+            IBridgehub(s.bridgehub).proveL1ToL2TransactionStatus(
+                _syncLayerChainId,
+                migrationHash,
+                _l2BatchNumber,
+                _l2MessageIndex,
+                _l2TxNumberInBatch,
+                _merkleProof,
+                TxStatus.Failure
+            ),
+            "Migration not failed"
+        );
 
-        
         s.syncLayerState = SyncLayerState.ActiveL1;
         s.syncLayerChainId = 0;
         s.syncLayerMigrationHash = bytes32(0);
 
         // We do not need to perform any additional actions, since no changes related to the chain commitment can be performed
         // while the chain is in the "migrated" state.
-
     }
 
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId

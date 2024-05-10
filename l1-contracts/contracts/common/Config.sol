@@ -125,8 +125,7 @@ struct HyperchainCommitment {
     /// @notice Total number of committed batches i.e. batches[totalBatchesCommitted] points at the latest committed
     /// batch
     uint256 totalBatchesCommitted;
-
     bytes32[] batchHashes;
 
-    /// TODO: add priority queue here.    
+    /// TODO: add priority queue here.
 }

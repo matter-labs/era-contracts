@@ -10,7 +10,7 @@ import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import { initialBridgehubDeployment } from "../src.ts/deploy-process";
 import { ethTestConfig, getAddressFromEnv, getNumberFromEnv } from "../src.ts/utils";
 
-import { Wallet as ZkWallet, Provider as ZkProvider } from 'zksync-ethers';
+import { Wallet as ZkWallet, Provider as ZkProvider } from "zksync-ethers";
 
 const provider = web3Provider();
 
@@ -20,7 +20,7 @@ async function main() {
   program.version("0.1.0").name("deploy").description("deploy L1 contracts");
 
   program
-    .command('deploy-sync-layer-contracts')
+    .command("deploy-sync-layer-contracts")
     .option("--private-key <private-key>")
     .option("--chain-id <chain-id>")
     .option("--gas-price <gas-price>")
@@ -29,15 +29,15 @@ async function main() {
     .option("--diamond-upgrade-init <version>")
     .option("--only-verifier")
     .action(async (cmd) => {
-      if(process.env.CONTRACTS_BASE_NETWORK_ZKSYNC !== "true") {
+      if (process.env.CONTRACTS_BASE_NETWORK_ZKSYNC !== "true") {
         throw new Error("This script is only for zkSync network");
       }
 
       let deployWallet: ethers.Wallet | ZkWallet;
-      
+
       // if (process.env.CONTRACTS_BASE_NETWORK_ZKSYNC === "true") {
-        const provider = new ZkProvider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
-        deployWallet = cmd.privateKey
+      const provider = new ZkProvider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
+      deployWallet = cmd.privateKey
         ? new ZkWallet(cmd.privateKey, provider)
         : ZkWallet.fromMnemonic(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
@@ -90,7 +90,7 @@ async function main() {
 
       await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
 
-      // SyncLayer does not need to have all the same contracts as on L1. 
+      // SyncLayer does not need to have all the same contracts as on L1.
       // We only need validator timelock as well as the STM.
       await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
 
@@ -103,7 +103,7 @@ async function main() {
     });
 
   program
-    .command('register-sync-layer')
+    .command("register-sync-layer")
     .option("--private-key <private-key>")
     .option("--chain-id <chain-id>")
     .option("--gas-price <gas-price>")
@@ -114,18 +114,17 @@ async function main() {
     .action(async (cmd) => {
       // Now, all the operations are done on L1
       const deployWallet = cmd.privateKey
-      ? new Wallet(cmd.privateKey, provider)
-      : Wallet.fromMnemonic(
-          process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-          "m/44'/60'/0'/0/1"
-        ).connect(provider); 
+        ? new Wallet(cmd.privateKey, provider)
+        : Wallet.fromMnemonic(
+            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+            "m/44'/60'/0'/0/1"
+          ).connect(provider);
 
       const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
       console.log(`Using owner address: ${ownerAddress}`);
-  
-  
-      const stmOnSyncLayer = getAddressFromEnv('SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR');
-      const chainId = getNumberFromEnv('CHAIN_ETH_ZKSYNC_NETWORK_ID');
+
+      const stmOnSyncLayer = getAddressFromEnv("SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR");
+      const chainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
 
       console.log(`STM on SyncLayer: ${stmOnSyncLayer}`);
       console.log(`SyncLayer chain Id: ${chainId}`);

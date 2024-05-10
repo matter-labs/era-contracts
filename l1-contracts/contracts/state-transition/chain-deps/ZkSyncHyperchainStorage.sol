@@ -59,7 +59,7 @@ struct FeeParams {
 }
 
 enum SyncLayerState {
-    /// This is a hyperchain copy on L1, while the chain settles on L1 
+    /// This is a hyperchain copy on L1, while the chain settles on L1
     ActiveL1,
     /// This is a hyperchain copy on the synclayer, when the chain settles on synclayer
     ActiveSL,
@@ -161,11 +161,8 @@ struct ZkSyncHyperchainStorage {
     uint128 baseTokenGasPriceMultiplierDenominator;
     /// @dev The optional address of the contract that has to be used for transaction filtering/whitelisting
     address transactionFilterer;
-
-    /// @dev 
+    /// @dev
     SyncLayerState syncLayerState;
-
     uint256 syncLayerChainId;
-
     bytes32 syncLayerMigrationHash;
 }
