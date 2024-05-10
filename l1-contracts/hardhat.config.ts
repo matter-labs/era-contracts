@@ -5,6 +5,7 @@ import "hardhat-contract-sizer";
 import "hardhat-gas-reporter";
 import "hardhat-typechain";
 import "solidity-coverage";
+import 'solidity-docgen';
 
 // If no network is specified, use the default config
 if (!process.env.CHAIN_ETH_NETWORK) {
@@ -53,5 +54,10 @@ export default {
   },
   gasReporter: {
     enabled: true,
+  },
+  docgen: {
+    outputDir: '../docs/generated',
+    pages: "files",
+    templates: "../docs/templates",
   },
 };

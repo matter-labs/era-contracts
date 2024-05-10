@@ -1,0 +1,68 @@
+{{{natspec.devdoc}}}
+{{{name}}}
+
+{{#inheritedItems}}
+    {{#if functions}}
+        # Functions {{contract.name}}:
+        {{#functions}}
+            {{#if (or (eq visibility "public") (eq visibility "external"))}}
+                {{#unless (systemOnly this)}}
+                    - [`{{name}}({{args}})`](#{{gitbookAnchor anchor}})
+                {{/unless}}
+            {{/if}}
+        {{/functions}}
+    {{/if}}
+{{/inheritedItems}}
+
+{{#inheritedItems}}
+    {{#if events}}
+        # Events {{contract.name}}:
+        {{#events}}
+            - [`{{name}}({{args}})`](#{{gitbookAnchor anchor}})
+        {{/events}}
+    {{/if}}
+{{/inheritedItems}}
+
+
+{{#inheritedItems}}
+    {{#if variables}}
+        # Variables {{contract.name}}:
+        {{#variables}}
+            - [`{{name}}({{args}})`](#{{gitbookAnchor anchor}})
+        {{/variables}}
+    {{/if}}
+{{/inheritedItems}}
+
+# Functions:
+{{#functions}}
+    {{#unless (systemOnly this)}}
+        {{#if (or (eq visibility "public") (eq visibility "external"))}}
+            ## Function `{{name}}({{args}}){{#if outputs}} → {{outputs}}{{/if}}`
+            {{#if natspec.devdoc}}{{natspec.devdoc}}{{else}}No description{{/if}}
+            {{#if natspec.params}}
+                #### Parameters:
+                {{#natspec.params}}
+                    - `{{param}}`: {{description}}
+                {{/natspec.params}}
+            {{/if}}
+            {{#if natspec.returns}}
+                #### Return Values:
+                {{#natspec.returns}}
+                    - {{param}} {{description}}
+                {{/natspec.returns}}
+            {{/if}}
+        {{/if}}
+    {{/unless}}
+{{/functions}}
+
+# Events:
+{{#events}}
+    ## Event `{{name}}({{args}})`
+    {{#if natspec.devdoc}}{{natspec.devdoc}}{{else}}No description{{/if}}
+    {{#if natspec.params}}
+        #### Parameters:
+        {{#natspec.params}}
+            - `{{param}}`: {{description}}
+        {{/natspec.params}}
+    {{/if}}
+{{/events}}
