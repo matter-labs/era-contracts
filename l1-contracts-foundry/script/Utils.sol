@@ -2,10 +2,12 @@
 pragma solidity 0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
@@ -18,7 +20,7 @@ library Utils {
     // Create2Factory deterministic bytecode.
     // https://github.com/Arachnid/deterministic-deployment-proxy
     bytes internal constant CREATE2_FACTORY_BYTECODE =
-        hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
+    hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
 
     address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     uint256 constant MAX_PRIORITY_TX_GAS = 72000000;
@@ -111,7 +113,7 @@ library Utils {
      */
     function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
         string memory file = vm.readFile(
-            // solhint-disable-next-line func-named-parameters
+        // solhint-disable-next-line func-named-parameters
             string.concat(
                 "../system-contracts/artifacts-zk/contracts-preprocessed/",
                 filename,
@@ -231,7 +233,7 @@ library Utils {
             gasPrice,
             l2GasLimit,
             REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-        );
+        ) * 2;
 
         L2TransactionRequestDirect memory l2TransactionRequestDirect = L2TransactionRequestDirect({
             chainId: chainId,
@@ -245,17 +247,23 @@ library Utils {
             refundRecipient: msg.sender
         });
 
-        vm.startBroadcast();
         address baseTokenAddress = bridgehub.baseToken(chainId);
         if (ADDRESS_ONE != baseTokenAddress) {
             IERC20 baseToken = IERC20(baseTokenAddress);
-            baseToken.approve(l1SharedBridgeProxy, requiredValueToDeploy * 2);
+            vm.broadcast();
+            baseToken.approve(l1SharedBridgeProxy, requiredValueToDeploy);
             requiredValueToDeploy = 0;
         }
 
-        bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
 
-        vm.stopBroadcast();
+        executeUpgrade(bridgehub.owner(), bytes32(0), bridgehubAddress,
+            abi.encodeCall(bridgehub.requestL2TransactionDirect,
+                (l2TransactionRequestDirect)
+            ),
+            requiredValueToDeploy,
+            0
+        );
+
     }
 
     /**
@@ -293,7 +301,7 @@ library Utils {
         address _governor,
         bytes32 _salt,
         address _target,
-        bytes calldata _data,
+        bytes memory _data,
         uint256 _value,
         uint256 _delay
     ) public {
@@ -307,10 +315,15 @@ library Utils {
             predecessor: bytes32(0),
             salt: _salt
         });
-        vm.broadcast();
+
+        Ownable ownable = Ownable(_governor);
+        console.log(msg.sender);
+        console.log(ownable.owner());
+        vm.startBroadcast();
         governance.scheduleTransparent(operation, _delay);
         if (_delay == 0) {
             governance.execute{value: _value}(operation);
         }
+        vm.stopBroadcast();
     }
 }
