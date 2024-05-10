@@ -43,9 +43,9 @@ import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory"
 import type { FacetCut } from "./diamondCut";
 import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
 
-import { ERC20Factory, StateTransitionManagerFactory } from "../typechain"; 
+import { ERC20Factory, StateTransitionManagerFactory } from "../typechain";
 
-import { Wallet as ZkWallet } from 'zksync-ethers';
+import { Wallet as ZkWallet } from "zksync-ethers";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -342,7 +342,7 @@ export class Deployer {
       create2Salt,
       {
         ...ethTxOptions,
-        gasLimit: 20_000_000
+        gasLimit: 20_000_000,
       }
     );
 
@@ -904,10 +904,7 @@ export class Deployer {
   }
 
   public stateTransitionManagerContract(signerOrProvider: Signer | providers.Provider) {
-    return StateTransitionManagerFactory.connect(
-      this.addresses.StateTransition.StateTransitionProxy,
-      signerOrProvider
-    );
+    return StateTransitionManagerFactory.connect(this.addresses.StateTransition.StateTransitionProxy, signerOrProvider);
   }
 
   public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
