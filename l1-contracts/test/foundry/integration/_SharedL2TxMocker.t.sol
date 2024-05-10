@@ -37,7 +37,8 @@ contract L2TxMocker is Test {
         uint256 _mintValue,
         uint256 _l2Value,
         uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit
+        uint256 _l2GasPerPubdataByteLimit,
+        address _tokenAddress
     ) internal returns (L2TransactionRequestDirect memory request) {
         request.chainId = _chainId;
         request.mintValue = _mintValue;
@@ -46,8 +47,9 @@ contract L2TxMocker is Test {
         request.l2GasPerPubdataByteLimit = _l2GasPerPubdataByteLimit;
         request.l2Contract = chainContracts[_chainId];
 
-        //
-        request.l2Calldata = mockL2Calldata;
+        // for mocking encode just tokenaddress of the token
+        request.l2Calldata = abi.encode(_tokenAddress);
+
         request.factoryDeps = mockFactoryDeps;
         request.refundRecipient = mockRefundRecipient;
     }
