@@ -83,8 +83,9 @@ Also, when testing these contracts, some of them should also be deployed on the 
 - [Ecrecover.yul](contracts%2Fprecompiles%2FEcrecover.yul): uses precompile call instruction, which is address-dependent
 - [Keccak256.yul](contracts%2Fprecompiles%2FKeccak256.yul): uses precompile call instruction, which is address-dependent
 - [SHA256.yul](contracts%2Fprecompiles%2FSHA256.yul): uses precompile call instruction, which is address-dependent
-
-However, this is not the case for [EcAdd.yul](contracts%2Fprecompiles%2FEcAdd.yul) and [EcMul.yul](contracts%2Fprecompiles%2FEcMul.yul), so they can be deployed on any addresses, even outside kernel space.
+- [EcAdd.yul](contracts%2Fprecompiles%EcAdd.yul): uses precompile call instruction, which is address-dependent
+- [EcMul.yul](contracts%2Fprecompiles%EcMul.yul): uses precompile call instruction, which is address-dependent
+- [EcPairing.yul](contracts%2Fprecompiles%EcPairing.yul): uses precompile call instruction, which is address-dependent
 
 #### Test contracts/features
 
