@@ -74,11 +74,13 @@ object "EcPairing" {
 
             let pairs := div(bytesSize, CHUNK_SIZE_BYTES())
 
+            // We conduct all validations inside the precompileCall
+
             calldatacopy(0, 0, bytesSize)
 
             let precompileParams := unsafePackPrecompileParams(
                 0,              // input offset in words
-                mul(6, pairs),  // input length in words (p_x, p_x, q_x_a, q_x_b, q_y_a, q_y_b)
+                mul(6, pairs),  // input length in words multiples of (p_x, p_x, q_x_a, q_x_b, q_y_a, q_y_b)
                 0,              // output offset in words
                 1,              // output length in words (pairing check boolean)
                 pairs           // number of pairs

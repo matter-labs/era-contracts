@@ -14,13 +14,6 @@ object "EcMul" {
             //                      CONSTANTS
             ////////////////////////////////////////////////////////////////
 
-            /// @notice Constant function for the alt_bn128 field order.
-            /// @dev See https://eips.ethereum.org/EIPS/eip-196 for further details.
-            /// @return ret The alt_bn128 field order.
-            function P() -> ret {
-                ret := 21888242871839275222246405745257275088696311157297823662689037894645226208583
-            }
-
             /// @dev The gas cost of processing ecmul circuit precompile.
             function ECMUL_GAS_COST() -> ret {
                 ret := 7000
@@ -61,48 +54,6 @@ object "EcMul" {
                 precompileCall(0, gas())
             }
 
-            /// @notice Retrieves the highest half of the multiplication result.
-            /// @param multiplicand The value to multiply.
-            /// @param multiplier The multiplier.
-            /// @return ret The highest half of the multiplication result.
-            function getHighestHalfOfMultiplication(multiplicand, multiplier) -> ret {
-                ret := verbatim_2i_1o("mul_high", multiplicand, multiplier)
-            }
-
-            // @notice Checks if a point is on the curve.
-            // @dev The curve in question is the alt_bn128 curve.
-            // @dev The Short Weierstrass equation of the curve is y^2 = x^3 + 3.
-            // @param x The x coordinate of the point.
-            // @param y The y coordinate of the point.
-            // @return ret True if the point is on the curve, false otherwise.
-            function pointIsInCurve(x, y) -> ret {
-                let ySquared := mulmod(y, y, P())
-                let xSquared := mulmod(x, x, P())
-                let xQubed := mulmod(xSquared, x, P())
-                let xQubedPlusThree := addmod(xQubed, 3, P())
-
-                ret := eq(ySquared, xQubedPlusThree)
-            }
-
-            /// @notice Checks if a point is the point at infinity.
-            /// @dev The point at infinity is defined as the point (0, 0).
-            /// @dev See https://eips.ethereum.org/EIPS/eip-196 for further details.
-            /// @param x The x coordinate of the point.
-            /// @param y The y coordinate of the point.
-            /// @return ret True if the point is the point at infinity, false otherwise.
-            function isInfinity(x, y) -> ret {
-                ret := iszero(or(x, y))
-            }
-
-            /// @notice Checks if a coordinate is on the curve field order.
-            /// @dev A coordinate is on the curve field order if it is on the range [0, curveFieldOrder).
-            /// @dev This check is required in the precompile specification. See https://eips.ethereum.org/EIPS/eip-196 for further details.
-            /// @param coordinate The coordinate to check.
-            /// @return ret True if the coordinate is in the range, false otherwise.
-            function isOnFieldOrder(coordinate) -> ret {
-                ret := lt(coordinate, P())
-            }
-
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
@@ -112,20 +63,7 @@ object "EcMul" {
             let y := calldataload(32)
             let scalar := calldataload(64)
 
-            // Ensure that the coordinates are between 0 and the field order.
-            if or(not(isOnFieldOrder(x)), not(isOnFieldOrder(y))) {
-                burnGas()
-            }
-
-            if isInfinity(x, y) {
-                // Infinity * scalar = Infinity
-                return(0, 64)
-            }
-
-            // Ensure that the point is in the curve (Y^2 = X^3 + 3).
-            if not(pointIsInCurve(x, y)) {
-                burnGas()
-            }
+            // We conduct all validations inside the precompileCall
 
             mstore(0, x)
             mstore(32, y)
