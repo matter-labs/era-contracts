@@ -131,4 +131,8 @@ interface IStateTransitionManager {
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
     ) external;
+
+    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted)  external;
+
+    function registerCounterpart(uint256 _chainId, address _counterPart) external;
 }

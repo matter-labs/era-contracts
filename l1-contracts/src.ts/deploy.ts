@@ -43,27 +43,34 @@ import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory"
 import type { FacetCut } from "./diamondCut";
 import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
 
-import { ERC20Factory } from "../typechain";
+import { ERC20Factory, StateTransitionManagerFactory } from "../typechain"; 
+
+import { Wallet as ZkWallet } from 'zksync-ethers';
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
 
 export interface DeployerConfig {
-  deployWallet: Wallet;
+  deployWallet: Wallet | ZkWallet;
   addresses?: DeployedAddresses;
   ownerAddress?: string;
   verbose?: boolean;
   bootloaderBytecodeHash?: string;
   defaultAccountBytecodeHash?: string;
+  deployedLogPrefix?: string;
 }
 
 export class Deployer {
   public addresses: DeployedAddresses;
-  public deployWallet: Wallet;
+  public deployWallet: Wallet | ZkWallet;
   public verbose: boolean;
   public chainId: number;
   public ownerAddress: string;
-  public zkMode: boolean;
+  public deployedLogPrefix: string;
+
+  public isZkMode(): boolean {
+    return this.deployWallet instanceof ZkWallet;
+  }
 
   constructor(config: DeployerConfig) {
     this.deployWallet = config.deployWallet;
@@ -77,9 +84,7 @@ export class Deployer {
       : hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
     this.chainId = parseInt(process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID!);
-
-    // FIXME: do it generically
-    this.zkMode = process.env.ETH_CLIENT_CHAIN_ID === "270";
+    this.deployedLogPrefix = config.deployedLogPrefix ?? "CONTRACTS";
   }
 
   public async initialZkSyncHyperchainDiamondCut(extraFacets?: FacetCut[]) {
@@ -142,7 +147,7 @@ export class Deployer {
   }
 
   public async updateCreate2FactoryZkMode() {
-    if (!this.zkMode) {
+    if (!this.isZkMode()) {
       throw new Error("`updateCreate2FactoryZkMode` should be only called in Zk mode");
     }
 
@@ -156,7 +161,7 @@ export class Deployer {
       console.log("Deploying Create2 factory");
     }
 
-    if (this.zkMode) {
+    if (this.isZkMode()) {
       throw new Error("Create2Factory is built into zkSync and should not be deployed separately");
     }
 
@@ -184,9 +189,9 @@ export class Deployer {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     libraries?: any
   ) {
-    if (this.zkMode) {
+    if (this.isZkMode()) {
       const result = await deployViaCreate2Zk(
-        this.deployWallet,
+        this.deployWallet as ZkWallet,
         contractName,
         args,
         create2Salt,
@@ -217,7 +222,7 @@ export class Deployer {
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest
   ): Promise<string> {
-    if (this.zkMode) {
+    if (this.isZkMode()) {
       throw new Error("`deployBytecodeViaCreate2` not supported in zkMode");
     }
 
@@ -270,11 +275,11 @@ export class Deployer {
     let proxyAdmin;
     let rec;
 
-    if (this.zkMode) {
+    if (this.isZkMode()) {
       // @ts-ignore
       // TODO try to make it work with zksync ethers
       const artifact = hardhat.artifacts.readArtifactSync("ProxyAdmin");
-      const zkWal = ethersWalletToZkWallet(this.deployWallet);
+      const zkWal = this.deployWallet as ZkWallet;
       const contractFactory = new ZkContractFactory(artifact.abi, artifact.bytecode, zkWal);
       proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
       rec = await proxyAdmin.deployTransaction.wait();
@@ -699,7 +704,7 @@ export class Deployer {
     nonce?,
     predefinedChainId?: string
   ) {
-    const txOptions = this.zkMode ? {} : { gasLimit: 10_000_000 };
+    const txOptions = this.isZkMode() ? {} : { gasLimit: 10_000_000 };
 
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
@@ -853,7 +858,7 @@ export class Deployer {
   }
 
   public async updateBlobVersionedHashRetrieverZkMode() {
-    if (!this.zkMode) {
+    if (!this.isZkMode()) {
       throw new Error("`updateBlobVersionedHashRetrieverZk` should be only called when deploying on zkSync network");
     }
 
@@ -898,7 +903,7 @@ export class Deployer {
   }
 
   public stateTransitionManagerContract(signerOrProvider: Signer | providers.Provider) {
-    return IStateTransitionManagerFactory.connect(
+    return StateTransitionManagerFactory.connect(
       this.addresses.StateTransition.StateTransitionProxy,
       signerOrProvider
     );

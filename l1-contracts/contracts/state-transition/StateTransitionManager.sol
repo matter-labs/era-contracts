@@ -392,6 +392,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // TODO: emit event
     }
 
+    function registerCounterpart(uint256 _chainId, address _counterPart) external onlyOwner {
+        require(_counterPart != address(0), "STM: counter part zero");
+
+        stmCounterParts[_chainId] = _counterPart;
+    }
+
     function finalizeMigrationToSyncLayer(
         uint256 _chainId,
         address _baseToken,

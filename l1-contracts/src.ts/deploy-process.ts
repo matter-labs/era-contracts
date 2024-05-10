@@ -30,7 +30,7 @@ export async function initialBridgehubDeployment(
 
   // Create2 factory already deployed on the public networks, only deploy it on local node
   if (isCurrentNetworkLocal()) {
-    if (!deployer.zkMode) {
+    if (!deployer.isZkMode()) {
       await deployer.deployCreate2Factory({ gasPrice, nonce });
       nonce++;
     } else {
@@ -64,7 +64,7 @@ export async function initialBridgehubDeployment(
   await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
-  if (deployer.zkMode) {
+  if (deployer.isZkMode()) {
     await deployer.updateBlobVersionedHashRetrieverZkMode();
   } else {
     await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
