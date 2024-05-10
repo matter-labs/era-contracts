@@ -7,6 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
@@ -32,7 +33,6 @@ contract RegisterHyperchainScript is Script {
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
         address bridgehub;
-        address bridgehubGovernance;
         address stateTransitionProxy;
         address validatorTimelock;
         bytes diamondCutData;
@@ -60,25 +60,6 @@ contract RegisterHyperchainScript is Script {
         saveOutput();
     }
 
-    // This function should be called by the owner to accept the admin role
-    function acceptAdmin() public {
-        console.log("Accept admin Hyperchain");
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/accept-admin.toml");
-        string memory toml = vm.readFile(path);
-        address diamondProxy = toml.readAddress("$.diamond_proxy_addr");
-        IZkSyncHyperchain zkSyncStateTransition = IZkSyncHyperchain(diamondProxy);
-        bytes memory data = abi.encodeCall(zkSyncStateTransition.acceptAdmin, ());
-        Utils.executeUpgrade({
-            _governor: config.bridgehubGovernance,
-            _salt: bytes32(config.bridgehubCreateNewChainSalt),
-            _target: config.bridgehub,
-            _data: data,
-            _value: 0,
-            _delay: 0
-        });
-    }
-
     function initializeConfig() internal {
         // Grab config from output of l1 deployment
         string memory root = vm.projectRoot();
@@ -93,7 +74,6 @@ contract RegisterHyperchainScript is Script {
         config.ownerAddress = toml.readAddress("$.owner_address");
 
         config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-        config.bridgehubGovernance = toml.readAddress("$.deployed_addresses.bridge_governance");
         config.stateTransitionProxy = toml.readAddress(
             "$.deployed_addresses.state_transition.state_transition_proxy_addr"
         );
@@ -136,13 +116,14 @@ contract RegisterHyperchainScript is Script {
 
     function registerTokenOnBridgehub() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        Ownable ownable = Ownable(config.bridgehub);
 
         if (bridgehub.tokenIsRegistered(config.baseToken)) {
             console.log("Token already registered on Bridgehub");
         } else {
             bytes memory data = abi.encodeCall(bridgehub.addToken, (config.baseToken));
             Utils.executeUpgrade({
-                _governor: config.bridgehubGovernance,
+                _governor: ownable.owner(),
                 _salt: bytes32(config.bridgehubCreateNewChainSalt),
                 _target: config.bridgehub,
                 _data: data,
@@ -165,8 +146,8 @@ contract RegisterHyperchainScript is Script {
 
     function registerHyperchain() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        Ownable ownable = Ownable(config.bridgehub);
 
-        vm.broadcast();
         vm.recordLogs();
         bytes memory data = abi.encodeCall(
             bridgehub.createNewChain,
@@ -181,7 +162,7 @@ contract RegisterHyperchainScript is Script {
         );
 
         Utils.executeUpgrade({
-            _governor: config.bridgehubGovernance,
+            _governor: ownable.owner(),
             _salt: bytes32(config.bridgehubCreateNewChainSalt),
             _target: config.bridgehub,
             _data: data,

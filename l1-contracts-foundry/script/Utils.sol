@@ -154,7 +154,7 @@ library Utils {
 
         vm.broadcast();
         (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
-        contractAddress = Utils.bytesToAddress(data);
+        contractAddress = bytesToAddress(data);
 
         if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
             revert("Failed to deploy contract via create2");
@@ -231,7 +231,7 @@ library Utils {
             gasPrice,
             l2GasLimit,
             REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-        );
+        ) * 2;
 
         L2TransactionRequestDirect memory l2TransactionRequestDirect = L2TransactionRequestDirect({
             chainId: chainId,
@@ -245,17 +245,22 @@ library Utils {
             refundRecipient: msg.sender
         });
 
-        vm.startBroadcast();
         address baseTokenAddress = bridgehub.baseToken(chainId);
         if (ADDRESS_ONE != baseTokenAddress) {
             IERC20 baseToken = IERC20(baseTokenAddress);
-            baseToken.approve(l1SharedBridgeProxy, requiredValueToDeploy * 2);
+            vm.broadcast();
+            baseToken.approve(l1SharedBridgeProxy, requiredValueToDeploy);
             requiredValueToDeploy = 0;
         }
 
-        bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
-
-        vm.stopBroadcast();
+        executeUpgrade({
+            _governor: bridgehub.owner(),
+            _salt: bytes32(0),
+            _target: l1SharedBridgeProxy,
+            _data: abi.encodeCall(bridgehub.requestL2TransactionDirect, (l2TransactionRequestDirect)),
+            _value: requiredValueToDeploy,
+            _delay: 0
+        });
     }
 
     /**
@@ -293,7 +298,7 @@ library Utils {
         address _governor,
         bytes32 _salt,
         address _target,
-        bytes calldata _data,
+        bytes memory _data,
         uint256 _value,
         uint256 _delay
     ) public {
@@ -307,10 +312,12 @@ library Utils {
             predecessor: bytes32(0),
             salt: _salt
         });
-        vm.broadcast();
+
+        vm.startBroadcast();
         governance.scheduleTransparent(operation, _delay);
         if (_delay == 0) {
             governance.execute{value: _value}(operation);
         }
+        vm.stopBroadcast();
     }
 }
