@@ -70,7 +70,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     // Sync layer chain is expected to have ETH as the base token.
     mapping(uint256 chainId => bool isWhitelistedSyncLayer) whitelistedSyncLayers;
 
-    mapping(uint256 chainId => bytes32 lastMigrationTxHash) lastMigrationTxHashes;
+    // mapping(uint256 chainId => bytes32 lastMigrationTxHash) lastMigrationTxHashes;
     // mapping(uint256 chainId => bytes32 lastChainCommitment) lastMigratedCommitments;
 
     mapping(uint256 chainId => address stmCounterPart) stmCounterParts;
@@ -366,7 +366,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     ) external onlyBridgehub {
         // TODO: only allow on L1.
 
-        address hyperchainAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut, SyncLayerState.ActiveL1);
+        address hyperchainAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut, SyncLayerState.ActiveOnL1);
 
         // set chainId in VM
         IAdmin(hyperchainAddress).setChainIdUpgrade(genesisUpgrade);
@@ -421,7 +421,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             require(protocolVersion == _expectedProtocolVersion, "STM: protocolVersion mismatch");
 
             // We set "migrated L2 initially" as it will be reset later on in the `finalizeMigration` call.
-            currentAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut, SyncLayerState.MigratedSL);
+            currentAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut, SyncLayerState.MigratedFromSL);
 
             // note that we do not need the genesis upgrade, it is expected that everything is already prepared on l2.
         } 
@@ -499,7 +499,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         bytes32 canonicalHash = IBridgehub(BRIDGE_HUB).requestL2TransactionDirect{value: msg.value}(_request);
 
-        lastMigrationTxHashes[_chainId] = canonicalHash;
+        // lastMigrationTxHashes[_chainId] = canonicalHash;
+
+        hyperchain.storeMigrationHash(canonicalHash);
         // lastMigratedCommitments[_chainId] = keccak256(abi.encode(commitment));
         // Now, we need to send an L1->L2 tx to the sync layer blockchain to the spawn the chain on SL.
         // We just send it via a normal L-Z
