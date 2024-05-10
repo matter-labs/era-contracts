@@ -32,6 +32,7 @@ import type { FacetCut } from "./diamondCut";
 import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
 
 import { ERC20Factory } from "../typechain";
+import type { IBridgehub} from "zksync-ethers/typechain/IBridgehub";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -627,7 +628,6 @@ export class Deployer {
     await this.deployStateTransitionDiamondFacets(create2Salt, gasPrice, nonce);
     await this.deployStateTransitionManagerImplementation(create2Salt, { gasPrice });
     await this.deployStateTransitionManagerProxy(create2Salt, { gasPrice }, extraFacets);
-    await this.registerStateTransitionManager();
   }
 
   public async deployStateTransitionDiamondFacets(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
@@ -640,9 +640,7 @@ export class Deployer {
     await this.deployStateTransitionDiamondInit(create2Salt, { gasPrice, nonce: nonce + 4 });
   }
 
-  public async registerStateTransitionManager() {
-    const bridgehub = this.bridgehubContract(this.deployWallet);
-
+  public async registerStateTransitionManager(bridgehub: IBridgehub) {
     const tx = await bridgehub.addStateTransitionManager(this.addresses.StateTransition.StateTransitionProxy);
 
     const receipt = await tx.wait();
@@ -666,6 +664,7 @@ export class Deployer {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     const stateTransitionManager = this.stateTransitionManagerContract(this.deployWallet);
 
+    await this.registerStateTransitionManager(bridgehub);
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets);

@@ -17,7 +17,8 @@ import {
   L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
   initialBridgehubDeployment,
   registerHyperchain,
-  deployVerifier, deployHyperchain,
+  deployVerifier,
+  deployHyperchain,
 } from "./deploy-process";
 import { deployTokens, getTokens } from "./deploy-token";
 
