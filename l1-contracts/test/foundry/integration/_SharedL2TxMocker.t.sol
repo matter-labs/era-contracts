@@ -38,7 +38,8 @@ contract L2TxMocker is Test {
         uint256 _l2Value,
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit,
-        address _tokenAddress
+        address _tokenAddress,
+        bytes memory _l2CallData
     ) internal returns (L2TransactionRequestDirect memory request) {
         request.chainId = _chainId;
         request.mintValue = _mintValue;
@@ -46,10 +47,9 @@ contract L2TxMocker is Test {
         request.l2GasLimit = _l2GasLimit;
         request.l2GasPerPubdataByteLimit = _l2GasPerPubdataByteLimit;
         request.l2Contract = chainContracts[_chainId];
+        request.l2Calldata = _l2CallData;
 
-        // for mocking encode just tokenaddress of the token
-        request.l2Calldata = abi.encode(_tokenAddress);
-
+        //mocked
         request.factoryDeps = mockFactoryDeps;
         request.refundRecipient = mockRefundRecipient;
     }
@@ -69,6 +69,29 @@ contract L2TxMocker is Test {
         request.l2GasLimit = mockL2GasLimit;
         request.l2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
         request.factoryDeps = mockFactoryDeps;
+        request.refundRecipient = mockRefundRecipient;
+    }
+
+    function createMockL2TransactionRequestTwoBridgesSecond(
+        uint256 _chainId,
+        uint256 _mintValue,
+        uint256 _secondBridgeValue,
+        address _secondBridgeAddress,
+        uint256 _l2Value,
+        uint256 _l2GasLimit,
+        uint256 _l2GasPerPubdataByteLimit,
+        bytes memory _secondBridgeCalldata
+    ) internal returns (L2TransactionRequestTwoBridgesOuter memory request) {
+        request.chainId = _chainId;
+        request.mintValue = _mintValue;
+        request.secondBridgeAddress = _secondBridgeAddress;
+        request.secondBridgeValue = _secondBridgeValue;
+        request.l2Value = _l2Value;
+        request.l2GasLimit = _l2GasLimit;
+        request.l2GasPerPubdataByteLimit = _l2GasPerPubdataByteLimit;
+        request.secondBridgeCalldata = _secondBridgeCalldata;
+
+        //mocks
         request.refundRecipient = mockRefundRecipient;
     }
 
