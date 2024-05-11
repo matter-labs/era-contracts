@@ -22,3 +22,6 @@ fs_permissions = [
 ]
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/crates/config
+
+[invariant] #invariant section
+fail_on_revert = true
