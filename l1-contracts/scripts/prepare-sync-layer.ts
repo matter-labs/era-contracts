@@ -53,14 +53,6 @@ async function main() {
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
             "m/44'/60'/0'/0/1"
           ).connect(provider);
-      // } else {
-      //   deployWallet = cmd.privateKey
-      //   ? new Wallet(cmd.privateKey, provider)
-      //   : Wallet.fromMnemonic(
-      //       process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-      //       "m/44'/60'/0'/0/1"
-      //     ).connect(provider);
-      // }
 
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
@@ -88,6 +80,11 @@ async function main() {
         console.log("Deploying on a zkSync network!");
       }
 
+      // On Sync Layer there is no bridgehub
+      const dummyAddress = '0x1000000000000000000000000000000000000001';
+      deployer.addresses.Bridgehub.BridgehubProxy = dummyAddress;
+      deployer.addresses.Bridges.SharedBridgeProxy = dummyAddress;
+
       await deployer.updateCreate2FactoryZkMode();
       await deployer.updateBlobVersionedHashRetrieverZkMode();
 
@@ -104,12 +101,11 @@ async function main() {
       // We only need validator timelock as well as the STM.
       await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
 
-      // On L2 there is no bridgebub.
-      deployer.addresses.Bridgehub.BridgehubProxy = ethers.constants.AddressZero;
-
       await deployer.deployStateTransitionDiamondFacets(create2Salt, gasPrice);
       await deployer.deployStateTransitionManagerImplementation(create2Salt, { gasPrice });
       await deployer.deployStateTransitionManagerProxy(create2Salt, { gasPrice });
+
+      await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
     });
 
   program
@@ -301,6 +297,55 @@ async function main() {
       ).wait();
 
       console.log("Success!");
+    });
+
+  program
+    .command("prepare-validators")
+    .option("--private-key <private-key>")
+    .option("--chain-id <chain-id>")
+    .option("--gas-price <gas-price>")
+    .option("--owner-address <owner-address>")
+    .option("--create2-salt <create2-salt>")
+    .option("--diamond-upgrade-init <version>")
+    .option("--only-verifier")
+    .action(async (cmd) => {
+      const syncLayerProvider = new ZkProvider(process.env.SYNC_LAYER_API_WEB3_JSON_RPC_HTTP_URL);
+      const currentChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
+
+      // Right now the new admin is the wallet itself.
+      const adminWallet = cmd.privateKey
+      ? new ZkWallet(cmd.privateKey, syncLayerProvider)
+      : ZkWallet.fromMnemonic(
+          process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+          "m/44'/60'/0'/0/1"
+        ).connect(syncLayerProvider);
+
+      const operators = [
+        process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR,
+        process.env.ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR
+      ];
+
+      const deployer = new Deployer({
+        deployWallet: adminWallet,
+        addresses: deployedAddressesFromEnv(),
+        ownerAddress: adminWallet.address,
+        verbose: true,
+      });
+
+      console.log('Enablign validators');
+
+      // FIXME: do it in cleaner way
+      deployer.addresses.ValidatorTimeLock = getAddressFromEnv("SYNC_LAYER_VALIDATOR_TIMELOCK_ADDR");
+      const timelock = deployer.validatorTimelock(deployer.deployWallet);
+
+      for(const operator of operators) {
+        await (await timelock.addValidator(
+          currentChainId,
+          operator
+        )).wait();
+      }
+
+      console.log('Success!');
     });
 
   await program.parseAsync(process.argv);
