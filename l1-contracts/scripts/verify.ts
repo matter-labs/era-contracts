@@ -26,6 +26,7 @@ function verifyPromise(address: string, constructorArguments?: Array<any>, libra
   });
 }
 
+// Note: running all verifications in parallel might be too much for etherscan, comment out some of them if needed
 async function main() {
   if (process.env.CHAIN_ETH_NETWORK == "localhost") {
     console.log("Skip contract verification on localhost");
@@ -157,6 +158,66 @@ async function main() {
 
   // // // bridges
   // // // Note: do this manually and pass in  to verify:verify the following:  contract:"contracts/bridge/L1ERC20Bridge.sol:L1ERC20Bridge"
+  // const promise10 = verifyPromise(addresses.Bridges.ERC20BridgeImplementation, [addresses.Bridges.SharedBridgeProxy]);
+  // promises.push(promise10);
+
+  // const eraDiamondProxy = getAddressFromEnv("CONTRACTS_ERA_DIAMOND_PROXY_ADDR");
+  // const tokens = getTokens();
+  // const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
+
+  // const promise12 = verifyPromise(addresses.Bridges.SharedBridgeImplementation, [
+  //   l1WethToken,
+  //   addresses.Bridgehub.BridgehubProxy,
+  //   eraChainId,
+  //   eraDiamondProxy,
+  // ]);
+  // promises.push(promise12);
+  // const initCalldata4 = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi).encodeFunctionData(
+  //   "initialize",
+  //   [deployWalletAddress]
+  // );
+  // const promise13 = verifyPromise(addresses.Bridges.SharedBridgeProxy, [
+  //   addresses.Bridges.SharedBridgeImplementation,
+  //   addresses.TransparentProxyAdmin,
+  //   initCalldata4,
+  // ]);
+  // promises.push(promise13);
+
+  // const promise8 = verifyPromise(addresses.StateTransition.StateTransitionImplementation, [
+  //   addresses.Bridgehub.BridgehubProxy,
+  //   getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_HYPERCHAINS"),
+  // ]);
+  // promises.push(promise8);
+
+  // const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
+  // const genesisBatchHash = getHashFromEnv("CONTRACTS_GENESIS_ROOT"); // TODO: confusing name
+  // const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
+  // const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
+  // const diamondCut = await deployer.initialZkSyncHyperchainDiamondCut([]);
+  // const protocolVersion = getNumberFromEnv("CONTRACTS_GENESIS_PROTOCOL_VERSION");
+
+  // const initCalldata2 = stateTransitionManager.encodeFunctionData("initialize", [
+  //   {
+  //     owner: addresses.Governance,
+  //     validatorTimelock: addresses.ValidatorTimeLock,
+  //     genesisUpgrade: addresses.StateTransition.GenesisUpgrade,
+  //     genesisBatchHash,
+  //     genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
+  //     genesisBatchCommitment,
+  //     diamondCut,
+  //     protocolVersion,
+  //   },
+  // ]);
+
+  // const promise9 = verifyPromise(addresses.StateTransition.StateTransitionProxy, [
+  //   addresses.StateTransition.StateTransitionImplementation,
+  //   addresses.TransparentProxyAdmin,
+  //   initCalldata2,
+  // ]);
+  // promises.push(promise9);
+
+  // // bridges
+  // // Note: do this manually and pass in  to verify:verify the following:  contract:"contracts/bridge/L1ERC20Bridge.sol:L1ERC20Bridge"
   // const promise10 = verifyPromise(addresses.Bridges.ERC20BridgeImplementation, [addresses.Bridges.SharedBridgeProxy]);
   // promises.push(promise10);
 

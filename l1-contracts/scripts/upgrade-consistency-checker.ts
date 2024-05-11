@@ -68,7 +68,6 @@ const expectedRecursionCircuitsSetVksHash = "0x000000000000000000000000000000000
 const expectedBootloaderHash = "0x010008e742608b21bf7eb23c1a9d0602047e3618b464c9b59c0fba3b3d7ab66e";
 const expectedDefaultAccountHash = "0x01000563374c277a2c1e34659a2a1e87371bb6d852ce142022d497bfb50b9e32";
 
-// const expectedGovernance = "0xbF4B985eACb623aAFd0B90D9F8C794fa8585edE9";
 const validatorOne = "0x0D3250c3D5FAcb74Ac15834096397a3Ef790ec99";
 const validatorTwo = "0x3527439923a63F8C13CF72b8Fe80a77f6e572092";
 
@@ -360,46 +359,6 @@ async function checkMailbox() {
   console.log("Mailbox is correct!");
 }
 
-// async function checkUpgradeHyperchainParams() {
-//   const artifact = await hardhat.artifacts.readArtifact("GettersFacet");
-//   const contract = new ethers.Contract(expectedHyperchainAddr, artifact.abi, l1Provider);
-
-//   // Note: there is no getters for chainId
-//   const setBridgehub = await contract.getBridgehub();
-//   if (setBridgehub != bridgeHub) {
-//     throw new Error("Bridgehub is not set in Era correctly");
-//   }
-//   const setStateTransitionManager = await contract.getStateTransitionManager();
-//   if (setStateTransitionManager != stm) {
-//     throw new Error("Bridgehub is not set in Era correctly");
-//   }
-//   const setBaseTokenBridge = await contract.getBaseTokenBridge();
-//   if (setBaseTokenBridge != sharedBridgeProxy) {
-//     throw new Error("Bridgehub is not set in Era correctly");
-//   }
-//   const setBaseToken = await contract.getBaseToken();
-//   if (setBaseToken != utils.ETH_ADDRESS_IN_CONTRACTS) {
-//     throw new Error("Bridgehub is not set in Era correctly");
-//   }
-//   const baseTokenGasPriceMultiplierNominator = await contract.baseTokenGasPriceMultiplierNominator();
-//   if (baseTokenGasPriceMultiplierNominator != 1) {
-//     throw new Error("baseTokenGasPriceMultiplierNominator is not set in Era correctly");
-//   }
-//   const baseTokenGasPriceMultiplierDenominator = await contract.baseTokenGasPriceMultiplierDenominator();
-//   if (baseTokenGasPriceMultiplierDenominator != 1) {
-//     throw new Error("baseTokenGasPriceMultiplierDenominator is not set in Era correctly");
-//   }
-//   const admin = await contract.getAdmin();
-//   if (admin != expectedGovernance) {
-//     throw new Error("admin is not set in Era correctly");
-//   }
-//   const validatorTimelockIsRegistered = await contract.isValidator(validatorTimelock);
-//   if (!validatorTimelockIsRegistered) {
-//     throw new Error("Bridgehub is not set in Era correctly");
-//   }
-//   console.log("Validator timelock and admin is set correctly in Era!");
-// }
-
 async function checkSTMImpl() {
   const artifact = await hardhat.artifacts.readArtifact("StateTransitionManager");
   const contract = new ethers.Contract(stmImpl, artifact.abi, l1Provider);
@@ -521,8 +480,6 @@ async function main() {
     await checkIdenticalBytecode(diamondInit, "DiamondInit");
 
     await checkMailbox();
-    // we can only check this after the diamond cut
-    // await checkUpgradeHyperchainParams();
 
     await checkProxyAdmin();
 

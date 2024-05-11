@@ -19,9 +19,11 @@ export async function compileYul(paths: CompilerPaths, file: string) {
 export async function compileYulFolder(path: string) {
   const paths = prepareCompilerPaths(path);
   const files: string[] = (await fs.promises.readdir(path)).filter((fn) => fn.endsWith(".yul"));
+  const promises: Promise<void>[] = [];
   for (const file of files) {
-    await compileYul(paths, `${file}`);
+    promises.push(compileYul(paths, `${file}`));
   }
+  await Promise.all(promises);
 }
 
 async function main() {
