@@ -16,8 +16,7 @@ contract L1ContractDeployer is Test {
     Bridgehub bridgeHub;
 
     address public sharedBridgeProxyAddress;
-    L1SharedBridge public sharedBridge; 
-
+    L1SharedBridge public sharedBridge;
 
     function deployL1Contracts() internal {
         DeployL1Script l1Script = new DeployL1Script();
@@ -29,6 +28,8 @@ contract L1ContractDeployer is Test {
 
         sharedBridgeProxyAddress = l1Script.getSharedBridgeProxyAddress();
         sharedBridge = L1SharedBridge(sharedBridgeProxyAddress);
+        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(1);
+        sharedBridge.setEraPostDiamondUpgradeFirstBatch(1);
     }
 
     function registerNewToken(address _tokenAddress) internal {
@@ -56,5 +57,20 @@ contract L1ContractDeployer is Test {
             .with_key(_chainId)
             .with_key(_token)
             .checked_write(_value);
+    }
+
+    function _setSharedBridgeIsWithdrawalFinalized(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2ToL1MessageNumber,
+        bool _isFinalized
+    ) internal {
+        stdstore
+            .target(address(sharedBridge))
+            .sig(sharedBridge.isWithdrawalFinalized.selector)
+            .with_key(_chainId)
+            .with_key(_l2BatchNumber)
+            .with_key(_l2ToL1MessageNumber)
+            .checked_write(_isFinalized);
     }
 }
