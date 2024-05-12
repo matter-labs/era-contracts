@@ -8,23 +8,17 @@ interface IL2SharedBridge {
         address indexed l1Sender,
         address indexed l2Receiver,
         address indexed l2Token,
-        uint256 amount
+        bytes32 assetDataHash
     );
 
     event WithdrawalInitiated(
         address indexed l2Sender,
         address indexed l1Receiver,
         address indexed l2Token,
-        uint256 amount
+        bytes32 assetDataHash
     );
 
-    function finalizeDeposit(
-        address _l1Sender,
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        bytes calldata _data
-    ) external;
+    function finalizeDeposit(address _l1Sender, address _l2Receiver, address _l1Token, bytes calldata _data) external;
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external;
 

@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
+import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
@@ -154,5 +155,7 @@ interface IL1SharedBridge {
 
     function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
 
-    function getAssetInfoFromLegacy(address l1TokenAddress) external view returns (bytes32);
+    function setAssetAddress(bytes32 _additionalData, address _assetAddress) external;
+
+    function nativeTokenVault() external view returns (IL1NativeTokenVault);
 }

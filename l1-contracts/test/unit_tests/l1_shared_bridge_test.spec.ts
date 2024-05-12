@@ -3,7 +3,14 @@ import { ethers, Wallet } from "ethers";
 import { Interface } from "ethers/lib/utils";
 import * as hardhat from "hardhat";
 import type { L1SharedBridge, Bridgehub, WETH9 } from "../../typechain";
-import { L1SharedBridgeFactory, BridgehubFactory, WETH9Factory, TestnetERC20TokenFactory } from "../../typechain";
+import {
+  L1SharedBridgeFactory,
+  BridgehubFactory,
+  WETH9Factory,
+  TestnetERC20TokenFactory,
+  L1NativeTokenVault,
+} from "../../typechain";
+import { L1NativeTokenVaultFactory } from "../../typechain/L1NativeTokenVaultFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
 import { ADDRESS_ONE, ethTestConfig } from "../../src.ts/utils";
@@ -18,6 +25,7 @@ describe("Shared Bridge tests", () => {
   let deployWallet: Wallet;
   let deployer: Deployer;
   let bridgehub: Bridgehub;
+  let l1NativeTokenVault: L1NativeTokenVault;
   let l1SharedBridge: L1SharedBridge;
   let l1SharedBridgeInterface: Interface;
   let l1Weth: WETH9;
@@ -55,6 +63,10 @@ describe("Shared Bridge tests", () => {
     l1SharedBridge = L1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
     l1SharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
+    l1NativeTokenVault = L1NativeTokenVaultFactory.connect(
+      deployer.addresses.Bridges.NativeTokenVaultProxy,
+      deployWallet
+    );
 
     const tokens = getTokens();
     const l1WethTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
@@ -91,8 +103,12 @@ describe("Shared Bridge tests", () => {
           secondBridgeAddress: l1SharedBridge.address,
           secondBridgeValue: 0,
           secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
-            ["address", "uint256", "address"],
-            [erc20TestToken.address, 0, await randomSigner.getAddress()]
+            ["bytes32", "bytes", "address"],
+            [
+              await l1NativeTokenVault.getAssetInfoFromLegacy(erc20TestToken.address),
+              new ethers.utils.AbiCoder().encode(["uint256"], [0]),
+              await randomSigner.getAddress(),
+            ]
           ),
         },
         { value: mintValue }
@@ -104,9 +120,15 @@ describe("Shared Bridge tests", () => {
   it("Should deposit successfully", async () => {
     const amount = ethers.utils.parseEther("1");
     const mintValue = ethers.utils.parseEther("2");
-    await l1Weth.connect(randomSigner).deposit({ value: amount });
-    await (await l1Weth.connect(randomSigner).approve(l1SharedBridge.address, amount)).wait();
-    bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
+
+    await erc20TestToken.connect(randomSigner).mint(await randomSigner.getAddress(), amount.mul(10));
+
+    const balanceBefore = await erc20TestToken.balanceOf(await randomSigner.getAddress());
+    const balanceNTVBefore = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
+
+    const assetInfo = await l1NativeTokenVault.getAssetInfoFromLegacy(erc20TestToken.address);
+    await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, amount.mul(10))).wait();
+    await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
       {
         chainId,
         mintValue,
@@ -117,12 +139,20 @@ describe("Shared Bridge tests", () => {
         secondBridgeAddress: l1SharedBridge.address,
         secondBridgeValue: 0,
         secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
-          ["address", "uint256", "address"],
-          [l1Weth.address, amount, await randomSigner.getAddress()]
+          ["bytes32", "bytes", "address"],
+          [
+            await l1NativeTokenVault.getAssetInfoFromLegacy(erc20TestToken.address),
+            new ethers.utils.AbiCoder().encode(["uint256"], [amount]),
+            await randomSigner.getAddress(),
+          ]
         ),
       },
       { value: mintValue }
     );
+    const balanceAfter = await erc20TestToken.balanceOf(await randomSigner.getAddress());
+    expect(balanceAfter).equal(balanceBefore.sub(amount));
+    const balanceNTVAfter = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
+    expect(balanceNTVAfter).equal(balanceNTVBefore.add(amount));
   });
 
   it("Should revert on finalizing a withdrawal with short message length", async () => {
@@ -158,9 +188,13 @@ describe("Shared Bridge tests", () => {
   it("Should deposit erc20 token successfully", async () => {
     const amount = ethers.utils.parseEther("0.001");
     const mintValue = ethers.utils.parseEther("0.002");
-    await l1Weth.connect(randomSigner).deposit({ value: amount });
-    await (await l1Weth.connect(randomSigner).approve(l1SharedBridge.address, amount)).wait();
-    bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
+    await erc20TestToken.connect(randomSigner).mint(await randomSigner.getAddress(), amount.mul(10));
+    await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, amount.mul(10))).wait();
+
+    const balanceBefore = await erc20TestToken.balanceOf(await randomSigner.getAddress());
+    const balanceNTVBefore = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
+
+    await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
       {
         chainId,
         mintValue,
@@ -171,12 +205,20 @@ describe("Shared Bridge tests", () => {
         secondBridgeAddress: l1SharedBridge.address,
         secondBridgeValue: 0,
         secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
-          ["address", "uint256", "address"],
-          [l1Weth.address, amount, await randomSigner.getAddress()]
+          ["bytes32", "bytes", "address"],
+          [
+            await l1NativeTokenVault.getAssetInfoFromLegacy(erc20TestToken.address),
+            new ethers.utils.AbiCoder().encode(["uint256"], [amount]),
+            await randomSigner.getAddress(),
+          ]
         ),
       },
       { value: mintValue }
     );
+    const balanceAfter = await erc20TestToken.balanceOf(await randomSigner.getAddress());
+    expect(balanceAfter).equal(balanceBefore.sub(amount));
+    const balanceNTVAfter = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
+    expect(balanceNTVAfter).equal(balanceNTVBefore.add(amount));
   });
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {

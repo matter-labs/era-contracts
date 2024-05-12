@@ -52,10 +52,12 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
         l1Address = _l1Address;
 
         l2Bridge = msg.sender;
+        // We parse the data exactly as they were created on the L1 Native Token Vault
+        (uint256 _amount, bytes memory data) = abi.decode(_data, (uint256, bytes));
 
-        // We parse the data exactly as they were created on the L1 bridge
+        // We parse the data exactly as they were created on the L1 bridge getERC20Getters
         (bytes memory nameBytes, bytes memory symbolBytes, bytes memory decimalsBytes) = abi.decode(
-            _data,
+            data,
             (bytes, bytes, bytes)
         );
 
@@ -142,7 +144,9 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     /// @param _to The account that will receive the created tokens.
     /// @param _amount The amount that will be created.
     /// @notice Should be called by bridge after depositing tokens from L1.
-    function bridgeMint(address _to, uint256 _amount) external override onlyBridge {
+    function bridgeMint(address _to, bytes calldata _data) external override onlyBridge {
+        // We parse the data exactly as they were created on the L1 Native Token Vault
+        (uint256 _amount, ) = abi.decode(_data, (uint256, bytes));
         _mint(_to, _amount);
         emit BridgeMint(_to, _amount);
     }

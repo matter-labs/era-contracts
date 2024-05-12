@@ -252,6 +252,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         // We do not need to perform any additional actions, since no changes related to the chain commitment can be performed
         // while the chain is in the "migrated" state.
+
     }
 
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId

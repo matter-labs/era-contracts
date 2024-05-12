@@ -28,10 +28,12 @@ import {
   hashL2Bytecode,
   DIAMOND_CUT_DATA_ABI_STRING,
   ethersWalletToZkWallet,
+  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
 } from "./utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
+import { IL1NativeTokenVault } from "../typechain/IL1NativeTokenVault";
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 import { ProxyAdminFactory } from "../typechain/ProxyAdminFactory";
 
@@ -46,6 +48,7 @@ import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
 import { ERC20Factory, StateTransitionManagerFactory } from "../typechain";
 
 import { Wallet as ZkWallet } from "zksync-ethers";
+import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -294,7 +297,9 @@ export class Deployer {
 
     if (this.verbose) {
       console.log(
-        `Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}, tx hash ${rec.transactionHash}, expected address: ${proxyAdmin.address}`
+        `Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}, tx hash ${rec.transactionHash}, expected address: ${
+          proxyAdmin.address
+        }`
       );
       console.log(`CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR=${proxyAdmin.address}`);
     }
@@ -362,7 +367,7 @@ export class Deployer {
     const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
     const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
     const diamondCut = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
-    console.log("correct initial diamond cut", diamondCut);
+    // console.log("correct initial diamond cut", diamondCut);
     const protocolVersion = getNumberFromEnv("CONTRACTS_GENESIS_PROTOCOL_VERSION");
 
     const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
@@ -586,6 +591,54 @@ export class Deployer {
     this.addresses.Bridges.SharedBridgeProxy = contractAddress;
   }
 
+  public async deployNativeTokenVaultImplementation(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
+    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
+    const contractAddress = await this.deployViaCreate2(
+      "L1NativeTokenVault",
+      [this.addresses.Bridges.SharedBridgeProxy, eraChainId],
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`With era chain id ${eraChainId}`);
+      console.log(`CONTRACTS_L1_NATIVE_TOKEN_VAULT_BRIDGE_IMPL_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.Bridges.NativeTokenVaultImplementation = contractAddress;
+  }
+
+  public async deployNativeTokenVaultProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    const initCalldata = new Interface(hardhat.artifacts.readArtifactSync("L1NativeTokenVault").abi).encodeFunctionData(
+      "initialize",
+      [this.addresses.Governance]
+    );
+    const contractAddress = await this.deployViaCreate2(
+      "TransparentUpgradeableProxy",
+      [this.addresses.Bridges.NativeTokenVaultImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_L1_SHARED_BRIDGE_PROXY_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.Bridges.NativeTokenVaultProxy = contractAddress;
+
+    const sharedBridge = this.defaultSharedBridge(this.deployWallet);
+    const data = await sharedBridge.interface.encodeFunctionData("setNativeTokenVault", [
+      this.addresses.Bridges.NativeTokenVaultProxy,
+    ]);
+    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data);
+    if (this.verbose) {
+      console.log("Native token vault set in shared bridge");
+    }
+  }
+
   public async sharedBridgeSetEraPostUpgradeFirstBatch(ethTxOptions: ethers.providers.TransactionRequest) {
     const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
     const storageSwitch = getNumberFromEnv("CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH");
@@ -598,6 +651,7 @@ export class Deployer {
 
   public async registerSharedBridge(ethTxOptions: ethers.providers.TransactionRequest) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
+    const sharedBridge = this.defaultSharedBridge(this.deployWallet);
 
     /// registering ETH as a valid token, with address 1.
     const tx2 = await bridgehub.addToken(ADDRESS_ONE);
@@ -609,6 +663,28 @@ export class Deployer {
       console.log(
         `Shared bridge was registered, gas used: ${receipt3.gasUsed.toString()} and ${receipt2.gasUsed.toString()}`
       );
+    }
+
+    const tx4 = await sharedBridge.setAssetAddress(ethers.constants.HashZero, this.addresses.Bridgehub.BridgehubProxy);
+    const receipt4 = await tx4.wait();
+    this.addresses.ChainAssetInfo = ethers.utils.keccak256(
+      new ethers.utils.AbiCoder().encode(
+        ["tuple(address msgSender, bytes32 additionalData)"],
+        [{ msgSender: this.deployWallet.address, additionalData: ethers.constants.HashZero }]
+      )
+    );
+    if (this.verbose) {
+      console.log(`Chain asset was set in bridge, gas used: ${receipt4.gasUsed.toString()}`);
+      console.log(`CONTRACTS_CHAIN_ASSET_INFO=${this.addresses.ChainAssetInfo}`);
+    }
+  }
+  public async registerTokenInNativeTokenVault(token: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    const nativeTokenVault = this.nativeTokenVault(this.deployWallet);
+
+    const data = nativeTokenVault.interface.encodeFunctionData("registerToken", [token]);
+    await this.executeUpgrade(this.addresses.Bridges.NativeTokenVaultProxy, 0, data);
+    if (this.verbose) {
+      console.log("Native token vault registered with ETH");
     }
   }
 
@@ -695,6 +771,40 @@ export class Deployer {
     if (this.verbose) {
       console.log(`StateTransition System registered, gas used: ${receipt.gasUsed.toString()}`);
     }
+  }
+
+  public async registerSyncLayer() {
+    const stm = this.stateTransitionManagerContract(this.deployWallet);
+    const calldata = await stm.interface.encodeFunctionData("registerSyncLayer", [this.chainId, true]);
+    await this.executeUpgrade(this.addresses.StateTransition.StateTransitionProxy, 0, calldata);
+    if (this.verbose) {
+      console.log(`SyncLayer registered`);
+    }
+  }
+
+  public async moveChainToSyncLayer(synclayerChainId: number) {
+    const bridgehub = this.bridgehubContract(this.deployWallet);
+    const baseTokenAmount = ethers.utils.parseEther("1");
+
+    const calldata = await bridgehub.requestL2TransactionTwoBridges({
+      chainId: synclayerChainId,
+      mintValue: baseTokenAmount,
+      l2Value: 1,
+      l2GasLimit: 10000000,
+      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      refundRecipient: await this.deployWallet.getAddress(),
+      secondBridgeAddress: this.addresses.Bridgehub.BridgehubProxy,
+      secondBridgeValue: 0,
+      secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
+        ["bytes32", "bytes", "address"],
+
+        [
+          this.addresses.ChainAssetInfo,
+          new ethers.utils.AbiCoder().encode(["uint256"], [this.chainId]),
+          await this.deployWallet.getAddress(),
+        ]
+      ),
+    });
   }
 
   public async registerHyperchain(
@@ -819,7 +929,10 @@ export class Deployer {
 
     await this.deploySharedBridgeImplementation(create2Salt, { gasPrice, nonce: nonce });
     await this.deploySharedBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
-    await this.registerSharedBridge({ gasPrice, nonce: nonce + 2 });
+    await this.deployNativeTokenVaultImplementation(create2Salt, { gasPrice, nonce: nonce + 2 });
+    await this.deployNativeTokenVaultProxy(create2Salt, { gasPrice });
+    await this.registerSharedBridge({ gasPrice });
+    await this.registerTokenInNativeTokenVault(this.addresses.BaseToken, { gasPrice });
   }
 
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -921,6 +1034,10 @@ export class Deployer {
 
   public defaultSharedBridge(signerOrProvider: Signer | providers.Provider) {
     return L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, signerOrProvider);
+  }
+
+  public nativeTokenVault(signerOrProvider: Signer | providers.Provider) {
+    return IL1NativeTokenVaultFactory.connect(this.addresses.Bridges.NativeTokenVaultProxy, signerOrProvider);
   }
 
   public baseTokenContract(signerOrProvider: Signer | providers.Provider) {

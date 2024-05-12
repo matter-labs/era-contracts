@@ -4,11 +4,12 @@ import { ethers, Wallet } from "ethers";
 import { Interface } from "ethers/lib/utils";
 
 import type { TestnetERC20Token } from "../../typechain";
-import { TestnetERC20TokenFactory } from "../../typechain";
+import { L1NativeTokenVault, TestnetERC20TokenFactory } from "../../typechain";
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
 import type { IL1SharedBridge } from "../../typechain/IL1SharedBridge";
 import { IL1SharedBridgeFactory } from "../../typechain/IL1SharedBridgeFactory";
+import { L1NativeTokenVaultFactory } from "../../typechain/L1NativeTokenVaultFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
@@ -23,6 +24,7 @@ describe("Custom base token chain and bridge tests", () => {
   let deployWallet: Wallet;
   let deployer: Deployer;
   let l1SharedBridge: IL1SharedBridge;
+  let l1NativeTokenVault: L1NativeTokenVault;
   let bridgehub: IBridgehub;
   let baseToken: TestnetERC20Token;
   let baseTokenAddress: string;
@@ -62,6 +64,11 @@ describe("Custom base token chain and bridge tests", () => {
 
     // prepare the bridge
     l1SharedBridge = IL1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
+    l1NativeTokenVault = L1NativeTokenVaultFactory.connect(
+      deployer.addresses.Bridges.NativeTokenVaultProxy,
+      deployWallet
+    );
+    // await deployer.
   });
 
   it("Should have correct base token", async () => {
@@ -103,7 +110,7 @@ describe("Custom base token chain and bridge tests", () => {
   it("Should deposit base token successfully direct via bridgehub", async () => {
     await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), ethers.utils.parseUnits("800", 18));
     await (
-      await baseToken.connect(randomSigner).approve(l1SharedBridge.address, ethers.utils.parseUnits("800", 18))
+      await baseToken.connect(randomSigner).approve(l1NativeTokenVault.address, ethers.utils.parseUnits("800", 18))
     ).wait();
     await bridgehub.connect(randomSigner).requestL2TransactionDirect({
       chainId,
@@ -123,10 +130,10 @@ describe("Custom base token chain and bridge tests", () => {
     const baseTokenAmount = ethers.utils.parseUnits("800", 18);
 
     await altToken.connect(randomSigner).mint(await randomSigner.getAddress(), altTokenAmount);
-    await (await altToken.connect(randomSigner).approve(l1SharedBridge.address, altTokenAmount)).wait();
+    await (await altToken.connect(randomSigner).approve(l1NativeTokenVault.address, altTokenAmount)).wait();
 
     await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), baseTokenAmount);
-    await (await baseToken.connect(randomSigner).approve(l1SharedBridge.address, baseTokenAmount)).wait();
+    await (await baseToken.connect(randomSigner).approve(l1NativeTokenVault.address, baseTokenAmount)).wait();
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges({
       chainId,
       mintValue: baseTokenAmount,
@@ -137,8 +144,12 @@ describe("Custom base token chain and bridge tests", () => {
       secondBridgeAddress: l1SharedBridge.address,
       secondBridgeValue: 0,
       secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
-        ["address", "uint256", "address"],
-        [altTokenAddress, altTokenAmount, await randomSigner.getAddress()]
+        ["bytes32", "bytes", "address"],
+        [
+          await l1NativeTokenVault.getAssetInfoFromLegacy(altTokenAddress),
+          new ethers.utils.AbiCoder().encode(["uint256"], [altTokenAmount]),
+          await randomSigner.getAddress(),
+        ]
       ),
     });
   });

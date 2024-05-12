@@ -14,7 +14,10 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
-contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+import {IL1NativeTokenVault} from "../bridge/interfaces/IL1NativeTokenVault.sol";
+import {IL1StandardAsset} from "../bridge/interfaces/IL1StandardAsset.sol";
+
+contract Bridgehub is IBridgehub, IL1StandardAsset, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice all the ether is held by the weth bridge
     IL1SharedBridge public sharedBridge;
 
@@ -124,6 +127,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
     function setSharedBridge(address _sharedBridge) external onlyOwner {
         sharedBridge = IL1SharedBridge(_sharedBridge);
+        sharedBridge.setAssetAddress(bytes32(0), address(this));
     }
 
     /// @notice register new chain
@@ -241,7 +245,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             // slither-disable-next-line arbitrary-send-eth
             sharedBridge.bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
-                sharedBridge.getAssetInfoFromLegacy(token),
+                // bytes32(uint256(uint160(token))),
+                IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetInfoFromLegacy(token),
                 msg.sender,
                 _request.mintValue - msg.value // for eth we are setting this field to 0
             );
@@ -292,7 +297,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             // slither-disable-next-line arbitrary-send-eth
             sharedBridge.bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
-                sharedBridge.getAssetInfoFromLegacy(token),
+                IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetInfoFromLegacy(token),
                 msg.sender,
                 _request.mintValue - baseTokenMsgValue // for eth we are setting this field to 0
             );
@@ -344,7 +349,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) external override {
         require(syncLayerMode, "Bridgehub: not in sync layer mode");
         address hyperchain = getHyperchain(_chainId);
-        IZkSyncHyperchain(hyperchain).requestL2TransactionOnSyncLayer(_chainId, _request);
+        IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(_request);
     }
 
     function registerCounterpart(uint256 _chainId, address _counterPart) external onlyOwner {
@@ -360,6 +365,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         whitelistedSyncLayers[_newSyncLayerChainId] = _isWhitelisted;
 
         // TODO: emit event
+
     }
 
     function finalizeMigrationToSyncLayer(
@@ -371,6 +377,25 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         HyperchainCommitment calldata _commitment,
         bytes calldata _diamondCut
     ) external {}
+
+    /// @dev we can move assets using these
+    function bridgeBurn(
+        uint256 _chainId,
+        uint256 _mintValue,
+        bytes32 _tokenInfo,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external payable override returns (bytes memory _bridgeMintData) {}
+
+    function bridgeMint(address _account, uint256 _amount) external payable override {}
+
+    function bridgeClaimFailedBurn(
+        uint256 _chainId,
+        uint256 _mintValue,
+        bytes32 _tokenInfo,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external payable override {}
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE

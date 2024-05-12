@@ -82,10 +82,10 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         address _l1Sender,
         address _l2Receiver,
         address _l1Token,
-        uint256 _amount,
         bytes calldata _data
     ) external override {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
+
         require(
             AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
                 AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1LegacyBridge,
@@ -102,8 +102,8 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
             require(currentL1Token == _l1Token, "gg"); // Double check that the expected value equal to real one
         }
 
-        IL2StandardToken(expectedL2Token).bridgeMint(_l2Receiver, _amount);
-        emit FinalizeDeposit(_l1Sender, _l2Receiver, expectedL2Token, _amount);
+        IL2StandardToken(expectedL2Token).bridgeMint(_l2Receiver, _data);
+        emit FinalizeDeposit(_l1Sender, _l2Receiver, expectedL2Token, keccak256(_data));
     }
 
     /// @dev Deploy and initialize the L2 token for the L1 counterpart
@@ -121,10 +121,10 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @param _l1Receiver The account address that should receive funds on L1
     /// @param _l2Token The L2 token address which is withdrawn
     /// @param _amount The total amount of tokens to be withdrawn
-    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external override {
+    function withdraw(address _l1Receiver, bytes32 _assetInfo, uint256 _amount) external override {
         require(_amount > 0, "Amount cannot be zero");
 
-        IL2StandardToken(_l2Token).bridgeBurn(msg.sender, _amount);
+        IL2StandardToken(_l2Token).bridgeBurn(L1_CHAIN_ID, 0, msg.sender, _assetInfo, abi.encode(_amount));
 
         address l1Token = l1TokenAddress[_l2Token];
         require(l1Token != address(0), "yh");

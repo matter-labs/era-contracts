@@ -385,6 +385,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         BRIDGE_HUB.registerSyncLayer(_newSyncLayerChainId, _isWhitelisted);
 
         // TODO: emit event
+
     }
 
     function finalizeMigrationToSyncLayer(
@@ -396,40 +397,31 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         HyperchainCommitment calldata _commitment,
         bytes calldata _diamondCut
     ) external {
-        /// FIXME: adequate access rights
-
-        address currentAddress = getHyperchain(_chainId);
-
-        // We do not want to deal with inactive protocol versions during migration.
-        require(_expectedProtocolVersion == protocolVersion, "STM: not latest protocol version");
-
-        // Just in case
-        require(protocolVersionIsActive(_expectedProtocolVersion), "STM: protocolVersion not active");
-
-        if (currentAddress == address(0)) {
-            require(protocolVersion == _expectedProtocolVersion, "STM: protocolVersion mismatch");
-
-            // We set "migrated L2 initially" as it will be reset later on in the `finalizeMigration` call.
-            currentAddress = _deployNewChain(
-                _chainId,
-                _baseToken,
-                _sharedBridge,
-                _admin,
-                _diamondCut,
-                SyncLayerState.MigratedFromSL
-            );
-
-            // note that we do not need the genesis upgrade, it is expected that everything is already prepared on l2.
-        }
-
-        IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
-
-        uint256 currentProtocolVersion = hyperchain.getProtocolVersion();
-        // while it should be definitely the case when a chain is created, we double check just in case
-        require(currentProtocolVersion == _expectedProtocolVersion, "STM: protocolVersion mismatch");
-
-        // Now migrating the chain
-        hyperchain.finalizeMigration(_commitment);
+        // /// FIXME: adequate access rights
+        // address currentAddress = getHyperchain(_chainId);
+        // // We do not want to deal with inactive protocol versions during migration.
+        // require(_expectedProtocolVersion == protocolVersion, "STM: not latest protocol version");
+        // // Just in case
+        // require(protocolVersionIsActive(_expectedProtocolVersion), "STM: protocolVersion not active");
+        // if (currentAddress == address(0)) {
+        //     require(protocolVersion == _expectedProtocolVersion, "STM: protocolVersion mismatch");
+        //     // We set "migrated L2 initially" as it will be reset later on in the `finalizeMigration` call.
+        //     currentAddress = _deployNewChain(
+        //         _chainId,
+        //         _baseToken,
+        //         _sharedBridge,
+        //         _admin,
+        //         _diamondCut,
+        //         SyncLayerState.MigratedFromSL
+        //     );
+        //     // note that we do not need the genesis upgrade, it is expected that everything is already prepared on l2.
+        // }
+        // IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
+        // uint256 currentProtocolVersion = hyperchain.getProtocolVersion();
+        // // while it should be definitely the case when a chain is created, we double check just in case
+        // require(currentProtocolVersion == _expectedProtocolVersion, "STM: protocolVersion mismatch");
+        // // Now migrating the chain
+        // hyperchain.finalizeMigration(_commitment);
     }
 
     function finalizeMigrationFromSyncLayer(uint256 _chainId) external {
@@ -449,6 +441,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         //     _expectedProtocolVersion,
         //     commitment
         // );
+
     }
 
     function startMigrationToSyncLayer(
@@ -459,54 +452,41 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         bytes calldata _diamondCut
     ) external payable {
         // TODO: Maybe check l2 diamond cut here for failing fast?
-
-        require(_newSyncLayerAdmin != address(0), "STM: admin zero");
-
-        // TODO: add requirement for it to be a admin of the chain
-        require(BRIDGE_HUB.whitelistedSyncLayers(_syncLayerChainId), "sync layer not whitelisted");
-
-        // TODO: double check that get only returns when chain id is there.
-        IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
-
-        address chainBaseToken = hyperchain.getBaseToken();
-        uint256 currentProtocolVersion = hyperchain.getProtocolVersion();
-        require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
-
-        // FIXME: this will be removed once we support the migration of the priority queue also.
-        require(hyperchain.getPriorityQueueSize() == 0, "Migration is only allowed with empty priority queue");
-
-        HyperchainCommitment memory commitment = hyperchain.startMigrationToSyncLayer(_syncLayerChainId);
-
-        bytes memory migrationCalldata = abi.encodeCall(
-            IBridgehub.finalizeMigrationToSyncLayer,
-            (
-                _chainId,
-                chainBaseToken,
-                BRIDGE_HUB.bridgehubCounterParts(_syncLayerChainId),
-                _newSyncLayerAdmin,
-                currentProtocolVersion,
-                commitment,
-                _diamondCut
-            )
-        );
-
-        require(_request.chainId == _syncLayerChainId, "chain id incorrect");
-        // We assume that the sync layer always has eth as its base token.
-        require(_request.mintValue == msg.value, "Not enough value sent");
-
-        // It should be checked by the mailbox of the chain also, but just in case
-        require(_request.l2Value <= _request.mintValue, "L2 value too large");
-
-        _request.l2Calldata = migrationCalldata;
-
-        bytes32 canonicalHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(_request);
-
-        // lastMigrationTxHashes[_chainId] = canonicalHash;
-
-        hyperchain.storeMigrationHash(canonicalHash);
-        // lastMigratedCommitments[_chainId] = keccak256(abi.encode(commitment));
-        // Now, we need to send an L1->L2 tx to the sync layer blockchain to the spawn the chain on SL.
-        // We just send it via a normal L-Z
+        // require(_newSyncLayerAdmin != address(0), "STM: admin zero");
+        // // TODO: add requirement for it to be a admin of the chain
+        // require(BRIDGE_HUB.whitelistedSyncLayers(_syncLayerChainId), "sync layer not whitelisted");
+        // // TODO: double check that get only returns when chain id is there.
+        // IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
+        // address chainBaseToken = hyperchain.getBaseToken();
+        // uint256 currentProtocolVersion = hyperchain.getProtocolVersion();
+        // require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
+        // // FIXME: this will be removed once we support the migration of the priority queue also.
+        // require(hyperchain.getPriorityQueueSize() == 0, "Migration is only allowed with empty priority queue");
+        // HyperchainCommitment memory commitment = hyperchain.startMigrationToSyncLayer(_syncLayerChainId);
+        // bytes memory migrationCalldata = abi.encodeCall(
+        //     IBridgehub.finalizeMigrationToSyncLayer,
+        //     (
+        //         _chainId,
+        //         chainBaseToken,
+        //         BRIDGE_HUB.bridgehubCounterParts(_syncLayerChainId),
+        //         _newSyncLayerAdmin,
+        //         currentProtocolVersion,
+        //         commitment,
+        //         _diamondCut
+        //     )
+        // );
+        // require(_request.chainId == _syncLayerChainId, "chain id incorrect");
+        // // We assume that the sync layer always has eth as its base token.
+        // require(_request.mintValue == msg.value, "Not enough value sent");
+        // // It should be checked by the mailbox of the chain also, but just in case
+        // require(_request.l2Value <= _request.mintValue, "L2 value too large");
+        // _request.l2Calldata = migrationCalldata;
+        // bytes32 canonicalHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(_request);
+        // // lastMigrationTxHashes[_chainId] = canonicalHash;
+        // hyperchain.storeMigrationHash(canonicalHash);
+        // // lastMigratedCommitments[_chainId] = keccak256(abi.encode(commitment));
+        // // Now, we need to send an L1->L2 tx to the sync layer blockchain to the spawn the chain on SL.
+        // // We just send it via a normal L-Z
     }
 
     /// @dev This internal function is used to register a new hyperchain in the system.

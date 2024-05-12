@@ -10,4 +10,10 @@ import {IL1SharedBridge} from "./IL1SharedBridge.sol";
 /// @custom:security-contact security@matterlabs.dev
 interface IL1NativeTokenVault {
     function L1_SHARED_BRIDGE() external view returns (IL1SharedBridge);
+
+    function registerToken(address _l1Token) external;
+
+    function getAssetInfoFromLegacy(address l1TokenAddress) external view returns (bytes32);
+
+    function getAssetInfo(address l1TokenAddress) external view returns (bytes32);
 }
