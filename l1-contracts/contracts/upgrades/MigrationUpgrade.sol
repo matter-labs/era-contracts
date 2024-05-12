@@ -29,7 +29,7 @@ pragma solidity 0.8.24;
 //         // there should be batchesCommitted - batchesExecuted + 1 hashes.
 //         require(_commitment.batchHashes.length == batchesCommitted - batchesExecuted + 1, "Invalid number of batch hashes");
 
-//         // Note that this part is done in O(N), i.e. it is the reponsibility of the admin of the chain to ensure that the total number of
+//         // Note that this part is done in O(N), i.e. it is the responsibility of the admin of the chain to ensure that the total number of
 //         // outstanding committed batches is not too long.
 //         for(uint256 i = 0 ; i < _commitment.batchHashes.length; i++) {
 //             s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];

@@ -127,7 +127,7 @@ export class Deployer {
         baseToken: "0x0000000000000000000000000000000000004234",
         baseTokenBridge: "0x0000000000000000000000000000000000004234",
         storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
-        // The exact value is not important as it will be overriden by the STM
+        // The exact value is not important as it will be overridden by the STM
         syncLayerState: 0,
         verifier: this.addresses.StateTransition.Verifier,
         verifierParams,
@@ -481,20 +481,20 @@ export class Deployer {
     const data1 = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
       this.addresses.Bridges.ERC20BridgeProxy,
     ]);
-    const data2 = sharedBridge.interface.encodeFunctionData("setEraPostDiamondUpgradeFirstBatch", [
-      process.env.CONTRACTS_ERA_POST_DIAMOND_UPGRADE_FIRST_BATCH ?? 1,
-    ]);
-    const data3 = sharedBridge.interface.encodeFunctionData("setEraPostLegacyBridgeUpgradeFirstBatch", [
-      process.env.CONTRACTS_ERA_POST_LEGACY_BRIDGE_UPGRADE_FIRST_BATCH ?? 1,
-    ]);
-    const data4 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [
-      process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_BATCH ?? 1,
-      process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_TX_NUMBER ?? 0,
-    ]);
+    // const data2 = sharedBridge.interface.encodeFunctionData("setEraPostDiamondUpgradeFirstBatch", [
+    //   process.env.CONTRACTS_ERA_POST_DIAMOND_UPGRADE_FIRST_BATCH ?? 1,
+    // ]);
+    // const data3 = sharedBridge.interface.encodeFunctionData("setEraPostLegacyBridgeUpgradeFirstBatch", [
+    //   process.env.CONTRACTS_ERA_POST_LEGACY_BRIDGE_UPGRADE_FIRST_BATCH ?? 1,
+    // ]);
+    // const data4 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [
+    //   process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_BATCH ?? 1,
+    //   process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_TX_NUMBER ?? 0,
+    // ]);
     await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data1);
-    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data2);
-    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data3);
-    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data4);
+    // await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data2);
+    // await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data3);
+    // await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data4);
     if (this.verbose) {
       console.log("Shared bridge updated with ERC20Bridge address");
     }

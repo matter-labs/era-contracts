@@ -379,7 +379,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // Currently, we require that the sync layer is deployed by the same STM.
         address syncLayerAddress = hyperchainMap.get(_newSyncLayerChainId);
 
-        // TODO: Maybe `get` already ensured its existance.
+        // TODO: Maybe `get` already ensured its existence.
         require(syncLayerAddress != address(0), "STM: sync layer not registered");
 
         BRIDGE_HUB.registerSyncLayer(_newSyncLayerChainId, _isWhitelisted);
