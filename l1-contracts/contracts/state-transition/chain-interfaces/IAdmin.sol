@@ -82,6 +82,8 @@ interface IAdmin is IZkSyncHyperchainBase {
 
     function setChainIdUpgrade(address _genesisUpgrade) external;
 
+    function storeMigrationHash(bytes32 _migrationHash) external;
+
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
 

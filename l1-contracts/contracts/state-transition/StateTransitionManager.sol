@@ -31,7 +31,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /// @notice Address of the bridgehub
-    address public immutable BRIDGE_HUB;
+    IBridgehub public immutable BRIDGE_HUB;
 
     /// @notice The total number of hyperchains can be created/connected to this STM.
     /// This is the temporary security measure.
@@ -67,7 +67,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The address to accept the admin role
     address private pendingAdmin;
 
-    mapping(uint256 chainId => bytes32 lastMigrationTxHash) lastMigrationTxHashes;
+    // mapping(uint256 chainId => bytes32 lastMigrationTxHash) lastMigrationTxHashes;
     // mapping(uint256 chainId => bytes32 lastChainCommitment) lastMigratedCommitments;
 
     /// @dev Contract is expected to be used as proxy implementation.
@@ -362,7 +362,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             _sharedBridge,
             _admin,
             _diamondCut,
-            SyncLayerState.ActiveL1
+            SyncLayerState.ActiveOnL1
         );
 
         // set chainId in VM
@@ -382,7 +382,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // TODO: Maybe `get` already ensured its existance.
         require(syncLayerAddress != address(0), "STM: sync layer not registered");
 
-        IBridgehub(BRIDGE_HUB).registerSyncLayer(_newSyncLayerChainId, _isWhitelisted);
+        BRIDGE_HUB.registerSyncLayer(_newSyncLayerChainId, _isWhitelisted);
 
         // TODO: emit event
     }
@@ -416,7 +416,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
                 _sharedBridge,
                 _admin,
                 _diamondCut,
-                SyncLayerState.MigratedSL
+                SyncLayerState.MigratedFromSL
             );
 
             // note that we do not need the genesis upgrade, it is expected that everything is already prepared on l2.
@@ -451,17 +451,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // );
     }
 
-    // function _finalizeMigration(
-    //     uint256 _chainId,
-    //     address _baseToken,
-    //     address _sharedBridge,
-    //     address _admin,
-    //     uint256 _expectedProtocolVersion,
-    //     HyperchainCommitment calldata commitment
-    // ) {
-
-    // }
-
     function startMigrationToSyncLayer(
         uint256 _chainId,
         uint256 _syncLayerChainId,
@@ -493,7 +482,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             (
                 _chainId,
                 chainBaseToken,
-                IBridgehub(BRIDGE_HUB).bridgehubCounterParts(_syncLayerChainId),
+                BRIDGE_HUB.bridgehubCounterParts(_syncLayerChainId),
                 _newSyncLayerAdmin,
                 currentProtocolVersion,
                 commitment,
@@ -512,7 +501,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         bytes32 canonicalHash = IBridgehub(BRIDGE_HUB).requestL2TransactionDirect{value: msg.value}(_request);
 
-        lastMigrationTxHashes[_chainId] = canonicalHash;
+        // lastMigrationTxHashes[_chainId] = canonicalHash;
+
+        hyperchain.storeMigrationHash(canonicalHash);
         // lastMigratedCommitments[_chainId] = keccak256(abi.encode(commitment));
         // Now, we need to send an L1->L2 tx to the sync layer blockchain to the spawn the chain on SL.
         // We just send it via a normal L-Z

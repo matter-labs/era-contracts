@@ -139,10 +139,10 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function finalizeMigration(HyperchainCommitment memory _commitment) external onlyStateTransitionManager {
-        if (s.syncLayerState == SyncLayerState.MigratedL1) {
-            s.syncLayerState = SyncLayerState.ActiveL1;
-        } else if (s.syncLayerState == SyncLayerState.MigratedSL) {
-            s.syncLayerState = SyncLayerState.ActiveSL;
+        if (s.syncLayerState == SyncLayerState.MigratedFromL1) {
+            s.syncLayerState = SyncLayerState.ActiveOnL1;
+        } else if (s.syncLayerState == SyncLayerState.MigratedFromSL) {
+            s.syncLayerState = SyncLayerState.ActiveOnSL;
         } else {
             revert("Can not migrate when in active state");
         }
@@ -172,13 +172,22 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         emit MigrationComplete();
     }
 
+    // FI
+    // function becomeSyncLayer() external onlyStateTransitionManager {
+    //     require(s.syncLayerState == SyncLayerState.ActiveOnL1, "not active L1");
+    //     // TODO: possibly additional checks
+    //     s.syncLayerState = SyncLayerState.SyncLayerL1;
+    // }
+
     function startMigrationToSyncLayer(
         uint256 _syncLayerChainId
     ) external onlyStateTransitionManager returns (HyperchainCommitment memory commitment) {
         // TODO: add a check that there are no outstanding upgrades.
 
-        require(s.syncLayerState == SyncLayerState.ActiveL1, "not active L1");
-        s.syncLayerState = SyncLayerState.MigratedL1;
+        // FIXME: uncomment
+        require(s.syncLayerState == SyncLayerState.ActiveOnL1, "not active L1");
+        s.syncLayerState = SyncLayerState.MigratedFromL1;
+
         s.syncLayerChainId = _syncLayerChainId;
 
         commitment.totalBatchesCommitted = s.totalBatchesCommitted;
@@ -208,6 +217,10 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         commitment.batchHashes = batchHashes;
     }
 
+    function storeMigrationHash(bytes32 _migrationHash) external onlyStateTransitionManager {
+        s.syncLayerMigrationHash = _migrationHash;
+    }
+
     function recoverFromFailedMigrationToSyncLayer(
         uint256 _syncLayerChainId,
         uint256 _l2BatchNumber,
@@ -215,7 +228,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external onlyAdmin {
-        require(s.syncLayerState == SyncLayerState.MigratedL1, "not migrated L1");
+        require(s.syncLayerState == SyncLayerState.MigratedFromL1, "not migrated L1");
 
         bytes32 migrationHash = s.syncLayerMigrationHash;
         require(migrationHash != bytes32(0), "can not recover when there is no migration");
@@ -233,7 +246,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
             "Migration not failed"
         );
 
-        s.syncLayerState = SyncLayerState.ActiveL1;
+        s.syncLayerState = SyncLayerState.ActiveOnL1;
         s.syncLayerChainId = 0;
         s.syncLayerMigrationHash = bytes32(0);
 

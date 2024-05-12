@@ -60,13 +60,15 @@ struct FeeParams {
 
 enum SyncLayerState {
     /// This is a hyperchain copy on L1, while the chain settles on L1
-    ActiveL1,
+    ActiveOnL1,
     /// This is a hyperchain copy on the synclayer, when the chain settles on synclayer
-    ActiveSL,
+    ActiveOnSL,
     /// This is a hyperchain copy on L1, while the chain settles on synclayer
-    MigratedL1,
+    MigratedFromL1,
     /// This is a hyperchain copy on the synclayer, while the chain settles on L1
-    MigratedSL
+    MigratedFromSL,
+    /// This is a hyperchain that serves as a synclayer itself.
+    SyncLayerL1
 }
 
 /// @dev storing all storage variables for hyperchain diamond facets
