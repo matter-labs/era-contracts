@@ -315,7 +315,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             );
         }
 
-        if (s.syncLayerState == SyncLayerState.MigratedL1) {
+        if (s.syncLayerState == SyncLayerState.MigratedFromL1) {
             canonicalTxHash = IMailbox(
                 IStateTransitionManager(s.stateTransitionManager).getHyperchain(s.syncLayerChainId)
             ).requestL2TransactionOnSyncLayer(s.chainId, _request);

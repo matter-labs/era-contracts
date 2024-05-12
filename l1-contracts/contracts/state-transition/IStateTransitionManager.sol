@@ -6,6 +6,8 @@ import {Diamond} from "./libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+
 /// @notice Struct that holds all data needed for initializing STM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
 /// @param owner The address who can manage non-critical updates in the contract
@@ -57,7 +59,7 @@ interface IStateTransitionManager {
     /// @notice new ProtocolVersion
     event NewProtocolVersion(uint256 indexed oldProtocolVersion, uint256 indexed newProtocolVersion);
 
-    function BRIDGE_HUB() external view returns (address);
+    function BRIDGE_HUB() external view returns (IBridgehub);
 
     function setPendingAdmin(address _newPendingAdmin) external;
 

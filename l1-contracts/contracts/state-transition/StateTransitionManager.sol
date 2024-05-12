@@ -72,14 +72,14 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(address _bridgehub, uint256 _maxNumberOfHyperchains) reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgehub, uint256 _maxNumberOfHyperchains) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
         MAX_NUMBER_OF_HYPERCHAINS = _maxNumberOfHyperchains;
     }
 
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
-        require(msg.sender == BRIDGE_HUB, "STM: only bridgehub");
+        require(msg.sender == address(BRIDGE_HUB), "STM: only bridgehub");
         _;
     }
 
@@ -313,7 +313,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         {
             mandatoryInitData = bytes.concat(
                 bytes32(_chainId),
-                bytes32(uint256(uint160(BRIDGE_HUB))),
+                bytes32(uint256(uint160(address(BRIDGE_HUB)))),
                 bytes32(uint256(uint160(address(this)))),
                 bytes32(uint256(protocolVersion)),
                 bytes32(uint256(uint160(_admin))),
@@ -463,7 +463,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         require(_newSyncLayerAdmin != address(0), "STM: admin zero");
 
         // TODO: add requiremenet for it to be a admin of the chain
-        require(IBridgehub(BRIDGE_HUB).whitelistedSyncLayers(_syncLayerChainId), "sync layer not whitelisted");
+        require(BRIDGE_HUB.whitelistedSyncLayers(_syncLayerChainId), "sync layer not whitelisted");
 
         // TODO: double check that get only returns when chain id is there.
         IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
@@ -499,7 +499,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         _request.l2Calldata = migrationCalldata;
 
-        bytes32 canonicalHash = IBridgehub(BRIDGE_HUB).requestL2TransactionDirect{value: msg.value}(_request);
+        bytes32 canonicalHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(_request);
 
         // lastMigrationTxHashes[_chainId] = canonicalHash;
 
