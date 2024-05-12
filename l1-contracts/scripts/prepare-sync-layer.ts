@@ -81,7 +81,7 @@ async function main() {
       }
 
       // On Sync Layer there is no bridgehub
-      const dummyAddress = '0x1000000000000000000000000000000000000001';
+      const dummyAddress = "0x1000000000000000000000000000000000000001";
       deployer.addresses.Bridgehub.BridgehubProxy = dummyAddress;
       deployer.addresses.Bridges.SharedBridgeProxy = dummyAddress;
 
@@ -314,15 +314,15 @@ async function main() {
 
       // Right now the new admin is the wallet itself.
       const adminWallet = cmd.privateKey
-      ? new ZkWallet(cmd.privateKey, syncLayerProvider)
-      : ZkWallet.fromMnemonic(
-          process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-          "m/44'/60'/0'/0/1"
-        ).connect(syncLayerProvider);
+        ? new ZkWallet(cmd.privateKey, syncLayerProvider)
+        : ZkWallet.fromMnemonic(
+            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+            "m/44'/60'/0'/0/1"
+          ).connect(syncLayerProvider);
 
       const operators = [
         process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR,
-        process.env.ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR
+        process.env.ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR,
       ];
 
       const deployer = new Deployer({
@@ -332,20 +332,17 @@ async function main() {
         verbose: true,
       });
 
-      console.log('Enablign validators');
+      console.log("Enablign validators");
 
       // FIXME: do it in cleaner way
       deployer.addresses.ValidatorTimeLock = getAddressFromEnv("SYNC_LAYER_VALIDATOR_TIMELOCK_ADDR");
       const timelock = deployer.validatorTimelock(deployer.deployWallet);
 
-      for(const operator of operators) {
-        await (await timelock.addValidator(
-          currentChainId,
-          operator
-        )).wait();
+      for (const operator of operators) {
+        await (await timelock.addValidator(currentChainId, operator)).wait();
       }
 
-      console.log('Success!');
+      console.log("Success!");
     });
 
   await program.parseAsync(process.argv);
