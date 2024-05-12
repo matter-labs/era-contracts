@@ -196,7 +196,7 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getSyncLayerState() external view returns (SyncLayerState) {
-        // TODO: consider making private so that noone relies on it
+        // TODO: consider making private so that no one relies on it
 
         return s.syncLayerState;
     }

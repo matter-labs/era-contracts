@@ -46,9 +46,17 @@ contract L1NativeTokenVault is
     mapping(bytes32 => address) public tokenAddress;
 
     /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridge(uint256 _chainId) {
+    modifier onlyBridge() {
         require(msg.sender == address(L1_SHARED_BRIDGE), "NTV not ShB");
         _;
+    }
+
+    /// @dev Contract is expected to be used as proxy implementation.
+    /// @dev Initialize the implementation to prevent Parity hack.
+    constructor(IL1SharedBridge _l1SharedBridge, uint256 _eraChainId) reentrancyGuardInitializer {
+        _disableInitializers();
+        ERA_CHAIN_ID = _eraChainId;
+        L1_SHARED_BRIDGE = _l1SharedBridge;
     }
 
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
@@ -58,7 +66,7 @@ contract L1NativeTokenVault is
         bytes32 _tokenInfo,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable virtual onlyBridge(_chainId) whenNotPaused returns (bytes memory _bridgeMintData) {
+    ) external payable virtual onlyBridge whenNotPaused returns (bytes memory _bridgeMintData) {
         uint256 _depositAmount = abi.decode(_data, (uint256));
 
         uint256 amount;

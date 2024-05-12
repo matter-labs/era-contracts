@@ -7,7 +7,6 @@ import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap
 import {StateTransitionManager} from "../../state-transition/StateTransitionManager.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
-
 /// @title DummyExecutor
 /// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
 contract DummyStateTransitionManagerWBH is StateTransitionManager {

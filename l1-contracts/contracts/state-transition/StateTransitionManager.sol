@@ -9,20 +9,20 @@ import {IBridgehub, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.so
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
 import {IAdmin} from "./chain-interfaces/IAdmin.sol";
-import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
+// import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager, StateTransitionManagerInitializeData} from "./IStateTransitionManager.sol";
-import {ISystemContext} from "./l2-deps/ISystemContext.sol";
+// import {ISystemContext} from "./l2-deps/ISystemContext.sol";
 import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
 import {FeeParams, SyncLayerState} from "./chain-deps/ZkSyncHyperchainStorage.sol";
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
-import {L2CanonicalTransaction, TxStatus} from "../common/Messaging.sol";
+// import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
+import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
+// import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT, HyperchainCommitment} from "../common/Config.sol";
-import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
+// import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
 
 /// @title State Transition Manager contract
 /// @author Matter Labs
@@ -462,7 +462,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         require(_newSyncLayerAdmin != address(0), "STM: admin zero");
 
-        // TODO: add requiremenet for it to be a admin of the chain
+        // TODO: add requirement for it to be a admin of the chain
         require(BRIDGE_HUB.whitelistedSyncLayers(_syncLayerChainId), "sync layer not whitelisted");
 
         // TODO: double check that get only returns when chain id is there.
