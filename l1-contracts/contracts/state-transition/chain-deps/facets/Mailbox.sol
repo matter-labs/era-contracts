@@ -240,8 +240,8 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         );
         IL1SharedBridge(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
+            bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))),
             msg.sender,
-            ETH_TOKEN_ADDRESS,
             msg.value
         );
     }
@@ -264,7 +264,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         uint256 _chainId,
         BridgehubL2TransactionRequest calldata _request
     ) external returns (bytes32 canonicalTxHash) {
-        require(IBridgehub(s.bridgehub).whitelistedSyncLayers(s.chainId), "Mailbox SL: not SL");
+        require(IBridgehub(s.bridgehub).whitelistedSyncLayers(block.chainid), "Mailbox SL: not on SL");
         require(
             IStateTransitionManager(s.stateTransitionManager).getHyperchain(_chainId) == msg.sender,
             "Mailbox SL: not hyperchain"

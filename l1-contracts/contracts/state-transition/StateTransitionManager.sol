@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "../bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";

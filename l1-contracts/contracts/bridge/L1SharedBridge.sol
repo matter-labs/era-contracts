@@ -12,6 +12,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
+import {IStandardToken} from "./interfaces/IStandardToken.sol";
 
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {L2Message, TxStatus} from "../common/Messaging.sol";
@@ -82,12 +83,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev Indicates whether the hyperbridging is enabled for a given chain.
     // slither-disable-next-line uninitialized-state
-    mapping(uint256 chainId => bool enabled) internal hyperbridgingEnabled;
+    mapping(uint256 chainId => bool enabled) public hyperbridgingEnabled;
 
-    /// @dev Maps token balances for each chain to prevent unauthorized spending across hyperchains.
-    /// This serves as a security measure until hyperbridging is implemented.
-    /// NOTE: this function may be removed in the future, don't rely on it!
-    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
+    /// @dev A mapping assetInfo => tokenAddress
+    mapping(bytes32 _assetInfo => address _assetAddress) public tokenAddress;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -139,67 +138,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         _transferOwnership(_owner);
     }
 
-    /// @dev This sets the first post diamond upgrade batch for era, used to check old eth withdrawals
-    /// @param _eraPostDiamondUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after diamond proxy upgrade.
-    function setEraPostDiamondUpgradeFirstBatch(uint256 _eraPostDiamondUpgradeFirstBatch) external onlyOwner {
-        require(eraPostDiamondUpgradeFirstBatch == 0, "ShB: eFPUB already set");
-        eraPostDiamondUpgradeFirstBatch = _eraPostDiamondUpgradeFirstBatch;
-    }
-
-    /// @dev This sets the first post upgrade batch for era, used to check old token withdrawals
-    /// @param _eraPostLegacyBridgeUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after legacy bridge upgrade.
-    function setEraPostLegacyBridgeUpgradeFirstBatch(uint256 _eraPostLegacyBridgeUpgradeFirstBatch) external onlyOwner {
-        require(eraPostLegacyBridgeUpgradeFirstBatch == 0, "ShB: eFPUB already set");
-        eraPostLegacyBridgeUpgradeFirstBatch = _eraPostLegacyBridgeUpgradeFirstBatch;
-    }
-
-    /// @dev This sets the first post upgrade batch for era, used to check old withdrawals
-    /// @param  _eraLegacyBridgeLastDepositBatch The the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge
-    /// @param _eraLegacyBridgeLastDepositTxNumber The tx number in the _eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge
-    function setEraLegacyBridgeLastDepositTime(
-        uint256 _eraLegacyBridgeLastDepositBatch,
-        uint256 _eraLegacyBridgeLastDepositTxNumber
-    ) external onlyOwner {
-        require(eraLegacyBridgeLastDepositBatch == 0, "ShB: eLOBDB already set");
-        require(eraLegacyBridgeLastDepositTxNumber == 0, "ShB: eLOBDTN already set");
-        eraLegacyBridgeLastDepositBatch = _eraLegacyBridgeLastDepositBatch;
-        eraLegacyBridgeLastDepositTxNumber = _eraLegacyBridgeLastDepositTxNumber;
-    }
-
-    /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process
-    function transferFundsFromLegacy(address _token, address _target, uint256 _targetChainId) external onlySelf {
-        if (_token == ETH_TOKEN_ADDRESS) {
-            uint256 balanceBefore = address(this).balance;
-            IMailbox(_target).transferEthToSharedBridge();
-            uint256 balanceAfter = address(this).balance;
-            require(balanceAfter > balanceBefore, "ShB: 0 eth transferred");
-            chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] =
-                chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] +
-                balanceAfter -
-                balanceBefore;
-        } else {
-            uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
-            uint256 legacyBridgeBalance = IERC20(_token).balanceOf(address(legacyBridge));
-            require(legacyBridgeBalance > 0, "ShB: 0 amount to transfer");
-            IL1ERC20Bridge(_target).transferTokenToSharedBridge(_token);
-            uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
-            require(balanceAfter - balanceBefore >= legacyBridgeBalance, "ShB: wrong amount transferred");
-            chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + legacyBridgeBalance;
-        }
-    }
-
-    /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process.
-    /// @dev Unlike `transferFundsFromLegacy` is provides a concrete limit on the gas used for the transfer and even if it will fail, it will not revert the whole transaction.
-    function safeTransferFundsFromLegacy(
-        address _token,
-        address _target,
-        uint256 _targetChainId,
-        uint256 _gasPerToken
-    ) external onlyOwner {
-        try this.transferFundsFromLegacy{gas: _gasPerToken}(_token, _target, _targetChainId) {} catch {
-            // A reasonable amount of gas will be provided to transfer the token.
-            // If the transfer fails, we don't want to revert the whole transaction.
-        }
+    /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
+    function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
+        require(address(legacyBridge) == address(0), "ShB: legacy bridge already set");
+        require(_legacyBridge != address(0), "ShB: legacy bridge 0");
+        legacyBridge = IL1ERC20Bridge(_legacyBridge);
     }
 
     function receiveEth(uint256 _chainId) external payable {
@@ -215,36 +158,20 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
     function bridgehubDepositBaseToken(
         uint256 _chainId,
+        bytes32 _assetInfo,
         address _prevMsgSender,
-        address _l1Token,
         uint256 _amount
     ) external payable virtual onlyBridgehubOrEra(_chainId) whenNotPaused {
-        if (_l1Token == ETH_TOKEN_ADDRESS) {
-            require(msg.value == _amount, "L1SharedBridge: msg.value not equal to amount");
-        } else {
-            // The Bridgehub also checks this, but we want to be sure
-            require(msg.value == 0, "ShB m.v > 0 b d.it");
+        address _l1Token = tokenAddress[_assetInfo];
+        IStandardToken(_l1Token).bridgeBurn{value: msg.value}(
+            _chainId,
+            _assetInfo,
+            _prevMsgSender,
+            abi.encode(_amount)
+        );
 
-            uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
-            require(amount == _amount, "3T"); // The token has non-standard transfer logic
-        }
-
-        if (!hyperbridgingEnabled[_chainId]) {
-            chainBalance[_chainId][_l1Token] += _amount;
-        }
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
         emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _l1Token, _amount);
-    }
-
-    /// @dev Transfers tokens from the depositor address to the smart contract address.
-    /// @return The difference between the contract balance before and after the transferring of funds.
-    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
-        uint256 balanceBefore = _token.balanceOf(address(this));
-        // slither-disable-next-line arbitrary-send-erc20
-        _token.safeTransferFrom(_from, address(this), _amount);
-        uint256 balanceAfter = _token.balanceOf(address(this));
-
-        return balanceAfter - balanceBefore;
     }
 
     /// @notice Initiates a deposit transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
@@ -264,34 +191,33 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     {
         require(l2BridgeAddress[_chainId] != address(0), "ShB l2 bridge not deployed");
 
-        (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
+        (bytes32 _assetInfo, bytes memory _tokenData, address _l2Receiver) = abi.decode(
             _data,
-            (address, uint256, address)
+            (bytes32, bytes, address)
         );
-        require(_l1Token != L1_WETH_TOKEN, "ShB: WETH deposit not supported");
-        require(BRIDGE_HUB.baseToken(_chainId) != _l1Token, "ShB: baseToken deposit not supported");
+        require(BRIDGE_HUB.baseToken(_chainId) != tokenAddress[_assetInfo], "ShB: baseToken deposit not supported");
+        bytes memory bridgeMintCalldata;
 
-        uint256 amount;
-        if (_l1Token == ETH_TOKEN_ADDRESS) {
-            amount = msg.value;
-            require(_depositAmount == 0, "ShB wrong withdraw amount");
-        } else {
-            require(msg.value == 0, "ShB m.v > 0 for BH d.it 2");
-            amount = _depositAmount;
-
-            uint256 withdrawAmount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _depositAmount);
-            require(withdrawAmount == _depositAmount, "5T"); // The token has non-standard transfer logic
+        {
+            address l1Token = tokenAddress[_assetInfo];
+            bridgeMintCalldata = IStandardToken(l1Token).bridgeBurn{value: msg.value}(
+                _chainId,
+                _assetInfo,
+                _prevMsgSender,
+                _tokenData
+            );
         }
-        require(amount != 0, "6T"); // empty deposit amount
 
-        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
-        if (!hyperbridgingEnabled[_chainId]) {
-            chainBalance[_chainId][_l1Token] += amount;
-        }
+        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _assetInfo, _tokenData));
 
         {
             // Request the finalization of the deposit on the L2 side
-            bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _l2Receiver, _l1Token, amount);
+            bytes memory l2TxCalldata = _getDepositL2Calldata(
+                _prevMsgSender,
+                _l2Receiver,
+                _assetInfo,
+                bridgeMintCalldata
+            );
 
             request = L2TransactionRequestTwoBridgesInner({
                 magicValue: TWO_BRIDGES_MAGIC_VALUE,
@@ -301,13 +227,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
                 txDataHash: txDataHash
             });
         }
+
+        address l1Token = tokenAddress[_assetInfo];
         emit BridgehubDepositInitiated({
             chainId: _chainId,
             txDataHash: txDataHash,
             from: _prevMsgSender,
             to: _l2Receiver,
-            l1Token: _l1Token,
-            amount: amount
+            l1Token: l1Token,
+            bridgeMintCalldataHash: keccak256(bridgeMintCalldata)
         });
     }
 
@@ -323,37 +251,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
-    /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
-    function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
-        require(address(legacyBridge) == address(0), "ShB: legacy bridge already set");
-        require(_legacyBridge != address(0), "ShB: legacy bridge 0");
-        legacyBridge = IL1ERC20Bridge(_legacyBridge);
-    }
-
     /// @dev Generate a calldata for calling the deposit finalization on the L2 bridge contract
     function _getDepositL2Calldata(
         address _l1Sender,
         address _l2Receiver,
-        address _l1Token,
-        uint256 _amount
+        bytes32 _assetInfo,
+        bytes memory _tokenData
     ) internal view returns (bytes memory) {
-        bytes memory gettersData = _getERC20Getters(_l1Token);
-        return abi.encodeCall(IL2Bridge.finalizeDeposit, (_l1Sender, _l2Receiver, _l1Token, _amount, gettersData));
-    }
-
-    /// @dev Receives and parses (name, symbol, decimals) from the token contract
-    function _getERC20Getters(address _token) internal view returns (bytes memory) {
-        if (_token == ETH_TOKEN_ADDRESS) {
-            bytes memory name = bytes("Ether");
-            bytes memory symbol = bytes("ETH");
-            bytes memory decimals = abi.encode(uint8(18));
-            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
-        }
-
-        (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
-        (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
-        (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
-        return abi.encode(data1, data2, data3);
+        return abi.encodeCall(IL2Bridge.finalizeDeposit, (_l1Sender, _l2Receiver, _assetInfo, _tokenData));
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2
@@ -435,11 +340,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             }
         }
 
-        if (!hyperbridgingEnabled[_chainId]) {
-            // check that the chain has sufficient balance
-            require(chainBalance[_chainId][_l1Token] >= _amount, "ShB n funds");
-            chainBalance[_chainId][_l1Token] -= _amount;
-        }
+        // if (!hyperbridgingEnabled[_chainId]) {
+        //     // check that the chain has sufficient balance
+        //     require(chainBalance[_chainId][_l1Token] >= _amount, "ShB n funds");
+        //     chainBalance[_chainId][_l1Token] -= _amount;
+        // }
 
         // Withdraw funds
         if (_l1Token == ETH_TOKEN_ADDRESS) {
@@ -566,11 +471,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         });
         (l1Receiver, l1Token, amount) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
 
-        if (!hyperbridgingEnabled[_chainId]) {
-            // Check that the chain has sufficient balance
-            require(chainBalance[_chainId][l1Token] >= amount, "ShB not enough funds 2"); // not enough funds
-            chainBalance[_chainId][l1Token] -= amount;
-        }
+        // if (!hyperbridgingEnabled[_chainId]) {
+        //     // Check that the chain has sufficient balance
+        //     require(chainBalance[_chainId][l1Token] >= amount, "ShB not enough funds 2"); // not enough funds
+        //     chainBalance[_chainId][l1Token] -= amount;
+        // }
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
@@ -695,12 +600,18 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(l2BridgeAddress[ERA_CHAIN_ID] != address(0), "ShB b. n dep");
         require(_l1Token != L1_WETH_TOKEN, "ShB: WETH deposit not supported 2");
 
-        // Note that funds have been transferred to this contract in the legacy ERC20 bridge.
-        if (!hyperbridgingEnabled[ERA_CHAIN_ID]) {
-            chainBalance[ERA_CHAIN_ID][_l1Token] += _amount;
-        }
+        // // Note that funds have been transferred to this contract in the legacy ERC20 bridge.
+        // if (!hyperbridgingEnabled[ERA_CHAIN_ID]) {
+        //     chainBalance[ERA_CHAIN_ID][_l1Token] += _amount;
+        // }
 
-        bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _l2Receiver, _l1Token, _amount);
+        bytes memory bridgeMintData = abi.encode(_amount); //todo
+        bytes memory l2TxCalldata = _getDepositL2Calldata(
+            _prevMsgSender,
+            _l2Receiver,
+            getAssetInfoFromLegacy(_l1Token),
+            bridgeMintData
+        );
 
         {
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
@@ -734,6 +645,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             l1Token: _l1Token,
             amount: _amount
         });
+    }
+
+    function getAssetInfoFromLegacy(address l1TokenAddress) public view override returns (bytes32) {
+        return keccak256(abi.encode(l1TokenAddress)); /// todo
     }
 
     /// @notice Finalizes the withdrawal for transactions initiated via the legacy ERC20 bridge.

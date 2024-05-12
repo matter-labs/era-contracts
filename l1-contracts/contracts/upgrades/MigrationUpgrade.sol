@@ -1,6 +1,6 @@
-// // SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 
-// pragma solidity 0.8.24;
+pragma solidity 0.8.24;
 
 // import {ZkSyncHyperchainBase} from "../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
 // import {Diamond} from "../state-transition/libraries/Diamond.sol";
@@ -24,12 +24,12 @@
 //         require(batchesExecuted <= batchesVerified, "Executed is not consistent with verified");
 //         require(batchesVerified <= batchesCommitted, "Verified is not consistent with committed");
 
-//         // In the worst case, we may need to revert all the committed batches that were not executed. 
-//         // This means that the stored batch hashes should be stored for [batchesExecuted; batchesCommitted] batches, i.e. 
+//         // In the worst case, we may need to revert all the committed batches that were not executed.
+//         // This means that the stored batch hashes should be stored for [batchesExecuted; batchesCommitted] batches, i.e.
 //         // there should be batchesCommitted - batchesExecuted + 1 hashes.
 //         require(_commitment.batchHashes.length == batchesCommitted - batchesExecuted + 1, "Invalid number of batch hashes");
 
-//         // Note that this part is done in O(N), i.e. it is the reponsibility of the admin of the chain to ensure that the total number of 
+//         // Note that this part is done in O(N), i.e. it is the reponsibility of the admin of the chain to ensure that the total number of
 //         // outstanding committed batches is not too long.
 //         for(uint256 i = 0 ; i < _commitment.batchHashes.length; i++) {
 //             s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];

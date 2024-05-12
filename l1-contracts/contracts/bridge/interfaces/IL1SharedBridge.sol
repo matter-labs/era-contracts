@@ -25,7 +25,7 @@ interface IL1SharedBridge {
         address indexed from,
         address to,
         address l1Token,
-        uint256 amount
+        bytes32 bridgeMintCalldataHash
     );
 
     event BridgehubDepositBaseTokenInitiated(
@@ -111,14 +111,14 @@ interface IL1SharedBridge {
         bytes32[] calldata _merkleProof
     ) external;
 
-    function setEraPostDiamondUpgradeFirstBatch(uint256 _eraPostDiamondUpgradeFirstBatch) external;
+    // function setEraPostDiamondUpgradeFirstBatch(uint256 _eraPostDiamondUpgradeFirstBatch) external;
 
-    function setEraPostLegacyBridgeUpgradeFirstBatch(uint256 _eraPostLegacyBridgeUpgradeFirstBatch) external;
+    // function setEraPostLegacyBridgeUpgradeFirstBatch(uint256 _eraPostLegacyBridgeUpgradeFirstBatch) external;
 
-    function setEraLegacyBridgeLastDepositTime(
-        uint256 _eraLegacyBridgeLastDepositBatch,
-        uint256 _eraLegacyBridgeLastDepositTxNumber
-    ) external;
+    // function setEraLegacyBridgeLastDepositTime(
+    //     uint256 _eraLegacyBridgeLastDepositBatch,
+    //     uint256 _eraLegacyBridgeLastDepositTxNumber
+    // ) external;
 
     function L1_WETH_TOKEN() external view returns (address);
 
@@ -143,12 +143,16 @@ interface IL1SharedBridge {
 
     function bridgehubDepositBaseToken(
         uint256 _chainId,
+        bytes32 _assetInfo,
         address _prevMsgSender,
-        address _l1Token,
         uint256 _amount
     ) external payable;
 
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 
     function receiveEth(uint256 _chainId) external payable;
+
+    function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
+
+    function getAssetInfoFromLegacy(address l1TokenAddress) external view returns (bytes32);
 }
