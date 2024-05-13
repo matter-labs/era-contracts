@@ -664,7 +664,11 @@ export class Deployer {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     const stateTransitionManager = this.stateTransitionManagerContract(this.deployWallet);
 
-    await this.registerStateTransitionManager(bridgehub);
+    const stateManagerIsRegistered = await bridgehub.stateTransitionManagerIsRegistered(stateTransitionManager.address);
+    if (!stateManagerIsRegistered) {
+      console.log("Register state transition manager");
+      await this.registerStateTransitionManager(bridgehub);
+    }
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
