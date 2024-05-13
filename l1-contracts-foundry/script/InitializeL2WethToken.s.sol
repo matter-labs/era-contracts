@@ -46,8 +46,8 @@ contract InitializeL2WethTokenScript is Script {
         string memory toml = vm.readFile(path);
 
         config.l1WethTokenAddr = toml.readAddress("$.l1_weth_token_addr");
-        config.l1WethTokenName = toml.readString("$.l1_weth_token_name");
-        config.l1WethTokenSymbol = toml.readString("$.l1_weth_token_symbol");
+        config.l1WethTokenName = "Wrapped Ether";
+        config.l1WethTokenSymbol = "WETH";
         config.create2FactoryAddr = toml.readAddress("$.create2_factory_addr");
         config.create2FactorySalt = toml.readBytes32("$.create2_factory_salt");
         config.eraChainId = toml.readUint("$.era_chain_id");
