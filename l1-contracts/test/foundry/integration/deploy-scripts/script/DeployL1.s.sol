@@ -10,6 +10,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
+import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {Verifier} from "contracts/state-transition/Verifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -96,6 +97,7 @@ contract DeployL1Script is Script {
         bytes32 recursionNodeLevelVkHash;
         bytes32 recursionLeafLevelVkHash;
         bytes32 recursionCircuitsSetVksHash;
+        string validatorImplementation;
         uint256 priorityTxMaxGasLimit;
         PubdataPricingMode diamondInitPubdataPricingMode;
         uint256 diamondInitBatchOverheadL1Gas;
@@ -197,6 +199,7 @@ contract DeployL1Script is Script {
         config.contracts.recursionNodeLevelVkHash = toml.readBytes32("$.contracts.recursion_node_level_vk_hash");
         config.contracts.recursionLeafLevelVkHash = toml.readBytes32("$.contracts.recursion_leaf_level_vk_hash");
         config.contracts.recursionCircuitsSetVksHash = toml.readBytes32("$.contracts.recursion_circuits_set_vks_hash");
+        config.contracts.validatorImplementation = toml.readString("$.contracts.verifier_implementation");
         config.contracts.priorityTxMaxGasLimit = toml.readUint("$.contracts.priority_tx_max_gas_limit");
         config.contracts.diamondInitPubdataPricingMode = PubdataPricingMode(
             toml.readUint("$.contracts.diamond_init_pubdata_pricing_mode")
@@ -251,7 +254,7 @@ contract DeployL1Script is Script {
     }
 
     function deployVerifier() internal {
-        address contractAddress = deployViaCreate2(type(Verifier).creationCode);
+        address contractAddress = deployViaCreate2(vm.getCode(config.contracts.validatorImplementation));
         console.log("Verifier deployed at:", contractAddress);
         addresses.stateTransition.verifier = contractAddress;
     }
