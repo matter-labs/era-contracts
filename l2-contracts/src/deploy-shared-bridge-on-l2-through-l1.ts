@@ -200,12 +200,15 @@ export async function deploySharedBridgeOnL2ThroughL1(
   deployer: Deployer,
   chainId: string,
   gasPrice: BigNumberish,
-  localLegacyBridgeTesting: boolean = false
+  localLegacyBridgeTesting: boolean,
+  skipInitializeChainGovernance: boolean
 ) {
   await publishL2SharedBridgeDependencyBytecodesOnL2(deployer, chainId, gasPrice);
   await deploySharedBridgeImplOnL2ThroughL1(deployer, chainId, gasPrice, localLegacyBridgeTesting);
   await deploySharedBridgeProxyOnL2ThroughL1(deployer, chainId, gasPrice, localLegacyBridgeTesting);
-  await initializeChainGovernance(deployer, chainId);
+  if (!skipInitializeChainGovernance) {
+    await initializeChainGovernance(deployer, chainId);
+  }
 }
 
 async function main() {
@@ -220,6 +223,7 @@ async function main() {
     .option("--gas-price <gas-price>")
     .option("--nonce <nonce>")
     .option("--erc20-bridge <erc20-bridge>")
+    .option("--skip-initialize-chain-governance <skip-initialize-chain-governance>")
     .action(async (cmd) => {
       const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
       const deployWallet = cmd.privateKey
@@ -244,7 +248,19 @@ async function main() {
         : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-      await deploySharedBridgeOnL2ThroughL1(deployer, chainId, gasPrice, cmd.localLegacyBridgeTesting);
+      const skipInitializeChainGovernance =
+        !!cmd.skipInitializeChainGovernance && cmd.skipInitializeChainGovernance === "true";
+      if (skipInitializeChainGovernance) {
+        console.log("Initialization of the chain governance will be skipped");
+      }
+
+      await deploySharedBridgeOnL2ThroughL1(
+        deployer,
+        chainId,
+        gasPrice,
+        cmd.localLegacyBridgeTesting,
+        skipInitializeChainGovernance
+      );
     });
 
   await program.parseAsync(process.argv);
