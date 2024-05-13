@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "../common/Config.sol";
-import {ProposedUpgrade, BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
+import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -14,7 +14,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
     function _setNewProtocolVersion(uint256 _newProtocolVersion) internal override {
         uint256 previousProtocolVersion = s.protocolVersion;
         require(
-            // Genesis Upgrade difference: Note this is the only thing change > to >=
+            // IMPORTANT Genesis Upgrade difference: Note this is the only thing change > to >=
             _newProtocolVersion >= previousProtocolVersion,
             "New protocol version is not greater than the current one"
         );
@@ -32,32 +32,5 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
 
         s.protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
-    }
-
-    /// @notice The main function that will be provided by the upgrade proxy
-    /// @dev This is a virtual function and should be overridden by custom upgrade implementations.
-    /// @param _proposedUpgrade The upgrade to be executed.
-    /// @return txHash The hash of the L2 system contract upgrade transaction.
-    function upgrade(ProposedUpgrade calldata _proposedUpgrade) public virtual override returns (bytes32 txHash) {
-        // Note that due to commitment delay, the timestamp of the L2 upgrade batch may be earlier than the timestamp
-        // of the L1 block at which the upgrade occurred. This means that using timestamp as a signifier of "upgraded"
-        // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade batches will be reduced
-        // as the permitted delay window is reduced in the future.
-        require(block.timestamp >= _proposedUpgrade.upgradeTimestamp, "Upgrade is not ready yet");
-
-        _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
-        _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
-        _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash);
-
-        txHash = _setL2SystemContractUpgrade(
-            _proposedUpgrade.l2ProtocolUpgradeTx,
-            _proposedUpgrade.factoryDeps,
-            _proposedUpgrade.newProtocolVersion
-        );
-
-        _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
-
-        emit UpgradeComplete(_proposedUpgrade.newProtocolVersion, txHash, _proposedUpgrade);
     }
 }

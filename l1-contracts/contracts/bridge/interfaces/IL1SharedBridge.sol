@@ -111,9 +111,18 @@ interface IL1SharedBridge {
         bytes32[] calldata _merkleProof
     ) external;
 
-    function l1WethAddress() external view returns (address);
+    function setEraPostDiamondUpgradeFirstBatch(uint256 _eraPostDiamondUpgradeFirstBatch) external;
 
-    function bridgehub() external view returns (IBridgehub);
+    function setEraPostLegacyBridgeUpgradeFirstBatch(uint256 _eraPostLegacyBridgeUpgradeFirstBatch) external;
+
+    function setEraLegacyBridgeLastDepositTime(
+        uint256 _eraLegacyBridgeLastDepositBatch,
+        uint256 _eraLegacyBridgeLastDepositTxNumber
+    ) external;
+
+    function L1_WETH_TOKEN() external view returns (address);
+
+    function BRIDGE_HUB() external view returns (IBridgehub);
 
     function legacyBridge() external view returns (IL1ERC20Bridge);
 

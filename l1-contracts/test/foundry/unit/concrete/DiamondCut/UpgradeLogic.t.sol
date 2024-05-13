@@ -119,12 +119,12 @@ contract UpgradeLogicTest is DiamondCutTest {
     function test_RevertWhen_EmergencyFreezeWhenUnauthorizedGovernor() public {
         vm.startPrank(randomSigner);
 
-        vm.expectRevert(abi.encodePacked("Hyperchain: Only by admin or state transition manager"));
+        vm.expectRevert(abi.encodePacked("Hyperchain: not state transition manager"));
         proxyAsAdmin.freezeDiamond();
     }
 
-    function test_RevertWhen_DoubleFreezingByGovernor() public {
-        vm.startPrank(admin);
+    function test_RevertWhen_DoubleFreezingBySTM() public {
+        vm.startPrank(stateTransitionManager);
 
         proxyAsAdmin.freezeDiamond();
 
@@ -133,7 +133,7 @@ contract UpgradeLogicTest is DiamondCutTest {
     }
 
     function test_RevertWhen_UnfreezingWhenNotFrozen() public {
-        vm.startPrank(admin);
+        vm.startPrank(stateTransitionManager);
 
         vm.expectRevert(abi.encodePacked("a7"));
         proxyAsAdmin.unfreezeDiamond();

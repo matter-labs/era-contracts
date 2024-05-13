@@ -42,9 +42,6 @@ contract ExperimentalBridgeTest is Test {
         // test if the ownership of the bridgeHub is set correctly or not
         address defaultOwner = bridgeHub.owner();
 
-        // The defaultOwner should be the same as this contract address, since this is the one deploying the bridgehub contract
-        assertEq(defaultOwner, address(this));
-
         // Now, the `reentrancyGuardInitializer` should prevent anyone from calling `initialize` since we have called the constructor of the contract
         vm.expectRevert(bytes("1B"));
         bridgeHub.initialize(bridgeOwner);
@@ -63,6 +60,7 @@ contract ExperimentalBridgeTest is Test {
         // The ownership can only be transferred by the current owner to a new owner via the two-step approach
 
         // Default owner calls transferOwnership
+        vm.prank(defaultOwner);
         bridgeHub.transferOwnership(bridgeOwner);
 
         // bridgeOwner calls acceptOwnership
@@ -357,6 +355,7 @@ contract ExperimentalBridgeTest is Test {
         }
 
         chainId = bound(chainId, 1, type(uint48).max);
+        vm.prank(mockSTM.owner());
         bytes memory _newChainInitData = _createNewChainInitData(
             isFreezable,
             mockSelectors,
@@ -367,7 +366,7 @@ contract ExperimentalBridgeTest is Test {
         // bridgeHub.createNewChain => stateTransitionManager.createNewChain => this function sets the stateTransition mapping
         // of `chainId`, let's emulate that using foundry cheatcodes or let's just use the extra function we introduced in our mockSTM
         mockSTM.setHyperchain(chainId, address(mockChainContract));
-        assertTrue(mockSTM.hyperchain(chainId) == address(mockChainContract));
+        assertTrue(mockSTM.getHyperchain(chainId) == address(mockChainContract));
 
         vm.startPrank(deployerAddress);
         vm.mockCall(

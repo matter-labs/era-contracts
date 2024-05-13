@@ -4,7 +4,8 @@ import * as hre from "hardhat";
 import { Command } from "commander";
 import { Wallet, ethers } from "ethers";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
-import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA, provider, ethTestConfig, priorityTxMaxGasLimit } from "./utils";
+import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA, provider, priorityTxMaxGasLimit } from "./utils";
+import { ethTestConfig } from "./deploy-shared-bridge-on-l2-through-l1";
 
 function getContractBytecode(contractName: string) {
   return hre.artifacts.readArtifactSync(contractName).bytecode;

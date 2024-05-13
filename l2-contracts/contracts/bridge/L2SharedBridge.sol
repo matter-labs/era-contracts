@@ -50,24 +50,24 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @param _aliasedOwner The address of the governor contract.
     function initialize(
         address _l1Bridge,
-        address _l1LegecyBridge,
+        address _l1LegacyBridge,
         bytes32 _l2TokenProxyBytecodeHash,
         address _aliasedOwner
     ) external reinitializer(2) {
         require(_l1Bridge != address(0), "bf");
         require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
         require(_aliasedOwner != address(0), "sf");
-        require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
 
         l1Bridge = _l1Bridge;
-        l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
 
         if (block.chainid != ERA_CHAIN_ID) {
             address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
             l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
+            l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
             l2TokenBeacon.transferOwnership(_aliasedOwner);
         } else {
-            require(_l1LegecyBridge != address(0), "bf2");
+            require(_l1LegacyBridge != address(0), "bf2");
+            l1LegacyBridge = _l1LegacyBridge;
             // l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
         }
     }

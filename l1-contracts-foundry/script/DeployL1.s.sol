@@ -97,7 +97,6 @@ contract DeployL1Script is Script {
         bytes32 recursionLeafLevelVkHash;
         bytes32 recursionCircuitsSetVksHash;
         uint256 priorityTxMaxGasLimit;
-        uint256 sharedBridgeUpgradeStorageSwitch;
         PubdataPricingMode diamondInitPubdataPricingMode;
         uint256 diamondInitBatchOverheadL1Gas;
         uint256 diamondInitMaxPubdataPerBatch;
@@ -106,6 +105,7 @@ contract DeployL1Script is Script {
         uint256 diamondInitMinimalL2GasPrice;
         address governanceSecurityCouncilAddress;
         uint256 governanceMinDelay;
+        uint256 maxNumberOfHyperchains;
     }
 
     struct TokensConfig {
@@ -166,6 +166,7 @@ contract DeployL1Script is Script {
             "$.contracts.governance_security_council_address"
         );
         config.contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
+        config.contracts.maxNumberOfHyperchains = toml.readUint("$.contracts.max_number_of_hyperchains");
         config.contracts.create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
         if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
             config.contracts.create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
@@ -181,9 +182,6 @@ contract DeployL1Script is Script {
         config.contracts.recursionLeafLevelVkHash = toml.readBytes32("$.contracts.recursion_leaf_level_vk_hash");
         config.contracts.recursionCircuitsSetVksHash = toml.readBytes32("$.contracts.recursion_circuits_set_vks_hash");
         config.contracts.priorityTxMaxGasLimit = toml.readUint("$.contracts.priority_tx_max_gas_limit");
-        config.contracts.sharedBridgeUpgradeStorageSwitch = toml.readUint(
-            "$.contracts.shared_bridge_upgrade_storage_switch"
-        );
         config.contracts.diamondInitPubdataPricingMode = PubdataPricingMode(
             toml.readUint("$.contracts.diamond_init_pubdata_pricing_mode")
         );
@@ -348,7 +346,8 @@ contract DeployL1Script is Script {
     function deployStateTransitionManagerImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(StateTransitionManager).creationCode,
-            abi.encode(addresses.bridgehub.bridgehubProxy)
+            abi.encode(addresses.bridgehub.bridgehubProxy),
+            abi.encode(config.contracts.maxNumberOfHyperchains)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("StateTransitionManagerImplementation deployed at:", contractAddress);
@@ -499,8 +498,7 @@ contract DeployL1Script is Script {
     }
 
     function deploySharedBridgeProxy() internal {
-        uint256 storageSwitch = config.contracts.sharedBridgeUpgradeStorageSwitch;
-        bytes memory initCalldata = abi.encodeCall(L1SharedBridge.initialize, (config.deployerAddress, storageSwitch));
+        bytes memory initCalldata = abi.encodeCall(L1SharedBridge.initialize, (config.deployerAddress));
         bytes memory bytecode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(addresses.bridges.sharedBridgeImplementation, addresses.transparentProxyAdmin, initCalldata)

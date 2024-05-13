@@ -210,7 +210,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev Call the hyperchain diamond contract with the same calldata as this contract was called.
     /// Note: it is called the hyperchain diamond contract, not delegatecalled!
     function _propagateToZkSyncHyperchain(uint256 _chainId) internal {
-        address contractAddress = stateTransitionManager.hyperchain(_chainId);
+        address contractAddress = stateTransitionManager.getHyperchain(_chainId);
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())

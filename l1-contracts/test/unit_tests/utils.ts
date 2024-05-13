@@ -11,14 +11,13 @@ import type { IMailbox } from "../../typechain/IMailbox";
 import type { ExecutorFacet } from "../../typechain";
 
 import type { FeeParams, L2CanonicalTransaction } from "../../src.ts/utils";
-import { ADDRESS_ONE, PubdataPricingMode } from "../../src.ts/utils";
+import { ADDRESS_ONE, PubdataPricingMode, EMPTY_STRING_KECCAK } from "../../src.ts/utils";
 
-export const CONTRACTS_LATEST_PROTOCOL_VERSION = (21).toString();
+export const CONTRACTS_GENESIS_PROTOCOL_VERSION = (21).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const IERC20_INTERFACE = require("@openzeppelin/contracts/build/contracts/IERC20");
 export const DEFAULT_REVERT_REASON = "VM did not revert";
 
-export const EMPTY_STRING_KECCAK = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
 export const DEFAULT_L2_LOGS_TREE_ROOT_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000";
 export const L2_SYSTEM_CONTEXT_ADDRESS = "0x000000000000000000000000000000000000800b";
 export const L2_BOOTLOADER_ADDRESS = "0x0000000000000000000000000000000000008001";
@@ -75,7 +74,7 @@ export async function getCallRevertReason(promise) {
     try {
       await promise;
     } catch (e) {
-      // KL todo. The error messages are messed up. So we need all these cases.
+      // kl to do. The error messages are messed up. So we need all these cases.
       try {
         revertReason = e.reason.match(/reverted with reason string '([^']*)'/)?.[1] || e.reason;
         if (
@@ -381,7 +380,7 @@ export async function depositERC20(
   const neededValue = await bridgehubContract.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
   const ethIsBaseToken = (await bridgehubContract.baseToken(chainId)) == ADDRESS_ONE;
 
-  await bridge["deposit(address,address,uint256,uint256,uint256,address)"](
+  const deposit = await bridge["deposit(address,address,uint256,uint256,uint256,address)"](
     l2Receiver,
     l1Token,
     amount,
@@ -392,6 +391,7 @@ export async function depositERC20(
       value: ethIsBaseToken ? neededValue : 0,
     }
   );
+  await deposit.wait();
 }
 
 export function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>): L2CanonicalTransaction {
