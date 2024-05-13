@@ -346,3 +346,41 @@ export async function transferTokens(deployer: Deployer, token: string) {
   await tx.wait();
   console.log("Receipt", tx.hash);
 }
+
+export async function upgradeProverFix(deployer: Deployer, create2Salt: string, gasPrice: BigNumberish) {
+  await deployer.deployVerifier(create2Salt, { gasPrice });
+  await deployer.deployExecutorFacet(create2Salt, { gasPrice });
+  // await deployer.deployDefaultUpgrade(create2Salt, { gasPrice });  // Not needed on mainnet
+}
+
+export async function setInitialCutHash(deployer: Deployer) {
+  const diamondCut = await deployer.initialZkSyncHyperchainDiamondCut([]);
+  const calldata = deployer
+    .stateTransitionManagerContract(deployer.deployWallet)
+    .interface.encodeFunctionData("setInitialCutHash", [diamondCut]);
+  await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, calldata, "true");
+}
+
+export async function transferTokensOnForkedNetwork(deployer: Deployer) {
+  // const startToken = 20;
+  // const tokens = tokenList.slice(startToken);
+  // console.log(`From ${startToken}`, tokens);
+  // for (const tokenAddress of tokenList) {
+  //   const erc20contract = IERC20Factory.connect(tokenAddress, provider);
+  //   console.log(`Migrating token ${tokenAddress}`);
+  //   console.log(
+  //     `Balance before: ${await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
+  //   );
+  //   await transferTokens(deployer, tokenAddress);
+  //   console.log(
+  //     `Balance after: ${await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
+  //   );
+  // }
+  // console.log("From 0", tokenList);
+  // for (const tokenAddress of tokenList) {
+  //   const erc20contract = IERC20Factory.connect(tokenAddress, provider);
+  //   if (!(await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)).eq(0)) {
+  //     console.log(`Failed to transfer all tokens ${tokenAddress}`);
+  //   }
+  // }
+}

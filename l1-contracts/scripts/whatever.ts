@@ -8,7 +8,7 @@ import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, GAS_MULTIPLIER } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import { ethTestConfig } from "../src.ts/utils";
-import { transferTokens } from "../src.ts/hyperchain-upgrade";
+import { setInitialCutHash, upgradeProverFix } from "../src.ts/hyperchain-upgrade";
 import { IERC20Factory } from "../typechain/IERC20Factory";
 
 const provider = web3Provider();
@@ -49,34 +49,19 @@ async function main() {
       const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
       console.log(`Using nonce: ${nonce}`);
 
+      const create2Salt = cmd.create2Salt
+        ? cmd.create2Salt
+        : "0x0000000000000000000000000000000000000000000000000000000000000000";
+
       const deployer = new Deployer({
         deployWallet,
         addresses: deployedAddressesFromEnv(),
         ownerAddress,
         verbose: true,
       });
-      const startToken = 20;
-      const tokens = tokenList.slice(startToken);
-      console.log(`From ${startToken}`, tokens);
-      for (const tokenAddress of tokenList) {
-        const erc20contract = IERC20Factory.connect(tokenAddress, provider);
-        console.log(`Migrating token ${tokenAddress}`);
-        console.log(
-          `Balance before: ${await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
-        );
-        await transferTokens(deployer, tokenAddress);
-        console.log(
-          `Balance after: ${await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
-        );
-      }
 
-      // console.log("From 0", tokenList);
-      // for (const tokenAddress of tokenList) {
-      //   const erc20contract = IERC20Factory.connect(tokenAddress, provider);
-      //   if (!(await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)).eq(0)) {
-      //     console.log(`Failed to transfer all tokens ${tokenAddress}`);
-      //   }
-      // }
+      // await upgradeProverFix(deployer, create2Salt, gasPrice);
+      await setInitialCutHash(deployer);
     });
 
   await program.parseAsync(process.argv);

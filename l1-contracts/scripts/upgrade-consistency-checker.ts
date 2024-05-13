@@ -21,13 +21,13 @@ const validatorTimelockDeployTx = "0x420e0dddae4a1565fee430ecafa8f5ddbc3eebee266
 const validatorTimelock = "0xc2d7a7Bd59a548249e64C1a587220c0E4F6F439E";
 const upgradeHyperchains = "0xb2963DDc6694a989B527AED0B1E19f9F0675AE4d";
 
-const verifier = "0x9D6c59D9A234F585B367b4ba3C62e5Ec7A6179FD";
+const verifier = "0x353Ac6bB8d608B607f0443f033e2A89aDa16bcb0";
 const proxyAdmin = "0xf2c1d17441074FFb18E9A918db81A17dB1752146";
 
 const bridgeHubImpl = "0xF9D2E98Ed518eC6Daac0579a9707d83da55D5f89";
 const bridgeHub = "0x5B5c82f4Da996e118B127880492a23391376F65c";
 
-const executorFacet = "0x1a451d9bFBd176321966e9bc540596Ca9d39B4B1";
+const executorFacet = "0x63f4c229F261c2576E8B5A405321769c08134c73";
 const adminFacet = "0x342a09385E9BAD4AD32a6220765A6c333552e565";
 const mailboxFacetDeployTx = "0x2fa6af6e9317089be2734ffae73771c8099382d390d4edbb6c35e2db7f73b152";
 const mailboxFacet = "0x7814399116C17F2750Ca99cBFD2b75bA9a0793d7";
@@ -315,7 +315,7 @@ async function checkBridgehub() {
 
   const owner = await contract.owner();
   if (owner.toLowerCase() != expectedOwner.toLowerCase()) {
-    throw new Error("ValidatorTimelock owner is not correct");
+    throw new Error("Bridgehub owner is not correct");
   }
 
   const baseToken = await contract.baseToken(eraChainId);

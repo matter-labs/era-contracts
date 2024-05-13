@@ -20,6 +20,7 @@ function verifyPromise(address: string, constructorArguments?: Array<any>, libra
         address,
         constructorArguments,
         libraries,
+        // contract:"contracts/bridge/L1ERC20Bridge.sol:L1ERC20Bridge"
       })
       .then(() => resolve(`Successfully verified ${address}`))
       .catch((e) => reject(`Failed to verify ${address}\nError: ${e.message}`));
@@ -75,7 +76,7 @@ async function main() {
   // promises.push(promise2);
 
   // console.log("CONTRACTS_HYPERCHAIN_UPGRADE_ADDR", process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR);
-  // const promise3 = verifyPromise(process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR);
+  // const promise3 = verifyPromise(process.env.CONTRACTS_DEFAULT_UPGRADE_ADDR);
   // promises.push(promise3);
 
   // const promise5 = verifyPromise(addresses.TransparentProxyAdmin);
