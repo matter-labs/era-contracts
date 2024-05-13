@@ -185,45 +185,19 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
 
     // handle event emited from logs and decodes it properly
     function handleRequestByMockL2Contract(NewPriorityRequest memory request) internal {
-        address payable contractAddress = payable(address(uint160(uint256(request.transaction.to))));
-        address someMockAddress = makeAddr("mocked");
-
-        address tokenAddress;
-        address receiver;
-        uint256 toSend;
-        address l1Sender;
-
-        uint256 requestLength = request.transaction.data.length;
-        bytes memory temp;
-
-        if (requestLength > 96) {
-            (l1Sender, receiver, tokenAddress, toSend, temp) = getDecodedDepositL2Calldata(request.transaction.data);
-        } else {
-            (tokenAddress, toSend, receiver) = abi.decode(request.transaction.data, (address, uint256, address));
-        }
-
-        assertEq(contractAddress, receiver);
-
-        uint256 balanceAfter = 0;
+        address contractAddress = address(uint160(uint256(request.transaction.to)));
+        uint256 toSend = request.transaction.value;
+        address tokenAddress = abi.decode(request.transaction.data, (address));
+        uint256 balanceAfter;
 
         if (tokenAddress == ETH_TOKEN_ADDRESS) {
-            vm.deal(someMockAddress, toSend);
-
-            vm.startPrank(someMockAddress);
-            bool sent = contractAddress.send(toSend);
-            vm.stopPrank();
-            assertEq(sent, true);
+            uint256 balanceBefore = contractAddress.balance;
+            vm.deal(contractAddress, toSend + balanceBefore);
 
             balanceAfter = contractAddress.balance;
         } else {
             TestnetERC20Token token = TestnetERC20Token(tokenAddress);
-            token.mint(someMockAddress, toSend);
-
-            vm.startPrank(someMockAddress);
-            token.approve(someMockAddress, toSend);
-            bool sent = token.transferFrom(someMockAddress, contractAddress, toSend);
-            vm.stopPrank();
-            assertEq(sent, true);
+            token.mint(contractAddress, toSend);
 
             balanceAfter = token.balanceOf(contractAddress);
         }
@@ -495,20 +469,17 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         l2ValuesSum[currentTokenAddress] += l2Value;
     }
 
-    function withdraw(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {
+    function withdrawERC20Token(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {
         uint256 l2BatchNumber = uint256(uint160(makeAddr("l2BatchNumber")));
         uint256 l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
         uint16 l2TxNumberInBatch = uint16(uint160(makeAddr("l2TxNumberInBatch")));
         bytes32[] memory merkleProof = new bytes32[](1);
 
         _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
-        _setSharedBridgeChainBalance(
-            currentChainId,
-            currentTokenAddress,
-            currentToken.balanceOf(address(sharedBridge))
-        );
+        uint256 beforeChainBalance = sharedBridge.chainBalance(currentChainId, currentTokenAddress);
+        uint256 beforeBalance = currentToken.balanceOf(sharedBridgeProxyAddress);
 
-        if (currentToken.balanceOf(address(sharedBridge)) < amountToWithdraw) {
+        if (beforeChainBalance < amountToWithdraw) {
             vm.expectRevert("ShB not enough funds 2");
         } else {
             tokenSumWithdrawal[currentTokenAddress] += amountToWithdraw;
@@ -549,6 +520,71 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
             _message: message,
             _merkleProof: merkleProof
         });
+
+        // check if the balance was updated correctly
+        if (beforeChainBalance > amountToWithdraw) {
+            assertEq(
+                beforeChainBalance - sharedBridge.chainBalance(currentChainId, currentTokenAddress),
+                amountToWithdraw
+            );
+            assertEq(beforeBalance - currentToken.balanceOf(sharedBridgeProxyAddress), amountToWithdraw);
+        }
+    }
+
+    function withdrawETHToken(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {
+        uint256 l2BatchNumber = uint256(uint160(makeAddr("l2BatchNumber")));
+        uint256 l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
+        uint16 l2TxNumberInBatch = uint16(uint160(makeAddr("l2TxNumberInBatch")));
+        bytes32[] memory merkleProof = new bytes32[](1);
+
+        _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
+        uint256 beforeChainBalance = sharedBridge.chainBalance(currentChainId, currentTokenAddress);
+        uint256 beforeBalance = sharedBridgeProxyAddress.balance;
+
+        if (beforeChainBalance < amountToWithdraw) {
+            vm.expectRevert("ShB not enough funds 2");
+        } else {
+            tokenSumWithdrawal[currentTokenAddress] += amountToWithdraw;
+        }
+
+        bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, currentUser, amountToWithdraw);
+        L2Message memory l2ToL1Message = L2Message({
+            txNumberInBatch: l2TxNumberInBatch,
+            sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            data: message
+        });
+
+        vm.mockCall(
+            bridgehubProxyAddress,
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(
+                IBridgehub.proveL2MessageInclusion.selector,
+                currentChainId,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2ToL1Message,
+                merkleProof
+            ),
+            abi.encode(true)
+        );
+
+        sharedBridge.finalizeWithdrawal({
+            _chainId: currentChainId,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
+
+        // check if the balance was updated correctly
+        if (beforeChainBalance > amountToWithdraw) {
+            assertEq(
+                beforeChainBalance - sharedBridge.chainBalance(currentChainId, currentTokenAddress),
+                amountToWithdraw
+            );
+            assertEq(beforeBalance - sharedBridgeProxyAddress.balance, amountToWithdraw);
+        }
     }
 
     function depositEthToEthBridgeSuccess(
@@ -587,13 +623,13 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         uint256 chainIndexSeed,
         uint256 tokenIndexSeed,
         uint256 amountToWithdraw
-    ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) useRandomToken(tokenIndexSeed) {
+    ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) {
         address token = getHyperchainBaseToken(currentChainId);
 
-        if (currentTokenAddress == token && currentTokenAddress != ETH_TOKEN_ADDRESS) {
-            withdraw(amountToWithdraw, currentTokenAddress);
-        } else {
-            // 2 bridges deposit
+        if (token != ETH_TOKEN_ADDRESS) {
+            withdrawERC20Token(amountToWithdraw, token);
+        } else if (token == ETH_TOKEN_ADDRESS) {
+            withdrawETHToken(amountToWithdraw, token);
         }
     }
 
