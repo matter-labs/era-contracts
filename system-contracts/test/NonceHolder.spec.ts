@@ -185,17 +185,17 @@ describe("NonceHolder tests", () => {
         returnData: encodedAccountInfo,
       });
 
-      const firstValue = (await nonceHolder.connect(systemAccount).getValueUnderNonce(currentNonce)).add(111)
+      const firstValue = (await nonceHolder.connect(systemAccount).getValueUnderNonce(currentNonce)).add(111);
       await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(currentNonce, firstValue))
         .to.emit(nonceHolder, "ValueSetUnderNonce")
         .withArgs(systemAccount.address, currentNonce, firstValue);
 
-      const secondValue = (await nonceHolder.connect(systemAccount).getValueUnderNonce(currentNonce.add(2))).add(333)
+      const secondValue = (await nonceHolder.connect(systemAccount).getValueUnderNonce(currentNonce.add(2))).add(333);
       await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(currentNonce.add(2), secondValue))
         .to.emit(nonceHolder, "ValueSetUnderNonce")
         .withArgs(systemAccount.address, currentNonce.add(2), secondValue);
 
-      const thirdValue = (await nonceHolder.connect(systemAccount).getValueUnderNonce(currentNonce.add(1))).add(222)
+      const thirdValue = (await nonceHolder.connect(systemAccount).getValueUnderNonce(currentNonce.add(1))).add(222);
       await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(currentNonce.add(1), thirdValue))
         .to.emit(nonceHolder, "ValueSetUnderNonce")
         .withArgs(systemAccount.address, currentNonce.add(1), thirdValue);
@@ -206,7 +206,6 @@ describe("NonceHolder tests", () => {
       expect(storedValueNext).to.equal(thirdValue);
       const storedAfterNext = await nonceHolder.connect(systemAccount).getValueUnderNonce(currentNonce.add(2));
       expect(storedAfterNext).to.equal(secondValue);
-
     });
   });
 
