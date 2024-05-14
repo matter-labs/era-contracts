@@ -207,7 +207,7 @@ contract MailboxFacet is Base, IMailbox {
 
         // Enforcing that `_l2GasPerPubdataByteLimit` equals to a certain constant number. This is needed
         // to ensure that users do not get used to using "exotic" numbers for _l2GasPerPubdataByteLimit, e.g. 1-2, etc.
-        // VERY IMPORTANT: nobody should rely on this constant to be fixed and every contract should give their users the ability to provide the
+        // VERY IMPORTANT: nobody should rely on this constant to be fixed and every contract should give their users the
         // ability to provide `_l2GasPerPubdataByteLimit` for each independent transaction.
         // CHANGING THIS CONSTANT SHOULD BE A CLIENT-SIDE CHANGE.
         require(_l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");

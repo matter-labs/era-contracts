@@ -37,14 +37,14 @@ contract ExecutorFacet is Base, IExecutor {
         uint8 pubdataSource = uint8(bytes1(_newBatch.pubdataCommitments[0]));
         require(pubdataSource == uint8(PubdataSource.Calldata) || pubdataSource == uint8(PubdataSource.Blob), "us");
 
-        // Check that batch contain all meta information for L2 logs.
-        // Get the chained hash of priority transaction hashes.
+        // Check that batch contains all meta information for L2 logs.
+        // Get the chained hash of the priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
         if (pubdataSource == uint8(PubdataSource.Blob)) {
-            // We want only want to include the actual blob linear hashes when we send pubdata via blobs.
+            // We only want to include the actual blob linear hashes when we send pubdata via blobs.
             // Otherwise we should be using bytes32(0)
             blobHashes[0] = logOutput.blob1Hash;
             blobHashes[1] = logOutput.blob2Hash;
@@ -132,7 +132,7 @@ contract ExecutorFacet is Base, IExecutor {
         // See SystemLogKey enum in Constants.sol for ordering.
         uint256 processedLogs;
 
-        // linear traversal of the logs
+        // Linear traversal of the logs
         for (uint256 i = 0; i < emittedL2Logs.length; i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE)) {
             // Extract the values to be compared to/used such as the log sender, key, and value
             (address logSender, ) = UnsafeBytes.readAddress(emittedL2Logs, i + L2_LOG_ADDRESS_OFFSET);
@@ -194,9 +194,9 @@ contract ExecutorFacet is Base, IExecutor {
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) external nonReentrant onlyValidator {
-        // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
+        // With the new changes for EIP-4844, namely the restriction on the number of blobs per block, we only allow for a single batch to be committed at a time.
         require(_newBatchesData.length == 1, "e4");
-        // Check that we commit batches after last committed batch
+        // Check that we commit batches after the last committed batch
         require(s.storedBatchHashes[s.totalBatchesCommitted] == _hashStoredBatchInfo(_lastCommittedBatchData), "i"); // incorrect previous batch data
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
