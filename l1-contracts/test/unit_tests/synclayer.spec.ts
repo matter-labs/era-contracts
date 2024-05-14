@@ -6,8 +6,7 @@ import * as hardhat from "hardhat";
 import type { Bridgehub, StateTransitionManager } from "../../typechain";
 import { BridgehubFactory, StateTransitionManagerFactory } from "../../typechain";
 
-import { registerHyperchain } from "../../src.ts/deploy-process";
-import { initialTestnetDeploymentProcess, defaultDeployerForTests } from "../../src.ts/deploy-test-process";
+import { initialTestnetDeploymentProcess, defaultDeployerForTests, registerHyperchainWithBridgeRegistration } from "../../src.ts/deploy-test-process";
 import { ethTestConfig } from "../../src.ts/utils";
 
 import type { Deployer } from "../../src.ts/deploy";
@@ -54,7 +53,7 @@ describe("Synclayer", function () {
 
     deployer2 = await defaultDeployerForTests(deployWallet, ownerAddress);
     deployer2.chainId = 10;
-    await registerHyperchain(deployer2, false, [], gasPrice, undefined, deployer2.chainId.toString());
+    await registerHyperchainWithBridgeRegistration(deployer2, false, [], gasPrice, undefined, deployer2.chainId.toString());
 
     // For tests, the chainId is 9
     deployer.chainId = 9;

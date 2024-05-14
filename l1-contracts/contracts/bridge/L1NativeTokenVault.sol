@@ -73,10 +73,12 @@ contract L1NativeTokenVault is
         _transferOwnership(_owner);
     }
 
+    /// @dev We want to be able to bridge naitive tokens automatically, this means registering them on the fly
+    /// @notice Allows the bridge to register a token address for the vault.
     function registerToken(address _l1Token) external onlyOwnerOrBridge {
-        bytes32 tokenInfo = keccak256(abi.encode(address(this), uint256(uint160(_l1Token))));
+        bytes32 assetInfo = keccak256(abi.encode(address(this), uint256(uint160(_l1Token))));
         L1_SHARED_BRIDGE.setAssetAddress(bytes32(uint256(uint160(_l1Token))), address(this));
-        tokenAddress[tokenInfo] = _l1Token;
+        tokenAddress[assetInfo] = _l1Token;
     }
 
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.

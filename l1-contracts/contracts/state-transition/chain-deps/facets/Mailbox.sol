@@ -251,7 +251,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         uint256 _chainId,
         BridgehubL2TransactionRequest calldata _request
     ) external returns (bytes32 canonicalTxHash) {
-        require(IBridgehub(s.bridgehub).whitelistedSyncLayers(s.chainId), "Mailbox SL: not SL");
+        require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId), "Mailbox SL: not SL");
         require(
             IStateTransitionManager(s.stateTransitionManager).getHyperchain(_chainId) == msg.sender,
             "Mailbox SL: not hyperchain"
@@ -302,10 +302,8 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             );
         }
 
-        if (s.syncLayerState == SyncLayerState.MigratedFromL1) {
-            canonicalTxHash = IMailbox(
-                IStateTransitionManager(s.stateTransitionManager).getHyperchain(s.syncLayerChainId)
-            ).requestL2TransactionToSyncLayer(s.chainId, _request);
+        if (s.syncLayer != address(0)) {
+            canonicalTxHash = IMailbox(s.syncLayer).requestL2TransactionToSyncLayer(s.chainId, _request);
             return canonicalTxHash;
         }
         // Enforcing that `_request.l2GasPerPubdataByteLimit` equals to a certain constant number. This is needed

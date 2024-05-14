@@ -14,7 +14,7 @@ interface IL1StandardAsset {
     function bridgeBurn(
         uint256 _chainId,
         uint256 _mintValue,
-        bytes32 _tokenInfo,
+        bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);
@@ -22,7 +22,7 @@ interface IL1StandardAsset {
     function bridgeClaimFailedBurn(
         uint256 _chainId,
         uint256 _mintValue,
-        bytes32 _tokenInfo,
+        bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable;

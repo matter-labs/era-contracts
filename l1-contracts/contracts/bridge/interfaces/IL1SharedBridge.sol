@@ -24,8 +24,7 @@ interface IL1SharedBridge {
         uint256 indexed chainId,
         bytes32 indexed txDataHash,
         address indexed from,
-        address to,
-        address l1Token,
+        bytes32 assetInfo,
         bytes32 bridgeMintCalldataHash
     );
 
@@ -151,6 +150,8 @@ interface IL1SharedBridge {
 
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 
+    function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external;
+
     function receiveEth(uint256 _chainId) external payable;
 
     function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
@@ -158,4 +159,6 @@ interface IL1SharedBridge {
     function setAssetAddress(bytes32 _additionalData, address _assetAddress) external;
 
     function nativeTokenVault() external view returns (IL1NativeTokenVault);
+
+    function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external;
 }

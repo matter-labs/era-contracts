@@ -105,8 +105,26 @@ export async function initialTestnetDeploymentProcess(
   // deploy the verifier first
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true);
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false);
-  await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName);
+  await registerHyperchainWithBridgeRegistration(deployer, false, extraFacets, gasPrice, baseTokenName);
   return deployer;
+}
+
+export async function registerHyperchainWithBridgeRegistration(
+  deployer: Deployer,
+  onlyVerifier: boolean,
+  extraFacets: FacetCut[],
+  gasPrice: BigNumberish,
+  baseTokenName?: string,
+  chainId?: string
+) {
+  chainId = chainId ?? deployer.chainId.toString();
+  await registerHyperchain(deployer, onlyVerifier, extraFacets, gasPrice, baseTokenName, chainId);
+  const l1SharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
+  const upgradeCall = l1SharedBridge.interface.encodeFunctionData("initializeChainGovernance", [
+    chainId,
+    ADDRESS_ONE,
+  ]);
+  const txHash = await deployer.executeUpgrade(l1SharedBridge.address, 0, upgradeCall);
 }
 
 // This is used to deploy the diamond and bridge such that they can be upgraded using UpgradeHyperchain.sol

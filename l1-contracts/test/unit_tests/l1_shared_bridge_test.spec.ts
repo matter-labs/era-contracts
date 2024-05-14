@@ -79,16 +79,6 @@ describe("Shared Bridge tests", () => {
     await erc20TestToken.connect(randomSigner).approve(l1SharedBridge.address, ethers.utils.parseUnits("10000", 18));
   });
 
-  it("Check should initialize through governance", async () => {
-    const upgradeCall = l1SharedBridgeInterface.encodeFunctionData("initializeChainGovernance(uint256,address)", [
-      chainId,
-      ADDRESS_ONE,
-    ]);
-    const txHash = await deployer.executeUpgrade(l1SharedBridge.address, 0, upgradeCall);
-
-    expect(txHash).not.equal(ethers.constants.HashZero);
-  });
-
   it("Should not allow depositing zero erc20 amount", async () => {
     const mintValue = ethers.utils.parseEther("0.01");
     const revertReason = await getCallRevertReason(
