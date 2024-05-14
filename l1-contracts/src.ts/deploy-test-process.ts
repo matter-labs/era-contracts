@@ -17,6 +17,8 @@ import {
   L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
   initialBridgehubDeployment,
   registerHyperchain,
+  deployVerifier,
+  deployStateTransitionManager,
 } from "./deploy-process";
 import { deployTokens, getTokens } from "./deploy-token";
 
@@ -102,8 +104,9 @@ export async function initialTestnetDeploymentProcess(
   fs.writeFileSync(testnetTokenPath, JSON.stringify(result, null, 2));
 
   // deploy the verifier first
-  await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true);
-  await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false);
+  await deployVerifier(deployer, gasPrice);
+  await initialBridgehubDeployment(deployer, gasPrice);
+  await deployStateTransitionManager(deployer, [], gasPrice);
   await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName);
   return deployer;
 }
@@ -186,10 +189,11 @@ export async function initialEraTestnetDeploymentProcess(
   fs.writeFileSync(testnetTokenPath, JSON.stringify(result, null, 2));
 
   // deploy the verifier first
-  await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true);
+  await deployVerifier(deployer, gasPrice);
   await deployer.deployDiamondProxy(extraFacets, {});
   // deploy normal contracts
-  await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false);
+  await initialBridgehubDeployment(deployer, gasPrice);
+  await deployStateTransitionManager(deployer, extraFacets, gasPrice);
   // for Era we first deploy the DiamondProxy manually, set the vars manually, and register it in the system via bridgehub.createNewChain(ERA_CHAIN_ID, ..)
   if (deployer.verbose) {
     console.log("Applying DiamondCut");

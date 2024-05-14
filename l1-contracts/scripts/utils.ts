@@ -8,7 +8,7 @@ import * as path from "path";
 
 const warning = chalk.bold.yellow;
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
-export const GAS_MULTIPLIER = 1;
+export const GAS_MULTIPLIER = 2;
 
 interface SystemConfig {
   requiredL2GasPricePerPubdata: number;
@@ -36,6 +36,7 @@ export function web3Url() {
 }
 
 export function web3Provider() {
+  console.log("Connecting to", web3Url());
   const provider = new ethers.providers.JsonRpcProvider(web3Url());
 
   // Check that `CHAIN_ETH_NETWORK` variable is set. If not, it's most likely because

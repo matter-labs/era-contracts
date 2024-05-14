@@ -32,6 +32,7 @@ import type { FacetCut } from "./diamondCut";
 import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
 
 import { ERC20Factory } from "../typechain";
+import type { IBridgehub } from "../typechain/IBridgehub";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -94,7 +95,7 @@ export class Deployer {
     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
     const feeParams = {
-      pubdataPricingMode: PubdataPricingMode.Rollup,
+      pubdataPricingMode: PubdataPricingMode.Validium,
       batchOverheadL1Gas: SYSTEM_CONFIG.priorityTxBatchOverheadL1Gas,
       maxPubdataPerBatch: SYSTEM_CONFIG.priorityTxPubdataPerBatch,
       priorityTxMaxPubdata: SYSTEM_CONFIG.priorityTxMaxPubdata,
@@ -126,8 +127,9 @@ export class Deployer {
 
     return diamondCut(
       facetCuts,
-      this.addresses.StateTransition.DiamondInit,
-      "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2)
+      "0xec9bC474567913B3827D312B573B8F5f3708455A",
+      "0x0000000000000000000000003b29e933235677677b8947624f6ad35d98169c81f520cd5b37e74e19fdb369c8d676a04dce8a19457497ac6686d2bb95d94109c8ffb19d007c67b9000b40b372e7a7a55a47d11c92588515598d6cad4052c75ebb0000000000000000000000000000000000000000000000000000000000000000010008e5808982ae5d626373e297349bf6f4c8ba240d104748fe76caa59d86bd01000563374c277a2c1e34659a2a1e87371bb6d852ce142022d497bfb50b9e3200000000000000000000000000000000000000000000000000000000044aa200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000f4240000000000000000000000000000000000000000000000000000000000001d4c00000000000000000000000000000000000000000000000000000000004c4b40000000000000000000000000000000000000000000000000000000000000182b8000000000000000000000000000000000000000000000000000000000ee6b2800000000000000000000000008708bf28ed3ee152748c2936e6c9f4cebe03ccf5"
+      // "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2)
     );
   }
 
@@ -470,11 +472,19 @@ export class Deployer {
       );
       return;
     }
-    const scheduleTx = await governance.scheduleTransparent(operation, 0);
-    await scheduleTx.wait();
+    console.log("pre-schedule");
+    try {
+      const scheduleTx = await governance.scheduleTransparent(operation, 0);
+      await scheduleTx.wait();
+    } catch (e) {
+      console.log("Error in schedule", e);
+      return;
+    }
+    console.log("post-wait");
     if (this.verbose) {
       console.log("Upgrade scheduled");
     }
+    console.log("pre-execute");
     const executeTX = await governance.execute(operation, { value: value });
     await executeTX.wait();
     if (this.verbose) {
@@ -644,7 +654,6 @@ export class Deployer {
     await this.deployStateTransitionDiamondFacets(create2Salt, gasPrice, nonce);
     await this.deployStateTransitionManagerImplementation(create2Salt, { gasPrice });
     await this.deployStateTransitionManagerProxy(create2Salt, { gasPrice }, extraFacets);
-    await this.registerStateTransitionManager();
   }
 
   public async deployStateTransitionDiamondFacets(create2Salt: string, gasPrice?: BigNumberish, nonce?) {

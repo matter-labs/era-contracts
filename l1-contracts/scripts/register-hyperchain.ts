@@ -58,6 +58,7 @@ async function main() {
   program.version("0.1.0").name("register-hyperchain").description("register hyperchains");
 
   program
+    .allowUnknownOption(true)
     .option("--private-key <private-key>")
     .option("--chain-id <chain-id>")
     .option("--gas-price <gas-price>")
