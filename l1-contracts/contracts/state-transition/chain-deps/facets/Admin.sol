@@ -179,7 +179,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         s.priorityQueue.head = pqHead;
         s.priorityQueue.tail = pqHead + _commitment.priorityQueueTxs.length;
 
-        for(uint256 i = 0; i < _commitment.priorityQueueTxs.length; i++) {
+        for (uint256 i = 0; i < _commitment.priorityQueueTxs.length; i++) {
             s.priorityQueue.data[pqHead + i] = _commitment.priorityQueueTxs[i];
         }
 
@@ -201,7 +201,6 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         commitment.totalBatchesVerified = s.totalBatchesVerified;
         commitment.totalBatchesExecuted = s.totalBatchesExecuted;
 
-
         uint256 pqHead = s.priorityQueue.head;
         commitment.priorityQueueHead = pqHead;
 
@@ -211,9 +210,9 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         PriorityOperation[] memory priorityQueueTxs = new PriorityOperation[](pqLength);
 
-        for(uint256 i = pqHead; i < s.priorityQueue.tail; i++) {
+        for (uint256 i = pqHead; i < s.priorityQueue.tail; i++) {
             priorityQueueTxs[i] = s.priorityQueue.data[i];
-        }    
+        }
         commitment.priorityQueueTxs = priorityQueueTxs;
 
         commitment.l2SystemContractsUpgradeBatchNumber = s.l2SystemContractsUpgradeBatchNumber;
@@ -250,7 +249,6 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     ) external onlyStateTransitionManager returns (bytes memory migrationCalldata) {
         // TODO: add a check that there are no outstanding upgrades.
 
-
         // FIXME: uncomment
         require(s.syncLayerState == SyncLayerState.ActiveOnL1, "not active L1");
         s.syncLayerState = SyncLayerState.MigratedFromL1;
@@ -260,15 +258,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         migrationCalldata = abi.encodeCall(
             IStateTransitionManager.finalizeMigrationToSyncLayer,
-            (
-                s.chainId,
-                s.baseToken,
-                _stmCounterPart,
-                _newSyncLayerAdmin,
-                s.protocolVersion,
-                commitment,
-                _diamondCut
-            )
+            (s.chainId, s.baseToken, _stmCounterPart, _newSyncLayerAdmin, s.protocolVersion, commitment, _diamondCut)
         );
     }
 

@@ -80,7 +80,7 @@ async function main() {
       }
 
       // On Sync Layer there is no bridgehub
-      const dummyAddress = '0x1000000000000000000000000000000000000001';
+      const dummyAddress = "0x1000000000000000000000000000000000000001";
       deployer.addresses.Bridgehub.BridgehubProxy = dummyAddress;
       deployer.addresses.Bridges.SharedBridgeProxy = dummyAddress;
 
@@ -92,7 +92,7 @@ async function main() {
       await deployer.deployGenesisUpgrade(create2Salt, { gasPrice });
 
       await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
-      await deployer.deployBridgehubContract(create2Salt, gasPrice);    
+      await deployer.deployBridgehubContract(create2Salt, gasPrice);
 
       await deployer.deployGovernance(create2Salt, { gasPrice });
       await deployer.deployVerifier(create2Salt, { gasPrice });
@@ -324,15 +324,15 @@ async function main() {
 
       // Right now the new admin is the wallet itself.
       const adminWallet = cmd.privateKey
-      ? new ZkWallet(cmd.privateKey, syncLayerProvider)
-      : ZkWallet.fromMnemonic(
-          process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-          "m/44'/60'/0'/0/1"
-        ).connect(syncLayerProvider);
+        ? new ZkWallet(cmd.privateKey, syncLayerProvider)
+        : ZkWallet.fromMnemonic(
+            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+            "m/44'/60'/0'/0/1"
+          ).connect(syncLayerProvider);
 
       const operators = [
         process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR,
-        process.env.ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR
+        process.env.ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR,
       ];
 
       const deployer = new Deployer({
@@ -342,49 +342,49 @@ async function main() {
         verbose: true,
       });
 
-      console.log('Enablign validators');
+      console.log("Enablign validators");
 
       // FIXME: do it in cleaner way
       deployer.addresses.ValidatorTimeLock = getAddressFromEnv("SYNC_LAYER_VALIDATOR_TIMELOCK_ADDR");
       const timelock = deployer.validatorTimelock(deployer.deployWallet);
 
-      for(const operator of operators) {
+      for (const operator of operators) {
         await deployer.deployWallet.sendTransaction({
           to: operator,
-          value: ethers.utils.parseEther('5')
+          value: ethers.utils.parseEther("5"),
         });
 
-        await (await timelock.addValidator(
-          currentChainId,
-          operator
-        )).wait();
-      } 
+        await (await timelock.addValidator(currentChainId, operator)).wait();
+      }
 
       // FIXME: this method includes bridgehub manipulation, but in the future it wont.
-      deployer.addresses.StateTransition.StateTransitionProxy = getAddressFromEnv("SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR");
+      deployer.addresses.StateTransition.StateTransitionProxy = getAddressFromEnv(
+        "SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR"
+      );
       deployer.addresses.Bridgehub.BridgehubProxy = getAddressFromEnv("SYNC_LAYER_BRIDGEHUB_PROXY_ADDR");
 
-      const bridgehub  = deployer.bridgehubContract(deployer.deployWallet);
+      const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
 
-      console.log('Registering the chain on bridgehub');
-
+      console.log("Registering the chain on bridgehub");
 
       // // For now, only ETH is supported as base chain.
-      await (await bridgehub.unsafeRegisterChain(
-        currentChainId,
-        deployer.addresses.StateTransition.StateTransitionProxy,
-        zkUtils.ETH_ADDRESS_IN_CONTRACTS
-      )).wait();
+      await (
+        await bridgehub.unsafeRegisterChain(
+          currentChainId,
+          deployer.addresses.StateTransition.StateTransitionProxy,
+          zkUtils.ETH_ADDRESS_IN_CONTRACTS
+        )
+      ).wait();
 
-      // FIXME? Do we want to 
-      console.log('Setting default token multiplier');
+      // FIXME? Do we want to
+      console.log("Setting default token multiplier");
 
       const hyperchain = deployer.stateTransitionContract(deployer.deployWallet);
 
-      console.log('The fefault ones');
-      await (await hyperchain.setTokenMultiplier(1,1)).wait();
+      console.log("The fefault ones");
+      await (await hyperchain.setTokenMultiplier(1, 1)).wait();
 
-      console.log('Success!');
+      console.log("Success!");
     });
 
   await program.parseAsync(process.argv);

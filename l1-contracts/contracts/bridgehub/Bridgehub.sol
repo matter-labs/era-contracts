@@ -111,15 +111,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function setSharedBridge(address _sharedBridge) external onlyOwner {
         sharedBridge = IL1SharedBridge(_sharedBridge);
     }
- 
+
     /// FIXME: this method should not be present in the production code.
     /// just used in code to register chain successfully until full migration is complete.
-    function unsafeRegisterChain(
-        uint256 _chainId,
-        address _stateTransitionManager,
-        address _baseToken
-    ) external{
-
+    function unsafeRegisterChain(uint256 _chainId, address _stateTransitionManager, address _baseToken) external {
         require(_chainId != 0, "Bridgehub: chainId cannot be 0");
         require(_chainId <= type(uint48).max, "Bridgehub: chainId too large");
 
