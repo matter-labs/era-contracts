@@ -75,7 +75,8 @@ contract L1NativeTokenVault is
 
     /// @dev We want to be able to bridge naitive tokens automatically, this means registering them on the fly
     /// @notice Allows the bridge to register a token address for the vault.
-    function registerToken(address _l1Token) external onlyOwnerOrBridge {
+    function registerToken(address _l1Token) external {
+        require(_l1Token == ETH_TOKEN_ADDRESS || _l1Token.code.length > 0, "NTV: empty token");
         bytes32 assetInfo = keccak256(abi.encode(block.chainid, address(this), uint256(uint160(_l1Token))));
         L1_SHARED_BRIDGE.setAssetAddress(bytes32(uint256(uint160(_l1Token))), address(this));
         tokenAddress[assetInfo] = _l1Token;
@@ -90,16 +91,16 @@ contract L1NativeTokenVault is
         address _prevMsgSender,
         bytes calldata _data
     ) external payable override onlyBridge whenNotPaused returns (bytes memory _bridgeMintData) {
-        uint256 _depositAmount = abi.decode(_data, (uint256));
+        (uint256 _depositAmount, address _l2Receiver) = abi.decode(_data, (uint256, address));
 
         uint256 amount;
         address l1Token = tokenAddress[_assetInfo];
         if (l1Token == ETH_TOKEN_ADDRESS) {
             amount = msg.value;
-            require(_depositAmount == 0, "L1SharedBridge: msg.value not equal to amount");
+            require(_depositAmount == 0 || _depositAmount == amount, "L1NTV: msg.value not equal to amount");
         } else {
             // The Bridgehub also checks this, but we want to be sure
-            require(msg.value == 0, "ShB m.v > 0 b d.it");
+            require(msg.value == 0, "NTV m.v > 0 b d.it");
             amount = _depositAmount;
 
             uint256 withdrawAmount = _depositFunds(_prevMsgSender, IERC20(l1Token), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
@@ -111,7 +112,7 @@ contract L1NativeTokenVault is
             chainBalance[_chainId][l1Token] += _depositAmount;
         }
 
-        _bridgeMintData = abi.encode(amount, _getERC20Getters(l1Token)); // to do add l2Receiver in here
+        _bridgeMintData = abi.encode(amount, _l2Receiver, _getERC20Getters(l1Token)); // to do add l2Receiver in here
     }
 
     /// @dev Transfers tokens from the depositor address to the smart contract address.
@@ -143,7 +144,7 @@ contract L1NativeTokenVault is
     function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {
         // if (!hyperbridgingEnabled[_chainId]) {
         //     // Check that the chain has sufficient balance
-        //     require(chainBalance[_chainId][l1Token] >= amount, "ShB not enough funds 2"); // not enough funds
+        //     require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
         //     chainBalance[_chainId][l1Token] -= amount;
         // }
         address l1Token = tokenAddress[_assetInfo];
@@ -154,7 +155,7 @@ contract L1NativeTokenVault is
             assembly {
                 callSuccess := call(gas(), l1Receiver, _amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "ShB: withdraw failed");
+            require(callSuccess, "NTV: withdraw failed");
         } else {
             // Withdraw funds
             IERC20(l1Token).safeTransfer(l1Receiver, _amount);
@@ -177,7 +178,7 @@ contract L1NativeTokenVault is
             assembly {
                 callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "ShB: claimFailedDeposit failed");
+            require(callSuccess, "NTV: claimFailedDeposit failed");
         } else {
             IERC20(l1Token).safeTransfer(_depositSender, _amount);
             // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.
@@ -186,7 +187,7 @@ contract L1NativeTokenVault is
 
         if (L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
             // check that the chain has sufficient balance
-            require(chainBalance[_chainId][l1Token] >= _amount, "ShB n funds");
+            require(chainBalance[_chainId][l1Token] >= _amount, "NTV n funds");
             chainBalance[_chainId][l1Token] -= _amount;
         }
     }

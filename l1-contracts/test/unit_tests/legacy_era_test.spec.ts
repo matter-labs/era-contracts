@@ -121,6 +121,9 @@ describe("Legacy Era tests", function () {
       deployer.addresses.StateTransition.DiamondProxy,
       mockExecutorContract.signer
     );
+
+    const txExecute = await proxyAsMockExecutor.setExecutedBatches(1);
+    await txExecute.wait();
   });
 
   it("Check should initialize through governance", async () => {

@@ -7,6 +7,8 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IL1NativeTokenVault} from "../../../bridge/interfaces/IL1NativeTokenVault.sol";
+
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {Merkle} from "../../libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
@@ -240,9 +242,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         );
         IL1SharedBridge(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
-            bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))),
+            (IL1SharedBridge(s.baseTokenBridge).nativeTokenVault()).getAssetInfo(ETH_TOKEN_ADDRESS),
             msg.sender,
-            msg.value
+            0
         );
     }
 
