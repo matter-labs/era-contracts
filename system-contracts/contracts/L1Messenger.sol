@@ -7,7 +7,7 @@ import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, STATE_DIFF_ENTRY_SIZE, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER, COMPUTATIONAL_PRICE_FOR_PUBDATA} from "./Constants.sol";
+import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, BATCH_AGGREGATOR, STATE_DIFF_ENTRY_SIZE, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER, COMPUTATIONAL_PRICE_FOR_PUBDATA} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -194,6 +194,14 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     function publishPubdataAndClearState(
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
     ) external onlyCallFromBootloader {
+        // Send hyperchain batches
+        SystemContractHelper.toL1(
+            true,
+            bytes32(uint256(SystemLogKey.AGGREGATED_HYPERCHAIN_PUBDATA_KEY)),
+            EfficientCall.keccak(BATCH_AGGREGATOR.returnBatchesAndClearState())
+        );
+        
+
         uint256 calldataPtr = 0;
 
         /// Check logs
@@ -308,6 +316,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
             stateDiffs,
             compressedStateDiffs
         );
+        // 
 
         /// Check for calldata strict format
         require(calldataPtr == _totalL2ToL1PubdataAndStateDiffs.length, "Extra data in the totalL2ToL1Pubdata array");

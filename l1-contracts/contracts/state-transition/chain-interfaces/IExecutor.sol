@@ -25,7 +25,8 @@ enum SystemLogKey {
 /// @dev Enum used to determine the source of pubdata. At first we will support calldata and blobs but this can be extended.
 enum PubdataSource {
     Calldata,
-    Blob
+    Blob,
+    ForwardedMessage
 }
 
 struct LogProcessingOutput {
