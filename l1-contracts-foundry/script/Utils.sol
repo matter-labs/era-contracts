@@ -301,6 +301,7 @@ library Utils {
 
         bytes memory bytecode = vm.parseJsonBytes(
             json,
+            // solhint-disable-next-line func-named-parameters
             string.concat("$.contracts.['", contractPath, "'].", contractName, ".evm.bytecode.object")
         );
         return bytecode;
