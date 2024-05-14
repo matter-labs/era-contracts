@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
+import {ZksyncContract, FailedToDeploy, BytecodeNotSet, FailedToDeployViaCreate2} from "./ZksyncScriptErrors.sol";
 
 library Utils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
@@ -30,12 +31,13 @@ library Utils {
 
         // Extract selectors from the result
         string[] memory parts = vm.split(stringResult, "\n");
-        bytes4[] memory selectors = new bytes4[](parts.length);
-        for (uint256 i = 0; i < parts.length; i++) {
+        uint256 partsLength = parts.length;
+        bytes4[] memory selectors = new bytes4[](partsLength);
+        for (uint256 i = 0; i < partsLength; ++i) {
             bytes memory part = bytes(parts[i]);
             bytes memory extractedSelector = new bytes(10);
             // Selector length 10 is 0x + 4 bytes
-            for (uint256 j = 0; j < 10; j++) {
+            for (uint256 j = 0; j < 10; ++j) {
                 extractedSelector[j] = part[j];
             }
             bytes4 selector = bytes4(vm.parseBytes(string(extractedSelector)));
@@ -44,16 +46,17 @@ library Utils {
 
         // Remove `getName()` selector if existing
         bool hasGetName = false;
-        for (uint256 i = 0; i < selectors.length; i++) {
+        uint256 selectorsLength = selectors.length;
+        for (uint256 i = 0; i < selectorsLength; ++i) {
             if (selectors[i] == bytes4(keccak256("getName()"))) {
-                selectors[i] = selectors[selectors.length - 1];
+                selectors[i] = selectors[selectorsLength - 1];
                 hasGetName = true;
                 break;
             }
         }
         if (hasGetName) {
-            bytes4[] memory newSelectors = new bytes4[](selectors.length - 1);
-            for (uint256 i = 0; i < selectors.length - 1; i++) {
+            bytes4[] memory newSelectors = new bytes4[](selectorsLength - 1);
+            for (uint256 i = 0; i < selectorsLength - 1; ++i) {
                 newSelectors[i] = selectors[i];
             }
             return newSelectors;
@@ -76,10 +79,11 @@ library Utils {
      */
     function bytesToUint256(bytes memory bys) internal pure returns (uint256 value) {
         // Add left padding to 32 bytes if needed
-        if (bys.length < 32) {
+        uint256 bytesLength = bys.length;
+        if (bytesLength < 32) {
             bytes memory padded = new bytes(32);
-            for (uint256 i = 0; i < bys.length; i++) {
-                padded[i + 32 - bys.length] = bys[i];
+            for (uint256 i = 0; i < bytesLength; ++i) {
+                padded[i + 32 - bytesLength] = bys[i];
             }
             bys = padded;
         }
@@ -125,8 +129,9 @@ library Utils {
             child := create(0, add(bytecode, 0x20), mload(bytecode))
         }
         vm.stopBroadcast();
-        require(child != address(0), "Failed to deploy Create2Factory");
-        require(child.code.length > 0, "Failed to deploy Create2Factory");
+        if (child == address(0) || child.code.length == 0) {
+            revert FailedToDeploy(ZksyncContract.Create2Factory);
+        }
         return child;
     }
 
@@ -135,7 +140,7 @@ library Utils {
      */
     function deployViaCreate2(bytes memory _bytecode, bytes32 _salt, address _factory) internal returns (address) {
         if (_bytecode.length == 0) {
-            revert("Bytecode is not set");
+            revert BytecodeNotSet();
         }
         address contractAddress = vm.computeCreate2Address(_salt, keccak256(_bytecode), _factory);
         if (contractAddress.code.length != 0) {
@@ -147,7 +152,7 @@ library Utils {
         contractAddress = Utils.bytesToAddress(data);
 
         if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
-            revert("Failed to deploy contract via create2");
+            revert FailedToDeployViaCreate2();
         }
 
         return contractAddress;

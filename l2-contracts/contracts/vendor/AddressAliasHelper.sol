@@ -19,7 +19,7 @@
 pragma solidity 0.8.20;
 
 library AddressAliasHelper {
-    uint160 constant offset = uint160(0x1111000000000000000000000000000000001111);
+    uint160 internal constant offset = uint160(0x1111000000000000000000000000000000001111);
 
     /// @notice Utility function converts the address that submitted a tx
     /// to the inbox on L1 to the msg.sender viewed on L2
