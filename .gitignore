@@ -26,3 +26,4 @@ l1-contracts-foundry/broadcast/*
 l1-contracts-foundry/script-config/*
 l1-contracts-foundry/script-out/*
 !l1-contracts-foundry/script-out/.gitkeep
+l2-contracts/zkout/*

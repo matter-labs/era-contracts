@@ -42,8 +42,9 @@ contract DeployPaymaster is Script {
     }
 
     function deploy() internal {
-        bytes memory testnetPaymasterBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/TestnetPaymaster.sol/TestnetPaymaster.json"
+        bytes memory testnetPaymasterBytecode = Utils.readForgeBytecode(
+            "/../l2-contracts/zkout/TestnetPaymaster.sol/artifacts.json",
+            "contracts/TestnetPaymaster.sol"
         );
 
         config.paymaster = Utils.deployThroughL1({
