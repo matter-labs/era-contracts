@@ -113,12 +113,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         _;
     }
 
-    /// @notice Checks that the message sender is the shared bridge itself.
-    // modifier onlySelf() {
-    //     require(msg.sender == address(this), "ShB not shared bridge");
-    //     _;
-    // }
-
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
@@ -183,10 +177,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         nativeTokenVault = _nativeTokenVault;
     }
 
-    // function receiveEth(uint256 _chainId) external payable {
-    //     require(BRIDGE_HUB.getHyperchain(_chainId) == msg.sender, "receiveEth not state transition");
-    // }
-
     /// @dev Initializes the l2Bridge address by governance for a specific chain.
     function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwner {
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
@@ -194,7 +184,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev Used to set the assedAddress for a given assetInfo.
     function setAssetAddress(bytes32 _additionalData, address _assetAddress) external {
-        bytes32 assetInfo = keccak256(abi.encode(block.chainid, msg.sender, _additionalData));
+        bytes32 assetInfo = keccak256(abi.encode(block.chainid, msg.sender, _additionalData)); /// todo make other asse
         assetAddress[assetInfo] = _assetAddress;
     }
 
@@ -229,7 +219,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             address(uint160(uint256(_assetInfo))).code.length > 0
         ) {
             l1Asset = address(nativeTokenVault);
-            assetInfo = keccak256(abi.encode(nativeTokenVault, uint256(uint160(uint256(_assetInfo)))));
+            assetInfo = keccak256(abi.encode(block.chainid, nativeTokenVault, uint256(uint160(uint256(_assetInfo)))));
             assetAddress[assetInfo] = address(nativeTokenVault);
             nativeTokenVault.registerToken(address(uint160(uint256(_assetInfo))));
         }

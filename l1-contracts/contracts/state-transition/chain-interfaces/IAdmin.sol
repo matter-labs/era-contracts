@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.24;
 
-import {HyperchainCommitment} from "../../common/Config.sol";
+// import {HyperchainCommitment} from "../../common/Config.sol";
 
 import {IZkSyncHyperchainBase} from "../chain-interfaces/IZkSyncHyperchainBase.sol";
-import {L2CanonicalTransaction, TxStatus} from "../../common/Messaging.sol";
+import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";

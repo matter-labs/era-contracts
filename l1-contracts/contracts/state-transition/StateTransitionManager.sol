@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
-import {IBridgehub, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
@@ -17,11 +17,11 @@ import {IStateTransitionManager, StateTransitionManagerInitializeData} from "./I
 import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
 import {FeeParams, SyncLayerState} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 // import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
-import {L2CanonicalTransaction} from "../common/Messaging.sol";
+// import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 // import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT, HyperchainCommitment} from "../common/Config.sol";
+import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
 // import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
 
 /// @title State Transition Manager contract
@@ -294,9 +294,14 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address _baseToken,
         address _sharedBridge,
         address _admin,
-        bytes calldata _diamondCut,
-        SyncLayerState _syncLayerState
-    ) internal returns (address hyperchainAddress) {
+        bytes calldata _diamondCut
+    )
+        internal
+        returns (
+            // SyncLayerState _syncLayerState
+            address hyperchainAddress
+        )
+    {
         if (getHyperchain(_chainId) != address(0)) {
             // Hyperchain already registered
             return getHyperchain(_chainId);
@@ -361,8 +366,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             _baseToken,
             _sharedBridge,
             _admin,
-            _diamondCut,
-            SyncLayerState.ActiveOnL1
+            _diamondCut
+            // SyncLayerState.ActiveOnL1
         );
 
         // set chainId in VM

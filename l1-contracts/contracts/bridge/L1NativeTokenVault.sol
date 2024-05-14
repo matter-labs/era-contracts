@@ -43,7 +43,7 @@ contract L1NativeTokenVault is
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 
     /// @dev A mapping assetInfo => tokenAddress
-    mapping(bytes32 assetInfo => address tokenAddresss) public tokenAddress;
+    mapping(bytes32 assetInfo => address tokenAddress) public tokenAddress;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridge() {
@@ -76,7 +76,7 @@ contract L1NativeTokenVault is
     /// @dev We want to be able to bridge naitive tokens automatically, this means registering them on the fly
     /// @notice Allows the bridge to register a token address for the vault.
     function registerToken(address _l1Token) external onlyOwnerOrBridge {
-        bytes32 assetInfo = keccak256(abi.encode(address(this), uint256(uint160(_l1Token))));
+        bytes32 assetInfo = keccak256(abi.encode(block.chainid, address(this), uint256(uint160(_l1Token))));
         L1_SHARED_BRIDGE.setAssetAddress(bytes32(uint256(uint160(_l1Token))), address(this));
         tokenAddress[assetInfo] = _l1Token;
     }
@@ -199,6 +199,6 @@ contract L1NativeTokenVault is
     }
 
     function getAssetInfo(address _l1TokenAddress) public view override returns (bytes32) {
-        return keccak256(abi.encode(address(this), bytes32(uint256(uint160(_l1TokenAddress)))));
+        return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1TokenAddress)))));
     }
 }
