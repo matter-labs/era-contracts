@@ -310,7 +310,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             factoryDeps: new bytes[](0),
             txDataHash: _txDataHash
         });
-
     }
 
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
@@ -388,7 +387,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
         delete depositHappened[_chainId][_l2TxHash];
 
-        IL1StandardAsset(assetAddress[_assetInfo]).bridgeClaimFailedBurn(_chainId, _assetInfo, _depositSender, _assetData);
+        IL1StandardAsset(assetAddress[_assetInfo]).bridgeClaimFailedBurn(
+            _chainId,
+            _assetInfo,
+            _depositSender,
+            _assetData
+        );
 
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetInfo, keccak256(_assetData));
     }

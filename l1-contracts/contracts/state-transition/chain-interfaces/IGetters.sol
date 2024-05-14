@@ -152,5 +152,4 @@ interface IGetters is IZkSyncHyperchainBase {
     function getSyncLayerState() external view returns (SyncLayerState);
 
     function getSyncLayer() external view returns (address);
-
 }

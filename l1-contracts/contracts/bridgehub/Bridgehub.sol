@@ -371,7 +371,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         whitelistedSettlementLayers[_newSyncLayerChainId] = _isWhitelisted;
 
         // TODO: emit event
-
     }
 
     // function finalizeMigrationToSyncLayer(

@@ -385,7 +385,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         BRIDGE_HUB.registerSyncLayer(_newSyncLayerChainId, _isWhitelisted);
 
         // TODO: emit event
-
     }
 
     function createMigratingChain(

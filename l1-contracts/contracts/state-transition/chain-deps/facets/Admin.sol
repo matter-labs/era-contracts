@@ -253,13 +253,13 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         require(s.priorityQueue.getSize() == 0, "Migration is only allowed with empty priority queue");
         bytes memory commitment = _collectDataForMigration();
         _bridgeMintData = abi.encode( // todo
-            _chainId,
-            s.baseToken,
-            _newSyncLayerAdmin,
-            currentProtocolVersion,
-            commitment,
-            _diamondCut
-        );
+                _chainId,
+                s.baseToken,
+                _newSyncLayerAdmin,
+                currentProtocolVersion,
+                commitment,
+                _diamondCut
+            );
     }
 
     function _collectDataForMigration() internal view returns (bytes memory _chainData) {
