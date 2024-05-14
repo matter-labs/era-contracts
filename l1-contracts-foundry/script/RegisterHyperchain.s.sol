@@ -7,10 +7,13 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
+import {Utils} from "./Utils.sol";
+import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 
 contract RegisterHyperchainScript is Script {
     using stdToml for string;
@@ -55,18 +58,6 @@ contract RegisterHyperchainScript is Script {
         setPendingAdmin();
 
         saveOutput();
-    }
-
-    // This function should be called by the owner to accept the admin role
-    function acceptAdmin() public {
-        console.log("Accept admin Hyperchain");
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/accept-admin.toml");
-        string memory toml = vm.readFile(path);
-        address diamondProxy = toml.readAddress("$.diamond_proxy_addr");
-        IZkSyncHyperchain zkSyncStateTransition = IZkSyncHyperchain(diamondProxy);
-        vm.broadcast();
-        zkSyncStateTransition.acceptAdmin();
     }
 
     function initializeConfig() internal {
@@ -125,12 +116,20 @@ contract RegisterHyperchainScript is Script {
 
     function registerTokenOnBridgehub() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        Ownable ownable = Ownable(config.bridgehub);
 
         if (bridgehub.tokenIsRegistered(config.baseToken)) {
             console.log("Token already registered on Bridgehub");
         } else {
-            vm.broadcast();
-            bridgehub.addToken(config.baseToken);
+            bytes memory data = abi.encodeCall(bridgehub.addToken, (config.baseToken));
+            Utils.executeUpgrade({
+                _governor: ownable.owner(),
+                _salt: bytes32(config.bridgehubCreateNewChainSalt),
+                _target: config.bridgehub,
+                _data: data,
+                _value: 0,
+                _delay: 0
+            });
             console.log("Token registered on Bridgehub");
         }
     }
@@ -147,16 +146,28 @@ contract RegisterHyperchainScript is Script {
 
     function registerHyperchain() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        Ownable ownable = Ownable(config.bridgehub);
 
-        vm.broadcast();
         vm.recordLogs();
-        bridgehub.createNewChain({
-            _chainId: config.hyperchainChainId,
-            _stateTransitionManager: config.stateTransitionProxy,
-            _baseToken: config.baseToken,
-            _salt: config.bridgehubCreateNewChainSalt,
-            _admin: msg.sender,
-            _initData: config.diamondCutData
+        bytes memory data = abi.encodeCall(
+            bridgehub.createNewChain,
+            (
+                config.hyperchainChainId,
+                config.stateTransitionProxy,
+                config.baseToken,
+                config.bridgehubCreateNewChainSalt,
+                msg.sender,
+                config.diamondCutData
+            )
+        );
+
+        Utils.executeUpgrade({
+            _governor: ownable.owner(),
+            _salt: bytes32(config.bridgehubCreateNewChainSalt),
+            _target: config.bridgehub,
+            _data: data,
+            _value: 0,
+            _delay: 0
         });
         console.log("Hyperchain registered");
 
@@ -196,10 +207,9 @@ contract RegisterHyperchainScript is Script {
             config.baseTokenGasPriceMultiplierDenominator
         );
 
-        // TODO: support validium mode when available
-        // if (config.contractsMode) {
-        //     zkSyncStateTransition.setValidiumMode(PubdataPricingMode.Validium);
-        // }
+        if (config.validiumMode) {
+            hyperchain.setPubdataPricingMode(PubdataPricingMode.Validium);
+        }
 
         vm.stopBroadcast();
         console.log("ZkSync State Transition configured");
