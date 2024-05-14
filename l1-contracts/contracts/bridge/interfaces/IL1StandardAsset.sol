@@ -9,7 +9,7 @@ interface IL1StandardAsset {
 
     event BridgeBurn(address indexed _account, uint256 _amount);
 
-    function bridgeMint(address _account, uint256 _amount) external payable;
+    function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable;
 
     function bridgeBurn(
         uint256 _chainId,

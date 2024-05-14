@@ -8,6 +8,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {IBridgehub, IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
+import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, HyperchainCommitment} from "../common/Config.sol";
@@ -15,9 +16,8 @@ import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
 import {IL1NativeTokenVault} from "../bridge/interfaces/IL1NativeTokenVault.sol";
-import {IL1StandardAsset} from "../bridge/interfaces/IL1StandardAsset.sol";
 
-contract Bridgehub is IBridgehub, IL1StandardAsset, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice all the ether is held by the weth bridge
     IL1SharedBridge public sharedBridge;
 
@@ -41,11 +41,17 @@ contract Bridgehub is IBridgehub, IL1StandardAsset, ReentrancyGuard, Ownable2Ste
     /// @dev used to indicate that the contract is deployed on synclayer
     bool public syncLayerMode;
 
-    // Sync layer chain is expected to have .. as the base token.
-    mapping(uint256 chainId => bool isWhitelistedSyncLayer) public whitelistedSyncLayers;
+    /// @dev used to indicate the currently active settlement layer for a given chainId
+    mapping(uint256 chainId => uint256 activeSettlementLayerChainId) public settlementLayer;
+
+    /// @dev Sync layer chain is expected to have .. as the base token.
+    mapping(uint256 chainId => bool isWhitelistedSyncLayer) public whitelistedSettlementLayers;
 
     /// @dev the address of the bridghub on other chains
-    mapping(uint256 chainId => address stmCounterPart) public bridgehubCounterParts;
+    mapping(uint256 chainId => address bridgehubCounterPart) public bridgehubCounterParts;
+
+    /// @notice chainID => baseTokenAssetInfo
+    mapping(uint256 _chainId => bytes32) public baseTokenAssetInfo;
 
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {}
@@ -362,37 +368,52 @@ contract Bridgehub is IBridgehub, IL1StandardAsset, ReentrancyGuard, Ownable2Ste
         uint256 _newSyncLayerChainId,
         bool _isWhitelisted
     ) external onlyChainSTM(_newSyncLayerChainId) {
-        whitelistedSyncLayers[_newSyncLayerChainId] = _isWhitelisted;
+        whitelistedSettlementLayers[_newSyncLayerChainId] = _isWhitelisted;
 
         // TODO: emit event
 
     }
 
-    function finalizeMigrationToSyncLayer(
-        uint256 _chainId,
-        address _baseToken,
-        address _sharedBridge,
-        address _admin,
-        uint256 _expectedProtocolVersion,
-        HyperchainCommitment calldata _commitment,
-        bytes calldata _diamondCut
-    ) external {}
+    // function finalizeMigrationToSyncLayer(
+    //     uint256 _chainId,
+    //     address _baseToken,
+    //     address _sharedBridge,
+    //     address _admin,
+    //     uint256 _expectedProtocolVersion,
+    //     HyperchainCommitment calldata _commitment,
+    //     bytes calldata _diamondCut
+    // ) external {}
 
     /// @dev we can move assets using these
     function bridgeBurn(
-        uint256 _chainId,
+        uint256 _settlementChainId,
         uint256 _mintValue,
-        bytes32 _tokenInfo,
+        bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override returns (bytes memory _bridgeMintData) {}
+    ) external payable override returns (bytes memory _bridgeMintData) {
+        (uint256 _chainId, ) = abi.decode(_data, (uint256, bytes));
+
+        require(whitelistedSettlementLayers[_settlementChainId], "sync layer not whitelisted");
+
+        settlementLayer[_chainId] = _settlementChainId;
+
+        IZkSyncHyperchain(getHyperchain(_chainId)).bridgeBurn(
+            _settlementChainId,
+            _mintValue,
+            _assetInfo,
+            _prevMsgSender,
+            _data
+        );
+        // TODO: double check that get only returns when chain id is there.
+    }
 
     function bridgeMint(address _account, uint256 _amount) external payable override {}
 
     function bridgeClaimFailedBurn(
         uint256 _chainId,
         uint256 _mintValue,
-        bytes32 _tokenInfo,
+        bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable override {}

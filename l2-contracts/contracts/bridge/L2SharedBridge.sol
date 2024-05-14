@@ -78,12 +78,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @param _l1Token The address of the token that was locked on the L1
     /// @param _amount Total amount of tokens deposited from L1
     /// @param _data The additional data that user can pass with the deposit
-    function finalizeDeposit(
-        address _l1Sender,
-        address _l2Receiver,
-        address _l1Token,
-        bytes calldata _data
-    ) external override {
+    function finalizeDeposit(address _l1Sender, address _l1Token, bytes calldata _data) external override {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
 
         require(
@@ -102,8 +97,8 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
             require(currentL1Token == _l1Token, "gg"); // Double check that the expected value equal to real one
         }
 
-        IL2StandardToken(expectedL2Token).bridgeMint(_l2Receiver, _data);
-        emit FinalizeDeposit(_l1Sender, _l2Receiver, expectedL2Token, keccak256(_data));
+        IL2StandardToken(expectedL2Token).bridgeMint(_data);
+        emit FinalizeDeposit(_l1Sender, expectedL2Token, keccak256(_data));
     }
 
     /// @dev Deploy and initialize the L2 token for the L1 counterpart

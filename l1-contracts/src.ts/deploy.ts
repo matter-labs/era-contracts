@@ -34,6 +34,7 @@ import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
 import { IL1NativeTokenVault } from "../typechain/IL1NativeTokenVault";
+import { IL1SharedBridgeFactory } from "../typechain/IL1SharedBridgeFactory";
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 import { ProxyAdminFactory } from "../typechain/ProxyAdminFactory";
 
@@ -131,7 +132,7 @@ export class Deployer {
         baseTokenBridge: "0x0000000000000000000000000000000000004234",
         storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
         // The exact value is not important as it will be overridden by the STM
-        syncLayerState: 0,
+        // syncLayerState: 0,
         verifier: this.addresses.StateTransition.Verifier,
         verifierParams,
         l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
@@ -145,7 +146,7 @@ export class Deployer {
     return diamondCut(
       facetCuts,
       this.addresses.StateTransition.DiamondInit,
-      "0x" + diamondInitCalldata.slice(2 + (4 + 10 * 32) * 2)
+      "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2)
     );
   }
 
@@ -486,20 +487,20 @@ export class Deployer {
     const data1 = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
       this.addresses.Bridges.ERC20BridgeProxy,
     ]);
-    // const data2 = sharedBridge.interface.encodeFunctionData("setEraPostDiamondUpgradeFirstBatch", [
-    //   process.env.CONTRACTS_ERA_POST_DIAMOND_UPGRADE_FIRST_BATCH ?? 1,
-    // ]);
-    // const data3 = sharedBridge.interface.encodeFunctionData("setEraPostLegacyBridgeUpgradeFirstBatch", [
-    //   process.env.CONTRACTS_ERA_POST_LEGACY_BRIDGE_UPGRADE_FIRST_BATCH ?? 1,
-    // ]);
-    // const data4 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [
-    //   process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_BATCH ?? 1,
-    //   process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_TX_NUMBER ?? 0,
-    // ]);
+    const data2 = sharedBridge.interface.encodeFunctionData("setEraPostDiamondUpgradeFirstBatch", [
+      process.env.CONTRACTS_ERA_POST_DIAMOND_UPGRADE_FIRST_BATCH ?? 1,
+    ]);
+    const data3 = sharedBridge.interface.encodeFunctionData("setEraPostLegacyBridgeUpgradeFirstBatch", [
+      process.env.CONTRACTS_ERA_POST_LEGACY_BRIDGE_UPGRADE_FIRST_BATCH ?? 1,
+    ]);
+    const data4 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [
+      process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_BATCH ?? 1,
+      process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_TX_NUMBER ?? 0,
+    ]);
     await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data1);
-    // await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data2);
-    // await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data3);
-    // await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data4);
+    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data2);
+    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data3);
+    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data4);
     if (this.verbose) {
       console.log("Shared bridge updated with ERC20Bridge address");
     }
@@ -785,26 +786,29 @@ export class Deployer {
   public async moveChainToSyncLayer(synclayerChainId: number) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     const baseTokenAmount = ethers.utils.parseEther("1");
+    const chainData = new ethers.utils.AbiCoder().encode(["uint256"], [synclayerChainId]);
+    const bridgehubData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [this.chainId, chainData]);
+    // console.log("bridgehubData", bridgehubData)
+    // console.log("this.addresses.ChainAssetInfo", this.addresses.ChainAssetInfo)
+    const sharedBridgeData = ethers.utils.defaultAbiCoder.encode(
+      ["bytes32", "bytes"],
 
-    const calldata = await bridgehub.requestL2TransactionTwoBridges({
-      chainId: synclayerChainId,
-      mintValue: baseTokenAmount,
-      l2Value: 1,
-      l2GasLimit: 10000000,
-      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-      refundRecipient: await this.deployWallet.getAddress(),
-      secondBridgeAddress: this.addresses.Bridgehub.BridgehubProxy,
-      secondBridgeValue: 0,
-      secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
-        ["bytes32", "bytes", "address"],
-
-        [
-          this.addresses.ChainAssetInfo,
-          new ethers.utils.AbiCoder().encode(["uint256"], [this.chainId]),
-          await this.deployWallet.getAddress(),
-        ]
-      ),
-    });
+      [this.addresses.ChainAssetInfo, bridgehubData]
+    );
+    const calldata = await bridgehub.requestL2TransactionTwoBridges(
+      {
+        chainId: synclayerChainId,
+        mintValue: baseTokenAmount,
+        l2Value: 1,
+        l2GasLimit: 10000000,
+        l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+        refundRecipient: await this.deployWallet.getAddress(),
+        secondBridgeAddress: this.addresses.Bridges.SharedBridgeProxy,
+        secondBridgeValue: 0,
+        secondBridgeCalldata: sharedBridgeData,
+      },
+      { value: baseTokenAmount }
+    );
   }
 
   public async registerHyperchain(
@@ -823,6 +827,9 @@ export class Deployer {
     const stateTransitionManager = this.stateTransitionManagerContract(this.deployWallet);
 
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
+    const alreadyRegisteredInSTM =
+      (await stateTransitionManager.getHyperchain(inputChainId)) != ethers.constants.AddressZero;
+
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
@@ -856,7 +863,8 @@ export class Deployer {
 
       console.log(`CONTRACTS_BASE_TOKEN_ADDR=${baseTokenAddress}`);
     }
-    if (!predefinedChainId) {
+
+    if (!alreadyRegisteredInSTM) {
       const diamondProxyAddress =
         "0x" +
         receipt.logs
@@ -902,7 +910,7 @@ export class Deployer {
     const tx4 = await diamondProxy.setTokenMultiplier(1, 1);
     const receipt4 = await tx4.wait();
     if (this.verbose) {
-      console.log(`BaseTokenMultiplier set, gas used: ${receipt4.gasUsed.toString()}`);
+      console.log(`BaseTokenMultiplier set ${diamondProxy.address}, gas used: ${receipt4.gasUsed.toString()}`);
     }
 
     if (validiumMode) {
@@ -1033,7 +1041,7 @@ export class Deployer {
   }
 
   public defaultSharedBridge(signerOrProvider: Signer | providers.Provider) {
-    return L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, signerOrProvider);
+    return IL1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, signerOrProvider);
   }
 
   public nativeTokenVault(signerOrProvider: Signer | providers.Provider) {

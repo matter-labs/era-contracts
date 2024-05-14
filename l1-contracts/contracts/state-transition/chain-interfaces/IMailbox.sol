@@ -116,7 +116,7 @@ interface IMailbox is IZkSyncHyperchainBase {
     ) external view returns (uint256);
 
     /// @notice transfer Eth to shared bridge as part of migration process
-    function transferEthToSharedBridge() external;
+    // function transferEthToSharedBridge() external;
 
     /// @notice New priority request event. Emitted when a request is placed into the priority queue
     /// @param txId Serial number of the priority operation

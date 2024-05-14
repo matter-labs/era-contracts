@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {HyperchainCommitment} from "../common/Config.sol";
+import {IL1StandardAsset} from "../bridge/interfaces/IL1StandardAsset.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -38,7 +39,7 @@ struct L2TransactionRequestTwoBridgesInner {
     bytes32 txDataHash;
 }
 
-interface IBridgehub {
+interface IBridgehub is IL1StandardAsset {
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
@@ -62,6 +63,8 @@ interface IBridgehub {
     function tokenIsRegistered(address _baseToken) external view returns (bool);
 
     function baseToken(uint256 _chainId) external view returns (address);
+
+    function baseTokenAssetInfo(uint256 _chainId) external view returns (bytes32);
 
     function sharedBridge() external view returns (IL1SharedBridge);
 
@@ -133,21 +136,21 @@ interface IBridgehub {
 
     function registerCounterpart(uint256 _chainId, address _counterPart) external;
 
-    function whitelistedSyncLayers(uint256 _chainId) external view returns (bool);
+    function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
 
     function bridgehubCounterParts(uint256 _chainId) external view returns (address);
 
     function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
 
-    function finalizeMigrationToSyncLayer(
-        uint256 _chainId,
-        address _baseToken,
-        address _sharedBridge,
-        address _admin,
-        uint256 _expectedProtocolVersion,
-        HyperchainCommitment calldata _commitment,
-        bytes calldata _diamondCut
-    ) external;
+    // function finalizeMigrationToSyncLayer(
+    //     uint256 _chainId,
+    //     address _baseToken,
+    //     address _sharedBridge,
+    //     address _admin,
+    //     uint256 _expectedProtocolVersion,
+    //     HyperchainCommitment calldata _commitment,
+    //     bytes calldata _diamondCut
+    // ) external;
 
     function forwardTransactionSyncLayer(uint256 _chainId, BridgehubL2TransactionRequest calldata _request) external;
 }

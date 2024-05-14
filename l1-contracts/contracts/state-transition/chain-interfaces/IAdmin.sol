@@ -9,11 +9,12 @@ import {L2CanonicalTransaction, TxStatus} from "../../common/Messaging.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
+import {IL1StandardAsset} from "../../bridge/interfaces/IL1StandardAsset.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IAdmin is IZkSyncHyperchainBase {
+interface IAdmin is IZkSyncHyperchainBase, IL1StandardAsset {
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin
@@ -59,19 +60,6 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @param _diamondCut The diamond cut parameters to be executed
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
-    function finalizeMigration(HyperchainCommitment calldata _hyperchainCommitment) external;
-    function startMigrationToSyncLayer(
-        uint256 _syncLayerChainId
-    ) external returns (HyperchainCommitment memory commitment);
-
-    function recoverFromFailedMigrationToSyncLayer(
-        uint256 _syncLayerChainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
-    ) external;
-
     /// @notice Instantly pause the functionality of all freezable facets & their selectors
     /// @dev Only the governance mechanism may freeze Diamond Proxy
     function freezeDiamond() external;
@@ -81,8 +69,6 @@ interface IAdmin is IZkSyncHyperchainBase {
     function unfreezeDiamond() external;
 
     function setChainIdUpgrade(address _genesisUpgrade) external;
-
-    function storeMigrationHash(bytes32 _migrationHash) external;
 
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);

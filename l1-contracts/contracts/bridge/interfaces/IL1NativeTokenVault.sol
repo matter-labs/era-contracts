@@ -16,4 +16,6 @@ interface IL1NativeTokenVault {
     function getAssetInfoFromLegacy(address l1TokenAddress) external view returns (bytes32);
 
     function getAssetInfo(address l1TokenAddress) external view returns (bytes32);
+
+    function tokenAddress(bytes32 assetInfo) external view returns (address);
 }

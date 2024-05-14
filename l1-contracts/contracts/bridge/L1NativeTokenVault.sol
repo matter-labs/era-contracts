@@ -140,7 +140,26 @@ contract L1NativeTokenVault is
         return abi.encode(data1, data2, data3);
     }
 
-    function bridgeMint(address _account, uint256 _amount) external payable override {}
+    function bridgeMint(bytes32 _assetInfo, bytes calldata _data) external payable override {
+        // if (!hyperbridgingEnabled[_chainId]) {
+        //     // Check that the chain has sufficient balance
+        //     require(chainBalance[_chainId][l1Token] >= amount, "ShB not enough funds 2"); // not enough funds
+        //     chainBalance[_chainId][l1Token] -= amount;
+        // }
+        address l1Token = tokenAddress[_assetInfo];
+        (uint256 _amount, address l1Receiver) = abi.decode(_data, (uint256, address));
+        if (l1Token == ETH_TOKEN_ADDRESS) {
+            bool callSuccess;
+            // Low-level assembly call, to avoid any memory copying (save gas)
+            assembly {
+                callSuccess := call(gas(), l1Receiver, _amount, 0, 0, 0, 0)
+            }
+            require(callSuccess, "ShB: withdraw failed");
+        } else {
+            // Withdraw funds
+            IERC20(l1Token).safeTransfer(l1Receiver, _amount);
+        }
+    }
 
     function bridgeClaimFailedBurn(
         uint256 _chainId,
@@ -148,7 +167,30 @@ contract L1NativeTokenVault is
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override {}
+    ) external payable override {
+        (uint256 _amount, address _depositSender) = abi.decode(_data, (uint256, address));
+        address l1Token = tokenAddress[_assetInfo];
+        require(_amount > 0, "y1");
+
+        if (l1Token == ETH_TOKEN_ADDRESS) {
+            bool callSuccess;
+            // Low-level assembly call, to avoid any memory copying (save gas)
+            assembly {
+                callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
+            }
+            require(callSuccess, "ShB: claimFailedDeposit failed");
+        } else {
+            IERC20(l1Token).safeTransfer(_depositSender, _amount);
+            // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.
+            // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
+        }
+
+        if (L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
+            // check that the chain has sufficient balance
+            require(chainBalance[_chainId][l1Token] >= _amount, "ShB n funds");
+            chainBalance[_chainId][l1Token] -= _amount;
+        }
+    }
 
     function getAssetInfoFromLegacy(address _l1TokenAddress) public view override returns (bytes32) {
         if (tokenAddress[getAssetInfo(_l1TokenAddress)] != address(0)) {

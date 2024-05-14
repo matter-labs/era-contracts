@@ -4,12 +4,7 @@ pragma solidity 0.8.20;
 
 /// @author Matter Labs
 interface IL2SharedBridge {
-    event FinalizeDeposit(
-        address indexed l1Sender,
-        address indexed l2Receiver,
-        address indexed l2Token,
-        bytes32 assetDataHash
-    );
+    event FinalizeDeposit(address indexed l1Sender, address indexed l2Token, bytes32 assetDataHash);
 
     event WithdrawalInitiated(
         address indexed l2Sender,
@@ -18,7 +13,7 @@ interface IL2SharedBridge {
         bytes32 assetDataHash
     );
 
-    function finalizeDeposit(address _l1Sender, address _l2Receiver, address _l1Token, bytes calldata _data) external;
+    function finalizeDeposit(address _l1Sender, address _l1Token, bytes calldata _data) external;
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external;
 

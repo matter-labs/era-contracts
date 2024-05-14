@@ -31,7 +31,7 @@ interface IL1SharedBridge {
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,
         address indexed from,
-        address l1Token,
+        bytes32 assetInfo,
         uint256 amount
     );
 
@@ -44,15 +44,15 @@ interface IL1SharedBridge {
     event WithdrawalFinalizedSharedBridge(
         uint256 indexed chainId,
         address indexed to,
-        address indexed l1Token,
-        uint256 amount
+        bytes32 indexed assetInfo,
+        bytes32 assetDataHash
     );
 
     event ClaimedFailedDepositSharedBridge(
         uint256 indexed chainId,
         address indexed to,
-        address indexed l1Token,
-        uint256 amount
+        bytes32 indexed assetInfo,
+        bytes32 assetDataHash
     );
 
     function isWithdrawalFinalized(
@@ -152,7 +152,7 @@ interface IL1SharedBridge {
 
     function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external;
 
-    function receiveEth(uint256 _chainId) external payable;
+    // function receiveEth(uint256 _chainId) external payable;
 
     function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
 
@@ -161,4 +161,16 @@ interface IL1SharedBridge {
     function nativeTokenVault() external view returns (IL1NativeTokenVault);
 
     function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external;
+
+    function claimFailedBurn(
+        uint256 _chainId,
+        address _depositSender,
+        bytes32 _assetInfo,
+        bytes calldata _tokenData,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external;
 }
