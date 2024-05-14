@@ -408,11 +408,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // TODO: double check that get only returns when chain id is there.
     }
 
-    function bridgeMint(address _account, uint256 _amount) external payable override {}
+    function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {}
 
     function bridgeClaimFailedBurn(
         uint256 _chainId,
-        uint256 _mintValue,
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data

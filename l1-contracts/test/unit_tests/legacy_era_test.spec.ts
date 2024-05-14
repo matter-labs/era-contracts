@@ -160,7 +160,7 @@ describe("Legacy Era tests", function () {
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
     const revertReason = await getCallRevertReason(
-      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, "0x", [ethers.constants.HashZero])
+      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(1, 0, 0, "0x", [ethers.constants.HashZero])
     );
     expect(revertReason).equal("ShB wrong msg len");
   });
@@ -169,7 +169,7 @@ describe("Legacy Era tests", function () {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge
         .connect(randomSigner)
-        .finalizeWithdrawal(0, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
+        .finalizeWithdrawal(1, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
     );
     expect(revertReason).equal("ShB Incorrect message function selector");
   });
@@ -197,7 +197,7 @@ describe("Legacy Era tests", function () {
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
-      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, l2ToL1message, [])
+      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(1, 0, 0, l2ToL1message, [])
     );
     expect(revertReason).equal("xc");
   });
@@ -213,7 +213,7 @@ describe("Legacy Era tests", function () {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge
         .connect(randomSigner)
-        .finalizeWithdrawal(0, 0, 0, l2ToL1message, Array(9).fill(ethers.constants.HashZero))
+        .finalizeWithdrawal(1, 0, 0, l2ToL1message, Array(9).fill(ethers.constants.HashZero))
     );
     expect(revertReason).equal("ShB withd w proof");
   });

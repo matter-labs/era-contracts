@@ -16,7 +16,7 @@ interface IL1SharedBridge {
         bytes32 indexed l2DepositTxHash,
         address indexed from,
         address to,
-        address l1Token,
+        address l1Asset,
         uint256 amount
     );
 

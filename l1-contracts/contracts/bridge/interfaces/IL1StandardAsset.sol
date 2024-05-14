@@ -21,7 +21,6 @@ interface IL1StandardAsset {
 
     function bridgeClaimFailedBurn(
         uint256 _chainId,
-        uint256 _mintValue,
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data

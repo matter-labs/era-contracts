@@ -194,7 +194,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev Used to set the assedAddress for a given assetInfo.
     function setAssetAddress(bytes32 _additionalData, address _assetAddress) external {
-        assetAddress[keccak256(abi.encode(msg.sender, _additionalData))] = _assetAddress;
+        bytes32 assetInfo = keccak256(abi.encode(block.chainid, msg.sender, _additionalData));
+        assetAddress[assetInfo] = _assetAddress;
     }
 
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
@@ -273,6 +274,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         });
     }
 
+    /// @dev send the burn message to the asset
     function _burn(
         uint256 _chainId,
         uint256 _l2Value,
@@ -290,6 +292,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         );
     }
 
+    /// @dev The request data that is passed to the bridgehub
     function _requestToBridge(
         uint256 _chainId,
         address _prevMsgSender,
@@ -355,7 +358,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
     function _claimFailedBurn(
         uint256 _chainId,
-        address _depositSender,
+        address _depositSender, // todo is this needed, or should it be part of assetData?
         bytes32 _assetInfo,
         bytes memory _assetData,
         bytes32 _l2TxHash,
@@ -378,10 +381,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
 
         require(!_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch), "ShB: legacy cFD");
-        bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
-        bytes32 txDataHash = keccak256(abi.encode(_depositSender, _assetInfo, _assetData));
-        require(dataHash == txDataHash, "ShB: d.it not hap");
+        {
+            bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
+            bytes32 txDataHash = keccak256(abi.encode(_depositSender, _assetInfo, _assetData));
+            require(dataHash == txDataHash, "ShB: d.it not hap");
+        }
         delete depositHappened[_chainId][_l2TxHash];
+
+        IL1StandardAsset(assetAddress[_assetInfo]).bridgeClaimFailedBurn(_chainId, _assetInfo, _depositSender, _assetData);
 
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetInfo, keccak256(_assetData));
     }
@@ -479,16 +486,17 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
         // Handling special case for withdrawal from zkSync Era initiated before Shared Bridge.
         require(!_isEraLegacyEthWithdrawal(_chainId, _l2BatchNumber), "ShB: legacy eth withdrawal");
-
-        MessageParams memory messageParams = MessageParams({
-            l2BatchNumber: _l2BatchNumber,
-            l2MessageIndex: _l2MessageIndex,
-            l2TxNumberInBatch: _l2TxNumberInBatch
-        });
         bytes memory assetData;
-        (l1Receiver, assetInfo, assetData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
-        address l1Token = assetAddress[assetInfo];
-        IL1StandardAsset(l1Token).bridgeMint(_chainId, assetInfo, assetData);
+        {
+            MessageParams memory messageParams = MessageParams({
+                l2BatchNumber: _l2BatchNumber,
+                l2MessageIndex: _l2MessageIndex,
+                l2TxNumberInBatch: _l2TxNumberInBatch
+            });
+            (l1Receiver, assetInfo, assetData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
+        }
+        address l1Asset = assetAddress[assetInfo];
+        IL1StandardAsset(l1Asset).bridgeMint(_chainId, assetInfo, assetData);
 
         emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetInfo, keccak256(assetData));
     }
@@ -500,7 +508,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) internal view returns (address l1Receiver, bytes32 assetInfo, bytes memory assetData) {
-        (l1Receiver, assetInfo, assetData) = _parseL2WithdrawalMessage(_chainId, _message);
+        (assetInfo, assetData) = _parseL2WithdrawalMessage(_chainId, _message);
         L2Message memory l2ToL1Message;
         {
             bool baseTokenWithdrawal = (assetInfo == BRIDGE_HUB.baseTokenAssetInfo(_chainId));
@@ -526,7 +534,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     function _parseL2WithdrawalMessage(
         uint256 _chainId,
         bytes memory _l2ToL1message
-    ) internal view returns (address l1Receiver, address l1Token, bytes memory assetData) {
+    ) internal view returns (bytes32 assetInfo, bytes memory assetData) {
         // We check that the message is long enough to read the data.
         // Please note that there are two versions of the message:
         // 1. The message that is sent by `withdraw(address _l1Receiver)`
@@ -539,13 +547,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         // So the data is expected to be at least 56 bytes long.
         require(_l2ToL1message.length >= 56, "ShB wrong msg len"); // wrong message length
         uint256 amount;
+        address l1Asset;
+        address l1Receiver;
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {
             // this message is a base token withdrawal
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-            l1Token = BRIDGE_HUB.baseToken(_chainId);
+            l1Asset = BRIDGE_HUB.baseToken(_chainId);
         } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) {
             // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
 
@@ -556,7 +566,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             // 76 (bytes).
             require(_l2ToL1message.length == 76, "ShB wrong msg len 2");
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-            (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+            (l1Asset, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
             //todo
@@ -571,7 +581,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2
     /// @param _depositSender The address of the deposit initiator
-    /// @param _l1Token The address of the deposited L1 ERC20 token
+    /// @param _l1Asset The address of the deposited L1 ERC20 token
     /// @param _amount The amount of the deposit that failed.
     /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization
     /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed
@@ -581,7 +591,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     function claimFailedDeposit(
         uint256 _chainId,
         address _depositSender,
-        address _l1Token,
+        address _l1Asset,
         uint256 _amount,
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,
@@ -589,12 +599,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        bytes32 assetInfo = nativeTokenVault.getAssetInfoFromLegacy(_l1Token);
+        bytes32 assetInfo = nativeTokenVault.getAssetInfoFromLegacy(_l1Asset);
+        bytes memory assetData = abi.encode(_amount); // todo
         _claimFailedBurn({
             _chainId: _chainId,
             _depositSender: _depositSender,
             _assetInfo: assetInfo,
-            _amount: _amount,
+            _assetData: assetData,
             _l2TxHash: _l2TxHash,
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
@@ -612,7 +623,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
     /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
     /// @param _l2Receiver The account address that should receive funds on L2
-    /// @param _l1Token The L1 token address which is deposited
+    /// @param _l1Asset The L1 token address which is deposited
     /// @param _amount The total amount of tokens to be bridged
     /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
@@ -634,24 +645,24 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     function depositLegacyErc20Bridge(
         address _prevMsgSender,
         address _l2Receiver,
-        address _l1Token,
+        address _l1Asset,
         uint256 _amount,
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 l2TxHash) {
         require(l2BridgeAddress[ERA_CHAIN_ID] != address(0), "ShB b. n dep");
-        require(_l1Token != L1_WETH_TOKEN, "ShB: WETH deposit not supported 2");
+        require(_l1Asset != L1_WETH_TOKEN, "ShB: WETH deposit not supported 2");
 
         // // Note that funds have been transferred to this contract in the legacy ERC20 bridge.
         // if (!hyperbridgingEnabled[ERA_CHAIN_ID]) {
-        //     chainBalance[ERA_CHAIN_ID][_l1Token] += _amount;
+        //     chainBalance[ERA_CHAIN_ID][_l1Asset] += _amount;
         // }
 
         bytes memory bridgeMintData = abi.encode(_amount); //todo
         bytes memory l2TxCalldata = _getDepositL2Calldata(
             _prevMsgSender,
-            IL1NativeTokenVault(nativeTokenVault).getAssetInfoFromLegacy(_l1Token),
+            IL1NativeTokenVault(nativeTokenVault).getAssetInfoFromLegacy(_l1Asset),
             bridgeMintData
         );
 
@@ -675,7 +686,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             l2TxHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
         }
 
-        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, _amount));
+        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Asset, _amount));
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
         depositHappened[ERA_CHAIN_ID][l2TxHash] = txDataHash;
 
@@ -684,7 +695,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             l2DepositTxHash: l2TxHash,
             from: _prevMsgSender,
             to: _l2Receiver,
-            l1Token: _l1Token,
+            l1Asset: _l1Asset,
             amount: _amount
         });
     }
@@ -697,7 +708,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
     ///
     /// @return l1Receiver The address on L1 that will receive the withdrawn funds
-    /// @return l1Token The address of the L1 token being withdrawn
+    /// @return l1Asset The address of the L1 token being withdrawn
     /// @return amount The amount of the token being withdrawn
     function finalizeWithdrawalLegacyErc20Bridge(
         uint256 _l2BatchNumber,
@@ -705,7 +716,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external override onlyLegacyBridge returns (address l1Receiver, address l1Token, uint256 amount) {
+    ) external override onlyLegacyBridge returns (address l1Receiver, address l1Asset, uint256 amount) {
         bytes32 assetInfo;
         (l1Receiver, assetInfo, amount) = _finalizeReceive({
             _chainId: ERA_CHAIN_ID,
@@ -715,7 +726,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _message: _message,
             _merkleProof: _merkleProof
         });
-        l1Token = IL1NativeTokenVault(nativeTokenVault).tokenAddress(assetInfo);
+        l1Asset = IL1NativeTokenVault(nativeTokenVault).tokenAddress(assetInfo);
     }
 
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on zkSync Era chain.
@@ -723,7 +734,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// method in `L1ERC20Bridge`.
     ///
     /// @param _depositSender The address of the deposit initiator
-    /// @param _l1Token The address of the deposited L1 ERC20 token
+    /// @param _l1Asset The address of the deposited L1 ERC20 token
     /// @param _amount The amount of the deposit that failed.
     /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization
     /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed
@@ -732,7 +743,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization
     function claimFailedDepositLegacyErc20Bridge(
         address _depositSender,
-        address _l1Token,
+        address _l1Asset,
         uint256 _amount,
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,
@@ -740,7 +751,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge {
-        bytes32 assetInfo = nativeTokenVault.getAssetInfoFromLegacy(_l1Token);
+        bytes32 assetInfo = nativeTokenVault.getAssetInfoFromLegacy(_l1Asset);
         bytes memory assetData = abi.encode(_amount); //todo
         _claimFailedBurn({
             _chainId: ERA_CHAIN_ID,

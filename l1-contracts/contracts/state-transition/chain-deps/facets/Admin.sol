@@ -266,7 +266,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         // todo
     }
 
-    function bridgeMint(address _account, uint256 _amount) external payable override {}
+    function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {}
 
     // function finalizeMigration(HyperchainCommitment memory _commitment) public onlyStateTransitionManager {
     //     if (s.syncLayerState == SyncLayerState.MigratedFromL1) {
@@ -448,7 +448,6 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
     function bridgeClaimFailedBurn(
         uint256 _chainId,
-        uint256 _mintValue,
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data

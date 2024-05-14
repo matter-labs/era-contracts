@@ -140,7 +140,7 @@ contract L1NativeTokenVault is
         return abi.encode(data1, data2, data3);
     }
 
-    function bridgeMint(bytes32 _assetInfo, bytes calldata _data) external payable override {
+    function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {
         // if (!hyperbridgingEnabled[_chainId]) {
         //     // Check that the chain has sufficient balance
         //     require(chainBalance[_chainId][l1Token] >= amount, "ShB not enough funds 2"); // not enough funds
@@ -163,7 +163,6 @@ contract L1NativeTokenVault is
 
     function bridgeClaimFailedBurn(
         uint256 _chainId,
-        uint256 _mintValue,
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
