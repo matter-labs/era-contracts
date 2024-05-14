@@ -89,7 +89,7 @@ IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher
     address(SYSTEM_CONTRACTS_OFFSET + 0x11)
 );
 
-IBatchAggregator constant BATCH_AGGREGATOR = IBatchAggregator(address(SYSTEM_CONTRACTS_OFFSET + 0x12))
+IBatchAggregator constant BATCH_AGGREGATOR = IBatchAggregator(address(SYSTEM_CONTRACTS_OFFSET + 0x12));
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
@@ -123,7 +123,7 @@ enum SystemLogKey {
     BLOB_FIVE_HASH_KEY,
     BLOB_SIX_HASH_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
-    AGGREGATED_HYPERCHAIN_PUBDATA
+    HYPERCHAIN_PUBDATA_KEY
 }
 
 /// @dev The number of leaves in the L2->L1 log Merkle tree.

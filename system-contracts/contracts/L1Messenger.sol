@@ -197,8 +197,8 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         // Send hyperchain batches
         SystemContractHelper.toL1(
             true,
-            bytes32(uint256(SystemLogKey.AGGREGATED_HYPERCHAIN_PUBDATA_KEY)),
-            EfficientCall.keccak(BATCH_AGGREGATOR.returnBatchesAndClearState())
+            bytes32(uint256(SystemLogKey.HYPERCHAIN_PUBDATA_KEY)),
+            keccak256(BATCH_AGGREGATOR.returnBatchesAndClearState())
         );
         
 

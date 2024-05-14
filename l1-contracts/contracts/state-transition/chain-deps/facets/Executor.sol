@@ -11,10 +11,10 @@ import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "../../../common/L2ContractAddresses.sol";
 import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
-import {IBatchAggregator} from "../../../../../system-contracts/contracts/interfaces/IBatchAggregator.sol";
+import {IBatchAggregator} from "../../../common/interfaces/IBatchAggregator.sol";
 
 // TODO: replace with actual system address
-constant address BATCH_AGGREGATOR_ADDRESS = 0x0000000000000000000000000000000000009012;
+address constant BATCH_AGGREGATOR_ADDRESS = 0x0000000000000000000000000000000000009012;
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
