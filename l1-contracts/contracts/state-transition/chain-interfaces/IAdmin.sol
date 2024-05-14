@@ -61,8 +61,11 @@ interface IAdmin is IZkSyncHyperchainBase {
 
     function finalizeMigration(HyperchainCommitment calldata _hyperchainCommitment) external;
     function startMigrationToSyncLayer(
-        uint256 _syncLayerChainId
-    ) external returns (HyperchainCommitment memory commitment);
+        uint256 _syncLayerChainId,
+        address _stmCounterPart,
+        address _newSyncLayerAdmin,
+        bytes calldata _diamondCut
+    ) external returns (bytes memory migrationCalldata);
 
     function recoverFromFailedMigrationToSyncLayer(
         uint256 _syncLayerChainId,

@@ -109,6 +109,14 @@ interface IBridgehub {
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
 
+    /// FIXME: this method should not be present in the production code.
+    /// just used in code to register chain successfully until full migration is complete.
+    function unsafeRegisterChain(
+        uint256 _chainId,
+        address _stateTransitionManager,
+        address _baseToken
+    ) external;
+
     //// Registry
 
     function createNewChain(

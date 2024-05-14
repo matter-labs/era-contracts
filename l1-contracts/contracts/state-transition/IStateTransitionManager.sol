@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {Diamond} from "./libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
+import {HyperchainCommitment} from "../common/Config.sol";
 
 /// @notice Struct that holds all data needed for initializing STM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
@@ -135,4 +136,14 @@ interface IStateTransitionManager {
     function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
 
     function registerCounterpart(uint256 _chainId, address _counterPart) external;
+
+    function finalizeMigrationToSyncLayer(
+        uint256 _chainId,
+        address _baseToken,
+        address _sharedBridge,
+        address _admin,
+        uint256 _expectedProtocolVersion,
+        HyperchainCommitment calldata _commitment,
+        bytes calldata _diamondCut
+    ) external;
 }

@@ -10,6 +10,7 @@ import {FeeParams, PubdataPricingMode, SyncLayerState} from "../ZkSyncHyperchain
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 import {ISystemContext} from "../../l2-deps/ISystemContext.sol";
+import {PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../common/L2ContractAddresses.sol";
 import {L2CanonicalTransaction, TxStatus} from "../../../common/Messaging.sol";
 import {ProposedUpgrade} from "../../../upgrades/BaseZkSyncUpgrade.sol";
@@ -151,6 +152,10 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         uint256 batchesVerified = _commitment.totalBatchesVerified;
         uint256 batchesCommitted = _commitment.totalBatchesCommitted;
 
+        s.totalBatchesCommitted = batchesCommitted;
+        s.totalBatchesVerified = batchesVerified;
+        s.totalBatchesExecuted = batchesExecuted;
+
         // Some consistency checks just in case.
         require(batchesExecuted <= batchesVerified, "Executed is not consistent with verified");
         require(batchesVerified <= batchesCommitted, "Verified is not consistent with committed");
@@ -169,6 +174,18 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
             s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];
         }
 
+        // Currently only zero length is allowed.
+        uint256 pqHead = _commitment.priorityQueueHead;
+        s.priorityQueue.head = pqHead;
+        s.priorityQueue.tail = pqHead + _commitment.priorityQueueTxs.length;
+
+        for(uint256 i = 0; i < _commitment.priorityQueueTxs.length; i++) {
+            s.priorityQueue.data[pqHead + i] = _commitment.priorityQueueTxs[i];
+        }
+
+        s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
+        s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
+
         emit MigrationComplete();
     }
 
@@ -179,20 +196,28 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     //     s.syncLayerState = SyncLayerState.SyncLayerL1;
     // }
 
-    function startMigrationToSyncLayer(
-        uint256 _syncLayerChainId
-    ) external onlyStateTransitionManager returns (HyperchainCommitment memory commitment) {
-        // TODO: add a check that there are no outstanding upgrades.
-
-        // FIXME: uncomment
-        require(s.syncLayerState == SyncLayerState.ActiveOnL1, "not active L1");
-        s.syncLayerState = SyncLayerState.MigratedFromL1;
-
-        s.syncLayerChainId = _syncLayerChainId;
-
+    function _prepareChainCommitment() internal returns (HyperchainCommitment memory commitment) {
         commitment.totalBatchesCommitted = s.totalBatchesCommitted;
         commitment.totalBatchesVerified = s.totalBatchesVerified;
         commitment.totalBatchesExecuted = s.totalBatchesExecuted;
+
+
+        uint256 pqHead = s.priorityQueue.head;
+        commitment.priorityQueueHead = pqHead;
+
+        uint256 pqLength = s.priorityQueue.tail - pqHead;
+        // FIXME: this will be removed once we support the migration of any priority queue size.
+        require(pqLength <= 50, "Migration is only allowed with empty priority queue");
+
+        PriorityOperation[] memory priorityQueueTxs = new PriorityOperation[](pqLength);
+
+        for(uint256 i = pqHead; i < s.priorityQueue.tail; i++) {
+            priorityQueueTxs[i] = s.priorityQueue.data[i];
+        }    
+        commitment.priorityQueueTxs = priorityQueueTxs;
+
+        commitment.l2SystemContractsUpgradeBatchNumber = s.l2SystemContractsUpgradeBatchNumber;
+        commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
 
         // just in case
         require(
@@ -215,6 +240,36 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         }
 
         commitment.batchHashes = batchHashes;
+    }
+
+    function startMigrationToSyncLayer(
+        uint256 _syncLayerChainId,
+        address _stmCounterPart,
+        address _newSyncLayerAdmin,
+        bytes calldata _diamondCut
+    ) external onlyStateTransitionManager returns (bytes memory migrationCalldata) {
+        // TODO: add a check that there are no outstanding upgrades.
+
+
+        // FIXME: uncomment
+        require(s.syncLayerState == SyncLayerState.ActiveOnL1, "not active L1");
+        s.syncLayerState = SyncLayerState.MigratedFromL1;
+        s.syncLayerChainId = _syncLayerChainId;
+
+        HyperchainCommitment memory commitment = _prepareChainCommitment();
+
+        migrationCalldata = abi.encodeCall(
+            IStateTransitionManager.finalizeMigrationToSyncLayer,
+            (
+                s.chainId,
+                s.baseToken,
+                _stmCounterPart,
+                _newSyncLayerAdmin,
+                s.protocolVersion,
+                commitment,
+                _diamondCut
+            )
+        );
     }
 
     function storeMigrationHash(bytes32 _migrationHash) external onlyStateTransitionManager {

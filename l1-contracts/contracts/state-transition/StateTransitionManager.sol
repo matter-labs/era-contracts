@@ -443,24 +443,24 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         hyperchain.finalizeMigration(_commitment);
     }
 
-    function finalizeMigrationFromSyncLayer(uint256 _chainId) external {
-        // FIXME: this method should check that a certain message was sent from the SL to L1.
+    // function finalizeMigrationFromSyncLayer(uint256 _chainId) external {
+    //     // FIXME: this method should check that a certain message was sent from the SL to L1.
 
-        require(false, "TODO");
+    //     require(false, "TODO");
 
-        // address currentAddress = getHyperchain(_chainId);
-        // // On L1 we do expect that the chain is already registered.
-        // require(currentAddress != address(0), "STM: chain not registered");
+    //     // address currentAddress = getHyperchain(_chainId);
+    //     // // On L1 we do expect that the chain is already registered.
+    //     // require(currentAddress != address(0), "STM: chain not registered");
 
-        // _finalizeMigration(
-        //     _chainId,
-        //     _baseToken,
-        //     _sharedBridge,
-        //     _admin,
-        //     _expectedProtocolVersion,
-        //     commitment
-        // );
-    }
+    //     // _finalizeMigration(
+    //     //     _chainId,
+    //     //     _baseToken,
+    //     //     _sharedBridge,
+    //     //     _admin,
+    //     //     _expectedProtocolVersion,
+    //     //     commitment
+    //     // );
+    // }
 
     function startMigrationToSyncLayer(
         uint256 _chainId,
@@ -479,26 +479,14 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // TODO: double check that get only returns when chain id is there.
         IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
 
-        address chainBaseToken = hyperchain.getBaseToken();
         uint256 currentProtocolVersion = hyperchain.getProtocolVersion();
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
 
-        // FIXME: this will be removed once we support the migration of the priority queue also.
-        require(hyperchain.getPriorityQueueSize() == 0, "Migration is only allowed with empty priority queue");
-
-        HyperchainCommitment memory commitment = hyperchain.startMigrationToSyncLayer(_syncLayerChainId);
-
-        bytes memory migrationCalldata = abi.encodeCall(
-            this.finalizeMigrationToSyncLayer,
-            (
-                _chainId,
-                chainBaseToken,
-                stmCounterParts[_syncLayerChainId],
-                _newSyncLayerAdmin,
-                currentProtocolVersion,
-                commitment,
-                _diamondCut
-            )
+        bytes memory migrationCalldata = hyperchain.startMigrationToSyncLayer(
+            _syncLayerChainId,
+            stmCounterParts[_syncLayerChainId],
+            _newSyncLayerAdmin,
+            _diamondCut
         );
 
         require(_request.chainId == _syncLayerChainId, "chain id incorrect");
