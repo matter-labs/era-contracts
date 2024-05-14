@@ -219,7 +219,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _assetInfo, _amount);
     }
 
-    /// @dev for backwards compatiblity and to automatically register l1 assets, and we return the correct info.
+    /// @dev for backwards compatibility and to automatically register l1 assets, and we return the correct info.
     function _getAssetProperties(bytes32 _assetInfo) internal returns (address l1Asset, bytes32 assetInfo) {
         l1Asset = assetAddress[_assetInfo];
         assetInfo = _assetInfo;

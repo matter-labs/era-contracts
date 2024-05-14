@@ -984,7 +984,7 @@ export class Deployer {
       throw new Error("`updateBlobVersionedHashRetrieverZk` should be only called when deploying on zkSync network");
     }
 
-    console.log("BlobVersionedHashRetriever is not needed within zkSync network and wont be deployed");
+    console.log("BlobVersionedHashRetriever is not needed within zkSync network and won't be deployed");
 
     // 0 is not allowed, we need to some random non-zero value. Let it be 0x1000000000000000000000000000000000000001
     console.log(`CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR=0x1000000000000000000000000000000000000001`);

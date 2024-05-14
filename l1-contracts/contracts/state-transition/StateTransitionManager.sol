@@ -370,7 +370,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     function getProtocolVersion(uint256 _chainId) public view returns (uint256) {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).getProtocolVersion();
+        return IZkSyncHyperchain(hyperchainMap.get(_chainId)).getProtocolVersion();
     }
 
     function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external onlyOwner {

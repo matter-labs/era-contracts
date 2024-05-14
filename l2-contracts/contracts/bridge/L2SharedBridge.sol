@@ -35,12 +35,17 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
 
     address private l1LegacyBridge;
 
-    /// @dev Contract is expected to be used as proxy implementation.
-    /// @dev Disable the initialization to prevent Parity hack.
+    /// @dev Chain ID of Era for legacy reasons
     uint256 immutable ERA_CHAIN_ID;
 
-    constructor(uint256 _eraChainId) {
+    /// @dev Chain ID of L1 for bridging reasons
+    uint256 immutable L1_CHAIN_ID;
+
+    /// @dev Contract is expected to be used as proxy implementation.
+    /// @dev Disable the initialization to prevent Parity hack.
+    constructor(uint256 _eraChainId, uint256 _l1ChainId) {
         ERA_CHAIN_ID = _eraChainId;
+        L1_CHAIN_ID = _l1ChainId;
         _disableInitializers();
     }
 
@@ -74,9 +79,9 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
 
     /// @notice Finalize the deposit and mint funds
     /// @param _l1Sender The account address that initiated the deposit on L1
-    /// @param _l2Receiver The account address that would receive minted ether
+    // / @param _l2Receiver The account address that would receive minted ether
     /// @param _l1Token The address of the token that was locked on the L1
-    /// @param _amount Total amount of tokens deposited from L1
+    // / @param _amount Total amount of tokens deposited from L1
     /// @param _data The additional data that user can pass with the deposit
     function finalizeDeposit(address _l1Sender, address _l1Token, bytes calldata _data) external override {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
@@ -114,11 +119,11 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked
     /// @param _l1Receiver The account address that should receive funds on L1
-    /// @param _l2Token The L2 token address which is withdrawn
+    /// @param _assetInfo The L2 token address which is withdrawn
     /// @param _amount The total amount of tokens to be withdrawn
     function withdraw(address _l1Receiver, bytes32 _assetInfo, uint256 _amount) external override {
         require(_amount > 0, "Amount cannot be zero");
-
+        address _l2Token = l2TokenAddress(_assetInfo);
         IL2StandardToken(_l2Token).bridgeBurn(L1_CHAIN_ID, 0, msg.sender, _assetInfo, abi.encode(_amount));
 
         address l1Token = l1TokenAddress[_l2Token];
@@ -127,7 +132,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         bytes memory message = _getL1WithdrawMessage(_l1Receiver, l1Token, _amount);
         L2ContractHelper.sendMessageToL1(message);
 
-        emit WithdrawalInitiated(msg.sender, _l1Receiver, _l2Token, _amount);
+        emit WithdrawalInitiated(msg.sender, _l1Receiver, _l2Token, bytes32(_amount));
     }
 
     /// @dev Encode the message for l2ToL1log sent with withdraw initialization
