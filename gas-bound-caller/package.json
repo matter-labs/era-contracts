@@ -1,0 +1,60 @@
+{
+  "name": "gas-bound-caller",
+  "version": "0.1.0",
+  "repository": "git@github.com:matter-labs/era-contracts.git",
+  "license": "MIT",
+  "dependencies": {
+    "@matterlabs/hardhat-zksync-deploy": "^0.6.5",
+    "@matterlabs/hardhat-zksync-solc": "^1.1.4",
+    "@matterlabs/zksync-contracts": "^0.6.1",
+    "commander": "^9.4.1",
+    "eslint": "^8.51.0",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-prettier": "^5.0.1",
+    "ethers": "^5.7.0",
+    "fast-glob": "^3.3.2",
+    "hardhat": "^2.18.3",
+    "preprocess": "^3.2.0",
+    "zksync-ethers": "https://github.com/zksync-sdk/zksync-ethers#ethers-v5-feat/bridgehub"
+  },
+  "devDependencies": {
+    "@matterlabs/hardhat-zksync-chai-matchers": "^0.1.4",
+    "@matterlabs/hardhat-zksync-node": "^0.0.1-beta.7",
+    "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
+    "@nomiclabs/hardhat-ethers": "^2.0.0",
+    "@typechain/ethers-v5": "^2.0.0",
+    "@types/chai": "^4.2.21",
+    "@types/elliptic": "^6.4.18",
+    "@types/lodash": "^4.14.199",
+    "@types/mocha": "^8.2.3",
+    "@types/node": "^17.0.34",
+    "chai": "^4.3.10",
+    "elliptic": "^6.5.4",
+    "hardhat-typechain": "^0.3.3",
+    "lodash": "^4.17.21",
+    "mocha": "^9.0.2",
+    "template-file": "^6.0.1",
+    "ts-generator": "^0.1.1",
+    "ts-node": "^10.1.0",
+    "typechain": "^4.0.0",
+    "typescript": "^4.6.4",
+    "zksync-ethers": "https://github.com/zksync-sdk/zksync-ethers#ethers-v5-feat/bridgehub"
+  },
+  "mocha": {
+    "timeout": 240000,
+    "exit": true,
+    "color": false,
+    "slow": 0,
+    "require": [
+      "ts-node/register"
+    ]
+  },
+  "scripts": {
+    "build": "hardhat compile",
+    "clean": "yarn clean:bootloader && yarn clean:system-contracts",
+    "test": "yarn build && hardhat test --network zkSyncTestNode",
+    "test-node": "hardhat node-zksync --tag v0.0.1-vm1.5.0",
+    "deploy-on-hyperchain": "ts-node ./scripts/deploy-on-hyperchain.ts",
+    "deploy-on-localhost": "hardhat deploy --network localhost"
+  }
+}
