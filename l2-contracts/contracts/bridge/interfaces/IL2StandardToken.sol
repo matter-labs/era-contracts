@@ -11,15 +11,7 @@ interface IL2StandardToken {
 
     function bridgeMint(address _account, uint256 _amount) external;
 
-    // function bridgeBurn(address _account, uint256 _amount) external;
-
-    function bridgeBurn(
-        uint256 _chainId,
-        uint256 _mintValue,
-        bytes32 _tokenInfo,
-        address _prevMsgSender,
-        bytes calldata _data
-    ) external payable;
+    function bridgeBurn(address _account, uint256 _amount) external;
 
     function l1Address() external view returns (address);
 

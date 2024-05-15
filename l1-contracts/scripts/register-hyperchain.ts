@@ -100,8 +100,9 @@ async function main() {
       console.log(`Using base token address: ${baseTokenAddress}`);
 
       if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
-        await deployer.registerToken(baseTokenAddress);
+        await deployer.registerTokenBridgehub(baseTokenAddress);
       }
+      await deployer.registerTokenInNativeTokenVault(baseTokenAddress, { gasPrice });
 
       await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice);
     });

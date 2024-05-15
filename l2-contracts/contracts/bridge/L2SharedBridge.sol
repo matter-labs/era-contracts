@@ -8,7 +8,8 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
-import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
+import {IL2StandardAsset} from "./interfaces/IL2StandardAsset.sol";
+import {IL2StandardDeployer} from "./interfaces/IL2StandardDeployer.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
@@ -19,7 +20,7 @@ import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2SharedBridge is IL2SharedBridge, Initializable {
+contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, Initializable {
     /// @dev The address of the L1 bridge counterpart.
     address public override l1Bridge;
 
@@ -40,6 +41,11 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
 
     /// @dev Chain ID of L1 for bridging reasons
     uint256 immutable L1_CHAIN_ID;
+
+    IL2StandardDeployer public standardDeployer;
+
+    /// @dev A mapping l2 token address => l1 token address
+    mapping(bytes32 assetInfo => address assetAddress) public override assetAddress;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
@@ -83,7 +89,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @param _l1Token The address of the token that was locked on the L1
     // / @param _amount Total amount of tokens deposited from L1
     /// @param _data The additional data that user can pass with the deposit
-    function finalizeDeposit(address _l1Sender, address _l1Token, bytes calldata _data) external override {
+    function finalizeDeposit(bytes32 _assetInfo, bytes calldata _data) external override {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
 
         require(
@@ -92,89 +98,77 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
             "mq"
         );
 
-        address expectedL2Token = l2TokenAddress(_l1Token);
-        address currentL1Token = l1TokenAddress[expectedL2Token];
-        if (currentL1Token == address(0)) {
-            address deployedToken = _deployL2Token(_l1Token, _data);
-            require(deployedToken == expectedL2Token, "mt");
-            l1TokenAddress[expectedL2Token] = _l1Token;
+        address asset = assetAddress[_assetInfo];
+        if (asset != address(0)) {
+            IL2StandardAsset(asset).bridgeMint(L1_CHAIN_ID, _assetInfo, _data);
         } else {
-            require(currentL1Token == _l1Token, "gg"); // Double check that the expected value equal to real one
+            IL2StandardAsset(standardDeployer).bridgeMint(L1_CHAIN_ID, _assetInfo, _data);
         }
 
-        IL2StandardToken(expectedL2Token).bridgeMint(_data);
-        emit FinalizeDeposit(_l1Sender, expectedL2Token, keccak256(_data));
-    }
-
-    /// @dev Deploy and initialize the L2 token for the L1 counterpart
-    function _deployL2Token(address _l1Token, bytes calldata _data) internal returns (address) {
-        bytes32 salt = _getCreate2Salt(_l1Token);
-
-        BeaconProxy l2Token = _deployBeaconProxy(salt);
-        L2StandardERC20(address(l2Token)).bridgeInitialize(_l1Token, _data);
-
-        return address(l2Token);
+        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetInfo, keccak256(_data));
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked
-    /// @param _l1Receiver The account address that should receive funds on L1
     /// @param _assetInfo The L2 token address which is withdrawn
-    /// @param _amount The total amount of tokens to be withdrawn
-    function withdraw(address _l1Receiver, bytes32 _assetInfo, uint256 _amount) external override {
-        require(_amount > 0, "Amount cannot be zero");
-        address _l2Token = l2TokenAddress(_assetInfo);
-        IL2StandardToken(_l2Token).bridgeBurn(L1_CHAIN_ID, 0, msg.sender, _assetInfo, abi.encode(_amount));
+    /// @param _assetData The data that is passed to the asset contract
+    function withdraw(bytes32 _assetInfo, bytes calldata _assetData) external override {
+        address asset = assetAddress[_assetInfo];
+        bytes memory _bridgeMintData = IL2StandardAsset(assetAddress[_assetInfo]).bridgeBurn(
+            L1_CHAIN_ID,
+            0,
+            _assetInfo,
+            msg.sender,
+            _assetData
+        );
 
-        address l1Token = l1TokenAddress[_l2Token];
-        require(l1Token != address(0), "yh");
-
-        bytes memory message = _getL1WithdrawMessage(_l1Receiver, l1Token, _amount);
+        bytes memory message = _getL1WithdrawMessage(_assetInfo, _bridgeMintData);
         L2ContractHelper.sendMessageToL1(message);
 
-        emit WithdrawalInitiated(msg.sender, _l1Receiver, _l2Token, bytes32(_amount));
+        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, msg.sender, _assetInfo, keccak256(_assetData));
     }
 
     /// @dev Encode the message for l2ToL1log sent with withdraw initialization
     function _getL1WithdrawMessage(
-        address _to,
-        address _l1Token,
-        uint256 _amount
+        bytes32 _assetInfo,
+        bytes memory _bridgeMintData
     ) internal pure returns (bytes memory) {
         // note we use the IL1ERC20Bridge.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
         // and we use this interface so that when the switch happened the old messages could be processed
-        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _to, _l1Token, _amount);
+        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _assetInfo, _bridgeMintData);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            LEGACY FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function finalizeDeposit(
+        address _l1Sender,
+        address _l2Receiver,
+        address _l1Token,
+        uint256 _amount,
+        bytes calldata _data
+    ) external onlyBridge {
+        bytes32 assetInfo = keccak256(
+            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint160(_l1Token)))
+        );
+        bytes memory data = abi.encode(_l1Sender, _amount, _l2Receiver, _data, _l1Token);
+        finalizeDeposit(assetInfo, data);
+    }
+
+    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
+        bytes32 assetInfo = keccak256(
+            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint160(l1TokenAddress(_l2Token))))
+        );
+        bytes memory data = abi.encode(_amount, _l1Receiver);
+    }
+
+    function l1TokenAddress(address _l2Token) public view returns (address) {
+        return IL2StandardToken(_l2Token).l1Address();
     }
 
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view override returns (address) {
-        bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
-        bytes32 salt = _getCreate2Salt(_l1Token);
-        return
-            L2ContractHelper.computeCreate2Address(address(this), salt, l2TokenProxyBytecodeHash, constructorInputHash);
-    }
-
-    /// @dev Convert the L1 token address to the create2 salt of deployed L2 token
-    function _getCreate2Salt(address _l1Token) internal pure returns (bytes32 salt) {
-        salt = bytes32(uint256(uint160(_l1Token)));
-    }
-
-    /// @dev Deploy the beacon proxy for the L2 token, while using ContractDeployer system contract.
-    /// @dev This function uses raw call to ContractDeployer to make sure that exactly `l2TokenProxyBytecodeHash` is used
-    /// for the code of the proxy.
-    function _deployBeaconProxy(bytes32 salt) internal returns (BeaconProxy proxy) {
-        (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
-            uint32(gasleft()),
-            DEPLOYER_SYSTEM_CONTRACT,
-            0,
-            abi.encodeCall(
-                IContractDeployer.create2,
-                (salt, l2TokenProxyBytecodeHash, abi.encode(address(l2TokenBeacon), ""))
-            )
-        );
-
-        // The deployment should be successful and return the address of the proxy
-        require(success, "mk");
-        proxy = BeaconProxy(abi.decode(returndata, (address)));
+        return standardDeployer.l2TokenAddress(_l1Token);
     }
 }

@@ -20,7 +20,7 @@ import {L2Message, TxStatus} from "../common/Messaging.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
@@ -184,7 +184,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev Used to set the assedAddress for a given assetInfo.
     function setAssetAddress(bytes32 _additionalData, address _assetAddress) external {
-        bytes32 assetInfo = keccak256(abi.encode(block.chainid, msg.sender, _additionalData)); /// todo make other asse
+        address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
+        bytes32 assetInfo = keccak256(abi.encode(block.chainid, sender, _additionalData)); /// todo make other asse
         assetAddress[assetInfo] = _assetAddress;
     }
 
@@ -215,7 +216,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         assetInfo = _assetInfo;
         if (l1Asset == address(0) && (uint256(_assetInfo) <= type(uint160).max)) {
             l1Asset = address(nativeTokenVault);
-            assetInfo = keccak256(abi.encode(block.chainid, nativeTokenVault, uint256(uint160(uint256(_assetInfo)))));
+            assetInfo = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetInfo));
             // assetAddress[assetInfo] = address(nativeTokenVault);
             nativeTokenVault.registerToken(address(uint160(uint256(_assetInfo))));
         }
@@ -334,7 +335,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes32 _assetInfo,
         bytes memory _assetData
     ) internal view returns (bytes memory) {
-        return abi.encodeCall(IL2Bridge.finalizeDeposit, (_l1Sender, _assetInfo, _assetData));
+        return abi.encodeCall(IL2Bridge.finalizeDeposit, (_assetInfo, _assetData));
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2
@@ -377,9 +378,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             bytes32 assetInfo;
             bytes32 txDataHash;
             if (uint256(_assetInfo) <= type(uint160).max) {
-                assetInfo = keccak256(
-                    abi.encode(block.chainid, nativeTokenVault, uint256(uint160(uint256(_assetInfo))))
-                );
+                assetInfo = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetInfo));
                 (uint256 _amount, ) = abi.decode(_assetData, (uint256, address));
                 txDataHash = keccak256(abi.encode(_depositSender, uint160(uint256(_assetInfo)), _amount));
             } else {

@@ -3,7 +3,7 @@ import "@nomiclabs/hardhat-ethers";
 import { ethers } from "ethers";
 import { SingletonFactoryFactory } from "../typechain";
 
-import { getAddressFromEnv, isZKMode } from "./utils";
+import { getAddressFromEnv, getHashFromEnv, isZKMode } from "./utils";
 
 export async function deployViaCreate2(
   deployWallet: ethers.Wallet,
@@ -157,8 +157,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       SharedBridgeProxy: getAddressFromEnv("CONTRACTS_L1_SHARED_BRIDGE_PROXY_ADDR"),
       L2SharedBridgeImplementation: getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_IMPL_ADDR"),
       L2SharedBridgeProxy: getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR"),
-      NativeTokenVaultImplementation: getAddressFromEnv("CONTRACTS_NATIVE_TOKEN_VAULT_IMPL_ADDR"),
-      NativeTokenVaultProxy: getAddressFromEnv("CONTRACTS_NATIVE_TOKEN_VAULT_PROXY_ADDR"),
+      NativeTokenVaultImplementation: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_IMPL_ADDR"),
+      NativeTokenVaultProxy: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_PROXY_ADDR"),
     },
     BaseToken: getAddressFromEnv("CONTRACTS_BASE_TOKEN_ADDR"),
     TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),
@@ -166,6 +166,6 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     BlobVersionedHashRetriever: getAddressFromEnv("CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR"),
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
     Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
-    ChainAssetInfo: getAddressFromEnv("CONTRACTS_CHAIN_ASSET_INFO_ADDR"),
+    ChainAssetInfo: getHashFromEnv("CONTRACTS_CHAIN_ASSET_INFO"),
   };
 }

@@ -922,7 +922,7 @@ export class Deployer {
     }
   }
 
-  public async registerToken(tokenAddress: string) {
+  public async registerTokenBridgehub(tokenAddress: string) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     const tx = await bridgehub.addToken(tokenAddress);
 
@@ -940,7 +940,6 @@ export class Deployer {
     await this.deployNativeTokenVaultImplementation(create2Salt, { gasPrice, nonce: nonce + 2 });
     await this.deployNativeTokenVaultProxy(create2Salt, { gasPrice });
     await this.registerSharedBridge({ gasPrice });
-    await this.registerTokenInNativeTokenVault(this.addresses.BaseToken, { gasPrice });
   }
 
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {

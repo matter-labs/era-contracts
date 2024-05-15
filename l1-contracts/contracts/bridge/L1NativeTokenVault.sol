@@ -14,7 +14,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IL1StandardAsset} from "./interfaces/IL1StandardAsset.sol";
 
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 
@@ -77,7 +77,9 @@ contract L1NativeTokenVault is
     /// @notice Allows the bridge to register a token address for the vault.
     function registerToken(address _l1Token) external {
         require(_l1Token == ETH_TOKEN_ADDRESS || _l1Token.code.length > 0, "NTV: empty token");
-        bytes32 assetInfo = keccak256(abi.encode(block.chainid, address(this), uint256(uint160(_l1Token))));
+        bytes32 assetInfo = keccak256(
+            abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, uint256(uint160(_l1Token)))
+        );
         L1_SHARED_BRIDGE.setAssetAddress(bytes32(uint256(uint160(_l1Token))), address(this));
         tokenAddress[assetInfo] = _l1Token;
     }
@@ -112,7 +114,7 @@ contract L1NativeTokenVault is
             chainBalance[_chainId][l1Token] += _depositAmount;
         }
 
-        _bridgeMintData = abi.encode(amount, _l2Receiver, _getERC20Getters(l1Token)); // to do add l2Receiver in here
+        _bridgeMintData = abi.encode(amount, _prevMsgSender, _l2Receiver, _getERC20Getters(l1Token), l1Token); // to do add l2Receiver in here
     }
 
     /// @dev Transfers tokens from the depositor address to the smart contract address.
@@ -200,6 +202,13 @@ contract L1NativeTokenVault is
     }
 
     function getAssetInfo(address _l1TokenAddress) public view override returns (bytes32) {
-        return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1TokenAddress)))));
+        return
+            keccak256(
+                abi.encode(
+                    block.chainid,
+                    NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS,
+                    bytes32(uint256(uint160(_l1TokenAddress)))
+                )
+            );
     }
 }
