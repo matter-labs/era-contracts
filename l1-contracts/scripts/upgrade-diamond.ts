@@ -2,12 +2,11 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
 import { Command } from "commander";
-import { Wallet, ethers } from "ethers";
+import { Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, GAS_MULTIPLIER } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-import { IZkSyncHyperchainFactory } from "../typechain/IZkSyncHyperchainFactory";
 import { StateTransitionManagerFactory } from "../typechain";
 
 const provider = web3Provider();
@@ -24,8 +23,10 @@ async function main() {
     .option("--owner-address <owner-address>")
     .option("--create2-salt <create2-salt>")
     .action(async (cmd) => {
-      const deployWallet = new Wallet("DEPLOYER_WALLET", provider);
+      const deployWallet = new Wallet("", provider); //TODO: put deployer PK here
+      const govWallet = new Wallet("", provider); // TODO: put governor PK here
       console.log(`Using deployer wallet: ${deployWallet.address}`);
+      console.log(`Using governor wallet: ${govWallet.address}`);
 
       const gasPrice = cmd.gasPrice
         ? parseUnits(cmd.gasPrice, "gwei")
@@ -47,28 +48,36 @@ async function main() {
         verbose: true,
       });
 
-      const contractAddress1 = await deployer.deployViaCreate2("Verifier", [], create2Salt, {
-        gasPrice,
-        nonce,
-        gasLimit: 10_000_000,
+      const govDeployer = new Deployer({
+        deployWallet: govWallet,
+        addresses: deployedAddressesFromEnv(),
+        ownerAddress: deployWallet.address,
+        verbose: true,
       });
-      nonce++;
-      console.log(`VERIFIER ADDR: ${contractAddress1}`);
+      govDeployer.addresses.Governance = ""; // TODO: put governance address here
 
-      const contractAddress2 = await deployer.deployViaCreate2("UpgradeVerifier", [], create2Salt, { gasPrice, nonce });
+      // TODO: replace UpgradeBootloaderHash to the name of your upgrade
+      const upgradeAddress = await deployer.deployViaCreate2("UpgradeBootloaderHash", [], create2Salt, { gasPrice, nonce });
       nonce++;
-      console.log(`UPGRADE VERIFIER ADDR: ${contractAddress2}`);
+      console.log(`UPGRADE ADDR: ${upgradeAddress}`);
 
-      // STEP 2: uncomment this code, insert the correct address and calldata, and run
-      // const diamond = StateTransitionManagerFactory.connect(deployer.addresses.StateTransition.StateTransitionProxy, deployer.deployWallet);
-      // let tx = await diamond.executeUpgrade(
-      //     282, {
-      //         facetCuts: [],
-      //         initAddress: "INIT_ADDRESS",
-      //         initCalldata: "INIT_CALLDATA" // call to the()
-      //     }, {gasPrice, nonce: nonce});
-      // const receipt = await tx.wait();
-      // console.log(receipt);
+      const stm = StateTransitionManagerFactory.connect(
+        govDeployer.addresses.StateTransition.StateTransitionProxy,
+        govDeployer.deployWallet
+      );
+
+      await govDeployer.executeUpgrade(
+          govDeployer.addresses.StateTransition.StateTransitionProxy,
+        0,
+          stm.interface.encodeFunctionData("executeUpgrade", [
+              9, // TODO: set your chain ID here
+              {
+                  facetCuts: [],
+                  initAddress: upgradeAddress,
+                  initCalldata: "", // TODO: set your init calldata here(use abi-encode with your upgrade signature and arguments)
+              }
+          ])
+      );
     });
 
   await program.parseAsync(process.argv);
