@@ -200,7 +200,6 @@ contract L1Messenger is IL1Messenger, ISystemContract {
             bytes32(uint256(SystemLogKey.HYPERCHAIN_PUBDATA_KEY)),
             keccak256(BATCH_AGGREGATOR.returnBatchesAndClearState())
         );
-        
 
         uint256 calldataPtr = 0;
 
@@ -316,7 +315,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
             stateDiffs,
             compressedStateDiffs
         );
-        // 
+        //
 
         /// Check for calldata strict format
         require(calldataPtr == _totalL2ToL1PubdataAndStateDiffs.length, "Extra data in the totalL2ToL1Pubdata array");

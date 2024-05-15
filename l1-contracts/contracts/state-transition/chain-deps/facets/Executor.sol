@@ -76,7 +76,11 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         } else if (pubdataSource == uint8(PubdataSource.ForwardedMessage)) {
             // Similar to Calldata, forwards packed pubdataCommitments of hyperchains to the lower layer
             // Add batch to BatchAggregator
-            IBatchAggregator(BATCH_AGGREGATOR_ADDRESS).commitBatch(_newBatch.pubdataCommitments,0,_newBatch.batchNumber);
+            IBatchAggregator(BATCH_AGGREGATOR_ADDRESS).commitBatch(
+                _newBatch.pubdataCommitments,
+                0,
+                _newBatch.batchNumber
+            );
         }
 
         require(_previousBatch.batchHash == logOutput.previousBatchHash, "l");

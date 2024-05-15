@@ -17,12 +17,16 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
     mapping(uint256 => bool) chainSet;
     uint256[] chainList;
     function addChain(uint256 chainId) internal {
-        if (chainSet[chainId]==false){
+        if (chainSet[chainId] == false) {
             chainList.push(chainId);
             chainSet[chainId] = true;
         }
     }
-    function commitBatch(bytes calldata _totalL2ToL1PubdataAndStateDiffs, uint256 chainId, uint256 batchNumber) external{
+    function commitBatch(
+        bytes calldata _totalL2ToL1PubdataAndStateDiffs,
+        uint256 chainId,
+        uint256 batchNumber
+    ) external {
         addChain(chainId);
 
         uint256 calldataPtr = 0;
@@ -30,14 +34,21 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
         /// Check logs
         uint32 numberOfL2ToL1Logs = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
         require(numberOfL2ToL1Logs <= L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, "Too many L2->L1 logs");
-        logStorage[chainId].push(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4 + numberOfL2ToL1Logs*L2_TO_L1_LOG_SERIALIZE_SIZE]);
-        calldataPtr += 4 + L2_TO_L1_LOG_SERIALIZE_SIZE*numberOfL2ToL1Logs;
-    
+        logStorage[chainId].push(
+            _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr +
+                4 +
+                numberOfL2ToL1Logs *
+                L2_TO_L1_LOG_SERIALIZE_SIZE]
+        );
+        calldataPtr += 4 + L2_TO_L1_LOG_SERIALIZE_SIZE * numberOfL2ToL1Logs;
+
         /// Check messages
         uint32 numberOfMessages = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-        messageStorage[chainId].push(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4+numberOfMessages*4]);
-        calldataPtr += 4+numberOfMessages*4;
-        
+        messageStorage[chainId].push(
+            _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4 + numberOfMessages * 4]
+        );
+        calldataPtr += 4 + numberOfMessages * 4;
+
         /// Check bytecodes
         uint32 numberOfBytecodes = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
         uint256 bytecodeSliceStart = calldataPtr;
@@ -84,14 +95,20 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
         calldataPtr += numberOfStateDiffs * STATE_DIFF_ENTRY_SIZE;
 
         stateDiffStorage[chainId].push(_totalL2ToL1PubdataAndStateDiffs[stateDiffSliceStart:calldataPtr]);
-
     }
-    function returnBatchesAndClearState() external returns(bytes memory batchInfo) {
-        for (uint256 i = 0;i<chainList.length; i+=1){
+    function returnBatchesAndClearState() external returns (bytes memory batchInfo) {
+        for (uint256 i = 0; i < chainList.length; i += 1) {
             uint256 chainId = chainList[i];
-            
-            chainData.push(abi.encode(chainId,logStorage[chainId],messageStorage[chainId],
-                bytecodeStorage[chainId],stateDiffStorage[chainId]));
+
+            chainData.push(
+                abi.encode(
+                    chainId,
+                    logStorage[chainId],
+                    messageStorage[chainId],
+                    bytecodeStorage[chainId],
+                    stateDiffStorage[chainId]
+                )
+            );
 
             delete chainSet[chainId];
             delete logStorage[chainId];
