@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "../common/Config.sol";
 import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
-import {ProtocolVersionShouldBeGreater, ProtocolVersionDeltaTooLarge, PreviousUprgadeNotFinalized, PreviousUpgradeBatchNotCleared} from "./ZkSyncUpgradeErrors.sol";
+import {ProtocolVersionShouldBeGreater, ProtocolVersionDeltaTooLarge, PreviousUpgradeNotFinalized, PreviousUpgradeBatchNotCleared} from "./ZkSyncUpgradeErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -29,7 +29,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
 
         // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
         if (s.l2SystemContractsUpgradeTxHash != bytes32(0)) {
-            revert PreviousUprgadeNotFinalized();
+            revert PreviousUpgradeNotFinalized();
         }
 
         if (
