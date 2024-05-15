@@ -215,7 +215,7 @@ contract DeployL1Script is Script {
 
         if (isConfigured) {
             if (config.contracts.create2FactoryAddr.code.length == 0) {
-                revert AddressHasNoCode(ZksyncContract.Create2Factory);
+                revert AddressHasNoCode(config.contracts.create2FactoryAddr);
             }
             contractAddress = config.contracts.create2FactoryAddr;
             console.log("Using configured Create2Factory address:", contractAddress);
