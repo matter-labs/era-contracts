@@ -128,7 +128,7 @@ export class Deployer {
         baseTokenBridge: "0x0000000000000000000000000000000000004234",
         storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
         // The exact value is not important as it will be overriden by the STM
-        syncLayerState: 0,
+        // syncLayerState: 0,
         verifier: this.addresses.StateTransition.Verifier,
         verifierParams,
         l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
@@ -142,7 +142,7 @@ export class Deployer {
     return diamondCut(
       facetCuts,
       this.addresses.StateTransition.DiamondInit,
-      "0x" + diamondInitCalldata.slice(2 + (4 + 10 * 32) * 2)
+      "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2)
     );
   }
 
@@ -362,7 +362,7 @@ export class Deployer {
     const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
     const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
     const diamondCut = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
-    console.log("correct initial diamond cut", diamondCut);
+    // console.log("correct initial diamond cut", diamondCut);
     const protocolVersion = getNumberFromEnv("CONTRACTS_GENESIS_PROTOCOL_VERSION");
 
     const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
@@ -713,6 +713,9 @@ export class Deployer {
     const stateTransitionManager = this.stateTransitionManagerContract(this.deployWallet);
 
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
+    const alreadyRegisteredInSTM =
+      (await stateTransitionManager.getHyperchain(inputChainId)) != ethers.constants.AddressZero;
+
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
@@ -746,7 +749,7 @@ export class Deployer {
 
       console.log(`CONTRACTS_BASE_TOKEN_ADDR=${baseTokenAddress}`);
     }
-    if (!predefinedChainId) {
+    if (!alreadyRegisteredInSTM) {
       const diamondProxyAddress =
         "0x" +
         receipt.logs

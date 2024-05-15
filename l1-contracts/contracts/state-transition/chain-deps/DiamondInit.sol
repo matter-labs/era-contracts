@@ -47,7 +47,7 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
         s.feeParams = _initializeData.feeParams;
         s.blobVersionedHashRetriever = _initializeData.blobVersionedHashRetriever;
 
-        s.syncLayerState = _initializeData.syncLayerState;
+        // s.syncLayerState = _initializeData.syncLayerState;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages

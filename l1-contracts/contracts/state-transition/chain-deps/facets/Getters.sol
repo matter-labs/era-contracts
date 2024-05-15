@@ -52,6 +52,11 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     function getStateTransitionManager() external view returns (address) {
         return s.stateTransitionManager;
     }
+    
+    /// @inheritdoc IGetters
+    function getChainId() external view returns (uint256) {
+        return s.chainId;
+    }
 
     /// @inheritdoc IGetters
     function getBaseToken() external view returns (address) {
@@ -195,10 +200,10 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getSyncLayerState() external view returns (SyncLayerState) {
+    function getSyncLayer() external view returns (address) {
         // TODO: consider making private so that noone relies on it
 
-        return s.syncLayerState;
+        return s.syncLayer;
     }
 
     /*//////////////////////////////////////////////////////////////

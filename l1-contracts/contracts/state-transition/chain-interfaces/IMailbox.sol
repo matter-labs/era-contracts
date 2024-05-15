@@ -94,6 +94,11 @@ interface IMailbox is IZkSyncHyperchainBase {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash);
+    
+    function requestL2TransactionToSyncLayer(
+        uint256 _chainId,
+        BridgehubL2TransactionRequest calldata _request
+    ) external returns (bytes32 canonicalTxHash);
 
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
@@ -109,9 +114,6 @@ interface IMailbox is IZkSyncHyperchainBase {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
-
-    /// @notice transfer Eth to shared bridge as part of migration process
-    function transferEthToSharedBridge() external;
 
     /// @notice New priority request event. Emitted when a request is placed into the priority queue
     /// @param txId Serial number of the priority operation

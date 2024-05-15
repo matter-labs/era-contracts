@@ -2,6 +2,9 @@
 
 pragma solidity 0.8.24;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
@@ -15,6 +18,8 @@ import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+    using SafeERC20 for IERC20;
+
     /// @notice all the ether is held by the weth bridge
     IL1SharedBridge public sharedBridge;
 
@@ -26,6 +31,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice chainID => StateTransitionManager contract address, storing StateTransitionManager
     mapping(uint256 _chainId => address) public stateTransitionManager;
 
+    /// @dev used to indicate the currently active settlement layer for a given chainId
+    mapping(uint256 chainId => uint256 activeSettlementLayerChainId) public settlementLayer;
+
     /// @notice chainID => baseToken contract address, storing baseToken
     mapping(uint256 _chainId => address) public baseToken;
 
@@ -34,6 +42,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @dev used to accept the admin role
     address private pendingAdmin;
+
+    /// @dev used to indicate that the contract is deployed on synclayer
+    bool public syncLayerMode;
+
+    /// @dev the allowed settlement layers
+    mapping(uint256 chainId => bool isWhitelistedSyncLayer) public whitelistedSettlementLayers;
+
+    /// @dev the deployed bridgehub on other chains
+    mapping(uint256 chainId => address bridgehubCounterPart) public bridgehubCounterParts;
 
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {}
@@ -45,6 +62,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     modifier onlyOwnerOrAdmin() {
         require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
+        _;
+    }
+
+    modifier onlyChainSTM(uint256 _chainId) {
+        require(msg.sender == stateTransitionManager[_chainId], "Bridgehub: not chain STM");
         _;
     }
 
@@ -234,7 +256,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
-    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+    ) public payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
         {
             address token = baseToken[_request.chainId];
             if (token == ETH_TOKEN_ADDRESS) {
@@ -342,6 +364,80 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             canonicalTxHash
         );
     }
+
+    function forwardTransactionOnSyncLayer(
+        uint256 _chainId,
+        BridgehubL2TransactionRequest calldata _request
+    ) external override {
+        require(syncLayerMode, "Bridgehub: not in sync layer mode");
+        address hyperchain = getHyperchain(_chainId);
+        IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(_request);
+    }
+
+    function registerCounterpart(uint256 _chainId, address _counterPart) external onlyOwner {
+        require(_counterPart != address(0), "STM: counter part zero");
+
+        bridgehubCounterParts[_chainId] = _counterPart;
+    }
+
+    function registerSyncLayer(
+        uint256 _newSyncLayerChainId,
+        bool _isWhitelisted
+    ) external onlyChainSTM(_newSyncLayerChainId) {
+        whitelistedSettlementLayers[_newSyncLayerChainId] = _isWhitelisted;
+
+        // TODO: emit event
+    }
+
+    /// @dev we can move assets using these
+    function startMigrationFromL1(
+        L2TransactionRequestDirect memory _request,
+        uint256 _migratingChainId,
+        address _newSyncLayerAdmin,
+        bytes memory _diamondCut
+    ) external payable override returns (bytes memory _bridgeMintData) {
+        require(!syncLayerMode, "Bh: in sync layer mode");
+        uint256 settlementChainId = _request.chainId;
+        require(msg.sender == IZkSyncHyperchain(getHyperchain(_migratingChainId)).getAdmin(), "Bh: not chain STM");
+        require(whitelistedSettlementLayers[settlementChainId], "Bh: stl not whitelisted");
+        require(settlementLayer[_migratingChainId] == block.chainid, "Bh: already migrated");
+        require(_newSyncLayerAdmin != address(0), "STM: admin zero");
+
+        IERC20 token = IERC20(baseToken[settlementChainId]);
+        token.safeTransferFrom(msg.sender, address(this), _request.mintValue);
+        token.safeIncreaseAllowance(address(sharedBridge), _request.mintValue);
+
+        settlementLayer[_migratingChainId] = settlementChainId;
+
+        bytes memory chainData = IZkSyncHyperchain(getHyperchain(_migratingChainId)).startMigration(
+            settlementChainId
+        );
+        bytes memory l2Calldata = abi.encodeCall(this.finalizeMigrationToSL.selector, [_request, _newSyncLayerAdmin, _diamondCut]);
+
+        canonicalTxHash = this.requestL2TransactionDirect(
+            L2TransactionRequestDirect({
+                chainId: settlementChainId,
+                mintValue: _request.mintValue,
+                contractL2: bridgehubCounterParts[_settlementChainId],
+                l2Value: 0,
+                l2Calldata: l2Calldata,
+                l2GasLimit: _request.l2GasLimit,
+                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
+                factoryDeps: _request.factoryDeps,
+                refundRecipient: refundRecipient
+            })
+        );
+
+    }
+
+    function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {}
+
+    function bridgeClaimFailedBurn(
+        uint256 _chainId,
+        bytes32 _assetInfo,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external payable override {}
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE
