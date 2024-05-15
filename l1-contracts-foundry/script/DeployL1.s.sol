@@ -11,6 +11,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {Verifier} from "contracts/state-transition/Verifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -80,6 +81,7 @@ contract DeployL1Script is Script {
         uint256 eraChainId;
         address deployerAddress;
         address ownerAddress;
+        bool testnetVerifier;
         ContractsConfig contracts;
         TokensConfig tokens;
     }
@@ -107,6 +109,8 @@ contract DeployL1Script is Script {
         uint256 governanceMinDelay;
         uint256 maxNumberOfHyperchains;
         bytes diamondCutData;
+        bytes32 bootloaderHash;
+        bytes32 defaultAAHash;
     }
 
     struct TokensConfig {
@@ -162,6 +166,7 @@ contract DeployL1Script is Script {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.eraChainId = toml.readUint("$.era_chain_id");
         config.ownerAddress = toml.readAddress("$.owner_address");
+        config.testnetVerifier = toml.readBool("$.testnet_verifier");
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
@@ -197,6 +202,8 @@ contract DeployL1Script is Script {
             "$.contracts.diamond_init_priority_tx_max_pubdata"
         );
         config.contracts.diamondInitMinimalL2GasPrice = toml.readUint("$.contracts.diamond_init_minimal_l2_gas_price");
+        config.contracts.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
+        config.contracts.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
@@ -236,7 +243,13 @@ contract DeployL1Script is Script {
     }
 
     function deployVerifier() internal {
-        address contractAddress = deployViaCreate2(type(Verifier).creationCode);
+        bytes memory code;
+        if (config.testnetVerifier) {
+            code = type(TestnetVerifier).creationCode;
+        } else {
+            code = type(Verifier).creationCode;
+        }
+        address contractAddress = deployViaCreate2(code);
         console.log("Verifier deployed at:", contractAddress);
         addresses.stateTransition.verifier = contractAddress;
     }
@@ -400,8 +413,8 @@ contract DeployL1Script is Script {
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(addresses.stateTransition.verifier),
             verifierParams: verifierParams,
-            l2BootloaderBytecodeHash: bytes32(Utils.getBatchBootloaderBytecodeHash()),
-            l2DefaultAccountBytecodeHash: bytes32(Utils.readSystemContractsBytecode("DefaultAccount")),
+            l2BootloaderBytecodeHash: config.contracts.bootloaderHash,
+            l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
             priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
             feeParams: feeParams,
             blobVersionedHashRetriever: addresses.blobVersionedHashRetriever
@@ -467,7 +480,7 @@ contract DeployL1Script is Script {
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(0),
-            initCalldata: hex""
+            initCalldata: ""
         });
         bytes memory bytecode = abi.encodePacked(
             type(DiamondProxy).creationCode,
@@ -555,7 +568,7 @@ contract DeployL1Script is Script {
         validatorTimelock.transferOwnership(config.ownerAddress);
 
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
-        bridgehub.transferOwnership(config.ownerAddress);
+        bridgehub.transferOwnership(addresses.governance);
 
         L1SharedBridge sharedBridge = L1SharedBridge(addresses.bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses.governance);
