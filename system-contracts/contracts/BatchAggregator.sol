@@ -2,17 +2,23 @@
 
 pragma solidity 0.8.20;
 
-import {IBatchAggregator} from "./interfaces/IBatchAggregator.sol";
+import {UnsafeBytesCalldata} from "./libraries/UnsafeBytesCalldata.sol";
+import {IBatchAggregator, COMPRESSED_STATE_DIFF_SIZE} from "./interfaces/IBatchAggregator.sol";
+import {OPERATION_BITMASK, LENGTH_BITS_OFFSET, MAX_ENUMERATION_INDEX_SIZE} from "./interfaces/ICompressor.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE, STATE_DIFF_COMPRESSION_VERSION_NUMBER} from "./interfaces/IL1Messenger.sol";
 import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, BATCH_AGGREGATOR, STATE_DIFF_ENTRY_SIZE, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER, COMPUTATIONAL_PRICE_FOR_PUBDATA} from "./Constants.sol";
 
 contract BatchAggregator is IBatchAggregator, ISystemContract {
+    using UnsafeBytesCalldata for bytes;
+
     bytes[] batchStorage;
     bytes[] chainData;
     mapping(uint256 => bytes[]) messageStorage;
     mapping(uint256 => bytes[]) logStorage;
-    mapping(uint256 => bytes[]) stateDiffStorage;
+    mapping(uint256 => mapping(bytes32 => uint256)) stateDiffStorage;
+    mapping(uint256 => mapping(bytes32 => bool)) keyStatus;
+    mapping(uint256 => bytes32[]) touchedKeys;
     mapping(uint256 => bytes[]) bytecodeStorage;
     mapping(uint256 => bool) chainSet;
     uint256[] chainList;
@@ -72,7 +78,6 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
                 STATE_DIFF_COMPRESSION_VERSION_NUMBER,
             "state diff compression version mismatch"
         );
-        uint256 stateDiffSliceStart = calldataPtr;
         calldataPtr++;
 
         uint24 compressedStateDiffSize = uint24(bytes3(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 3]));
@@ -94,19 +99,93 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             (numberOfStateDiffs * STATE_DIFF_ENTRY_SIZE)];
         calldataPtr += numberOfStateDiffs * STATE_DIFF_ENTRY_SIZE;
 
-        stateDiffStorage[chainId].push(_totalL2ToL1PubdataAndStateDiffs[stateDiffSliceStart:calldataPtr]);
+        require(enumerationIndexSize <= MAX_ENUMERATION_INDEX_SIZE, "enumeration index size is too large");
+        uint256 numberOfInitialWrites = uint256(compressedStateDiffs.readUint16(0));
+        bytes32[] memory derivedKeyTable = new bytes32[](numberOfInitialWrites);
+
+        uint256 stateDiffPtr = 2;
+        uint256 numInitialWritesProcessed = 0;
+        // Process initial writes
+        for (uint256 i = 0; i < numberOfStateDiffs * STATE_DIFF_ENTRY_SIZE; i += STATE_DIFF_ENTRY_SIZE) {
+            bytes calldata stateDiff = stateDiffs[i:i + STATE_DIFF_ENTRY_SIZE];
+            uint64 enumIndex = stateDiff.readUint64(84);
+            if (enumIndex != 0) {
+                // It is a repeated write, so we skip it.
+                continue;
+            }
+
+            bytes32 derivedKey = stateDiff.readBytes32(52);
+            derivedKeyTable[numInitialWritesProcessed] = derivedKey;
+            uint256 initValue = stateDiff.readUint256(92);
+            uint256 finalValue = stateDiff.readUint256(124);
+
+            numInitialWritesProcessed++;
+            require(derivedKey == compressedStateDiffs.readBytes32(stateDiffPtr), "iw: initial key mismatch");
+            if (keyStatus[chainId][derivedKey] == false) {
+                keyStatus[chainId][derivedKey] = true;
+                touchedKeys[chainId].push(derivedKey);
+            }
+            stateDiffStorage[chainId][derivedKey] = finalValue;
+
+            stateDiffPtr += 32;
+
+            uint8 metadata = uint8(bytes1(compressedStateDiffs[stateDiffPtr]));
+            stateDiffPtr++;
+            uint8 operation = metadata & OPERATION_BITMASK;
+            uint8 len = operation == 0 ? 32 : metadata >> LENGTH_BITS_OFFSET;
+
+            stateDiffPtr += len;
+        }
+
+        require(numInitialWritesProcessed == numberOfInitialWrites, "Incorrect number of initial storage diffs");
+
+        // Process repeated writes
+        for (uint256 i = 0; i < numberOfStateDiffs * STATE_DIFF_ENTRY_SIZE; i += STATE_DIFF_ENTRY_SIZE) {
+            bytes calldata stateDiff = stateDiffs[i:i + STATE_DIFF_ENTRY_SIZE];
+            uint64 enumIndex = stateDiff.readUint64(84);
+            if (enumIndex == 0) {
+                continue;
+            }
+            bytes32 derivedKey = derivedKeyTable[enumIndex];
+            uint256 initValue = stateDiff.readUint256(92);
+            uint256 finalValue = stateDiff.readUint256(124);
+
+            stateDiffStorage[chainId][derivedKey] = finalValue;
+            stateDiffPtr += enumerationIndexSize;
+
+            uint8 metadata = uint8(bytes1(compressedStateDiffs[stateDiffPtr]));
+            stateDiffPtr += 1;
+            uint8 operation = metadata & OPERATION_BITMASK;
+            uint8 len = operation == 0 ? 32 : metadata >> LENGTH_BITS_OFFSET;
+
+            stateDiffPtr += len;
+        }
+
+        require(stateDiffPtr == compressedStateDiffs.length, "Extra data in _compressedStateDiffs");
     }
     function returnBatchesAndClearState() external returns (bytes memory batchInfo) {
         for (uint256 i = 0; i < chainList.length; i += 1) {
             uint256 chainId = chainList[i];
-
+            bytes memory compressedStateDiff = new bytes(touchedKeys[chainId].length * COMPRESSED_STATE_DIFF_SIZE);
+            uint256 stateDiffPtr = 0;
+            for (uint256 keyIndex = 0; keyIndex < touchedKeys[chainId].length; keyIndex += 1) {
+                bytes32 derivedKey = touchedKeys[chainId][keyIndex];
+                uint256 finalValue = stateDiffStorage[chainId][derivedKey];
+                assembly {
+                    mstore(add(compressedStateDiff, stateDiffPtr), derivedKey)
+                    mstore(add(compressedStateDiff, add(stateDiffPtr, 0x20)), finalValue)
+                }
+                delete stateDiffStorage[chainId][derivedKey];
+                delete keyStatus[chainId][derivedKey];
+                stateDiffPtr += COMPRESSED_STATE_DIFF_SIZE;
+            }
             chainData.push(
                 abi.encode(
                     chainId,
                     logStorage[chainId],
                     messageStorage[chainId],
                     bytecodeStorage[chainId],
-                    stateDiffStorage[chainId]
+                    compressedStateDiff
                 )
             );
 
@@ -114,14 +193,10 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             delete logStorage[chainId];
             delete messageStorage[chainId];
             delete bytecodeStorage[chainId];
-            delete stateDiffStorage[chainId];
+            delete touchedKeys[chainId];
         }
         delete chainList;
         batchInfo = abi.encode(chainData);
         delete chainData;
-        /*delete messageStorage;
-        delete logStorage;
-        delete stateDiffStorage;
-        delete bytecodeStorage;*/
     }
 }
