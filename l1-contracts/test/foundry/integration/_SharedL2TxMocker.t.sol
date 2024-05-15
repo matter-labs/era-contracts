@@ -32,13 +32,12 @@ contract L2TxMocker is Test {
         chainContracts[_chainId] = _chainContract;
     }
 
-    function createL2TransitionRequestDirectSecond(
+    function createL2TransactionRequestDirect(
         uint256 _chainId,
         uint256 _mintValue,
         uint256 _l2Value,
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit,
-        address _tokenAddress,
         bytes memory _l2CallData
     ) internal returns (L2TransactionRequestDirect memory request) {
         request.chainId = _chainId;
@@ -55,13 +54,13 @@ contract L2TxMocker is Test {
     }
 
     function createMockL2TransactionRequestDirect(
-        uint256 chainId,
-        uint256 mintValue,
-        uint256 l2Value
+        uint256 _chainId,
+        uint256 _mintValue,
+        uint256 _l2Value
     ) internal returns (L2TransactionRequestDirect memory request) {
-        request.chainId = chainId;
-        request.mintValue = mintValue;
-        request.l2Value = l2Value;
+        request.chainId = _chainId;
+        request.mintValue = _mintValue;
+        request.l2Value = _l2Value;
 
         // mocks
         request.l2Contract = mockL2Contract;
@@ -72,7 +71,7 @@ contract L2TxMocker is Test {
         request.refundRecipient = mockRefundRecipient;
     }
 
-    function createMockL2TransactionRequestTwoBridgesSecond(
+    function createL2TransactionRequestTwoBridges(
         uint256 _chainId,
         uint256 _mintValue,
         uint256 _secondBridgeValue,
@@ -96,23 +95,23 @@ contract L2TxMocker is Test {
     }
 
     function createMockL2TransactionRequestTwoBridges(
-        uint256 chainId,
-        uint256 mintValue,
-        uint256 secondBridgeValue,
-        uint256 l2Value,
-        address secondBridgeAddress,
-        bytes memory secondBridgeCalldata
+        uint256 _chainId,
+        uint256 _mintValue,
+        uint256 _secondBridgeValue,
+        uint256 _l2Value,
+        address _secondBridgeAddress,
+        bytes memory _secondBridgeCalldata
     ) internal returns (L2TransactionRequestTwoBridgesOuter memory request) {
-        request.chainId = chainId;
-        request.mintValue = mintValue;
-        request.secondBridgeAddress = secondBridgeAddress;
-        request.secondBridgeValue = secondBridgeValue;
-        request.l2Value = l2Value;
+        request.chainId = _chainId;
+        request.mintValue = _mintValue;
+        request.secondBridgeAddress = _secondBridgeAddress;
+        request.secondBridgeValue = _secondBridgeValue;
+        request.l2Value = _l2Value;
+        request.secondBridgeCalldata = _secondBridgeCalldata;
 
         // mocks
         request.l2GasLimit = mockL2GasLimit;
         request.l2GasPerPubdataByteLimit = mockL2GasPerPubdataByteLimit;
         request.refundRecipient = mockRefundRecipient;
-        request.secondBridgeCalldata = secondBridgeCalldata;
     }
 }

@@ -10,8 +10,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
-import {Verifier} from "contracts/state-transition/Verifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
