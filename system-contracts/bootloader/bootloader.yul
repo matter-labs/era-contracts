@@ -1569,7 +1569,10 @@ object "Bootloader" {
                     <!-- @ifdef ACCOUNT_IMPERSONATING -->
                     success := ZKSYNC_NEAR_CALL_executeL2TxImpersonating(
                         executeABI,
-                        txDataOffset
+                        txDataOffset,
+                        basePubdataSpent,
+                        reservedGas,
+                        gasPerPubdata
                     )
                     <!-- @endif -->
 
@@ -1654,7 +1657,10 @@ object "Bootloader" {
             <!-- @ifdef ACCOUNT_IMPERSONATING -->
             function ZKSYNC_NEAR_CALL_executeL2TxImpersonating(
                 abi,
-                txDataOffset
+                txDataOffset,
+                basePubdataSpent,
+                reservedGas,
+                gasPerPubdata
             ) -> success {
                 let innerTxDataOffset := add(txDataOffset, 32)
                 let to := getTo(innerTxDataOffset)
@@ -1677,6 +1683,18 @@ object "Bootloader" {
                     value,
                     dataPtr
                 )
+
+                if isNotEnoughGasForPubdata(
+                    basePubdataSpent,
+                    gas(),
+                    reservedGas,
+                    gasPerPubdata
+                ) {
+                    // If not enough gas for pubdata was provided, we revert all the state diffs / messages
+                    // that caused the pubdata to be published
+                    nearCallPanic()
+                }
+                
                 debugLog("Executing L2 ret", success)
             }
             <!-- @endif -->
