@@ -36,7 +36,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         StoredBatchInfo memory _previousBatch,
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
-    ) internal view returns (StoredBatchInfo memory) {
+    ) internal returns (StoredBatchInfo memory) {
         require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batch
 
         uint8 pubdataSource = uint8(bytes1(_newBatch.pubdataCommitments[0]));
@@ -75,7 +75,8 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             );
         } else if (pubdataSource == uint8(PubdataSource.ForwardedMessage)) {
             // Similar to Calldata, forwards packed pubdataCommitments of hyperchains to the lower layer
-            
+            // Add batch to BatchAggregator
+            IBatchAggregator(BATCH_AGGREGATOR_ADDRESS).commitBatch(_newBatch.pubdataCommitments,0,_newBatch.batchNumber);
         }
 
         require(_previousBatch.batchHash == logOutput.previousBatchHash, "l");
