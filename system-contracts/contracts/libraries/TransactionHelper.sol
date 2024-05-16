@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import {IERC20} from "../openzeppelin/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../openzeppelin/token/ERC20/utils/SafeERC20.sol";
@@ -161,7 +161,9 @@ library TransactionHelper {
             encodedGasParam = bytes.concat(encodedGasPrice, encodedGasLimit);
         }
 
-        bytes memory encodedTo = RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
+        bytes memory encodedTo = _transaction.reserved[1] == 0
+            ? RLPEncoder.encodeAddress(address(uint160(_transaction.to)))
+            : bytes(hex"80");
         bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
         // Encode only the length of the transaction data, and not the data itself,
         // so as not to copy to memory a potentially huge transaction data twice.
@@ -230,7 +232,9 @@ library TransactionHelper {
             bytes memory encodedNonce = RLPEncoder.encodeUint256(_transaction.nonce);
             bytes memory encodedGasPrice = RLPEncoder.encodeUint256(_transaction.maxFeePerGas);
             bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
-            bytes memory encodedTo = RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
+            bytes memory encodedTo = _transaction.reserved[1] == 0
+                ? RLPEncoder.encodeAddress(address(uint160(_transaction.to)))
+                : bytes(hex"80");
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
             // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(
@@ -303,7 +307,9 @@ library TransactionHelper {
             bytes memory encodedMaxPriorityFeePerGas = RLPEncoder.encodeUint256(_transaction.maxPriorityFeePerGas);
             bytes memory encodedMaxFeePerGas = RLPEncoder.encodeUint256(_transaction.maxFeePerGas);
             bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
-            bytes memory encodedTo = RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
+            bytes memory encodedTo = _transaction.reserved[1] == 0
+                ? RLPEncoder.encodeAddress(address(uint160(_transaction.to)))
+                : bytes(hex"80");
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
             // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(

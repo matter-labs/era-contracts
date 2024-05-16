@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import {IKnownCodesStorage} from "./interfaces/IKnownCodesStorage.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {COMPRESSOR_CONTRACT, L1_MESSENGER_CONTRACT} from "./Constants.sol";
+import {COMPRESSOR_CONTRACT, L1_MESSENGER_CONTRACT, DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -76,5 +76,23 @@ contract KnownCodesStorage is IKnownCodesStorage, ISystemContract {
         require(version == 1 && _bytecodeHash[1] == bytes1(0), "Incorrectly formatted bytecodeHash");
 
         require(Utils.bytecodeLenInWords(_bytecodeHash) % 2 == 1, "Code length in words must be odd");
+    }
+
+    function publishEVMBytecode(bytes calldata bytecode) external onlyCallFrom(address(DEPLOYER_SYSTEM_CONTRACT)) {
+        /*
+            TODO: ensure that it is properly padded, etc.
+            To preserve EVM compatibility, we can not emit any events here.
+        */
+
+        bytes32 hash = Utils.hashEVMBytecode(bytecode);
+
+        if (getMarker(hash) == 0) {
+            // ToDO: use efficient call
+            L1_MESSENGER_CONTRACT.sendToL1(bytecode);
+
+            assembly {
+                sstore(hash, 1)
+            }
+        }
     }
 }

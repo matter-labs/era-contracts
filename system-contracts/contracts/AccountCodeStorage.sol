@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
 import {Utils} from "./libraries/Utils.sol";
@@ -135,5 +135,11 @@ contract AccountCodeStorage is IAccountCodeStorage {
         ) {
             codeSize = Utils.bytecodeLenInBytes(codeHash);
         }
+    }
+
+    /// @notice Method for detecting whether an address is an EVM contract
+    function isAccountEVM(address _addr) external view override returns (bool) {
+        bytes32 bytecodeHash = getRawCodeHash(_addr);
+        return Utils.isCodeHashEVM(bytecodeHash);
     }
 }

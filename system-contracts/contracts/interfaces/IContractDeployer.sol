@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 interface IContractDeployer {
     /// @notice Defines the version of the account abstraction protocol
@@ -40,6 +40,8 @@ interface IContractDeployer {
 
     event AccountVersionUpdated(address indexed accountAddress, AccountAbstractionVersion aaVersion);
 
+    event EVMProxyHashUpdated(bytes32 indexed oldHash, bytes32 indexed newHash);
+
     function getNewAddressCreate2(
         address _sender,
         bytes32 _bytecodeHash,
@@ -48,6 +50,14 @@ interface IContractDeployer {
     ) external view returns (address newAddress);
 
     function getNewAddressCreate(address _sender, uint256 _senderNonce) external pure returns (address newAddress);
+
+    // function getNewAddressCreate2EVM(
+    //     address _sender,
+    //     bytes32 _salt,
+    //     bytes calldata _bytecode
+    // ) external view returns (address newAddress);
+
+    // function getNewAddressCreateEVM(address _sender, uint256 _senderNonce) external pure returns (address newAddress);
 
     function create2(
         bytes32 _salt,
@@ -88,4 +98,32 @@ interface IContractDeployer {
 
     /// @notice Can be called by an account to update its nonce ordering
     function updateNonceOrdering(AccountNonceOrdering _nonceOrdering) external;
+
+    /// @notice code hash of an evm contract
+    // function getCodeHash(address _addr) external view returns (bytes32);
+
+    /// @notice size of an evm contracts code
+    // function getCodeSize(address addr) external view returns (uint256);
+
+    /// @notice code for a given evm contract
+    // function getCode(address addr) external view returns (bytes memory code);
+
+    /// @notice prepares needed data for evm execution
+    // function prepareEvmExecution(address codeAddress) external returns (bool isConstructor, bytes memory bytecode);
+
+    function createEVM(bytes calldata _initCode) external payable returns (address newAddress);
+
+    function create2EVM(bytes32 _salt, bytes calldata _initCode) external payable returns (address);
+
+    function createEVMInternal(address _newAddress, bytes calldata _initCode) external payable;
+
+    function evmCodeHash(address) external view returns (bytes32);
+
+    // TODO: this is a hack before rewriting to assembly.
+    // This is the only reliable way to pass gas into constructor
+    // function constructorGas(address) external view returns (uint256);
+
+    function setDeployedCode(uint256 constructorGasLeft, bytes calldata newDeployedCode) external;
+
+    function constructorReturnGas() external view returns (uint256);
 }

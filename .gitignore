@@ -17,6 +17,7 @@ tools/data/Verifier.sol
 typechain/
 yarn-debug.log*
 yarn-error.log*
+system-contracts/contracts/EvmInterpreterPreprocessed.yul
 l1-contracts/yarn-error.log*
 l1-contracts/lcov.info
 l1-contracts/report/*

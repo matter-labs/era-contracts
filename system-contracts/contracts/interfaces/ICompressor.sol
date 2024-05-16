@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 // The bitmask by applying which to the compressed state diff metadata we retrieve its operation.
 uint8 constant OPERATION_BITMASK = 7;

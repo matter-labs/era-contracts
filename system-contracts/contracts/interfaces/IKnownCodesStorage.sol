@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 /**
  * @author Matter Labs
@@ -16,4 +16,6 @@ interface IKnownCodesStorage {
     function markBytecodeAsPublished(bytes32 _bytecodeHash) external;
 
     function getMarker(bytes32 _hash) external view returns (uint256);
+
+    function publishEVMBytecode(bytes calldata bytecode) external;
 }

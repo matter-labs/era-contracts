@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "./interfaces/IAccount.sol";
 import {TransactionHelper, Transaction} from "./libraries/TransactionHelper.sol";
@@ -135,6 +135,12 @@ contract DefaultAccount is IAccount {
         uint128 value = Utils.safeCastToU128(_transaction.value);
         bytes calldata data = _transaction.data;
         uint32 gas = Utils.safeCastToU32(gasleft());
+
+        // TODO: if possible, maybe implment some way to avoid memory copying here.
+        if (_transaction.reserved[1] != 0) {
+            DEPLOYER_SYSTEM_CONTRACT.createEVM{value: value}(data);
+            return;
+        }
 
         // Note, that the deployment method from the deployer contract can only be called with a "systemCall" flag.
         bool isSystemCall;

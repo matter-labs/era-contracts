@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import {REAL_DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";

@@ -536,6 +536,12 @@ object "Bootloader" {
                 ret := 1000000
             }
 
+            /// @dev The maximal amount of pubdata that can be safely used by a transaction. 
+            /// If a transaction uses more pubdata than this, it will be reverted.
+            function MAX_PUBDATA_FOR_TX() -> ret {
+                ret := 120000
+            }
+
             /// @dev Ceil division of integers
             function ceilDiv(x, y) -> ret {
                 switch or(eq(x, 0), eq(y, 0))
@@ -610,7 +616,6 @@ object "Bootloader" {
                         if lt(userProvidedPubdataPrice, gasPerPubdata) {
                             revertWithReason(UNACCEPTABLE_GAS_PRICE_ERR_CODE(), 0)
                         }
-
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
                         processL2Tx(txDataOffset, resultPtr, transactionIndex, gasPerPubdata)
                         <!-- @endif -->
@@ -3207,7 +3212,6 @@ object "Bootloader" {
                         <!-- @endif -->
 
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
-                        assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                         assertEq(getFactoryDepsBytesLength(innerTxDataOffset), 0, "factory deps non zero")
@@ -3230,7 +3234,6 @@ object "Bootloader" {
                         <!-- @endif -->
 
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
-                        assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                         assertEq(getFactoryDepsBytesLength(innerTxDataOffset), 0, "factory deps non zero")
@@ -3249,7 +3252,6 @@ object "Bootloader" {
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
-                        assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                     }
