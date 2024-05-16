@@ -39,7 +39,7 @@ contract DeployL1Script is Script {
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
-        // solhint-disable-next-line gas-struct-packing
+    // solhint-disable-next-line gas-struct-packing
     struct DeployedAddresses {
         BridgehubDeployedAddresses bridgehub;
         StateTransitionDeployedAddresses stateTransition;

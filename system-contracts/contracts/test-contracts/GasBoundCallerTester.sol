@@ -50,8 +50,8 @@ contract GasBoundCallerTester is GasBoundCaller {
         lastRecordedGasLeft = gasbefore - gasleft();
     }
 
-    function spender(uint32 _ergsToBurn, uint32 _pubdataToUse) external {
-        SystemContractHelper.burnGas(_ergsToBurn, _pubdataToUse);
+    function spender(uint32 _gasToBurn, uint32 _pubdataToUse) external {
+        SystemContractHelper.burnGas(_gasToBurn, _pubdataToUse);
     }
 
     function gasBoundCallRelayer(

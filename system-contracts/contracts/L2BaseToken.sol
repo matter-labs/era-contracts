@@ -33,8 +33,8 @@ contract L2BaseToken is IBaseToken, ISystemContract {
     function transferFromTo(address _from, address _to, uint256 _amount) external override {
         if (
             msg.sender != MSG_VALUE_SYSTEM_CONTRACT &&
-                msg.sender != address(DEPLOYER_SYSTEM_CONTRACT) &&
-                msg.sender != BOOTLOADER_FORMAL_ADDRESS
+            msg.sender != address(DEPLOYER_SYSTEM_CONTRACT) &&
+            msg.sender != BOOTLOADER_FORMAL_ADDRESS
         ) {
             revert Unauthorized(msg.sender);
         }

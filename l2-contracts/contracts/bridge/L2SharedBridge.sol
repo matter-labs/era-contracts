@@ -38,7 +38,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     address private l1LegacyBridge;
 
     uint256 internal immutable ERA_CHAIN_ID;
-    
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
     constructor(uint256 _eraChainId) {
@@ -100,7 +100,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
         if (
             AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
-                AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1LegacyBridge
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1LegacyBridge
         ) {
             revert InvalidCaller(msg.sender);
         }

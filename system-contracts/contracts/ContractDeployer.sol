@@ -79,7 +79,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
 
         if (
             _nonceOrdering != AccountNonceOrdering.Arbitrary &&
-                currentInfo.nonceOrdering != AccountNonceOrdering.Sequential
+            currentInfo.nonceOrdering != AccountNonceOrdering.Sequential
         ) {
             revert InvalidNonceOrderingChange();
         }
@@ -241,9 +241,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @dev We do not require `onlySystemCall` here, since the method is accessible only
     /// by `FORCE_DEPLOYER`.
     function forceDeployOnAddresses(ForceDeployment[] calldata _deployments) external payable {
-        if (
-            msg.sender != FORCE_DEPLOYER && msg.sender != address(COMPLEX_UPGRADER_CONTRACT)
-        ) {
+        if (msg.sender != FORCE_DEPLOYER && msg.sender != address(COMPLEX_UPGRADER_CONTRACT)) {
             revert Unauthorized(msg.sender);
         }
 
@@ -272,7 +270,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         if (_bytecodeHash == bytes32(0x0)) {
             revert EmptyBytes32();
         }
-        if (uint160(_newAddress) <= MAX_SYSTEM_CONTRACT_ADDRESS ) {
+        if (uint160(_newAddress) <= MAX_SYSTEM_CONTRACT_ADDRESS) {
             revert NotAllowedToDeployInKernelSpace();
         }
 

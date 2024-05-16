@@ -4,7 +4,6 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors
 
-
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";

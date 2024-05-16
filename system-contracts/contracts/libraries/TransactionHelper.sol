@@ -79,7 +79,8 @@ library TransactionHelper {
     using SafeERC20 for IERC20;
 
     /// @notice The EIP-712 typehash for the contract's domain
-    bytes32 internal constant EIP712_DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,string version,uint256 chainId)");
+    bytes32 internal constant EIP712_DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId)");
 
     bytes32 internal constant EIP712_TRANSACTION_TYPE_HASH =
         keccak256(

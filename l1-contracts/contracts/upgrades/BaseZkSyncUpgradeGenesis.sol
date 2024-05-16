@@ -21,9 +21,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
             revert ProtocolVersionShouldBeGreater(previousProtocolVersion, _newProtocolVersion);
         }
         uint256 protocolDiff = _newProtocolVersion - previousProtocolVersion;
-        if (
-            protocolDiff > MAX_ALLOWED_PROTOCOL_VERSION_DELTA
-        ) {
+        if (protocolDiff > MAX_ALLOWED_PROTOCOL_VERSION_DELTA) {
             revert ProtocolVersionDeltaTooLarge(protocolDiff, MAX_ALLOWED_PROTOCOL_VERSION_DELTA);
         }
 
@@ -32,9 +30,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
             revert PreviousUpgradeNotFinalized();
         }
 
-        if (
-            s.l2SystemContractsUpgradeBatchNumber != 0
-        ) {
+        if (s.l2SystemContractsUpgradeBatchNumber != 0) {
             revert PreviousUpgradeBatchNotCleared();
         }
 

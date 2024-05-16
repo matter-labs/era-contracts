@@ -100,7 +100,7 @@ library Utils {
         // bytecode length in words must be odd
         if (lengthInWords % 2 == 0) {
             revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
-        } 
+        }
         hashedBytecode =
             EfficientCall.sha(_bytecode) &
             0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;

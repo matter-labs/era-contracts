@@ -200,7 +200,11 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         /// Check logs
         uint32 numberOfL2ToL1Logs = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
         if (numberOfL2ToL1Logs > L2_TO_L1_LOGS_MERKLE_TREE_LEAVES) {
-            revert ReconstructionMismatch(PubdataField.NumberOfLogs, bytes32(L2_TO_L1_LOGS_MERKLE_TREE_LEAVES), bytes32(uint256(numberOfL2ToL1Logs)));
+            revert ReconstructionMismatch(
+                PubdataField.NumberOfLogs,
+                bytes32(L2_TO_L1_LOGS_MERKLE_TREE_LEAVES),
+                bytes32(uint256(numberOfL2ToL1Logs))
+            );
         }
         calldataPtr += 4;
 
@@ -268,7 +272,11 @@ contract L1Messenger is IL1Messenger, ISystemContract {
             calldataPtr += currentBytecodeLength;
         }
         if (reconstructedChainedL1BytecodesRevealDataHash != chainedL1BytecodesRevealDataHash) {
-            revert ReconstructionMismatch(PubdataField.Bytecode, chainedL1BytecodesRevealDataHash, reconstructedChainedL1BytecodesRevealDataHash);
+            revert ReconstructionMismatch(
+                PubdataField.Bytecode,
+                chainedL1BytecodesRevealDataHash,
+                reconstructedChainedL1BytecodesRevealDataHash
+            );
         }
 
         /// Check State Diffs
@@ -278,9 +286,13 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         /// encoded state diffs: [20bytes address][32bytes key][32bytes derived key][8bytes enum index][32bytes initial value][32bytes final value]
         if (
             uint256(uint8(bytes1(_totalL2ToL1PubdataAndStateDiffs[calldataPtr]))) !=
-                STATE_DIFF_COMPRESSION_VERSION_NUMBER
+            STATE_DIFF_COMPRESSION_VERSION_NUMBER
         ) {
-            revert ReconstructionMismatch(PubdataField.StateDiffCompressionVersion, bytes32(STATE_DIFF_COMPRESSION_VERSION_NUMBER), bytes32(uint256(uint8(bytes1(_totalL2ToL1PubdataAndStateDiffs[calldataPtr])))));
+            revert ReconstructionMismatch(
+                PubdataField.StateDiffCompressionVersion,
+                bytes32(STATE_DIFF_COMPRESSION_VERSION_NUMBER),
+                bytes32(uint256(uint8(bytes1(_totalL2ToL1PubdataAndStateDiffs[calldataPtr]))))
+            );
         }
         ++calldataPtr;
 
@@ -312,7 +324,11 @@ contract L1Messenger is IL1Messenger, ISystemContract {
 
         /// Check for calldata strict format
         if (calldataPtr != _totalL2ToL1PubdataAndStateDiffs.length) {
-            revert ReconstructionMismatch(PubdataField.ExtraData, bytes32(calldataPtr), bytes32(_totalL2ToL1PubdataAndStateDiffs.length));
+            revert ReconstructionMismatch(
+                PubdataField.ExtraData,
+                bytes32(calldataPtr),
+                bytes32(_totalL2ToL1PubdataAndStateDiffs.length)
+            );
         }
 
         PUBDATA_CHUNK_PUBLISHER.chunkAndPublishPubdata(totalL2ToL1Pubdata);
