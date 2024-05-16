@@ -1,9 +1,17 @@
-name: Build and release
+name: Build and release(manual)
 
 on:
-  push:
-    branches:
-      - "*"
+  workflow_dispatch:
+    inputs:
+      commit:
+        type: string
+        description: SHA commit for build
+        required: false
+      prefix:
+        type: string
+        description: Prefix for release name
+        required: false
+        default: manual
 
 jobs:
   build-contracts:
@@ -12,6 +20,8 @@ jobs:
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit }}
 
       - name: Use Node.js
         uses: actions/setup-node@v3
@@ -23,7 +33,7 @@ jobs:
         id: init
         run: |
           yarn
-          echo "release_tag=$(echo ${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}})-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "release_tag=${{ inputs.prefix }}-${{ inputs.commit }}" >> $GITHUB_OUTPUT
 
       - name: Build contracts
         run: |
@@ -42,7 +52,7 @@ jobs:
         with:
           tag_name: ${{ steps.init.outputs.release_tag }}
           fail_on_unmatched_files: true
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ inputs.commit }}
           body: ""
           files: |
             l1-contracts.tar.gz
