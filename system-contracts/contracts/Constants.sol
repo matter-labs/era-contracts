@@ -14,6 +14,7 @@ import {ICompressor} from "./interfaces/ICompressor.sol";
 import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
 import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
+import {IBatchAggregator} from "./interfaces/IBatchAggregator.sol";
 
 /// @dev All the system contracts introduced by zkSync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
@@ -88,6 +89,8 @@ IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher
     address(SYSTEM_CONTRACTS_OFFSET + 0x11)
 );
 
+IBatchAggregator constant BATCH_AGGREGATOR = IBatchAggregator(address(SYSTEM_CONTRACTS_OFFSET + 0x12));
+
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
 uint256 constant MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT = 1;
@@ -119,7 +122,8 @@ enum SystemLogKey {
     BLOB_FOUR_HASH_KEY,
     BLOB_FIVE_HASH_KEY,
     BLOB_SIX_HASH_KEY,
-    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
+    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
+    HYPERCHAIN_PUBDATA_KEY
 }
 
 /// @dev The number of leaves in the L2->L1 log Merkle tree.
