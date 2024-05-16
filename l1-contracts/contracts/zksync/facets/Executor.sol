@@ -24,6 +24,9 @@ contract ExecutorFacet is Base, IExecutor {
     /// @inheritdoc IBase
     string public constant override getName = "ExecutorFacet";
 
+    // Proving system identifier
+    string internal constant verifierId = "zksync-";
+
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
     /// @dev returns new batch StoredBatchInfo
     /// @notice Does not change storage
@@ -323,7 +326,8 @@ contract ExecutorFacet is Base, IExecutor {
     function proveBatches(
         StoredBatchInfo calldata _prevBatch,
         StoredBatchInfo[] calldata _committedBatches,
-        ProofInput calldata _proof
+        ProofInput calldata _proof,
+        NewHorizenVerificationRequest calldata _verificationRequest
     ) external nonReentrant onlyValidator {
         // Save the variables into the stack to save gas on reading them later
         uint256 currentTotalBatchesVerified = s.totalBatchesVerified;
@@ -357,31 +361,45 @@ contract ExecutorFacet is Base, IExecutor {
         }
         require(currentTotalBatchesVerified <= s.totalBatchesCommitted, "q");
 
+        /*
         // #if DUMMY_VERIFIER
 
         // Additional level of protection for the mainnet
         assert(block.chainid != 1);
         // We allow skipping the zkp verification for the test(net) environment
         // If the proof is not empty, verify it, otherwise, skip the verification
+        
         if (_proof.serializedProof.length > 0) {
             _verifyProof(proofPublicInput, _proof);
         }
         // #else
         _verifyProof(proofPublicInput, _proof);
         // #endif
-
+        */
+        _verifyProof(proofPublicInput, _proof, _verificationRequest);
         emit BlocksVerification(s.totalBatchesVerified, currentTotalBatchesVerified);
         s.totalBatchesVerified = currentTotalBatchesVerified;
     }
 
-    function _verifyProof(uint256[] memory proofPublicInput, ProofInput calldata _proof) internal view {
-        // We can only process 1 batch proof at a time.
-        require(proofPublicInput.length == 1, "t4");
+    function _verifyProof(
+        uint256[] memory proofPublicInput,
+        ProofInput calldata _proof,
+        NewHorizenVerificationRequest calldata verificationRequest
+    ) internal view {
+        bool successVerifyProof;
+        uint merklePathLength = verificationRequest.merklePath.length;
+        bytes32[] memory merklePath = new bytes32[](merklePathLength);
+        for (uint i = 0; i < merklePathLength; i++) {
+            merklePath[i] = bytes32(verificationRequest.merklePath[merklePathLength]);
+        }
+        bytes32 leaf = keccak256(abi.encodePacked(verifierId, bytes32(proofPublicInput[0])));
 
-        bool successVerifyProof = s.verifier.verify(
-            proofPublicInput,
-            _proof.serializedProof,
-            _proof.recursiveAggregationInput
+        successVerifyProof = s.nhVerifier.verifyProofAttestation(
+            verificationRequest.attestationId,
+            leaf,
+            merklePath,
+            verificationRequest.leafCount,
+            verificationRequest.index
         );
         require(successVerifyProof, "p"); // Proof verification fail
     }

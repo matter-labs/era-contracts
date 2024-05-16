@@ -7,6 +7,7 @@ import {IExecutor} from "./interfaces/IExecutor.sol";
 import {Diamond} from "./libraries/Diamond.sol";
 import {Base} from "./facets/Base.sol";
 import {Verifier} from "./Verifier.sol";
+import {INewHorizenProofVerifier} from "./../nh/INewHorizenProofVerifier.sol";
 import {VerifierParams, FeeParams} from "./Storage.sol";
 /* solhint-disable max-line-length */
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH, MAX_GAS_PER_TRANSACTION} from "./Config.sol";
@@ -18,6 +19,7 @@ import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_R
 contract DiamondInit is Base {
     /// @notice Struct that holds all data needed for initializing zkSync Diamond Proxy.
     /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
+    /// @param nhVerifier address of New Horizen Verifier contract
     /// @param verifier address of Verifier contract
     /// @param governor address who can manage critical updates in the contract
     /// @param admin address who can manage non-critical updates in the contract
@@ -33,6 +35,7 @@ contract DiamondInit is Base {
     /// @param feeParams Fee parameters to be used for L1->L2 transactions
     /// @param blobVersionedHashRetriever Address of contract used to pull the blob versioned hash for a transaction.
     struct InitializeData {
+        INewHorizenProofVerifier nhVerifier;
         IVerifier verifier;
         address governor;
         address admin;
@@ -60,7 +63,9 @@ contract DiamondInit is Base {
         require(_initalizeData.governor != address(0), "vy");
         require(_initalizeData.admin != address(0), "hc");
         require(_initalizeData.priorityTxMaxGasLimit <= MAX_GAS_PER_TRANSACTION, "vu");
+        require(address(_initalizeData.nhVerifier) != address(0), "vt");
 
+        s.nhVerifier = _initalizeData.nhVerifier;
         s.verifier = _initalizeData.verifier;
         s.governor = _initalizeData.governor;
         s.admin = _initalizeData.admin;
