@@ -8,7 +8,7 @@ import type { BigNumberish, BytesLike } from "ethers";
 import { BigNumber, ethers } from "ethers";
 import * as fs from "fs";
 import * as fsPr from "fs/promises";
-import { hashBytecode } from "zksync-web3/build/src/utils";
+import { hashBytecode } from "zksync-ethers/build/utils";
 import type { YulContractDescription, ZasmContractDescription } from "./constants";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
 import { getCompilersDir } from "hardhat/internal/util/global-dir";

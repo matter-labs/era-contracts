@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import type { Wallet } from "zksync-web3";
+import type { Wallet } from "zksync-ethers";
 import type { PubdataChunkPublisher } from "../typechain";
 import { PubdataChunkPublisherFactory } from "../typechain";
 import { TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS, TEST_PUBDATA_CHUNK_PUBLISHER_ADDRESS } from "./shared/constants";

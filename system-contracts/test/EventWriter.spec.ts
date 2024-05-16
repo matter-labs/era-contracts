@@ -2,10 +2,11 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Wallet } from "zksync-ethers";
 import { Contract } from "zksync-ethers";
-import type { TransactionResponse } from "zksync-web3/build/src/types";
+
 import { ONE_BYTES32_HEX, REAL_EVENT_WRITER_CONTRACT_ADDRESS } from "./shared/constants";
 import { EXTRA_ABI_CALLER_ADDRESS, encodeExtraAbiCallerCalldata } from "./shared/extraAbiCaller";
 import { getCode, getWallets, loadYulBytecode, loadZasmBytecode, setCode } from "./shared/utils";
+import type { TransactionResponse } from "zksync-ethers/build/types";
 
 describe("EventWriter tests", function () {
   let wallet: Wallet;
