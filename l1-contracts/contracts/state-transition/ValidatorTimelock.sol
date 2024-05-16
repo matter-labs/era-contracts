@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";

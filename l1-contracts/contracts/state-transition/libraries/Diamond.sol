@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors
-
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 

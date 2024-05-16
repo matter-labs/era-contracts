@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors
-
 /**
  * @custom:security-contact security@matterlabs.dev
  * @dev Contract module that helps prevent reentrant calls to a function.

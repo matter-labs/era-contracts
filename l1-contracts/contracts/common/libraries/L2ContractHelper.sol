@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors
-
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev

@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors
-
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
