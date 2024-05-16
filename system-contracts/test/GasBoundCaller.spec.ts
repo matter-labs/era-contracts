@@ -40,16 +40,15 @@ describe("GasBoundCaller tests", function () {
   });
 
   it("test returndata overhead", async () => {
-    // The tests' behavior depends on the amount of gas provided to its inner part, so we always provide 40kk
     await (
-      await tester.testReturndataOverhead(10, 40_000_000, {
+      await tester.testReturndataOverhead(10, {
         gasLimit: 80_000_000,
       })
     ).wait();
     const smallBytecodeGas = await tester.lastRecordedGasLeft();
 
     await (
-      await tester.testReturndataOverhead(100000, 40_000_000, {
+      await tester.testReturndataOverhead(100000, {
         gasLimit: 80_000_000,
       })
     ).wait();
