@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable gas-custom-errors
+
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IGovernance} from "./IGovernance.sol";
 
@@ -224,8 +226,10 @@ contract Governance is IGovernance, Ownable2Step {
     /// @param _id The operation hash (see `hashOperation` function)
     /// @param _delay The delay time (in seconds) after which the proposed upgrade can be executed by the owner.
     function _schedule(bytes32 _id, uint256 _delay) internal {
+        // solhint-disable reason-string
         require(!isOperation(_id), "Operation with this proposal id already exists");
         require(_delay >= minDelay, "Proposed delay is less than minimum delay");
+        // solhint-enable reason-string
 
         timestamps[_id] = block.timestamp + _delay;
     }

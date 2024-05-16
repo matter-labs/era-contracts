@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable reason-string, gas-custom-errors
+
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
