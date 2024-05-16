@@ -111,7 +111,7 @@ library Utils {
     }
 
     // the real max supported number is 2^16, but we'll stick to evm convention
-    uint256 constant MAX_EVM_BYTECODE_LENGTH = 24576;
+    uint256 constant MAX_EVM_BYTECODE_LENGTH = 65000;
 
     function hashEVMBytecode(bytes memory _bytecode) internal view returns (bytes32 hashedEVMBytecode) {
         require(_bytecode.length <= MAX_EVM_BYTECODE_LENGTH, "po");
