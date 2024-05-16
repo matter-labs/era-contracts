@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors
+import {SlotOccupied} from "./L1ContractErrors.sol";
 
 /**
  * @custom:security-contact security@matterlabs.dev
@@ -57,7 +57,9 @@ abstract contract ReentrancyGuard {
         }
 
         // Check that storage slot for reentrancy guard is empty to rule out possibility of slot conflict
-        require(lockSlotOldValue == 0, "1B");
+        if (lockSlotOldValue != 0) {
+            revert SlotOccupied();
+        }
     }
 
     /**
@@ -74,7 +76,9 @@ abstract contract ReentrancyGuard {
         }
 
         // On the first call to nonReentrant, _notEntered will be true
-        require(_status == _NOT_ENTERED, "r1");
+        if (_status != _NOT_ENTERED) {
+            revert SlotOccupied();
+        }
 
         // Any calls to nonReentrant after this point will fail
         assembly {
