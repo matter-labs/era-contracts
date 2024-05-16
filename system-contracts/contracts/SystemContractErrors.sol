@@ -8,7 +8,6 @@ error AddressHasNoCode(address);
 error EncodingLengthMismatch();
 error IndexOutOfBounds();
 error ValuesNotEqual(uint256 expected, uint256 actual);
-error HashMismatch(bytes32 expected, uint256 actual);
 error IndexSizeError();
 error UnsupportedOperation();
 error InvalidNonceOrderingChange();
