@@ -4,6 +4,15 @@ pragma solidity 0.8.24;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IGovernance} from "./IGovernance.sol";
+import {
+    ZeroAddress, 
+    Unauthorized, 
+    OperationShouldBeReady, 
+    OperationShouldBePending,
+    OperationExists,
+    InvalidDelay,
+    PreviousOperationNotExecuted
+} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -39,7 +48,9 @@ contract Governance is IGovernance, Ownable2Step {
     /// @param _securityCouncil The address to be assigned as the security council of the contract.
     /// @param _minDelay The initial minimum delay (in seconds) to be set for operations.
     constructor(address _admin, address _securityCouncil, uint256 _minDelay) {
-        require(_admin != address(0), "Admin should be non zero address");
+        if (_admin == address(0)) {
+            revert ZeroAddress();
+        }
 
         _transferOwnership(_admin);
 
@@ -56,25 +67,25 @@ contract Governance is IGovernance, Ownable2Step {
 
     /// @notice Checks that the message sender is contract itself.
     modifier onlySelf() {
-        // solhint-disable-next-line reason-string
-        require(msg.sender == address(this), "Only governance contract itself is allowed to call this function");
+        if (msg.sender != address(this)) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     /// @notice Checks that the message sender is an active security council.
     modifier onlySecurityCouncil() {
-        // solhint-disable-next-line reason-string
-        require(msg.sender == securityCouncil, "Only security council is allowed to call this function");
+        if (msg.sender != securityCouncil) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     /// @notice Checks that the message sender is an active owner or an active security council.
     modifier onlyOwnerOrSecurityCouncil() {
-        // solhint-disable-next-line reason-string
-        require(
-            msg.sender == owner() || msg.sender == securityCouncil,
-            "Only the owner and security council are allowed to call this function"
-        );
+        if (msg.sender != owner() && msg.sender != securityCouncil) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
@@ -155,7 +166,9 @@ contract Governance is IGovernance, Ownable2Step {
     /// @dev Only owner can call this function.
     /// @param _id Proposal id value (see `hashOperation`)
     function cancel(bytes32 _id) external onlyOwner {
-        require(isOperationPending(_id), "Operation must be pending");
+        if (!isOperationPending(_id)) {
+            revert OperationShouldBePending();
+        }
         delete timestamps[_id];
         emit OperationCancelled(_id);
     }
@@ -173,15 +186,17 @@ contract Governance is IGovernance, Ownable2Step {
         // Check if the predecessor operation is completed.
         _checkPredecessorDone(_operation.predecessor);
         // Ensure that the operation is ready to proceed.
-        // solhint-disable-next-line reason-string
-        require(isOperationReady(id), "Operation must be ready before execution");
+        if (!isOperationReady(id)) {
+            revert OperationShouldBeReady();
+        }
         // Execute operation.
         // slither-disable-next-line reentrancy-eth
         _execute(_operation.calls);
         // Reconfirming that the operation is still ready after execution.
         // This is needed to avoid unexpected reentrancy attacks of re-executing the same operation.
-        // solhint-disable-next-line reason-string
-        require(isOperationReady(id), "Operation must be ready after execution");
+        if (!isOperationReady(id)) {
+            revert OperationShouldBeReady();
+        }
         // Set operation to be done
         timestamps[id] = EXECUTED_PROPOSAL_TIMESTAMP;
         emit OperationExecuted(id);
@@ -196,15 +211,17 @@ contract Governance is IGovernance, Ownable2Step {
         // Check if the predecessor operation is completed.
         _checkPredecessorDone(_operation.predecessor);
         // Ensure that the operation is in a pending state before proceeding.
-        // solhint-disable-next-line reason-string
-        require(isOperationPending(id), "Operation must be pending before execution");
+        if (!isOperationPending(id)) {
+            revert OperationShouldBePending();
+        }
         // Execute operation.
         // slither-disable-next-line reentrancy-eth
         _execute(_operation.calls);
         // Reconfirming that the operation is still pending before execution.
         // This is needed to avoid unexpected reentrancy attacks of re-executing the same operation.
-        // solhint-disable-next-line reason-string
-        require(isOperationPending(id), "Operation must be pending after execution");
+        if (!isOperationPending(id)) {
+            revert OperationShouldBePending();
+        }
         // Set operation to be done
         timestamps[id] = EXECUTED_PROPOSAL_TIMESTAMP;
         emit OperationExecuted(id);
@@ -224,8 +241,12 @@ contract Governance is IGovernance, Ownable2Step {
     /// @param _id The operation hash (see `hashOperation` function)
     /// @param _delay The delay time (in seconds) after which the proposed upgrade can be executed by the owner.
     function _schedule(bytes32 _id, uint256 _delay) internal {
-        require(!isOperation(_id), "Operation with this proposal id already exists");
-        require(_delay >= minDelay, "Proposed delay is less than minimum delay");
+        if (isOperation(_id)) {
+            revert OperationExists();
+        }
+        if (_delay < minDelay) {
+            revert InvalidDelay();
+        }
 
         timestamps[_id] = block.timestamp + _delay;
     }
@@ -250,8 +271,9 @@ contract Governance is IGovernance, Ownable2Step {
     /// @param _predecessorId The hash of the operation that should be completed.
     /// @dev Doesn't check the operation to be complete if the input is zero.
     function _checkPredecessorDone(bytes32 _predecessorId) internal view {
-        // solhint-disable-next-line reason-string
-        require(_predecessorId == bytes32(0) || isOperationDone(_predecessorId), "Predecessor operation not completed");
+        if (_predecessorId != bytes32(0) && !isOperationDone(_predecessorId)) {
+            revert PreviousOperationNotExecuted();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

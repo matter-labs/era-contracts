@@ -11,6 +11,8 @@ import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
+import {Unauthorized, EmptyDeposit, ValueMismatch, WithdrawalAlreadyFinalized} from "../common/L1ContractErrors.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to hyperchains
@@ -65,7 +67,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev transfer token to shared bridge as part of upgrade
     function transferTokenToSharedBridge(address _token) external {
-        require(msg.sender == address(SHARED_BRIDGE), "Not shared bridge");
+        if (msg.sender != address(SHARED_BRIDGE)) {
+            revert Unauthorized(msg.sender);
+        }
         uint256 amount = IERC20(_token).balanceOf(address(this));
         IERC20(_token).safeTransfer(address(SHARED_BRIDGE), amount);
     }
@@ -148,9 +152,15 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) public payable nonReentrant returns (bytes32 l2TxHash) {
-        require(_amount != 0, "0T"); // empty deposit
+        // empty deposit
+        if (_amount == 0) {
+            revert EmptyDeposit();
+        }
         uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
-        require(amount == _amount, "3T"); // The token has non-standard transfer logic
+        // The token has non-standard transfer logic
+        if (amount != _amount) {
+            revert ValueMismatch(_amount, amount);
+        }
 
         l2TxHash = SHARED_BRIDGE.depositLegacyErc20Bridge{value: msg.value}({
             _msgSender: msg.sender,
@@ -194,7 +204,10 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
         uint256 amount = depositAmount[_depositSender][_l1Token][_l2TxHash];
-        require(amount != 0, "2T"); // empty deposit
+        // empty deposit
+        if (amount == 0) {
+            revert EmptyDeposit();
+        }
         delete depositAmount[_depositSender][_l1Token][_l2TxHash];
 
         SHARED_BRIDGE.claimFailedDepositLegacyErc20Bridge({
@@ -223,7 +236,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
-        require(!isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], "pw");
+        if (isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex]) {
+            revert WithdrawalAlreadyFinalized();
+        }
         // We don't need to set finalizeWithdrawal here, as we set it in the shared bridge
 
         (address l1Receiver, address l1Token, uint256 amount) = SHARED_BRIDGE.finalizeWithdrawalLegacyErc20Bridge({

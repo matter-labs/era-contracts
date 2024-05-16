@@ -13,6 +13,20 @@ import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyp
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
+import {
+    Unauthorized,
+    STMAlreadyRegistered,
+    STMNotRegistered,
+    TokenAlreadyRegistered,
+    TokenNotRegistered,
+    InvalidChainId,
+    WethBridgeNotSet,
+    BridgeHubAlreadyRegistered,
+    ValueMismatch,
+    InsufficientFunds,
+    NonEmptyMsgValue,
+    AddressTooLow
+} from "../common/L1ContractErrors.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice all the ether is held by the weth bridge
@@ -44,7 +58,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     modifier onlyOwnerOrAdmin() {
-        require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
+        if (msg.sender != admin && msg.sender != owner()) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
@@ -62,7 +78,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @inheritdoc IBridgehub
     function acceptAdmin() external {
         address currentPendingAdmin = pendingAdmin;
-        require(msg.sender == currentPendingAdmin, "n42"); // Only proposed by current admin address can claim the admin rights
+        // Only proposed by current admin address can claim the admin rights
+        if (msg.sender != currentPendingAdmin) {
+            revert Unauthorized(msg.sender);
+        }
 
         address previousAdmin = admin;
         admin = currentPendingAdmin;
@@ -83,26 +102,26 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
     function addStateTransitionManager(address _stateTransitionManager) external onlyOwner {
-        require(
-            !stateTransitionManagerIsRegistered[_stateTransitionManager],
-            "Bridgehub: state transition already registered"
-        );
+        if (stateTransitionManagerIsRegistered[_stateTransitionManager]) {
+            revert STMAlreadyRegistered();
+        }
         stateTransitionManagerIsRegistered[_stateTransitionManager] = true;
     }
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
     /// @notice this stops new Chains from using the STF, old chains are not affected
     function removeStateTransitionManager(address _stateTransitionManager) external onlyOwner {
-        require(
-            stateTransitionManagerIsRegistered[_stateTransitionManager],
-            "Bridgehub: state transition not registered yet"
-        );
+        if (!stateTransitionManagerIsRegistered[_stateTransitionManager]) {
+            revert STMNotRegistered();
+        }
         stateTransitionManagerIsRegistered[_stateTransitionManager] = false;
     }
 
     /// @notice token can be any contract with the appropriate interface/functionality
     function addToken(address _token) external onlyOwner {
-        require(!tokenIsRegistered[_token], "Bridgehub: token already registered");
+        if (tokenIsRegistered[_token]) {
+            revert TokenAlreadyRegistered(_token);
+        }
         tokenIsRegistered[_token] = true;
     }
 
@@ -123,17 +142,26 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address _admin,
         bytes calldata _initData
     ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256) {
-        require(_chainId != 0, "Bridgehub: chainId cannot be 0");
-        require(_chainId <= type(uint48).max, "Bridgehub: chainId too large");
+        if (_chainId == 0) {
+            revert InvalidChainId();
+        }
+        if (_chainId <= type(uint48).max) {
+            revert InvalidChainId();
+        }
 
-        require(
-            stateTransitionManagerIsRegistered[_stateTransitionManager],
-            "Bridgehub: state transition not registered"
-        );
-        require(tokenIsRegistered[_baseToken], "Bridgehub: token not registered");
-        require(address(sharedBridge) != address(0), "Bridgehub: weth bridge not set");
+        if (!stateTransitionManagerIsRegistered[_stateTransitionManager]) {
+            revert STMNotRegistered();
+        }
+        if (!tokenIsRegistered[_baseToken]) {
+            revert TokenNotRegistered(_baseToken);
+        }
+        if (address(sharedBridge) == address(0)) {
+            revert WethBridgeNotSet();
+        }
 
-        require(stateTransitionManager[_chainId] == address(0), "Bridgehub: chainId already registered");
+        if (stateTransitionManager[_chainId] != address(0)) {
+            revert BridgeHubAlreadyRegistered();
+        }
 
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
@@ -219,9 +247,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         {
             address token = baseToken[_request.chainId];
             if (token == ETH_TOKEN_ADDRESS) {
-                require(msg.value == _request.mintValue, "Bridgehub: msg.value mismatch 1");
+                if (msg.value != _request.mintValue) {
+                    revert InsufficientFunds();
+                }
             } else {
-                require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
+                if (msg.value != 0) {
+                    revert NonEmptyMsgValue();
+                }
             }
 
             // slither-disable-next-line arbitrary-send-eth
@@ -266,13 +298,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             address token = baseToken[_request.chainId];
             uint256 baseTokenMsgValue;
             if (token == ETH_TOKEN_ADDRESS) {
-                require(
-                    msg.value == _request.mintValue + _request.secondBridgeValue,
-                    "Bridgehub: msg.value mismatch 2"
-                );
+                if (msg.value != _request.mintValue + _request.secondBridgeValue) {
+                    revert InsufficientFunds();
+                }
                 baseTokenMsgValue = _request.mintValue;
             } else {
-                require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 3");
+                if (msg.value != _request.secondBridgeValue) {
+                    revert NonEmptyMsgValue();
+                }
                 baseTokenMsgValue = 0;
             }
             // slither-disable-next-line arbitrary-send-eth
@@ -295,14 +328,16 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _request.secondBridgeCalldata
         );
 
-        require(outputRequest.magicValue == TWO_BRIDGES_MAGIC_VALUE, "Bridgehub: magic value mismatch");
+        if (outputRequest.magicValue != TWO_BRIDGES_MAGIC_VALUE) {
+            revert ValueMismatch(uint256(TWO_BRIDGES_MAGIC_VALUE), uint256(outputRequest.magicValue));
+        }
 
         address refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
 
-        require(
-            _request.secondBridgeAddress > BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
-            "Bridgehub: second bridge address too low"
-        ); // to avoid calls to precompiles
+        if (_request.secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
+            revert AddressTooLow(_request.secondBridgeAddress);
+        }
+        // to avoid calls to precompiles
         canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(
             BridgehubL2TransactionRequest({
                 sender: _request.secondBridgeAddress,
