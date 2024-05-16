@@ -67,13 +67,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The address to accept the admin role
     address private pendingAdmin;
 
-    // Sync layer chain is expected to have ETH as the base token.
-    mapping(uint256 chainId => bool isWhitelistedSyncLayer) whitelistedSyncLayers;
-
     // mapping(uint256 chainId => bytes32 lastMigrationTxHash) lastMigrationTxHashes;
     // mapping(uint256 chainId => bytes32 lastChainCommitment) lastMigratedCommitments;
 
-    mapping(uint256 chainId => address stmCounterPart) stmCounterParts;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -325,8 +321,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
                 bytes32(uint256(uint160(validatorTimelock))),
                 bytes32(uint256(uint160(_baseToken))),
                 bytes32(uint256(uint160(_sharedBridge))),
-                bytes32(storedBatchZero),
-                bytes32(uint256(_syncLayerState))
+                bytes32(storedBatchZero)
+                // bytes32(uint256(_syncLayerState))
             );
         }
 
@@ -387,125 +383,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // TODO: Maybe `get` already ensured its existance.
         require(syncLayerAddress != address(0), "STM: sync layer not registered");
 
-        whitelistedSyncLayers[_newSyncLayerChainId] = _isWhitelisted;
+        IBridgehub(BRIDGE_HUB).registerSyncLayer(_newSyncLayerChainId, _isWhitelisted);
 
         // TODO: emit event
-    }
-
-    function registerCounterpart(uint256 _chainId, address _counterPart) external onlyOwner {
-        require(_counterPart != address(0), "STM: counter part zero");
-
-        stmCounterParts[_chainId] = _counterPart;
-    }
-
-    function finalizeMigrationToSyncLayer(
-        uint256 _chainId,
-        address _baseToken,
-        address _sharedBridge,
-        address _admin,
-        uint256 _expectedProtocolVersion,
-        HyperchainCommitment calldata _commitment,
-        bytes calldata _diamondCut
-    ) external {
-        /// FIXME: adequate access rights
-
-        address currentAddress = getHyperchain(_chainId);
-
-        // We do not want to deal with inactive protocol versions during migration.
-        require(_expectedProtocolVersion == protocolVersion, "STM: not latest protocol version");
-
-        // Just in case
-        require(protocolVersionIsActive(_expectedProtocolVersion), "STM: protocolVersion not active");
-
-        if (currentAddress == address(0)) {
-            require(protocolVersion == _expectedProtocolVersion, "STM: protocolVersion mismatch");
-
-            // We set "migrated L2 initially" as it will be reset later on in the `finalizeMigration` call.
-            currentAddress = _deployNewChain(
-                _chainId,
-                _baseToken,
-                _sharedBridge,
-                _admin,
-                _diamondCut,
-                SyncLayerState.MigratedFromSL
-            );
-
-            // note that we do not need the genesis upgrade, it is expected that everything is already prepared on l2.
-        }
-
-        IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
-
-        uint256 currentProtocolVersion = hyperchain.getProtocolVersion();
-        // while it should be definitely the case when a chain is created, we double check just in case
-        require(currentProtocolVersion == _expectedProtocolVersion, "STM: protocolVersion mismatch");
-
-        // Now migrating the chain
-        hyperchain.finalizeMigration(_commitment);
-    }
-
-    // function finalizeMigrationFromSyncLayer(uint256 _chainId) external {
-    //     // FIXME: this method should check that a certain message was sent from the SL to L1.
-
-    //     require(false, "TODO");
-
-    //     // address currentAddress = getHyperchain(_chainId);
-    //     // // On L1 we do expect that the chain is already registered.
-    //     // require(currentAddress != address(0), "STM: chain not registered");
-
-    //     // _finalizeMigration(
-    //     //     _chainId,
-    //     //     _baseToken,
-    //     //     _sharedBridge,
-    //     //     _admin,
-    //     //     _expectedProtocolVersion,
-    //     //     commitment
-    //     // );
-    // }
-
-    function startMigrationToSyncLayer(
-        uint256 _chainId,
-        uint256 _syncLayerChainId,
-        address _newSyncLayerAdmin,
-        L2TransactionRequestDirect memory _request,
-        bytes calldata _diamondCut
-    ) external payable {
-        // TODO: Maybe check l2 diamond cut here for failing fast?
-
-        require(_newSyncLayerAdmin != address(0), "STM: admin zero");
-
-        // TODO: add requiremenet for it to be a admin of the chain
-        require(whitelistedSyncLayers[_syncLayerChainId], "sync layer not whitelisted");
-
-        // TODO: double check that get only returns when chain id is there.
-        IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
-
-        uint256 currentProtocolVersion = hyperchain.getProtocolVersion();
-        require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
-
-        bytes memory migrationCalldata = hyperchain.startMigrationToSyncLayer(
-            _syncLayerChainId,
-            stmCounterParts[_syncLayerChainId],
-            _newSyncLayerAdmin,
-            _diamondCut
-        );
-
-        require(_request.chainId == _syncLayerChainId, "chain id incorrect");
-        // We assume that the sync layer always has eth as its base token.
-        require(_request.mintValue == msg.value, "Not enough value sent");
-
-        // It should be checked by the mailbox of the chain also, but just in case
-        require(_request.l2Value <= _request.mintValue, "L2 value too large");
-
-        _request.l2Calldata = migrationCalldata;
-
-        bytes32 canonicalHash = IBridgehub(BRIDGE_HUB).requestL2TransactionDirect{value: msg.value}(_request);
-
-        // lastMigrationTxHashes[_chainId] = canonicalHash;
-
-        hyperchain.storeMigrationHash(canonicalHash);
-        // lastMigratedCommitments[_chainId] = keccak256(abi.encode(commitment));
-        // Now, we need to send an L1->L2 tx to the sync layer blockchain to the spawn the chain on SL.
-        // We just send it via a normal L-Z
     }
 
     /// @dev This internal function is used to register a new hyperchain in the system.

@@ -25,7 +25,7 @@ export async function deployViaCreate2(
   });
   const bytecode = contractFactory.getDeployTransaction(...args, ethTxOptions).data;
 
-  console.log("hexed bytecode length: ", bytecode.length);
+  // console.log("hexed bytecode length: ", bytecode.length);
 
   return await deployBytecodeViaCreate2(
     deployWallet,

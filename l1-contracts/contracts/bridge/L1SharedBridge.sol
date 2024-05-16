@@ -166,42 +166,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         eraLegacyBridgeLastDepositTxNumber = _eraLegacyBridgeLastDepositTxNumber;
     }
 
-    /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process
-    function transferFundsFromLegacy(address _token, address _target, uint256 _targetChainId) external onlySelf {
-        if (_token == ETH_TOKEN_ADDRESS) {
-            uint256 balanceBefore = address(this).balance;
-            IMailbox(_target).transferEthToSharedBridge();
-            uint256 balanceAfter = address(this).balance;
-            require(balanceAfter > balanceBefore, "ShB: 0 eth transferred");
-            chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] =
-                chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] +
-                balanceAfter -
-                balanceBefore;
-        } else {
-            uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
-            uint256 legacyBridgeBalance = IERC20(_token).balanceOf(address(legacyBridge));
-            require(legacyBridgeBalance > 0, "ShB: 0 amount to transfer");
-            IL1ERC20Bridge(_target).transferTokenToSharedBridge(_token);
-            uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
-            require(balanceAfter - balanceBefore >= legacyBridgeBalance, "ShB: wrong amount transferred");
-            chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + legacyBridgeBalance;
-        }
-    }
-
-    /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process.
-    /// @dev Unlike `transferFundsFromLegacy` is provides a concrete limit on the gas used for the transfer and even if it will fail, it will not revert the whole transaction.
-    function safeTransferFundsFromLegacy(
-        address _token,
-        address _target,
-        uint256 _targetChainId,
-        uint256 _gasPerToken
-    ) external onlyOwner {
-        try this.transferFundsFromLegacy{gas: _gasPerToken}(_token, _target, _targetChainId) {} catch {
-            // A reasonable amount of gas will be provided to transfer the token.
-            // If the transfer fails, we don't want to revert the whole transaction.
-        }
-    }
-
     function receiveEth(uint256 _chainId) external payable {
         require(BRIDGE_HUB.getHyperchain(_chainId) == msg.sender, "receiveEth not state transition");
     }

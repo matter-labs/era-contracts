@@ -30,6 +30,9 @@ interface IGetters is IZkSyncHyperchainBase {
     /// @return The address of the state transition
     function getStateTransitionManager() external view returns (address);
 
+    /// @return The chain id of the chain
+    function getChainId() external view returns (uint256);
+
     /// @return The address of the base token
     function getBaseToken() external view returns (address);
 
@@ -146,5 +149,5 @@ interface IGetters is IZkSyncHyperchainBase {
     function isFacetFreezable(address _facet) external view returns (bool isFreezable);
 
     /// TODO
-    function getSyncLayerState() external view returns (SyncLayerState);
+    function getSyncLayer() external view returns (address);
 }

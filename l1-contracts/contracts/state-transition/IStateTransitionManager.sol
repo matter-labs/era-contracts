@@ -134,16 +134,4 @@ interface IStateTransitionManager {
     ) external;
 
     function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
-
-    function registerCounterpart(uint256 _chainId, address _counterPart) external;
-
-    function finalizeMigrationToSyncLayer(
-        uint256 _chainId,
-        address _baseToken,
-        address _sharedBridge,
-        address _admin,
-        uint256 _expectedProtocolVersion,
-        HyperchainCommitment calldata _commitment,
-        bytes calldata _diamondCut
-    ) external;
 }

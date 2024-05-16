@@ -3,7 +3,8 @@
 pragma solidity 0.8.24;
 
 import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
-import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {IL1StandardAsset} from "../bridge/interfaces/IL1StandardAsset.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -37,13 +38,15 @@ struct L2TransactionRequestTwoBridgesInner {
     bytes32 txDataHash;
 }
 
-interface IBridgehub {
+interface IBridgehub is IL1StandardAsset {
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
 
     /// @notice Admin changed
     event NewAdmin(address indexed oldAdmin, address indexed newAdmin);
+
+    event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
 
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
@@ -132,5 +135,13 @@ interface IBridgehub {
 
     function setSharedBridge(address _sharedBridge) external;
 
-    event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
+    function registerCounterpart(uint256 _chainId, address _counterPart) external;
+
+    function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
+
+    function bridgehubCounterParts(uint256 _chainId) external view returns (address);
+
+    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
+
+    function forwardTransactionOnSyncLayer(uint256 _chainId, BridgehubL2TransactionRequest calldata _request) external;
 }

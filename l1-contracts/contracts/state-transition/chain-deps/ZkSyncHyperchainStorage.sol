@@ -164,7 +164,5 @@ struct ZkSyncHyperchainStorage {
     /// @dev The optional address of the contract that has to be used for transaction filtering/whitelisting
     address transactionFilterer;
     /// @dev
-    SyncLayerState syncLayerState;
-    uint256 syncLayerChainId;
-    bytes32 syncLayerMigrationHash;
+    address syncLayer;
 }
