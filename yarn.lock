@@ -711,15 +711,6 @@
     ordinal "1.0.3"
     zksync-ethers "^5.0.0"
 
-"@matterlabs/hardhat-zksync-deploy@^0.6.5":
-  version "0.6.6"
-  resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-deploy/-/hardhat-zksync-deploy-0.6.6.tgz#5c86cf7da859844167d62300528c3e6013ee0286"
-  integrity sha512-QpkxK2wnyQCgaTVLdFATpfiySfr7073yPre9eq5LfKA8VxXWD4WZAuBMq700GL5UyfW9yyHkCdkSzaGigmZ4/Q==
-  dependencies:
-    "@matterlabs/hardhat-zksync-solc" "0.4.2"
-    chalk "4.1.2"
-    ts-morph "^19.0.0"
-
 "@matterlabs/hardhat-zksync-deploy@^0.7.0":
   version "0.7.0"
   resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-deploy/-/hardhat-zksync-deploy-0.7.0.tgz#e56b73d8f8fbd0f809a779d0028418ea7d914017"
@@ -753,18 +744,6 @@
     axios "^1.4.0"
     chalk "4.1.2"
     fs-extra "^11.1.1"
-
-"@matterlabs/hardhat-zksync-solc@0.4.2":
-  version "0.4.2"
-  resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-solc/-/hardhat-zksync-solc-0.4.2.tgz#64121082e88c5ab22eb4e9594d120e504f6af499"
-  integrity sha512-6NFWPSZiOAoo7wNuhMg4ztj7mMEH+tLrx09WuCbcURrHPijj/KxYNsJD6Uw5lapKr7G8H7SQISGid1/MTXVmXQ==
-  dependencies:
-    "@nomiclabs/hardhat-docker" "^2.0.0"
-    chalk "4.1.2"
-    dockerode "^3.3.4"
-    fs-extra "^11.1.1"
-    proper-lockfile "^4.1.2"
-    semver "^7.5.1"
 
 "@matterlabs/hardhat-zksync-solc@1.0.6":
   version "1.0.6"
