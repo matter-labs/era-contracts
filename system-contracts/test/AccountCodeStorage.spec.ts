@@ -4,12 +4,10 @@ import type { Wallet } from "zksync-ethers";
 import type { AccountCodeStorage } from "../typechain";
 import { AccountCodeStorageFactory } from "../typechain";
 import {
-  EMPTY_STRING_KECCAK,
-  ONE_BYTES32_HEX,
   TEST_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS,
   TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
 } from "./shared/constants";
-import { prepareEnvironment, setResult } from "./shared/mocks";
+import { prepareEnvironment } from "./shared/mocks";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
 
 describe("AccountCodeStorage tests", function () {
