@@ -10,7 +10,7 @@ import { web3Provider } from "../../l1-contracts/scripts/utils";
 import type { BigNumber, BytesLike, Wallet } from "ethers";
 import { ethers } from "ethers";
 import type { Provider } from "zksync-ethers";
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-ethers/build/utils";
+import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, sleep } from "zksync-ethers/build/utils";
 
 import { ERC20Factory } from "../../l1-contracts/typechain";
 import { IERC20Factory } from "../typechain/IERC20Factory";
