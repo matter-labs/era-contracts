@@ -7,6 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "./Utils.sol";
+import {MintFailed} from "./ZkSyncScriptErrors.sol";
 
 contract DeployErc20Script is Script {
     using stdToml for string;
@@ -27,7 +28,7 @@ contract DeployErc20Script is Script {
         uint256 mint;
     }
 
-    Config config;
+    Config internal config;
 
     function run() public {
         console.log("Deploying ERC20 Tokens");
@@ -52,7 +53,8 @@ contract DeployErc20Script is Script {
         config.create2FactorySalt = vm.parseTomlBytes32(toml, "$.create2_factory_salt");
         string[] memory tokens = vm.parseTomlKeys(toml, "$.tokens");
 
-        for (uint256 i = 0; i < tokens.length; i++) {
+        uint256 tokensLength = tokens.length;
+        for (uint256 i = 0; i < tokensLength; ++i) {
             TokenDescription memory token;
             string memory key = string.concat("$.tokens.", tokens[i]);
             token.name = toml.readString(string.concat(key, ".name"));
@@ -66,7 +68,8 @@ contract DeployErc20Script is Script {
     }
 
     function deployTokens() internal {
-        for (uint256 i = 0; i < config.tokens.length; i++) {
+        uint256 tokensLength = config.tokens.length;
+        for (uint256 i = 0; i < tokensLength; ++i) {
             TokenDescription memory token = config.tokens[i];
             console.log("Deploying token:", token.name);
             address tokenAddress = deployErc20({
@@ -103,7 +106,9 @@ contract DeployErc20Script is Script {
             (bool success, ) = tokenAddress.call(
                 abi.encodeWithSignature("mint(address,uint256)", config.deployerAddress, mint)
             );
-            require(success, "Mint failed");
+            if (!success) {
+                revert MintFailed();
+            }
         }
 
         return tokenAddress;
@@ -114,7 +119,8 @@ contract DeployErc20Script is Script {
         vm.serializeBytes32("root", "create2_factory_salt", config.create2FactorySalt);
 
         string memory tokens = "";
-        for (uint256 i = 0; i < config.tokens.length; i++) {
+        uint256 tokensLength = config.tokens.length;
+        for (uint256 i = 0; i < tokensLength; ++i) {
             TokenDescription memory token = config.tokens[i];
             vm.serializeString(token.symbol, "name", token.name);
             vm.serializeString(token.symbol, "symbol", token.symbol);

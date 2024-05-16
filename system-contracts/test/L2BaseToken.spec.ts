@@ -53,9 +53,9 @@ describe("L2BaseToken tests", () => {
 
     it("not called by bootloader", async () => {
       const amountToMint: BigNumber = ethers.utils.parseEther("10.0");
-      await expect(L2BaseToken.connect(wallets[0]).mint(wallets[0].address, amountToMint)).to.be.rejectedWith(
-        "Callable only by the bootloader"
-      );
+      await expect(
+        L2BaseToken.connect(wallets[0]).mint(wallets[0].address, amountToMint)
+      ).to.be.revertedWithCustomError(L2BaseToken, "CallerMustBeBootloader");
     });
   });
 
@@ -90,7 +90,7 @@ describe("L2BaseToken tests", () => {
 
       await expect(
         L2BaseToken.connect(bootloaderAccount).transferFromTo(wallets[0].address, wallets[1].address, amountToTransfer)
-      ).to.be.rejectedWith("Transfer amount exceeds balance");
+      ).to.be.revertedWithCustomError(L2BaseToken, "InsufficientFunds");
     });
 
     it("no transfer - require special access", async () => {
@@ -107,7 +107,7 @@ describe("L2BaseToken tests", () => {
           wallets[1].address,
           amountToTransfer
         )
-      ).to.be.rejectedWith("Only system contracts with special access can call this method");
+      ).to.be.revertedWithCustomError(L2BaseToken, "Unauthorized");
     });
   });
 

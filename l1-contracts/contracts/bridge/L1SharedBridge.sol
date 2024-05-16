@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable reason-string, gas-custom-errors
+
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
@@ -37,10 +39,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     IBridgehub public immutable override BRIDGE_HUB;
 
     /// @dev Era's chainID
-    uint256 immutable ERA_CHAIN_ID;
+    uint256 internal immutable ERA_CHAIN_ID;
 
     /// @dev The address of zkSync Era diamond proxy contract.
-    address immutable ERA_DIAMOND_PROXY;
+    address internal immutable ERA_DIAMOND_PROXY;
 
     /// @dev Stores the first batch number on the zkSync Era Diamond Proxy that was settled after Diamond proxy upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade Eth withdrawals. Withdrawals from batches older

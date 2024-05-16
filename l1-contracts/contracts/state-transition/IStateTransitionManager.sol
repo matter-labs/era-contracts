@@ -16,6 +16,7 @@ import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 /// @param genesisBatchCommitment The zk-proof commitment for the genesis batch
 /// @param diamondCut The diamond cut for the first upgrade transaction on the newly deployed chain
 /// @param protocolVersion The initial protocol version on the newly deployed chain
+// solhint-disable-next-line gas-struct-packing
 struct StateTransitionManagerInitializeData {
     address owner;
     address validatorTimelock;

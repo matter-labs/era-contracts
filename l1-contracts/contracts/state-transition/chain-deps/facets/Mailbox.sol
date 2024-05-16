@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable reason-string, gas-custom-errors
+
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
@@ -34,7 +36,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     string public constant override getName = "MailboxFacet";
 
     /// @dev Era's chainID
-    uint256 immutable ERA_CHAIN_ID;
+    uint256 public immutable ERA_CHAIN_ID;
 
     constructor(uint256 _eraChainId) {
         ERA_CHAIN_ID = _eraChainId;
@@ -60,7 +62,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     function proveL2MessageInclusion(
         uint256 _batchNumber,
         uint256 _index,
-        L2Message memory _message,
+        L2Message calldata _message,
         bytes32[] calldata _proof
     ) public view returns (bool) {
         return _proveL2LogInclusion(_batchNumber, _index, _L2MessageToLog(_message), _proof);
@@ -70,7 +72,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     function proveL2LogInclusion(
         uint256 _batchNumber,
         uint256 _index,
-        L2Log memory _log,
+        L2Log calldata _log,
         bytes32[] calldata _proof
     ) external view returns (bool) {
         return _proveL2LogInclusion(_batchNumber, _index, _log, _proof);
@@ -134,7 +136,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     }
 
     /// @dev Convert arbitrary-length message to the raw l2 log
-    function _L2MessageToLog(L2Message memory _message) internal pure returns (L2Log memory) {
+    function _L2MessageToLog(L2Message calldata _message) internal pure returns (L2Log memory) {
         return
             L2Log({
                 l2ShardId: 0,
@@ -279,6 +281,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         request.refundRecipient = AddressAliasHelper.actualRefundRecipient(request.refundRecipient, request.sender);
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
+        // solhint-disable avoid-tx-origin
         // slither-disable-next-line tx-origin
         if (request.sender != tx.origin) {
             request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);

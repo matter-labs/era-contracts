@@ -78,7 +78,7 @@ describe("NonceHolder tests", () => {
 
       await expect(
         nonceHolder.connect(systemAccount).increaseMinNonce(BigNumber.from(2).pow(32).add(1))
-      ).to.be.rejectedWith("The value for incrementing the nonce is too high");
+      ).to.be.revertedWithCustomError(nonceHolder, "NonceIncreaseError");
 
       const nonceAfter = await nonceHolder.getMinNonce(systemAccount.address);
       const rawNonceAfter = await nonceHolder.getRawNonce(systemAccount.address);
@@ -88,21 +88,26 @@ describe("NonceHolder tests", () => {
     });
 
     it("should revert This method require system call flag", async () => {
-      await expect(nonceHolder.increaseMinNonce(123)).to.be.rejectedWith("This method require system call flag");
+      await expect(nonceHolder.increaseMinNonce(123)).to.be.revertedWithCustomError(
+        nonceHolder,
+        "SystemCallFlagRequired"
+      );
     });
   });
 
   describe("incrementMinNonceIfEquals", async () => {
     it("should revert This method require system call flag", async () => {
       const expectedNonce = await nonceHolder.getMinNonce(systemAccount.address);
-      await expect(nonceHolder.incrementMinNonceIfEquals(expectedNonce)).to.be.rejectedWith(
-        "This method require system call flag"
+      await expect(nonceHolder.incrementMinNonceIfEquals(expectedNonce)).to.be.revertedWithCustomError(
+        nonceHolder,
+        "SystemCallFlagRequired"
       );
     });
 
     it("should revert Incorrect nonce", async () => {
-      await expect(nonceHolder.connect(systemAccount).incrementMinNonceIfEquals(2222222)).to.be.rejectedWith(
-        "Incorrect nonce"
+      await expect(nonceHolder.connect(systemAccount).incrementMinNonceIfEquals(2222222)).to.be.revertedWithCustomError(
+        nonceHolder,
+        "ValuesNotEqual"
       );
     });
 
@@ -116,8 +121,9 @@ describe("NonceHolder tests", () => {
 
   describe("incrementDeploymentNonce", async () => {
     it("should revert Only the contract deployer can increment the deployment nonce", async () => {
-      await expect(nonceHolder.incrementDeploymentNonce(deployerAccount.address)).to.be.rejectedWith(
-        "Only the contract deployer can increment the deployment nonce"
+      await expect(nonceHolder.incrementDeploymentNonce(deployerAccount.address)).to.be.revertedWithCustomError(
+        nonceHolder,
+        "Unauthorized"
       );
     });
 
@@ -141,8 +147,9 @@ describe("NonceHolder tests", () => {
         failure: false,
         returnData: encodedAccountInfo,
       });
-      await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(124, 0)).to.be.rejectedWith(
-        "Nonce value cannot be set to 0"
+      await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(124, 0)).to.be.revertedWithCustomError(
+        nonceHolder,
+        "ZeroNonceError"
       );
     });
 
@@ -153,8 +160,9 @@ describe("NonceHolder tests", () => {
         failure: false,
         returnData: encodedAccountInfo,
       });
-      await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(443, 111)).to.be.rejectedWith(
-        "Previous nonce has not been used"
+      await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(443, 111)).to.be.revertedWithCustomError(
+        nonceHolder,
+        "NonceJumpError"
       );
     });
 
@@ -235,8 +243,9 @@ describe("NonceHolder tests", () => {
 
   describe("validateNonceUsage", () => {
     it("used nonce & should not be used", async () => {
-      await expect(nonceHolder.validateNonceUsage(systemAccount.address, 1, false)).to.be.rejectedWith(
-        "Reusing the same nonce twice"
+      await expect(nonceHolder.validateNonceUsage(systemAccount.address, 1, false)).to.be.revertedWithCustomError(
+        nonceHolder,
+        "NonceAlreadyUsed"
       );
     });
 
@@ -245,8 +254,9 @@ describe("NonceHolder tests", () => {
     });
 
     it("not used nonce & should be used", async () => {
-      await expect(nonceHolder.validateNonceUsage(systemAccount.address, 2 ** 16, true)).to.be.rejectedWith(
-        "The nonce was not set as used"
+      await expect(nonceHolder.validateNonceUsage(systemAccount.address, 2 ** 16, true)).to.be.revertedWithCustomError(
+        nonceHolder,
+        "NonceNotUsed"
       );
     });
 

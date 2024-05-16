@@ -14,6 +14,7 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 contract InitializeL2WethTokenScript is Script {
     using stdToml for string;
 
+    // solhint-disable-next-line gas-struct-packing
     struct Config {
         address deployerAddress;
         address create2FactoryAddr;
@@ -31,7 +32,7 @@ contract InitializeL2WethTokenScript is Script {
         uint256 gasMultiplier;
     }
 
-    Config config;
+    Config internal config;
 
     function run() public {
         initializeConfig();
