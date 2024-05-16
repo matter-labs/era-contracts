@@ -126,7 +126,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let verifier_contract_template = fs::read_to_string("data/verifier_contract_template.txt")?;
 
-    let verification_key = fs::read_to_string(opt.input_path).unwrap();
+    let verification_key = fs::read_to_string(&opt.input_path)
+        .expect(&format!("Unable to read from {}", &opt.input_path));
 
     let verification_key: VerificationKey<Bn256, ZkSyncSnarkWrapperCircuit> =
         serde_json::from_str(&verification_key).unwrap();
