@@ -31,7 +31,7 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {ZksyncContract, AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
+import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
 
 contract DeployL1Script is Script {
     using stdToml for string;
