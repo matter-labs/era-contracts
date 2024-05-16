@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
 import {ZkSyncHyperchainStorage} from "../ZkSyncHyperchainStorage.sol";
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 

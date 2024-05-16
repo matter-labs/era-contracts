@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors
-
 import {Diamond} from "../libraries/Diamond.sol";
 
 /// @title Diamond Proxy Contract (EIP-2535)
