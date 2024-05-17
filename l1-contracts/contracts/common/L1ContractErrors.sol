@@ -9,7 +9,6 @@ error ZeroAddress();
 error SharedBridgeValueAlreadySet(SharedBridgeKey);
 error NoFundsTransferred();
 error ZeroBalance();
-error RevertWithMsg(string message);
 error NonEmptyMsgValue();
 error L2BridgeNotDeployed(uint256 chainId);
 error TokenNotSupported(address token);
@@ -45,6 +44,12 @@ error TimeNotReached();
 error TooMuchGas();
 error MalformedCalldata();
 error FacetIsFrozen(bytes4 func);
+error PubdataBatchIsLessThanTxn();
+error InvalidPubdataPricingMode();
+error InvalidValue();
+error ChainAlreadyLive();
+error InvalidProtocolVersion();
+error DiamondFreezeIncorrectState();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
@@ -59,5 +64,3 @@ enum BytecodeError {
     Length,
     WordsMustBeOdd
 }
-
-string constant ERR_RECEIVE_ETH_BRIDGE = "receiveEth not state transition";

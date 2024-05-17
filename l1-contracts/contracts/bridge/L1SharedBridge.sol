@@ -30,8 +30,6 @@ import {
     NoFundsTransferred, 
     ZeroBalance, 
     ValueMismatch, 
-    RevertWithMsg, 
-    ERR_RECEIVE_ETH_BRIDGE, 
     NonEmptyMsgValue, 
     L2BridgeNotDeployed, 
     TokenNotSupported, 
@@ -230,7 +228,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     function receiveEth(uint256 _chainId) external payable {
         if (BRIDGE_HUB.getHyperchain(_chainId) != msg.sender) {
-            revert RevertWithMsg(ERR_RECEIVE_ETH_BRIDGE);
+            revert Unauthorized(msg.sender);
         }
     }
 
