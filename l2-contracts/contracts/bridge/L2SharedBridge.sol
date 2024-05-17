@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.20;
 
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
@@ -26,7 +25,7 @@ import {NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, OwnableUpgradeable {
+contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, Initializable {
     /// @dev The address of the L1 bridge counterpart.
     address public override l1SharedBridge;
 
@@ -36,6 +35,9 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, OwnableUpgrad
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
+
+    /// @dev A mapping l2 token address => l1 token address
+    mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
 
     address private l1LegacyBridge;
 
@@ -66,13 +68,16 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, OwnableUpgrad
         address _l1Bridge,
         address _l1LegacyBridge,
         bytes32 _l2TokenProxyBytecodeHash,
-        address _aliasedOwner
-    ) external initializer { // Why do we use reinitializer here insted of initializer?
+        address _aliasedOwner,
+        IL2StandardDeployer _standardDeployer
+    ) external reinitializer(2) {
         require(_l1Bridge != address(0), "bf");
         require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
         require(_aliasedOwner != address(0), "sf");
+        require(address(_standardDeployer) != address(0), "cf");
 
         l1SharedBridge = _l1Bridge;
+        standardDeployer = _standardDeployer;
 
         if (block.chainid != ERA_CHAIN_ID) {
             address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
@@ -84,8 +89,6 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, OwnableUpgrad
             l1LegacyBridge = _l1LegacyBridge;
             // l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
         }
-
-        __Ownable_init(); // Shall we use 2 step version instead? 
     }
 
     /// @notice Finalize the deposit and mint funds
@@ -120,15 +123,9 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, OwnableUpgrad
     function withdraw(bytes32 _assetInfo, bytes calldata _assetData) external override {
         address asset = assetAddress[_assetInfo];
         bytes memory _bridgeBurnData;
-        
-         if (asset != address(0)) {
-            _bridgeBurnData = IL2StandardAsset(asset).bridgeBurn(
-                L1_CHAIN_ID,
-                0,
-                _assetInfo,
-                msg.sender,
-                _assetData
-            );
+
+        if (asset != address(0)) {
+            _bridgeBurnData = IL2StandardAsset(asset).bridgeBurn(L1_CHAIN_ID, 0, _assetInfo, msg.sender, _assetData);
         } else {
             _bridgeBurnData = IL2StandardAsset(standardDeployer).bridgeBurn(
                 L1_CHAIN_ID,
@@ -155,13 +152,6 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, OwnableUpgrad
         return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _assetInfo, _bridgeBurnData);
     }
 
-    /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
-    function setNativeTokenVault(IL2StandardDeployer _standardDeployer) external onlyOwner {
-        require(address(standardDeployer) == address(0), "ShB: standard deployer already set");
-        require(address(_standardDeployer) != address(0), "ShB: standard deployer 0");
-        standardDeployer = _standardDeployer;
-    }
-
     /*//////////////////////////////////////////////////////////////
                             LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -181,14 +171,21 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, OwnableUpgrad
     }
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
+        if (l1TokenAddress[_l2Token] == address(0)) {
+            updateL1TokenAddress(_l2Token);
+        }
         bytes32 assetInfo = keccak256(
-            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(l1TokenAddress(_l2Token)))))
+            abi.encode(
+                L1_CHAIN_ID,
+                NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS,
+                bytes32(uint256(uint160(l1TokenAddress[_l2Token])))
+            )
         );
         bytes memory data = abi.encode(_amount, _l1Receiver);
         this.withdraw(assetInfo, data);
     }
 
-    function l1TokenAddress(address _l2Token) public view returns (address) {
+    function updateL1TokenAddress(address _l2Token) public view returns (address) {
         return IL2StandardToken(_l2Token).l1Address();
     }
 

@@ -54,11 +54,26 @@ describe("ERC20Bridge", function () {
     const beaconProxyBytecodeHash = hashBytecode((await deployer.loadArtifact("BeaconProxy")).bytecode);
     const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [testChainId, 1]);
     const erc20StandardDeployerImpl = await deployer.deploy(await deployer.loadArtifact("L2StandardDeployer"));
+    const standardDeployerInitializeData = erc20StandardDeployerImpl.interface.encodeFunctionData("initialize", [
+      deployerWallet.address,
+      beaconProxyBytecodeHash,
+      governorWallet.address,
+      contractsDeployedAlready,
+    ]);
+
+    const erc20StandardDeployerProxy = await deployer.deploy(
+      await deployer.loadArtifact("TransparentUpgradeableProxy"),
+      [erc20StandardDeployerImpl.address, governorWallet.address, standardDeployerInitializeData]
+    );
+
+    contractsDeployedAlready = true;
+
     const bridgeInitializeData = erc20BridgeImpl.interface.encodeFunctionData("initialize", [
       unapplyL1ToL2Alias(l1BridgeWallet.address),
       ethers.constants.AddressZero,
       beaconProxyBytecodeHash,
       governorWallet.address,
+      erc20StandardDeployerProxy.address,
     ]);
 
     const erc20BridgeProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
@@ -67,25 +82,10 @@ describe("ERC20Bridge", function () {
       bridgeInitializeData,
     ]);
 
-    const standardDeployerInitializeData = erc20StandardDeployerImpl.interface.encodeFunctionData("initialize", [
-      erc20BridgeProxy.address,
-      beaconProxyBytecodeHash,
-      governorWallet.address,
-      contractsDeployedAlready,
-    ]);
-
-    contractsDeployedAlready = true;
-
-    const erc20StandardDeployerProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
-      erc20StandardDeployerImpl.address,
-      governorWallet.address,
-      standardDeployerInitializeData,
-    ]);
-
     erc20Bridge = L2SharedBridgeFactory.connect(erc20BridgeProxy.address, deployerWallet);
     erc20StandardDeployer = L2StandardDeployerFactory.connect(erc20StandardDeployerProxy.address, deployerWallet);
 
-    await erc20Bridge.setNativeTokenVault(erc20StandardDeployerProxy.address);
+    await erc20StandardDeployer.setSharedBridge(erc20BridgeProxy.address);
   });
 
   it("Should finalize deposit ERC20 deposit", async function () {
