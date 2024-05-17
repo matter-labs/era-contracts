@@ -1870,13 +1870,15 @@ object "EVMInterpreter" {
             
                     key, sp := popStackItem(sp)
             
-                    if iszero(isSlotWarm(key)) {
+                    let wasWarm := isSlotWarm(key)
+            
+                    if iszero(wasWarm) {
                         evmGasLeft := chargeGas(evmGasLeft, 2000)
                     }
             
                     value := sload(key)
             
-                    if iszero(isSlotWarm(key)) {
+                    if iszero(wasWarm) {
                         let _wasW, _orgV := warmSlot(key, value)
                     }
             
@@ -4457,13 +4459,15 @@ object "EVMInterpreter" {
             
                     key, sp := popStackItem(sp)
             
-                    if iszero(isSlotWarm(key)) {
+                    let wasWarm := isSlotWarm(key)
+            
+                    if iszero(wasWarm) {
                         evmGasLeft := chargeGas(evmGasLeft, 2000)
                     }
             
                     value := sload(key)
             
-                    if iszero(isSlotWarm(key)) {
+                    if iszero(wasWarm) {
                         let _wasW, _orgV := warmSlot(key, value)
                     }
             
