@@ -43,6 +43,8 @@ error HashMismatch(bytes32 expected, bytes32 actual);
 error HyperchainLimitReached();
 error TimeNotReached();
 error TooMuchGas();
+error MalformedCalldata();
+error FacetIsFrozen(bytes4 func);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

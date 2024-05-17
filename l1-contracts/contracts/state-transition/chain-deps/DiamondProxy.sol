@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {Diamond} from "../libraries/Diamond.sol";
+import {ValueMismatch, MalformedCalldata, InvalidSelector, FacetIsFrozen} from "../../common/L1ContractErrors.sol";
 
 /// @title Diamond Proxy Contract (EIP-2535)
 /// @author Matter Labs
@@ -11,7 +12,9 @@ contract DiamondProxy {
     constructor(uint256 _chainId, Diamond.DiamondCutData memory _diamondCut) {
         // Check that the contract is deployed on the expected chain.
         // Thus, the contract deployed by the same Create2 factory on the different chain will have different addresses!
-        require(_chainId == block.chainid, "pr");
+        if (_chainId != block.chainid) {
+            revert ValueMismatch(block.chainid, _chainId);
+        }
         Diamond.diamondCut(_diamondCut);
     }
 
@@ -22,13 +25,21 @@ contract DiamondProxy {
         // Check whether the data contains a "full" selector or it is empty.
         // Required because Diamond proxy finds a facet by function signature,
         // which is not defined for data length in range [1, 3].
-        require(msg.data.length >= 4 || msg.data.length == 0, "Ut");
+        if (msg.data.length < 4 && msg.data.length != 0) {
+            revert MalformedCalldata();
+        }
         // Get facet from function selector
         Diamond.SelectorToFacet memory facet = diamondStorage.selectorToFacet[msg.sig];
         address facetAddress = facet.facetAddress;
 
-        require(facetAddress != address(0), "F"); // Proxy has no facet for this selector
-        require(!diamondStorage.isFrozen || !facet.isFreezable, "q1"); // Facet is frozen
+        // Proxy has no facet for this selector
+        if (facetAddress == address(0)) {
+            revert InvalidSelector(msg.sig);
+        }
+        // Facet is frozen
+        if (diamondStorage.isFrozen && facet.isFreezable) {
+            revert FacetIsFrozen(msg.sig);
+        }
 
         assembly {
             // The pointer to the free memory slot
