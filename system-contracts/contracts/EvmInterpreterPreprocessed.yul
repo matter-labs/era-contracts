@@ -162,12 +162,14 @@ object "EVMInterpreter" {
         }
         
         function readBytes(start, length) -> value {
-            let max := add(start, length)
-            for {} lt(start, max) { start := add(start, 1) } {
-                let next_byte := readIP(start)
+            // TODO: Why not do this at the beginning once instead of every time?
+            let bytecodeLen := mload(BYTECODE_OFFSET())
         
-                value := or(shl(8, value), next_byte)
+            let maxAcceptablePos := add(add(BYTECODE_OFFSET(), bytecodeLen), 31)
+            if gt(add(start,sub(length,1)), maxAcceptablePos) {
+                revert(0, 0)
             }
+            value := shr(mul(8,sub(32,length)),mload(start))
         }
         
         function dupStackItem(sp, evmGas, position) -> newSp, evmGasLeft {
@@ -2740,12 +2742,14 @@ object "EVMInterpreter" {
             }
             
             function readBytes(start, length) -> value {
-                let max := add(start, length)
-                for {} lt(start, max) { start := add(start, 1) } {
-                    let next_byte := readIP(start)
+                // TODO: Why not do this at the beginning once instead of every time?
+                let bytecodeLen := mload(BYTECODE_OFFSET())
             
-                    value := or(shl(8, value), next_byte)
+                let maxAcceptablePos := add(add(BYTECODE_OFFSET(), bytecodeLen), 31)
+                if gt(add(start,sub(length,1)), maxAcceptablePos) {
+                    revert(0, 0)
                 }
+                value := shr(mul(8,sub(32,length)),mload(start))
             }
             
             function dupStackItem(sp, evmGas, position) -> newSp, evmGasLeft {
