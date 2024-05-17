@@ -253,14 +253,8 @@ library Utils {
             requiredValueToDeploy = 0;
         }
 
-        executeUpgrade({
-            _governor: bridgehub.owner(),
-            _salt: bytes32(0),
-            _target: l1SharedBridgeProxy,
-            _data: abi.encodeCall(bridgehub.requestL2TransactionDirect, (l2TransactionRequestDirect)),
-            _value: requiredValueToDeploy,
-            _delay: 0
-        });
+        vm.broadcast();
+        bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
     }
 
     /**
