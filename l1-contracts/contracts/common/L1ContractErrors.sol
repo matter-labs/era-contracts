@@ -41,6 +41,8 @@ error InvalidDelay();
 error PreviousOperationNotExecuted();
 error HashMismatch(bytes32 expected, bytes32 actual);
 error HyperchainLimitReached();
+error TimeNotReached();
+error TooMuchGas();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
