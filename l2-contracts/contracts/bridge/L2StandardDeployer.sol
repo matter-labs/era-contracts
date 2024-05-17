@@ -30,7 +30,7 @@ contract L2StandardDeployer is IL2StandardDeployer, Initializable {
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
 
-    mapping(bytes32 assetInfo => address tokenAddress) public override tokenAddress;
+    mapping(bytes32 assetInfo => address tokenAddress) public override tokenAddress; // ToDo: why here token address and in shared bridge asset address?
 
     modifier onlyBridge() {
         require(msg.sender == address(l2Bridge), "SD: only Bridge"); // Only L2 bridge can call this method
@@ -90,7 +90,7 @@ contract L2StandardDeployer is IL2StandardDeployer, Initializable {
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override onlyBridge returns (bytes memory _bridgeMintData) {
+    ) external payable override onlyBridge returns (bytes memory _bridgeBurnData) {
         (uint256 _amount, address _l1Receiver) = abi.decode(_data, (uint256, address));
         require(_amount > 0, "Amount cannot be zero");
 
@@ -99,6 +99,7 @@ contract L2StandardDeployer is IL2StandardDeployer, Initializable {
 
         /// backwards compatible event
         emit WithdrawalInitiated(_prevMsgSender, _l1Receiver, l2Token, _amount);
+        _bridgeBurnData = abi.encodePacked(_chainId, _mintValue, _assetInfo, _prevMsgSender, _data);
     }
 
     /// @dev Deploy and initialize the L2 token for the L1 counterpart
