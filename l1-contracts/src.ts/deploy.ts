@@ -866,6 +866,36 @@ export class Deployer {
     );
   }
 
+  public async finishMoveChainToL1(synclayerChainId: number) {
+    const sharedBridge = this.defaultSharedBridge(this.deployWallet);
+    // const baseTokenAmount = ethers.utils.parseEther("1");
+    // const chainData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [ADDRESS_ONE, "0x"]); // todo
+    // const bridgehubData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [this.chainId, chainData]);
+    // console.log("bridgehubData", bridgehubData)
+    // console.log("this.addresses.ChainAssetInfo", this.addresses.ChainAssetInfo)
+    // const sharedBridgeData = ethers.utils.defaultAbiCoder.encode(
+    //   ["bytes32", "bytes"],
+
+    //   [await bridgehub.stmAssetInfoFromChainId(this.chainId), bridgehubData]
+    // );
+    const l2BatchNumber = 1;
+    const l2MsgIndex = 1;
+    const l2TxNumberInBatch = 1;
+    const message = ethers.utils.defaultAbiCoder.encode(
+      ["bytes32", "bytes"],
+      []
+    );
+    const merkleProof = ["0x00"];
+    const receipt = await sharedBridge.finalizeWithdrawal(
+        synclayerChainId,
+        l2BatchNumber,
+        l2MsgIndex,
+        l2TxNumberInBatch,
+        message,
+        merkleProof
+    )
+  }
+
   public async registerHyperchain(
     baseTokenAddress: string,
     validiumMode: boolean,

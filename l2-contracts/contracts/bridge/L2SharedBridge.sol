@@ -9,18 +9,19 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
 import {IL2StandardAsset} from "./interfaces/IL2StandardAsset.sol";
+import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 import {IL2StandardDeployer} from "./interfaces/IL2StandardDeployer.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, IContractDeployer} from "../L2ContractHelper.sol";
+import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, Initializable {
+contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @dev The address of the L1 bridge counterpart.
     address public override l1Bridge;
 
@@ -89,14 +90,14 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, Initializable
     /// @param _l1Token The address of the token that was locked on the L1
     // / @param _amount Total amount of tokens deposited from L1
     /// @param _data The additional data that user can pass with the deposit
-    function finalizeDeposit(bytes32 _assetInfo, bytes calldata _data) external override {
+    function finalizeDeposit(bytes32 _assetInfo, bytes calldata _data) public override {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
 
-        require(
-            AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
-                AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1LegacyBridge,
-            "mq"
-        );
+        // require(
+        //     AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
+        //         AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1LegacyBridge,
+        //     "mq"
+        // );
 
         address asset = assetAddress[_assetInfo];
         if (asset != address(0)) {
@@ -148,7 +149,7 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, Initializable
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external onlyBridge {
+    ) external { // onlyBridge {
         bytes32 assetInfo = keccak256(
             abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint160(_l1Token)))
         );
@@ -158,17 +159,17 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, Initializable
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
         bytes32 assetInfo = keccak256(
-            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint160(l1TokenAddress(_l2Token))))
+            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint160(getL1TokenAddress(_l2Token))))
         );
         bytes memory data = abi.encode(_amount, _l1Receiver);
     }
 
-    function l1TokenAddress(address _l2Token) public view returns (address) {
+    function getL1TokenAddress(address _l2Token) public view returns (address) {
         return IL2StandardToken(_l2Token).l1Address();
     }
 
     /// @return Address of an L2 token counterpart
-    function l2TokenAddress(address _l1Token) public view override returns (address) {
+    function l2TokenAddress(address _l1Token) public view returns (address) {
         return standardDeployer.l2TokenAddress(_l1Token);
     }
 }
