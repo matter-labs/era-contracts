@@ -2,8 +2,10 @@
 
 pragma solidity 0.8.20;
 
-import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {REAL_SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
+import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
+import {ISystemContext} from "./ISystemContext.sol";
+
+ISystemContext constant SYSTEM_CONTEXT_CONTRACT = ISystemContext(address(0x800b));
 
 /**
  * @author Matter Labs
@@ -18,7 +20,7 @@ contract GasBoundCaller {
     uint256 constant CALL_ENTRY_OVERHEAD = 800;
     /// @notice We assume that no more than `CALL_RETURN_OVERHEAD` ergs are used for the O(1) operations at the end of the execution,
     /// as such relaying the return.
-    uint256 constant CALL_RETURN_OVERHEAD = 200;
+    uint256 constant CALL_RETURN_OVERHEAD = 400;
 
     /// @notice The function that implements limiting of the total gas expenditure of the call.
     /// @dev On Era, the gas for pubdata is charged at the end of the execution of the entire transaction, meaning
@@ -48,7 +50,7 @@ contract GasBoundCaller {
         // This is the amount of gas that can be spent *exclusively* on pubdata in addition to the `gas` provided to this function.
         uint256 pubdataAllowance = _maxTotalGas > expectedForCompute ? _maxTotalGas - expectedForCompute : 0;
 
-        uint256 pubdataPublishedBefore = REAL_SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
+        uint256 pubdataPublishedBefore = SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
 
         // We never permit system contract calls.
         // If the call fails, the `EfficientCall.call` will propagate the revert.
@@ -62,7 +64,16 @@ contract GasBoundCaller {
             _isSystem: false
         });
 
-        uint256 pubdataPublishedAfter = REAL_SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
+        // We will calculate the length of the returndata to be used at the end of the function.
+        // We need additional `96` bytes to encode the offset `0x40` for the entire pubdata,
+        // the gas spent on pubdata as well as the length of the original returndata.
+        // Note, that it has to be padded to the 32 bytes to adhere to proper ABI encoding.
+        uint256 paddedReturndataLen = returnData.length + 96;
+        if (paddedReturndataLen % 32 != 0) {
+            paddedReturndataLen += 32 - (paddedReturndataLen % 32);
+        }
+
+        uint256 pubdataPublishedAfter = SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
 
         // It is possible that pubdataPublishedAfter < pubdataPublishedBefore if the call, e.g. removes
         // some of the previously created state diffs
@@ -70,7 +81,7 @@ contract GasBoundCaller {
             ? pubdataPublishedAfter - pubdataPublishedBefore
             : 0;
 
-        uint256 pubdataGasRate = REAL_SYSTEM_CONTEXT_CONTRACT.gasPerPubdataByte();
+        uint256 pubdataGasRate = SYSTEM_CONTEXT_CONTRACT.gasPerPubdataByte();
 
         // In case there is an overflow here, the `_maxTotalGas` wouldn't be able to cover it anyway, so
         // we don't mind the contract panicking here in case of it.
@@ -83,8 +94,16 @@ contract GasBoundCaller {
         }
 
         assembly {
-            // We just relay the return data from the call.
-            return(add(returnData, 0x20), mload(returnData))
+            // This place does interfere with the memory layout, however, it is done right before
+            // the `return` statement, so it is safe to do.
+            // We need to transform `bytes memory returnData` into (bytes memory returndata, gasSpentOnPubdata)
+            // `bytes memory returnData` is encoded as `length` + `data`.
+            // We need to prepend it with 0x40 and `pubdataGas`.
+            //
+            // It is assumed that the position of returndata is >= 0x40, since 0x40 is the free memory pointer location.
+            mstore(sub(returnData, 0x40), 0x40)
+            mstore(sub(returnData, 0x20), pubdataGas)
+            return(sub(returnData, 0x40), paddedReturndataLen)
         }
     }
 }

@@ -71,7 +71,9 @@ export async function deployBytecodeViaCreate2(
   const receipt = await tx.wait();
 
   const gasUsed = receipt.gasUsed;
-  log(`${contractName} deployed, gasUsed: ${gasUsed.toString()}`);
+  log(
+    `${contractName} deployed, gasUsed: ${gasUsed.toString()}, tx hash: ${tx.hash}, expected address: ${expectedAddress}`
+  );
 
   const deployedBytecodeAfter = await deployWallet.provider.getCode(expectedAddress);
   if (ethers.utils.hexDataLength(deployedBytecodeAfter) == 0) {

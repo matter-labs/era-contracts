@@ -66,6 +66,14 @@ export interface DeployerConfig {
   deployedLogPrefix?: string;
 }
 
+export interface Operation {
+  calls: { target: string; value: BigNumberish; data: string }[];
+  predecessor: string;
+  salt: string;
+}
+
+export type OperationOrString = Operation | string;
+
 export class Deployer {
   public addresses: DeployedAddresses;
   public deployWallet: Wallet | ZkWallet;
@@ -276,8 +284,9 @@ export class Deployer {
 
   public async deployTransparentProxyAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     if (this.verbose) {
-      console.log("Deploying Proxy Admin factory");
+      console.log("Deploying Proxy Admin");
     }
+    // Note: we cannot deploy using Create2, as the owner of the ProxyAdmin is msg.sender
 
     let proxyAdmin;
     let rec;
@@ -510,18 +519,25 @@ export class Deployer {
   }
 
   /// this should be only use for local testing
-  public async executeUpgrade(
-    targetAddress: string,
-    value: BigNumberish,
-    callData: string,
-    ethTxOptions?: ethers.providers.TransactionRequest
-  ) {
+  public async executeUpgrade(targetAddress: string, value: BigNumberish, callData: string,  ethTxOptions?: ethers.providers.TransactionRequest, printFileName?: string) {
     const governance = IGovernanceFactory.connect(this.addresses.Governance, this.deployWallet);
     const operation = {
       calls: [{ target: targetAddress, value: value, data: callData }],
       predecessor: ethers.constants.HashZero,
       salt: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
     };
+    if (printFileName) {
+      console.log("Operation:", operation);
+      console.log(
+        "Schedule operation: ",
+        governance.interface.encodeFunctionData("scheduleTransparent", [operation, 0])
+      );
+      console.log(
+        `Execute operation value: ${value}, calldata`,
+        governance.interface.encodeFunctionData("execute", [operation])
+      );
+      return;
+    }
     const scheduleTx = await governance.scheduleTransparent(operation, 0);
     await scheduleTx.wait();
     if (this.verbose) {
@@ -819,13 +835,16 @@ export class Deployer {
   public async registerStateTransitionManager() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
-    const upgradeData = bridgehub.interface.encodeFunctionData("addStateTransitionManager", [
-      this.addresses.StateTransition.StateTransitionProxy,
-    ]);
-
-    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData);
-    if (this.verbose) {
-      console.log(`StateTransition System registered in BH`);
+    if (!(await bridgehub.stateTransitionManagerIsRegistered(this.addresses.StateTransition.StateTransitionProxy))) {
+      const upgradeData = bridgehub.interface.encodeFunctionData("addStateTransitionManager", [
+        this.addresses.StateTransition.StateTransitionProxy,
+      ]);
+  
+      const receipt = await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData);
+      
+      if (this.verbose) {
+        console.log(`StateTransition System registered, gas used: ${receipt.gasUsed.toString()}`);
+      }
     }
   }
 
