@@ -96,6 +96,8 @@ export interface DeployedAddresses {
   Bridgehub: {
     BridgehubProxy: string;
     BridgehubImplementation: string;
+    STMDeploymentTrackerImplementation: string;
+    STMDeploymentTrackerProxy: string;
   };
   StateTransition: {
     StateTransitionProxy: string;
@@ -127,7 +129,6 @@ export interface DeployedAddresses {
   BlobVersionedHashRetriever: string;
   ValidatorTimeLock: string;
   Create2Factory: string;
-  ChainAssetInfo: string;
 }
 
 export function deployedAddressesFromEnv(): DeployedAddresses {
@@ -135,6 +136,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     Bridgehub: {
       BridgehubProxy: getAddressFromEnv("CONTRACTS_BRIDGEHUB_PROXY_ADDR"),
       BridgehubImplementation: getAddressFromEnv("CONTRACTS_BRIDGEHUB_IMPL_ADDR"),
+      STMDeploymentTrackerImplementation: getAddressFromEnv("CONTRACTS_STM_DEPLOYMENT_TRACKER_IMPL_ADDR"),
+      STMDeploymentTrackerProxy: getAddressFromEnv("CONTRACTS_STM_DEPLOYMENT_TRACKER_PROXY_ADDR"),
     },
     StateTransition: {
       StateTransitionProxy: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_PROXY_ADDR"),
@@ -166,6 +169,5 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     BlobVersionedHashRetriever: getAddressFromEnv("CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR"),
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
     Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
-    ChainAssetInfo: getHashFromEnv("CONTRACTS_CHAIN_ASSET_INFO"),
   };
 }

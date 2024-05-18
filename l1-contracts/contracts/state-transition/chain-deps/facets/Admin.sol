@@ -233,16 +233,13 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override returns (bytes memory _bridgeMintData) {
-        (uint256 _chainId, ) = abi.decode(_data, (uint256, bytes));
+    ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
         (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
 
         require(_prevMsgSender == s.admin, "BH: not chainAdmin");
         IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
 
         require(_newSyncLayerAdmin != address(0), "STM: admin zero");
-
-        // TODO: add requirement for it to be a admin of the chain
 
         // address chainBaseToken = hyperchain.getBaseToken();
         uint256 currentProtocolVersion = s.protocolVersion;
@@ -251,18 +248,12 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
         // FIXME: this will be removed once we support the migration of the priority queue also.
         require(s.priorityQueue.getSize() == 0, "Migration is only allowed with empty priority queue");
-        bytes memory commitment = _collectDataForMigration();
-        _bridgeMintData = abi.encode( // todo
-                _chainId,
-                s.baseToken,
-                _newSyncLayerAdmin,
-                currentProtocolVersion,
-                commitment,
-                _diamondCut
-            );
+        bytes memory chainData = _collectChainDataForMigration();
+        bytes memory stmData = abi.encode(_newSyncLayerAdmin, currentProtocolVersion, chainData, _diamondCut); // todo
+        chainBridgeMintData = abi.encode(stmData, chainData); // todo
     }
 
-    function _collectDataForMigration() internal view returns (bytes memory _chainData) {
+    function _collectChainDataForMigration() internal view returns (bytes memory chainData) {
         // todo
     }
 

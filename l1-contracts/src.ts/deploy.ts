@@ -50,6 +50,8 @@ import { ERC20Factory, StateTransitionManagerFactory } from "../typechain";
 
 import { Wallet as ZkWallet } from "zksync-ethers";
 import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
+import { ISTMDeploymentTracker } from "../typechain/ISTMDeploymentTracker";
+import { ISTMDeploymentTrackerFactory } from "../typechain/ISTMDeploymentTrackerFactory";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -262,7 +264,8 @@ export class Deployer {
   }
 
   public async deployBridgehubImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const contractAddress = await this.deployViaCreate2("Bridgehub", [], create2Salt, ethTxOptions);
+    const l1ChainId = await this.deployWallet.getChainId();
+    const contractAddress = await this.deployViaCreate2("Bridgehub", [l1ChainId], create2Salt, ethTxOptions);
 
     if (this.verbose) {
       console.log(`CONTRACTS_BRIDGEHUB_IMPL_ADDR=${contractAddress}`);
@@ -322,7 +325,7 @@ export class Deployer {
   public async deployBridgehubProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const bridgehub = new Interface(hardhat.artifacts.readArtifactSync("Bridgehub").abi);
 
-    const initCalldata = bridgehub.encodeFunctionData("initialize", [this.ownerAddress]);
+    const initCalldata = bridgehub.encodeFunctionData("initialize", [this.addresses.Governance]);
 
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
@@ -487,27 +490,32 @@ export class Deployer {
     const data1 = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
       this.addresses.Bridges.ERC20BridgeProxy,
     ]);
-    const data2 = sharedBridge.interface.encodeFunctionData("setEraPostDiamondUpgradeFirstBatch", [
-      process.env.CONTRACTS_ERA_POST_DIAMOND_UPGRADE_FIRST_BATCH ?? 1,
-    ]);
-    const data3 = sharedBridge.interface.encodeFunctionData("setEraPostLegacyBridgeUpgradeFirstBatch", [
-      process.env.CONTRACTS_ERA_POST_LEGACY_BRIDGE_UPGRADE_FIRST_BATCH ?? 1,
-    ]);
-    const data4 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [
-      process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_BATCH ?? 1,
-      process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_TX_NUMBER ?? 0,
-    ]);
+    // const data2 = sharedBridge.interface.encodeFunctionData("setEraPostDiamondUpgradeFirstBatch", [
+    //   process.env.CONTRACTS_ERA_POST_DIAMOND_UPGRADE_FIRST_BATCH ?? 1,
+    // ]);
+    // const data3 = sharedBridge.interface.encodeFunctionData("setEraPostLegacyBridgeUpgradeFirstBatch", [
+    //   process.env.CONTRACTS_ERA_POST_LEGACY_BRIDGE_UPGRADE_FIRST_BATCH ?? 1,
+    // ]);
+    // const data4 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [
+    //   process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_BATCH ?? 1,
+    //   process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_TX_NUMBER ?? 0,
+    // ]);
     await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data1);
-    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data2);
-    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data3);
-    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data4);
+    // await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data2);
+    // await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data3);
+    // await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data4);
     if (this.verbose) {
       console.log("Shared bridge updated with ERC20Bridge address");
     }
   }
 
   /// this should be only use for local testing
-  public async executeUpgrade(targetAddress: string, value: BigNumberish, callData: string) {
+  public async executeUpgrade(
+    targetAddress: string,
+    value: BigNumberish,
+    callData: string,
+    ethTxOptions?: ethers.providers.TransactionRequest
+  ) {
     const governance = IGovernanceFactory.connect(this.addresses.Governance, this.deployWallet);
     const operation = {
       calls: [{ target: targetAddress, value: value, data: callData }],
@@ -520,7 +528,7 @@ export class Deployer {
       console.log("Upgrade scheduled");
     }
     const executeTX = await governance.execute(operation, { value: value });
-    await executeTX.wait();
+    const receipt = await executeTX.wait();
     if (this.verbose) {
       console.log(
         "Upgrade with target ",
@@ -529,6 +537,7 @@ export class Deployer {
         await governance.isOperationDone(await governance.hashOperation(operation))
       );
     }
+    return receipt;
   }
 
   // used for testing, mimics original deployment process.
@@ -576,7 +585,7 @@ export class Deployer {
   public async deploySharedBridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const initCalldata = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi).encodeFunctionData(
       "initialize",
-      [this.addresses.Governance]
+      [this.addresses.Governance, 1, 1, 1, 0]
     );
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
@@ -640,6 +649,60 @@ export class Deployer {
     }
   }
 
+  public async deploySTMDeploymentTrackerImplementation(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
+    const contractAddress = await this.deployViaCreate2(
+      "STMDeploymentTracker",
+      [this.addresses.Bridgehub.BridgehubProxy, this.addresses.Bridges.SharedBridgeProxy],
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_STM_DEPLOYMENT_TRACKER_IMPL_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.Bridgehub.STMDeploymentTrackerImplementation = contractAddress;
+  }
+
+  public async deploySTMDeploymentTrackerProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    const initCalldata = new Interface(
+      hardhat.artifacts.readArtifactSync("STMDeploymentTracker").abi
+    ).encodeFunctionData("initialize", [this.addresses.Governance]);
+    const contractAddress = await this.deployViaCreate2(
+      "TransparentUpgradeableProxy",
+      [this.addresses.Bridgehub.STMDeploymentTrackerImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_STM_DEPLOYMENT_TRACKER_PROXY_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.Bridgehub.STMDeploymentTrackerProxy = contractAddress;
+
+    const bridgehub = this.bridgehubContract(this.deployWallet);
+    const data0 = bridgehub.interface.encodeFunctionData("setSTMDeployer", [
+      this.addresses.Bridgehub.STMDeploymentTrackerProxy,
+    ]);
+    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, data0);
+    if (this.verbose) {
+      console.log("STM DT registered in Bridgehub");
+    }
+
+    const stmDeploymentTracker = this.stmDeploymentTracker(this.deployWallet);
+    const data1 = stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL1", [
+      this.addresses.StateTransition.StateTransitionProxy,
+    ]);
+    const receipt = await this.executeUpgrade(this.addresses.Bridgehub.STMDeploymentTrackerProxy, 0, data1);
+    if (this.verbose) {
+      console.log("STM asset registered in L1 Shared Bridge via STM Deployment Tracker");
+    }
+  }
+
   public async sharedBridgeSetEraPostUpgradeFirstBatch(ethTxOptions: ethers.providers.TransactionRequest) {
     const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
     const storageSwitch = getNumberFromEnv("CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH");
@@ -655,28 +718,18 @@ export class Deployer {
     const sharedBridge = this.defaultSharedBridge(this.deployWallet);
 
     /// registering ETH as a valid token, with address 1.
-    const tx2 = await bridgehub.addToken(ADDRESS_ONE);
-    const receipt2 = await tx2.wait();
-
-    const tx3 = await bridgehub.setSharedBridge(this.addresses.Bridges.SharedBridgeProxy);
-    const receipt3 = await tx3.wait();
+    const upgradeData1 = bridgehub.interface.encodeFunctionData("addToken", [ADDRESS_ONE]);
+    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData1);
     if (this.verbose) {
-      console.log(
-        `Shared bridge was registered, gas used: ${receipt3.gasUsed.toString()} and ${receipt2.gasUsed.toString()}`
-      );
+      console.log("ETH token registered in Bridgehub");
     }
 
-    const tx4 = await sharedBridge.setAssetAddress(ethers.constants.HashZero, this.addresses.Bridgehub.BridgehubProxy);
-    const receipt4 = await tx4.wait();
-    this.addresses.ChainAssetInfo = ethers.utils.keccak256(
-      new ethers.utils.AbiCoder().encode(
-        ["tuple(address msgSender, bytes32 additionalData)"],
-        [{ msgSender: this.deployWallet.address, additionalData: ethers.constants.HashZero }]
-      )
-    );
+    const upgradeData2 = await bridgehub.interface.encodeFunctionData("setSharedBridge", [
+      this.addresses.Bridges.SharedBridgeProxy,
+    ]);
+    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
     if (this.verbose) {
-      console.log(`Chain asset was set in bridge, gas used: ${receipt4.gasUsed.toString()}`);
-      console.log(`CONTRACTS_CHAIN_ASSET_INFO=${this.addresses.ChainAssetInfo}`);
+      console.log(`Shared bridge was registered in Bridgehub`);
     }
   }
   public async registerTokenInNativeTokenVault(token: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -766,11 +819,13 @@ export class Deployer {
   public async registerStateTransitionManager() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
-    const tx = await bridgehub.addStateTransitionManager(this.addresses.StateTransition.StateTransitionProxy);
+    const upgradeData = bridgehub.interface.encodeFunctionData("addStateTransitionManager", [
+      this.addresses.StateTransition.StateTransitionProxy,
+    ]);
 
-    const receipt = await tx.wait();
+    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData);
     if (this.verbose) {
-      console.log(`StateTransition System registered, gas used: ${receipt.gasUsed.toString()}`);
+      console.log(`StateTransition System registered in BH`);
     }
   }
 
@@ -786,14 +841,14 @@ export class Deployer {
   public async moveChainToSyncLayer(synclayerChainId: number) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     const baseTokenAmount = ethers.utils.parseEther("1");
-    const chainData = new ethers.utils.AbiCoder().encode(["uint256"], [synclayerChainId]);
+    const chainData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [ADDRESS_ONE, "0x"]); // todo
     const bridgehubData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [this.chainId, chainData]);
     // console.log("bridgehubData", bridgehubData)
     // console.log("this.addresses.ChainAssetInfo", this.addresses.ChainAssetInfo)
     const sharedBridgeData = ethers.utils.defaultAbiCoder.encode(
       ["bytes32", "bytes"],
 
-      [this.addresses.ChainAssetInfo, bridgehubData]
+      [await bridgehub.stmAssetInfoFromChainId(this.chainId), bridgehubData]
     );
     const calldata = await bridgehub.requestL2TransactionTwoBridges(
       {
@@ -834,24 +889,24 @@ export class Deployer {
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
-    const tx = await bridgehub.createNewChain(
+    const upgradeData = await bridgehub.interface.encodeFunctionData("createNewChain", [
       inputChainId,
       this.addresses.StateTransition.StateTransitionProxy,
       baseTokenAddress,
       Date.now(),
       admin,
       initialDiamondCut,
-      {
-        gasPrice,
-        nonce,
-        ...txOptions,
-      }
-    );
-    const receipt = await tx.wait();
+    ]);
+    const receipt = await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData, {
+      gasPrice,
+      nonce,
+      ...txOptions,
+    });
     const chainId = receipt.logs.find((log) => log.topics[0] == bridgehub.interface.getEventTopic("NewChain"))
       .topics[1];
 
     nonce++;
+    nonce++; // upgrade takes 2 txs
 
     this.addresses.BaseToken = baseTokenAddress;
 
@@ -924,9 +979,9 @@ export class Deployer {
 
   public async registerTokenBridgehub(tokenAddress: string) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
-    const tx = await bridgehub.addToken(tokenAddress);
+    const upgradeData = await bridgehub.interface.encodeFunctionData("addToken", [tokenAddress]);
 
-    const receipt = await tx.wait();
+    const receipt = await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData);
     if (this.verbose) {
       console.log(`Token ${tokenAddress} was registered, gas used: ${receipt.gasUsed.toString()}`);
     }
@@ -940,6 +995,8 @@ export class Deployer {
     await this.deployNativeTokenVaultImplementation(create2Salt, { gasPrice, nonce: nonce + 2 });
     await this.deployNativeTokenVaultProxy(create2Salt, { gasPrice });
     await this.registerSharedBridge({ gasPrice });
+    await this.deploySTMDeploymentTrackerImplementation(create2Salt, { gasPrice });
+    await this.deploySTMDeploymentTrackerProxy(create2Salt, { gasPrice });
   }
 
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -1045,6 +1102,10 @@ export class Deployer {
 
   public nativeTokenVault(signerOrProvider: Signer | providers.Provider) {
     return IL1NativeTokenVaultFactory.connect(this.addresses.Bridges.NativeTokenVaultProxy, signerOrProvider);
+  }
+
+  public stmDeploymentTracker(signerOrProvider: Signer | providers.Provider) {
+    return ISTMDeploymentTrackerFactory.connect(this.addresses.Bridgehub.STMDeploymentTrackerProxy, signerOrProvider);
   }
 
   public baseTokenContract(signerOrProvider: Signer | providers.Provider) {
