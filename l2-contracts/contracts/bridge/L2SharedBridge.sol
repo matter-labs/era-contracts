@@ -9,6 +9,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
 import {IL2StandardAsset} from "./interfaces/IL2StandardAsset.sol";
+import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 import {IL2StandardDeployer} from "./interfaces/IL2StandardDeployer.sol";
 
@@ -21,7 +22,7 @@ import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2SharedBridge is IL2SharedBridge, Initializable {
+contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable {
     /// @dev The address of the L1 shared bridge counterpart.
     address public override l1SharedBridge;
 
@@ -98,7 +99,8 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
 
         // require(
         //     AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
-        //         AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1LegacyBridge,
+        //         AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1LegacyBridge ||
+        //         msg.sender == address(this),
         //     "mq"
         // );
 
@@ -152,17 +154,22 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external override { // onlyBridge {
+    ) external override {
+        // onlyBridge {
         bytes32 assetInfo = keccak256(
-            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint160(_l1Token)))
+            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
         );
         bytes memory data = abi.encode(_l1Sender, _amount, _l2Receiver, _data, _l1Token);
-        finalizeDeposit(assetInfo, data);
+        this.finalizeDeposit(assetInfo, data);
     }
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
         bytes32 assetInfo = keccak256(
-            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint160(getL1TokenAddress(_l2Token))))
+            abi.encode(
+                L1_CHAIN_ID,
+                NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS,
+                bytes32(uint256(uint160(getL1TokenAddress(_l2Token))))
+            )
         );
         bytes memory data = abi.encode(_amount, _l1Receiver);
     }

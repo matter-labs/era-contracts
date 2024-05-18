@@ -9,7 +9,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 /// @author Matter Labs
 /// @notice The implementation of the shared bridge that allows setting legacy bridge. Must only be used in local testing environments.
 contract DevL2SharedBridge is L2SharedBridge {
-    constructor(uint256 _eraChainId) L2SharedBridge(_eraChainId) {}
+    constructor(uint256 _eraChainId, uint256 _l1ChainId) L2SharedBridge(_eraChainId, _l1ChainId) {}
 
     function initializeDevBridge(
         address _l1SharedBridge,

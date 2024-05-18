@@ -519,7 +519,13 @@ export class Deployer {
   }
 
   /// this should be only use for local testing
-  public async executeUpgrade(targetAddress: string, value: BigNumberish, callData: string,  ethTxOptions?: ethers.providers.TransactionRequest, printFileName?: string) {
+  public async executeUpgrade(
+    targetAddress: string,
+    value: BigNumberish,
+    callData: string,
+    ethTxOptions?: ethers.providers.TransactionRequest,
+    printFileName?: string
+  ) {
     const governance = IGovernanceFactory.connect(this.addresses.Governance, this.deployWallet);
     const operation = {
       calls: [{ target: targetAddress, value: value, data: callData }],
@@ -839,9 +845,9 @@ export class Deployer {
       const upgradeData = bridgehub.interface.encodeFunctionData("addStateTransitionManager", [
         this.addresses.StateTransition.StateTransitionProxy,
       ]);
-  
+
       const receipt = await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData);
-      
+
       if (this.verbose) {
         console.log(`StateTransition System registered, gas used: ${receipt.gasUsed.toString()}`);
       }
@@ -900,19 +906,16 @@ export class Deployer {
     const l2BatchNumber = 1;
     const l2MsgIndex = 1;
     const l2TxNumberInBatch = 1;
-    const message = ethers.utils.defaultAbiCoder.encode(
-      ["bytes32", "bytes"],
-      []
-    );
+    const message = ethers.utils.defaultAbiCoder.encode(["bytes32", "bytes"], []);
     const merkleProof = ["0x00"];
     const receipt = await sharedBridge.finalizeWithdrawal(
-        synclayerChainId,
-        l2BatchNumber,
-        l2MsgIndex,
-        l2TxNumberInBatch,
-        message,
-        merkleProof
-    )
+      synclayerChainId,
+      l2BatchNumber,
+      l2MsgIndex,
+      l2TxNumberInBatch,
+      message,
+      merkleProof
+    );
   }
 
   public async registerHyperchain(
