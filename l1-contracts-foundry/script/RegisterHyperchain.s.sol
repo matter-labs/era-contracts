@@ -135,6 +135,7 @@ contract RegisterHyperchainScript is Script {
     }
 
     function deployGovernance() internal {
+        vm.broadcast();
         Governance governance = new Governance(
             config.ownerAddress,
             config.governanceSecurityCouncilAddress,
@@ -220,11 +221,12 @@ contract RegisterHyperchainScript is Script {
 
         vm.broadcast();
         hyperchain.setPendingAdmin(config.governance);
-        console.log("Owner set");
+        console.log("Owner for ", config.newDiamondProxy, "set to", config.governance);
     }
 
     function saveOutput() internal {
-        string memory toml = vm.serializeAddress("root", "diamond_proxy_addr", config.newDiamondProxy);
+        vm.serializeAddress("root", "diamond_proxy_addr", config.newDiamondProxy);
+        string memory toml = vm.serializeAddress("root", "governance_addr", config.governance);
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-register-hyperchain.toml");
         vm.writeToml(toml, path);
