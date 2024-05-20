@@ -46,6 +46,14 @@ export interface DeployerConfig {
   defaultAccountBytecodeHash?: string;
 }
 
+export interface Operation {
+  calls: { target: string; value: BigNumberish; data: string }[];
+  predecessor: string;
+  salt: string;
+}
+
+export type OperationOrString = Operation | string;
+
 export class Deployer {
   public addresses: DeployedAddresses;
   public deployWallet: Wallet;
@@ -216,9 +224,9 @@ export class Deployer {
   public async deployTransparentProxyAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     if (this.verbose) {
-      console.log("Deploying Proxy Admin factory");
+      console.log("Deploying Proxy Admin");
     }
-
+    // Note: we cannot deploy using Create2, as the owner of the ProxyAdmin is msg.sender
     const contractFactory = await hardhat.ethers.getContractFactory("ProxyAdmin", {
       signer: this.deployWallet,
     });
@@ -678,11 +686,13 @@ export class Deployer {
   public async registerStateTransitionManager() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
-    const tx = await bridgehub.addStateTransitionManager(this.addresses.StateTransition.StateTransitionProxy);
+    if (!(await bridgehub.stateTransitionManagerIsRegistered(this.addresses.StateTransition.StateTransitionProxy))) {
+      const tx = await bridgehub.addStateTransitionManager(this.addresses.StateTransition.StateTransitionProxy);
 
-    const receipt = await tx.wait();
-    if (this.verbose) {
-      console.log(`StateTransition System registered, gas used: ${receipt.gasUsed.toString()}`);
+      const receipt = await tx.wait();
+      if (this.verbose) {
+        console.log(`StateTransition System registered, gas used: ${receipt.gasUsed.toString()}`);
+      }
     }
   }
 
