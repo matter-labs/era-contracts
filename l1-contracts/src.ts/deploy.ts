@@ -32,6 +32,7 @@ import type { FacetCut } from "./diamondCut";
 import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
 
 import { ERC20Factory } from "../typechain";
+import type { Contract, Overrides } from "@ethersproject/contracts";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -450,15 +451,39 @@ export class Deployer {
     }
   }
 
+  public async executeDirectOrGovernance(
+    useGovernance: boolean,
+    contract: Contract,
+    fname: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fargs: any[],
+    value: BigNumberish,
+    overrides?: Overrides,
+    printOperation: boolean = false
+  ): Promise<ethers.ContractReceipt> {
+    if (useGovernance) {
+      const cdata = contract.interface.encodeFunctionData(fname, fargs);
+      return this.executeUpgrade(contract.address, value, cdata, printOperation);
+    } else {
+      const tx: ethers.ContractTransaction = await contract[fname](...fargs, ...(overrides ? [overrides] : []));
+      return await tx.wait();
+    }
+  }
+
   /// this should be only use for local testing
-  public async executeUpgrade(targetAddress: string, value: BigNumberish, callData: string, printFileName?: string) {
+  public async executeUpgrade(
+    targetAddress: string,
+    value: BigNumberish,
+    callData: string,
+    printOperation: boolean = false
+  ) {
     const governance = IGovernanceFactory.connect(this.addresses.Governance, this.deployWallet);
     const operation = {
       calls: [{ target: targetAddress, value: value, data: callData }],
       predecessor: ethers.constants.HashZero,
       salt: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
     };
-    if (printFileName) {
+    if (printOperation) {
       console.log("Operation:", operation);
       console.log(
         "Schedule operation: ",
@@ -476,7 +501,7 @@ export class Deployer {
       console.log("Upgrade scheduled");
     }
     const executeTX = await governance.execute(operation, { value: value });
-    await executeTX.wait();
+    const receipt = await executeTX.wait();
     if (this.verbose) {
       console.log(
         "Upgrade with target ",
@@ -485,6 +510,7 @@ export class Deployer {
         await governance.isOperationDone(await governance.hashOperation(operation))
       );
     }
+    return receipt;
   }
 
   // used for testing, mimics original deployment process.
@@ -676,7 +702,8 @@ export class Deployer {
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,
     nonce?,
-    predefinedChainId?: string
+    predefinedChainId?: string,
+    useGovernance: boolean = false
   ) {
     const gasLimit = 10_000_000;
 
@@ -690,24 +717,34 @@ export class Deployer {
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
-    const tx = await bridgehub.createNewChain(
-      inputChainId,
-      this.addresses.StateTransition.StateTransitionProxy,
-      baseTokenAddress,
-      Date.now(),
-      admin,
-      initialDiamondCut,
+    const receipt = await this.executeDirectOrGovernance(
+      useGovernance,
+      bridgehub,
+      "createNewChain",
+      [
+        inputChainId,
+        this.addresses.StateTransition.StateTransitionProxy,
+        baseTokenAddress,
+        Date.now(),
+        admin,
+        initialDiamondCut,
+      ],
+      0,
       {
         gasPrice,
         nonce,
         gasLimit,
       }
     );
-    const receipt = await tx.wait();
+
     const chainId = receipt.logs.find((log) => log.topics[0] == bridgehub.interface.getEventTopic("NewChain"))
       .topics[1];
 
     nonce++;
+    if (useGovernance) {
+      // deploying through governance requires two transactions
+      nonce++;
+    }
 
     this.addresses.BaseToken = baseTokenAddress;
 
@@ -777,11 +814,11 @@ export class Deployer {
     }
   }
 
-  public async registerToken(tokenAddress: string) {
+  public async registerToken(tokenAddress: string, useGovernance: boolean = false) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
-    const tx = await bridgehub.addToken(tokenAddress);
 
-    const receipt = await tx.wait();
+    const receipt = await this.executeDirectOrGovernance(useGovernance, bridgehub, "addToken", [tokenAddress], 0);
+
     if (this.verbose) {
       console.log(`Token ${tokenAddress} was registered, gas used: ${receipt.gasUsed.toString()}`);
     }
