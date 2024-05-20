@@ -24,7 +24,6 @@ import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable {
-
     /// @dev The address of the L1 shared bridge counterpart.
     address public override l1SharedBridge;
 
@@ -126,7 +125,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         address asset = assetAddress[_assetInfo];
         bytes memory _bridgeMintData;
 
-        /// should the address not be set already? Or do we need this to do it automatically. 
+        /// should the address not be set already? Or do we need this to do it automatically.
         if (asset != address(0)) {
             _bridgeMintData = IL2StandardAsset(asset).bridgeBurn(L1_CHAIN_ID, 0, _assetInfo, msg.sender, _assetData);
         } else {

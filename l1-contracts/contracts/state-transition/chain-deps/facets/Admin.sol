@@ -375,7 +375,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     //     // while the chain is in the "migrated" state.
     // }
 
-     // FI
+    // FI
     // function becomeSyncLayer() external onlyStateTransitionManager {
     //     require(s.syncLayerState == SyncLayerState.ActiveOnL1, "not active L1");
     //     // TODO: possibly additional checks

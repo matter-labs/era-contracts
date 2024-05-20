@@ -41,7 +41,7 @@ export async function upgradeToHyperchains(
 ) {
   await upgradeToHyperchains1(deployer, gasPrice, create2Salt, nonce);
   await upgradeToHyperchains2(deployer, gasPrice, printFileName);
-  await upgradeToHyperchains3(deployer, printFileName);
+  // await upgradeToHyperchains3(deployer, printFileName);
 }
 
 /// this just deploys the contract ( we do it here instead of using the protocol-upgrade tool, since we are deploying more than just facets, the Bridgehub, STM, etc.)
@@ -190,25 +190,25 @@ export async function upgradeToHyperchains2(deployer: Deployer, gasPrice: BigNum
 }
 
 // This sets the Shared Bridge parameters. We need to do this separately, as these params will be known after the upgrade
-export async function upgradeToHyperchains3(deployer: Deployer, printFileName?: string) {
-  const sharedBridge = L1SharedBridgeFactory.connect(
-    deployer.addresses.Bridges.SharedBridgeProxy,
-    deployer.deployWallet
-  );
-  const data2 = sharedBridge.interface.encodeFunctionData("setEraPostDiamondUpgradeFirstBatch", [
-    process.env.CONTRACTS_ERA_POST_DIAMOND_UPGRADE_FIRST_BATCH,
-  ]);
-  const data3 = sharedBridge.interface.encodeFunctionData("setEraPostLegacyBridgeUpgradeFirstBatch", [
-    process.env.CONTRACTS_ERA_POST_LEGACY_BRIDGE_UPGRADE_FIRST_BATCH,
-  ]);
-  const data4 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [
-    process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_BATCH,
-    process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_TX_NUMBER,
-  ]);
-  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data2, printFileName);
-  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data3, printFileName);
-  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data4, printFileName);
-}
+// export async function upgradeToHyperchains3(deployer: Deployer, printFileName?: string) {
+//   const sharedBridge = L1SharedBridgeFactory.connect(
+//     deployer.addresses.Bridges.SharedBridgeProxy,
+//     deployer.deployWallet
+//   );
+//   const data2 = sharedBridge.interface.encodeFunctionData("setEraPostDiamondUpgradeFirstBatch", [
+//     process.env.CONTRACTS_ERA_POST_DIAMOND_UPGRADE_FIRST_BATCH,
+//   ]);
+//   const data3 = sharedBridge.interface.encodeFunctionData("setEraPostLegacyBridgeUpgradeFirstBatch", [
+//     process.env.CONTRACTS_ERA_POST_LEGACY_BRIDGE_UPGRADE_FIRST_BATCH,
+//   ]);
+//   const data4 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [
+//     process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_BATCH,
+//     process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_TX_NUMBER,
+//   ]);
+//   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data2, null,printFileName);
+//   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data3, null, printFileName);
+//   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data4, null, printFileName);
+// }
 
 async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, create2Salt?: string, nonce?: number) {
   nonce = nonce || (await deployer.deployWallet.getTransactionCount());
@@ -287,6 +287,7 @@ async function upgradeL2Bridge(deployer: Deployer, gasPrice: BigNumberish, print
     deployer.addresses.StateTransition.DiamondProxy,
     requiredValueForL2Tx,
     mailboxCalldata,
+    null,
     printFileName
   );
 }
@@ -307,7 +308,7 @@ async function upgradeL1ERC20Bridge(deployer: Deployer, gasPrice: BigNumberish, 
       deployer.addresses.Bridges.ERC20BridgeImplementation,
     ]);
 
-    await deployer.executeUpgrade(deployer.addresses.TransparentProxyAdmin, 0, data1, printFileName);
+    await deployer.executeUpgrade(deployer.addresses.TransparentProxyAdmin, 0, data1, null, printFileName);
 
     if (deployer.verbose) {
       console.log("L1ERC20Bridge upgrade sent");
@@ -328,7 +329,7 @@ export async function transferERC20BridgeToProxyAdmin(
     deployer.addresses.TransparentProxyAdmin,
   ]);
 
-  await deployer.executeUpgrade(deployer.addresses.Bridges.ERC20BridgeProxy, 0, data1, printFileName);
+  await deployer.executeUpgrade(deployer.addresses.Bridges.ERC20BridgeProxy, 0, data1, null, printFileName);
 
   if (deployer.verbose) {
     console.log("ERC20Bridge ownership transfer sent");

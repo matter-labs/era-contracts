@@ -151,7 +151,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         tokenIsRegistered[_token] = true;
     }
 
-
     /// FIXME: this method should not be present in the production code.
     /// just used in code to register chain successfully until full migration is complete.
     function unsafeRegisterChain(uint256 _chainId, address _stateTransitionManager, address _baseToken) external {
