@@ -75,11 +75,8 @@ function MAX_UINT() -> max_uint {
 }
 
 // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
-function readIP(ip) -> opcode {
+function readIP(ip,maxAcceptablePos) -> opcode {
     // TODO: Why not do this at the beginning once instead of every time?
-    let bytecodeLen := mload(BYTECODE_OFFSET())
-
-    let maxAcceptablePos := add(add(BYTECODE_OFFSET(), bytecodeLen), 31)
     if gt(ip, maxAcceptablePos) {
         revert(0, 0)
     }
@@ -87,11 +84,7 @@ function readIP(ip) -> opcode {
     opcode := and(mload(sub(ip, 31)), 0xff)
 }
 
-function readBytes(start, length) -> value {
-    // TODO: Why not do this at the beginning once instead of every time?
-    let bytecodeLen := mload(BYTECODE_OFFSET())
-
-    let maxAcceptablePos := add(add(BYTECODE_OFFSET(), bytecodeLen), 31)
+function readBytes(start, maxAcceptablePos,length) -> value {
     if gt(add(start,sub(length,1)), maxAcceptablePos) {
         revert(0, 0)
     }
@@ -1203,4 +1196,136 @@ function genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, 
     mstore(sub(offset, 0x60), back)
     back, sp := popStackItem(sp)
     mstore(sub(offset, 0x80), back)
+}
+
+function performExtCodeCopy(evmGas,oldSp) -> evmGasLeft, sp {
+    evmGasLeft := chargeGas(evmGas, 100)
+
+    let addr, dest, offset, len
+    addr, sp := popStackItem(oldSp)
+    dest, sp := popStackItem(sp)
+    offset, sp := popStackItem(sp)
+    len, sp := popStackItem(sp)
+
+    // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
+    // minimum_word_size = (size + 31) / 32
+
+    let dynamicGas := add(
+        mul(3, shr(5, add(len, 31))),
+        expandMemory(add(dest, len))
+    )
+    if iszero(warmAddress(addr)) {
+        dynamicGas := add(dynamicGas, 2500)
+    }
+    evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+
+    let len_32 := shr(5, len)
+    for {let i := 0} lt(i, len_32) { i := add(i, 1) } {
+        mstore(shl(5,i),0)
+    }
+    let size_32 := shl(5,len_32)
+    let rest_32 := sub(len, size_32)
+    for {let i := 0} lt(i, rest_32) { i := add(i, 1) } {
+        mstore8(add(size_32,i),0)
+    }
+    // Gets the code from the addr
+    pop(_fetchDeployedCode(addr, add(offset, MEM_OFFSET_INNER()), len))
+}
+
+function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
+    evmGasLeft := chargeGas(evmGas, 32000)
+
+    if isStatic {
+        revert(0, 0)
+    }
+
+    let value, offset, size
+
+    value, sp := popStackItem(oldSp)
+    offset, sp := popStackItem(sp)
+    size, sp := popStackItem(sp)
+
+    checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)))
+
+    if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
+        revert(0, 0)
+    }
+
+    if gt(value, balance(address())) {
+        revert(0, 0)
+    }
+
+    // dynamicGas = init_code_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
+    // minimum_word_size = (size + 31) / 32
+    // init_code_cost = 2 * minimum_word_size
+    // code_deposit_cost = 200 * deployed_code_size
+    let dynamicGas := add(
+        shr(4, add(size, 31)),
+        expandMemory(add(offset, size))
+    )
+    evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+
+    let addr := getNewAddress(address())
+
+    let result
+    result, evmGasLeft := genericCreate(addr, offset, size, sp, value, evmGasLeft)
+
+    switch result
+        case 0 { sp := pushStackItem(sp, 0) }
+        default { sp := pushStackItem(sp, addr) }
+}
+
+function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp{
+    evmGasLeft := chargeGas(evmGas, 32000)
+
+    if isStatic {
+        revert(0, 0)
+    }
+
+    let value, offset, size, salt
+
+    value, sp := popStackItem(oldSp)
+    offset, sp := popStackItem(sp)
+    size, sp := popStackItem(sp)
+    salt, sp := popStackItem(sp)
+
+    checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)))
+
+    if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
+        revert(0, 0)
+    }
+
+    if gt(value, balance(address())) {
+        revert(0, 0)
+    }
+
+    // dynamicGas = init_code_cost + hash_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
+    // minimum_word_size = (size + 31) / 32
+    // init_code_cost = 2 * minimum_word_size
+    // hash_cost = 6 * minimum_word_size
+    // code_deposit_cost = 200 * deployed_code_size
+    evmGasLeft := chargeGas(evmGasLeft, add(
+        expandMemory(add(offset, size)),
+        shr(2, add(size, 31))
+    ))
+
+    {
+        let hashedBytecode := keccak256(add(MEM_OFFSET_INNER(), offset), size)
+        mstore8(0, 0xFF)
+        mstore(0x01, shl(0x60, address()))
+        mstore(0x15, salt)
+        mstore(0x35, hashedBytecode)
+    }
+
+    let addr := and(
+        keccak256(0, 0x55),
+        0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+    )
+
+    let result
+    result, evmGasLeft := genericCreate(addr, offset, size, sp, value, evmGasLeft) 
+
+    switch result
+        case 0 { sp := pushStackItem(sp, 0) }
+        default { sp := pushStackItem(sp, addr) }
 }
