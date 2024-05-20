@@ -79,42 +79,7 @@ async function main() {
         console.log("Deploying on a zkSync network!");
       }
 
-      // On Sync Layer there is no bridgehub
-      const dummyAddress = "0x1000000000000000000000000000000000000001";
-      deployer.addresses.Bridgehub.BridgehubProxy = dummyAddress;
-      deployer.addresses.Bridges.SharedBridgeProxy = dummyAddress;
-
-      await deployer.updateCreate2FactoryZkMode();
-      await deployer.updateBlobVersionedHashRetrieverZkMode();
-
-      await deployer.deployMulticall3(create2Salt, { gasPrice });
-      await deployer.deployDefaultUpgrade(create2Salt, { gasPrice });
-      await deployer.deployGenesisUpgrade(create2Salt, { gasPrice });
-
-      await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
-      await deployer.deployBridgehubContract(create2Salt, gasPrice);
-
-      await deployer.deployGovernance(create2Salt, { gasPrice });
-      await deployer.deployVerifier(create2Salt, { gasPrice });
-
-      await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
-
-      // SyncLayer does not need to have all the same contracts as on L1.
-      // We only need validator timelock as well as the STM.
-      await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
-
-      await deployer.deployStateTransitionDiamondFacets(create2Salt, gasPrice);
-      await deployer.deployStateTransitionManagerImplementation(create2Salt, { gasPrice });
-      await deployer.deployStateTransitionManagerProxy(create2Salt, { gasPrice });
-      await deployer.registerStateTransitionManager();
-
-      await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
-
-      // FIXME: this wont be needed once we fully integrate the sync layer.
-      await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
-      await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
-      await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });
-      await deployer.setParametersSharedBridge();
+      await initialBridgehubDeployment(deployer, [], gasPrice, false, create2Salt);
     });
 
   program
@@ -137,15 +102,13 @@ async function main() {
 
       const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
       console.log(`Using owner address: ${ownerAddress}`);
-
-      await registerSTMOnL1(
-        new Deployer({
-          deployWallet,
-          addresses: deployedAddressesFromEnv(),
-          ownerAddress,
-          verbose: true,
-        })
-      );
+      const deployer = new Deployer({
+        deployWallet,
+        addresses: deployedAddressesFromEnv(),
+        ownerAddress,
+        verbose: true,
+      })
+      await connectL1SLContracts(deployer);
     });
 
   program
@@ -175,22 +138,14 @@ async function main() {
         verbose: true,
       });
 
-      const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
-
       const syncLayerChainId = getNumberFromEnv("SYNC_LAYER_CHAIN_ID");
       const gasPrice = cmd.gasPrice
         ? parseUnits(cmd.gasPrice, "gwei")
         : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
 
-      // Just some large gas limit that should always be enough
-      const l2GasLimit = ethers.BigNumber.from(72_000_000);
 
-      const expectedCost = await bridgehub.l2TransactionBaseCost(
-        syncLayerChainId,
-        gasPrice,
-        l2GasLimit,
-        REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-      );
+
+
 
       const currentChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
 
@@ -208,34 +163,8 @@ async function main() {
         "SYNC_LAYER_BLOB_VERSIONED_HASH_RETRIEVER_ADDR"
       );
       deployer.addresses.StateTransition.DiamondInit = getAddressFromEnv("SYNC_LAYER_DIAMOND_INIT_ADDR");
-      const diamondCutData = await deployer.initialZkSyncHyperchainDiamondCut();
-      console.log("Cut data during migration, ", diamondCutData);
-      const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
-
-      const receipt = await performViaGovernane(deployer, {
-        to: stm.address,
-        data: stm.interface.encodeFunctionData("startMigrationToSyncLayer", [
-          currentChainId,
-          syncLayerChainId,
-          // FIXME: should be eventually the governance contract
-          ownerAddress,
-          {
-            chainId: syncLayerChainId,
-            mintValue: expectedCost,
-            l2Contract: counterPart,
-            l2GasLimit: l2GasLimit,
-            l2Value: 0,
-            // The migration calldata will be set inside STM
-            // FIXME: maybe it is better if we set it here also + double checked on STM
-            l2Calldata: "0x",
-            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            factoryDeps: [],
-            refundRecipient: ownerAddress,
-          },
-          initialDiamondCut,
-        ]),
-        value: expectedCost,
-      });
+      
+      const receipt = await deployer.moveChainToSyncLayer(syncLayerChainId, gasPrice, true);
 
       const syncLayerAddress = await stm.getHyperchain(syncLayerChainId);
 
@@ -390,7 +319,11 @@ async function main() {
   await program.parseAsync(process.argv);
 }
 
-async function registerSTMOnL1(deployer: Deployer) {
+async function connectL1SLContracts(deployer:Deployer) {
+  /// Shared bridge on L1 L2
+  /// Bridgehub on L1 L2
+  /// STM on L1 L2 in Bridge and BH
+  /// KL todo
   const stmOnSyncLayer = getAddressFromEnv("SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR");
   const bridgehubOnSyncLayer = getAddressFromEnv("SYNC_LAYER_BRIDGEHUB_PROXY_ADDR");
 
@@ -404,45 +337,19 @@ async function registerSTMOnL1(deployer: Deployer) {
   console.log(deployer.addresses.StateTransition.StateTransitionProxy);
   // this script only works when owner is the deployer
   console.log(`Registering SyncLayer chain id on the STM`);
-  await performViaGovernane(deployer, {
-    to: l1STM.address,
-    data: l1STM.interface.encodeFunctionData("registerSyncLayer", [chainId, true]),
-    value: 0,
-  });
+  await  deployer.executeUpgrade(
+    l1STM.address,
+     0,
+    l1STM.interface.encodeFunctionData("registerSyncLayer", [chainId, true])
+  );
 
   console.log(`Registering STM counter part on the SyncLayer`);
-  await performViaGovernane(deployer, {
-    to: l1Bridgehub.address, // kl todo fix. The BH has the counterpart, the BH needs to be deployed on L2, and the STM needs to be registered in the L2 BH.
-    data: l1Bridgehub.interface.encodeFunctionData("registerCounterpart", [chainId, bridgehubOnSyncLayer]),
-    value: 0,
-  });
+  await deployer.executeUpgrade(
+    l1Bridgehub.address, // kl todo fix. The BH has the counterpart, the BH needs to be deployed on L2, and the STM needs to be registered in the L2 BH.
+    0,
+    l1Bridgehub.interface.encodeFunctionData("registerCounterpart", [chainId, bridgehubOnSyncLayer])
+  );
   console.log(`SyncLayer registration completed`);
-}
-
-async function performViaGovernane(
-  deployer: Deployer,
-  params: {
-    to: string;
-    data: string;
-    value: BigNumberish;
-  }
-) {
-  const governance = deployer.governanceContract(deployer.deployWallet);
-  console.log(governance.address);
-  const operation = {
-    calls: [
-      {
-        target: params.to,
-        data: params.data,
-        value: params.value,
-      },
-    ],
-    predecessor: ethers.constants.HashZero,
-    salt: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-  };
-  await (await governance.scheduleTransparent(operation, 0)).wait();
-
-  return await (await governance.execute(operation, { value: params.value })).wait();
 }
 
 // TODO: maybe move it to SDK
