@@ -12,6 +12,7 @@ import {PriorityQueue, PriorityOperation} from "../../../state-transition/librar
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 import {ISystemContext} from "../../l2-deps/ISystemContext.sol";
+import {PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../common/L2ContractAddresses.sol";
 import {L2CanonicalTransaction, TxStatus} from "../../../common/Messaging.sol";
 import {ProposedUpgrade} from "../../../upgrades/BaseZkSyncUpgrade.sol";
@@ -259,7 +260,8 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
     function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {}
 
-    // function finalizeMigration(HyperchainCommitment memory _commitment) public onlyStateTransitionManager {
+    // /// @inheritdoc IAdmin
+    // function finalizeMigration(HyperchainCommitment memory _commitment) external onlyStateTransitionManager {
     //     if (s.syncLayerState == SyncLayerState.MigratedFromL1) {
     //         s.syncLayerState = SyncLayerState.ActiveOnL1;
     //     } else if (s.syncLayerState == SyncLayerState.MigratedFromSL) {
@@ -271,6 +273,10 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     //     uint256 batchesExecuted = _commitment.totalBatchesExecuted;
     //     uint256 batchesVerified = _commitment.totalBatchesVerified;
     //     uint256 batchesCommitted = _commitment.totalBatchesCommitted;
+
+    //     s.totalBatchesCommitted = batchesCommitted;
+    //     s.totalBatchesVerified = batchesVerified;
+    //     s.totalBatchesExecuted = batchesExecuted;
 
     //     // Some consistency checks just in case.
     //     require(batchesExecuted <= batchesVerified, "Executed is not consistent with verified");
@@ -284,36 +290,119 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     //         "Invalid number of batch hashes"
     //     );
 
-    //     // Note that this part is done in O(N), i.e. it is the responsibility of the admin of the chain to ensure that the total number of
+    //     // Note that this part is done in O(N), i.e. it is the reponsibility of the admin of the chain to ensure that the total number of
     //     // outstanding committed batches is not too long.
     //     for (uint256 i = 0; i < _commitment.batchHashes.length; i++) {
     //         s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];
     //     }
 
+    //     // Currently only zero length is allowed.
+    //     uint256 pqHead = _commitment.priorityQueueHead;
+    //     s.priorityQueue.head = pqHead;
+    //     s.priorityQueue.tail = pqHead + _commitment.priorityQueueTxs.length;
+
+    //     for (uint256 i = 0; i < _commitment.priorityQueueTxs.length; i++) {
+    //         s.priorityQueue.data[pqHead + i] = _commitment.priorityQueueTxs[i];
+    //     }
+
+    //     s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
+    //     s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
+
     //     emit MigrationComplete();
     // }
 
-    // FI
+    // // FI
+    // // function becomeSyncLayer() external onlyStateTransitionManager {
+    // //     require(s.syncLayerState == SyncLayerState.ActiveOnL1, "not active L1");
+    // //     // TODO: possibly additional checks
+    // //     s.syncLayerState = SyncLayerState.SyncLayerL1;
+    // // }
+
+    // function startMigrationToSyncLayer(
+    //     uint256 _syncLayerChainId,
+    //     address _stmCounterPart,
+    //     address _newSyncLayerAdmin,
+    //     bytes calldata _diamondCut
+    // ) external onlyStateTransitionManager returns (bytes memory migrationCalldata) {
+    //     // TODO: add a check that there are no outstanding upgrades.
+
+    //     // FIXME: uncomment
+    //     require(s.syncLayerState == SyncLayerState.ActiveOnL1, "not active L1");
+    //     s.syncLayerState = SyncLayerState.MigratedFromL1;
+    //     s.syncLayerChainId = _syncLayerChainId;
+
+    //     HyperchainCommitment memory commitment = _prepareChainCommitment();
+
+    //     migrationCalldata = abi.encodeCall(
+    //         IStateTransitionManager.finalizeMigrationToSyncLayer,
+    //         (s.chainId, s.baseToken, _stmCounterPart, _newSyncLayerAdmin, s.protocolVersion, commitment, _diamondCut)
+    //     );
+    // }
+
+    // function storeMigrationHash(bytes32 _migrationHash) external onlyStateTransitionManager {
+    //     s.syncLayerMigrationHash = _migrationHash;
+    // }
+    // function recoverFromFailedMigrationToSyncLayer(
+    //     uint256 _syncLayerChainId,
+    //     uint256 _l2BatchNumber,
+    //     uint256 _l2MessageIndex,
+    //     uint16 _l2TxNumberInBatch,
+    //     bytes32[] calldata _merkleProof
+    // ) external onlyAdmin {
+    //     require(s.syncLayerState == SyncLayerState.MigratedFromL1, "not migrated L1");
+
+    //     bytes32 migrationHash = s.syncLayerMigrationHash;
+    //     require(migrationHash != bytes32(0), "can not recover when there is no migration");
+
+    //     require(
+    //         IBridgehub(s.bridgehub).proveL1ToL2TransactionStatus(
+    //             _syncLayerChainId,
+    //             migrationHash,
+    //             _l2BatchNumber,
+    //             _l2MessageIndex,
+    //             _l2TxNumberInBatch,
+    //             _merkleProof,
+    //             TxStatus.Failure
+    //         ),
+    //         "Migration not failed"
+    //     );
+
+    //     s.syncLayerState = SyncLayerState.ActiveOnL1;
+    //     s.syncLayerChainId = 0;
+    //     s.syncLayerMigrationHash = bytes32(0);
+
+    //     // We do not need to perform any additional actions, since no changes related to the chain commitment can be performed
+    //     // while the chain is in the "migrated" state.
+    // }
+
+     // FI
     // function becomeSyncLayer() external onlyStateTransitionManager {
     //     require(s.syncLayerState == SyncLayerState.ActiveOnL1, "not active L1");
     //     // TODO: possibly additional checks
     //     s.syncLayerState = SyncLayerState.SyncLayerL1;
     // }
 
-    // function startMigrationToSyncLayer(
-    //     uint256 _syncLayerChainId
-    // ) external onlyStateTransitionManager returns (HyperchainCommitment memory commitment) {
-    //     // TODO: add a check that there are no outstanding upgrades.
-
-    //     // FIXME: uncomment
-    //     // require(s.syncLayerState == SyncLayerState.ActiveOnL1, "not active L1");
-    //     // s.syncLayerState = SyncLayerState.MigratedFromL1;
-
-    //     // s.syncLayerChainId = _syncLayerChainId;
-
+    // function _prepareChainCommitment() internal returns (HyperchainCommitment memory commitment) {
     //     commitment.totalBatchesCommitted = s.totalBatchesCommitted;
     //     commitment.totalBatchesVerified = s.totalBatchesVerified;
     //     commitment.totalBatchesExecuted = s.totalBatchesExecuted;
+
+    //     uint256 pqHead = s.priorityQueue.head;
+    //     commitment.priorityQueueHead = pqHead;
+
+    //     uint256 pqLength = s.priorityQueue.tail - pqHead;
+    //     // FIXME: this will be removed once we support the migration of any priority queue size.
+    //     require(pqLength <= 50, "Migration is only allowed with empty priority queue");
+
+    //     PriorityOperation[] memory priorityQueueTxs = new PriorityOperation[](pqLength);
+
+    //     for (uint256 i = pqHead; i < s.priorityQueue.tail; i++) {
+    //         priorityQueueTxs[i] = s.priorityQueue.data[i];
+    //     }
+    //     commitment.priorityQueueTxs = priorityQueueTxs;
+
+    //     commitment.l2SystemContractsUpgradeBatchNumber = s.l2SystemContractsUpgradeBatchNumber;
+    //     commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
 
     //     // just in case
     //     require(
@@ -336,74 +425,6 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     //     }
 
     //     commitment.batchHashes = batchHashes;
-    // }
-
-    // function recoverFromFailedMigrationToSyncLayer(
-    //     uint256 _syncLayerChainId,
-    //     uint256 _l2BatchNumber,
-    //     uint256 _l2MessageIndex,
-    //     uint16 _l2TxNumberInBatch,
-    //     bytes32[] calldata _merkleProof
-    // ) external onlyAdmin {
-    //     require(s.syncLayerState == SyncLayerState.MigratedFromL1, "not migrated L1");
-    //     bytes32 migrationHash = s.syncLayerMigrationHash;
-    //     require(migrationHash != bytes32(0), "can not recover when there is no migration");
-    //     require(
-    //         IBridgehub(s.bridgehub).proveL1ToL2TransactionStatus(
-    //             _syncLayerChainId,
-    //             migrationHash,
-    //             _l2BatchNumber,
-    //             _l2MessageIndex,
-    //             _l2TxNumberInBatch,
-    //             _merkleProof,
-    //             TxStatus.Failure
-    //         ),
-    //         "Migration not failed"
-    //     );
-    //     s.syncLayerState = SyncLayerState.ActiveOnL1;
-    //     s.syncLayerChainId = 0;
-    //     s.syncLayerMigrationHash = bytes32(0);
-    //     We do not need to perform any additional actions, since no changes related to the chain commitment can be performed
-    //     while the chain is in the "migrated" state.
-    // }
-
-    // function finalizeMigrationToSyncLayer(
-    //     uint256 _chainId,
-    //     address _baseToken,
-    //     address _sharedBridge,
-    //     address _admin,
-    //     uint256 _expectedProtocolVersion,
-    //     HyperchainCommitment calldata _commitment,
-    //     bytes calldata _diamondCut
-    // ) external {
-    //     /// FIXME: adequate access rights
-    //     IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
-    //     address currentAddress = stm.getHyperchain(_chainId);
-    //     // We do not want to deal with inactive protocol versions during migration.
-
-    //     uint256 protocolVersion = stm.protocolVersion();
-    //     require(_expectedProtocolVersion == protocolVersion, "STM: not latest protocol version");
-    //     // Just in case
-    //     require(stm.protocolVersionIsActive(_expectedProtocolVersion), "STM: protocolVersion not active");
-    //     if (currentAddress == address(0)) {
-    //         require(protocolVersion == _expectedProtocolVersion, "STM: protocolVersion mismatch");
-    //         // We set "migrated L2 initially" as it will be reset later on in the `finalizeMigration` call.
-    //         // currentAddress = _deployNewChain(
-    //         //     _chainId,
-    //         //     _baseToken,
-    //         //     _sharedBridge,
-    //         //     _admin,
-    //         //     _diamondCut,
-    //         //     SyncLayerState.MigratedFromSL
-    //         // );
-    //         // note that we do not need the genesis upgrade, it is expected that everything is already prepared on l2.
-    //     }
-    //     // IZkSyncHyperchain hyperchain = IZkSyncHyperchain(hyperchainMap.get(_chainId));
-    //     uint256 currentProtocolVersion = s.protocolVersion;
-    //     // while it should be definitely the case when a chain is created, we double check just in case
-    //     require(currentProtocolVersion == _expectedProtocolVersion, "STM: protocolVersion mismatch");
-    //     // Now migrating the chain
-    //     finalizeMigration(_commitment);
     // }
 
     // function finalizeMigrationFromSyncLayer(uint256 _chainId) external {

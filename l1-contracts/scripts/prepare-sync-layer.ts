@@ -45,7 +45,6 @@ async function main() {
 
       let deployWallet: ethers.Wallet | ZkWallet;
 
-      // if (process.env.CONTRACTS_BASE_NETWORK_ZKSYNC === "true") {
       const provider = new ZkProvider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
       deployWallet = cmd.privateKey
         ? new ZkWallet(cmd.privateKey, provider)
@@ -92,6 +91,9 @@ async function main() {
       await deployer.deployDefaultUpgrade(create2Salt, { gasPrice });
       await deployer.deployGenesisUpgrade(create2Salt, { gasPrice });
 
+      await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
+      await deployer.deployBridgehubContract(create2Salt, gasPrice);
+
       await deployer.deployGovernance(create2Salt, { gasPrice });
       await deployer.deployVerifier(create2Salt, { gasPrice });
 
@@ -104,8 +106,15 @@ async function main() {
       await deployer.deployStateTransitionDiamondFacets(create2Salt, gasPrice);
       await deployer.deployStateTransitionManagerImplementation(create2Salt, { gasPrice });
       await deployer.deployStateTransitionManagerProxy(create2Salt, { gasPrice });
+      await deployer.registerStateTransitionManager();
 
       await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
+
+      // FIXME: this wont be needed once we fully integrate the sync layer.
+      await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
+      await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
+      await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });
+      await deployer.setParametersSharedBridge();
     });
 
   program
@@ -244,7 +253,8 @@ async function main() {
       const receiptOnSL = await (await txL2Handle).wait();
 
       const stmOnSL = IStateTransitionManagerFactory.connect(counterPart, syncLayerProvider);
-      console.log("New hyperchain address: ", await stmOnSL.getHyperchain(currentChainId));
+      const hyperchainAddress = await stmOnSL.getHyperchain(currentChainId);
+      console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${hyperchainAddress}`);
 
       console.log("Success!");
     });
@@ -339,8 +349,40 @@ async function main() {
       const timelock = deployer.validatorTimelock(deployer.deployWallet);
 
       for (const operator of operators) {
+        await deployer.deployWallet.sendTransaction({
+          to: operator,
+          value: ethers.utils.parseEther("5"),
+        });
+
         await (await timelock.addValidator(currentChainId, operator)).wait();
       }
+
+      // FIXME: this method includes bridgehub manipulation, but in the future it wont.
+      deployer.addresses.StateTransition.StateTransitionProxy = getAddressFromEnv(
+        "SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR"
+      );
+      deployer.addresses.Bridgehub.BridgehubProxy = getAddressFromEnv("SYNC_LAYER_BRIDGEHUB_PROXY_ADDR");
+
+      const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
+
+      console.log("Registering the chain on bridgehub");
+
+      // // For now, only ETH is supported as base chain.
+      await (
+        await bridgehub.unsafeRegisterChain(
+          currentChainId,
+          deployer.addresses.StateTransition.StateTransitionProxy,
+          zkUtils.ETH_ADDRESS_IN_CONTRACTS
+        )
+      ).wait();
+
+      // FIXME? Do we want to
+      console.log("Setting default token multiplier");
+
+      const hyperchain = deployer.stateTransitionContract(deployer.deployWallet);
+
+      console.log("The fefault ones");
+      await (await hyperchain.setTokenMultiplier(1, 1)).wait();
 
       console.log("Success!");
     });

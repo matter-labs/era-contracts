@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {Diamond} from "./libraries/Diamond.sol";
 // import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
+import {HyperchainCommitment} from "../common/Config.sol";
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
