@@ -93,7 +93,6 @@ describe("ERC20Bridge", function () {
 
     const l1Depositor = ethers.Wallet.createRandom();
     const l2Receiver = ethers.Wallet.createRandom();
-
     const tx = await (
       await erc20BridgeWithL1Bridge["finalizeDeposit(address,address,address,uint256,bytes)"](
         // Depositor and l2Receiver can be any here
@@ -104,10 +103,8 @@ describe("ERC20Bridge", function () {
         encodedTokenData("TestToken", "TT", 18)
       )
     ).wait();
-
     const l2TokenInfo = tx.events.find((event) => event.event === "FinalizeDepositSharedBridge").args.assetInfo;
     const l2TokenAddress = await erc20StandardDeployer.tokenAddress(l2TokenInfo);
-
     // Checking the correctness of the balance:
     erc20Token = L2StandardERC20Factory.connect(l2TokenAddress, deployerWallet);
     expect(await erc20Token.balanceOf(l2Receiver.address)).to.equal(100);

@@ -79,6 +79,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         require(address(_standardDeployer) != address(0), "cf");
 
         l1SharedBridge = _l1SharedBridge;
+        standardDeployer = _standardDeployer;
 
         if (block.chainid != ERA_CHAIN_ID) {
             address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
@@ -170,12 +171,12 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
             abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
         );
         bytes memory data = abi.encode(_l1Sender, _amount, _l2Receiver, _data, _l1Token);
-        this.finalizeDeposit(assetInfo, data);
+        finalizeDeposit(assetInfo, data);
     }
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
         if (l1TokenAddress[_l2Token] == address(0)) {
-            updateL1TokenAddress(_l2Token);
+            getL1TokenAddress(_l2Token);
         }
         bytes32 assetInfo = keccak256(
             abi.encode(

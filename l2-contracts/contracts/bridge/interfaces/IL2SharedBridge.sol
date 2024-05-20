@@ -17,8 +17,6 @@ interface IL2SharedBridge {
 
     function withdraw(bytes32 _assetInfo, bytes calldata _data) external;
 
-    function l1SharedBridge() external view returns (address);
-
     function l1Bridge() external view returns (address);
 
     function assetAddress(bytes32 _assetInfo) external view returns (address);
