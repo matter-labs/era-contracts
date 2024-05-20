@@ -390,7 +390,7 @@ contract ExecutorFacet is Base, IExecutor {
         uint merklePathLength = verificationRequest.merklePath.length;
         bytes32[] memory merklePath = new bytes32[](merklePathLength);
         for (uint i = 0; i < merklePathLength; i++) {
-            merklePath[i] = bytes32(verificationRequest.merklePath[merklePathLength]);
+            merklePath[i] = bytes32(verificationRequest.merklePath[i]);
         }
         bytes32 leaf = keccak256(abi.encodePacked(verifierId, bytes32(proofPublicInput[0])));
 
