@@ -18,10 +18,10 @@ contract HyperchainDeployer is L1ContractDeployer {
     uint256 eraHyperchainId = 9;
     uint256[] public hyperchainIds;
 
-    function deployHyperchains() internal {
+    function _deployHyperchains() internal {
         deployScript = new RegisterHyperchainsScript();
 
-        hyperchainsToDeploy.push(getDefaultHyperchainDeployInfo("era", eraHyperchainId, ETH_TOKEN_ADDRESS));
+        hyperchainsToDeploy.push(_getDefaultHyperchainDeployInfo("era", eraHyperchainId, ETH_TOKEN_ADDRESS));
         hyperchainIds.push(eraHyperchainId);
 
         saveHyperchainConfig();
@@ -34,13 +34,13 @@ contract HyperchainDeployer is L1ContractDeployer {
         deployScript.run();
     }
 
-    function addNewHyperchainToDeploy(string memory _name, address _baseToken) internal {
-        hyperchainsToDeploy.push(getDefaultHyperchainDeployInfo(_name, currentHyperChainId, _baseToken));
+    function _addNewHyperchainToDeploy(string memory _name, address _baseToken) internal {
+        hyperchainsToDeploy.push(_getDefaultHyperchainDeployInfo(_name, currentHyperChainId, _baseToken));
         hyperchainIds.push(currentHyperChainId);
         currentHyperChainId++;
     }
 
-    function getDefaultDescription(
+    function _getDefaultDescription(
         uint256 __chainId,
         address __baseToken
     ) internal returns (RegisterHyperchainsScript.HyperchainDescription memory description) {
@@ -56,12 +56,12 @@ contract HyperchainDeployer is L1ContractDeployer {
         });
     }
 
-    function getDefaultHyperchainDeployInfo(
+    function _getDefaultHyperchainDeployInfo(
         string memory __name,
         uint256 __chainId,
         address __baseToken
     ) internal returns (HyperchainDeployInfo memory deployInfo) {
-        deployInfo = HyperchainDeployInfo({name: __name, description: getDefaultDescription(__chainId, __baseToken)});
+        deployInfo = HyperchainDeployInfo({name: __name, description: _getDefaultDescription(__chainId, __baseToken)});
     }
 
     function saveHyperchainConfig() public {

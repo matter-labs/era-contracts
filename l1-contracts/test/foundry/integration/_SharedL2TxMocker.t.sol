@@ -28,11 +28,11 @@ contract L2TxMocker is Test {
         mockFactoryDeps[0] = "11111111111111111111111111111111";
     }
 
-    function addL2ChainContract(uint256 _chainId, address _chainContract) internal {
+    function _addL2ChainContract(uint256 _chainId, address _chainContract) internal {
         chainContracts[_chainId] = _chainContract;
     }
 
-    function createL2TransactionRequestDirect(
+    function _createL2TransactionRequestDirect(
         uint256 _chainId,
         uint256 _mintValue,
         uint256 _l2Value,
@@ -53,7 +53,7 @@ contract L2TxMocker is Test {
         request.refundRecipient = mockRefundRecipient;
     }
 
-    function createMockL2TransactionRequestDirect(
+    function _createMockL2TransactionRequestDirect(
         uint256 _chainId,
         uint256 _mintValue,
         uint256 _l2Value
@@ -71,7 +71,7 @@ contract L2TxMocker is Test {
         request.refundRecipient = mockRefundRecipient;
     }
 
-    function createL2TransactionRequestTwoBridges(
+    function _createL2TransactionRequestTwoBridges(
         uint256 _chainId,
         uint256 _mintValue,
         uint256 _secondBridgeValue,
@@ -94,7 +94,7 @@ contract L2TxMocker is Test {
         request.refundRecipient = mockRefundRecipient;
     }
 
-    function createMockL2TransactionRequestTwoBridges(
+    function _createMockL2TransactionRequestTwoBridges(
         uint256 _chainId,
         uint256 _mintValue,
         uint256 _secondBridgeValue,

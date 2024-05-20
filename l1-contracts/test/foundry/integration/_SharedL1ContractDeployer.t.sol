@@ -18,7 +18,7 @@ contract L1ContractDeployer is Test {
     address public sharedBridgeProxyAddress;
     L1SharedBridge public sharedBridge;
 
-    function deployL1Contracts() internal {
+    function _deployL1Contracts() internal {
         DeployL1Script l1Script = new DeployL1Script();
         l1Script.run();
 
@@ -32,20 +32,20 @@ contract L1ContractDeployer is Test {
         sharedBridge.setEraPostDiamondUpgradeFirstBatch(1);
     }
 
-    function registerNewToken(address _tokenAddress) internal {
+    function _registerNewToken(address _tokenAddress) internal {
         if (!bridgeHub.tokenIsRegistered(_tokenAddress)) {
             vm.prank(bridgehubOwnerAddress);
             bridgeHub.addToken(_tokenAddress);
         }
     }
 
-    function registerNewTokens(address[] memory _tokens) internal {
+    function _registerNewTokens(address[] memory _tokens) internal {
         for (uint256 i = 0; i < _tokens.length; i++) {
-            registerNewToken(_tokens[i]);
+            _registerNewToken(_tokens[i]);
         }
     }
 
-    function registerL2SharedBridge(uint256 _chainId, address _l2SharedBridge) internal {
+    function _registerL2SharedBridge(uint256 _chainId, address _l2SharedBridge) internal {
         vm.prank(bridgehubOwnerAddress);
         sharedBridge.initializeChainGovernance(_chainId, _l2SharedBridge);
     }

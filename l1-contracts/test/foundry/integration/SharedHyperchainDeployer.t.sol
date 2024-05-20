@@ -9,8 +9,8 @@ contract TestHyperchainDeployConfig is HyperchainDeployer {
     function test_saveAndReadHyperchainsConfig() public {
         RegisterHyperchainsScript deployScript = new RegisterHyperchainsScript();
         address someBaseAddress = makeAddr("baseToken");
-        hyperchainsToDeploy.push(getDefaultHyperchainDeployInfo("era", currentHyperChainId, ETH_TOKEN_ADDRESS));
-        hyperchainsToDeploy.push(getDefaultHyperchainDeployInfo("era2", currentHyperChainId + 1, someBaseAddress));
+        hyperchainsToDeploy.push(_getDefaultHyperchainDeployInfo("era", currentHyperChainId, ETH_TOKEN_ADDRESS));
+        hyperchainsToDeploy.push(_getDefaultHyperchainDeployInfo("era2", currentHyperChainId + 1, someBaseAddress));
 
         saveHyperchainConfig();
 

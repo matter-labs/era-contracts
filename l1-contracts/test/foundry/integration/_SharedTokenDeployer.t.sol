@@ -8,7 +8,7 @@ contract TokenDeployer is Test {
     address[] tokens;
     DeployErc20Script private deployScript;
 
-    function deployTokens() internal {
+    function _deployTokens() internal {
         deployScript = new DeployErc20Script();
         deployScript.run();
         tokens = deployScript.getTokensAddresses();

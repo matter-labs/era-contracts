@@ -24,16 +24,16 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
     TestnetERC20Token baseToken;
 
     function setUp() public {
-        deployL1Contracts();
-        deployTokens();
+        _deployL1Contracts();
+        _deployTokens();
 
-        registerNewTokens(tokens);
+        _registerNewTokens(tokens);
 
-        addNewHyperchainToDeploy("hyperchain1", ETH_TOKEN_ADDRESS);
-        addNewHyperchainToDeploy("hyperchain2", ETH_TOKEN_ADDRESS);
-        addNewHyperchainToDeploy("hyperchain3", tokens[0]);
-        addNewHyperchainToDeploy("hyperchain4", tokens[0]);
-        deployHyperchains();
+        _addNewHyperchainToDeploy("hyperchain1", ETH_TOKEN_ADDRESS);
+        _addNewHyperchainToDeploy("hyperchain2", ETH_TOKEN_ADDRESS);
+        _addNewHyperchainToDeploy("hyperchain3", tokens[0]);
+        _addNewHyperchainToDeploy("hyperchain4", tokens[0]);
+        _deployHyperchains();
 
         alice = makeAddr("alice");
         bob = makeAddr("bob");
@@ -51,12 +51,12 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
         assertTrue(getHyperchainBaseToken(firstChainId) == ETH_TOKEN_ADDRESS);
         assertTrue(getHyperchainBaseToken(secondChainId) == ETH_TOKEN_ADDRESS);
 
-        L2TransactionRequestDirect memory aliceRequest = createMockL2TransactionRequestDirect(
+        L2TransactionRequestDirect memory aliceRequest = _createMockL2TransactionRequestDirect(
             firstChainId,
             1 ether,
             0.1 ether
         );
-        L2TransactionRequestDirect memory bobRequest = createMockL2TransactionRequestDirect(
+        L2TransactionRequestDirect memory bobRequest = _createMockL2TransactionRequestDirect(
             secondChainId,
             1 ether,
             0.1 ether
@@ -113,12 +113,12 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
         assertTrue(getHyperchainBaseToken(firstChainId) == address(baseToken));
         assertTrue(getHyperchainBaseToken(secondChainId) == address(baseToken));
 
-        L2TransactionRequestDirect memory aliceRequest = createMockL2TransactionRequestDirect(
+        L2TransactionRequestDirect memory aliceRequest = _createMockL2TransactionRequestDirect(
             firstChainId,
             1 ether,
             0.1 ether
         );
-        L2TransactionRequestDirect memory bobRequest = createMockL2TransactionRequestDirect(
+        L2TransactionRequestDirect memory bobRequest = _createMockL2TransactionRequestDirect(
             secondChainId,
             1 ether,
             0.1 ether
@@ -188,8 +188,8 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
         assertTrue(getHyperchainBaseToken(firstChainId) == ETH_TOKEN_ADDRESS);
         assertTrue(getHyperchainBaseToken(secondChainId) == ETH_TOKEN_ADDRESS);
 
-        registerL2SharedBridge(firstChainId, mockL2SharedBridge);
-        registerL2SharedBridge(secondChainId, mockL2SharedBridge);
+        _registerL2SharedBridge(firstChainId, mockL2SharedBridge);
+        _registerL2SharedBridge(secondChainId, mockL2SharedBridge);
 
         vm.txGasPrice(0.05 ether);
         vm.deal(alice, mintValue);
@@ -213,7 +213,7 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
         bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
         {
             bytes memory aliceSecondBridgeCalldata = abi.encode(tokenAddress, aliceDepositAmount, l2Receiver);
-            L2TransactionRequestTwoBridgesOuter memory aliceRequest = createMockL2TransactionRequestTwoBridges({
+            L2TransactionRequestTwoBridgesOuter memory aliceRequest = _createMockL2TransactionRequestTwoBridges({
                 _chainId: firstChainId,
                 _mintValue: mintValue,
                 _secondBridgeValue: 0,
@@ -235,7 +235,7 @@ contract BaseIntegrationTests is L1ContractDeployer, HyperchainDeployer, TokenDe
 
         {
             bytes memory bobSecondBridgeCalldata = abi.encode(tokenAddress, bobDepositAmount, l2Receiver);
-            L2TransactionRequestTwoBridgesOuter memory bobRequest = createMockL2TransactionRequestTwoBridges({
+            L2TransactionRequestTwoBridgesOuter memory bobRequest = _createMockL2TransactionRequestTwoBridges({
                 _chainId: secondChainId,
                 _mintValue: mintValue,
                 _secondBridgeValue: 0,
