@@ -69,6 +69,7 @@ async function main() {
     .option("--validium-mode")
     .option("--base-token-name <base-token-name>")
     .option("--base-token-address <base-token-address>")
+    .option("--use-governance <use-governance>")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -99,12 +100,14 @@ async function main() {
       await checkTokenAddress(baseTokenAddress);
       console.log(`Using base token address: ${baseTokenAddress}`);
 
+      const useGovernance = !!cmd.useGovernance && cmd.useGovernance === "true";
+
       if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
-        await deployer.registerTokenBridgehub(baseTokenAddress);
+        await deployer.registerTokenBridgehub(baseTokenAddress, useGovernance);
       }
       await deployer.registerTokenInNativeTokenVault(baseTokenAddress, { gasPrice });
 
-      await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice);
+      await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice, useGovernance);
     });
 
   await program.parseAsync(process.argv);

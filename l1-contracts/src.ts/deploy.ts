@@ -2,7 +2,7 @@ import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 import "@matterlabs/hardhat-zksync-ethers";
 
-import type { BigNumberish, providers, Signer, Wallet } from "ethers";
+import type { BigNumberish, providers, Signer, Wallet, Contract, Overrides } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
 import { Wallet as ZkWallet } from "zksync-ethers";
@@ -518,13 +518,32 @@ export class Deployer {
     }
   }
 
+  public async executeDirectOrGovernance(
+    useGovernance: boolean,
+    contract: Contract,
+    fname: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fargs: any[],
+    value: BigNumberish,
+    overrides?: ethers.providers.TransactionRequest,
+    printOperation: boolean = false
+  ): Promise<ethers.ContractReceipt> {
+    if (useGovernance) {
+      const cdata = contract.interface.encodeFunctionData(fname, fargs);
+      return this.executeUpgrade(contract.address, value, cdata, overrides, printOperation);
+    } else {
+      const tx: ethers.ContractTransaction = await contract[fname](...fargs, ...(overrides ? [overrides] : []));
+      return await tx.wait();
+    }
+  }
+
   /// this should be only use for local testing
   public async executeUpgrade(
     targetAddress: string,
     value: BigNumberish,
     callData: string,
     ethTxOptions?: ethers.providers.TransactionRequest,
-    printFileName?: string
+    printOperation: boolean = false
   ) {
     const governance = IGovernanceFactory.connect(this.addresses.Governance, this.deployWallet);
     const operation = {
@@ -532,7 +551,7 @@ export class Deployer {
       predecessor: ethers.constants.HashZero,
       salt: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
     };
-    if (printFileName) {
+    if (printOperation) {
       console.log("Operation:", operation);
       console.log(
         "Schedule operation: ",
@@ -968,7 +987,8 @@ export class Deployer {
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,
     nonce?,
-    predefinedChainId?: string
+    predefinedChainId?: string,
+    useGovernance: boolean = false
   ) {
     const txOptions = this.isZkMode() ? {} : { gasLimit: 10_000_000 };
 
@@ -985,24 +1005,34 @@ export class Deployer {
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
-    const upgradeData = await bridgehub.interface.encodeFunctionData("createNewChain", [
-      inputChainId,
-      this.addresses.StateTransition.StateTransitionProxy,
-      baseTokenAddress,
-      Date.now(),
-      admin,
-      initialDiamondCut,
-    ]);
-    const receipt = await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData, {
-      gasPrice,
-      nonce,
-      ...txOptions,
-    });
+    const receipt = await this.executeDirectOrGovernance(
+      useGovernance,
+      bridgehub,
+      "createNewChain",
+      [
+        inputChainId,
+        this.addresses.StateTransition.StateTransitionProxy,
+        baseTokenAddress,
+        Date.now(),
+        admin,
+        initialDiamondCut,
+      ],
+      0,
+      {
+        gasPrice,
+        nonce,
+        ...txOptions,
+      }
+    );
+
     const chainId = receipt.logs.find((log) => log.topics[0] == bridgehub.interface.getEventTopic("NewChain"))
       .topics[1];
 
     nonce++;
-    nonce++; // upgrade takes 2 txs
+    if (useGovernance) {
+      // deploying through governance requires two transactions
+      nonce++;
+    }
 
     this.addresses.BaseToken = baseTokenAddress;
 
@@ -1073,11 +1103,11 @@ export class Deployer {
     }
   }
 
-  public async registerTokenBridgehub(tokenAddress: string) {
+  public async registerTokenBridgehub(tokenAddress: string, useGovernance: boolean = false) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
-    const upgradeData = await bridgehub.interface.encodeFunctionData("addToken", [tokenAddress]);
 
-    const receipt = await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData);
+    const receipt = await this.executeDirectOrGovernance(useGovernance, bridgehub, "addToken", [tokenAddress], 0);
+
     if (this.verbose) {
       console.log(`Token ${tokenAddress} was registered, gas used: ${receipt.gasUsed.toString()}`);
     }
