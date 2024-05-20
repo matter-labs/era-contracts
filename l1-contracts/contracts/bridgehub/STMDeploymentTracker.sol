@@ -60,7 +60,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         address _prevMsgSender,
         uint256 _l2Value,
         bytes calldata _data
-    ) external onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) external payable onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
         require(msg.value == 0, "STMDT: no eth allowed");
         (bool _registerOnBridgehub, address _stmL1Address, address _stmL2Address) = abi.decode(
             _data,
