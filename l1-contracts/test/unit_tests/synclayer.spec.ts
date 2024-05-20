@@ -74,7 +74,11 @@ describe("Synclayer", function () {
     await deployer2.registerSyncLayer();
   });
 
-  it("Check move chain to synclayer", async () => {
+  it("Check start move chain to synclayer", async () => {
     await deployer.moveChainToSyncLayer(deployer2.chainId);
   });
+
+  // it("Check finish move chain to l1", async () => {
+  //   await deployer.finishMoveChainToL1(deployer2.chainId);
+  // });
 });

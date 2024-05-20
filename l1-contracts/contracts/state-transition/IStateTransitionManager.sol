@@ -135,4 +135,10 @@ interface IStateTransitionManager {
     ) external;
 
     function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
+
+    function bridgeMintNewChain(
+        uint256 _chainId,
+        bytes calldata _chainData,
+        bytes calldata _diamondCut
+    ) external returns (address);
 }

@@ -131,37 +131,49 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
     /// @param _owner Address which can change L2 token implementation and upgrade the bridge
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    function initialize(address _owner) external reentrancyGuardInitializer initializer {
-        require(_owner != address(0), "ShB owner 0");
-        _transferOwnership(_owner);
-    }
-
-    /// @dev This sets the first post diamond upgrade batch for era, used to check old eth withdrawals
-    /// @param _eraPostDiamondUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after diamond proxy upgrade.
-    function setEraPostDiamondUpgradeFirstBatch(uint256 _eraPostDiamondUpgradeFirstBatch) external onlyOwner {
-        require(eraPostDiamondUpgradeFirstBatch == 0, "ShB: eFPUB already set");
-        eraPostDiamondUpgradeFirstBatch = _eraPostDiamondUpgradeFirstBatch;
-    }
-
-    /// @dev This sets the first post upgrade batch for era, used to check old token withdrawals
-    /// @param _eraPostLegacyBridgeUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after legacy bridge upgrade.
-    function setEraPostLegacyBridgeUpgradeFirstBatch(uint256 _eraPostLegacyBridgeUpgradeFirstBatch) external onlyOwner {
-        require(eraPostLegacyBridgeUpgradeFirstBatch == 0, "ShB: eFPUB already set");
-        eraPostLegacyBridgeUpgradeFirstBatch = _eraPostLegacyBridgeUpgradeFirstBatch;
-    }
-
-    /// @dev This sets the first post upgrade batch for era, used to check old withdrawals
-    /// @param  _eraLegacyBridgeLastDepositBatch The the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge
-    /// @param _eraLegacyBridgeLastDepositTxNumber The tx number in the _eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge
-    function setEraLegacyBridgeLastDepositTime(
+    function initialize(
+        address _owner,
+        uint256 _eraPostDiamondUpgradeFirstBatch,
+        uint256 _eraPostLegacyBridgeUpgradeFirstBatch,
         uint256 _eraLegacyBridgeLastDepositBatch,
         uint256 _eraLegacyBridgeLastDepositTxNumber
-    ) external onlyOwner {
-        require(eraLegacyBridgeLastDepositBatch == 0, "ShB: eLOBDB already set");
-        require(eraLegacyBridgeLastDepositTxNumber == 0, "ShB: eLOBDTN already set");
-        eraLegacyBridgeLastDepositBatch = _eraLegacyBridgeLastDepositBatch;
-        eraLegacyBridgeLastDepositTxNumber = _eraLegacyBridgeLastDepositTxNumber;
+    ) external reentrancyGuardInitializer initializer {
+        require(_owner != address(0), "ShB owner 0");
+        _transferOwnership(_owner);
+        if (eraPostDiamondUpgradeFirstBatch == 0) {
+            eraPostDiamondUpgradeFirstBatch = _eraPostDiamondUpgradeFirstBatch;
+            eraPostLegacyBridgeUpgradeFirstBatch = _eraPostLegacyBridgeUpgradeFirstBatch;
+            eraLegacyBridgeLastDepositBatch = _eraLegacyBridgeLastDepositBatch;
+            eraLegacyBridgeLastDepositTxNumber = _eraLegacyBridgeLastDepositTxNumber;
+        }
     }
+
+    // /// @dev This sets the first post diamond upgrade batch for era, used to check old eth withdrawals
+    // /// @param _eraPostDiamondUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after diamond proxy upgrade.
+    // function setEraPostDiamondUpgradeFirstBatch(uint256 _eraPostDiamondUpgradeFirstBatch) external onlyOwner {
+    //     require(eraPostDiamondUpgradeFirstBatch == 0, "ShB: eFPUB already set");
+    //     eraPostDiamondUpgradeFirstBatch = _eraPostDiamondUpgradeFirstBatch;
+    // }
+
+    // /// @dev This sets the first post upgrade batch for era, used to check old token withdrawals
+    // /// @param _eraPostLegacyBridgeUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after legacy bridge upgrade.
+    // function setEraPostLegacyBridgeUpgradeFirstBatch(uint256 _eraPostLegacyBridgeUpgradeFirstBatch) external onlyOwner {
+    //     require(eraPostLegacyBridgeUpgradeFirstBatch == 0, "ShB: eFPUB already set");
+    //     eraPostLegacyBridgeUpgradeFirstBatch = _eraPostLegacyBridgeUpgradeFirstBatch;
+    // }
+
+    // /// @dev This sets the first post upgrade batch for era, used to check old withdrawals
+    // /// @param  _eraLegacyBridgeLastDepositBatch The the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge
+    // /// @param _eraLegacyBridgeLastDepositTxNumber The tx number in the _eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge
+    // function setEraLegacyBridgeLastDepositTime(
+    //     uint256 _eraLegacyBridgeLastDepositBatch,
+    //     uint256 _eraLegacyBridgeLastDepositTxNumber
+    // ) external onlyOwner {
+    //     require(eraLegacyBridgeLastDepositBatch == 0, "ShB: eLOBDB already set");
+    //     require(eraLegacyBridgeLastDepositTxNumber == 0, "ShB: eLOBDTN already set");
+    //     eraLegacyBridgeLastDepositBatch = _eraLegacyBridgeLastDepositBatch;
+    //     eraLegacyBridgeLastDepositTxNumber = _eraLegacyBridgeLastDepositTxNumber;
+    // }
 
     /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
     function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
@@ -185,8 +197,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev Used to set the assedAddress for a given assetInfo.
     function setAssetAddress(bytes32 _additionalData, address _assetAddress) external {
         address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
-        bytes32 assetInfo = keccak256(abi.encode(block.chainid, sender, _additionalData)); /// todo make other asse
+        bytes32 assetInfo = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData)); /// todo make other asse
         assetAddress[assetInfo] = _assetAddress;
+        emit AssetRegistered(assetInfo, _assetAddress, _additionalData, sender);
     }
 
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.

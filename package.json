@@ -6,7 +6,8 @@
     "packages": [
       "l1-contracts",
       "l2-contracts",
-      "system-contracts"
+      "system-contracts",
+      "gas-bound-caller"
     ],
     "nohoist": [
       "**/@openzeppelin/**"
@@ -36,6 +37,7 @@
     "prettier:fix": "prettier --write \"**/*.{js,json,md,sol,ts,yaml}\"",
     "l1": "yarn workspace l1-contracts",
     "l2": "yarn workspace l2-contracts",
-    "sc": "yarn workspace system-contracts"
+    "sc": "yarn workspace system-contracts",
+    "gas-bound-caller": "yarn workspace gas-bound-caller"
   }
 }

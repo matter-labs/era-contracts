@@ -55,6 +55,13 @@ interface IL1SharedBridge {
         bytes32 assetDataHash
     );
 
+    event AssetRegistered(
+        bytes32 indexed assetInfo,
+        address indexed _assetAddress,
+        bytes32 indexed additionalData,
+        address sender
+    );
+
     function isWithdrawalFinalized(
         uint256 _chainId,
         uint256 _l2BatchNumber,
@@ -157,6 +164,8 @@ interface IL1SharedBridge {
     function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
 
     function setAssetAddress(bytes32 _additionalData, address _assetAddress) external;
+
+    function assetAddress(bytes32 _assetInfo) external view returns (address);
 
     function nativeTokenVault() external view returns (IL1NativeTokenVault);
 

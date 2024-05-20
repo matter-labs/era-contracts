@@ -23,5 +23,7 @@ interface IL2SharedBridge {
 
     function assetAddress(bytes32 _assetInfo) external view returns (address);
 
+    function l1SharedBridge() external view returns (address);
+
     function l1TokenAddress(address _l2Token) external view returns (address);
 }

@@ -43,7 +43,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The batch zero hash, calculated at initialization
     bytes32 public storedBatchZero;
 
-    /// @dev The stored cutData for diamond cut
+    /// @dev The stored cutData for diamond cut used at creating the chain
     bytes32 public initialCutHash;
 
     /// @dev The genesisUpgrade contract address, used to setChainId
@@ -66,6 +66,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev The address to accept the admin role
     address private pendingAdmin;
+
+    /// @dev The stored cutData for diamond cut, differes on each settlement chain.
+    // todo: this is only used to check the cutHash before migrating, do we want this?. We could s
+    mapping(uint256 settlementChainId => bytes32 cutHash) public migrationCutHash;
 
     // mapping(uint256 chainId => bytes32 lastMigrationTxHash) lastMigrationTxHashes;
     // mapping(uint256 chainId => bytes32 lastChainCommitment) lastMigratedCommitments;
@@ -295,13 +299,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address _sharedBridge,
         address _admin,
         bytes calldata _diamondCut
-    )
-        internal
-        returns (
-            // SyncLayerState _syncLayerState
-            address hyperchainAddress
-        )
-    {
+    ) internal returns (address hyperchainAddress) {
         if (getHyperchain(_chainId) != address(0)) {
             // Hyperchain already registered
             return getHyperchain(_chainId);
@@ -392,12 +390,21 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // TODO: emit event
     }
 
-    function createMigratingChain(
+    function bridgeMintNewChain(
         uint256 _chainId,
-        address _baseToken,
-        address _admin,
+        bytes calldata _chainData,
         bytes calldata _diamondCut
-    ) external onlyBridgehub {}
+    ) external override onlyBridgehub returns (address hyperchainAddress) {
+        (uint256 _chainId, address _baseToken, address _admin) = abi.decode(_chainData, (uint256, address, address));
+        hyperchainAddress = _deployNewChain(
+            _chainId,
+            _baseToken,
+            address(BRIDGE_HUB.sharedBridge()),
+            _admin,
+            _diamondCut
+            // SyncLayerState.ActiveOnL1
+        );
+    }
 
     /// @dev This internal function is used to register a new hyperchain in the system.
     function _registerNewHyperchain(uint256 _chainId, address _hyperchain) internal {
