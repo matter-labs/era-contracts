@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {GasBoundCaller} from "../GasBoundCaller.sol";
-import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
+import {SystemContractHelper} from "./SystemContractHelper.sol";
 
 /**
  * @author Matter Labs
@@ -35,11 +35,24 @@ contract GasBoundCallerTester is GasBoundCaller {
             );
             require(success, "Call failed");
 
+            // It is not needed to query the exact value for the test.
+            uint256 pubdataGas = 100;
+
             // `2/3` to ensure that the constant is good with sufficient overhead
             SystemContractHelper.burnGas(uint32(gasleft() - (2 * CALL_RETURN_OVERHEAD) / 3), 0);
             assembly {
-                // We just relay the return data from the call.
-                return(add(returnData, 0x20), mload(returnData))
+                // This place does interfere with the memory layout, however, it is done right before
+                // the `return` statement, so it is safe to do.
+                // We need to transform `bytes memory returnData` into (bytes memory returndata, gasSpentOnPubdata)
+                // `bytes memory returnData` is encoded as `length` + `data`.
+                // We need to prepend it with 0x40 and `pubdataGas`.
+                //
+                // It is assumed that the position of returndata is >= 0x40, since 0x40 is the free memory pointer location.
+                mstore(sub(returnData, 0x40), 0x40)
+                mstore(sub(returnData, 0x20), pubdataGas)
+                let returndataLen := add(mload(returnData), 0x60)
+
+                return(sub(returnData, 0x40), returndataLen)
             }
         }
     }
@@ -50,16 +63,32 @@ contract GasBoundCallerTester is GasBoundCaller {
         lastRecordedGasLeft = gasbefore - gasleft();
     }
 
-    function spender(uint32 _ergsToBurn, uint32 _pubdataToUse) external {
+    function spender(uint32 _ergsToBurn, uint32 _pubdataToUse, bytes memory expectedReturndata) external {
         SystemContractHelper.burnGas(_ergsToBurn, _pubdataToUse);
+
+        assembly {
+            // Return the expected returndata
+            return(add(expectedReturndata, 0x20), mload(expectedReturndata))
+        }
     }
 
     function gasBoundCallRelayer(
         uint256 _gasToPass,
         address _to,
         uint256 _maxTotalGas,
-        bytes calldata _data
+        bytes calldata _data,
+        bytes memory expectedReturndata,
+        uint256 expectedPubdataGas
     ) external payable {
-        this.gasBoundCall{gas: _gasToPass}(_to, _maxTotalGas, _data);
+        (bool success, bytes memory returnData) = address(this).call{gas: _gasToPass}(
+            abi.encodeWithSelector(GasBoundCaller.gasBoundCall.selector, _to, _maxTotalGas, _data)
+        );
+
+        require(success);
+
+        (bytes memory realReturnData, uint256 pubdataGas) = abi.decode(returnData, (bytes, uint256));
+
+        require(keccak256(expectedReturndata) == keccak256(realReturnData), "Return data is incorrect");
+        require(pubdataGas == expectedPubdataGas, "Pubdata gas is incorrect");
     }
 }

@@ -2,7 +2,7 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
 import { Command } from "commander";
-import { Wallet, ethers } from "ethers";
+import { Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, GAS_MULTIPLIER } from "./utils";
@@ -46,7 +46,9 @@ async function main() {
       const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
       console.log(`Using nonce: ${nonce}`);
 
-      const create2Salt = cmd.create2Salt ? cmd.create2Salt : ethers.utils.hexlify(ethers.utils.randomBytes(32));
+      const create2Salt = cmd.create2Salt
+        ? cmd.create2Salt
+        : "0x0000000000000000000000000000000000000000000000000000000000000000";
 
       const deployer = new Deployer({
         deployWallet,

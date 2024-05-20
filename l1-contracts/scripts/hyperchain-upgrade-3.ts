@@ -24,6 +24,7 @@ async function main() {
     .option("--nonce <nonce>")
     .option("--owner-address <owner-address>")
     .option("--create2-salt <create2-salt>")
+    .option("--print-file-path <print-file-path>")
     .option("--diamond-upgrade-init <version>")
     .option("--only-verifier")
     .action(async (cmd) => {
@@ -33,7 +34,7 @@ async function main() {
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
             "m/44'/60'/0'/0/1"
           ).connect(provider);
-      console.log(`Using deployer wallet: ${deployWallet.address}, ${deployWallet.privateKey}`);
+      console.log(`Using deployer wallet: ${deployWallet.address}`);
 
       const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
       console.log(`Using owner address: ${ownerAddress}`);
@@ -53,7 +54,7 @@ async function main() {
         verbose: true,
       });
 
-      await upgradeToHyperchains3(deployer);
+      await upgradeToHyperchains3(deployer, cmd.printFilePath);
     });
 
   await program.parseAsync(process.argv);
