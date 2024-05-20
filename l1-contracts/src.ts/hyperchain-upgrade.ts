@@ -292,7 +292,7 @@ async function upgradeL2Bridge(deployer: Deployer, gasPrice: BigNumberish, print
 }
 
 async function upgradeL1ERC20Bridge(deployer: Deployer, gasPrice: BigNumberish, printFileName?: string) {
-  if  (isCurrentNetworkLocal())  {
+  if (isCurrentNetworkLocal()) {
     // we need to wait here for a new block
     await new Promise((resolve) => setTimeout(resolve, 5000));
     // upgrade ERC20.

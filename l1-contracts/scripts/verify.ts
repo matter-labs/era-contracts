@@ -1,7 +1,13 @@
 // hardhat import should be the first import in the file
 import * as hardhat from "hardhat";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-import { getNumberFromEnv, getHashFromEnv, getAddressFromEnv, isCurrentNetworkLocal, ethTestConfig } from "../src.ts/utils";
+import {
+  getNumberFromEnv,
+  getHashFromEnv,
+  getAddressFromEnv,
+  isCurrentNetworkLocal,
+  ethTestConfig,
+} from "../src.ts/utils";
 
 import { Interface } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
