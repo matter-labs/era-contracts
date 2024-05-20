@@ -1729,10 +1729,14 @@ object "EVMInterpreter" {
                     }
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                    // TODO: Check if Zeroing out the memory is necessary
-                    let _lastByte := add(dest, len)
-                    for {let i := dest} lt(i, _lastByte) { i := add(i, 1) } {
-                        mstore8(i, 0)
+                    let len_32 := shr(5, len)
+                    for {let i := 0} lt(i, len_32) { i := add(i, 1) } {
+                        mstore(shl(5,i),0)
+                    }
+                    let size_32 := shl(5,len_32)
+                    let rest_32 := sub(len, size_32)
+                    for {let i := 0} lt(i, rest_32) { i := add(i, 1) } {
+                        mstore8(add(size_32,i),0)
                     }
                     // Gets the code from the addr
                     pop(_fetchDeployedCode(addr, add(offset, MEM_OFFSET_INNER()), len))
@@ -4320,10 +4324,14 @@ object "EVMInterpreter" {
                     }
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                    // TODO: Check if Zeroing out the memory is necessary
-                    let _lastByte := add(dest, len)
-                    for {let i := dest} lt(i, _lastByte) { i := add(i, 1) } {
-                        mstore8(i, 0)
+                    let len_32 := shr(5, len)
+                    for {let i := 0} lt(i, len_32) { i := add(i, 1) } {
+                        mstore(shl(5,i),0)
+                    }
+                    let size_32 := shl(5,len_32)
+                    let rest_32 := sub(len, size_32)
+                    for {let i := 0} lt(i, rest_32) { i := add(i, 1) } {
+                        mstore8(add(size_32,i),0)
                     }
                     // Gets the code from the addr
                     pop(_fetchDeployedCode(addr, add(offset, MEM_OFFSET_INNER()), len))
