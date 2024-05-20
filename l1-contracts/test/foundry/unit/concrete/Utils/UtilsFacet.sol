@@ -162,6 +162,14 @@ contract UtilsFacet is ZkSyncHyperchainBase {
         return s.isFrozen;
     }
 
+    function util_setTotalBatchesExecuted(uint256 _numberOfBatches) external {
+        s.totalBatchesExecuted = _numberOfBatches;
+    }
+
+    function util_setl2LogsRootHash(uint256 _batchNumber, bytes32 _newHash) external {
+        s.l2LogsRootHashes[_batchNumber] = _newHash;
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }
