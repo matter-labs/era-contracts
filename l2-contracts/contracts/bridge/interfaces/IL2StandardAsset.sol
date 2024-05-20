@@ -13,7 +13,7 @@ interface IL2StandardAsset {
 
     function bridgeBurn(
         uint256 _chainId,
-        uint256 _mintValue, // Do we need mintvalue here?, if yes, shall we pass it to withdraw?
+        uint256 _mintValue,
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data

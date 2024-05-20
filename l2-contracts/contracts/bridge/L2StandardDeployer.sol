@@ -30,7 +30,7 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
 
-    mapping(bytes32 assetInfo => address tokenAddress) public override tokenAddress; // ToDo: why here token address and in shared bridge asset address?
+    mapping(bytes32 assetInfo => address tokenAddress) public override tokenAddress;
 
     modifier onlyBridge() {
         require(msg.sender == address(l2Bridge), "SD: only Bridge"); // Only L2 bridge can call this method
