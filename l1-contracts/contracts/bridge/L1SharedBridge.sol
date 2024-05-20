@@ -211,7 +211,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _amount
     ) external payable virtual onlyBridgehubOrEra(_chainId) whenNotPaused {
         (address l1Asset, bytes32 assetInfo) = _getAssetProperties(_assetInfo);
-        IL1StandardAsset(l1Asset).bridgeBurn{value: msg.value}(
+        bytes32 bridgeMintData = IL1StandardAsset(l1Asset).bridgeBurn{value: msg.value}(
             _chainId,
             0,
             assetInfo,

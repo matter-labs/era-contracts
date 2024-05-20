@@ -11,7 +11,7 @@ interface ISTMDeploymentTracker {
         address _prevMsgSender,
         uint256 _l2Value,
         bytes calldata _data
-    ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
+    ) external returns (L2TransactionRequestTwoBridgesInner memory request);
 
     function BRIDGE_HUB() external view returns (IBridgehub);
 

@@ -44,7 +44,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     ISTMDeploymentTracker public stmDeployer;
 
-    /// @dev assset info used to identify chains in the Shared Bridge
+    /// @dev asset info used to identify chains in the Shared Bridge
     mapping(bytes32 stmAssetInfo => address stmAddress) public stmAssetInfoToAddress;
 
     /// @dev used to indicate the currently active settlement layer for a given chainId
@@ -366,7 +366,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) external override {
         require(L1_CHAIN_ID == block.chainid, "BH: not in sync layer mode");
         address hyperchain = getHyperchain(_chainId);
-        IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(_request);
+        bytes32 canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(_request);
     }
 
     function registerCounterpart(uint256 _chainId, address _counterPart) external onlyOwner {
