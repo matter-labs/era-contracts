@@ -5,29 +5,26 @@ pragma solidity 0.8.20;
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
-import "hardhat/console.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
-import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
+import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IL2StandardAsset} from "./interfaces/IL2StandardAsset.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 import {IL2StandardDeployer} from "./interfaces/IL2StandardDeployer.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, IContractDeployer} from "../L2ContractHelper.sol";
+import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT,NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
-
-import {NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, Initializable {
+contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable {
     /// @dev The address of the L1 bridge counterpart.
-    address public override l1SharedBridge;
+    address public override l1Bridge;
 
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
@@ -39,7 +36,7 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, Initializable
     /// @dev A mapping l2 token address => l1 token address
     mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
 
-    address private l1LegacyBridge;
+    address public override l1SharedBridge;
 
     /// @dev Chain ID of Era for legacy reasons
     uint256 immutable ERA_CHAIN_ID;
@@ -50,7 +47,7 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, Initializable
     IL2StandardDeployer public standardDeployer;
 
     /// @dev A mapping l2 token address => l1 token address
-    mapping(bytes32 assetInfo => address assetAddress) public override assetAddress; // ToDo: Why do we call asset if it's token?? and it's not set
+    mapping(bytes32 assetInfo => address assetAddress) public override assetAddress;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
@@ -86,7 +83,7 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, Initializable
             l2TokenBeacon.transferOwnership(_aliasedOwner);
         } else {
             require(_l1LegacyBridge != address(0), "bf2");
-            l1LegacyBridge = _l1LegacyBridge;
+            l1Bridge = _l1LegacyBridge;
             // l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
         }
     }
@@ -101,8 +98,8 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, Initializable
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
 
         require(
-            AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1SharedBridge ||
-                AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1LegacyBridge,
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
+                AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1SharedBridge,
             "mq"
         );
 
@@ -122,12 +119,13 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, Initializable
     /// @param _assetData The data that is passed to the asset contract
     function withdraw(bytes32 _assetInfo, bytes calldata _assetData) external override {
         address asset = assetAddress[_assetInfo];
-        bytes memory _bridgeBurnData;
+        bytes memory _bridgeMintData;
 
+        /// should the address not be set already? Or do we need this to do it automatically. 
         if (asset != address(0)) {
-            _bridgeBurnData = IL2StandardAsset(asset).bridgeBurn(L1_CHAIN_ID, 0, _assetInfo, msg.sender, _assetData);
+            _bridgeMintData = IL2StandardAsset(asset).bridgeBurn(L1_CHAIN_ID, 0, _assetInfo, msg.sender, _assetData);
         } else {
-            _bridgeBurnData = IL2StandardAsset(standardDeployer).bridgeBurn(
+            _bridgeMintData = IL2StandardAsset(standardDeployer).bridgeBurn(
                 L1_CHAIN_ID,
                 0,
                 _assetInfo,
@@ -136,7 +134,7 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, Initializable
             );
         }
 
-        bytes memory message = _getL1WithdrawMessage(_assetInfo, _bridgeBurnData);
+        bytes memory message = _getL1WithdrawMessage(_assetInfo, _bridgeMintData);
         L2ContractHelper.sendMessageToL1(message);
 
         emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, msg.sender, _assetInfo, keccak256(_assetData));
@@ -145,11 +143,11 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, Initializable
     /// @dev Encode the message for l2ToL1log sent with withdraw initialization
     function _getL1WithdrawMessage(
         bytes32 _assetInfo,
-        bytes memory _bridgeBurnData
+        bytes memory _bridgeMintData
     ) internal pure returns (bytes memory) {
         // note we use the IL1ERC20Bridge.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
         // and we use this interface so that when the switch happened the old messages could be processed
-        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _assetInfo, _bridgeBurnData);
+        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _assetInfo, _bridgeMintData);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -162,7 +160,7 @@ contract L2SharedBridge is IL2SharedBridge, IL2SharedBridgeLegacy, Initializable
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external {
+    ) external { // onlyBridge
         bytes32 assetInfo = keccak256(
             abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
         );
