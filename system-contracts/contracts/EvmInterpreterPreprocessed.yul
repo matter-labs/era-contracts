@@ -566,10 +566,12 @@ object "EVMInterpreter" {
             if gt(newSizeInWords, oldSizeInWords) {
                 // TODO: Check this, it feels like there might be a more optimized way
                 // of doing this cost calculation.
-                let oldCost := memCost(oldSizeInWords)
-                let newCost := memCost(newSizeInWords)
+                //let oldCost := memCost(oldSizeInWords)
+                //let newCost := memCost(newSizeInWords)
+                let new_minus_old := sub(newSizeInWords, oldSizeInWords)
+                gasCost := add(mul(3,new_minus_old), div(mul(new_minus_old,add(newSizeInWords,oldSizeInWords)),512))
         
-                gasCost := sub(newCost, oldCost)
+                //gasCost := sub(newCost, oldCost)
                 mstore(MEM_OFFSET(), newSizeInWords)
             }
         }
@@ -3150,10 +3152,12 @@ object "EVMInterpreter" {
                 if gt(newSizeInWords, oldSizeInWords) {
                     // TODO: Check this, it feels like there might be a more optimized way
                     // of doing this cost calculation.
-                    let oldCost := memCost(oldSizeInWords)
-                    let newCost := memCost(newSizeInWords)
+                    //let oldCost := memCost(oldSizeInWords)
+                    //let newCost := memCost(newSizeInWords)
+                    let new_minus_old := sub(newSizeInWords, oldSizeInWords)
+                    gasCost := add(mul(3,new_minus_old), div(mul(new_minus_old,add(newSizeInWords,oldSizeInWords)),512))
             
-                    gasCost := sub(newCost, oldCost)
+                    //gasCost := sub(newCost, oldCost)
                     mstore(MEM_OFFSET(), newSizeInWords)
                 }
             }
