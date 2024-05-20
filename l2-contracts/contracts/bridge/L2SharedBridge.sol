@@ -8,6 +8,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
+import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IL2StandardAsset} from "./interfaces/IL2StandardAsset.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
@@ -23,6 +24,7 @@ import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable {
+
     /// @dev The address of the L1 shared bridge counterpart.
     address public override l1SharedBridge;
 
@@ -68,13 +70,16 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         address _l1SharedBridge,
         address _l1Bridge,
         bytes32 _l2TokenProxyBytecodeHash,
-        address _aliasedOwner
+        address _aliasedOwner,
+        IL2StandardDeployer _standardDeployer
     ) external reinitializer(2) {
         require(_l1SharedBridge != address(0), "bf");
         require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
         require(_aliasedOwner != address(0), "sf");
+        require(address(_standardDeployer) != address(0), "cf");
 
         l1SharedBridge = _l1SharedBridge;
+        standardDeployer = _standardDeployer;
 
         if (block.chainid != ERA_CHAIN_ID) {
             address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
@@ -94,15 +99,14 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @param _l1Token The address of the token that was locked on the L1
     // / @param _amount Total amount of tokens deposited from L1
     /// @param _data The additional data that user can pass with the deposit
-    function finalizeDeposit(bytes32 _assetInfo, bytes calldata _data) public override {
+    function finalizeDeposit(bytes32 _assetInfo, bytes memory _data) public override {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
 
-        // require(
-        //     AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
-        //         AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1LegacyBridge ||
-        //         msg.sender == address(this),
-        //     "mq"
-        // );
+        require(
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
+                AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1SharedBridge,
+            "mq"
+        );
 
         address asset = assetAddress[_assetInfo];
         if (asset != address(0)) {
@@ -120,13 +124,20 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @param _assetData The data that is passed to the asset contract
     function withdraw(bytes32 _assetInfo, bytes calldata _assetData) external override {
         address asset = assetAddress[_assetInfo];
-        bytes memory _bridgeMintData = IL2StandardAsset(assetAddress[_assetInfo]).bridgeBurn(
-            L1_CHAIN_ID,
-            0,
-            _assetInfo,
-            msg.sender,
-            _assetData
-        );
+        bytes memory _bridgeMintData;
+
+        /// should the address not be set already? Or do we need this to do it automatically. 
+        if (asset != address(0)) {
+            _bridgeMintData = IL2StandardAsset(asset).bridgeBurn(L1_CHAIN_ID, 0, _assetInfo, msg.sender, _assetData);
+        } else {
+            _bridgeMintData = IL2StandardAsset(standardDeployer).bridgeBurn(
+                L1_CHAIN_ID,
+                0,
+                _assetInfo,
+                msg.sender,
+                _assetData
+            );
+        }
 
         bytes memory message = _getL1WithdrawMessage(_assetInfo, _bridgeMintData);
         L2ContractHelper.sendMessageToL1(message);
@@ -160,10 +171,13 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
             abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
         );
         bytes memory data = abi.encode(_l1Sender, _amount, _l2Receiver, _data, _l1Token);
-        this.finalizeDeposit(assetInfo, data);
+        finalizeDeposit(assetInfo, data);
     }
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
+        if (l1TokenAddress[_l2Token] == address(0)) {
+            getL1TokenAddress(_l2Token);
+        }
         bytes32 assetInfo = keccak256(
             abi.encode(
                 L1_CHAIN_ID,
@@ -172,6 +186,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
             )
         );
         bytes memory data = abi.encode(_amount, _l1Receiver);
+        this.withdraw(assetInfo, data);
     }
 
     function getL1TokenAddress(address _l2Token) public view returns (address) {

@@ -52,12 +52,10 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
         l1Address = _l1Address;
 
         l2Bridge = msg.sender;
-        // We parse the data exactly as they were created on the L1 Native Token Vault
-        (uint256 _amount, bytes memory data) = abi.decode(_data, (uint256, bytes));
 
-        // We parse the data exactly as they were created on the L1 bridge getERC20Getters
+        // We parse the data exactly as they were created on the L1 bridge
         (bytes memory nameBytes, bytes memory symbolBytes, bytes memory decimalsBytes) = abi.decode(
-            data,
+            _data,
             (bytes, bytes, bytes)
         );
 

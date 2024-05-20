@@ -67,7 +67,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The address to accept the admin role
     address private pendingAdmin;
 
-    /// @dev The stored cutData for diamond cut, differes on each settlement chain.
+    /// @dev The stored cutData for diamond cut, differs on each settlement chain.
     // todo: this is only used to check the cutHash before migrating, do we want this?. We could s
     mapping(uint256 settlementChainId => bytes32 cutHash) public migrationCutHash;
 

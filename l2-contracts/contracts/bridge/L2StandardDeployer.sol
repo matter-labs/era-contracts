@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
@@ -20,7 +20,7 @@ import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2StandardDeployer is IL2StandardDeployer, Initializable {
+contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
     IL2SharedBridge public override l2Bridge;
 
     /// @dev Contract that stores the implementation address for token.
@@ -38,27 +38,27 @@ contract L2StandardDeployer is IL2StandardDeployer, Initializable {
     }
 
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
-    /// @param _l2Bridge The address of the L1 Bridge contract.
+    /// @param _owner Address which can set the shared bridge address and upgrade the deployer
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
+    /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed
     function initialize(
-        IL2SharedBridge _l2Bridge,
+        address _owner,
         bytes32 _l2TokenProxyBytecodeHash,
         address _aliasedOwner,
-        bool contractsDeployedAlready
+        bool _contractsDeployedAlready
     ) external reinitializer(2) {
-        require(address(_l2Bridge) != address(0), "bf");
         require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
         require(_aliasedOwner != address(0), "sf");
 
-        l2Bridge = _l2Bridge;
-
-        if (!contractsDeployedAlready) {
+        if (!_contractsDeployedAlready) {
             address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
             l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
             l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
             l2TokenBeacon.transferOwnership(_aliasedOwner);
         }
+
+        _transferOwnership(_owner);
     }
 
     function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {
@@ -90,7 +90,7 @@ contract L2StandardDeployer is IL2StandardDeployer, Initializable {
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override onlyBridge returns (bytes memory _bridgeMintData) {
+    ) external payable override onlyBridge returns (bytes memory _bridgeBurnData) {
         (uint256 _amount, address _l1Receiver) = abi.decode(_data, (uint256, address));
         require(_amount > 0, "Amount cannot be zero");
 
@@ -99,6 +99,7 @@ contract L2StandardDeployer is IL2StandardDeployer, Initializable {
 
         /// backwards compatible event
         emit WithdrawalInitiated(_prevMsgSender, _l1Receiver, l2Token, _amount);
+        _bridgeBurnData = abi.encodePacked(_chainId, _mintValue, _assetInfo, _prevMsgSender, _data);
     }
 
     /// @dev Deploy and initialize the L2 token for the L1 counterpart
@@ -141,5 +142,12 @@ contract L2StandardDeployer is IL2StandardDeployer, Initializable {
         bytes32 salt = _getCreate2Salt(_l1Token);
         return
             L2ContractHelper.computeCreate2Address(address(this), salt, l2TokenProxyBytecodeHash, constructorInputHash);
+    }
+
+    /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
+    function setSharedBridge(IL2SharedBridge _sharedBridge) external onlyOwner {
+        require(address(l2Bridge) == address(0), "SD: shared bridge already set");
+        require(address(_sharedBridge) != address(0), "SD: shared bridge 0");
+        l2Bridge = _sharedBridge;
     }
 }
