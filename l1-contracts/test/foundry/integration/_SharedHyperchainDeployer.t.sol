@@ -11,8 +11,7 @@ contract HyperchainDeployer is L1ContractDeployer {
 
     struct HyperchainDeployInfo {
         string name;
-        uint256 chainId;
-        address baseToken;
+        RegisterHyperchainsScript.HyperchainDescription description;
     }
 
     uint256 currentHyperChainId = 10;
@@ -70,19 +69,7 @@ contract HyperchainDeployer is L1ContractDeployer {
 
         for (uint256 i = 0; i < hyperchainsToDeploy.length; i++) {
             HyperchainDeployInfo memory info = hyperchainsToDeploy[i];
-
-            RegisterHyperchainsScript.HyperchainDescription memory description = RegisterHyperchainsScript
-                .HyperchainDescription({
-                    hyperchainChainId: info.chainId,
-                    baseToken: info.baseToken,
-                    bridgehubCreateNewChainSalt: 0,
-                    validiumMode: false,
-                    validatorSenderOperatorCommitEth: address(0),
-                    validatorSenderOperatorBlobsEth: address(1),
-                    baseTokenGasPriceMultiplierNominator: uint128(1),
-                    baseTokenGasPriceMultiplierDenominator: uint128(1)
-                });
-
+            RegisterHyperchainsScript.HyperchainDescription memory description = info.description;
             string memory hyperchainName = info.name;
 
             vm.serializeUint(hyperchainName, "hyperchain_chain_id", description.hyperchainChainId);
