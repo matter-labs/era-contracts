@@ -3,13 +3,19 @@ import "@nomiclabs/hardhat-ethers";
 import { Deployer as ZkDeployer } from "@matterlabs/hardhat-zksync-deploy";
 // import "@matterlabs/hardhat-zksync-ethers";
 import { ethers } from "ethers";
+import * as path from "path";
 import { IL2ContractDeployerFactory } from "../typechain/IL2ContractDeployerFactory";
 import { utils as zkUtils, ContractFactory, Wallet as ZkWallet, Provider } from "zksync-ethers";
 import { encode } from "querystring";
 import { web3Provider, web3Url } from "../scripts/utils";
-import { ethersWalletToZkWallet } from "./utils";
+import { ethersWalletToZkWallet, readBytecode, readInterface } from "./utils";
 
 export const BUILT_IN_ZKSYNC_CREATE2_FACTORY = "0x0000000000000000000000000000000000010000";
+
+const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/l2-contracts/artifacts-zk/");
+const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@openzeppelin/contracts/proxy/beacon");
+export const BEACON_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
+export const L2_SHARED_BRIDGE_PATH = contractArtifactsPath + "contracts/bridge";
 
 export async function deployViaCreate2(
   deployWallet: ZkWallet,
@@ -82,6 +88,64 @@ export async function deployBytecodeViaCreate2(
   return [expectedAddress, tx.hash];
 }
 
+export async function deployBytecodeViaCreate2OnPath(
+  deployWallet: ZkWallet,
+  contractName: string,
+  contractPath: string,
+  create2Salt: string,
+  ethTxOptions: ethers.providers.TransactionRequest,
+  args: any[],
+  factoryDeps: string[] = [],
+  verbose: boolean = true
+): Promise<[string, string]> {
+  // [address, txHash]
+
+  const log = (msg: string) => {
+    if (verbose) {
+      console.log(msg);
+    }
+  };
+
+  // @ts-ignore
+  const zkDeployer = new ZkDeployer(hardhat, deployWallet);
+  const bytecode = readBytecode(contractPath, contractName);
+
+  const bytecodeHash = zkUtils.hashBytecode(bytecode);
+  const iface = readInterface(contractPath, contractName);
+  const encodedArgs = iface.encodeDeploy(args);
+
+  // The CREATE2Factory has the same interface as the contract deployer
+  const create2Factory = IL2ContractDeployerFactory.connect(BUILT_IN_ZKSYNC_CREATE2_FACTORY, deployWallet);
+  const expectedAddress = zkUtils.create2Address(create2Factory.address, bytecodeHash, create2Salt, encodedArgs);
+
+  const deployedBytecodeBefore = await deployWallet.provider.getCode(expectedAddress);
+  if (ethers.utils.hexDataLength(deployedBytecodeBefore) > 0) {
+    log(`Contract ${contractName} already deployed`);
+    return [expectedAddress, ethers.constants.HashZero];
+  }
+
+  const encodedTx = create2Factory.interface.encodeFunctionData("create2", [create2Salt, bytecodeHash, encodedArgs]);
+
+  const tx = await deployWallet.sendTransaction({
+    data: encodedTx,
+    to: create2Factory.address,
+    ...ethTxOptions,
+    customData: {
+      factoryDeps: [bytecode, ...factoryDeps],
+    },
+  });
+  const receipt = await tx.wait();
+
+  const gasUsed = receipt.gasUsed;
+  log(`${contractName} deployed, gasUsed: ${gasUsed.toString()}`);
+
+  const deployedBytecodeAfter = await deployWallet.provider.getCode(expectedAddress);
+  if (ethers.utils.hexDataLength(deployedBytecodeAfter) == 0) {
+    throw new Error(`Failed to deploy ${contractName} bytecode via create2 factory`);
+  }
+
+  return [expectedAddress, tx.hash];
+}
 export async function deployContractWithArgs(
   wallet: ethers.Wallet,
   contractName: string,

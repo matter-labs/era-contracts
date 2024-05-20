@@ -107,7 +107,7 @@ async function main() {
         addresses: deployedAddressesFromEnv(),
         ownerAddress,
         verbose: true,
-      })
+      });
       await connectL1SLContracts(deployer);
     });
 
@@ -143,10 +143,6 @@ async function main() {
         ? parseUnits(cmd.gasPrice, "gwei")
         : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
 
-
-
-
-
       const currentChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
 
       const stm = deployer.stateTransitionManagerContract(deployer.deployWallet);
@@ -163,7 +159,7 @@ async function main() {
         "SYNC_LAYER_BLOB_VERSIONED_HASH_RETRIEVER_ADDR"
       );
       deployer.addresses.StateTransition.DiamondInit = getAddressFromEnv("SYNC_LAYER_DIAMOND_INIT_ADDR");
-      
+
       const receipt = await deployer.moveChainToSyncLayer(syncLayerChainId, gasPrice, true);
 
       const syncLayerAddress = await stm.getHyperchain(syncLayerChainId);
@@ -319,7 +315,7 @@ async function main() {
   await program.parseAsync(process.argv);
 }
 
-async function connectL1SLContracts(deployer:Deployer) {
+async function connectL1SLContracts(deployer: Deployer) {
   /// Shared bridge on L1 L2
   /// Bridgehub on L1 L2
   /// STM on L1 L2 in Bridge and BH
@@ -337,9 +333,9 @@ async function connectL1SLContracts(deployer:Deployer) {
   console.log(deployer.addresses.StateTransition.StateTransitionProxy);
   // this script only works when owner is the deployer
   console.log(`Registering SyncLayer chain id on the STM`);
-  await  deployer.executeUpgrade(
+  await deployer.executeUpgrade(
     l1STM.address,
-     0,
+    0,
     l1STM.interface.encodeFunctionData("registerSyncLayer", [chainId, true])
   );
 

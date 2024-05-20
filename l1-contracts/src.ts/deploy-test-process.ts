@@ -118,7 +118,7 @@ export async function registerHyperchainWithBridgeRegistration(
   chainId?: string
 ) {
   chainId = chainId ?? deployer.chainId.toString();
-  await registerHyperchain(deployer, onlyVerifier, extraFacets, gasPrice, baseTokenName, chainId);
+  await registerHyperchain(deployer, onlyVerifier, extraFacets, gasPrice, baseTokenName, chainId, true);
   const l1SharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
   const upgradeCall = l1SharedBridge.interface.encodeFunctionData("initializeChainGovernance", [chainId, ADDRESS_ONE]);
   const txHash = await deployer.executeUpgrade(l1SharedBridge.address, 0, upgradeCall);
@@ -222,7 +222,7 @@ export async function initialEraTestnetDeploymentProcess(
     deployer.addresses.StateTransition.DiamondProxy,
   ]);
   await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, registerData);
-  await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString());
+  await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString(), true);
   return deployer;
 }
 

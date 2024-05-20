@@ -907,11 +907,7 @@ export class Deployer {
     }
   }
 
-  public async moveChainToSyncLayer(
-    syncLayerChainId: string,
-    gasPrice: BigNumberish,
-    executeViaUpgrade: boolean = false
-  ) {
+  public async moveChainToSyncLayer(syncLayerChainId: string, gasPrice: BigNumberish, useGovernance: boolean = false) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     // Just some large gas limit that should always be enough
     const l2GasLimit = ethers.BigNumber.from(72_000_000);
@@ -934,10 +930,11 @@ export class Deployer {
 
       [await bridgehub.stmAssetInfoFromChainId(this.chainId), bridgehubData]
     );
-    const receipt = await this.executeUpgrade(
-      bridgehub.address,
-      expectedCost,
-      bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
+    const receipt = await this.executeDirectOrGovernance(
+      useGovernance,
+      bridgehub,
+      "requestL2TransactionTwoBridges",
+      [
         {
           chainId: syncLayerChainId,
           mintValue: expectedCost,
@@ -949,7 +946,8 @@ export class Deployer {
           secondBridgeValue: 0,
           secondBridgeCalldata: sharedBridgeData,
         },
-      ])
+      ],
+      expectedCost
     );
     return receipt;
   }

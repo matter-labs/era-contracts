@@ -1,7 +1,6 @@
 // hardhat import should be the first import in the file
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
-import * as path from "path";
 
 import "@nomiclabs/hardhat-ethers";
 
@@ -15,8 +14,9 @@ import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUp
 import { StateTransitionManagerFactory, L1SharedBridgeFactory, ValidatorTimelockFactory } from "../typechain";
 
 import { Interface } from "ethers/lib/utils";
-import { ADDRESS_ONE, getAddressFromEnv, isCurrentNetworkLocal, readBytecode } from "./utils";
-import type { L2CanonicalTransaction, ProposedUpgrade, VerifierParams } from "./utils";
+import { ADDRESS_ONE, getAddressFromEnv, isCurrentNetworkLocal } from "./utils";
+import { BEACON_PROXY_BYTECODE } from "./deploy-utils-zk";
+// import type { L2CanonicalTransaction, ProposedUpgrade, VerifierParams } from "./utils";
 
 import {
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -25,10 +25,6 @@ import {
   hashL2Bytecode,
 } from "../../l2-contracts/src/utils";
 import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
-
-const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/l2-contracts/artifacts-zk/");
-const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@openzeppelin/contracts/proxy/beacon");
-export const BEACON_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
 
 /// In the hardhat tests we do the upgrade all at once.
 /// On localhost/stage/.. we will call the components and send the calldata to Governance manually
@@ -288,11 +284,11 @@ async function upgradeL2Bridge(deployer: Deployer, gasPrice: BigNumberish, print
     requiredValueForL2Tx,
     mailboxCalldata,
     null,
-    printFileName
+    !!printFileName
   );
 }
 
-async function upgradeL1ERC20Bridge(deployer: Deployer, gasPrice: BigNumberish, printFileName?: string) {
+async function upgradeL1ERC20Bridge(deployer: Deployer, gasPrice: BigNumberish, printFileName: string) {
   if (isCurrentNetworkLocal()) {
     // we need to wait here for a new block
     await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -308,7 +304,7 @@ async function upgradeL1ERC20Bridge(deployer: Deployer, gasPrice: BigNumberish, 
       deployer.addresses.Bridges.ERC20BridgeImplementation,
     ]);
 
-    await deployer.executeUpgrade(deployer.addresses.TransparentProxyAdmin, 0, data1, null, printFileName);
+    await deployer.executeUpgrade(deployer.addresses.TransparentProxyAdmin, 0, data1, null, !!printFileName);
 
     if (deployer.verbose) {
       console.log("L1ERC20Bridge upgrade sent");
@@ -329,7 +325,7 @@ export async function transferERC20BridgeToProxyAdmin(
     deployer.addresses.TransparentProxyAdmin,
   ]);
 
-  await deployer.executeUpgrade(deployer.addresses.Bridges.ERC20BridgeProxy, 0, data1, null, printFileName);
+  await deployer.executeUpgrade(deployer.addresses.Bridges.ERC20BridgeProxy, 0, data1, null, !!printFileName);
 
   if (deployer.verbose) {
     console.log("ERC20Bridge ownership transfer sent");
