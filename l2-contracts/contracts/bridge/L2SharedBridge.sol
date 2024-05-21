@@ -29,10 +29,10 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
 
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
-    UpgradeableBeacon public l2TokenBeacon;
+    UpgradeableBeacon public DEPRACATED_l2TokenBeacon;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
-    bytes32 internal l2TokenProxyBytecodeHash;
+    bytes32 internal DEPRACATED_l2TokenProxyBytecodeHash;
 
     /// @dev A mapping l2 token address => l1 token address
     mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
@@ -63,32 +63,22 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
     /// @param _l1SharedBridge The address of the L1 Bridge contract.
     /// @param _l1Bridge The address of the legacy L1 Bridge contract.
-    /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
     function initialize(
         address _l1SharedBridge,
         address _l1Bridge,
-        bytes32 _l2TokenProxyBytecodeHash,
         address _aliasedOwner,
         IL2StandardDeployer _standardDeployer
     ) external reinitializer(2) {
         require(_l1SharedBridge != address(0), "bf");
-        require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
         require(_aliasedOwner != address(0), "sf");
         require(address(_standardDeployer) != address(0), "cf");
 
         l1SharedBridge = _l1SharedBridge;
         standardDeployer = _standardDeployer;
-
-        if (block.chainid != ERA_CHAIN_ID) {
-            address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
-            l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
-            l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
-            l2TokenBeacon.transferOwnership(_aliasedOwner);
-        } else {
+        if (block.chainid == ERA_CHAIN_ID){
             require(_l1Bridge != address(0), "bf2");
             l1Bridge = _l1Bridge;
-            // l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
         }
     }
 

@@ -37,13 +37,24 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         _;
     }
 
+        /// @dev Contract is expected to be used as proxy implementation.
+    /// @dev Disable the initialization to prevent Parity hack.
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
+    function setSharedBridge(IL2SharedBridge _sharedBridge) external onlyOwner {
+        require(address(l2Bridge) == address(0), "SD: shared bridge already set");
+        require(address(_sharedBridge) != address(0), "SD: shared bridge 0");
+        l2Bridge = _sharedBridge;
+    }
+
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
-    /// @param _owner Address which can set the shared bridge address and upgrade the deployer
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
     /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed
     function initialize(
-        address _owner,
         bytes32 _l2TokenProxyBytecodeHash,
         address _aliasedOwner,
         bool _contractsDeployedAlready
@@ -58,7 +69,7 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
             l2TokenBeacon.transferOwnership(_aliasedOwner);
         }
 
-        _transferOwnership(_owner);
+        _transferOwnership(_aliasedOwner);
     }
 
     function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {
@@ -142,12 +153,5 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         bytes32 salt = _getCreate2Salt(_l1Token);
         return
             L2ContractHelper.computeCreate2Address(address(this), salt, l2TokenProxyBytecodeHash, constructorInputHash);
-    }
-
-    /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
-    function setSharedBridge(IL2SharedBridge _sharedBridge) external onlyOwner {
-        require(address(l2Bridge) == address(0), "SD: shared bridge already set");
-        require(address(_sharedBridge) != address(0), "SD: shared bridge 0");
-        l2Bridge = _sharedBridge;
     }
 }

@@ -122,6 +122,8 @@ export interface DeployedAddresses {
     SharedBridgeProxy: string;
     L2SharedBridgeProxy: string;
     L2SharedBridgeImplementation: string;
+    L2StandardDeployerImplementation: string;
+    L2StandardDeployerProxy: string;
     NativeTokenVaultImplementation: string;
     NativeTokenVaultProxy: string;
   };
@@ -160,6 +162,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       ERC20BridgeProxy: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR"),
       SharedBridgeImplementation: getAddressFromEnv("CONTRACTS_L1_SHARED_BRIDGE_IMPL_ADDR"),
       SharedBridgeProxy: getAddressFromEnv("CONTRACTS_L1_SHARED_BRIDGE_PROXY_ADDR"),
+      L2StandardDeployerImplementation: getAddressFromEnv("CONTRACTS_L2_STANDARD_DEPLOYER_IMPL_ADDR"),
+      L2StandardDeployerProxy: getAddressFromEnv("CONTRACTS_L2_STANDARD_DEPLOYER_PROXY_ADDR"),
       L2SharedBridgeImplementation: getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_IMPL_ADDR"),
       L2SharedBridgeProxy: getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR"),
       NativeTokenVaultImplementation: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_IMPL_ADDR"),

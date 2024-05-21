@@ -26,4 +26,6 @@ interface IL2StandardDeployer is IL2StandardAsset {
     function tokenAddress(bytes32 _assetInfo) external view returns (address);
 
     function l2TokenAddress(address _l1Token) external view returns (address);
+
+    function setSharedBridge(IL2SharedBridge _sharedBridge) external;
 }
