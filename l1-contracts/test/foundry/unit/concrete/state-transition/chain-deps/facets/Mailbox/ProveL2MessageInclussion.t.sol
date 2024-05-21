@@ -7,7 +7,7 @@ import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransactionFiltererTrue.sol";
 import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
-import {L2Message} from "contracts/common/Messaging.sol";
+import {L2Message, L2Log} from "contracts/common/Messaging.sol";
 import "forge-std/Test.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L1_GAS_PER_PUBDATA_BYTE} from "contracts/common/Config.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
@@ -50,7 +50,7 @@ contract ProveL2Logs is MailboxTest {
         uint256 index = 0;
         L2Message memory message = L2Message({txNumberInBatch: 0, sender: sender, data: abi.encodePacked("test")});
         bytes32[] memory proof = new bytes32[](0);
-        vm.expectRevert(); // should be "xx" but something with lookup ;/
+        vm.expectRevert(bytes("xx"));
         mailboxFacet.proveL2MessageInclusion(batchNumber, index, message, proof);
     }
 
@@ -115,7 +115,87 @@ contract ProveL2Logs is MailboxTest {
         assertEq(ret, true);
     }
 
-    function test_proveL1ToL2TransactionStatus() public {
+    function test_successful_proveL2LogInclusion() public {
+        merkleTree = new MerkleTree();
+        merkle = new MerkleTest();
+
+        bytes32 secondL2TxHash = keccak256("SecondL2Transaction");
+        TxStatus txStatus = TxStatus.Success;
+        address sender = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR;
+        address messageSender = makeAddr("sender");
+        bytes memory data = abi.encodePacked("123");
+
+        uint8 l2ShardId = 0;
+        bool isService = true;
+        uint256 indexInTree = 0;
+        uint16 txNumberInBatch = 0;
+
+        L2Log memory log = L2Log({
+            l2ShardId: l2ShardId,
+            isService: isService,
+            txNumberInBatch: txNumberInBatch,
+            sender: sender,
+            key: bytes32(uint256(uint160(messageSender))),
+            value: keccak256(data)
+        });
+
+        // Add first element to the Merkle tree
+        elements.push(
+            keccak256(
+                abi.encodePacked(
+                    l2ShardId,
+                    isService,
+                    txNumberInBatch,
+                    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+                    bytes32(uint256(uint160(messageSender))),
+                    keccak256(data)
+                )
+            )
+        );
+
+        // update changing values
+        indexInTree += 1;
+        txNumberInBatch += 1;
+
+        // Add second element to the Merkle tree
+        elements.push(
+            keccak256(
+                abi.encodePacked(
+                    l2ShardId,
+                    isService,
+                    txNumberInBatch,
+                    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+                    bytes32(uint256(uint160(messageSender))),
+                    keccak256(data)
+                )
+            )
+        );
+
+        // Calculate the Merkle root
+        bytes32 root = merkleTree.getRoot(elements);
+        // Set root hash for current batch
+        utilsFacet.util_setl2LogsRootHash(0, root);
+
+        // Get Merkle proof for the first element
+        bytes32[] memory proof = merkleTree.getProof(elements, 0);
+
+        {
+            // Calculate the root using the Merkle proof
+            bytes32 leaf = elements[0];
+            uint256 leafIndex = 0;
+            bytes32 calculatedRoot = merkle.calculateRoot(proof, leafIndex, leaf);
+            // Assert that the calculated root matches the expected root
+            assertEq(calculatedRoot, root);
+        }
+
+        // Prove L1 to L2 transaction status
+        bool ret = mailboxFacet.proveL2LogInclusion({_batchNumber: 0, _index: 0, _proof: proof, _log: log});
+
+        // Assert that the proof was successful
+        assertEq(ret, true);
+    }
+
+    function test_successful_proveL1ToL2TransactionStatus() public {
         merkleTree = new MerkleTree();
         merkle = new MerkleTest();
 
@@ -284,5 +364,45 @@ contract ProveL2Logs is MailboxTest {
         vm.prank(address(baseTokenBridge));
         mailboxFacet.transferEthToSharedBridge();
         assertEq(address(baseTokenBridge).balance, 1 ether);
+    }
+
+    function test_RevertWhen_transferEthToSharedBridgeBadCaller() public {
+        address baseTokenBridge = makeAddr("bridge");
+
+        utilsFacet.util_setChainId(eraChainId);
+
+        vm.deal(diamondProxy, 1 ether);
+
+        vm.expectRevert("Hyperchain: Only base token bridge can call this function");
+        vm.prank(baseTokenBridge);
+        mailboxFacet.transferEthToSharedBridge();
+    }
+
+    function test_RevertWhen_transferEthToSharedBridgeBadHyperchain() public {
+        address baseTokenBridge = makeAddr("bridge");
+
+        utilsFacet.util_setChainId(eraChainId + 1);
+        utilsFacet.util_setBaseTokenBridge(baseTokenBridge);
+
+        vm.deal(diamondProxy, 1 ether);
+
+        vm.expectRevert("Mailbox: transferEthToSharedBridge only available for Era on mailbox");
+        vm.prank(baseTokenBridge);
+        mailboxFacet.transferEthToSharedBridge();
+    }
+
+    function test_RevertWhen_finalizeEthWithdrawalNotEra() public {
+        utilsFacet.util_setChainId(eraChainId + 1);
+        bytes32[] memory proof = new bytes32[](0);
+        bytes memory message = "message";
+        vm.expectRevert("Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
+
+        mailboxFacet.finalizeEthWithdrawal({
+            _l2BatchNumber: 0,
+            _l2MessageIndex: 0,
+            _l2TxNumberInBatch: 0,
+            _message: message,
+            _merkleProof: proof
+        });
     }
 }
