@@ -2,19 +2,15 @@
 
 pragma solidity 0.8.24;
 
-// import {HyperchainCommitment} from "../../common/Config.sol";
-
 import {IZkSyncHyperchainBase} from "../chain-interfaces/IZkSyncHyperchainBase.sol";
-import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
-import {IL1StandardAsset} from "../../bridge/interfaces/IL1StandardAsset.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IAdmin is IZkSyncHyperchainBase, IL1StandardAsset {
+interface IAdmin is IZkSyncHyperchainBase {
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin
@@ -68,8 +64,6 @@ interface IAdmin is IZkSyncHyperchainBase, IL1StandardAsset {
     /// @dev Both the admin and the STM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
 
-    function setChainIdUpgrade(address _genesisUpgrade) external;
-
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
 
@@ -106,19 +100,9 @@ interface IAdmin is IZkSyncHyperchainBase, IL1StandardAsset {
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
 
-    /// TODO: maybe include some params
-    event MigrationComplete();
-
     /// @notice Emitted when the contract is frozen.
     event Freeze();
 
     /// @notice Emitted when the contract is unfrozen.
     event Unfreeze();
-
-    /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
-    event SetChainIdUpgrade(
-        address indexed _hyperchain,
-        L2CanonicalTransaction _l2Transaction,
-        uint256 indexed _protocolVersion
-    );
 }

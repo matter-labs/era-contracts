@@ -3,11 +3,8 @@
 pragma solidity 0.8.24;
 
 import {Diamond} from "./libraries/Diamond.sol";
-// import {L2CanonicalTransaction} from "../common/Messaging.sol";
+import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
-import {HyperchainCommitment} from "../common/Config.sol";
-
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 /// @notice Struct that holds all data needed for initializing STM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
@@ -34,12 +31,12 @@ interface IStateTransitionManager {
     /// @dev Emitted when a new Hyperchain is added
     event NewHyperchain(uint256 indexed _chainId, address indexed _hyperchainContract);
 
-    // /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
-    // event SetChainIdUpgrade(
-    //     address indexed _hyperchain,
-    //     L2CanonicalTransaction _l2Transaction,
-    //     uint256 indexed _protocolVersion
-    // );
+    /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
+    event SetChainIdUpgrade(
+        address indexed _hyperchain,
+        L2CanonicalTransaction _l2Transaction,
+        uint256 indexed _protocolVersion
+    );
 
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
@@ -60,7 +57,7 @@ interface IStateTransitionManager {
     /// @notice new ProtocolVersion
     event NewProtocolVersion(uint256 indexed oldProtocolVersion, uint256 indexed newProtocolVersion);
 
-    function BRIDGE_HUB() external view returns (IBridgehub);
+    function BRIDGE_HUB() external view returns (address);
 
     function setPendingAdmin(address _newPendingAdmin) external;
 
@@ -134,12 +131,4 @@ interface IStateTransitionManager {
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
     ) external;
-
-    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
-
-    function bridgeMintNewChain(
-        uint256 _chainId,
-        bytes calldata _chainData,
-        bytes calldata _diamondCut
-    ) external returns (address);
 }

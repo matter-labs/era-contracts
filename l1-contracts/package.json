@@ -81,14 +81,9 @@
     "token-migration": "ts-node scripts/token-migration.ts",
     "setup-legacy-bridge-era": "ts-node scripts/setup-legacy-bridge-era.ts",
     "upgrade-consistency-checker": "ts-node scripts/upgrade-consistency-checker.ts",
-    "governance-accept-ownership": "ts-node scripts/governance-accept-ownership.ts",
-    "sync-layer": "ts-node scripts/sync-layer.ts"
+    "governance-accept-ownership": "ts-node scripts/governance-accept-ownership.ts"
   },
   "dependencies": {
-    "@matterlabs/hardhat-zksync-deploy": "0.6.5",
-    "@matterlabs/hardhat-zksync-ethers": "^1.0.0",
-    "@matterlabs/hardhat-zksync-solc": "^1.1.4",
-    "@matterlabs/hardhat-zksync-verify": "^1.4.2",
     "dotenv": "^16.0.3",
     "solhint-plugin-prettier": "^0.0.5"
   }

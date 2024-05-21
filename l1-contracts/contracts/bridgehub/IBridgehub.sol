@@ -3,10 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
-import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-import {HyperchainCommitment} from "../common/Config.sol";
-import {IL1StandardAsset} from "../bridge/interfaces/IL1StandardAsset.sol";
-import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
+import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -40,7 +37,7 @@ struct L2TransactionRequestTwoBridgesInner {
     bytes32 txDataHash;
 }
 
-interface IBridgehub is IL1StandardAsset {
+interface IBridgehub {
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
@@ -114,10 +111,6 @@ interface IBridgehub is IL1StandardAsset {
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
 
-    /// FIXME: this method should not be present in the production code.
-    /// just used in code to register chain successfully until full migration is complete.
-    function unsafeRegisterChain(uint256 _chainId, address _stateTransitionManager, address _baseToken) external;
-
     //// Registry
 
     function createNewChain(
@@ -138,38 +131,4 @@ interface IBridgehub is IL1StandardAsset {
     function setSharedBridge(address _sharedBridge) external;
 
     event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
-
-    function registerCounterpart(uint256 _chainId, address _counterPart) external;
-
-    function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
-
-    function bridgehubCounterParts(uint256 _chainId) external view returns (address);
-
-    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
-
-    // function finalizeMigrationToSyncLayer(
-    //     uint256 _chainId,
-    //     address _baseToken,
-    //     address _sharedBridge,
-    //     address _admin,
-    //     uint256 _expectedProtocolVersion,
-    //     HyperchainCommitment calldata _commitment,
-    //     bytes calldata _diamondCut
-    // ) external;
-
-    function forwardTransactionSyncLayer(uint256 _chainId, BridgehubL2TransactionRequest calldata _request) external;
-
-    function stmAssetInfoFromChainId(uint256 _chainId) external view returns (bytes32);
-
-    function stmAssetInfo(address _stmAddress) external view returns (bytes32);
-
-    function stmDeployer() external view returns (ISTMDeploymentTracker);
-
-    function setSTMDeployer(ISTMDeploymentTracker _stmDeployer) external;
-
-    function stmAssetInfoToAddress(bytes32 _assetInfo) external view returns (address);
-
-    function setAssetAddress(bytes32 _additionalData, address _assetAddress) external;
-
-    function L1_CHAIN_ID() external view returns (uint256);
 }
