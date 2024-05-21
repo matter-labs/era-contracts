@@ -123,6 +123,13 @@ interface IExecutor is IBase {
         uint256[] serializedProof;
     }
 
+    struct NewHorizenVerificationRequest {
+        uint256 attestationId;
+        uint256[] merklePath;
+        uint256 leafCount;
+        uint256 index;
+    }
+
     /// @notice Function called by the operator to commit new batches. It is responsible for:
     /// - Verifying the correctness of their timestamps.
     /// - Processing their L2->L1 logs.
@@ -142,7 +149,8 @@ interface IExecutor is IBase {
     function proveBatches(
         StoredBatchInfo calldata _prevBatch,
         StoredBatchInfo[] calldata _committedBatches,
-        ProofInput calldata _proof
+        ProofInput calldata _proof,
+        NewHorizenVerificationRequest calldata _verificationRequest
     ) external;
 
     /// @notice The function called by the operator to finalize (execute) batches. It is responsible for:
