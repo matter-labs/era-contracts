@@ -19,13 +19,7 @@ contract MailboxTest is Test {
     address sender;
     uint256 eraChainId = 9;
     address internal testnetVerifier = address(new TestnetVerifier());
-
-    // function getMailboxSelectors() public pure returns (bytes4[] memory) {
-    //     bytes4[] memory selectors = new bytes4[](1);
-    //     selectors[0] = IMailbox.bridgehubRequestL2Transaction.selector;
-
-    //     return selectors;
-    // }
+    address diamondProxy;
 
     function setUp() public virtual {
         sender = makeAddr("sender");
@@ -51,7 +45,7 @@ contract MailboxTest is Test {
             selectors: Utils.getGettersSelectors()
         });
 
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
+        diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
         mailboxFacet = IMailbox(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
         gettersFacet = IGetters(diamondProxy);
