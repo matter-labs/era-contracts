@@ -361,21 +361,6 @@ contract ExecutorFacet is Base, IExecutor {
         }
         require(currentTotalBatchesVerified <= s.totalBatchesCommitted, "q");
 
-        /*
-        // #if DUMMY_VERIFIER
-
-        // Additional level of protection for the mainnet
-        assert(block.chainid != 1);
-        // We allow skipping the zkp verification for the test(net) environment
-        // If the proof is not empty, verify it, otherwise, skip the verification
-        
-        if (_proof.serializedProof.length > 0) {
-            _verifyProof(proofPublicInput, _proof);
-        }
-        // #else
-        _verifyProof(proofPublicInput, _proof);
-        // #endif
-        */
         _verifyProof(proofPublicInput, _proof, _verificationRequest);
         emit BlocksVerification(s.totalBatchesVerified, currentTotalBatchesVerified);
         s.totalBatchesVerified = currentTotalBatchesVerified;
@@ -383,24 +368,30 @@ contract ExecutorFacet is Base, IExecutor {
 
     function _verifyProof(
         uint256[] memory proofPublicInput,
-        ProofInput calldata _proof,
+        ProofInput calldata proof,
         NewHorizenVerificationRequest calldata verificationRequest
     ) internal view {
         bool successVerifyProof;
-        uint merklePathLength = verificationRequest.merklePath.length;
-        bytes32[] memory merklePath = new bytes32[](merklePathLength);
-        for (uint i = 0; i < merklePathLength; i++) {
-            merklePath[i] = bytes32(verificationRequest.merklePath[i]);
-        }
-        bytes32 leaf = keccak256(abi.encodePacked(verifierId, bytes32(proofPublicInput[0])));
 
-        successVerifyProof = s.nhVerifier.verifyProofAttestation(
-            verificationRequest.attestationId,
-            leaf,
-            merklePath,
-            verificationRequest.leafCount,
-            verificationRequest.index
-        );
+        if (proof.serializedProof.length > 0) {
+            uint merklePathLength = verificationRequest.merklePath.length;
+            bytes32[] memory merklePath = new bytes32[](merklePathLength);
+            for (uint i = 0; i < merklePathLength; i++) {
+                merklePath[i] = bytes32(verificationRequest.merklePath[i]);
+            }
+            bytes32 leaf = keccak256(abi.encodePacked(verifierId, bytes32(proofPublicInput[0])));
+
+            successVerifyProof = s.nhVerifier.verifyProofAttestation(
+                verificationRequest.attestationId,
+                leaf,
+                merklePath,
+                verificationRequest.leafCount,
+                verificationRequest.index
+            );
+        } else {
+            successVerifyProof = s.nhVerifier.mockVerifyProofAttestation();
+        }
+
         require(successVerifyProof, "p"); // Proof verification fail
     }
 
