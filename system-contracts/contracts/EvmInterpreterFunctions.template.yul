@@ -680,6 +680,22 @@ function getNonce(addr) -> nonce {
     nonce := mload(0)
 }
 
+function getRawNonce(addr) -> nonce {
+    mstore8(0, 0x5a)
+    mstore8(1, 0xa9)
+    mstore8(2, 0xb6)
+    mstore8(3, 0xb5)
+    mstore(4, addr)
+
+    let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+
+    if iszero(result) {
+        revert(0, 0)
+    }
+
+    nonce := mload(0)
+}
+
 function _isEVM(_addr) -> isEVM {
     // bytes4 selector = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM.selector; (0x8c040477)
     // function isAccountEVM(address _addr) external view returns (bool);
@@ -889,6 +905,46 @@ function getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize) -> maxExpa
     }
 }
 
+function _performCall(addr,gasToPass,value,argsOffset,argsSize,retOffset,retSize,isStatic) -> success, frameGasLeft, gasToPassNew{
+    gasToPassNew := gasToPass
+    let is_evm := _isEVM(addr)
+    if isStatic {
+        if value {
+            revert(0, 0)
+        }
+        success, frameGasLeft:= _performStaticCall(
+            is_evm,
+            gasToPassNew,
+            addr,
+            argsOffset,
+            argsSize,
+            retOffset,
+            retSize
+        )
+    }
+
+    if and(is_evm, iszero(isStatic)) {
+        _pushEVMFrame(gasToPassNew, isStatic)
+        success := call(gasToPassNew, addr, value, argsOffset, argsSize, 0, 0)
+        frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+        _popEVMFrame()
+    }
+
+    // zkEVM native
+    if and(iszero(is_evm), iszero(isStatic)) {
+        gasToPassNew := _getZkEVMGas(gasToPassNew)
+        let zkevmGasBefore := gas()
+        success := call(gasToPassNew, addr, value, argsOffset, argsSize, retOffset, retSize)
+        _saveReturndataAfterZkEVMCall()
+        let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
+
+        frameGasLeft := 0
+        if gt(gasToPassNew, gasUsed) {
+            frameGasLeft := sub(gasToPassNew, gasUsed)
+        }
+    }
+}
+
 function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
     let gasToPass,addr,value,argsOffset,argsSize,retOffset,retSize
 
@@ -932,44 +988,17 @@ function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
     checkMemOverflow(add(argsOffset, argsSize))
     checkMemOverflow(add(retOffset, retSize))
 
-    let frameGasLeft
-    let success
-
-    if isStatic {
-        if value {
-            revert(0, 0)
-        }
-        success, frameGasLeft:= _performStaticCall(
-            _isEVM(addr),
-            gasToPass,
-            addr,
-            argsOffset,
-            argsSize,
-            retOffset,
-            retSize
-        )
-    }
-
-    if and(_isEVM(addr), iszero(isStatic)) {
-        _pushEVMFrame(gasToPass, isStatic)
-        success := call(gasToPass, addr, value, argsOffset, argsSize, 0, 0)
-        frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-        _popEVMFrame()
-    }
-
-    // zkEVM native
-    if and(iszero(_isEVM(addr)), iszero(isStatic)) {
-        gasToPass := _getZkEVMGas(gasToPass)
-        let zkevmGasBefore := gas()
-        success := call(gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
-        _saveReturndataAfterZkEVMCall()
-        let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
-
-        frameGasLeft := 0
-        if gt(gasToPass, gasUsed) {
-            frameGasLeft := sub(gasToPass, gasUsed)
-        }
-    }
+    let success, frameGasLeft 
+    success, frameGasLeft, gasToPass:= _performCall(
+        addr,
+        gasToPass,
+        value,
+        argsOffset,
+        argsSize,
+        retOffset,
+        retSize,
+        isStatic
+    )
 
     extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
     extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
@@ -1104,12 +1133,12 @@ function _performStaticCall(
 
 function isAddrEmpty(addr) -> isEmpty {
     isEmpty := 0
-    if  and( and( 
-            iszero(balance(addr)), 
-            iszero(extcodesize(addr)) ),
-            iszero(getNonce(addr))
-        ) {
-        isEmpty := 1
+    if iszero(extcodesize(addr)) { // YUL doesn't have short-circuit evaluation
+        if iszero(balance(addr)) {
+            if iszero(getRawNonce(addr)) {
+                isEmpty := 1
+            }
+        }
     }
 }
 
