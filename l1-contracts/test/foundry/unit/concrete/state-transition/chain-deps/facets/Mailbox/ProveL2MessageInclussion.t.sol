@@ -9,7 +9,7 @@ import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransac
 import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
 import {L2Message, L2Log} from "contracts/common/Messaging.sol";
 import "forge-std/Test.sol";
-import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L1_GAS_PER_PUBDATA_BYTE} from "contracts/common/Config.sol";
+import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L1_GAS_PER_PUBDATA_BYTE, L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/common/Config.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
 import {Merkle} from "contracts/state-transition/libraries/Merkle.sol";
 import {MurkyBase} from "murky/common/MurkyBase.sol";
@@ -20,7 +20,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-
+import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {DummyStateTransitionManagerWBH} from "contracts/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
@@ -43,6 +43,11 @@ contract ProveL2Logs is MailboxTest {
     MerkleTest merkle;
     MerkleTree merkleTree;
 
+    function test_eraChainIdSet() public {
+        MailboxFacet m = new MailboxFacet(eraChainId);
+        assertEq(m.ERA_CHAIN_ID(), eraChainId);
+    }
+
     function test_RevertWhen_batchNumberGreaterThanBatchesExecuted() public {
         uint256 totalBatchesExecuted = gettersFacet.getTotalBatchesExecuted();
         address sender = makeAddr("l2sender");
@@ -54,6 +59,9 @@ contract ProveL2Logs is MailboxTest {
         mailboxFacet.proveL2MessageInclusion(batchNumber, index, message, proof);
     }
 
+    //  require(hashedLog != L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, "tw");
+    // this is not possible in case of message, because some default values
+    // are set during translation from message to log
     function test_successful_proveL2MessageInclussion() public {
         merkleTree = new MerkleTree();
         merkle = new MerkleTest();
@@ -193,6 +201,61 @@ contract ProveL2Logs is MailboxTest {
 
         // Assert that the proof was successful
         assertEq(ret, true);
+    }
+
+    function test_RevertWhen_proveL2LogInclusionDefaultLog() public {
+        merkleTree = new MerkleTree();
+        merkle = new MerkleTest();
+
+        bytes32 secondL2TxHash = keccak256("SecondL2Transaction");
+        TxStatus txStatus = TxStatus.Success;
+        address sender = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR;
+        address messageSender = makeAddr("sender");
+
+        uint8 l2ShardId = 0;
+        bool isService = false;
+        uint256 indexInTree = 0;
+        uint16 txNumberInBatch = 0;
+
+        L2Log memory log = L2Log({
+            l2ShardId: l2ShardId,
+            isService: isService,
+            txNumberInBatch: txNumberInBatch,
+            sender: address(0),
+            key: bytes32(0),
+            value: bytes32(0)
+        });
+
+        // Add first element to the Merkle tree
+        elements.push(keccak256(new bytes(L2_TO_L1_LOG_SERIALIZE_SIZE)));
+
+        txNumberInBatch += 1;
+        indexInTree += 1;
+
+        elements.push(
+            keccak256(abi.encodePacked(l2ShardId, isService, txNumberInBatch, address(0), bytes32(0), bytes32(0)))
+        );
+
+        // Calculate the Merkle root
+        bytes32 root = merkleTree.getRoot(elements);
+        // Set root hash for current batch
+        utilsFacet.util_setl2LogsRootHash(0, root);
+
+        // Get Merkle proof for the first element
+        bytes32[] memory proof = merkleTree.getProof(elements, 0);
+
+        {
+            // Calculate the root using the Merkle proof
+            bytes32 leaf = elements[0];
+            uint256 leafIndex = 0;
+            bytes32 calculatedRoot = merkle.calculateRoot(proof, leafIndex, leaf);
+            // Assert that the calculated root matches the expected root
+            assertEq(calculatedRoot, root);
+        }
+
+        // Prove L1 to L2 transaction status
+        vm.expectRevert(bytes("tw"));
+        mailboxFacet.proveL2LogInclusion({_batchNumber: 0, _index: 0, _proof: proof, _log: log});
     }
 
     function test_successful_proveL1ToL2TransactionStatus() public {
