@@ -189,6 +189,7 @@ export interface DeployedAddresses {
     DiamondUpgradeInit: string;
     DefaultUpgrade: string;
     DiamondProxy: string;
+    NHVerifier: string;
   };
   Bridges: {
     ERC20BridgeImplementation: string;
@@ -214,6 +215,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       DefaultUpgrade: getAddressFromEnv("CONTRACTS_DEFAULT_UPGRADE_ADDR"),
       DiamondProxy: getAddressFromEnv("CONTRACTS_DIAMOND_PROXY_ADDR"),
       Verifier: getAddressFromEnv("CONTRACTS_VERIFIER_ADDR"),
+      NHVerifier: getAddressFromEnv("CONTRACTS_NH_VERIFIER_ADDR"),
     },
     Bridges: {
       ERC20BridgeImplementation: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR"),

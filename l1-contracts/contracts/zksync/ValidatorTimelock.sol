@@ -126,7 +126,8 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     function proveBatches(
         StoredBatchInfo calldata,
         StoredBatchInfo[] calldata,
-        ProofInput calldata
+        ProofInput calldata,
+        NewHorizenVerificationRequest calldata _verificationRequest
     ) external onlyValidator {
         _propagateToZkSync();
     }

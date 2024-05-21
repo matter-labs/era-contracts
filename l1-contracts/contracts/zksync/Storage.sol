@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 
 import {IVerifier} from "./../zksync/interfaces/IVerifier.sol";
 import {PriorityQueue} from "./libraries/PriorityQueue.sol";
+import {INewHorizenProofVerifier} from "./../nh/INewHorizenProofVerifier.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
@@ -111,6 +112,8 @@ struct AppStorage {
     mapping(address validatorAddress => bool isValidator) validators;
     /// @dev Verifier contract. Used to verify aggregated proof for batches
     IVerifier verifier;
+    /// @dev New Horizen Verifier contract. Used to verify aggregated proof for batches
+    INewHorizenProofVerifier nhVerifier;
     /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch
     /// (batch 0 is genesis)
     uint256 totalBatchesExecuted;

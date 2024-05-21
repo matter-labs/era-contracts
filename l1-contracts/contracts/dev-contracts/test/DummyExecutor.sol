@@ -68,7 +68,8 @@ contract DummyExecutor is IExecutor {
     function proveBatches(
         StoredBatchInfo calldata _prevBatch,
         StoredBatchInfo[] calldata _committedBatches,
-        ProofInput calldata
+        ProofInput calldata,
+        NewHorizenVerificationRequest calldata verificationRequest
     ) external {
         require(!shouldRevertOnProveBatches, "DummyExecutor: shouldRevertOnProveBatches");
         require(_prevBatch.batchNumber == getTotalBatchesVerified, "DummyExecutor: Invalid previous batch number");
