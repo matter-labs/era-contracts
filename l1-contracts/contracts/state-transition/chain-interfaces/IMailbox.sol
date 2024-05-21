@@ -113,6 +113,25 @@ interface IMailbox is IZkSyncHyperchainBase {
     /// @notice transfer Eth to shared bridge as part of migration process
     function transferEthToSharedBridge() external;
 
+    // function relayTxSL(
+    //     address _to,
+    //     L2CanonicalTransaction memory _transaction,
+    //     bytes[] memory _factoryDeps,
+    //     bytes32 _canonicalTxHash,
+    //     uint64 _expirationTimestamp
+    // ) external;
+
+    function freeAcceptTx(
+        L2CanonicalTransaction memory _transaction,
+        bytes[] memory _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external;
+
+    function acceptFreeRequestFromBridgehub(
+        BridgehubL2TransactionRequest calldata _request
+    ) external;
+
     /// @notice New priority request event. Emitted when a request is placed into the priority queue
     /// @param txId Serial number of the priority operation
     /// @param txHash keccak256 hash of encoded transaction representation

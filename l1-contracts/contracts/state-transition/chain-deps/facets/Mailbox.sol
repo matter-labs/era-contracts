@@ -18,10 +18,15 @@ import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, ETH_TOKEN_ADDRESS, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 
+import { IBridgehub } from "../../../bridgehub/IBridgehub.sol";
+
+import { IStateTransitionManager } from "../../IStateTransitionManager.sol";
 import {IL1SharedBridge} from "../../../bridge/interfaces/IL1SharedBridge.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
+
+import { SyncLayerState } from "../ZkSyncHyperchainStorage.sol";
 
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -234,9 +239,85 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         );
     }
 
-    // function freeTxRelay(WritePriorityOpParams memory _priorityOpParams) external {
-    //     // TODO: adequate access rights
-    //     _writePriorityOp(_priorityOpParams);
+    // Receiving as a SL-based chain
+    function freeAcceptTx(
+        L2CanonicalTransaction memory _transaction,
+        bytes[] memory _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external {
+        // TODO: adequate access rights
+
+        _writePriorityOp(
+            _transaction, 
+            _factoryDeps,
+            _canonicalTxHash,
+            _expirationTimestamp
+        );
+    }
+
+    function acceptFreeRequestFromBridgehub(
+        BridgehubL2TransactionRequest calldata _request
+    ) external {
+        WritePriorityOpParams memory params = WritePriorityOpParams({
+            request: _request,
+            txId: s.priorityQueue.getTotalPriorityTxs(),
+            l2GasPrice: 0,
+            expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
+        });
+
+        (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) = _validateTx(params);
+        _writePriorityOp(
+            transaction,
+            params.request.factoryDeps,
+            canonicalTxHash,
+            params.expirationTimestamp
+        );
+    }
+
+    // // TODO: only allow for sync layer
+    // function relayTxSL(
+    //     address _to,
+    //     L2CanonicalTransaction memory _transaction,
+    //     bytes[] memory _factoryDeps,
+    //     bytes32 _canonicalTxHash,
+    //     uint64 _expirationTimestamp
+    // ) external {
+    //     bytes memory data = abi.encodeCall(
+    //         this.freeAcceptTx,
+    //         (_transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp)
+    //     );
+
+    //     BridgehubL2TransactionRequest memory request = BridgehubL2TransactionRequest({
+    //         // This is a temporary branch, sender does not matte
+    //         sender: msg.sender,
+    //         contractL2: _to,
+    //         mintValue: 0,
+    //         l2Value: 0,
+    //         l2Calldata: data,
+    //         // Very large amount
+    //         l2GasLimit: 72_000_000,
+    //         // TODO: use constant for that
+    //         l2GasPerPubdataByteLimit: 800,
+    //         factoryDeps: new bytes[](0),
+    //         // Tx is free, no so refund recipient needed
+    //         refundRecipient: address(0)
+    //     }); 
+
+    //     WritePriorityOpParams memory params = WritePriorityOpParams({
+    //         request: request,
+    //         txId: s.priorityQueue.getTotalPriorityTxs(),
+    //         l2GasPrice: 0,
+    //         expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
+    //     });
+
+    //     (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) = _validateTx(params);
+    //     _writePriorityOp(
+    //         transaction,
+    //         params.request.factoryDeps,
+    //         canonicalTxHash,
+    //         params.expirationTimestamp
+    //     );
     // }
 
     function _requestL2TransactionSender(
@@ -291,8 +372,35 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
         // populate missing fields
         _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
+        
+        L2CanonicalTransaction memory transaction;
+        (transaction, canonicalTxHash) = _validateTx(_params);
 
-        canonicalTxHash = _writePriorityOp(_params);
+        if (s.syncLayerState == SyncLayerState.ActiveOnL1) {
+            _writePriorityOp(
+                transaction,
+                _params.request.factoryDeps,
+                canonicalTxHash,
+                _params.expirationTimestamp
+            );
+        } else if (s.syncLayerState == SyncLayerState.MigratedFromL1) {
+            // We also write it anyway
+            _writePriorityOp(
+                transaction,
+                _params.request.factoryDeps,
+                canonicalTxHash,
+                _params.expirationTimestamp
+            );
+
+            _relayPriorityOp(
+                transaction,
+                _params.request.factoryDeps,
+                canonicalTxHash,
+                _params.expirationTimestamp
+            );
+        } else {
+            revert("Can not be called on SL");
+        }
     }
 
     function _serializeL2Transaction(
@@ -320,27 +428,51 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         });
     }
 
-    /// @notice Stores a transaction record in storage & send event about that
-    function _writePriorityOp(
-        WritePriorityOpParams memory _priorityOpParams
-    ) internal returns (bytes32 canonicalTxHash) {
-        L2CanonicalTransaction memory transaction = _serializeL2Transaction(_priorityOpParams);
-
+    function _validateTx(WritePriorityOpParams memory _priorityOpParams) internal returns (
+        L2CanonicalTransaction memory transaction,
+        bytes32 canonicalTxHash
+    ) {
+        transaction = _serializeL2Transaction(_priorityOpParams);
         bytes memory transactionEncoding = abi.encode(transaction);
-
         TransactionValidator.validateL1ToL2Transaction(
             transaction,
             transactionEncoding,
             s.priorityTxMaxGasLimit,
             s.feeParams.priorityTxMaxPubdata
         );
-
         canonicalTxHash = keccak256(transactionEncoding);
+    }
 
+    function _relayPriorityOp(
+        L2CanonicalTransaction memory _transaction,
+        bytes[] memory _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint256 _expirationTimestamp
+    ) internal {
+        bytes memory dataToRelay = abi.encodeCall(
+            this.freeAcceptTx,
+            (_transaction, _factoryDeps, _canonicalTxHash, uint64(_expirationTimestamp))
+        );
+
+        IBridgehub(s.bridgehub).relayTxThroughBH(
+            s.syncLayerChainId,
+            s.chainId,
+            dataToRelay
+        );        
+    }
+
+    /// @notice Stores a transaction record in storage & send event about that
+    function _writePriorityOp(
+        L2CanonicalTransaction memory _transaction,
+        bytes[] memory _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) internal {
         s.priorityQueue.pushBack(
             PriorityOperation({
-                canonicalTxHash: canonicalTxHash,
-                expirationTimestamp: _priorityOpParams.expirationTimestamp,
+                canonicalTxHash: _canonicalTxHash,
+                // FIXME: safe downcast
+                expirationTimestamp: _expirationTimestamp,
                 layer2Tip: uint192(0) // TODO: Restore after fee modeling will be stable. (SMA-1230)
             })
         );
@@ -348,11 +480,11 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters
         emit NewPriorityRequest(
-            _priorityOpParams.txId,
-            canonicalTxHash,
-            _priorityOpParams.expirationTimestamp,
-            transaction,
-            _priorityOpParams.request.factoryDeps
+            _transaction.nonce,
+            _canonicalTxHash,
+            _expirationTimestamp,
+            _transaction,
+            _factoryDeps
         );
     }
 

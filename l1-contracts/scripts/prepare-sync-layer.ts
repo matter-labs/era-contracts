@@ -110,11 +110,11 @@ async function main() {
 
       await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
 
-      // FIXME: this wont be needed once we fully integrate the sync layer.
-      await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
-      await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
-      await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });
-      await deployer.setParametersSharedBridge();
+      // // FIXME: this wont be needed once we fully integrate the sync layer.
+      // await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
+      // await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
+      // await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });
+      // await deployer.setParametersSharedBridge();
     });
 
   program
@@ -392,12 +392,14 @@ async function main() {
 
 async function registerSTMOnL1(deployer: Deployer) {
   const stmOnSyncLayer = getAddressFromEnv("SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR");
+  const bridgehubOnSyncLayer = getAddressFromEnv("SYNC_LAYER_BRIDGEHUB_PROXY_ADDR");
   const chainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
 
   console.log(`STM on SyncLayer: ${stmOnSyncLayer}`);
   console.log(`SyncLayer chain Id: ${chainId}`);
 
   const l1STM = deployer.stateTransitionManagerContract(deployer.deployWallet);
+  const l1Bridgehub = deployer.bridgehubContract(deployer.deployWallet);
   console.log(deployer.addresses.StateTransition.StateTransitionProxy);
   // this script only works when owner is the deployer
   console.log(`Registering SyncLayer chain id on the STM`);
@@ -413,6 +415,12 @@ async function registerSTMOnL1(deployer: Deployer) {
     data: l1STM.interface.encodeFunctionData("registerCounterpart", [chainId, stmOnSyncLayer]),
     value: 0,
   });
+
+  console.log(`Registering Bridgehub counter part on the SyncLayer`);
+  await (
+    await deployer.bridgehubContract(deployer.deployWallet).registerCounterpart(chainId, bridgehubOnSyncLayer)
+  ).wait();
+  
   console.log(`SyncLayer registration completed`);
 }
 
