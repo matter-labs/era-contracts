@@ -278,13 +278,26 @@ library Utils {
     }
 
     /**
-     * @dev Read hardhat bytecodes
+     * @dev Read forge bytecode from compiled artifacts
      */
-    function readHardhatBytecode(string memory artifactPath) public view returns (bytes memory) {
+    function readForgeBytecode(
+        string memory artifactPath,
+        string memory contractPath
+    ) public view returns (bytes memory) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, artifactPath);
         string memory json = vm.readFile(path);
-        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode");
+
+        // Parse contract name from `contractPath`
+        string[] memory parts = vm.split(contractPath, "/");
+        string memory contractNameWithExtension = parts[parts.length - 1];
+        string memory contractName = vm.split(contractNameWithExtension, ".")[0];
+
+        bytes memory bytecode = vm.parseJsonBytes(
+            json,
+            // solhint-disable-next-line func-named-parameters
+            string.concat("$.contracts.['", contractPath, "'].", contractName, ".evm.bytecode.object")
+        );
         return bytecode;
     }
 

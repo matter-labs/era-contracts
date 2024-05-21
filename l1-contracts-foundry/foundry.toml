@@ -12,9 +12,9 @@ allow_paths = ["../l1-contracts/contracts", "../l2-contracts/contracts"]
 fs_permissions = [
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
     { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed" },
-    { access = "read", path = "../l2-contracts/artifacts-zk/" },
     { access = "read", path = "./script-config" },
     { access = "read-write", path = "./script-out" },
-    { access = "read", path = "./out" }
+    { access = "read", path = "./out" },
+    { access = "read", path = "../l2-contracts/zkout" }
 ]
 evm_version = "cancun"
