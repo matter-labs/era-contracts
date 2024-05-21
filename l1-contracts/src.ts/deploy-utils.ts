@@ -98,8 +98,6 @@ export interface DeployedAddresses {
   Bridgehub: {
     BridgehubProxy: string;
     BridgehubImplementation: string;
-    STMDeploymentTrackerImplementation: string;
-    STMDeploymentTrackerProxy: string;
   };
   StateTransition: {
     StateTransitionProxy: string;
@@ -139,9 +137,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
   return {
     Bridgehub: {
       BridgehubProxy: getAddressFromEnv("CONTRACTS_BRIDGEHUB_PROXY_ADDR"),
-      BridgehubImplementation: getAddressFromEnv("CONTRACTS_BRIDGEHUB_IMPL_ADDR"),
-      STMDeploymentTrackerImplementation: getAddressFromEnv("CONTRACTS_STM_DEPLOYMENT_TRACKER_IMPL_ADDR"),
-      STMDeploymentTrackerProxy: getAddressFromEnv("CONTRACTS_STM_DEPLOYMENT_TRACKER_PROXY_ADDR"),
+      BridgehubImplementation: getAddressFromEnv("CONTRACTS_BRIDGEHUB_IMPL_ADDR")
     },
     StateTransition: {
       StateTransitionProxy: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_PROXY_ADDR"),

@@ -1,12 +1,10 @@
 import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
-import "@matterlabs/hardhat-zksync-ethers";
 
-import type { BigNumberish, providers, Signer, Wallet, Contract, Overrides } from "ethers";
+import type { BigNumberish, providers, Signer, Wallet, Contract } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
 import { Wallet as ZkWallet } from "zksync-ethers";
-import { utils as zkUtils, ContractFactory as ZkContractFactory } from "zksync-ethers";
 
 import type { DeployedAddresses } from "./deploy-utils";
 import {
@@ -633,24 +631,6 @@ export class Deployer {
     if (this.verbose) {
       console.log("Native token vault set in shared bridge");
     }
-  }
-
-  public async deploySTMDeploymentTrackerImplementation(
-    create2Salt: string,
-    ethTxOptions: ethers.providers.TransactionRequest
-  ) {
-    const contractAddress = await this.deployViaCreate2(
-      "STMDeploymentTracker",
-      [this.addresses.Bridgehub.BridgehubProxy, this.addresses.Bridges.SharedBridgeProxy],
-      create2Salt,
-      ethTxOptions
-    );
-
-    if (this.verbose) {
-      console.log(`CONTRACTS_STM_DEPLOYMENT_TRACKER_IMPL_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.Bridgehub.STMDeploymentTrackerImplementation = contractAddress;
   }
 
   public async sharedBridgeSetEraPostUpgradeFirstBatch(ethTxOptions: ethers.providers.TransactionRequest) {
