@@ -234,6 +234,11 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         );
     }
 
+    // function freeTxRelay(WritePriorityOpParams memory _priorityOpParams) external {
+    //     // TODO: adequate access rights
+    //     _writePriorityOp(_priorityOpParams);
+    // }
+
     function _requestL2TransactionSender(
         BridgehubL2TransactionRequest memory _request
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {

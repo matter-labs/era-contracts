@@ -2,7 +2,10 @@
 
 pragma solidity 0.8.24;
 
+import {HyperchainCommitment} from "../../common/Config.sol";
+
 import {IZkSyncHyperchainBase} from "../chain-interfaces/IZkSyncHyperchainBase.sol";
+import {L2CanonicalTransaction, TxStatus} from "../../common/Messaging.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
@@ -56,6 +59,22 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @param _diamondCut The diamond cut parameters to be executed
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
+    function finalizeMigration(HyperchainCommitment calldata _hyperchainCommitment) external;
+    function startMigrationToSyncLayer(
+        uint256 _syncLayerChainId,
+        address _stmCounterPart,
+        address _newSyncLayerAdmin,
+        bytes calldata _diamondCut
+    ) external returns (bytes memory migrationCalldata);
+
+    function recoverFromFailedMigrationToSyncLayer(
+        uint256 _syncLayerChainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external;
+
     /// @notice Instantly pause the functionality of all freezable facets & their selectors
     /// @dev Only the governance mechanism may freeze Diamond Proxy
     function freezeDiamond() external;
@@ -63,6 +82,10 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice Unpause the functionality of all freezable facets & their selectors
     /// @dev Both the admin and the STM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
+
+    function setChainIdUpgrade(address _genesisUpgrade) external;
+
+    function storeMigrationHash(bytes32 _migrationHash) external;
 
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
@@ -100,9 +123,19 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
 
+    /// TODO: maybe include some params
+    event MigrationComplete();
+
     /// @notice Emitted when the contract is frozen.
     event Freeze();
 
     /// @notice Emitted when the contract is unfrozen.
     event Unfreeze();
+
+    /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
+    event SetChainIdUpgrade(
+        address indexed _hyperchain,
+        L2CanonicalTransaction _l2Transaction,
+        uint256 indexed _protocolVersion
+    );
 }

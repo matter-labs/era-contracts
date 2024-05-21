@@ -43,27 +43,42 @@ import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory"
 import type { FacetCut } from "./diamondCut";
 import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
 
-import { ERC20Factory } from "../typechain";
+import { ERC20Factory, StateTransitionManagerFactory } from "../typechain";
+
+import { Wallet as ZkWallet } from "zksync-ethers";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
 
 export interface DeployerConfig {
-  deployWallet: Wallet;
+  deployWallet: Wallet | ZkWallet;
   addresses?: DeployedAddresses;
   ownerAddress?: string;
   verbose?: boolean;
   bootloaderBytecodeHash?: string;
   defaultAccountBytecodeHash?: string;
+  deployedLogPrefix?: string;
 }
+
+export interface Operation {
+  calls: { target: string; value: BigNumberish; data: string }[];
+  predecessor: string;
+  salt: string;
+}
+
+export type OperationOrString = Operation | string;
 
 export class Deployer {
   public addresses: DeployedAddresses;
-  public deployWallet: Wallet;
+  public deployWallet: Wallet | ZkWallet;
   public verbose: boolean;
   public chainId: number;
   public ownerAddress: string;
-  public zkMode: boolean;
+  public deployedLogPrefix: string;
+
+  public isZkMode(): boolean {
+    return this.deployWallet instanceof ZkWallet;
+  }
 
   constructor(config: DeployerConfig) {
     this.deployWallet = config.deployWallet;
@@ -77,9 +92,7 @@ export class Deployer {
       : hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
     this.chainId = parseInt(process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID!);
-
-    // FIXME: do it generically
-    this.zkMode = process.env.ETH_CLIENT_CHAIN_ID === "270";
+    this.deployedLogPrefix = config.deployedLogPrefix ?? "CONTRACTS";
   }
 
   public async initialZkSyncHyperchainDiamondCut(extraFacets?: FacetCut[]) {
@@ -122,6 +135,8 @@ export class Deployer {
         baseToken: "0x0000000000000000000000000000000000004234",
         baseTokenBridge: "0x0000000000000000000000000000000000004234",
         storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
+        // The exact value is not important as it will be overriden by the STM
+        syncLayerState: 0,
         verifier: this.addresses.StateTransition.Verifier,
         verifierParams,
         l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
@@ -135,12 +150,12 @@ export class Deployer {
     return diamondCut(
       facetCuts,
       this.addresses.StateTransition.DiamondInit,
-      "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2)
+      "0x" + diamondInitCalldata.slice(2 + (4 + 10 * 32) * 2)
     );
   }
 
   public async updateCreate2FactoryZkMode() {
-    if (!this.zkMode) {
+    if (!this.isZkMode()) {
       throw new Error("`updateCreate2FactoryZkMode` should be only called in Zk mode");
     }
 
@@ -154,7 +169,7 @@ export class Deployer {
       console.log("Deploying Create2 factory");
     }
 
-    if (this.zkMode) {
+    if (this.isZkMode()) {
       throw new Error("Create2Factory is built into zkSync and should not be deployed separately");
     }
 
@@ -182,9 +197,9 @@ export class Deployer {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     libraries?: any
   ) {
-    if (this.zkMode) {
+    if (this.isZkMode()) {
       const result = await deployViaCreate2Zk(
-        this.deployWallet,
+        this.deployWallet as ZkWallet,
         contractName,
         args,
         create2Salt,
@@ -215,7 +230,7 @@ export class Deployer {
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest
   ): Promise<string> {
-    if (this.zkMode) {
+    if (this.isZkMode()) {
       throw new Error("`deployBytecodeViaCreate2` not supported in zkMode");
     }
 
@@ -262,17 +277,17 @@ export class Deployer {
 
   public async deployTransparentProxyAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     if (this.verbose) {
-      console.log("Deploying Proxy Admin factory");
+      console.log("Deploying Proxy Admin");
     }
-
+    // Note: we cannot deploy using Create2, as the owner of the ProxyAdmin is msg.sender
     let proxyAdmin;
     let rec;
 
-    if (this.zkMode) {
+    if (this.isZkMode()) {
       // @ts-ignore
       // TODO try to make it work with zksync ethers
       const artifact = hardhat.artifacts.readArtifactSync("ProxyAdmin");
-      const zkWal = ethersWalletToZkWallet(this.deployWallet);
+      const zkWal = this.deployWallet as ZkWallet;
       const contractFactory = new ZkContractFactory(artifact.abi, artifact.bytecode, zkWal);
       proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
       rec = await proxyAdmin.deployTransaction.wait();
@@ -287,7 +302,9 @@ export class Deployer {
 
     if (this.verbose) {
       console.log(
-        `Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}, tx hash ${rec.transactionHash}, expected address: ${proxyAdmin.address}`
+        `Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}, tx hash ${rec.transactionHash}, expected address: ${
+          proxyAdmin.address
+        }`
       );
       console.log(`CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR=${proxyAdmin.address}`);
     }
@@ -333,7 +350,10 @@ export class Deployer {
       "StateTransitionManager",
       [this.addresses.Bridgehub.BridgehubProxy, getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_HYPERCHAINS")],
       create2Salt,
-      ethTxOptions
+      {
+        ...ethTxOptions,
+        gasLimit: 20_000_000,
+      }
     );
 
     if (this.verbose) {
@@ -352,6 +372,7 @@ export class Deployer {
     const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
     const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
     const diamondCut = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
+    console.log("correct initial diamond cut", diamondCut);
     const protocolVersion = getNumberFromEnv("CONTRACTS_GENESIS_PROTOCOL_VERSION");
 
     const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
@@ -490,13 +511,25 @@ export class Deployer {
   }
 
   /// this should be only use for local testing
-  public async executeUpgrade(targetAddress: string, value: BigNumberish, callData: string) {
+  public async executeUpgrade(targetAddress: string, value: BigNumberish, callData: string, printFileName?: string) {
     const governance = IGovernanceFactory.connect(this.addresses.Governance, this.deployWallet);
     const operation = {
       calls: [{ target: targetAddress, value: value, data: callData }],
       predecessor: ethers.constants.HashZero,
       salt: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
     };
+    if (printFileName) {
+      console.log("Operation:", operation);
+      console.log(
+        "Schedule operation: ",
+        governance.interface.encodeFunctionData("scheduleTransparent", [operation, 0])
+      );
+      console.log(
+        `Execute operation value: ${value}, calldata`,
+        governance.interface.encodeFunctionData("execute", [operation])
+      );
+      return;
+    }
     const scheduleTx = await governance.scheduleTransparent(operation, 0);
     await scheduleTx.wait();
     if (this.verbose) {
@@ -678,11 +711,13 @@ export class Deployer {
   public async registerStateTransitionManager() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
-    const tx = await bridgehub.addStateTransitionManager(this.addresses.StateTransition.StateTransitionProxy);
+    if (!(await bridgehub.stateTransitionManagerIsRegistered(this.addresses.StateTransition.StateTransitionProxy))) {
+      const tx = await bridgehub.addStateTransitionManager(this.addresses.StateTransition.StateTransitionProxy);
 
-    const receipt = await tx.wait();
-    if (this.verbose) {
-      console.log(`StateTransition System registered, gas used: ${receipt.gasUsed.toString()}`);
+      const receipt = await tx.wait();
+      if (this.verbose) {
+        console.log(`StateTransition System registered, gas used: ${receipt.gasUsed.toString()}`);
+      }
     }
   }
 
@@ -694,7 +729,7 @@ export class Deployer {
     nonce?,
     predefinedChainId?: string
   ) {
-    const txOptions = this.zkMode ? {} : { gasLimit: 10_000_000 };
+    const txOptions = this.isZkMode() ? {} : { gasLimit: 10_000_000 };
 
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
@@ -848,7 +883,7 @@ export class Deployer {
   }
 
   public async updateBlobVersionedHashRetrieverZkMode() {
-    if (!this.zkMode) {
+    if (!this.isZkMode()) {
       throw new Error("`updateBlobVersionedHashRetrieverZk` should be only called when deploying on zkSync network");
     }
 
@@ -893,10 +928,7 @@ export class Deployer {
   }
 
   public stateTransitionManagerContract(signerOrProvider: Signer | providers.Provider) {
-    return IStateTransitionManagerFactory.connect(
-      this.addresses.StateTransition.StateTransitionProxy,
-      signerOrProvider
-    );
+    return StateTransitionManagerFactory.connect(this.addresses.StateTransition.StateTransitionProxy, signerOrProvider);
   }
 
   public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {

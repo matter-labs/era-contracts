@@ -112,6 +112,25 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         sharedBridge = IL1SharedBridge(_sharedBridge);
     }
 
+    /// FIXME: this method should not be present in the production code.
+    /// just used in code to register chain successfully until full migration is complete.
+    function unsafeRegisterChain(uint256 _chainId, address _stateTransitionManager, address _baseToken) external {
+        require(_chainId != 0, "Bridgehub: chainId cannot be 0");
+        require(_chainId <= type(uint48).max, "Bridgehub: chainId too large");
+
+        require(
+            stateTransitionManagerIsRegistered[_stateTransitionManager],
+            "Bridgehub: state transition not registered"
+        );
+        require(tokenIsRegistered[_baseToken], "Bridgehub: token not registered");
+        require(address(sharedBridge) != address(0), "Bridgehub: weth bridge not set");
+
+        require(stateTransitionManager[_chainId] == address(0), "Bridgehub: chainId already registered");
+
+        stateTransitionManager[_chainId] = _stateTransitionManager;
+        baseToken[_chainId] = _baseToken;
+    }
+
     /// @notice register new chain
     /// @notice for Eth the baseToken address is 1
     function createNewChain(

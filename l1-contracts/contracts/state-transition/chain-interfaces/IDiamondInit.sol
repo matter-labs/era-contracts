@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IVerifier, VerifierParams} from "./IVerifier.sol";
-import {FeeParams} from "../chain-deps/ZkSyncHyperchainStorage.sol";
+import {FeeParams, SyncLayerState} from "../chain-deps/ZkSyncHyperchainStorage.sol";
 
 /// @param chainId the id of the chain
 /// @param bridgehub the address of the bridgehub contract
@@ -31,6 +31,7 @@ struct InitializeData {
     address baseToken;
     address baseTokenBridge;
     bytes32 storedBatchZero;
+    SyncLayerState syncLayerState;
     IVerifier verifier;
     VerifierParams verifierParams;
     bytes32 l2BootloaderBytecodeHash;

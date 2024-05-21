@@ -12,7 +12,7 @@ import { ethersWalletToZkWallet } from "./utils";
 export const BUILT_IN_ZKSYNC_CREATE2_FACTORY = "0x0000000000000000000000000000000000010000";
 
 export async function deployViaCreate2(
-  deployWallet: ethers.Wallet,
+  deployWallet: ZkWallet,
   contractName: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args: any[],
@@ -24,7 +24,7 @@ export async function deployViaCreate2(
 }
 
 export async function deployBytecodeViaCreate2(
-  deployWallet: ethers.Wallet,
+  deployWallet: ZkWallet,
   contractName: string,
   create2Salt: string,
   ethTxOptions: ethers.providers.TransactionRequest,
@@ -32,8 +32,6 @@ export async function deployBytecodeViaCreate2(
   verbose: boolean = true
 ): Promise<[string, string]> {
   // [address, txHash]
-
-  const zksyncWallet = new ZkWallet(deployWallet.privateKey, new Provider(web3Url()));
 
   const log = (msg: string) => {
     if (verbose) {
@@ -43,7 +41,7 @@ export async function deployBytecodeViaCreate2(
   log(`Deploying ${contractName}`);
 
   // @ts-ignore
-  const zkDeployer = ZkDeployer.fromEthWallet(hardhat, deployWallet);
+  const zkDeployer = new ZkDeployer(hardhat, deployWallet);
   const artifact = await zkDeployer.loadArtifact(contractName);
   const factoryDeps = await zkDeployer.extractFactoryDeps(artifact);
 
@@ -52,10 +50,10 @@ export async function deployBytecodeViaCreate2(
   const encodedArgs = iface.encodeDeploy(args);
 
   // The CREATE2Factory has the same interface as the contract deployer
-  const create2Factory = IL2ContractDeployerFactory.connect(BUILT_IN_ZKSYNC_CREATE2_FACTORY, zksyncWallet);
+  const create2Factory = IL2ContractDeployerFactory.connect(BUILT_IN_ZKSYNC_CREATE2_FACTORY, deployWallet);
   const expectedAddress = zkUtils.create2Address(create2Factory.address, bytecodeHash, create2Salt, encodedArgs);
 
-  const deployedBytecodeBefore = await zksyncWallet.provider.getCode(expectedAddress);
+  const deployedBytecodeBefore = await deployWallet.provider.getCode(expectedAddress);
   if (ethers.utils.hexDataLength(deployedBytecodeBefore) > 0) {
     log(`Contract ${contractName} already deployed`);
     return [expectedAddress, ethers.constants.HashZero];
@@ -63,7 +61,7 @@ export async function deployBytecodeViaCreate2(
 
   const encodedTx = create2Factory.interface.encodeFunctionData("create2", [create2Salt, bytecodeHash, encodedArgs]);
 
-  const tx = await zksyncWallet.sendTransaction({
+  const tx = await deployWallet.sendTransaction({
     data: encodedTx,
     to: create2Factory.address,
     ...ethTxOptions,
@@ -76,7 +74,7 @@ export async function deployBytecodeViaCreate2(
   const gasUsed = receipt.gasUsed;
   log(`${contractName} deployed, gasUsed: ${gasUsed.toString()}`);
 
-  const deployedBytecodeAfter = await zksyncWallet.provider.getCode(expectedAddress);
+  const deployedBytecodeAfter = await deployWallet.provider.getCode(expectedAddress);
   if (ethers.utils.hexDataLength(deployedBytecodeAfter) == 0) {
     throw new Error(`Failed to deploy ${contractName} bytecode via create2 factory`);
   }

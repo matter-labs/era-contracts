@@ -25,6 +25,8 @@ export async function deployViaCreate2(
   });
   const bytecode = contractFactory.getDeployTransaction(...args, ethTxOptions).data;
 
+  console.log("hexed bytecode length: ", bytecode.length);
+
   return await deployBytecodeViaCreate2(
     deployWallet,
     contractName,
@@ -71,7 +73,9 @@ export async function deployBytecodeViaCreate2(
   const receipt = await tx.wait();
 
   const gasUsed = receipt.gasUsed;
-  log(`${contractName} deployed, gasUsed: ${gasUsed.toString()}`);
+  log(
+    `${contractName} deployed, gasUsed: ${gasUsed.toString()}, tx hash: ${tx.hash}, expected address: ${expectedAddress}`
+  );
 
   const deployedBytecodeAfter = await deployWallet.provider.getCode(expectedAddress);
   if (ethers.utils.hexDataLength(deployedBytecodeAfter) == 0) {
