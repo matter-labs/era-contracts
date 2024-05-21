@@ -14,13 +14,6 @@ import {
   deployBytecodeViaCreate2 as deployBytecodeViaCreate2EVM,
   deployViaCreate2 as deployViaCreate2EVM,
 } from "./deploy-utils";
-import {
-  deployBytecodeViaCreate2 as deployBytecodeViaCreate2Zk,
-  deployViaCreate2 as deployViaCreate2Zk,
-  BUILT_IN_ZKSYNC_CREATE2_FACTORY,
-  deployBytecodeViaCreate2OnPath,
-  L2_SHARED_BRIDGE_PATH,
-} from "./deploy-utils-zk";
 import { readBatchBootloaderBytecode, readSystemContractsBytecode, SYSTEM_CONFIG } from "../scripts/utils";
 import { getTokens } from "./deploy-token";
 import {
@@ -31,7 +24,6 @@ import {
   PubdataPricingMode,
   hashL2Bytecode,
   DIAMOND_CUT_DATA_ABI_STRING,
-  ethersWalletToZkWallet,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
 } from "./utils";
 import type { FacetCut } from "./diamondCut";
@@ -48,7 +40,6 @@ import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IL1SharedBridgeFactory } from "../typechain/IL1SharedBridgeFactory";
 import { L1SharedBridgeFactory } from "../typechain/L1SharedBridgeFactory";
 import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
-import { ISTMDeploymentTrackerFactory } from "../typechain/ISTMDeploymentTrackerFactory";
 import { IZkSyncHyperchainFactory } from "../typechain/IZkSyncHyperchainFactory";
 
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
@@ -81,10 +72,6 @@ export class Deployer {
   public chainId: number;
   public ownerAddress: string;
   public deployedLogPrefix: string;
-
-  public isZkMode(): boolean {
-    return this.deployWallet instanceof ZkWallet;
-  }
 
   constructor(config: DeployerConfig) {
     this.deployWallet = config.deployWallet;
@@ -142,7 +129,6 @@ export class Deployer {
         baseTokenBridge: "0x0000000000000000000000000000000000004234",
         storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
         // The exact value is not important as it will be overridden by the STM
-        // syncLayerState: 0,
         verifier: this.addresses.StateTransition.Verifier,
         verifierParams,
         l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
@@ -160,23 +146,9 @@ export class Deployer {
     );
   }
 
-  public async updateCreate2FactoryZkMode() {
-    if (!this.isZkMode()) {
-      throw new Error("`updateCreate2FactoryZkMode` should be only called in Zk mode");
-    }
-
-    console.log("Create2Factory is built into zkSync and so won't be deployed separately");
-    console.log(`CONTRACTS_CREATE2_FACTORY_ADDR=${BUILT_IN_ZKSYNC_CREATE2_FACTORY}`);
-    this.addresses.Create2Factory = BUILT_IN_ZKSYNC_CREATE2_FACTORY;
-  }
-
   public async deployCreate2Factory(ethTxOptions?: ethers.providers.TransactionRequest) {
     if (this.verbose) {
       console.log("Deploying Create2 factory");
-    }
-
-    if (this.isZkMode()) {
-      throw new Error("Create2Factory is built into zkSync and should not be deployed separately");
     }
 
     const contractFactory = await hardhat.ethers.getContractFactory("SingletonFactory", {
@@ -203,18 +175,6 @@ export class Deployer {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     libraries?: any
   ) {
-    if (this.isZkMode()) {
-      const result = await deployViaCreate2Zk(
-        this.deployWallet as ZkWallet,
-        contractName,
-        args,
-        create2Salt,
-        ethTxOptions,
-        this.verbose
-      );
-      return result[0];
-    }
-
     // For L1 deployments we try to use constant gas limit
     ethTxOptions.gasLimit ??= 10_000_000;
     const result = await deployViaCreate2EVM(
@@ -236,10 +196,6 @@ export class Deployer {
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest
   ): Promise<string> {
-    if (this.isZkMode()) {
-      throw new Error("`deployBytecodeViaCreate2` not supported in zkMode");
-    }
-
     ethTxOptions.gasLimit ??= 10_000_000;
 
     const result = await deployBytecodeViaCreate2EVM(
@@ -272,8 +228,7 @@ export class Deployer {
   }
 
   public async deployBridgehubImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const l1ChainId = await this.deployWallet.getChainId();
-    const contractAddress = await this.deployViaCreate2("Bridgehub", [l1ChainId], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2("Bridgehub", [], create2Salt, ethTxOptions);
 
     if (this.verbose) {
       console.log(`CONTRACTS_BRIDGEHUB_IMPL_ADDR=${contractAddress}`);
@@ -291,22 +246,12 @@ export class Deployer {
     let proxyAdmin;
     let rec;
 
-    if (this.isZkMode()) {
-      // @ts-ignore
-      // TODO try to make it work with zksync ethers
-      const artifact = hardhat.artifacts.readArtifactSync("ProxyAdmin");
-      const zkWal = this.deployWallet as ZkWallet;
-      const contractFactory = new ZkContractFactory(artifact.abi, artifact.bytecode, zkWal);
-      proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
-      rec = await proxyAdmin.deployTransaction.wait();
-    } else {
-      ethTxOptions.gasLimit ??= 10_000_000;
-      const contractFactory = await hardhat.ethers.getContractFactory("ProxyAdmin", {
-        signer: this.deployWallet,
-      });
-      proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
-      rec = await proxyAdmin.deployTransaction.wait();
-    }
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractFactory = await hardhat.ethers.getContractFactory("ProxyAdmin", {
+      signer: this.deployWallet,
+    });
+    proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
+    rec = await proxyAdmin.deployTransaction.wait();
 
     if (this.verbose) {
       console.log(
@@ -623,31 +568,6 @@ export class Deployer {
     this.addresses.Bridges.SharedBridgeImplementation = contractAddress;
   }
 
-  public async deployL2SharedBridgeImplementation(
-    create2Salt: string,
-    ethTxOptions: ethers.providers.TransactionRequest
-  ) {
-    const tokens = getTokens();
-    const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
-    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
-    const eraDiamondProxy = getAddressFromEnv("CONTRACTS_ERA_DIAMOND_PROXY_ADDR");
-    const contractAddress = await deployBytecodeViaCreate2OnPath(
-      this.deployWallet as ZkWallet,
-      "L1SharedBridge",
-      L2_SHARED_BRIDGE_PATH,
-      create2Salt,
-      ethTxOptions,
-      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, eraChainId, eraDiamondProxy]
-    );
-
-    if (this.verbose) {
-      console.log(`With era chain id ${eraChainId} and era diamond proxy ${eraDiamondProxy}`);
-      console.log(`CONTRACTS_L1_SHARED_BRIDGE_IMPL_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.Bridges.SharedBridgeImplementation = contractAddress[0];
-  }
-
   public async deploySharedBridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const initCalldata = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi).encodeFunctionData(
       "initialize",
@@ -731,42 +651,6 @@ export class Deployer {
     }
 
     this.addresses.Bridgehub.STMDeploymentTrackerImplementation = contractAddress;
-  }
-
-  public async deploySTMDeploymentTrackerProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const initCalldata = new Interface(
-      hardhat.artifacts.readArtifactSync("STMDeploymentTracker").abi
-    ).encodeFunctionData("initialize", [this.addresses.Governance]);
-    const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
-      [this.addresses.Bridgehub.STMDeploymentTrackerImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
-      create2Salt,
-      ethTxOptions
-    );
-
-    if (this.verbose) {
-      console.log(`CONTRACTS_STM_DEPLOYMENT_TRACKER_PROXY_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.Bridgehub.STMDeploymentTrackerProxy = contractAddress;
-
-    const bridgehub = this.bridgehubContract(this.deployWallet);
-    const data0 = bridgehub.interface.encodeFunctionData("setSTMDeployer", [
-      this.addresses.Bridgehub.STMDeploymentTrackerProxy,
-    ]);
-    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, data0);
-    if (this.verbose) {
-      console.log("STM DT registered in Bridgehub");
-    }
-
-    const stmDeploymentTracker = this.stmDeploymentTracker(this.deployWallet);
-    const data1 = stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL1", [
-      this.addresses.StateTransition.StateTransitionProxy,
-    ]);
-    const receipt = await this.executeUpgrade(this.addresses.Bridgehub.STMDeploymentTrackerProxy, 0, data1);
-    if (this.verbose) {
-      console.log("STM asset registered in L1 Shared Bridge via STM Deployment Tracker");
-    }
   }
 
   public async sharedBridgeSetEraPostUpgradeFirstBatch(ethTxOptions: ethers.providers.TransactionRequest) {
@@ -898,87 +782,6 @@ export class Deployer {
     }
   }
 
-  public async registerSyncLayer() {
-    const stm = this.stateTransitionManagerContract(this.deployWallet);
-    const calldata = await stm.interface.encodeFunctionData("registerSyncLayer", [this.chainId, true]);
-    await this.executeUpgrade(this.addresses.StateTransition.StateTransitionProxy, 0, calldata);
-    if (this.verbose) {
-      console.log(`SyncLayer registered`);
-    }
-  }
-
-  public async moveChainToSyncLayer(syncLayerChainId: string, gasPrice: BigNumberish, useGovernance: boolean = false) {
-    const bridgehub = this.bridgehubContract(this.deployWallet);
-    // Just some large gas limit that should always be enough
-    const l2GasLimit = ethers.BigNumber.from(72_000_000);
-    const expectedCost = await bridgehub.l2TransactionBaseCost(
-      syncLayerChainId,
-      gasPrice,
-      l2GasLimit,
-      REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-    );
-    const chainData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [ADDRESS_ONE, "0x"]); // todo
-    const bridgehubData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [this.chainId, chainData]);
-    const diamondCutData = await this.initialZkSyncHyperchainDiamondCut();
-    console.log("Cut data during migration, ", diamondCutData);
-    const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
-
-    // console.log("bridgehubData", bridgehubData)
-    // console.log("this.addresses.ChainAssetInfo", this.addresses.ChainAssetInfo)
-    const sharedBridgeData = ethers.utils.defaultAbiCoder.encode(
-      ["bytes32", "bytes"],
-
-      [await bridgehub.stmAssetInfoFromChainId(this.chainId), bridgehubData]
-    );
-    const receipt = await this.executeDirectOrGovernance(
-      useGovernance,
-      bridgehub,
-      "requestL2TransactionTwoBridges",
-      [
-        {
-          chainId: syncLayerChainId,
-          mintValue: expectedCost,
-          l2Value: 0,
-          l2GasLimit: l2GasLimit,
-          l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-          refundRecipient: await this.deployWallet.getAddress(),
-          secondBridgeAddress: this.addresses.Bridges.SharedBridgeProxy,
-          secondBridgeValue: 0,
-          secondBridgeCalldata: sharedBridgeData,
-        },
-      ],
-      expectedCost
-    );
-    return receipt;
-  }
-
-  public async finishMoveChainToL1(synclayerChainId: number) {
-    const sharedBridge = this.defaultSharedBridge(this.deployWallet);
-    // const baseTokenAmount = ethers.utils.parseEther("1");
-    // const chainData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [ADDRESS_ONE, "0x"]); // todo
-    // const bridgehubData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [this.chainId, chainData]);
-    // console.log("bridgehubData", bridgehubData)
-    // console.log("this.addresses.ChainAssetInfo", this.addresses.ChainAssetInfo)
-    // const sharedBridgeData = ethers.utils.defaultAbiCoder.encode(
-    //   ["bytes32", "bytes"],
-
-    //   [await bridgehub.stmAssetInfoFromChainId(this.chainId), bridgehubData]
-    // );
-    const l2BatchNumber = 1;
-    const l2MsgIndex = 1;
-    const l2TxNumberInBatch = 1;
-    const message = ethers.utils.defaultAbiCoder.encode(["bytes32", "bytes"], []);
-    const merkleProof = ["0x00"];
-    const receipt = await sharedBridge.finalizeWithdrawal(
-      synclayerChainId,
-      l2BatchNumber,
-      l2MsgIndex,
-      l2TxNumberInBatch,
-      message,
-      merkleProof
-    );
-  }
-
   public async registerHyperchain(
     baseTokenAddress: string,
     validiumMode: boolean,
@@ -988,7 +791,7 @@ export class Deployer {
     predefinedChainId?: string,
     useGovernance: boolean = false
   ) {
-    const txOptions = this.isZkMode() ? {} : { gasLimit: 10_000_000 };
+    const txOptions = { gasLimit: 10_000_000 };
 
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
@@ -1119,16 +922,6 @@ export class Deployer {
     await this.deployNativeTokenVaultImplementation(create2Salt, { gasPrice, nonce: nonce + 2 });
     await this.deployNativeTokenVaultProxy(create2Salt, { gasPrice });
     await this.registerSharedBridge({ gasPrice });
-    await this.deploySTMDeploymentTrackerImplementation(create2Salt, { gasPrice });
-    await this.deploySTMDeploymentTrackerProxy(create2Salt, { gasPrice });
-  }
-
-  public async deployL2SharedBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
-    nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
-
-    await this.deployL2SharedBridgeImplementation(create2Salt, { gasPrice, nonce: nonce });
-    await this.deploySharedBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
-    await this.registerSharedBridge({ gasPrice });
   }
 
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -1165,18 +958,6 @@ export class Deployer {
     if (this.verbose) {
       console.log(`CONTRACTS_L1_MULTICALL3_ADDR=${contractAddress}`);
     }
-  }
-
-  public async updateBlobVersionedHashRetrieverZkMode() {
-    if (!this.isZkMode()) {
-      throw new Error("`updateBlobVersionedHashRetrieverZk` should be only called when deploying on zkSync network");
-    }
-
-    console.log("BlobVersionedHashRetriever is not needed within zkSync network and won't be deployed");
-
-    // 0 is not allowed, we need to some random non-zero value. Let it be 0x1000000000000000000000000000000000000001
-    console.log(`CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR=0x1000000000000000000000000000000000000001`);
-    this.addresses.BlobVersionedHashRetriever = "0x1000000000000000000000000000000000000001";
   }
 
   public async deployBlobVersionedHashRetriever(
@@ -1234,10 +1015,6 @@ export class Deployer {
 
   public nativeTokenVault(signerOrProvider: Signer | providers.Provider) {
     return IL1NativeTokenVaultFactory.connect(this.addresses.Bridges.NativeTokenVaultProxy, signerOrProvider);
-  }
-
-  public stmDeploymentTracker(signerOrProvider: Signer | providers.Provider) {
-    return ISTMDeploymentTrackerFactory.connect(this.addresses.Bridgehub.STMDeploymentTrackerProxy, signerOrProvider);
   }
 
   public baseTokenContract(signerOrProvider: Signer | providers.Provider) {

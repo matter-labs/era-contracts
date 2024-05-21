@@ -6,8 +6,6 @@ import type { BytesLike, BigNumberish } from "ethers";
 import { ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
-import { Provider, Wallet as ZkWallet } from "zksync-ethers";
-import { web3Url } from "../scripts/utils";
 
 export const testConfigPath = process.env.ZKSYNC_ENV
   ? path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant")
@@ -175,14 +173,6 @@ export interface L2CanonicalTransaction {
   // Reserved dynamic type for the future use-case. Using it should be avoided,
   // But it is still here, just in case we want to enable some additional functionality.
   reservedDynamic: BytesLike;
-}
-
-export function ethersWalletToZkWallet(wallet: ethers.Wallet): ZkWallet {
-  return new ZkWallet(wallet.privateKey, new Provider(web3Url()));
-}
-
-export function isZKMode(): boolean {
-  return process.env.CONTRACTS_BASE_NETWORK_ZKSYNC === "true";
 }
 
 const LOCAL_NETWORKS = ["localhost", "hardhat", "localhostL2"];

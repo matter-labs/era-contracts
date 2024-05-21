@@ -69,10 +69,6 @@ async function main() {
         verbose: true,
       });
 
-      if (deployer.isZkMode()) {
-        console.log("Deploying on a zkSync network!");
-      }
-
       await initialBridgehubDeployment(deployer, [], gasPrice, cmd.onlyVerifier, create2Salt, nonce);
     });
 

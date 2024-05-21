@@ -219,9 +219,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         );
         IL1SharedBridge(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
+            (IL1SharedBridge(s.baseTokenBridge).nativeTokenVault()).getAssetInfo(ETH_TOKEN_ADDRESS),
             msg.sender,
-            ETH_TOKEN_ADDRESS,
-            msg.value
+            0
         );
     }
 
