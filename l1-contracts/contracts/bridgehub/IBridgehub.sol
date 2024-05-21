@@ -132,11 +132,7 @@ interface IBridgehub {
 
     function setSharedBridge(address _sharedBridge) external;
 
-    function relayTxThroughBH(
-        uint256 _baseDestChainId,
-        uint256 _destChainId,
-        bytes calldata _dataToRelay
-    ) external;
+    function relayTxThroughBH(uint256 _baseDestChainId, uint256 _destChainId, bytes calldata _dataToRelay) external;
 
     function registerCounterpart(uint256 chainid, address _counterpart) external;
 

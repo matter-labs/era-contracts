@@ -128,9 +128,7 @@ interface IMailbox is IZkSyncHyperchainBase {
         uint64 _expirationTimestamp
     ) external;
 
-    function acceptFreeRequestFromBridgehub(
-        BridgehubL2TransactionRequest calldata _request
-    ) external;
+    function acceptFreeRequestFromBridgehub(BridgehubL2TransactionRequest calldata _request) external;
 
     /// @notice New priority request event. Emitted when a request is placed into the priority queue
     /// @param txId Serial number of the priority operation

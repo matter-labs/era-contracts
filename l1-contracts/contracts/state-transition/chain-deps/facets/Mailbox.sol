@@ -18,15 +18,15 @@ import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, ETH_TOKEN_ADDRESS, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 
-import { IBridgehub } from "../../../bridgehub/IBridgehub.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
-import { IStateTransitionManager } from "../../IStateTransitionManager.sol";
+import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 import {IL1SharedBridge} from "../../../bridge/interfaces/IL1SharedBridge.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
-import { SyncLayerState } from "../ZkSyncHyperchainStorage.sol";
+import {SyncLayerState} from "../ZkSyncHyperchainStorage.sol";
 
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -248,17 +248,10 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     ) external {
         // TODO: adequate access rights
 
-        _writePriorityOp(
-            _transaction, 
-            _factoryDeps,
-            _canonicalTxHash,
-            _expirationTimestamp
-        );
+        _writePriorityOp(_transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp);
     }
 
-    function acceptFreeRequestFromBridgehub(
-        BridgehubL2TransactionRequest calldata _request
-    ) external {
+    function acceptFreeRequestFromBridgehub(BridgehubL2TransactionRequest calldata _request) external {
         WritePriorityOpParams memory params = WritePriorityOpParams({
             request: _request,
             txId: s.priorityQueue.getTotalPriorityTxs(),
@@ -267,12 +260,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         });
 
         (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) = _validateTx(params);
-        _writePriorityOp(
-            transaction,
-            params.request.factoryDeps,
-            canonicalTxHash,
-            params.expirationTimestamp
-        );
+        _writePriorityOp(transaction, params.request.factoryDeps, canonicalTxHash, params.expirationTimestamp);
     }
 
     // // TODO: only allow for sync layer
@@ -302,7 +290,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     //         factoryDeps: new bytes[](0),
     //         // Tx is free, no so refund recipient needed
     //         refundRecipient: address(0)
-    //     }); 
+    //     });
 
     //     WritePriorityOpParams memory params = WritePriorityOpParams({
     //         request: request,
@@ -372,32 +360,17 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
         // populate missing fields
         _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
-        
+
         L2CanonicalTransaction memory transaction;
         (transaction, canonicalTxHash) = _validateTx(_params);
 
         if (s.syncLayerState == SyncLayerState.ActiveOnL1) {
-            _writePriorityOp(
-                transaction,
-                _params.request.factoryDeps,
-                canonicalTxHash,
-                _params.expirationTimestamp
-            );
+            _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
         } else if (s.syncLayerState == SyncLayerState.MigratedFromL1) {
             // We also write it anyway
-            _writePriorityOp(
-                transaction,
-                _params.request.factoryDeps,
-                canonicalTxHash,
-                _params.expirationTimestamp
-            );
+            _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
 
-            _relayPriorityOp(
-                transaction,
-                _params.request.factoryDeps,
-                canonicalTxHash,
-                _params.expirationTimestamp
-            );
+            _relayPriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
         } else {
             revert("Can not be called on SL");
         }
@@ -428,10 +401,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         });
     }
 
-    function _validateTx(WritePriorityOpParams memory _priorityOpParams) internal returns (
-        L2CanonicalTransaction memory transaction,
-        bytes32 canonicalTxHash
-    ) {
+    function _validateTx(
+        WritePriorityOpParams memory _priorityOpParams
+    ) internal returns (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) {
         transaction = _serializeL2Transaction(_priorityOpParams);
         bytes memory transactionEncoding = abi.encode(transaction);
         TransactionValidator.validateL1ToL2Transaction(
@@ -454,11 +426,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             (_transaction, _factoryDeps, _canonicalTxHash, uint64(_expirationTimestamp))
         );
 
-        IBridgehub(s.bridgehub).relayTxThroughBH(
-            s.syncLayerChainId,
-            s.chainId,
-            dataToRelay
-        );        
+        IBridgehub(s.bridgehub).relayTxThroughBH(s.syncLayerChainId, s.chainId, dataToRelay);
     }
 
     /// @notice Stores a transaction record in storage & send event about that
@@ -479,13 +447,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters
-        emit NewPriorityRequest(
-            _transaction.nonce,
-            _canonicalTxHash,
-            _expirationTimestamp,
-            _transaction,
-            _factoryDeps
-        );
+        emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, _expirationTimestamp, _transaction, _factoryDeps);
     }
 
     /// @notice Hashes the L2 bytecodes and returns them in the format in which they are processed by the bootloader

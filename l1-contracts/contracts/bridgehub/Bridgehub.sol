@@ -178,10 +178,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// FIXME: this is a temporary method anyway
-    function callTxOnChain(
-        uint256 _chainId,
-        bytes calldata _data
-    ) external {
+    function callTxOnChain(uint256 _chainId, bytes calldata _data) external {
         address chainAddress = getHyperchain(_chainId);
 
         (bool success, bytes memory returndata) = address(chainAddress).call(_data);
@@ -189,18 +186,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(success, "Bridgehub: call failed");
     }
 
-    function relayTxThroughBH(
-        uint256 _baseDestChainId,
-        uint256 _destChainId,
-        bytes calldata _dataToRelay
-    ) external {
+    function relayTxThroughBH(uint256 _baseDestChainId, uint256 _destChainId, bytes calldata _dataToRelay) external {
         address counterpartAddr = trustedCounterparts[_baseDestChainId];
         address slAddress = getHyperchain(_baseDestChainId);
 
-        bytes memory callData = abi.encodeCall(
-            this.callTxOnChain,
-            (_destChainId, _dataToRelay)
-        );
+        bytes memory callData = abi.encodeCall(this.callTxOnChain, (_destChainId, _dataToRelay));
 
         BridgehubL2TransactionRequest memory request = BridgehubL2TransactionRequest({
             // This is a temporary branch, sender does not matte
@@ -216,11 +206,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             factoryDeps: new bytes[](0),
             // Tx is free, no so refund recipient needed
             refundRecipient: address(0)
-        }); 
+        });
 
-        IZkSyncHyperchain(slAddress).acceptFreeRequestFromBridgehub(
-            request
-        );
+        IZkSyncHyperchain(slAddress).acceptFreeRequestFromBridgehub(request);
     }
 
     //// Mailbox forwarder

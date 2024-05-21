@@ -420,7 +420,7 @@ async function registerSTMOnL1(deployer: Deployer) {
   await (
     await deployer.bridgehubContract(deployer.deployWallet).registerCounterpart(chainId, bridgehubOnSyncLayer)
   ).wait();
-  
+
   console.log(`SyncLayer registration completed`);
 }
 
