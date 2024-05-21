@@ -19,7 +19,7 @@ const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_co
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 // Maximum length of the combined length of dependencies
-const MAX_COMBINED_LENGTH = 90000;
+const MAX_COMBINED_LENGTH = 125000;
 
 const DEFAULT_ACCOUNT_CONTRACT_NAME = "DefaultAccount";
 const BOOTLOADER_CONTRACT_NAME = "Bootloader";

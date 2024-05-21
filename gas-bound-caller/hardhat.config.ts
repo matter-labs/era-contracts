@@ -55,16 +55,8 @@ export default {
       ethNetwork: "localhost",
       zksync: true,
     },
-    stage: {
-      url: "https://z2-dev-api.zksync.dev/",
-      ethNetwork: "sepolia",
-      zksync: true,
-    },
-    sepolia: {
-      url: "", // add your sepolia node url
-    },
   },
   paths: {
-    sources: "./contracts-preprocessed",
+    sources: "./contracts",
   },
 };
