@@ -7,14 +7,17 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 
-
 contract MailboxBaseTests is MailboxTest {
+    function setUp() public virtual {
+        init();
+    }
+
     function test_mailboxConstructor() public {
         MailboxFacet m = new MailboxFacet(eraChainId);
         assertEq(m.ERA_CHAIN_ID(), eraChainId);
     }
 
-    // Test the l2TransactionBaseCost function
+
     function test_RevertWhen_badDenominatorInL2TransactionBaseCost() public {
         utilsFacet.util_setbaseTokenGasPriceMultiplierDenominator(0);
 
@@ -45,6 +48,8 @@ contract MailboxBaseTests is MailboxTest {
 
         utilsFacet.util_setFeeParams(feeParams);
 
+        // this was get from running the function, but more reasonable would be to 
+        // have some invariants that the calculation should keep.
         uint256 l2TransactionBaseCost = 250125000000000;
 
         assertEq(
@@ -53,8 +58,6 @@ contract MailboxBaseTests is MailboxTest {
         );
     }
 
-    // currently returns max which is limit
-    // TODO: specify parameters so minrequiredbasetoken would be close to limit
     function test_successful_getL2TransactionBaseCostPricingModeRollup() public {
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(1);
@@ -74,6 +77,8 @@ contract MailboxBaseTests is MailboxTest {
 
         utilsFacet.util_setFeeParams(feeParams);
 
+        // this was get from running the function, but more reasonable would be to 
+        // have some invariants that the calculation should keep.
         uint256 l2TransactionBaseCost = 250125000000000;
 
         assertEq(
