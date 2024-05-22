@@ -17,7 +17,7 @@ contract MailboxTest is Test {
     UtilsFacet internal utilsFacet;
     IGetters internal gettersFacet;
     address sender;
-    uint256 eraChainId = 9;
+    uint256 constant eraChainId = 9;
     address internal testnetVerifier = address(new TestnetVerifier());
     address diamondProxy;
 
