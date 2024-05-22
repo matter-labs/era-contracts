@@ -652,7 +652,7 @@ export class Deployer {
 
     if (this.verbose) {
       console.log(`With era chain id ${eraChainId}`);
-      console.log(`CONTRACTS_L1_NATIVE_TOKEN_VAULT_BRIDGE_IMPL_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_L1_NATIVE_TOKEN_VAULT_IMPL_ADDR=${contractAddress}`);
     }
 
     this.addresses.Bridges.NativeTokenVaultImplementation = contractAddress;
@@ -671,7 +671,7 @@ export class Deployer {
     );
 
     if (this.verbose) {
-      console.log(`CONTRACTS_L1_NATIVE_TOKEN_VAULT_BRIDGE_PROXY_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_L1_NATIVE_TOKEN_VAULT_PROXY_ADDR=${contractAddress}`);
     }
 
     this.addresses.Bridges.NativeTokenVaultProxy = contractAddress;
