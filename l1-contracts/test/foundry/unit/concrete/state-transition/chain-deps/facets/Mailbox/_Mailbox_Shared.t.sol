@@ -21,7 +21,7 @@ contract MailboxTest is Test {
     address internal testnetVerifier = address(new TestnetVerifier());
     address diamondProxy;
 
-    function init() public {
+    function prepare() public {
         sender = makeAddr("sender");
         vm.deal(sender, 100 ether);
 

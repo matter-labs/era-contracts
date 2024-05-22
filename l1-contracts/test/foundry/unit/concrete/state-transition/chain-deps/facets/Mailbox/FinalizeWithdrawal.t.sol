@@ -9,15 +9,19 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 
 contract MailboxFinalizeWithdrawal is MailboxTest {
+    bytes32[] proof;
+    bytes message;
+
     function setUp() public virtual {
-        init();
+        prepare();
+
+        proof = new bytes32[](0);
+        message = "message";
     }
 
     function test_RevertWhen_notEra() public {
         utilsFacet.util_setChainId(eraChainId + 1);
-        bytes32[] memory proof = new bytes32[](0);
-        bytes memory message = "message";
-        
+
         vm.expectRevert("Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
         mailboxFacet.finalizeEthWithdrawal({
             _l2BatchNumber: 0,
@@ -28,13 +32,10 @@ contract MailboxFinalizeWithdrawal is MailboxTest {
         });
     }
 
-    function test_successful_withdrawal() public {
+    function test_success_withdrawal() public {
         address baseTokenBridge = makeAddr("baseTokenBridge");
         utilsFacet.util_setChainId(eraChainId);
         utilsFacet.util_setBaseTokenBridge(baseTokenBridge);
-
-        bytes32[] memory proof = new bytes32[](0);
-        bytes memory message = "message";
 
         vm.mockCall(
             baseTokenBridge,
