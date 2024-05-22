@@ -8,11 +8,7 @@ import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, GAS_MULTIPLIER, web3Url } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import { initialBridgehubDeployment } from "../src.ts/deploy-process";
-import {
-  ethTestConfig,
-  getAddressFromEnv,
-  getNumberFromEnv,
-} from "../src.ts/utils";
+import { ethTestConfig, getAddressFromEnv, getNumberFromEnv } from "../src.ts/utils";
 
 import { Wallet as ZkWallet, Provider as ZkProvider, utils as zkUtils } from "zksync-ethers";
 import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
@@ -74,14 +70,18 @@ async function main() {
       if (deployer.isZkMode()) {
         console.log("Deploying on a zkSync network!");
       }
-      deployer.addresses.Bridges.SharedBridgeProxy = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR")
+      deployer.addresses.Bridges.SharedBridgeProxy = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR");
 
       await initialBridgehubDeployment(deployer, [], gasPrice, true, create2Salt);
       await initialBridgehubDeployment(deployer, [], gasPrice, false, create2Salt);
       const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
       const l1ChainId = getNumberFromEnv("ETH_CLIENT_CHAIN_ID");
       const l1BridgehubAddress = getAddressFromEnv("CONTRACTS_BRIDGEHUB_PROXY_ADDR");
-      await deployer.executeUpgrade(bridgehub.address, 0, bridgehub.interface.encodeFunctionData("registerCounterpart", [l1ChainId, l1BridgehubAddress]));
+      await deployer.executeUpgrade(
+        bridgehub.address,
+        0,
+        bridgehub.interface.encodeFunctionData("registerCounterpart", [l1ChainId, l1BridgehubAddress])
+      );
     });
 
   program
