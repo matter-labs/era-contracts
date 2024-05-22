@@ -1406,9 +1406,7 @@ object "EVMInterpreter" {
                     a, sp := popStackItem(sp)
                     exponent, sp := popStackItem(sp)
             
-                    let result := exp(a, exponent)
-            
-                    sp := pushStackItem(sp, result)
+                    sp := pushStackItem(sp, exp(a, exponent))
             
                     let to_charge := 0
                     for {} gt(exponent,0) {} { // while exponent > 0
@@ -3997,9 +3995,7 @@ object "EVMInterpreter" {
                     a, sp := popStackItem(sp)
                     exponent, sp := popStackItem(sp)
             
-                    let result := exp(a, exponent)
-            
-                    sp := pushStackItem(sp, result)
+                    sp := pushStackItem(sp, exp(a, exponent))
             
                     let to_charge := 0
                     for {} gt(exponent,0) {} { // while exponent > 0
