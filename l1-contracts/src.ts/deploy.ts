@@ -5,7 +5,7 @@ import "@matterlabs/hardhat-zksync-ethers";
 import type { BigNumberish, providers, Signer, Wallet, Contract, Overrides } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
-import type { Wallet as ZkWallet } from "zksync-ethers";
+import { Wallet as ZkWallet } from "zksync-ethers";
 import { ContractFactory as ZkContractFactory } from "zksync-ethers";
 
 import type { DeployedAddresses } from "./deploy-utils";

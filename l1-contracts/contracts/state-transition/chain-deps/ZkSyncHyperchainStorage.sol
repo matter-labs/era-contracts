@@ -58,18 +58,18 @@ struct FeeParams {
     uint64 minimalL2GasPrice;
 }
 
-enum SyncLayerState {
-    /// This is a hyperchain copy on L1, while the chain settles on L1
-    ActiveOnL1,
-    /// This is a hyperchain copy on the synclayer, when the chain settles on synclayer
-    ActiveOnSL,
-    /// This is a hyperchain copy on L1, while the chain settles on synclayer
-    MigratedFromL1,
-    /// This is a hyperchain copy on the synclayer, while the chain settles on L1
-    MigratedFromSL,
-    /// This is a hyperchain that serves as a synclayer itself.
-    SyncLayerL1
-}
+// enum SyncLayerState {
+//     /// This is a hyperchain copy on L1, while the chain settles on L1
+//     ActiveOnL1,
+//     /// This is a hyperchain copy on the synclayer, when the chain settles on synclayer
+//     ActiveOnSL,
+//     /// This is a hyperchain copy on L1, while the chain settles on synclayer
+//     MigratedFromL1,
+//     /// This is a hyperchain copy on the synclayer, while the chain settles on L1
+//     MigratedFromSL,
+//     /// This is a hyperchain that serves as a synclayer itself.
+//     SyncLayerL1
+// }
 
 /// @dev storing all storage variables for hyperchain diamond facets
 /// NOTE: It is used in a proxy, so it is possible to add new variables to the end

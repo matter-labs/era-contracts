@@ -15,7 +15,7 @@ import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager, StateTransitionManagerInitializeData} from "./IStateTransitionManager.sol";
 // import {ISystemContext} from "./l2-deps/ISystemContext.sol";
 import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
-import {FeeParams, SyncLayerState} from "./chain-deps/ZkSyncHyperchainStorage.sol";
+import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 // import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
 // import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
@@ -314,6 +314,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         bytes memory mandatoryInitData;
         {
+            // solhint-disable-next-line func-named-parameters
             mandatoryInitData = bytes.concat(
                 bytes32(_chainId),
                 bytes32(uint256(uint160(address(BRIDGE_HUB)))),
@@ -358,7 +359,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         bytes calldata _diamondCut
     ) external onlyBridgehub {
         // TODO: only allow on L1.
-
+        // solhint-disable-next-line func-named-parameters
         address hyperchainAddress = _deployNewChain(
             _chainId,
             _baseToken,
@@ -396,6 +397,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         bytes calldata _diamondCut
     ) external override onlyBridgehub returns (address hyperchainAddress) {
         (uint256 _chainId, address _baseToken, address _admin) = abi.decode(_chainData, (uint256, address, address));
+        // solhint-disable-next-line func-named-parameters
         hyperchainAddress = _deployNewChain(
             _chainId,
             _baseToken,
