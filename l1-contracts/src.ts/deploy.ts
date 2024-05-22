@@ -534,7 +534,9 @@ export class Deployer {
       const cdata = contract.interface.encodeFunctionData(fname, fargs);
       return this.executeUpgrade(contract.address, value, cdata, overrides, printOperation);
     } else {
-      const tx: ethers.ContractTransaction = await contract[fname](...fargs, ...(overrides ? [overrides] : []));
+      overrides = overrides || {};
+      overrides.value = value;
+      const tx: ethers.ContractTransaction = await contract[fname](...fargs, overrides);
       return await tx.wait();
     }
   }
@@ -964,16 +966,12 @@ export class Deployer {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     // Just some large gas limit that should always be enough
     const l2GasLimit = ethers.BigNumber.from(72_000_000);
-    const expectedCost = await bridgehub.l2TransactionBaseCost(
-      syncLayerChainId,
-      gasPrice,
-      l2GasLimit,
-      REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-    );
+    const expectedCost = (
+      await bridgehub.l2TransactionBaseCost(syncLayerChainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
+    ).mul(5);
     const chainData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [ADDRESS_ONE, "0x"]); // todo
     const bridgehubData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [this.chainId, chainData]);
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut();
-    console.log("Cut data during migration, ", diamondCutData);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
     // console.log("bridgehubData", bridgehubData)

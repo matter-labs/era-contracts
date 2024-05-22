@@ -75,7 +75,8 @@ describe("Synclayer", function () {
   });
 
   it("Check start move chain to synclayer", async () => {
-    await deployer.moveChainToSyncLayer(deployer2.chainId);
+    const gasPrice = await owner.provider.getGasPrice();
+    await deployer.moveChainToSyncLayer(deployer2.chainId.toString(), gasPrice, false);
   });
 
   // it("Check finish move chain to l1", async () => {
