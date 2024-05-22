@@ -235,6 +235,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     function decodeLegacyData(bytes calldata _data, address _prevMsgSender) external returns (bytes32, bytes memory) {
+        require (msg.sender == address(this));
         (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
             _data,
             (address, uint256, address)
