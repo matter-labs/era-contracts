@@ -6,36 +6,41 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
-
 contract MailboxTransferEthToSharedBridge is MailboxTest {
+    function setUp() public virtual {
+        init();
+    }
+
     function test_transferEthToSharedBridge() public {
         DummyBridgehub bridgeHub = new DummyBridgehub();
+        address bridgehubAddress = address(bridgeHub);
         DummyStateTransitionManagerWBH stm = new DummyStateTransitionManagerWBH(address(bridgeHub));
         address l1WethAddress = makeAddr("l1Weth");
 
-        bridgeHub.setStateTransitionManager(eraChainId, address(stm));
-        stm.setHyperchain(eraChainId, diamondProxy);
-
         L1SharedBridge baseTokenBridge = new L1SharedBridge({
             _l1WethAddress: l1WethAddress,
-            _bridgehub: IBridgehub(address(bridgeHub)),
+            _bridgehub: IBridgehub(bridgehubAddress),
             _eraChainId: eraChainId,
             _eraDiamondProxy: diamondProxy
         });
 
+        address baseTokenBridgeAddress = address(baseTokenBridge);
+
+        bridgeHub.setStateTransitionManager(eraChainId, address(stm));
+        stm.setHyperchain(eraChainId, diamondProxy);
+
         utilsFacet.util_setChainId(eraChainId);
-        utilsFacet.util_setBaseTokenBridge(address(baseTokenBridge));
-        utilsFacet.util_setBridgehub(address(bridgeHub));
+        utilsFacet.util_setBaseTokenBridge(baseTokenBridgeAddress);
+        utilsFacet.util_setBridgehub(bridgehubAddress);
 
         vm.deal(diamondProxy, 1 ether);
-        vm.prank(address(baseTokenBridge));
+        vm.prank(baseTokenBridgeAddress);
         mailboxFacet.transferEthToSharedBridge();
-        assertEq(address(baseTokenBridge).balance, 1 ether);
+        assertEq(baseTokenBridgeAddress.balance, 1 ether);
     }
 
     function test_RevertWhen_transferEthToSharedBridgeBadCaller() public {
         address baseTokenBridge = makeAddr("bridge");
-
         utilsFacet.util_setChainId(eraChainId);
 
         vm.deal(diamondProxy, 1 ether);
