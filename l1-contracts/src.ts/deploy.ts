@@ -22,6 +22,7 @@ import {
   PubdataPricingMode,
   hashL2Bytecode,
   DIAMOND_CUT_DATA_ABI_STRING,
+  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
 } from "./utils";
 import type { FacetCut } from "./diamondCut";
 import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
@@ -682,15 +683,15 @@ export class Deployer {
     }
   }
 
-  public async sharedBridgeSetEraPostUpgradeFirstBatch() {
-    const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
-    const storageSwitch = getNumberFromEnv("CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH");
-    const tx = await sharedBridge.setEraPostUpgradeFirstBatch(storageSwitch);
-    const receipt = await tx.wait();
-    if (this.verbose) {
-      console.log(`Era first post upgrade batch set, gas used: ${receipt.gasUsed.toString()}`);
-    }
-  }
+  // public async sharedBridgeSetEraPostUpgradeFirstBatch() {
+  //   const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
+  //   const storageSwitch = getNumberFromEnv("CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH");
+  //   const tx = await sharedBridge.setEraPostUpgradeFirstBatch(storageSwitch);
+  //   const receipt = await tx.wait();
+  //   if (this.verbose) {
+  //     console.log(`Era first post upgrade batch set, gas used: ${receipt.gasUsed.toString()}`);
+  //   }
+  // }
 
   public async registerSharedBridge() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
@@ -950,7 +951,7 @@ export class Deployer {
     await this.deploySharedBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
     await this.deployNativeTokenVaultImplementation(create2Salt, { gasPrice, nonce: nonce + 2 });
     await this.deployNativeTokenVaultProxy(create2Salt, { gasPrice });
-    await this.registerSharedBridge({ gasPrice });
+    await this.registerSharedBridge();
   }
 
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
