@@ -19,6 +19,7 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
     // state diff data
     mapping(uint256 => bytes[]) initialWrites;
     mapping(uint256 => bytes[]) compressedInitialWrites;
+    mapping(uint256 => bytes32[]) initialWritesSlots; 
     mapping(uint256 => mapping(uint64 => bytes)) uncompressedWrites;
     mapping(uint256 => mapping(uint64 => bytes)) compressedWrites;
     mapping(uint256 => mapping(uint64 => bool)) slotStatus;
@@ -33,42 +34,17 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             chainSet[chainId] = true;
         }
     }
-    // TODO: import or delete
+  
     function _sliceToUint256(bytes calldata _calldataSlice) internal pure returns (uint256 number) {
         number = uint256(bytes32(_calldataSlice));
         number >>= (256 - (_calldataSlice.length * 8));
     }
-    function _verifyValueCompression(
-        uint256 _initialValue,
-        uint256 _finalValue,
-        uint256 _operation,
-        bytes calldata _compressedValue
-    ) internal pure {
-        uint256 convertedValue = _sliceToUint256(_compressedValue);
-
-        unchecked {
-            if (_operation == 0 || _operation == 3) {
-                require(convertedValue == _finalValue, "transform or no compression: compressed and final mismatch");
-            } else if (_operation == 1) {
-                require(
-                    _initialValue + convertedValue == _finalValue,
-                    "add: initial plus converted not equal to final"
-                );
-            } else if (_operation == 2) {
-                require(
-                    _initialValue - convertedValue == _finalValue,
-                    "sub: initial minus converted not equal to final"
-                );
-            } else {
-                revert("unsupported operation");
-            }
-        }
-    }
-    
 
     function addInitialWrite(uint256 chainId, bytes calldata stateDiff, bytes calldata compressedStateDiff) internal{
+        bytes32 derivedKey = stateDiff.readBytes32(52);
         initialWrites[chainId].push(stateDiff);
         compressedInitialWrites[chainId].push(compressedStateDiff);
+        initialWritesSlots[chainId].push(derivedKey);
     }
     function addRepeatedWrite(uint256 chainId, bytes calldata stateDiff, bytes calldata compressedStateDiff) internal{
         uint64 enumIndex = stateDiff.readUint64(84);
@@ -138,12 +114,7 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             stateDiffPtr++;
             uint8 operation = metadata & OPERATION_BITMASK;
             uint8 len = operation == 0 ? 32 : metadata >> LENGTH_BITS_OFFSET;
-            _verifyValueCompression(
-                initValue,
-                finalValue,
-                operation,
-                _compressedStateDiffs[stateDiffPtr:stateDiffPtr + len]
-            );
+        
             stateDiffPtr += len;
             addInitialWrite(chainId, stateDiff, _compressedStateDiffs[sliceStart:stateDiffPtr]);
         }
@@ -171,12 +142,7 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             stateDiffPtr += 1;
             uint8 operation = metadata & OPERATION_BITMASK;
             uint8 len = operation == 0 ? 32 : metadata >> LENGTH_BITS_OFFSET;
-            _verifyValueCompression(
-                initValue,
-                finalValue,
-                operation,
-                _compressedStateDiffs[stateDiffPtr:stateDiffPtr + len]
-            );
+        
             stateDiffPtr += len;
             addRepeatedWrite(chainId, stateDiff, _compressedStateDiffs[sliceStart:stateDiffPtr]);
             
@@ -266,13 +232,36 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
     function returnBatchesAndClearState() external returns (bytes memory batchInfo) {
         for (uint256 i = 0; i < chainList.length; i += 1) {
             uint256 chainId = chainList[i];
+            uint256 numberOfInitialWrites = initialWritesSlots[chainId].length;
+            uint256 numberOfRepeatedWrites = accesedSlots[chainId].length;
+            bytes memory stateDiffs = new bytes((numberOfRepeatedWrites+numberOfInitialWrites)*STATE_DIFF_ENTRY_SIZE);
+            // append initial writes
+            uint256 initialWritesPtr = 0;
+            for(uint256 i = 0;i<numberOfInitialWrites*STATE_DIFF_ENTRY_SIZE;i+=STATE_DIFF_ENTRY_SIZE){
+                bytes memory stateDiff = initialWrites[chainId][initialWritesPtr];
+                assembly{
+                    mstore(add(numberOfInitialWrites, i), stateDiff)
+                }
+                initialWritesPtr += 1;
+            }
+            // append repeated writes
+            uint256 stateDiffPtr = numberOfInitialWrites*STATE_DIFF_ENTRY_SIZE;
+            for (uint256 i = 0;i<numberOfRepeatedWrites;i+=1){
+                uint64 enumIndex = accesedSlots[chainId][i];
+                bytes memory stateDiff = uncompressedWrites[chainId][enumIndex];
+                assembly{
+                    mstore(add(numberOfInitialWrites, stateDiffPtr), stateDiff)
+                }
+                stateDiffPtr += STATE_DIFF_ENTRY_SIZE;
+            }
 
             chainData.push(
                 abi.encode(
                     chainId,
                     logStorage[chainId],
                     messageStorage[chainId],
-                    bytecodeStorage[chainId]
+                    bytecodeStorage[chainId],
+                    stateDiffs
                 )
             );
 
