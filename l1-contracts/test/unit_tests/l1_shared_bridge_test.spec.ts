@@ -1,20 +1,13 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
-import { Interface } from "ethers/lib/utils";
 import * as hardhat from "hardhat";
-import type { L1SharedBridge, Bridgehub, WETH9 } from "../../typechain";
-import {
-  L1SharedBridgeFactory,
-  BridgehubFactory,
-  WETH9Factory,
-  TestnetERC20TokenFactory,
-  L1NativeTokenVault,
-} from "../../typechain";
+import type { L1SharedBridge, Bridgehub, L1NativeTokenVault } from "../../typechain";
+import { L1SharedBridgeFactory, BridgehubFactory, TestnetERC20TokenFactory } from "../../typechain";
 import { L1NativeTokenVaultFactory } from "../../typechain/L1NativeTokenVaultFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
 import { Action, facetCut } from "../../src.ts/diamondCut";
-import { ADDRESS_ONE, ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/utils";
 import type { Deployer } from "../../src.ts/deploy";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
@@ -28,8 +21,6 @@ describe("Shared Bridge tests", () => {
   let bridgehub: Bridgehub;
   let l1NativeTokenVault: L1NativeTokenVault;
   let l1SharedBridge: L1SharedBridge;
-  let l1SharedBridgeInterface: Interface;
-  let l1Weth: WETH9;
   let erc20TestToken: ethers.Contract;
   const functionSignature = "0x6c0960f9";
   const ERC20functionSignature = "0x11a2ccc1";
@@ -67,15 +58,12 @@ describe("Shared Bridge tests", () => {
 
     l1SharedBridge = L1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
-    l1SharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
     l1NativeTokenVault = L1NativeTokenVaultFactory.connect(
       deployer.addresses.Bridges.NativeTokenVaultProxy,
       deployWallet
     );
 
     const tokens = getTokens();
-    const l1WethTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
-    l1Weth = WETH9Factory.connect(l1WethTokenAddress, owner);
 
     const tokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
     erc20TestToken = TestnetERC20TokenFactory.connect(tokenAddress, owner);
@@ -124,7 +112,7 @@ describe("Shared Bridge tests", () => {
     const balanceBefore = await erc20TestToken.balanceOf(await randomSigner.getAddress());
     const balanceNTVBefore = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
 
-    const assetInfo = await l1NativeTokenVault.getAssetInfoFromLegacy(erc20TestToken.address);
+    await l1NativeTokenVault.getAssetInfoFromLegacy(erc20TestToken.address);
     await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, amount.mul(10))).wait();
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
       {
@@ -161,7 +149,7 @@ describe("Shared Bridge tests", () => {
     const balanceBefore = await erc20TestToken.balanceOf(await randomSigner.getAddress());
     const balanceNTVBefore = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
 
-    const assetInfo = await l1NativeTokenVault.getAssetInfoFromLegacy(erc20TestToken.address);
+    await l1NativeTokenVault.getAssetInfoFromLegacy(erc20TestToken.address);
     await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, amount.mul(10))).wait();
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
       {

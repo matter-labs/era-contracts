@@ -13,8 +13,6 @@ import type { Provider } from "zksync-web3";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, sleep } from "zksync-web3/build/src/utils";
 import { IERC20Factory } from "zksync-web3/build/typechain";
 
-import { ERC20Factory } from "../../l1-contracts/typechain";
-
 export const provider = web3Provider();
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
