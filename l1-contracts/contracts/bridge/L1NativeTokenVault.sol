@@ -14,9 +14,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IL1StandardAsset} from "./interfaces/IL1StandardAsset.sol";
 
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
-
-import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
+import {ETH_TOKEN_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -36,6 +34,10 @@ contract L1NativeTokenVault is
 
     /// @dev Era's chainID
     uint256 public immutable ERA_CHAIN_ID;
+
+    /// @dev Indicates whether the hyperbridging is enabled for a given chain.
+    // slither-disable-next-line uninitialized-state
+    mapping(uint256 chainId => bool enabled) public hyperbridgingEnabled;
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across hyperchains.
     /// This serves as a security measure until hyperbridging is implemented.
@@ -88,7 +90,7 @@ contract L1NativeTokenVault is
     /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
     function bridgeBurn(
         uint256 _chainId,
-        uint256 _mintValue,
+        uint256,
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
@@ -114,6 +116,7 @@ contract L1NativeTokenVault is
             chainBalance[_chainId][l1Token] += _depositAmount;
         }
 
+        // solhint-disable-next-line func-named-parameters
         _bridgeMintData = abi.encode(amount, _prevMsgSender, _l2Receiver, _getERC20Getters(l1Token), l1Token); // to do add l2Receiver in here
     }
 
@@ -144,13 +147,14 @@ contract L1NativeTokenVault is
     }
 
     function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {
-        // if (!hyperbridgingEnabled[_chainId]) {
-        //     // Check that the chain has sufficient balance
-        //     require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
-        //     chainBalance[_chainId][l1Token] -= amount;
-        // }
         address l1Token = tokenAddress[_assetInfo];
         (uint256 _amount, address l1Receiver) = abi.decode(_data, (uint256, address));
+        if (!hyperbridgingEnabled[_chainId]) {
+            // Add back
+            // Check that the chain has sufficient balance
+            require(chainBalance[_chainId][l1Token] >= _amount, "NTV not enough funds 2"); // not enough funds
+            chainBalance[_chainId][l1Token] -= _amount;
+        }
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
@@ -167,7 +171,7 @@ contract L1NativeTokenVault is
     function bridgeClaimFailedBurn(
         uint256 _chainId,
         bytes32 _assetInfo,
-        address _prevMsgSender,
+        address,
         bytes calldata _data
     ) external payable override {
         (uint256 _amount, address _depositSender) = abi.decode(_data, (uint256, address));

@@ -13,8 +13,6 @@ import type { Provider } from "zksync-web3";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, sleep } from "zksync-web3/build/src/utils";
 import { IERC20Factory } from "zksync-web3/build/typechain";
 
-import { ERC20Factory } from "../../l1-contracts/typechain";
-
 export const provider = web3Provider();
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -127,7 +125,7 @@ export async function requestL2TransactionDirect(
   l2GasLimit: ethers.BigNumberish,
   gasPrice?: ethers.BigNumberish,
   factoryDeps?: ethers.BytesLike[]
-){
+) {
   const deployedAddresses = deployedAddressesFromEnv();
   const bridgehubAddress = deployedAddresses.Bridgehub.BridgehubProxy;
   const bridgehub = IBridgehubFactory.connect(bridgehubAddress, wallet);
@@ -163,7 +161,6 @@ export async function requestL2TransactionDirect(
     },
     { value: ethIsBaseToken ? expectedCost : 0, gasPrice }
   );
-
 }
 
 export async function publishBytecodeFromL1(

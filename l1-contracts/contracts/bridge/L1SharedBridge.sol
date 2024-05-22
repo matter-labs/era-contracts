@@ -5,7 +5,6 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -20,9 +19,8 @@ import {L2Message, TxStatus} from "../common/Messaging.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {ETH_TOKEN_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import {NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
-import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
 
 /// @author Matter Labs
@@ -211,13 +209,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _amount
     ) external payable virtual onlyBridgehubOrEra(_chainId) whenNotPaused {
         (address l1Asset, bytes32 assetInfo) = _getAssetProperties(_assetInfo);
-        bytes memory bridgeMintData = IL1StandardAsset(l1Asset).bridgeBurn{value: msg.value}(
-            _chainId,
-            0,
-            assetInfo,
-            _prevMsgSender,
-            abi.encode(_amount, address(0))
-        );
+        IL1StandardAsset(l1Asset).bridgeBurn{value: msg.value}({
+            _chainId: _chainId,
+            _mintValue: 0,
+            _assetInfo: assetInfo,
+            _prevMsgSender: _prevMsgSender,
+            _data: abi.encode(_amount, address(0))
+        });
 
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
         emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _assetInfo, _amount);
@@ -272,16 +270,22 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
         require(BRIDGE_HUB.baseToken(_chainId) != assetAddress[_assetInfo], "ShB: baseToken deposit not supported");
 
-        (bytes memory bridgeMintCalldata, bytes32 assetInfo) = _burn(
-            _chainId,
-            _l2Value,
-            _assetInfo,
-            _prevMsgSender,
-            _assetData
-        );
+        (bytes memory bridgeMintCalldata, bytes32 assetInfo) = _burn({
+            _chainId: _chainId,
+            _l2Value: _l2Value,
+            _assetInfo: _assetInfo,
+            _prevMsgSender: _prevMsgSender,
+            _assetData: _assetData
+        });
 
         bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, assetInfo, _assetData));
-        request = _requestToBridge(_chainId, _prevMsgSender, assetInfo, bridgeMintCalldata, txDataHash);
+        request = _requestToBridge({
+            _chainId: _chainId,
+            _prevMsgSender: _prevMsgSender,
+            _assetInfo: assetInfo,
+            _bridgeMintCalldata: bridgeMintCalldata,
+            _txDataHash: txDataHash
+        });
 
         emit BridgehubDepositInitiated({
             chainId: _chainId,
@@ -301,25 +305,25 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes memory _assetData
     ) internal returns (bytes memory bridgeMintCalldata, bytes32 assetInfo) {
         (address l1Asset, bytes32 assetInfo) = _getAssetProperties(_assetInfo);
-        bridgeMintCalldata = IL1StandardAsset(l1Asset).bridgeBurn{value: msg.value}(
-            _chainId,
-            _l2Value,
-            assetInfo,
-            _prevMsgSender,
-            _assetData
-        );
+        bridgeMintCalldata = IL1StandardAsset(l1Asset).bridgeBurn{value: msg.value}({
+            _chainId: _chainId,
+            _mintValue: _l2Value,
+            _assetInfo: assetInfo,
+            _prevMsgSender: _prevMsgSender,
+            _data: _assetData
+        });
     }
 
     /// @dev The request data that is passed to the bridgehub
     function _requestToBridge(
         uint256 _chainId,
-        address _prevMsgSender,
+        address,
         bytes32 _assetInfo,
         bytes memory _bridgeMintCalldata,
         bytes32 _txDataHash
     ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
         // Request the finalization of the deposit on the L2 side
-        bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _assetInfo, _bridgeMintCalldata);
+        bytes memory l2TxCalldata = _getDepositL2Calldata(_assetInfo, _bridgeMintCalldata);
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
@@ -343,11 +347,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev Generate a calldata for calling the deposit finalization on the L2 bridge contract
-    function _getDepositL2Calldata(
-        address _l1Sender,
-        bytes32 _assetInfo,
-        bytes memory _assetData
-    ) internal view returns (bytes memory) {
+    function _getDepositL2Calldata(bytes32 _assetInfo, bytes memory _assetData) internal view returns (bytes memory) {
         return abi.encodeCall(IL2Bridge.finalizeDeposit, (_assetInfo, _assetData));
     }
 
@@ -676,9 +676,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         //     chainBalance[ERA_CHAIN_ID][_l1Asset] += _amount;
         // }
 
-        bytes memory bridgeMintData = abi.encode(_amount); //todo
+        bytes memory bridgeMintData = abi.encode(_amount);
         bytes memory l2TxCalldata = _getDepositL2Calldata(
-            _prevMsgSender,
             IL1NativeTokenVault(nativeTokenVault).getAssetInfoFromLegacy(_l1Asset),
             bridgeMintData
         );

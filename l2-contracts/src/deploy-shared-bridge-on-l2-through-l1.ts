@@ -10,7 +10,7 @@ import {
   hashL2Bytecode,
   applyL1ToL2Alias,
   publishBytecodeFromL1,
-  requestL2TransactionDirect
+  requestL2TransactionDirect,
 } from "./utils";
 
 import { ethTestConfig } from "./deploy-utils";
@@ -18,7 +18,6 @@ import { ethTestConfig } from "./deploy-utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import * as hre from "hardhat";
-import { IL2StandardDeployer } from "../typechain/IL2StandardDeployer";
 import { IL2StandardDeployerFactory } from "../typechain/IL2StandardDeployerFactory";
 
 export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2SharedBridge").abi;
@@ -115,10 +114,10 @@ export async function deployStandardDeployerProxyOnL2ThroughL1(
   const l2GovernorAddress = applyL1ToL2Alias(deployer.addresses.Governance);
 
   const L2StandardDeployerInterface = new Interface(hre.artifacts.readArtifactSync("L2StandardDeployer").abi);
-  let proxyInitializationParams = L2StandardDeployerInterface.encodeFunctionData("initialize", [
+  const proxyInitializationParams = L2StandardDeployerInterface.encodeFunctionData("initialize", [
     hashL2Bytecode(L2_STANDARD_TOKEN_PROXY_BYTECODE),
     l2GovernorAddress,
-    false
+    false,
   ]);
 
   /// prepare constructor data
@@ -159,24 +158,24 @@ export async function deployStandardDeployerProxyOnL2ThroughL1(
 }
 
 export async function setSharedBridgeInStandardDeployer(deployer: Deployer, chainId: string) {
-  const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
-  const l2StandardDeployer = IL2StandardDeployerFactory.connect(deployer.addresses.Bridges.L2StandardDeployerProxy, deployer.deployWallet);
+  const l2StandardDeployer = IL2StandardDeployerFactory.connect(
+    deployer.addresses.Bridges.L2StandardDeployerProxy,
+    deployer.deployWallet
+  );
 
   const tx1 = await requestL2TransactionDirect(
     chainId,
     deployer.deployWallet,
     deployer.addresses.Bridges.L2StandardDeployerProxy,
-    l2StandardDeployer.interface.encodeFunctionData("setSharedBridge", [deployer.addresses.Bridges.L2SharedBridgeProxy]),
+    l2StandardDeployer.interface.encodeFunctionData("setSharedBridge", [
+      deployer.addresses.Bridges.L2SharedBridgeProxy,
+    ]),
     priorityTxMaxGasLimit
   );
   await tx1.wait();
 }
 
-export async function deploySharedBridgeImplOnL2ThroughL1(
-  deployer: Deployer,
-  chainId: string,
-  gasPrice: BigNumberish
-) {
+export async function deploySharedBridgeImplOnL2ThroughL1(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
   if (deployer.verbose) {
     console.log("Deploying L2SharedBridge Implementation");
   }
@@ -238,7 +237,7 @@ export async function deploySharedBridgeProxyOnL2ThroughL1(
   const l2GovernorAddress = applyL1ToL2Alias(deployer.addresses.Governance);
 
   const l2SharedBridgeInterface = new Interface(hre.artifacts.readArtifactSync("L2SharedBridge").abi);
-  let proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
+  const proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
     l1SharedBridge.address,
     deployer.addresses.Bridges.ERC20BridgeProxy,
     l2GovernorAddress,
@@ -362,12 +361,7 @@ async function main() {
         console.log("Initialization of the chain governance will be skipped");
       }
 
-      await deploySharedBridgeOnL2ThroughL1(
-        deployer,
-        chainId,
-        gasPrice,
-        skipInitializeChainGovernance
-      );
+      await deploySharedBridgeOnL2ThroughL1(deployer, chainId, gasPrice, skipInitializeChainGovernance);
     });
 
   await program.parseAsync(process.argv);

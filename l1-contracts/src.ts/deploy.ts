@@ -4,7 +4,7 @@ import "@nomiclabs/hardhat-ethers";
 import type { BigNumberish, providers, Signer, Wallet, Contract } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
-import { Wallet as ZkWallet } from "zksync-ethers";
+import type { Wallet as ZkWallet } from "zksync-ethers";
 
 import type { DeployedAddresses } from "./deploy-utils";
 import {
@@ -22,7 +22,6 @@ import {
   PubdataPricingMode,
   hashL2Bytecode,
   DIAMOND_CUT_DATA_ABI_STRING,
-  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
 } from "./utils";
 import type { FacetCut } from "./diamondCut";
 import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
@@ -241,15 +240,12 @@ export class Deployer {
     }
     // Note: we cannot deploy using Create2, as the owner of the ProxyAdmin is msg.sender
 
-    let proxyAdmin;
-    let rec;
-
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractFactory = await hardhat.ethers.getContractFactory("ProxyAdmin", {
       signer: this.deployWallet,
     });
-    proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
-    rec = await proxyAdmin.deployTransaction.wait();
+    const proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
+    const rec = await proxyAdmin.deployTransaction.wait();
 
     if (this.verbose) {
       console.log(
@@ -633,7 +629,7 @@ export class Deployer {
     }
   }
 
-  public async sharedBridgeSetEraPostUpgradeFirstBatch(ethTxOptions: ethers.providers.TransactionRequest) {
+  public async sharedBridgeSetEraPostUpgradeFirstBatch() {
     const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
     const storageSwitch = getNumberFromEnv("CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH");
     const tx = await sharedBridge.setEraPostUpgradeFirstBatch(storageSwitch);
@@ -643,7 +639,7 @@ export class Deployer {
     }
   }
 
-  public async registerSharedBridge(ethTxOptions: ethers.providers.TransactionRequest) {
+  public async registerSharedBridge() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
     /// registering ETH as a valid token, with address 1.
@@ -658,11 +654,11 @@ export class Deployer {
     ]);
     await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
     if (this.verbose) {
-      console.log(`Shared bridge was registered in Bridgehub`);
+      console.log("Shared bridge was registered in Bridgehub");
     }
   }
 
-  public async registerTokenInNativeTokenVault(token: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async registerTokenInNativeTokenVault(token: string) {
     const nativeTokenVault = this.nativeTokenVault(this.deployWallet);
 
     const data = nativeTokenVault.interface.encodeFunctionData("registerToken", [token]);

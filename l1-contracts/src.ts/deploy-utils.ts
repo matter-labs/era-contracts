@@ -86,6 +86,7 @@ export async function deployBytecodeViaCreate2(
 export async function deployContractWithArgs(
   wallet: ethers.Wallet,
   contractName: string,
+  // eslint-disable-next-line
   args: any[],
   ethTxOptions: ethers.providers.TransactionRequest
 ) {
@@ -137,7 +138,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
   return {
     Bridgehub: {
       BridgehubProxy: getAddressFromEnv("CONTRACTS_BRIDGEHUB_PROXY_ADDR"),
-      BridgehubImplementation: getAddressFromEnv("CONTRACTS_BRIDGEHUB_IMPL_ADDR")
+      BridgehubImplementation: getAddressFromEnv("CONTRACTS_BRIDGEHUB_IMPL_ADDR"),
     },
     StateTransition: {
       StateTransitionProxy: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_PROXY_ADDR"),
