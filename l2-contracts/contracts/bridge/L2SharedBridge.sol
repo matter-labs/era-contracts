@@ -3,7 +3,6 @@
 pragma solidity 0.8.20;
 
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
@@ -14,10 +13,8 @@ import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 import {IL2StandardDeployer} from "./interfaces/IL2StandardDeployer.sol";
 
-import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
-import {SystemContractsCaller} from "../SystemContractsCaller.sol";
+import {L2ContractHelper, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../L2ContractHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -29,10 +26,10 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
 
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
-    UpgradeableBeacon public DEPRACATED_l2TokenBeacon;
+    UpgradeableBeacon public DEPRECATED_l2TokenBeacon;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
-    bytes32 internal DEPRACATED_l2TokenProxyBytecodeHash;
+    bytes32 internal DEPRECATED_l2TokenProxyBytecodeHash;
 
     /// @dev A mapping l2 token address => l1 token address
     mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
@@ -115,15 +112,21 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
 
         /// should the address not be set already? Or do we need this to do it automatically.
         if (asset != address(0)) {
-            _bridgeMintData = IL2StandardAsset(asset).bridgeBurn(L1_CHAIN_ID, 0, _assetInfo, msg.sender, _assetData);
+            _bridgeMintData = IL2StandardAsset(asset).bridgeBurn({
+                _chainId: L1_CHAIN_ID,
+                _mintValue: 0,
+                _assetInfo: _assetInfo,
+                _prevMsgSender: msg.sender,
+                _data: _assetData
+            });
         } else {
-            _bridgeMintData = IL2StandardAsset(standardDeployer).bridgeBurn(
-                L1_CHAIN_ID,
-                0,
-                _assetInfo,
-                msg.sender,
-                _assetData
-            );
+            _bridgeMintData = IL2StandardAsset(standardDeployer).bridgeBurn({
+                _chainId: L1_CHAIN_ID,
+                _mintValue: 0,
+                _assetInfo: _assetInfo,
+                _prevMsgSender: msg.sender,
+                _data: _assetData
+            });
         }
 
         bytes memory message = _getL1WithdrawMessage(_assetInfo, _bridgeMintData);
@@ -139,6 +142,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     ) internal pure returns (bytes memory) {
         // note we use the IL1ERC20Bridge.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
         // and we use this interface so that when the switch happened the old messages could be processed
+        // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _assetInfo, _bridgeMintData);
     }
 
@@ -157,6 +161,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         bytes32 assetInfo = keccak256(
             abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
         );
+        // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encode(_l1Sender, _amount, _l2Receiver, _data, _l1Token);
         finalizeDeposit(assetInfo, data);
     }

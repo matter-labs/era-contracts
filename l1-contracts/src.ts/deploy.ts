@@ -5,8 +5,8 @@ import "@matterlabs/hardhat-zksync-ethers";
 import type { BigNumberish, providers, Signer, Wallet, Contract, Overrides } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
-import { Wallet as ZkWallet } from "zksync-ethers";
-import { utils as zkUtils, ContractFactory as ZkContractFactory } from "zksync-ethers";
+import type { Wallet as ZkWallet } from "zksync-ethers";
+import { ContractFactory as ZkContractFactory } from "zksync-ethers";
 
 import type { DeployedAddresses } from "./deploy-utils";
 import {
@@ -31,7 +31,6 @@ import {
   PubdataPricingMode,
   hashL2Bytecode,
   DIAMOND_CUT_DATA_ABI_STRING,
-  ethersWalletToZkWallet,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
 } from "./utils";
 import type { FacetCut } from "./diamondCut";
@@ -823,7 +822,7 @@ export class Deployer {
     }
   }
 
-  public async sharedBridgeSetEraPostUpgradeFirstBatch(ethTxOptions: ethers.providers.TransactionRequest) {
+  public async sharedBridgeSetEraPostUpgradeFirstBatch() {
     const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
     const storageSwitch = getNumberFromEnv("CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH");
     const tx = await sharedBridge.setEraPostUpgradeFirstBatch(storageSwitch);
@@ -833,7 +832,7 @@ export class Deployer {
     }
   }
 
-  public async registerSharedBridge(ethTxOptions: ethers.providers.TransactionRequest) {
+  public async registerSharedBridge() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
     /// registering ETH as a valid token, with address 1.
@@ -848,11 +847,11 @@ export class Deployer {
     ]);
     await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
     if (this.verbose) {
-      console.log(`Shared bridge was registered in Bridgehub`);
+      console.log("Shared bridge was registered in Bridgehub");
     }
   }
 
-  public async registerTokenInNativeTokenVault(token: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async registerTokenInNativeTokenVault(token: string) {
     const nativeTokenVault = this.nativeTokenVault(this.deployWallet);
 
     const data = nativeTokenVault.interface.encodeFunctionData("registerToken", [token]);
@@ -1168,7 +1167,7 @@ export class Deployer {
     await this.deploySharedBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
     await this.deployNativeTokenVaultImplementation(create2Salt, { gasPrice, nonce: nonce + 2 });
     await this.deployNativeTokenVaultProxy(create2Salt, { gasPrice });
-    await this.registerSharedBridge({ gasPrice });
+    await this.registerSharedBridge();
     await this.deploySTMDeploymentTrackerImplementation(create2Salt, { gasPrice });
     await this.deploySTMDeploymentTrackerProxy(create2Salt, { gasPrice });
   }
@@ -1178,7 +1177,7 @@ export class Deployer {
 
     await this.deployL2SharedBridgeImplementation(create2Salt, { gasPrice, nonce: nonce });
     await this.deploySharedBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
-    await this.registerSharedBridge({ gasPrice });
+    await this.registerSharedBridge();
   }
 
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {

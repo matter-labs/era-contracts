@@ -309,7 +309,6 @@ describe("Legacy Era tests", function () {
 
     it("Successful withdrawal", async () => {
       const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
-
       await mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF);
       const balanceAfter = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
       expect(balanceAfter.sub(balanceBefore)).equal(AMOUNT);
