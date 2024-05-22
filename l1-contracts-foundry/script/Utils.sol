@@ -175,7 +175,7 @@ library Utils {
         uint256 chainId,
         address bridgehubAddress,
         address l1SharedBridgeProxy
-    ) public returns (address) {
+    ) internal returns (address) {
         bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(bytecode);
 
         bytes memory deployData = abi.encodeWithSignature(
@@ -222,7 +222,7 @@ library Utils {
         uint256 chainId,
         address bridgehubAddress,
         address l1SharedBridgeProxy
-    ) public {
+    ) internal {
         Bridgehub bridgehub = Bridgehub(bridgehubAddress);
         uint256 gasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
 
@@ -265,7 +265,7 @@ library Utils {
         uint256 chainId,
         address bridgehubAddress,
         address l1SharedBridgeProxy
-    ) public {
+    ) internal {
         runL1L2Transaction({
             l2Calldata: "",
             l2GasLimit: MAX_PRIORITY_TX_GAS,
@@ -280,7 +280,7 @@ library Utils {
     /**
      * @dev Read hardhat bytecodes
      */
-    function readHardhatBytecode(string memory artifactPath) public view returns (bytes memory) {
+    function readHardhatBytecode(string memory artifactPath) internal view returns (bytes memory) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, artifactPath);
         string memory json = vm.readFile(path);
@@ -295,7 +295,7 @@ library Utils {
         bytes memory _data,
         uint256 _value,
         uint256 _delay
-    ) public {
+    ) internal {
         IGovernance governance = IGovernance(_governor);
 
         IGovernance.Call[] memory calls = new IGovernance.Call[](1);
