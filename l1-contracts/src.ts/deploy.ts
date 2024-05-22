@@ -41,6 +41,8 @@ import { IZkSyncHyperchainFactory } from "../typechain/IZkSyncHyperchainFactory"
 
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
 
+import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
+
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
 
@@ -520,6 +522,57 @@ export class Deployer {
     return receipt;
   }
 
+  /// this should be only use for local testing
+  public async executeUpgradeOnL2(
+    chainId: string,
+    targetAddress: string,
+    gasPrice: BigNumberish,
+    callData: string,
+    l2GasLimit: BigNumberish,
+    ethTxOptions?: ethers.providers.TransactionRequest,
+    printOperation: boolean = false
+  ) {
+    const bridgehub = this.bridgehubContract(this.deployWallet);
+    const value = await bridgehub.l2TransactionBaseCost(
+      chainId,
+      gasPrice,
+      l2GasLimit,
+      REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+    );
+    const baseTokenAddress = await bridgehub.baseToken(chainId);
+    const ethIsBaseToken = baseTokenAddress == ADDRESS_ONE;
+    if (!ethIsBaseToken) {
+      const baseToken = TestnetERC20TokenFactory.connect(baseTokenAddress, this.deployWallet);
+      await (await baseToken.transfer(this.addresses.Governance, value)).wait();
+      await this.executeUpgrade(
+        baseTokenAddress,
+        0,
+        baseToken.interface.encodeFunctionData("approve", [this.addresses.Bridges.SharedBridgeProxy, value])
+      );
+    }
+    const l1Calldata = bridgehub.interface.encodeFunctionData("requestL2TransactionDirect", [
+      {
+        chainId,
+        l2Contract: targetAddress,
+        mintValue: value,
+        l2Value: 0,
+        l2Calldata: callData,
+        l2GasLimit: l2GasLimit,
+        l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+        factoryDeps: [],
+        refundRecipient: this.deployWallet.address,
+      },
+    ]);
+    const receipt = await this.executeUpgrade(
+      this.addresses.Bridgehub.BridgehubProxy,
+      ethIsBaseToken ? value : 0,
+      l1Calldata,
+      ethTxOptions,
+      printOperation
+    );
+    return receipt;
+  }
+
   // used for testing, mimics original deployment process.
   // we don't use the real implementation, as we need the address to be independent
   public async deployERC20BridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -614,7 +667,7 @@ export class Deployer {
     );
 
     if (this.verbose) {
-      console.log(`CONTRACTS_L1_SHARED_BRIDGE_PROXY_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_L1_NATIVE_TOKEN_VAULT_BRIDGE_PROXY_ADDR=${contractAddress}`);
     }
 
     this.addresses.Bridges.NativeTokenVaultProxy = contractAddress;

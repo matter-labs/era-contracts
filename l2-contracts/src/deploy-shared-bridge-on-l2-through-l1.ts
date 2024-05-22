@@ -11,6 +11,7 @@ import {
   applyL1ToL2Alias,
   publishBytecodeFromL1,
   requestL2TransactionDirect,
+  unapplyL1ToL2Alias,
 } from "./utils";
 
 import { ethTestConfig } from "./deploy-utils";
@@ -48,6 +49,50 @@ export async function publishL2StandardDeployerDependencyBytecodesOnL2(
 
   if (deployer.verbose) {
     console.log("Bytecodes published on L2, hash: ", receipt.hash);
+  }
+}
+
+export async function deployL2ProxyAdmin(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
+  if (deployer.verbose) {
+    console.log("Deploying L2 ProxyAdmin ");
+  }
+
+  const L2ProxyAdminBytecode = hre.artifacts.readArtifactSync("ProxyAdmin").bytecode;
+
+  if (!L2ProxyAdminBytecode) {
+    throw new Error("L2 ProxyAdmin not found");
+  }
+  if (deployer.verbose) {
+    console.log("Computing l2 proxy admin Address");
+  }
+  const L2ProxyAdminAddress = computeL2Create2Address(
+    deployer.deployWallet,
+    L2ProxyAdminBytecode,
+    "0x00",
+    ethers.constants.HashZero
+  );
+  deployer.addresses.L2ProxyAdmin = L2ProxyAdminAddress;
+  if (deployer.verbose) {
+    console.log(`L2 Proxy Admin  Address: ${L2ProxyAdminAddress}`);
+    console.log("Deploying L2 Proxy Admin ");
+  }
+
+  // TODO: request from API how many L2 gas needs for the transaction.
+  const tx2 = await create2DeployFromL1(
+    chainId,
+    deployer.deployWallet,
+    L2ProxyAdminBytecode,
+    "0x00",
+    ethers.constants.HashZero,
+    priorityTxMaxGasLimit,
+    gasPrice,
+    []
+  );
+
+  await tx2.wait();
+  if (deployer.verbose) {
+    console.log("Deployed L2 Proxy Admin");
+    console.log(`CONTRACTS_L2_PROXY_ADMIN_ADDR=${L2ProxyAdminAddress}`);
   }
 }
 
@@ -116,7 +161,7 @@ export async function deployStandardDeployerProxyOnL2ThroughL1(
   const L2StandardDeployerInterface = new Interface(hre.artifacts.readArtifactSync("L2StandardDeployer").abi);
   const proxyInitializationParams = L2StandardDeployerInterface.encodeFunctionData("initialize", [
     hashL2Bytecode(L2_STANDARD_TOKEN_PROXY_BYTECODE),
-    l2GovernorAddress,
+    applyL1ToL2Alias(deployer.deployWallet.address),
     false,
   ]);
 
@@ -124,17 +169,21 @@ export async function deployStandardDeployerProxyOnL2ThroughL1(
   const L2StandardDeployerProxyConstructorData = ethers.utils.arrayify(
     new ethers.utils.AbiCoder().encode(
       ["address", "address", "bytes"],
-      [deployer.addresses.Bridges.L2StandardDeployerImplementation, l2GovernorAddress, proxyInitializationParams]
+      [
+        deployer.addresses.Bridges.L2StandardDeployerImplementation,
+        deployer.addresses.L2ProxyAdmin,
+        proxyInitializationParams,
+      ]
     )
   );
 
   /// loading TransparentUpgradeableProxy bytecode
-  const L2_SHARED_BRIDGE_PROXY_BYTECODE = hre.artifacts.readArtifactSync("TransparentUpgradeableProxy").bytecode;
+  const L2_STANDARD_DEPLOYER_PROXY_BYTECODE = hre.artifacts.readArtifactSync("TransparentUpgradeableProxy").bytecode;
 
   /// compute L2StandardDeployerProxy address
   const L2StandardDeployerProxyAddress = computeL2Create2Address(
     deployer.deployWallet,
-    L2_SHARED_BRIDGE_PROXY_BYTECODE,
+    L2_STANDARD_DEPLOYER_PROXY_BYTECODE,
     L2StandardDeployerProxyConstructorData,
     ethers.constants.HashZero
   );
@@ -145,11 +194,12 @@ export async function deployStandardDeployerProxyOnL2ThroughL1(
   const tx3 = await create2DeployFromL1(
     chainId,
     deployer.deployWallet,
-    L2_SHARED_BRIDGE_PROXY_BYTECODE,
+    L2_STANDARD_DEPLOYER_PROXY_BYTECODE,
     L2StandardDeployerProxyConstructorData,
     ethers.constants.HashZero,
     priorityTxMaxGasLimit,
-    gasPrice
+    gasPrice,
+    []
   );
   await tx3.wait();
   if (deployer.verbose) {
@@ -157,8 +207,8 @@ export async function deployStandardDeployerProxyOnL2ThroughL1(
   }
 }
 
-export async function setSharedBridgeInStandardDeployer(deployer: Deployer, chainId: string) {
-  const l2StandardDeployer = IL2StandardDeployerFactory.connect(
+export async function setSharedBridgeInStandardDeployer(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
+  const l2StandardDeployer = L2StandardDeployerFactory.connect(
     deployer.addresses.Bridges.L2StandardDeployerProxy,
     deployer.deployWallet
   );
@@ -173,6 +223,29 @@ export async function setSharedBridgeInStandardDeployer(deployer: Deployer, chai
     priorityTxMaxGasLimit
   );
   await tx1.wait();
+  if (deployer.verbose) {
+    console.log("Set L2SharedBridge in L2StandardDeployer");
+  }
+
+  const tx2 = await requestL2TransactionDirect(
+    chainId,
+    deployer.deployWallet,
+    deployer.addresses.Bridges.L2StandardDeployerProxy,
+    l2StandardDeployer.interface.encodeFunctionData("transferOwnership", [deployer.addresses.Governance]),
+    priorityTxMaxGasLimit
+  );
+  await tx2.wait();
+  if (deployer.verbose) {
+    console.log("Transfered L2StandardDeployer ownership to governance");
+  }
+
+  await deployer.executeUpgradeOnL2(
+    chainId,
+    deployer.addresses.Bridges.L2StandardDeployerProxy,
+    gasPrice,
+    l2StandardDeployer.interface.encodeFunctionData("acceptOwnership"),
+    priorityTxMaxGasLimit
+  );
 }
 
 export async function deploySharedBridgeImplOnL2ThroughL1(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
@@ -240,7 +313,6 @@ export async function deploySharedBridgeProxyOnL2ThroughL1(
   const proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
     l1SharedBridge.address,
     deployer.addresses.Bridges.ERC20BridgeProxy,
-    l2GovernorAddress,
     deployer.addresses.Bridges.L2StandardDeployerProxy,
   ]);
 
@@ -308,11 +380,12 @@ export async function deploySharedBridgeOnL2ThroughL1(
   skipInitializeChainGovernance: boolean
 ) {
   await publishL2StandardDeployerDependencyBytecodesOnL2(deployer, chainId, gasPrice);
+  await deployL2ProxyAdmin(deployer, chainId, gasPrice);
   await deployStandardDeployerImplOnL2ThroughL1(deployer, chainId, gasPrice);
   await deployStandardDeployerProxyOnL2ThroughL1(deployer, chainId, gasPrice);
   await deploySharedBridgeImplOnL2ThroughL1(deployer, chainId, gasPrice);
   await deploySharedBridgeProxyOnL2ThroughL1(deployer, chainId, gasPrice);
-  await setSharedBridgeInStandardDeployer(deployer, chainId);
+  await setSharedBridgeInStandardDeployer(deployer, chainId, gasPrice);
   if (!skipInitializeChainGovernance) {
     await initializeChainGovernance(deployer, chainId);
   }

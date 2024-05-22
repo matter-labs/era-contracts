@@ -124,8 +124,12 @@ contract L1NativeTokenVault is
     /// @return The difference between the contract balance before and after the transferring of funds.
     function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));
+        address from = _from;
+        if (_token.allowance(address(L1_SHARED_BRIDGE), address(this)) > 0) {
+            from = address(L1_SHARED_BRIDGE);
+        }
         // slither-disable-next-line arbitrary-send-erc20
-        _token.safeTransferFrom(_from, address(this), _amount);
+        _token.safeTransferFrom(from, address(this), _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
 
         return balanceAfter - balanceBefore;

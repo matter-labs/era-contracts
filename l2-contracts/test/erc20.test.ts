@@ -21,12 +21,17 @@ const richAccount = [
     address: "0x0D43eB5B8a47bA8900d84AA36656c92024e9772e",
     privateKey: "0xd293c684d884d56f8d6abd64fc76757d3664904e309a0645baf8522ab6366d9e",
   },
+  {
+    address: "0xA13c10C0D5bd6f79041B9835c63f91de35A15883",
+    privateKey: "0x850683b40d4a740aa6e745f889a6fdc8327be76e122f5aba645a5b02d0248db8",
+  },
 ];
 
 describe("ERC20Bridge", function () {
   const provider = new Provider(hre.config.networks.localhost.url);
   const deployerWallet = new Wallet(richAccount[0].privateKey, provider);
   const governorWallet = new Wallet(richAccount[1].privateKey, provider);
+  const proxyAdminWallet = new Wallet(richAccount[3].privateKey, provider);
 
   // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
   // It is a bit easier to use EOA and it is sufficient for the tests.
@@ -55,37 +60,36 @@ describe("ERC20Bridge", function () {
     const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [testChainId, 1]);
     const erc20StandardDeployerImpl = await deployer.deploy(await deployer.loadArtifact("L2StandardDeployer"));
     const standardDeployerInitializeData = erc20StandardDeployerImpl.interface.encodeFunctionData("initialize", [
-      deployerWallet.address,
       beaconProxyBytecodeHash,
-      governorWallet.address,
+      governorWallet.address, // Note on real deployment this will be the deployerWallet
       contractsDeployedAlready,
     ]);
 
     const erc20StandardDeployerProxy = await deployer.deploy(
       await deployer.loadArtifact("TransparentUpgradeableProxy"),
-      [erc20StandardDeployerImpl.address, governorWallet.address, standardDeployerInitializeData]
+      [erc20StandardDeployerImpl.address, proxyAdminWallet.address, standardDeployerInitializeData]
     );
 
     contractsDeployedAlready = true;
 
     const bridgeInitializeData = erc20BridgeImpl.interface.encodeFunctionData("initialize", [
       unapplyL1ToL2Alias(l1BridgeWallet.address),
-      ethers.constants.AddressZero,
-      beaconProxyBytecodeHash,
-      governorWallet.address,
+      // ethers.constants.AddressZero,
+      unapplyL1ToL2Alias(governorWallet.address), // note on real deployment this will be the governor
       erc20StandardDeployerProxy.address,
     ]);
 
     const erc20BridgeProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
       erc20BridgeImpl.address,
-      governorWallet.address,
+      proxyAdminWallet.address,
       bridgeInitializeData,
     ]);
 
     erc20Bridge = L2SharedBridgeFactory.connect(erc20BridgeProxy.address, deployerWallet);
-    erc20StandardDeployer = L2StandardDeployerFactory.connect(erc20StandardDeployerProxy.address, deployerWallet);
-
+    erc20StandardDeployer = L2StandardDeployerFactory.connect(erc20StandardDeployerProxy.address, governorWallet);
     await erc20StandardDeployer.setSharedBridge(erc20BridgeProxy.address);
+
+    /// note in real deployment we have to transfer ownership of standard deployer here
   });
 
   it("Should finalize deposit ERC20 deposit", async function () {
