@@ -3,10 +3,8 @@
 pragma solidity 0.8.24;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
-import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransactionFiltererTrue.sol";
-import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
+
+
 import {L2Message, L2Log} from "contracts/common/Messaging.sol";
 import "forge-std/Test.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L1_GAS_PER_PUBDATA_BYTE, L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/common/Config.sol";
@@ -15,14 +13,8 @@ import {Merkle} from "contracts/state-transition/libraries/Merkle.sol";
 import {MurkyBase} from "murky/common/MurkyBase.sol";
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 import {TxStatus} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {DummyStateTransitionManagerWBH} from "contracts/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
-import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract MerkleTree is MurkyBase {
     /// The original Merkle tree contains the ascending sort and concat prior to hashing, so we need to override it
@@ -38,15 +30,10 @@ contract MerkleTree is MurkyBase {
     function test() internal virtual {}
 }
 
-contract ProveL2Logs is MailboxTest {
+contract MaibloxL2LogsProve is MailboxTest {
     bytes32[] elements;
     MerkleTest merkle;
     MerkleTree merkleTree;
-
-    function test_eraChainIdSet() public {
-        MailboxFacet m = new MailboxFacet(eraChainId);
-        assertEq(m.ERA_CHAIN_ID(), eraChainId);
-    }
 
     function test_RevertWhen_batchNumberGreaterThanBatchesExecuted() public {
         uint256 totalBatchesExecuted = gettersFacet.getTotalBatchesExecuted();
@@ -336,136 +323,4 @@ contract ProveL2Logs is MailboxTest {
         assertEq(ret, true);
     }
 
-    // Test the l2TransactionBaseCost function
-    function test_RevertWhen_badDenominatorInL2TransactionBaseCost() public {
-        utilsFacet.util_setbaseTokenGasPriceMultiplierDenominator(0);
-
-        uint256 gasPrice = 100;
-        uint256 l2GasLimit = 10000;
-        uint256 l2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
-
-        vm.expectRevert("Mailbox: baseTokenGasPriceDenominator not set");
-        mailboxFacet.l2TransactionBaseCost(gasPrice, l2GasLimit, l2GasPerPubdataByteLimit);
-    }
-
-    function test_successful_getL2TransactionBaseCostPricingModeValidium() public {
-        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
-        utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(1);
-
-        uint256 gasPrice = 10000000;
-        uint256 l2GasLimit = 1000000;
-        uint256 l2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
-
-        FeeParams memory feeParams = FeeParams({
-            pubdataPricingMode: PubdataPricingMode.Validium,
-            batchOverheadL1Gas: 1000000,
-            maxPubdataPerBatch: 120000,
-            maxL2GasPerBatch: 80000000,
-            priorityTxMaxPubdata: 99000,
-            minimalL2GasPrice: 250000000
-        });
-
-        utilsFacet.util_setFeeParams(feeParams);
-
-        uint256 l2TransactionBaseCost = 250125000000000;
-
-        assertEq(
-            mailboxFacet.l2TransactionBaseCost(gasPrice, l2GasLimit, l2GasPerPubdataByteLimit),
-            l2TransactionBaseCost
-        );
-    }
-
-    // currently returns max which is limit
-    // TODO: specify parameters so minrequiredbasetoken would be close to limit
-    function test_successful_getL2TransactionBaseCostPricingModeRollup() public {
-        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
-        utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(1);
-
-        uint256 gasPrice = 10000000;
-        uint256 l2GasLimit = 1000000;
-        uint256 l2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
-
-        FeeParams memory feeParams = FeeParams({
-            pubdataPricingMode: PubdataPricingMode.Rollup,
-            batchOverheadL1Gas: 1000000,
-            maxPubdataPerBatch: 120000,
-            maxL2GasPerBatch: 80000000,
-            priorityTxMaxPubdata: 99000,
-            minimalL2GasPrice: 250000000
-        });
-
-        utilsFacet.util_setFeeParams(feeParams);
-
-        uint256 l2TransactionBaseCost = 250125000000000;
-
-        assertEq(
-            mailboxFacet.l2TransactionBaseCost(gasPrice, l2GasLimit, l2GasPerPubdataByteLimit),
-            l2TransactionBaseCost
-        );
-    }
-
-    function test_transferEthToSharedBridge() public {
-        DummyBridgehub bridgeHub = new DummyBridgehub();
-        DummyStateTransitionManagerWBH stm = new DummyStateTransitionManagerWBH(address(bridgeHub));
-        address l1WethAddress = makeAddr("l1Weth");
-
-        bridgeHub.setStateTransitionManager(eraChainId, address(stm));
-        stm.setHyperchain(eraChainId, diamondProxy);
-
-        L1SharedBridge baseTokenBridge = new L1SharedBridge({
-            _l1WethAddress: l1WethAddress,
-            _bridgehub: IBridgehub(address(bridgeHub)),
-            _eraChainId: eraChainId,
-            _eraDiamondProxy: diamondProxy
-        });
-
-        utilsFacet.util_setChainId(eraChainId);
-        utilsFacet.util_setBaseTokenBridge(address(baseTokenBridge));
-        utilsFacet.util_setBridgehub(address(bridgeHub));
-
-        vm.deal(diamondProxy, 1 ether);
-        vm.prank(address(baseTokenBridge));
-        mailboxFacet.transferEthToSharedBridge();
-        assertEq(address(baseTokenBridge).balance, 1 ether);
-    }
-
-    function test_RevertWhen_transferEthToSharedBridgeBadCaller() public {
-        address baseTokenBridge = makeAddr("bridge");
-
-        utilsFacet.util_setChainId(eraChainId);
-
-        vm.deal(diamondProxy, 1 ether);
-
-        vm.expectRevert("Hyperchain: Only base token bridge can call this function");
-        vm.prank(baseTokenBridge);
-        mailboxFacet.transferEthToSharedBridge();
-    }
-
-    function test_RevertWhen_transferEthToSharedBridgeBadHyperchain() public {
-        address baseTokenBridge = makeAddr("bridge");
-
-        utilsFacet.util_setChainId(eraChainId + 1);
-        utilsFacet.util_setBaseTokenBridge(baseTokenBridge);
-
-        vm.deal(diamondProxy, 1 ether);
-
-        vm.expectRevert("Mailbox: transferEthToSharedBridge only available for Era on mailbox");
-        vm.prank(baseTokenBridge);
-        mailboxFacet.transferEthToSharedBridge();
-    }
-
-    function test_RevertWhen_finalizeEthWithdrawalNotEra() public {
-        utilsFacet.util_setChainId(eraChainId + 1);
-        bytes32[] memory proof = new bytes32[](0);
-        bytes memory message = "message";
-        vm.expectRevert("Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
-
-        mailboxFacet.finalizeEthWithdrawal({
-            _l2BatchNumber: 0,
-            _l2MessageIndex: 0,
-            _l2TxNumberInBatch: 0,
-            _message: message,
-            _merkleProof: proof
-        });
-    }
 }
