@@ -1,9 +1,8 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
-import { Interface } from "ethers/lib/utils";
 import * as hardhat from "hardhat";
 import type { L1SharedBridge, Bridgehub, L1NativeTokenVault } from "../../typechain";
-import { L1SharedBridgeFactory, BridgehubFactory, WETH9Factory, TestnetERC20TokenFactory } from "../../typechain";
+import { L1SharedBridgeFactory, BridgehubFactory, TestnetERC20TokenFactory } from "../../typechain";
 import { L1NativeTokenVaultFactory } from "../../typechain/L1NativeTokenVaultFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
@@ -59,15 +58,12 @@ describe("Shared Bridge tests", () => {
 
     l1SharedBridge = L1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
-    l1SharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
     l1NativeTokenVault = L1NativeTokenVaultFactory.connect(
       deployer.addresses.Bridges.NativeTokenVaultProxy,
       deployWallet
     );
 
     const tokens = getTokens();
-    const l1WethTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
-    l1Weth = WETH9Factory.connect(l1WethTokenAddress, owner);
 
     const tokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
     erc20TestToken = TestnetERC20TokenFactory.connect(tokenAddress, owner);

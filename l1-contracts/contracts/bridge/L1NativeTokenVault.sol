@@ -150,15 +150,16 @@ contract L1NativeTokenVault is
         return abi.encode(data1, data2, data3);
     }
 
+    /* solhint-disable no-unused-vars */
     function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {
+        // if (!hyperbridgingEnabled[_chainId]) { // ToDo: add logic & uncomment
+        //     // Add back
+        //     // Check that the chain has sufficient balance
+        //     require(chainBalance[_chainId][l1Token] >= _amount, "NTV not enough funds 2"); // not enough funds
+        //     chainBalance[_chainId][l1Token] -= _amount;
+        // }
         address l1Token = tokenAddress[_assetInfo];
         (uint256 _amount, address l1Receiver) = abi.decode(_data, (uint256, address));
-        if (!hyperbridgingEnabled[_chainId]) {
-            // Add back
-            // Check that the chain has sufficient balance
-            require(chainBalance[_chainId][l1Token] >= _amount, "NTV not enough funds 2"); // not enough funds
-            chainBalance[_chainId][l1Token] -= _amount;
-        }
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
