@@ -35,6 +35,8 @@ interface IL1SharedBridge {
         uint256 amount
     );
 
+    event BridgehubMintData(bytes bridgeMintData);
+
     event BridgehubDepositFinalized(
         uint256 indexed chainId,
         bytes32 indexed txDataHash,

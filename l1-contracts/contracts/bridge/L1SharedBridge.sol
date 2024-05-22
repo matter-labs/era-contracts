@@ -209,7 +209,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _amount
     ) external payable virtual onlyBridgehubOrEra(_chainId) whenNotPaused {
         (address l1Asset, bytes32 assetInfo) = _getAssetProperties(_assetInfo);
-        IL1StandardAsset(l1Asset).bridgeBurn{value: msg.value}({
+        bytes memory bridgeMintData = IL1StandardAsset(l1Asset).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
             _mintValue: 0,
             _assetInfo: assetInfo,
@@ -219,6 +219,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
         emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _assetInfo, _amount);
+        // We could use this data instead of the above
+        emit BridgehubMintData(bridgeMintData);
     }
 
     /// @dev for backwards compatibility and to automatically register l1 assets, and we return the correct info.
