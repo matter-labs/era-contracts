@@ -3,9 +3,9 @@ import * as hardhat from "hardhat";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import {
   getNumberFromEnv,
-  isCurrentNetworkLocal,
   getHashFromEnv,
   getAddressFromEnv,
+  isCurrentNetworkLocal,
   ethTestConfig,
 } from "../src.ts/utils";
 

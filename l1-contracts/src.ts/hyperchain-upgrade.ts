@@ -14,9 +14,9 @@ import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUp
 import { StateTransitionManagerFactory, L1SharedBridgeFactory, ValidatorTimelockFactory } from "../typechain";
 
 import { Interface } from "ethers/lib/utils";
-import { ADDRESS_ONE, getAddressFromEnv, isCurrentNetworkLocal } from "./utils";
+import { ADDRESS_ONE, getAddressFromEnv, readBytecode, isCurrentNetworkLocal } from "./utils";
+import type { L2CanonicalTransaction, ProposedUpgrade, VerifierParams } from "./utils";
 import { BEACON_PROXY_BYTECODE } from "./deploy-utils-zk";
-// import type { L2CanonicalTransaction, ProposedUpgrade, VerifierParams } from "./utils";
 
 import {
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -288,7 +288,7 @@ async function upgradeL2Bridge(deployer: Deployer, gasPrice: BigNumberish, print
   );
 }
 
-async function upgradeL1ERC20Bridge(deployer: Deployer, gasPrice: BigNumberish, printFileName: string) {
+async function upgradeL1ERC20Bridge(deployer: Deployer, gasPrice: BigNumberish, printFileName?: string) {
   if (isCurrentNetworkLocal()) {
     // we need to wait here for a new block
     await new Promise((resolve) => setTimeout(resolve, 5000));
