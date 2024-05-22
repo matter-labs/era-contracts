@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity 0.8.24;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";

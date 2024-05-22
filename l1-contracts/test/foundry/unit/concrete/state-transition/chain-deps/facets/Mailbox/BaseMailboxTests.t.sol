@@ -17,16 +17,10 @@ contract MailboxBaseTests is MailboxTest {
         assertEq(m.ERA_CHAIN_ID(), eraChainId);
     }
 
-
     function test_RevertWhen_badDenominatorInL2TransactionBaseCost() public {
         utilsFacet.util_setbaseTokenGasPriceMultiplierDenominator(0);
-
-        uint256 gasPrice = 100;
-        uint256 l2GasLimit = 10000;
-        uint256 l2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
-
         vm.expectRevert("Mailbox: baseTokenGasPriceDenominator not set");
-        mailboxFacet.l2TransactionBaseCost(gasPrice, l2GasLimit, l2GasPerPubdataByteLimit);
+        mailboxFacet.l2TransactionBaseCost(100, 10000, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
     }
 
     function test_successful_getL2TransactionBaseCostPricingModeValidium() public {
