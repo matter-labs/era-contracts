@@ -63,20 +63,18 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
     /// @param _l1SharedBridge The address of the L1 Bridge contract.
     /// @param _l1Bridge The address of the legacy L1 Bridge contract.
-    /// @param _aliasedOwner The address of the governor contract.
+    /// @param _standardDeployer The address of the standardDeployer contract.
     function initialize(
         address _l1SharedBridge,
         address _l1Bridge,
-        address _aliasedOwner,
         IL2StandardDeployer _standardDeployer
     ) external reinitializer(2) {
         require(_l1SharedBridge != address(0), "bf");
-        require(_aliasedOwner != address(0), "sf");
         require(address(_standardDeployer) != address(0), "cf");
 
         l1SharedBridge = _l1SharedBridge;
         standardDeployer = _standardDeployer;
-        if (block.chainid == ERA_CHAIN_ID){
+        if (block.chainid == ERA_CHAIN_ID) {
             require(_l1Bridge != address(0), "bf2");
             l1Bridge = _l1Bridge;
         }

@@ -211,7 +211,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _amount
     ) external payable virtual onlyBridgehubOrEra(_chainId) whenNotPaused {
         (address l1Asset, bytes32 assetInfo) = _getAssetProperties(_assetInfo);
-        bytes memory bridgeMintData = IL1StandardAsset(l1Asset).bridgeBurn{value: msg.value}(
+        _transferAllowanceToNTV(assetInfo, _amount, _prevMsgSender);
+        IL1StandardAsset(l1Asset).bridgeBurn{value: msg.value}(
             _chainId,
             0,
             assetInfo,
@@ -230,12 +231,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         if (l1Asset == address(0) && (uint256(_assetInfo) <= type(uint160).max)) {
             l1Asset = address(nativeTokenVault);
             assetInfo = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetInfo));
-            // assetAddress[assetInfo] = address(nativeTokenVault);
             nativeTokenVault.registerToken(address(uint160(uint256(_assetInfo))));
         }
     }
 
-    function decodeLegacyData(bytes calldata _data) external returns (bytes32, bytes memory) {
+    function decodeLegacyData(bytes calldata _data, address _prevMsgSender) external returns (bytes32, bytes memory) {
         (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
             _data,
             (address, uint256, address)
@@ -244,7 +244,26 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         if (nativeTokenVault.tokenAddress(assetInfo) == address(0)) {
             nativeTokenVault.registerToken(_l1Token);
         }
+        _transferAllowanceToNTV(assetInfo, _depositAmount, _prevMsgSender);
         return (assetInfo, abi.encode(_depositAmount, _l2Receiver));
+    }
+
+    function _transferAllowanceToNTV(bytes32 _assetInfo, uint256 _amount, address _prevMsgSender) internal {
+        // assetInfo might be padded token address, or it might be asset info (get token from NTV)
+        // do the transfer if allowance is bigger than amount
+        address asset = assetAddress[_assetInfo];
+        address l1TokenAddress = nativeTokenVault.tokenAddress(_assetInfo);
+        if (asset == address(0) && (uint256(_assetInfo) <= type(uint160).max)) {
+            l1TokenAddress = address(uint160(uint256(_assetInfo)));
+        } else if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
+            return;
+        }
+        IERC20 l1Token = IERC20(l1TokenAddress);
+
+        if (l1Token.allowance(_prevMsgSender, address(this)) >= _amount) {
+            l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
+            l1Token.safeIncreaseAllowance(address(nativeTokenVault), _amount);
+        }
     }
 
     /// @notice Initiates a deposit transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
@@ -264,7 +283,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(l2BridgeAddress[_chainId] != address(0), "ShB l2 bridge not deployed");
         bytes32 _assetInfo;
         bytes memory _assetData;
-        try this.decodeLegacyData(_data) returns (bytes32 _assetInfoCatch, bytes memory _assetDataCatch) {
+        try this.decodeLegacyData(_data, _prevMsgSender) returns (
+            bytes32 _assetInfoCatch,
+            bytes memory _assetDataCatch
+        ) {
             (_assetInfo, _assetData) = (_assetInfoCatch, _assetDataCatch);
         } catch {
             (_assetInfo, _assetData) = abi.decode(_data, (bytes32, bytes));
@@ -300,7 +322,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         address _prevMsgSender,
         bytes memory _assetData
     ) internal returns (bytes memory bridgeMintCalldata, bytes32 assetInfo) {
-        (address l1Asset, bytes32 assetInfo) = _getAssetProperties(_assetInfo);
+        address l1Asset;
+        (l1Asset, assetInfo) = _getAssetProperties(_assetInfo);
         bridgeMintCalldata = IL1StandardAsset(l1Asset).bridgeBurn{value: msg.value}(
             _chainId,
             _l2Value,
@@ -347,7 +370,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         address _l1Sender,
         bytes32 _assetInfo,
         bytes memory _assetData
-    ) internal view returns (bytes memory) {
+    ) internal pure returns (bytes memory) {
         return abi.encodeCall(IL2Bridge.finalizeDeposit, (_assetInfo, _assetData));
     }
 

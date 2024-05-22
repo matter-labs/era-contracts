@@ -37,7 +37,7 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         _;
     }
 
-        /// @dev Contract is expected to be used as proxy implementation.
+    /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
     constructor() {
         _disableInitializers();
