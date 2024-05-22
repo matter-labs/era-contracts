@@ -3,8 +3,6 @@
 pragma solidity 0.8.24;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
-
-
 import {L2Message, L2Log} from "contracts/common/Messaging.sol";
 import "forge-std/Test.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L1_GAS_PER_PUBDATA_BYTE, L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/common/Config.sol";
@@ -30,297 +28,273 @@ contract MerkleTree is MurkyBase {
     function test() internal virtual {}
 }
 
-contract MaibloxL2LogsProve is MailboxTest {
+contract MailboxL2LogsProve is MailboxTest {
     bytes32[] elements;
     MerkleTest merkle;
     MerkleTree merkleTree;
+    bytes data;
+    uint256 batchNumber;
+    bool isService;
+    uint8 shardId;
 
-    function test_RevertWhen_batchNumberGreaterThanBatchesExecuted() public {
-        uint256 totalBatchesExecuted = gettersFacet.getTotalBatchesExecuted();
-        address sender = makeAddr("l2sender");
-        uint256 batchNumber = totalBatchesExecuted + 1;
-        uint256 index = 0;
-        L2Message memory message = L2Message({txNumberInBatch: 0, sender: sender, data: abi.encodePacked("test")});
-        bytes32[] memory proof = new bytes32[](0);
-        vm.expectRevert(bytes("xx"));
-        mailboxFacet.proveL2MessageInclusion(batchNumber, index, message, proof);
+    function setUp() public virtual {
+        init();
+
+        data = abi.encodePacked("test data");
+        merkleTree = new MerkleTree();
+        merkle = new MerkleTest();
+        batchNumber = gettersFacet.getTotalBatchesExecuted();
+        isService = true;
+        shardId = 0;
     }
 
-    //  require(hashedLog != L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, "tw");
+    function _addHashedLogToMerkleTree(
+        uint8 _shardId,
+        bool _isService,
+        uint16 _txNumberInBatch,
+        address _sender,
+        bytes32 _key,
+        bytes32 _value
+    ) internal returns (uint256 index) {
+        elements.push(keccak256(abi.encodePacked(_shardId, _isService, _txNumberInBatch, _sender, _key, _value)));
+
+        index = elements.length - 1;
+    }
+
+    function test_RevertWhen_batchNumberGreaterThanBatchesExecuted() public {
+        L2Message memory message = L2Message({txNumberInBatch: 0, sender: sender, data: data});
+        bytes32[] memory proof = new bytes32[](0);
+
+        vm.expectRevert(bytes("xx"));
+        mailboxFacet.proveL2MessageInclusion({
+            _batchNumber: batchNumber + 1,
+            _index: 0,
+            _message: message,
+            _proof: proof
+        });
+    }
+
+    // require(hashedLog != L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, "tw");
     // this is not possible in case of message, because some default values
     // are set during translation from message to log
     function test_successful_proveL2MessageInclussion() public {
-        merkleTree = new MerkleTree();
-        merkle = new MerkleTest();
-        address sender = makeAddr("sender");
-        bytes memory data = abi.encodePacked("123");
-        uint256 index = 0;
+        uint256 firstLogIndex = _addHashedLogToMerkleTree({
+            _shardId: 0,
+            _isService: true,
+            _txNumberInBatch: 0,
+            _sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            _key: bytes32(uint256(uint160(sender))),
+            _value: keccak256(data)
+        });
 
-        // Add first element to the Merkle tree
-        elements.push(
-            keccak256(
-                abi.encodePacked(
-                    uint8(0),
-                    true,
-                    uint16(0),
-                    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-                    bytes32(uint256(uint160(sender))),
-                    keccak256(data)
-                )
-            )
-        );
-        index += 1;
-
-        // Add second element to the Merkle tree
-        elements.push(
-            keccak256(
-                abi.encodePacked(
-                    uint8(0),
-                    true,
-                    uint16(1),
-                    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-                    bytes32(uint256(uint160(sender))),
-                    keccak256(data)
-                )
-            )
-        );
+        uint256 secondLogIndex = _addHashedLogToMerkleTree({
+            _shardId: 0,
+            _isService: true,
+            _txNumberInBatch: 1,
+            _sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            _key: bytes32(uint256(uint160(sender))),
+            _value: keccak256(data)
+        });
 
         // Calculate the Merkle root
         bytes32 root = merkleTree.getRoot(elements);
-        utilsFacet.util_setl2LogsRootHash(0, root);
+        utilsFacet.util_setl2LogsRootHash(batchNumber, root);
 
         // Create L2 message
         L2Message memory message = L2Message({txNumberInBatch: 0, sender: sender, data: data});
 
         // Get Merkle proof for the first element
-        bytes32[] memory proof = merkleTree.getProof(elements, 0);
-
-        // Calculate the root using the Merkle proof
-        bytes32 leaf = elements[0];
-        uint256 leafIndex = 0;
-        bytes32 calculatedRoot = merkle.calculateRoot(proof, leafIndex, leaf);
-
-        // Assert that the calculated root matches the expected root
-        assertEq(calculatedRoot, root);
-
-        // Prove L2 message inclusion
-        bool ret = mailboxFacet.proveL2MessageInclusion(0, leafIndex, message, proof);
-
-        // Assert that the proof was successful
-        assertEq(ret, true);
-    }
-
-    function test_successful_proveL2LogInclusion() public {
-        merkleTree = new MerkleTree();
-        merkle = new MerkleTest();
-
-        bytes32 secondL2TxHash = keccak256("SecondL2Transaction");
-        TxStatus txStatus = TxStatus.Success;
-        address sender = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR;
-        address messageSender = makeAddr("sender");
-        bytes memory data = abi.encodePacked("123");
-
-        uint8 l2ShardId = 0;
-        bool isService = true;
-        uint256 indexInTree = 0;
-        uint16 txNumberInBatch = 0;
-
-        L2Log memory log = L2Log({
-            l2ShardId: l2ShardId,
-            isService: isService,
-            txNumberInBatch: txNumberInBatch,
-            sender: sender,
-            key: bytes32(uint256(uint160(messageSender))),
-            value: keccak256(data)
-        });
-
-        // Add first element to the Merkle tree
-        elements.push(
-            keccak256(
-                abi.encodePacked(
-                    l2ShardId,
-                    isService,
-                    txNumberInBatch,
-                    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-                    bytes32(uint256(uint160(messageSender))),
-                    keccak256(data)
-                )
-            )
-        );
-
-        // update changing values
-        indexInTree += 1;
-        txNumberInBatch += 1;
-
-        // Add second element to the Merkle tree
-        elements.push(
-            keccak256(
-                abi.encodePacked(
-                    l2ShardId,
-                    isService,
-                    txNumberInBatch,
-                    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-                    bytes32(uint256(uint160(messageSender))),
-                    keccak256(data)
-                )
-            )
-        );
-
-        // Calculate the Merkle root
-        bytes32 root = merkleTree.getRoot(elements);
-        // Set root hash for current batch
-        utilsFacet.util_setl2LogsRootHash(0, root);
-
-        // Get Merkle proof for the first element
-        bytes32[] memory proof = merkleTree.getProof(elements, 0);
+        bytes32[] memory firstLogProof = merkleTree.getProof(elements, firstLogIndex);
 
         {
             // Calculate the root using the Merkle proof
-            bytes32 leaf = elements[0];
-            uint256 leafIndex = 0;
-            bytes32 calculatedRoot = merkle.calculateRoot(proof, leafIndex, leaf);
+            bytes32 leaf = elements[firstLogIndex];
+            bytes32 calculatedRoot = merkle.calculateRoot(firstLogProof, firstLogIndex, leaf);
+
             // Assert that the calculated root matches the expected root
             assertEq(calculatedRoot, root);
         }
 
-        // Prove L1 to L2 transaction status
-        bool ret = mailboxFacet.proveL2LogInclusion({_batchNumber: 0, _index: 0, _proof: proof, _log: log});
+        // Prove L2 message inclusion
+        bool ret = mailboxFacet.proveL2MessageInclusion(batchNumber, firstLogIndex, message, firstLogProof);
 
         // Assert that the proof was successful
         assertEq(ret, true);
+
+        // Prove L2 message inclusion for wrong leaf
+        ret = mailboxFacet.proveL2MessageInclusion(batchNumber, secondLogIndex, message, firstLogProof);
+
+        // Assert that the proof has failed
+        assertEq(ret, false);
+    }
+
+    function test_successful_proveL2LogInclusion() public {
+        uint256 firstLogIndex = _addHashedLogToMerkleTree({
+            _shardId: shardId,
+            _isService: isService,
+            _txNumberInBatch: 0,
+            _sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            _key: bytes32(uint256(uint160(sender))),
+            _value: keccak256(data)
+        });
+
+        uint256 secondLogIndex = _addHashedLogToMerkleTree({
+            _shardId: shardId,
+            _isService: isService,
+            _txNumberInBatch: 1,
+            _sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            _key: bytes32(uint256(uint160(sender))),
+            _value: keccak256(data)
+        });
+
+        L2Log memory log = L2Log({
+            l2ShardId: shardId,
+            isService: isService,
+            txNumberInBatch: 1,
+            sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            key: bytes32(uint256(uint160(sender))),
+            value: keccak256(data)
+        });
+
+        // Calculate the Merkle root
+        bytes32 root = merkleTree.getRoot(elements);
+        // Set root hash for current batch
+        utilsFacet.util_setl2LogsRootHash(batchNumber, root);
+
+        // Get Merkle proof for the first element
+        bytes32[] memory secondLogProof = merkleTree.getProof(elements, secondLogIndex);
+
+        {
+            // Calculate the root using the Merkle proof
+            bytes32 leaf = elements[secondLogIndex];
+
+            bytes32 calculatedRoot = merkle.calculateRoot(secondLogProof, secondLogIndex, leaf);
+            // Assert that the calculated root matches the expected root
+            assertEq(calculatedRoot, root);
+        }
+
+        // Prove l2 log inclusion with correct proof
+        bool ret = mailboxFacet.proveL2LogInclusion({
+            _batchNumber: batchNumber,
+            _index: secondLogIndex,
+            _proof: secondLogProof,
+            _log: log
+        });
+
+        // Assert that the proof was successful
+        assertEq(ret, true);
+
+        // Prove l2 log inclusion with wrong proof
+        ret = mailboxFacet.proveL2LogInclusion({
+            _batchNumber: batchNumber,
+            _index: firstLogIndex,
+            _proof: secondLogProof,
+            _log: log
+        });
+
+        // Assert that the proof was successful
+        assertEq(ret, false);
     }
 
     function test_RevertWhen_proveL2LogInclusionDefaultLog() public {
-        merkleTree = new MerkleTree();
-        merkle = new MerkleTest();
-
-        bytes32 secondL2TxHash = keccak256("SecondL2Transaction");
-        TxStatus txStatus = TxStatus.Success;
-        address sender = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR;
-        address messageSender = makeAddr("sender");
-
-        uint8 l2ShardId = 0;
-        bool isService = false;
-        uint256 indexInTree = 0;
-        uint16 txNumberInBatch = 0;
-
         L2Log memory log = L2Log({
-            l2ShardId: l2ShardId,
-            isService: isService,
-            txNumberInBatch: txNumberInBatch,
+            l2ShardId: 0,
+            isService: false,
+            txNumberInBatch: 0,
             sender: address(0),
             key: bytes32(0),
             value: bytes32(0)
         });
 
+        uint256 firstLogIndex = _addHashedLogToMerkleTree({
+            _shardId: 0,
+            _isService: true,
+            _txNumberInBatch: 1,
+            _sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            _key: bytes32(uint256(uint160(sender))),
+            _value: keccak256(data)
+        });
+
         // Add first element to the Merkle tree
         elements.push(keccak256(new bytes(L2_TO_L1_LOG_SERIALIZE_SIZE)));
-
-        txNumberInBatch += 1;
-        indexInTree += 1;
-
-        elements.push(
-            keccak256(abi.encodePacked(l2ShardId, isService, txNumberInBatch, address(0), bytes32(0), bytes32(0)))
-        );
+        uint256 secondLogIndex = 1;
 
         // Calculate the Merkle root
         bytes32 root = merkleTree.getRoot(elements);
         // Set root hash for current batch
-        utilsFacet.util_setl2LogsRootHash(0, root);
+        utilsFacet.util_setl2LogsRootHash(batchNumber, root);
 
         // Get Merkle proof for the first element
-        bytes32[] memory proof = merkleTree.getProof(elements, 0);
+        bytes32[] memory secondLogProof = merkleTree.getProof(elements, secondLogIndex);
 
         {
             // Calculate the root using the Merkle proof
-            bytes32 leaf = elements[0];
-            uint256 leafIndex = 0;
-            bytes32 calculatedRoot = merkle.calculateRoot(proof, leafIndex, leaf);
+            bytes32 leaf = elements[secondLogIndex];
+            bytes32 calculatedRoot = merkle.calculateRoot(secondLogProof, secondLogIndex, leaf);
             // Assert that the calculated root matches the expected root
             assertEq(calculatedRoot, root);
         }
 
-        // Prove L1 to L2 transaction status
+        // Prove log inclusion reverts
         vm.expectRevert(bytes("tw"));
-        mailboxFacet.proveL2LogInclusion({_batchNumber: 0, _index: 0, _proof: proof, _log: log});
+        mailboxFacet.proveL2LogInclusion({
+            _batchNumber: batchNumber,
+            _index: secondLogIndex,
+            _proof: secondLogProof,
+            _log: log
+        });
     }
 
     function test_successful_proveL1ToL2TransactionStatus() public {
-        merkleTree = new MerkleTree();
-        merkle = new MerkleTest();
-
         bytes32 firstL2TxHash = keccak256("firstL2Transaction");
         bytes32 secondL2TxHash = keccak256("SecondL2Transaction");
-
         TxStatus txStatus = TxStatus.Success;
-        address sender = L2_BOOTLOADER_ADDRESS;
-        uint8 l2ShardId = 0;
-        bool isService = true;
 
-        uint256 indexInTree = 0;
-        uint16 txNumberInBatch = 0;
+        uint256 firstLogIndex = _addHashedLogToMerkleTree({
+            _shardId: shardId,
+            _isService: isService,
+            _txNumberInBatch: 0,
+            _sender: L2_BOOTLOADER_ADDRESS,
+            _key: firstL2TxHash,
+            _value: bytes32(uint256(txStatus))
+        });
 
-        // Add first element to the Merkle tree
-        elements.push(
-            keccak256(
-                abi.encodePacked(
-                    l2ShardId,
-                    isService,
-                    txNumberInBatch,
-                    L2_BOOTLOADER_ADDRESS,
-                    firstL2TxHash,
-                    bytes32(uint256(txStatus))
-                )
-            )
-        );
-
-        // update changing values
-        indexInTree += 1;
-        txNumberInBatch += 1;
-
-        // Add second element to the Merkle tree
-        elements.push(
-            keccak256(
-                abi.encodePacked(
-                    l2ShardId,
-                    isService,
-                    txNumberInBatch,
-                    L2_BOOTLOADER_ADDRESS,
-                    secondL2TxHash,
-                    bytes32(uint256(txStatus))
-                )
-            )
-        );
+        uint256 secondLogIndex = _addHashedLogToMerkleTree({
+            _shardId: shardId,
+            _isService: isService,
+            _txNumberInBatch: 1,
+            _sender: L2_BOOTLOADER_ADDRESS,
+            _key: secondL2TxHash,
+            _value: bytes32(uint256(txStatus))
+        });
 
         // Calculate the Merkle root
         bytes32 root = merkleTree.getRoot(elements);
         // Set root hash for current batch
-        utilsFacet.util_setl2LogsRootHash(0, root);
+        utilsFacet.util_setl2LogsRootHash(batchNumber, root);
 
         // Get Merkle proof for the first element
-        bytes32[] memory proof = merkleTree.getProof(elements, 0);
+        bytes32[] memory secondLogProof = merkleTree.getProof(elements, secondLogIndex);
 
         {
             // Calculate the root using the Merkle proof
-            bytes32 leaf = elements[0];
-            uint256 leafIndex = 0;
-            bytes32 calculatedRoot = merkle.calculateRoot(proof, leafIndex, leaf);
+            bytes32 leaf = elements[secondLogIndex];
+            bytes32 calculatedRoot = merkle.calculateRoot(secondLogProof, secondLogIndex, leaf);
             // Assert that the calculated root matches the expected root
             assertEq(calculatedRoot, root);
         }
 
         // Prove L1 to L2 transaction status
         bool ret = mailboxFacet.proveL1ToL2TransactionStatus({
-            _l2TxHash: firstL2TxHash,
-            _l2BatchNumber: 0,
-            _l2MessageIndex: 0,
-            _l2TxNumberInBatch: 0,
-            _merkleProof: proof,
+            _l2TxHash: secondL2TxHash,
+            _l2BatchNumber: batchNumber,
+            _l2MessageIndex: secondLogIndex,
+            _l2TxNumberInBatch: 1,
+            _merkleProof: secondLogProof,
             _status: txStatus
         });
 
         // Assert that the proof was successful
         assertEq(ret, true);
     }
-
 }
