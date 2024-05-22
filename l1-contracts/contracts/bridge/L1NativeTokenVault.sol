@@ -112,7 +112,7 @@ contract L1NativeTokenVault is
         }
         require(amount != 0, "6T"); // empty deposit amount
 
-        if (L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
+        if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
             chainBalance[_chainId][l1Token] += _depositAmount;
         }
 
@@ -152,14 +152,10 @@ contract L1NativeTokenVault is
 
     /* solhint-disable no-unused-vars */
     function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {
-        // if (!hyperbridgingEnabled[_chainId]) { // ToDo: add logic & uncomment
-        //     // Add back
-        //     // Check that the chain has sufficient balance
-        //     require(chainBalance[_chainId][l1Token] >= _amount, "NTV not enough funds 2"); // not enough funds
-        //     chainBalance[_chainId][l1Token] -= _amount;
-        // }
+        // ToDo: onlyBridgehub right?
         address l1Token = tokenAddress[_assetInfo];
         (uint256 _amount, address l1Receiver) = abi.decode(_data, (uint256, address));
+
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
@@ -168,6 +164,13 @@ contract L1NativeTokenVault is
             }
             require(callSuccess, "NTV: withdraw failed");
         } else {
+            if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
+                // ToDo: add logic & uncomment
+                // Add back
+                // Check that the chain has sufficient balance
+                require(chainBalance[_chainId][l1Token] >= _amount, "NTV not enough funds 2"); // not enough funds
+                chainBalance[_chainId][l1Token] -= _amount;
+            }
             // Withdraw funds
             IERC20(l1Token).safeTransfer(l1Receiver, _amount);
         }
@@ -196,7 +199,7 @@ contract L1NativeTokenVault is
             // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
         }
 
-        if (L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
+        if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
             // check that the chain has sufficient balance
             require(chainBalance[_chainId][l1Token] >= _amount, "NTV n funds");
             chainBalance[_chainId][l1Token] -= _amount;

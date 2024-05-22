@@ -697,16 +697,24 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(l2BridgeAddress[ERA_CHAIN_ID] != address(0), "ShB b. n dep");
         require(_l1Asset != L1_WETH_TOKEN, "ShB: WETH deposit not supported 2");
 
-        // // Note that funds have been transferred to this contract in the legacy ERC20 bridge.
-        // if (!hyperbridgingEnabled[ERA_CHAIN_ID]) {
-        //     chainBalance[ERA_CHAIN_ID][_l1Asset] += _amount;
-        // }
-
+        bytes32 assetInfo = IL1NativeTokenVault(nativeTokenVault).getAssetInfoFromLegacy(_l1Asset);
         bytes memory bridgeMintData = abi.encode(_amount);
-        bytes memory l2TxCalldata = _getDepositL2Calldata(
-            IL1NativeTokenVault(nativeTokenVault).getAssetInfoFromLegacy(_l1Asset),
-            bridgeMintData
-        );
+        bytes memory l2TxCalldata = _getDepositL2Calldata(assetInfo, bridgeMintData);
+
+        _transferAllowanceToNTV(assetInfo, _amount, _prevMsgSender);
+        {
+            address prevMsgSender = _prevMsgSender;
+            uint256 amount = _amount;
+            (address l1Asset, bytes32 assetI) = _getAssetProperties(assetInfo);
+            /* solhint-disable no-unused-vars */
+            IL1StandardAsset(l1Asset).bridgeBurn{value: 0}({
+                _chainId: ERA_CHAIN_ID,
+                _mintValue: 0,
+                _assetInfo: assetInfo,
+                _prevMsgSender: prevMsgSender,
+                _data: abi.encode(amount, address(0))
+            });
+        }
 
         {
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.

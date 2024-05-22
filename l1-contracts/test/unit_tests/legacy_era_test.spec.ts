@@ -3,8 +3,8 @@ import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
 import { Interface } from "ethers/lib/utils";
 
-import type { Bridgehub, L1SharedBridge, GettersFacet, MockExecutorFacet } from "../../typechain";
 import {
+  L1NativeTokenVaultFactory,
   L1SharedBridgeFactory,
   BridgehubFactory,
   TestnetERC20TokenFactory,
@@ -12,6 +12,7 @@ import {
   GettersFacetFactory,
   MockExecutorFacetFactory,
 } from "../../typechain";
+import type { Bridgehub, L1SharedBridge, GettersFacet, MockExecutorFacet, L1NativeTokenVault } from "../../typechain";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
 import type { IMailbox } from "../../typechain/IMailbox";
@@ -93,6 +94,7 @@ describe("Legacy Era tests", function () {
 
     await erc20TestToken.mint(await randomSigner.getAddress(), ethers.utils.parseUnits("10000", 18));
     await erc20TestToken.connect(randomSigner).approve(l1ERC20BridgeAddress, ethers.utils.parseUnits("10000", 18));
+    await erc20TestToken.connect(randomSigner).approve(sharedBridgeProxy.address, ethers.utils.parseUnits("10000", 18));
 
     const sharedBridgeFactory = await hardhat.ethers.getContractFactory("L1SharedBridge");
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
@@ -150,6 +152,11 @@ describe("Legacy Era tests", function () {
 
   it("Should deposit successfully", async () => {
     const depositorAddress = await randomSigner.getAddress();
+    const vault: L1NativeTokenVault = L1NativeTokenVaultFactory.connect(
+      await sharedBridgeProxy.nativeTokenVault(),
+      deployWallet
+    );
+    await vault["registerToken(address)"](erc20TestToken.address);
     await depositERC20(
       l1ERC20Bridge.connect(randomSigner),
       bridgehub,
