@@ -234,8 +234,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
     }
 
-    function decodeLegacyData(bytes calldata _data, address _prevMsgSender) external returns (bytes32, bytes memory) {
-        require (msg.sender == address(this));
+    function _decodeLegacyData(bytes calldata _data, address _prevMsgSender) internal returns (bytes32, bytes memory) {
         (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
             _data,
             (address, uint256, address)
@@ -283,13 +282,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(l2BridgeAddress[_chainId] != address(0), "ShB l2 bridge not deployed");
         bytes32 _assetInfo;
         bytes memory _assetData;
-        try this.decodeLegacyData(_data, _prevMsgSender) returns (
-            bytes32 _assetInfoCatch,
-            bytes memory _assetDataCatch
-        ) {
-            (_assetInfo, _assetData) = (_assetInfoCatch, _assetDataCatch);
-        } catch {
+
+        if (_prevMsgSender == address(0)) {
             (_assetInfo, _assetData) = abi.decode(_data, (bytes32, bytes));
+        } else {
+            (_assetInfo, _assetData) = _decodeLegacyData(_data, _prevMsgSender);
         }
 
         require(BRIDGE_HUB.baseToken(_chainId) != assetAddress[_assetInfo], "ShB: baseToken deposit not supported");
