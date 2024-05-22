@@ -61,8 +61,12 @@ export async function initialBridgehubDeployment(
   await deployer.deployValidatorTimelock(create2Salt, { gasPrice, nonce });
   nonce++;
 
+  // Governance will be L1 governance, but we want to deploy it here for the init process. 
   await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
-  await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
+  if (deployer.isZkMode()) {
+    // proxy admin is already deployed when SL's L2SharedBridge is registered
+    await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
+  }
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
   if (deployer.isZkMode()) {
     await deployer.updateBlobVersionedHashRetrieverZkMode();
@@ -72,8 +76,9 @@ export async function initialBridgehubDeployment(
   await deployer.deployStateTransitionManagerContract(create2Salt, extraFacets, gasPrice);
   await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
 
+  // L2 Shared Bridge already deployed via L1 forced tx
   if (deployer.isZkMode()) {
-    await deployer.deployL2SharedBridgeContracts(create2Salt, gasPrice);
+    await deployer.registerSharedBridge();
   } else {
     await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
     await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
@@ -100,7 +105,7 @@ export async function registerHyperchain(
   if (!(await deployer.bridgehubContract(deployer.deployWallet).tokenIsRegistered(baseTokenAddress))) {
     await deployer.registerTokenBridgehub(baseTokenAddress, useGovernance);
   }
-  await deployer.registerTokenInNativeTokenVault(baseTokenAddress, { gasPrice });
+  await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
   await deployer.registerHyperchain(
     baseTokenAddress,
     validiumMode,

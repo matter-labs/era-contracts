@@ -9,16 +9,12 @@ import { web3Provider, GAS_MULTIPLIER, web3Url } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import { initialBridgehubDeployment } from "../src.ts/deploy-process";
 import {
-  DIAMOND_CUT_DATA_ABI_STRING,
-  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   ethTestConfig,
   getAddressFromEnv,
   getNumberFromEnv,
 } from "../src.ts/utils";
 
 import { Wallet as ZkWallet, Provider as ZkProvider, utils as zkUtils } from "zksync-ethers";
-import { IAdmin } from "../typechain/IAdmin";
-import { IAdminFactory } from "../typechain/IAdminFactory";
 import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
 import { BOOTLOADER_FORMAL_ADDRESS } from "zksync-ethers/build/src/utils";
 
@@ -78,8 +74,14 @@ async function main() {
       if (deployer.isZkMode()) {
         console.log("Deploying on a zkSync network!");
       }
+      deployer.addresses.Bridges.SharedBridgeProxy = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR")
 
+      await initialBridgehubDeployment(deployer, [], gasPrice, true, create2Salt);
       await initialBridgehubDeployment(deployer, [], gasPrice, false, create2Salt);
+      const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
+      const l1ChainId = getNumberFromEnv("ETH_CLIENT_CHAIN_ID");
+      const l1BridgehubAddress = getAddressFromEnv("CONTRACTS_BRIDGEHUB_PROXY_ADDR");
+      await deployer.executeUpgrade(bridgehub.address, 0, bridgehub.interface.encodeFunctionData("registerCounterpart", [l1ChainId, l1BridgehubAddress]));
     });
 
   program
@@ -316,16 +318,12 @@ async function main() {
 }
 
 async function connectL1SLContracts(deployer: Deployer) {
-  /// Shared bridge on L1 L2
-  /// Bridgehub on L1 L2
-  /// STM on L1 L2 in Bridge and BH
-  /// KL todo
-  const stmOnSyncLayer = getAddressFromEnv("SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR");
   const bridgehubOnSyncLayer = getAddressFromEnv("SYNC_LAYER_BRIDGEHUB_PROXY_ADDR");
+  const bridgeOnSyncLayer = getAddressFromEnv("SYNC_LAYER_SHARED_BRIDGE_PROXY_ADDR");
 
   const chainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
 
-  console.log(`STM on SyncLayer: ${stmOnSyncLayer}`);
+  console.log(`STM on SyncLayer: ${bridgehubOnSyncLayer}`);
   console.log(`SyncLayer chain Id: ${chainId}`);
 
   const l1STM = deployer.stateTransitionManagerContract(deployer.deployWallet);

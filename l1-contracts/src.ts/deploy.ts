@@ -819,6 +819,7 @@ export class Deployer {
     const receipt = await this.executeUpgrade(this.addresses.Bridgehub.STMDeploymentTrackerProxy, 0, data1);
     if (this.verbose) {
       console.log("STM asset registered in L1 Shared Bridge via STM Deployment Tracker");
+      console.log("CONTRACTS_STM_ASSET_INFO=", await bridgehub.stmAssetInfo(this.addresses.StateTransition.StateTransitionProxy));
     }
   }
 
