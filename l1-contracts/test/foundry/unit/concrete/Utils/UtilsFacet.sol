@@ -183,7 +183,7 @@ contract UtilsFacet is ZkSyncHyperchainBase {
     }
 
     function util_setBaseTokenGasPriceMultiplierNominator(uint128 _nominator) external {
-         s.baseTokenGasPriceMultiplierNominator = _nominator;
+        s.baseTokenGasPriceMultiplierNominator = _nominator;
     }
 
     // add this to be excluded from coverage report

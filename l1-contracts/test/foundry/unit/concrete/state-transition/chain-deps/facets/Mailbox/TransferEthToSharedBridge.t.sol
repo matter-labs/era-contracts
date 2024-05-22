@@ -10,7 +10,7 @@ contract MailboxTransferEthToSharedBridge is MailboxTest {
 
     function setUp() public virtual {
         prepare();
-        
+
         baseTokenBridge = makeAddr("bridge");
         vm.deal(diamondProxy, 1 ether);
         utilsFacet.util_setChainId(eraChainId);
