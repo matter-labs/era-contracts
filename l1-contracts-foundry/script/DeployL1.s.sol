@@ -514,7 +514,7 @@ contract DeployL1Script is Script {
     }
 
     function deploySharedBridgeProxy() internal {
-        bytes memory initCalldata = abi.encodeCall(L1SharedBridge.initialize, (config.deployerAddress));
+        bytes memory initCalldata = abi.encodeCall(L1SharedBridge.initialize, (config.deployerAddress, 1, 1, 1, 0));
         bytes memory bytecode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(addresses.bridges.sharedBridgeImplementation, addresses.transparentProxyAdmin, initCalldata)
