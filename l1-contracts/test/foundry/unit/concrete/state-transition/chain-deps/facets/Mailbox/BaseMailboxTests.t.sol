@@ -9,7 +9,9 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 
 contract MailboxBaseTests is MailboxTest {
     function setUp() public virtual {
-        init();
+        prepare();
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
+        utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(1);
     }
 
     function test_mailboxConstructor() public {
@@ -24,9 +26,6 @@ contract MailboxBaseTests is MailboxTest {
     }
 
     function test_successful_getL2TransactionBaseCostPricingModeValidium() public {
-        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
-        utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(1);
-
         uint256 gasPrice = 10000000;
         uint256 l2GasLimit = 1000000;
         uint256 l2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
@@ -42,8 +41,9 @@ contract MailboxBaseTests is MailboxTest {
 
         utilsFacet.util_setFeeParams(feeParams);
 
-        // this was get from running the function, but more reasonable would be to 
-        // have some invariants that the calculation should keep.
+        // this was get from running the function, but more reasonable would be to
+        // have some invariants that the calculation should keep for min required gas
+        // price and also gas limit
         uint256 l2TransactionBaseCost = 250125000000000;
 
         assertEq(
@@ -53,9 +53,6 @@ contract MailboxBaseTests is MailboxTest {
     }
 
     function test_successful_getL2TransactionBaseCostPricingModeRollup() public {
-        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
-        utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(1);
-
         uint256 gasPrice = 10000000;
         uint256 l2GasLimit = 1000000;
         uint256 l2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
@@ -71,8 +68,9 @@ contract MailboxBaseTests is MailboxTest {
 
         utilsFacet.util_setFeeParams(feeParams);
 
-        // this was get from running the function, but more reasonable would be to 
-        // have some invariants that the calculation should keep.
+        // this was get from running the function, but more reasonable would be to
+        // have some invariants that the calculation should keep for min required gas
+        // price and also gas limit
         uint256 l2TransactionBaseCost = 250125000000000;
 
         assertEq(

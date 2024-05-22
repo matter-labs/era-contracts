@@ -10,11 +10,10 @@ import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransa
 
 contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
     function setUp() public virtual {
-        init();
+        prepare();
     }
 
-
-    function test_successWithoutFilterer() public {
+    function test_success_withoutFilterer() public {
         address bridgehub = makeAddr("bridgehub");
 
         utilsFacet.util_setBridgehub(bridgehub);
@@ -29,7 +28,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
     }
 
-    function test_successWithFilterer() public {
+    function test_success_withFilterer() public {
         address bridgehub = makeAddr("bridgehub");
         TransactionFiltererTrue tf = new TransactionFiltererTrue();
 

@@ -38,7 +38,7 @@ contract MailboxL2LogsProve is MailboxTest {
     uint8 shardId;
 
     function setUp() public virtual {
-        init();
+        prepare();
 
         data = abi.encodePacked("test data");
         merkleTree = new MerkleTree();
@@ -74,10 +74,7 @@ contract MailboxL2LogsProve is MailboxTest {
         });
     }
 
-    // require(hashedLog != L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, "tw");
-    // this is not possible in case of message, because some default values
-    // are set during translation from message to log
-    function test_successful_proveL2MessageInclussion() public {
+    function test_success_proveL2MessageInclussion() public {
         uint256 firstLogIndex = _addHashedLogToMerkleTree({
             _shardId: 0,
             _isService: true,
@@ -128,7 +125,7 @@ contract MailboxL2LogsProve is MailboxTest {
         assertEq(ret, false);
     }
 
-    function test_successful_proveL2LogInclusion() public {
+    function test_success_proveL2LogInclusion() public {
         uint256 firstLogIndex = _addHashedLogToMerkleTree({
             _shardId: shardId,
             _isService: isService,
@@ -196,6 +193,8 @@ contract MailboxL2LogsProve is MailboxTest {
         assertEq(ret, false);
     }
 
+    // this is not possible in case of message, because some default values
+    // are set during translation from message to log
     function test_RevertWhen_proveL2LogInclusionDefaultLog() public {
         L2Log memory log = L2Log({
             l2ShardId: 0,
@@ -245,7 +244,7 @@ contract MailboxL2LogsProve is MailboxTest {
         });
     }
 
-    function test_successful_proveL1ToL2TransactionStatus() public {
+    function test_success_proveL1ToL2TransactionStatus() public {
         bytes32 firstL2TxHash = keccak256("firstL2Transaction");
         bytes32 secondL2TxHash = keccak256("SecondL2Transaction");
         TxStatus txStatus = TxStatus.Success;
