@@ -66,16 +66,21 @@ export async function mintTokens(
   tokens: TokenDescription[],
   wallet: Wallet,
   nonce: number,
-  mnemonic: string
+  mnemonic: string,
+  mnemonic2?: string
 ): Promise<L1Token[]> {
-  const targetAddresses = [wallet.address, ...getTestAddresses(mnemonic)];
+  const targetAddresses = [
+    wallet.address,
+    ...getTestAddresses(mnemonic),
+    ...(mnemonic2 ? getTestAddresses(mnemonic2) : []),
+  ];
 
   const results = [];
   const promises = [];
   for (const token of tokens) {
     if (token.implementation !== "WETH9") {
       for (const address of targetAddresses) {
-        const tx = await token.contract.mint(address, parseEther("3000000000"), { nonce: nonce++ });
+        const tx = await token.contract.mint(address, parseEther("300000000000000000000"), { nonce: nonce++ });
         promises.push(tx.wait());
       }
     }

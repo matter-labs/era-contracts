@@ -127,7 +127,7 @@ export async function requestL2TransactionDirect(
   l2GasLimit: ethers.BigNumberish,
   gasPrice?: ethers.BigNumberish,
   factoryDeps?: ethers.BytesLike[]
-){
+) {
   const deployedAddresses = deployedAddressesFromEnv();
   const bridgehubAddress = deployedAddresses.Bridgehub.BridgehubProxy;
   const bridgehub = IBridgehubFactory.connect(bridgehubAddress, wallet);
@@ -163,7 +163,6 @@ export async function requestL2TransactionDirect(
     },
     { value: ethIsBaseToken ? expectedCost : 0, gasPrice }
   );
-
 }
 
 export async function publishBytecodeFromL1(

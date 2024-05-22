@@ -107,7 +107,15 @@ async function main() {
       }
       await deployer.registerTokenInNativeTokenVault(baseTokenAddress, { gasPrice });
 
-      await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice, undefined, undefined, useGovernance);
+      await deployer.registerHyperchain(
+        baseTokenAddress,
+        cmd.validiumMode,
+        null,
+        gasPrice,
+        undefined,
+        undefined,
+        useGovernance
+      );
     });
 
   await program.parseAsync(process.argv);
