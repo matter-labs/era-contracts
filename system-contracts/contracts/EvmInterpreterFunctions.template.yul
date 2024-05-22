@@ -1304,7 +1304,7 @@ function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
         default { sp := pushStackItem(sp, addr) }
 }
 
-function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp{
+function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp, result, addr{
     evmGasLeft := chargeGas(evmGas, 32000)
 
     if isStatic {
@@ -1346,15 +1346,10 @@ function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp{
         mstore(0x35, hashedBytecode)
     }
 
-    let addr := and(
+    addr := and(
         keccak256(0, 0x55),
         0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
     )
 
-    let result
     result, evmGasLeft := genericCreate(addr, offset, size, sp, value, evmGasLeft) 
-
-    switch result
-        case 0 { sp := pushStackItem(sp, 0) }
-        default { sp := pushStackItem(sp, addr) }
 }

@@ -1189,7 +1189,11 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, gasUsed)
     }
     case 0xF5 { // OP_CREATE2
-        evmGasLeft, sp := performCreate2(evmGasLeft, sp, isStatic)
+        let result, addr
+        evmGasLeft, sp, result, addr := performCreate2(evmGasLeft, sp, isStatic)
+        switch result
+        case 0 { sp := pushStackItem(sp, 0) }
+        default { sp := pushStackItem(sp, addr) }
     }
     case 0xFA { // OP_STATICCALL
         evmGasLeft := chargeGas(evmGasLeft, 100)
