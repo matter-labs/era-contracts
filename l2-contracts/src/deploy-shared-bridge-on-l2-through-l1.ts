@@ -11,7 +11,6 @@ import {
   applyL1ToL2Alias,
   publishBytecodeFromL1,
   requestL2TransactionDirect,
-  unapplyL1ToL2Alias,
 } from "./utils";
 
 import { ethTestConfig } from "./deploy-utils";
@@ -19,7 +18,6 @@ import { ethTestConfig } from "./deploy-utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import * as hre from "hardhat";
-import { IL2StandardDeployerFactory } from "../typechain/IL2StandardDeployerFactory";
 
 export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2SharedBridge").abi;
 export const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
@@ -155,8 +153,6 @@ export async function deployStandardDeployerProxyOnL2ThroughL1(
   if (deployer.verbose) {
     console.log("Deploying L2StandardDeployer Proxy");
   }
-  /// prepare proxyInitializationParams
-  const l2GovernorAddress = applyL1ToL2Alias(deployer.addresses.Governance);
 
   const L2StandardDeployerInterface = new Interface(hre.artifacts.readArtifactSync("L2StandardDeployer").abi);
   const proxyInitializationParams = L2StandardDeployerInterface.encodeFunctionData("initialize", [
@@ -236,7 +232,7 @@ export async function setSharedBridgeInStandardDeployer(deployer: Deployer, chai
   );
   await tx2.wait();
   if (deployer.verbose) {
-    console.log("Transfered L2StandardDeployer ownership to governance");
+    console.log("Transferred L2StandardDeployer ownership to governance");
   }
 
   await deployer.executeUpgradeOnL2(

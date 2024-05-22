@@ -19,7 +19,7 @@ import {L2Message, TxStatus} from "../common/Messaging.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import {NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
 
@@ -302,7 +302,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, assetInfo, _assetData));
         request = _requestToBridge({
             _chainId: _chainId,
-            _prevMsgSender: _prevMsgSender,
             _assetInfo: assetInfo,
             _bridgeMintCalldata: bridgeMintCalldata,
             _txDataHash: txDataHash
@@ -339,7 +338,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev The request data that is passed to the bridgehub
     function _requestToBridge(
         uint256 _chainId,
-        address,
         bytes32 _assetInfo,
         bytes memory _bridgeMintCalldata,
         bytes32 _txDataHash
