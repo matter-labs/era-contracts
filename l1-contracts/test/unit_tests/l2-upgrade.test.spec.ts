@@ -40,6 +40,7 @@ import {
   makeExecutedEqualCommitted,
   getBatchStoredInfo,
 } from "./utils";
+import { packSemver, unpackStringSemVer } from "../../scripts/utils";
 
 describe("L2 upgrade test", function () {
   let proxyExecutor: ExecutorFacet;
@@ -92,7 +93,7 @@ describe("L2 upgrade test", function () {
     const transferOwnershipTx = await ownable.acceptOwnership();
     await transferOwnershipTx.wait();
 
-    initialProtocolVersion = parseInt(process.env.CONTRACTS_GENESIS_PROTOCOL_VERSION);
+    initialProtocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_VERSION));
 
     chainId = deployer.chainId;
     verifier = deployer.addresses.StateTransition.Verifier;

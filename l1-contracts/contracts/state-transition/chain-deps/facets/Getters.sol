@@ -10,7 +10,7 @@ import {PriorityQueue, PriorityOperation} from "../../../state-transition/librar
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
-import {SemVer} from "../../../common/libraries/Semver.sol";
+import {SemVer} from "../../../common/libraries/SemVer.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";

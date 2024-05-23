@@ -21,6 +21,7 @@ import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
 import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
+import {SemVer} from "../common/libraries/SemVer.sol";
 
 /// @title State Transition Manager contract
 /// @author Matter Labs
@@ -280,6 +281,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256[] memory uintEmptyArray;
         bytes[] memory bytesEmptyArray;
 
+        uint256 cachedProtocolVersion = protocolVersion;
+        (, uint32 minorVersion, ) = SemVer.unpackSemVer(cachedProtocolVersion);
+
         L2CanonicalTransaction memory l2ProtocolUpgradeTx = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
@@ -290,7 +294,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             maxPriorityFeePerGas: uint256(0),
             paymaster: uint256(0),
             // Note, that the protocol version is used as "nonce" for system upgrade transactions
-            nonce: protocolVersion,
+            nonce: uint256(minorVersion),
             value: 0,
             reserved: [uint256(0), 0, 0, 0],
             data: systemContextCalldata,

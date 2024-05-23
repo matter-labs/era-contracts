@@ -10,6 +10,9 @@ const warning = chalk.bold.yellow;
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 export const GAS_MULTIPLIER = 1;
 
+// Bit shift by 32 does not work in JS, so we have to multiply by 2^32
+const SEMVER_MINOR_VERSION_MULTIPLIER = 4294967296;
+
 interface SystemConfig {
   requiredL2GasPricePerPubdata: number;
   priorityTxMinimalGasPrice: number;
@@ -74,4 +77,19 @@ export function print(name: string, data: any) {
 
 export function getLowerCaseAddress(address: string) {
   return ethers.utils.getAddress(address).toLowerCase();
+}
+
+export function unpackStringSemVer(semver: string): [number, number, number] {
+  const [major, minor, patch] = semver.split(".");
+  console.log(major, minor, patch);
+  return [parseInt(major), parseInt(minor), parseInt(patch)];
+}
+
+// The major version is always 0 for now
+export function packSemver(major: number, minor: number, patch: number) {
+  if (major !== 0) {
+    throw new Error("Major version must be 0");
+  }
+
+  return (minor * SEMVER_MINOR_VERSION_MULTIPLIER) + patch;
 }

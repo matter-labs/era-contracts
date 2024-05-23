@@ -9,6 +9,7 @@ import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
+import {SemVer} from "../common/libraries/SemVer.sol";
 
 /// @notice The struct that represents the upgrade proposal.
 /// @param l2ProtocolUpgradeTx The system upgrade transaction.
@@ -199,10 +200,13 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
         TransactionValidator.validateUpgradeTransaction(_l2ProtocolUpgradeTx);
 
+        // We expect that the upgrade transactions are only present when the minor version changes
+        (, uint32 minorVersion, ) = SemVer.unpackSemVer(_newProtocolVersion);
+
         // We want the hashes of l2 system upgrade transactions to be unique.
         // This is why we require that the `nonce` field is unique to each upgrade.
         require(
-            _l2ProtocolUpgradeTx.nonce == _newProtocolVersion,
+            _l2ProtocolUpgradeTx.nonce == minorVersion,
             "The new protocol version should be included in the L2 system upgrade tx"
         );
 

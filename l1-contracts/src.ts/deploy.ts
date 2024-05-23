@@ -6,7 +6,7 @@ import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
 import type { DeployedAddresses } from "./deploy-utils";
 import { deployedAddressesFromEnv, deployBytecodeViaCreate2, deployViaCreate2 } from "./deploy-utils";
-import { readBatchBootloaderBytecode, readSystemContractsBytecode, SYSTEM_CONFIG } from "../scripts/utils";
+import { packSemver, readBatchBootloaderBytecode, readSystemContractsBytecode, SYSTEM_CONFIG, unpackStringSemVer } from "../scripts/utils";
 import { getTokens } from "./deploy-token";
 import {
   ADDRESS_ONE,
@@ -307,7 +307,11 @@ export class Deployer {
     const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
     const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
     const diamondCut = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
-    const protocolVersion = getNumberFromEnv("CONTRACTS_GENESIS_PROTOCOL_VERSION");
+    const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_VERSION));
+    
+    console.log(packSemver(0, 1000, 5));
+
+    console.log('applied protocovl version', protocolVersion);
 
     const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
 
