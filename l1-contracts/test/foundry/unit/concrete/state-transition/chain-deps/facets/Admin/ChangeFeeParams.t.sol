@@ -61,6 +61,23 @@ contract ChangeFeeParamsTest is AdminTest {
         adminFacet.changeFeeParams(newFeeParams);
     }
 
+    function test_revertWhen_changePubdataPricingMode() public {
+        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
+        FeeParams memory newFeeParams = FeeParams({
+            pubdataPricingMode: PubdataPricingMode.Validium,
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: 110_000,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: 99_000,
+            minimalL2GasPrice: 250_000_000
+        });
+
+        vm.expectRevert(bytes.concat("n7"));
+
+        vm.startPrank(stateTransitionManager);
+        adminFacet.changeFeeParams(newFeeParams);
+    }
+
     function test_successfulChange() public {
         address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
         FeeParams memory oldFeeParams = utilsFacet.util_getFeeParams();

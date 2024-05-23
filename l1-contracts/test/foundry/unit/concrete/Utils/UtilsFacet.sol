@@ -173,6 +173,22 @@ contract UtilsFacet is ZkSyncHyperchainBase {
     function util_setBaseTokenGasPriceMultiplierNominator(uint128 _nominator) external {
         s.baseTokenGasPriceMultiplierNominator = _nominator;
     }
+    
+    function util_setTotalBatchesCommitted(uint256 _totalBatchesCommitted) external {
+        s.totalBatchesCommitted = _totalBatchesCommitted;
+    }
+
+    function util_getTotalBatchesCommitted() external view returns (uint256) {
+        return s.totalBatchesCommitted;
+    }
+
+    function util_getBaseTokenGasPriceMultiplierDenominator() external view returns (uint128) {
+        return s.baseTokenGasPriceMultiplierDenominator;
+    }
+
+    function util_getBaseTokenGasPriceMultiplierNominator() external view returns (uint128) {
+        return s.baseTokenGasPriceMultiplierNominator;
+    }
 
     // add this to be excluded from coverage report
     function test() internal virtual {}
