@@ -13,9 +13,9 @@ import {DummyStateTransitionManagerWBH} from "contracts/dev-contracts/test/Dummy
 import {DummyHyperchain} from "contracts/dev-contracts/test/DummyHyperchain.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
-
+import {L2TransactionRequestTwoBridgesInner} from "contracts/bridgehub/IBridgehub.sol";
 import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
-import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -908,6 +908,61 @@ contract ExperimentalBridgeTest is Test {
         assertEq(canonicalHash, resultantHash);
     }
 
+    function test_requestTransactionTwoBridgesChecksMagicValue(
+        uint256 chainId,
+        uint256 mintValue,
+        uint256 l2Value,
+        uint256 l2GasLimit,
+        uint256 l2GasPerPubdataByteLimit,
+        address refundRecipient,
+        uint256 secondBridgeValue,
+        bytes memory secondBridgeCalldata,
+        bytes32 magicValue
+    ) public {
+        L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
+            chainId: chainId,
+            mintValue: mintValue,
+            l2Value: l2Value,
+            l2GasLimit: l2GasLimit,
+            l2GasPerPubdataByteLimit: l2GasPerPubdataByteLimit,
+            refundRecipient: refundRecipient,
+            secondBridgeValue: secondBridgeValue,
+            secondBridgeCalldata: secondBridgeCalldata
+        });
+
+        l2TxnReq2BridgeOut.chainId = _setUpHyperchainForChainId(l2TxnReq2BridgeOut.chainId);
+
+        _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true);
+        assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == ETH_TOKEN_ADDRESS);
+
+        _setUpSharedBridge();
+        assertTrue(bridgeHub.getHyperchain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
+
+        uint256 callerMsgValue = l2TxnReq2BridgeOut.mintValue + l2TxnReq2BridgeOut.secondBridgeValue;
+        address randomCaller = makeAddr("RANDOM_CALLER");
+        vm.deal(randomCaller, callerMsgValue);
+
+        if (magicValue != TWO_BRIDGES_MAGIC_VALUE) {
+            L2TransactionRequestTwoBridgesInner memory request = L2TransactionRequestTwoBridgesInner({
+                magicValue: magicValue,
+                l2Contract: makeAddr("L2_CONTRACT"),
+                l2Calldata: new bytes(0),
+                factoryDeps: new bytes[](0),
+                txDataHash: bytes32(0)
+            });
+
+            vm.mockCall(
+                address(mockSecondSharedBridge),
+                abi.encodeWithSelector(IL1SharedBridge.bridgehubDeposit.selector),
+                abi.encode(request)
+            );
+
+            vm.expectRevert("Bridgehub: magic value mismatch");
+            vm.prank(randomCaller);
+            bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
+        }
+    }
+
     function test_requestL2TransactionTwoBridges_ETHCase(
         uint256 chainId,
         uint256 mintValue,
@@ -916,6 +971,7 @@ contract ExperimentalBridgeTest is Test {
         uint256 l2GasPerPubdataByteLimit,
         address refundRecipient,
         uint256 secondBridgeValue,
+        uint160 secondBridgeAddressValue,
         bytes memory secondBridgeCalldata
     ) public {
         L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
@@ -951,11 +1007,15 @@ contract ExperimentalBridgeTest is Test {
             abi.encode(canonicalHash)
         );
 
-        vm.prank(randomCaller);
-        //bytes32 resultantHash =
-        bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
-
-        assertTrue(true);
+        if (secondBridgeAddressValue <= uint160(type(uint16).max)) {
+            l2TxnReq2BridgeOut.secondBridgeAddress = address(secondBridgeAddressValue);
+            vm.expectRevert("Bridgehub: second bridge address too low");
+            vm.prank(randomCaller);
+            bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
+        } else {
+            vm.prank(randomCaller);
+            bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
+        }
     }
 
     /////////////////////////////////////////////////////////
