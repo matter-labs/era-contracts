@@ -10,6 +10,7 @@ import {PriorityQueue, PriorityOperation} from "../../../state-transition/librar
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
+import {SemVer} from "../../../common/libraries/Semver.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -140,7 +141,15 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getProtocolVersion() external view returns (uint256) {
-        return s.protocolVersion;
+        (uint32 major, uint32 minor, ) = SemVer.unpackSemVer(s.protocolVersion);
+        require(major == 0, "Only 0 major version is supported right now");
+
+        return uint256(minor);
+    }
+
+    /// @inheritdoc IGetters
+    function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
+        return SemVer.unpackSemVer(s.protocolVersion);
     }
 
     /// @inheritdoc IGetters
