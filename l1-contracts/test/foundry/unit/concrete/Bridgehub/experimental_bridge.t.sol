@@ -74,6 +74,42 @@ contract ExperimentalBridgeTest is Test {
         assertEq(bridgeHub.owner(), bridgeOwner);
     }
 
+    function test_newPendingAdminReplacesPrevious(address randomDeployer, address otherRandomDeployer) public {
+        assertEq(address(0), bridgeHub.admin());
+
+        if (randomDeployer == otherRandomDeployer) {
+            return;
+        }
+
+        vm.prank(bridgeHub.owner());
+        bridgeHub.setPendingAdmin(randomDeployer);
+
+        vm.prank(bridgeHub.owner());
+        bridgeHub.setPendingAdmin(otherRandomDeployer);
+
+        vm.prank(otherRandomDeployer);
+        bridgeHub.acceptAdmin();
+
+        assertEq(otherRandomDeployer, bridgeHub.admin());
+    }
+
+    function test_onlyPendingAdminCanAccept(address randomDeployer, address otherRandomDeployer) public {
+        assertEq(address(0), bridgeHub.admin());
+
+        vm.prank(bridgeHub.owner());
+        bridgeHub.setPendingAdmin(randomDeployer);
+
+        if (randomDeployer == otherRandomDeployer) {
+            return;
+        }
+
+        vm.expectRevert(bytes("n42"));
+        vm.prank(otherRandomDeployer);
+        bridgeHub.acceptAdmin();
+
+        assertEq(address(0), bridgeHub.admin());
+    }
+
     function test_onlyOwnerCanSetDeployer(address randomDeployer) public {
         assertEq(address(0), bridgeHub.admin());
 
@@ -963,9 +999,10 @@ contract ExperimentalBridgeTest is Test {
         }
     }
 
-    function test_requestL2TransactionTwoBridges_ETHCase(
+    function test_requestL2TransactionTwoBridgesWrongBridgeAddress(
         uint256 chainId,
         uint256 mintValue,
+        uint256 msgValue,
         uint256 l2Value,
         uint256 l2GasLimit,
         uint256 l2GasPerPubdataByteLimit,
@@ -1012,10 +1049,123 @@ contract ExperimentalBridgeTest is Test {
             vm.expectRevert("Bridgehub: second bridge address too low");
             vm.prank(randomCaller);
             bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
-        } else {
-            vm.prank(randomCaller);
-            bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
         }
+    }
+
+    function test_requestL2TransactionTwoBridges_ETHCase(
+        uint256 chainId,
+        uint256 mintValue,
+        uint256 msgValue,
+        uint256 l2Value,
+        uint256 l2GasLimit,
+        uint256 l2GasPerPubdataByteLimit,
+        address refundRecipient,
+        uint256 secondBridgeValue,
+        bytes memory secondBridgeCalldata
+    ) public {
+        L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
+            chainId: chainId,
+            mintValue: mintValue,
+            l2Value: l2Value,
+            l2GasLimit: l2GasLimit,
+            l2GasPerPubdataByteLimit: l2GasPerPubdataByteLimit,
+            refundRecipient: refundRecipient,
+            secondBridgeValue: secondBridgeValue,
+            secondBridgeCalldata: secondBridgeCalldata
+        });
+
+        l2TxnReq2BridgeOut.chainId = _setUpHyperchainForChainId(l2TxnReq2BridgeOut.chainId);
+
+        _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true);
+        assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == ETH_TOKEN_ADDRESS);
+
+        _setUpSharedBridge();
+        assertTrue(bridgeHub.getHyperchain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
+
+        uint256 callerMsgValue = l2TxnReq2BridgeOut.mintValue + l2TxnReq2BridgeOut.secondBridgeValue;
+        address randomCaller = makeAddr("RANDOM_CALLER");
+
+        mockChainContract.setBridgeHubAddress(address(bridgeHub));
+
+        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+
+        vm.mockCall(
+            address(mockChainContract),
+            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
+            abi.encode(canonicalHash)
+        );
+
+        if (msgValue != (l2TxnReq2BridgeOut.mintValue + l2TxnReq2BridgeOut.secondBridgeValue)) {
+            vm.deal(randomCaller, msgValue);
+            vm.expectRevert("Bridgehub: msg.value mismatch 2");
+            vm.prank(randomCaller);
+            bridgeHub.requestL2TransactionTwoBridges{value: msgValue}(l2TxnReq2BridgeOut);
+        }
+
+        vm.deal(randomCaller, callerMsgValue);
+        vm.prank(randomCaller);
+        bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
+    }
+
+    function test_requestL2TransactionTwoBridges_ETHToNonETHCase(
+        uint256 chainId,
+        uint256 mintValue,
+        uint256 msgValue,
+        uint256 l2Value,
+        uint256 l2GasLimit,
+        uint256 l2GasPerPubdataByteLimit,
+        address refundRecipient,
+        uint256 secondBridgeValue,
+        address l2Receiver
+    ) public {
+        bytes memory secondBridgeCalldata = abi.encode(ETH_TOKEN_ADDRESS, 0, l2Receiver);
+
+        L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
+            chainId: chainId,
+            mintValue: mintValue,
+            l2Value: l2Value,
+            l2GasLimit: l2GasLimit,
+            l2GasPerPubdataByteLimit: l2GasPerPubdataByteLimit,
+            refundRecipient: refundRecipient,
+            secondBridgeValue: secondBridgeValue,
+            secondBridgeCalldata: secondBridgeCalldata
+        });
+
+        l2TxnReq2BridgeOut.chainId = _setUpHyperchainForChainId(l2TxnReq2BridgeOut.chainId);
+
+        _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, false);
+        assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == address(testToken));
+
+        _setUpSharedBridge();
+        assertTrue(bridgeHub.getHyperchain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
+
+        address randomCaller = makeAddr("RANDOM_CALLER");
+
+        mockChainContract.setBridgeHubAddress(address(bridgeHub));
+
+        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+
+        vm.mockCall(
+            address(mockChainContract),
+            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
+            abi.encode(canonicalHash)
+        );
+
+        if (msgValue != secondBridgeValue) {
+            vm.deal(randomCaller, msgValue);
+            vm.expectRevert("Bridgehub: msg.value mismatch 3");
+            vm.prank(randomCaller);
+            bridgeHub.requestL2TransactionTwoBridges{value: msgValue}(l2TxnReq2BridgeOut);
+        }
+
+        testToken.mint(randomCaller, l2TxnReq2BridgeOut.mintValue);
+        assertEq(testToken.balanceOf(randomCaller), l2TxnReq2BridgeOut.mintValue);
+        vm.prank(randomCaller);
+        testToken.approve(address(mockSharedBridge), l2TxnReq2BridgeOut.mintValue);
+
+        vm.deal(randomCaller, l2TxnReq2BridgeOut.secondBridgeValue);
+        vm.prank(randomCaller);
+        bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
     }
 
     /////////////////////////////////////////////////////////
