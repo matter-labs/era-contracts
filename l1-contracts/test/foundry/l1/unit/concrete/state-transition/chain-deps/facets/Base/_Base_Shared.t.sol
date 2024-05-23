@@ -33,6 +33,7 @@ bytes constant ERROR_ONLY_STATE_TRANSITION_MANAGER = "ZKChain: not state transit
 bytes constant ERROR_ONLY_BRIDGEHUB = "ZKChain: not bridgehub";
 bytes constant ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by admin or state transition manager";
 bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by validator or state transition manager";
+bytes constant ERROR_ONLY_BASE_TOKEN_BRIDGE = "ZKChain: Only base token bridge can call this function";
 
 contract ZKChainBaseTest is Test {
     TestBaseFacet internal testBaseFacet;
@@ -40,7 +41,7 @@ contract ZKChainBaseTest is Test {
     address internal testnetVerifier = address(new TestnetVerifier());
 
     function getTestBaseFacetSelectors() public pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](6);
+        selectors = new bytes4[](7);
         selectors[0] = TestBaseFacet.functionWithOnlyAdminModifier.selector;
         selectors[1] = TestBaseFacet.functionWithOnlyValidatorModifier.selector;
         selectors[2] = TestBaseFacet.functionWithOnlyChainTypeManagerModifier.selector;
