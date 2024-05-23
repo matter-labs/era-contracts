@@ -26,3 +26,5 @@ l1-contracts-foundry/broadcast/*
 l1-contracts-foundry/script-out/*
 !l1-contracts-foundry/script-out/.gitkeep
 *.timestamp
+
+.yarn/
