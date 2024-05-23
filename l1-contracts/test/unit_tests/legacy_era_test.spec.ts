@@ -150,7 +150,7 @@ describe("Legacy Era tests", function () {
     expect(revertReason).equal("0T");
   });
 
-  it("Should deposit successfully", async () => {
+  it("Should deposit successfully right here", async () => {
     const depositorAddress = await randomSigner.getAddress();
     const vault: L1NativeTokenVault = L1NativeTokenVaultFactory.connect(
       await sharedBridgeProxy.nativeTokenVault(),
@@ -166,6 +166,7 @@ describe("Legacy Era tests", function () {
       ethers.utils.parseUnits("800", 18),
       10000000
     );
+    expect(await vault.chainBalance(chainId, erc20TestToken.address)).equal(ethers.utils.parseUnits("800", 18));
   });
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {

@@ -520,6 +520,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) internal nonReentrant whenNotPaused returns (bytes32 assetInfo, uint256 amount) {
+        // ToDo: unused function param
         require(!isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");
         isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
@@ -536,7 +537,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             (assetInfo, assetData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
         }
         address l1Asset = assetAddress[assetInfo];
-        IL1StandardAsset(l1Asset).bridgeMint(_chainId, assetInfo, assetData);
+        IL1StandardAsset(l1Asset).bridgeMint(_chainId, assetInfo, assetData); // ToDo, shall we return amount & receiver from here?
 
         // emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetInfo, keccak256(assetData));
     }
@@ -705,7 +706,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         {
             address prevMsgSender = _prevMsgSender;
             uint256 amount = _amount;
-            (address l1Asset, bytes32 assetI) = _getAssetProperties(assetInfo);
+            (address l1Asset, ) = _getAssetProperties(assetInfo);
             /* solhint-disable no-unused-vars */
             IL1StandardAsset(l1Asset).bridgeBurn{value: 0}({
                 _chainId: ERA_CHAIN_ID,
@@ -767,6 +768,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge returns (address l1Receiver, address l1Asset, uint256 amount) {
+        // ToDo: return the receiver from _finalizeWithdrawal, or remove function param
         bytes32 assetInfo;
         (assetInfo, amount) = _finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
