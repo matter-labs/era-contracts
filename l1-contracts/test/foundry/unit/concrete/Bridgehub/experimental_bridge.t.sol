@@ -30,6 +30,8 @@ contract ExperimentalBridgeTest is Test {
 
     uint256 eraChainId;
 
+    event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
+
     function setUp() public {
         eraChainId = 9;
         bridgeHub = new Bridgehub();
@@ -74,6 +76,7 @@ contract ExperimentalBridgeTest is Test {
 
     function test_onlyOwnerCanSetDeployer(address randomDeployer) public {
         assertEq(address(0), bridgeHub.admin());
+
         vm.prank(bridgeHub.owner());
         bridgeHub.setPendingAdmin(randomDeployer);
         vm.prank(randomDeployer);
@@ -320,6 +323,182 @@ contract ExperimentalBridgeTest is Test {
     uint256 newChainId;
     address admin;
 
+    function test_pause_createNewChain() public {
+        address deployerAddress = makeAddr("DEPLOYER_ADDRESS");
+        admin = makeAddr("NEW_CHAIN_ADMIN");
+
+        vm.prank(bridgeOwner);
+        bridgeHub.pause();
+        vm.prank(bridgeOwner);
+        bridgeHub.setPendingAdmin(deployerAddress);
+        vm.prank(deployerAddress);
+        bridgeHub.acceptAdmin();
+
+        vm.expectRevert("Pausable: paused");
+        vm.prank(deployerAddress);
+        bridgeHub.createNewChain({
+            _chainId: 1,
+            _stateTransitionManager: address(mockSTM),
+            _baseToken: address(testToken),
+            _salt: uint256(123),
+            _admin: admin,
+            _initData: bytes("")
+        });
+
+        vm.prank(bridgeOwner);
+        bridgeHub.unpause();
+
+        vm.expectRevert("Bridgehub: state transition not registered");
+        vm.prank(deployerAddress);
+        bridgeHub.createNewChain({
+            _chainId: 1,
+            _stateTransitionManager: address(mockSTM),
+            _baseToken: address(testToken),
+            _salt: uint256(123),
+            _admin: admin,
+            _initData: bytes("")
+        });
+    }
+
+    function test_RevertWhen_STMNotRegisteredOnCreate(uint256 chainId) public {
+        address deployerAddress = makeAddr("DEPLOYER_ADDRESS");
+        admin = makeAddr("NEW_CHAIN_ADMIN");
+
+        vm.prank(bridgeOwner);
+        bridgeHub.setPendingAdmin(deployerAddress);
+        vm.prank(deployerAddress);
+        bridgeHub.acceptAdmin();
+
+        chainId = bound(chainId, 1, type(uint48).max);
+        vm.expectRevert("Bridgehub: state transition not registered");
+        vm.prank(deployerAddress);
+        bridgeHub.createNewChain({
+            _chainId: chainId,
+            _stateTransitionManager: address(mockSTM),
+            _baseToken: address(testToken),
+            _salt: uint256(123),
+            _admin: admin,
+            _initData: bytes("")
+        });
+    }
+
+    function test_RevertWhen_wrongChainIdOnCreate(uint256 chainId) public {
+        address deployerAddress = makeAddr("DEPLOYER_ADDRESS");
+        admin = makeAddr("NEW_CHAIN_ADMIN");
+
+        vm.prank(bridgeOwner);
+        bridgeHub.setPendingAdmin(deployerAddress);
+        vm.prank(deployerAddress);
+        bridgeHub.acceptAdmin();
+
+        chainId = bound(chainId, type(uint48).max + uint256(1), type(uint256).max);
+        vm.expectRevert("Bridgehub: chainId too large");
+        vm.prank(deployerAddress);
+        bridgeHub.createNewChain({
+            _chainId: chainId,
+            _stateTransitionManager: address(mockSTM),
+            _baseToken: address(testToken),
+            _salt: uint256(123),
+            _admin: admin,
+            _initData: bytes("")
+        });
+
+        chainId = 0;
+        vm.expectRevert("Bridgehub: chainId cannot be 0");
+        vm.prank(deployerAddress);
+        bridgeHub.createNewChain({
+            _chainId: chainId,
+            _stateTransitionManager: address(mockSTM),
+            _baseToken: address(testToken),
+            _salt: uint256(123),
+            _admin: admin,
+            _initData: bytes("")
+        });
+    }
+
+    function test_RevertWhen_tokenNotRegistered() public {
+        address deployerAddress = makeAddr("DEPLOYER_ADDRESS");
+        admin = makeAddr("NEW_CHAIN_ADMIN");
+
+        vm.prank(bridgeOwner);
+        bridgeHub.setPendingAdmin(deployerAddress);
+        vm.prank(deployerAddress);
+        bridgeHub.acceptAdmin();
+
+        vm.startPrank(bridgeOwner);
+        bridgeHub.addStateTransitionManager(address(mockSTM));
+        vm.stopPrank();
+
+        vm.expectRevert("Bridgehub: token not registered");
+        vm.prank(deployerAddress);
+        bridgeHub.createNewChain({
+            _chainId: 1,
+            _stateTransitionManager: address(mockSTM),
+            _baseToken: address(testToken),
+            _salt: uint256(123),
+            _admin: admin,
+            _initData: bytes("")
+        });
+    }
+
+    function test_RevertWhen_wethBridgeNotSet() public {
+        address deployerAddress = makeAddr("DEPLOYER_ADDRESS");
+        admin = makeAddr("NEW_CHAIN_ADMIN");
+
+        vm.prank(bridgeOwner);
+        bridgeHub.setPendingAdmin(deployerAddress);
+        vm.prank(deployerAddress);
+        bridgeHub.acceptAdmin();
+
+        vm.startPrank(bridgeOwner);
+        bridgeHub.addStateTransitionManager(address(mockSTM));
+        bridgeHub.addToken(address(testToken));
+        vm.stopPrank();
+
+        vm.expectRevert("Bridgehub: weth bridge not set");
+        vm.prank(deployerAddress);
+        bridgeHub.createNewChain({
+            _chainId: 1,
+            _stateTransitionManager: address(mockSTM),
+            _baseToken: address(testToken),
+            _salt: uint256(123),
+            _admin: admin,
+            _initData: bytes("")
+        });
+    }
+
+    function test_RevertWhen_chainIdAlreadyRegistered(uint256 chainId) public {
+        address deployerAddress = makeAddr("DEPLOYER_ADDRESS");
+        admin = makeAddr("NEW_CHAIN_ADMIN");
+
+        vm.prank(bridgeOwner);
+        bridgeHub.setPendingAdmin(deployerAddress);
+        vm.prank(deployerAddress);
+        bridgeHub.acceptAdmin();
+
+        vm.startPrank(bridgeOwner);
+        bridgeHub.addStateTransitionManager(address(mockSTM));
+        bridgeHub.addToken(address(testToken));
+        bridgeHub.setSharedBridge(address(mockSharedBridge));
+        vm.stopPrank();
+
+        chainId = bound(chainId, 1, type(uint48).max);
+        stdstore.target(address(bridgeHub)).sig("stateTransitionManager(uint256)").with_key(chainId).checked_write(
+            address(mockSTM)
+        );
+
+        vm.expectRevert("Bridgehub: chainId already registered");
+        vm.prank(deployerAddress);
+        bridgeHub.createNewChain({
+            _chainId: chainId,
+            _stateTransitionManager: address(mockSTM),
+            _baseToken: address(testToken),
+            _salt: uint256(123),
+            _admin: admin,
+            _initData: bytes("")
+        });
+    }
+
     function test_createNewChain(
         address randomCaller,
         uint256 chainId,
@@ -336,6 +515,7 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub.setPendingAdmin(deployerAddress);
         vm.prank(deployerAddress);
         bridgeHub.acceptAdmin();
+
         vm.startPrank(bridgeOwner);
         bridgeHub.addStateTransitionManager(address(mockSTM));
         bridgeHub.addToken(address(testToken));
@@ -383,6 +563,9 @@ contract ExperimentalBridgeTest is Test {
             ),
             bytes("")
         );
+
+        vm.expectEmit(true, true, true, true, address(bridgeHub));
+        emit NewChain(chainId, address(mockSTM), admin);
 
         newChainId = bridgeHub.createNewChain({
             _chainId: chainId,
@@ -589,6 +772,7 @@ contract ExperimentalBridgeTest is Test {
     function test_requestL2TransactionDirect_ETHCase(
         uint256 mockChainId,
         uint256 mockMintValue,
+        uint256 msgValue,
         address mockL2Contract,
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
@@ -623,7 +807,6 @@ contract ExperimentalBridgeTest is Test {
         _setUpSharedBridge();
 
         address randomCaller = makeAddr("RANDOM_CALLER");
-        vm.deal(randomCaller, l2TxnReqDirect.mintValue);
 
         assertTrue(bridgeHub.getHyperchain(l2TxnReqDirect.chainId) == address(mockChainContract));
         bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
@@ -641,8 +824,15 @@ contract ExperimentalBridgeTest is Test {
         mockChainContract.setBridgeHubAddress(address(bridgeHub));
         assertTrue(mockChainContract.getBridgeHubAddress() == address(bridgeHub));
 
-        vm.txGasPrice(0.05 ether);
+        if (msgValue != mockMintValue) {
+            vm.deal(randomCaller, msgValue);
+            vm.expectRevert("Bridgehub: msg.value mismatch 1");
+            vm.prank(randomCaller);
+            bridgeHub.requestL2TransactionDirect{value: msgValue}(l2TxnReqDirect);
+        }
 
+        vm.deal(randomCaller, l2TxnReqDirect.mintValue);
+        vm.txGasPrice(0.05 ether);
         vm.prank(randomCaller);
         bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
 
