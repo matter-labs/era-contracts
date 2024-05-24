@@ -257,23 +257,25 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
             _newProtocolVersion > previousProtocolVersion,
             "New protocol version is not greater than the current one"
         );
+        (uint32 previousMajorVersion, uint32 previousMinorVersion, ) = SemVer.unpackSemVer(
+            SafeCast.toUint96(previousProtocolVersion)
+        );
+        require(previousMajorVersion == 0, "Implementation requires that the major version is 0 at all times");
 
         uint32 newMajorVersion;
         // slither-disable-next-line unused-return
         (newMajorVersion, newMinorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion));
         require(newMajorVersion == 0, "Major version change is not allowed");
 
-        // slither-disable-next-line unused-return
-        (uint32 majorDelta, uint32 minorDelta, ) = SemVer.unpackSemVer(
-            SafeCast.toUint96(_newProtocolVersion - previousProtocolVersion)
-        );
+        // Since `_newProtocolVersion > previousProtocolVersion`, and both old and new major version is 0,
+        // the difference between minor versions is >= 0.
+        uint256 minorDelta = newMinorVersion - previousMinorVersion;
 
         if (minorDelta == 0) {
             patchOnly = true;
         }
 
         // While this is implicitly enforced by other checks above, we still double check just in case
-        require(majorDelta == 0, "Major version change is not allowed");
         require(minorDelta <= MAX_ALLOWED_MINOR_VERSION_DELTA, "Too big protocol version difference");
 
         // If the minor version changes also, we need to ensure that the previous upgrade has been finalized.
