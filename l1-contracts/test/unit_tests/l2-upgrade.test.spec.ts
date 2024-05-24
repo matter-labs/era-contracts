@@ -93,14 +93,14 @@ describe.only("L2 upgrade test", function () {
     const transferOwnershipTx = await ownable.acceptOwnership();
     await transferOwnershipTx.wait();
 
-    const [initialMajor, initalMinor, initialPatch] = unpackStringSemVer(
+    const [initialMajor, initialMinor, initialPatch] = unpackStringSemVer(
       process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION
     );
     if (initialMajor !== 0 || initialPatch !== 0) {
       throw new Error("Initial protocol version must be 0.x.0");
     }
-    initialProtocolVersion = packSemver(initialMajor, initalMinor, initialPatch);
-    initialMinorProtocolVersion = initalMinor;
+    initialProtocolVersion = packSemver(initialMajor, initialMinor, initialPatch);
+    initialMinorProtocolVersion = initialMinor;
 
     chainId = deployer.chainId;
     verifier = deployer.addresses.StateTransition.Verifier;
