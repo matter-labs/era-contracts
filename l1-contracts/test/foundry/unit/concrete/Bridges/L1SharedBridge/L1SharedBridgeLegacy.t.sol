@@ -9,8 +9,32 @@ import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {DummyMailbox} from "contracts/dev-contracts/test/DummyMailbox.sol";
 
 contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
+    function test_transferFundsFromLegacyZeroETHTransfered() public {
+        address targetDiamond = makeAddr("target diamond");
+        uint256 targetChainId = 31337;
+
+        vm.mockCall(targetDiamond, abi.encodeWithSelector(IMailbox.transferEthToSharedBridge.selector), "");
+
+        vm.expectRevert("ShB: 0 eth transferred");
+        vm.prank(owner);
+        sharedBridge.transferFundsFromLegacy(ETH_TOKEN_ADDRESS, targetDiamond, targetChainId);
+    }
+
+    function test_transferFundsFromLegacy(uint256 amount) public {
+        DummyMailbox mailbox = new DummyMailbox(address(sharedBridge));
+        address mailboxAddress = address(mailbox);
+
+        amount = bound(amount, 1, type(uint256).max);
+        vm.deal(mailboxAddress, amount);
+
+        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(IBridgehub.getHyperchain.selector, 9), abi.encode(mailboxAddress));
+        vm.prank(owner);
+        sharedBridge.transferFundsFromLegacy(ETH_TOKEN_ADDRESS, mailboxAddress, 9);
+    }
+
     function test_depositLegacyERC20Bridge() public {
         uint256 l2TxGasLimit = 100000;
         uint256 l2TxGasPerPubdataByte = 100;
