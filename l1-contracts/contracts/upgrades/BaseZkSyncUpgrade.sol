@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+
 import {ZkSyncHyperchainBase} from "../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
@@ -258,11 +260,11 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
         uint32 newMajorVersion;
         // slither-disable-next-line unused-return
-        (newMajorVersion, newMinorVersion, ) = SemVer.unpackSemVer(_newProtocolVersion);
+        (newMajorVersion, newMinorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion));
         require(newMajorVersion == 0, "Major version change is not allowed");
 
         // slither-disable-next-line unused-return
-        (uint32 majorDelta, uint32 minorDelta, ) = SemVer.unpackSemVer(_newProtocolVersion - previousProtocolVersion);
+        (uint32 majorDelta, uint32 minorDelta, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion - previousProtocolVersion));
 
         if (minorDelta == 0) {
             patchOnly = true;

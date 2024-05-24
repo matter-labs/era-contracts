@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
@@ -87,7 +88,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @return The tuple of (major, minor, patch) protocol version.
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
-        return SemVer.unpackSemVer(uint96(protocolVersion));
+        return SemVer.unpackSemVer(SafeCast.toUint96(protocolVersion));
     }
 
     /// @notice Returns all the registered hyperchain addresses
@@ -288,7 +289,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         uint256 cachedProtocolVersion = protocolVersion;
         // slither-disable-next-line unused-return
-        (, uint32 minorVersion, ) = SemVer.unpackSemVer(cachedProtocolVersion);
+        (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(cachedProtocolVersion));
 
         L2CanonicalTransaction memory l2ProtocolUpgradeTx = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,

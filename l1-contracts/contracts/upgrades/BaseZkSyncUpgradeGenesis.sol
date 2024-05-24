@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+
 import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
@@ -24,10 +26,10 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
 
         uint32 newMajorVersion;
         // slither-disable-next-line unused-return
-        (newMajorVersion, newMinorVersion, ) = SemVer.unpackSemVer(_newProtocolVersion);
+        (newMajorVersion, newMinorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion));
         require(newMajorVersion == 0, "Major version change is not allowed");
 
-        (uint32 majorDelta, uint32 minorDelta, ) = SemVer.unpackSemVer(_newProtocolVersion - previousProtocolVersion);
+        (uint32 majorDelta, uint32 minorDelta, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion - previousProtocolVersion));
 
         // IMPORTANT Genesis Upgrade difference: We never set patchOnly to `true` to allow to put a system upgrade transaction there.
         patchOnly = false;

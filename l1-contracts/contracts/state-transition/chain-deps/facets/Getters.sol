@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
@@ -146,7 +148,7 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
-        return SemVer.unpackSemVer(s.protocolVersion);
+        return SemVer.unpackSemVer(SafeCast.toUint96(s.protocolVersion));
     }
 
     /// @inheritdoc IGetters
