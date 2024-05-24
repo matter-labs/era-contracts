@@ -241,7 +241,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
-    function _setNewProtocolVersion(uint256 _newProtocolVersion) internal virtual returns (uint32 newMinorVersion, bool patchOnly) {
+    function _setNewProtocolVersion(
+        uint256 _newProtocolVersion
+    ) internal virtual returns (uint32 newMinorVersion, bool patchOnly) {
         uint256 previousProtocolVersion = s.protocolVersion;
         require(
             _newProtocolVersion > previousProtocolVersion,
@@ -249,10 +251,10 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         );
 
         uint32 newMajorVersion;
-        (newMajorVersion, newMinorVersion,) = SemVer.unpackSemVer(_newProtocolVersion);
+        (newMajorVersion, newMinorVersion, ) = SemVer.unpackSemVer(_newProtocolVersion);
         require(newMajorVersion == 0, "Major version change is not allowed");
 
-        (uint32 majorDelta, uint32 minorDelta,) = SemVer.unpackSemVer(_newProtocolVersion - previousProtocolVersion);
+        (uint32 majorDelta, uint32 minorDelta, ) = SemVer.unpackSemVer(_newProtocolVersion - previousProtocolVersion);
 
         if (minorDelta == 0) {
             patchOnly = true;
@@ -263,9 +265,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         require(minorDelta <= MAX_ALLOWED_MINOR_VERSION_DELTA, "Too big protocol version difference");
 
         // If the minor version changes also, we need to ensure that the previous upgrade has been finalized.
-        // In case the minor version does not change, we permit to keep the old upgrade transaction in the system, but it 
-        // must be ensured in the other parts of the upgrade that the is not overriden. 
-        if(!patchOnly) {
+        // In case the minor version does not change, we permit to keep the old upgrade transaction in the system, but it
+        // must be ensured in the other parts of the upgrade that the is not overriden.
+        if (!patchOnly) {
             // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
             // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
             require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import { SEMVER_MINOR_OFFSET, SEMVER_MAJOR_OFFSET } from "../Config.sol"; 
+import {SEMVER_MINOR_OFFSET, SEMVER_MAJOR_OFFSET} from "../Config.sol";
 
 library SemVer {
     function unpackSemVer(

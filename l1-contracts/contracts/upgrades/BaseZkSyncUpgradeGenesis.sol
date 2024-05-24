@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
-import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
+import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
 /// @author Matter Labs
@@ -12,7 +12,9 @@ import {SemVer} from "../common/libraries/SemVer.sol";
 abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
-    function _setNewProtocolVersion(uint256 _newProtocolVersion) internal override returns (uint32 newMinorVersion, bool patchOnly) {
+    function _setNewProtocolVersion(
+        uint256 _newProtocolVersion
+    ) internal override returns (uint32 newMinorVersion, bool patchOnly) {
         uint256 previousProtocolVersion = s.protocolVersion;
         // IMPORTANT Genesis Upgrade difference: Note this is the only thing change > to >=
         require(
@@ -21,10 +23,10 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
         );
 
         uint32 newMajorVersion;
-        (newMajorVersion, newMinorVersion,) = SemVer.unpackSemVer(_newProtocolVersion);
+        (newMajorVersion, newMinorVersion, ) = SemVer.unpackSemVer(_newProtocolVersion);
         require(newMajorVersion == 0, "Major version change is not allowed");
 
-        (uint32 majorDelta, uint32 minorDelta,) = SemVer.unpackSemVer(_newProtocolVersion - previousProtocolVersion);
+        (uint32 majorDelta, uint32 minorDelta, ) = SemVer.unpackSemVer(_newProtocolVersion - previousProtocolVersion);
 
         // IMPORTANT Genesis Upgrade difference: We never set patchOnly to `true` to allow to put a system upgrade transaction there.
         patchOnly = false;
@@ -34,9 +36,9 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
         require(minorDelta <= MAX_ALLOWED_MINOR_VERSION_DELTA, "Too big protocol version difference");
 
         // If the minor version changes also, we need to ensure that the previous upgrade has been finalized.
-        // In case the minor version does not change, we permit to keep the old upgrade transaction in the system, but it 
-        // must be ensured in the other parts of the upgrade that the is not overriden. 
-        if(!patchOnly) {
+        // In case the minor version does not change, we permit to keep the old upgrade transaction in the system, but it
+        // must be ensured in the other parts of the upgrade that the is not overriden.
+        if (!patchOnly) {
             // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
             // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
             require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
