@@ -1052,37 +1052,38 @@ contract ExperimentalBridgeTest is Test {
         }
     }
 
-    function test_requestL2TransactionTwoBridges_ETHCase(
+    function test_requestL2TransactionTwoBridges_ERC20ToNonBase(
         uint256 chainId,
         uint256 mintValue,
-        uint256 msgValue,
         uint256 l2Value,
         uint256 l2GasLimit,
         uint256 l2GasPerPubdataByteLimit,
         address refundRecipient,
-        uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata
+        address l2Receiver
     ) public {
+        TestnetERC20Token erc20Token = new TestnetERC20Token("ZKESTT", "ZkSync ERC Test Token", 18);
+        address erc20TokenAddress = address(erc20Token);
+        bytes memory secondBridgeCalldata = abi.encode(erc20TokenAddress, l2Value, l2Receiver);
+
         L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
             chainId: chainId,
             mintValue: mintValue,
-            l2Value: l2Value,
+            l2Value: 0, // not used
             l2GasLimit: l2GasLimit,
             l2GasPerPubdataByteLimit: l2GasPerPubdataByteLimit,
             refundRecipient: refundRecipient,
-            secondBridgeValue: secondBridgeValue,
+            secondBridgeValue: 0, // not used cause we are using ERC20
             secondBridgeCalldata: secondBridgeCalldata
         });
 
         l2TxnReq2BridgeOut.chainId = _setUpHyperchainForChainId(l2TxnReq2BridgeOut.chainId);
 
-        _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true);
-        assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == ETH_TOKEN_ADDRESS);
+        _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, false);
+        assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == address(testToken));
 
         _setUpSharedBridge();
         assertTrue(bridgeHub.getHyperchain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
 
-        uint256 callerMsgValue = l2TxnReq2BridgeOut.mintValue + l2TxnReq2BridgeOut.secondBridgeValue;
         address randomCaller = makeAddr("RANDOM_CALLER");
 
         mockChainContract.setBridgeHubAddress(address(bridgeHub));
@@ -1095,19 +1096,40 @@ contract ExperimentalBridgeTest is Test {
             abi.encode(canonicalHash)
         );
 
-        if (msgValue != (l2TxnReq2BridgeOut.mintValue + l2TxnReq2BridgeOut.secondBridgeValue)) {
-            vm.deal(randomCaller, msgValue);
-            vm.expectRevert("Bridgehub: msg.value mismatch 2");
-            vm.prank(randomCaller);
-            bridgeHub.requestL2TransactionTwoBridges{value: msgValue}(l2TxnReq2BridgeOut);
-        }
+        testToken.mint(randomCaller, l2TxnReq2BridgeOut.mintValue);
+        erc20Token.mint(randomCaller, l2Value);
 
-        vm.deal(randomCaller, callerMsgValue);
+        assertEq(testToken.balanceOf(randomCaller), l2TxnReq2BridgeOut.mintValue);
+        assertEq(erc20Token.balanceOf(randomCaller), l2Value);
+
+        vm.startPrank(randomCaller);
+        testToken.approve(address(mockSharedBridge), l2TxnReq2BridgeOut.mintValue);
+        erc20Token.approve(address(mockSecondSharedBridge), l2Value);
+        vm.stopPrank();
+
+        emit log_uint(erc20Token.balanceOf(randomCaller));
+
         vm.prank(randomCaller);
-        bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
+        bytes32 resultHash = bridgeHub.requestL2TransactionTwoBridges(l2TxnReq2BridgeOut);
+        assertEq(resultHash, canonicalHash);
+
+        emit log_uint(erc20Token.balanceOf(randomCaller));
+
+        assert(erc20Token.balanceOf(randomCaller) == 0);
+        assert(testToken.balanceOf(randomCaller) == 0);
+        assert(erc20Token.balanceOf(address(mockSecondSharedBridge)) == l2Value);
+        assert(testToken.balanceOf(address(mockSharedBridge)) == l2TxnReq2BridgeOut.mintValue);
+
+        l2TxnReq2BridgeOut.secondBridgeValue = 1;
+        testToken.mint(randomCaller, l2TxnReq2BridgeOut.mintValue);
+        vm.startPrank(randomCaller);
+        testToken.approve(address(mockSharedBridge), l2TxnReq2BridgeOut.mintValue);
+        vm.expectRevert("Bridgehub: msg.value mismatch 3");
+        bridgeHub.requestL2TransactionTwoBridges(l2TxnReq2BridgeOut);
+        vm.stopPrank();
     }
 
-    function test_requestL2TransactionTwoBridges_ETHToNonETHCase(
+    function test_requestL2TransactionTwoBridges_ETHToNonBase(
         uint256 chainId,
         uint256 mintValue,
         uint256 msgValue,
@@ -1185,8 +1207,9 @@ contract ExperimentalBridgeTest is Test {
         L2TransactionRequestTwoBridgesOuter memory l2Req;
 
         // Don't let the mintValue + secondBridgeValue go beyond type(uint256).max since that calculation is required to be done by our test: test_requestL2TransactionTwoBridges_ETHCase
-        mintValue = bound(mintValue, 1, (type(uint256).max) / 2);
-        secondBridgeValue = bound(secondBridgeValue, 1, (type(uint256).max) / 2);
+
+        mintValue = bound(mintValue, 0, (type(uint256).max) / 2);
+        secondBridgeValue = bound(secondBridgeValue, 0, (type(uint256).max) / 2);
 
         l2Req.chainId = chainId;
         l2Req.mintValue = mintValue;
