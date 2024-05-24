@@ -208,6 +208,24 @@ describe.only("L2 upgrade test", function () {
     expect(bootloaderRevertReason).to.equal("Patch only upgrade can not set upgrade transaction");
   });
 
+  it("Should not allow major version change", async () => {
+    // 2**64 is the offset for a major version change
+    const newVersion = ethers.BigNumber.from(2).pow(64);
+
+    const someTx = buildL2CanonicalTransaction({
+      txType: 254,
+      nonce: 0,
+    });
+
+    const bootloaderRevertReason = await getCallRevertReason(
+      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+        newProtocolVersion: newVersion,
+        l2ProtocolUpgradeTx: someTx,
+      })
+    );
+    expect(bootloaderRevertReason).to.equal("Major must always be 0");
+  });
+
   it("Timestamp should behave correctly", async () => {
     // Upgrade was scheduled for now should work fine
     const timeNow = (await hardhat.ethers.provider.getBlock("latest")).timestamp;

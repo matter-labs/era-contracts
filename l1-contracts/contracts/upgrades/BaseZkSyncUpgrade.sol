@@ -265,7 +265,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         uint32 newMajorVersion;
         // slither-disable-next-line unused-return
         (newMajorVersion, newMinorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion));
-        require(newMajorVersion == 0, "Major version change is not allowed");
+        require(newMajorVersion == 0, "Major must always be 0");
 
         // Since `_newProtocolVersion > previousProtocolVersion`, and both old and new major version is 0,
         // the difference between minor versions is >= 0.
