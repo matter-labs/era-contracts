@@ -148,6 +148,7 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
+        // slither-disable-next-line unused-return
         return SemVer.unpackSemVer(SafeCast.toUint96(s.protocolVersion));
     }
 
