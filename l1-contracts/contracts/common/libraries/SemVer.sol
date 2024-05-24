@@ -40,6 +40,9 @@ library SemVer {
         uint32 _minor,
         uint32 _patch
     ) internal pure returns (uint96 packedProtocolVersion) {
-        packedProtocolVersion = uint96(_patch) | (uint96(_minor) << SEMVER_MINOR_OFFSET) | (uint96(_major) << SEMVER_MAJOR_OFFSET);
+        packedProtocolVersion =
+            uint96(_patch) |
+            (uint96(_minor) << SEMVER_MINOR_OFFSET) |
+            (uint96(_major) << SEMVER_MAJOR_OFFSET);
     }
 }

@@ -29,7 +29,9 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
         (newMajorVersion, newMinorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion));
         require(newMajorVersion == 0, "Major version change is not allowed");
 
-        (uint32 majorDelta, uint32 minorDelta, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion - previousProtocolVersion));
+        (uint32 majorDelta, uint32 minorDelta, ) = SemVer.unpackSemVer(
+            SafeCast.toUint96(_newProtocolVersion - previousProtocolVersion)
+        );
 
         // IMPORTANT Genesis Upgrade difference: We never set patchOnly to `true` to allow to put a system upgrade transaction there.
         patchOnly = false;

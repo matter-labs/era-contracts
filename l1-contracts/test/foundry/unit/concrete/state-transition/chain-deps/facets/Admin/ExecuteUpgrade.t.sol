@@ -60,7 +60,6 @@ contract ExecuteUpgradeTest is AdminTest {
             initCalldata: abi.encodeCall(upgrade.upgrade, (proposedUpgrade))
         });
 
-
         address stm = utilsFacet.util_getStateTransitionManager();
         vm.startPrank(stm);
 
