@@ -121,7 +121,7 @@ async function main() {
   const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
   const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
   const diamondCut = await deployer.initialZkSyncHyperchainDiamondCut([]);
-  const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_VERSION));
+  const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
 
   const initCalldata2 = stateTransitionManager.encodeFunctionData("initialize", [
     {

@@ -94,7 +94,7 @@ describe("L2 upgrade test", function () {
     await transferOwnershipTx.wait();
 
     const [initialMajor, initalMinor, initialPatch] = unpackStringSemVer(
-      process.env.CONTRACTS_GENESIS_PROTOCOL_VERSION
+      process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION
     );
     if (initialMajor !== 0 || initialPatch !== 0) {
       throw new Error("Initial protocol version must be 0.x.0");
