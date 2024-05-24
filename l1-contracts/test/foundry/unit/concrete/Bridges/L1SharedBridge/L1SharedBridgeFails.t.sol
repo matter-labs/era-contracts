@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
-
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -14,9 +14,104 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 
 /// We are testing all the specified revert and require cases.
 contract L1SharedBridgeFailTest is L1SharedBridgeTest {
+    using stdStorage for StdStorage;
+
+    function test_wrongEraPostDiamondUpgradeFirstBatch(uint256 eraPostUpgradeFirstBatch) public {
+        eraPostUpgradeFirstBatch = bound(eraPostUpgradeFirstBatch, 1, type(uint256).max);
+        vm.prank(owner);
+        vm.expectRevert("ShB: eFPUB already set");
+        sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
+    }
+
+    function test_wrongEraPostLegacyBridgeUpgradeFirstBatch(uint256 eraPostLegacyBridgeUpgradeFirstBatch) public {
+        eraPostUpgradeFirstBatch = bound(eraPostLegacyBridgeUpgradeFirstBatch, 0, type(uint256).max);
+        vm.prank(owner);
+        vm.expectRevert("ShB: eFPUB already set");
+        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostLegacyBridgeUpgradeFirstBatch);
+    }
+
+    function test_eraLegacyBridgeLastDepositBatchAlreadySet(
+        uint256 eraLegacyBridgeLastDepositBatch,
+        uint256 eraLegacyBridgeLastDepositTxNumber
+    ) public {
+        L1SharedBridge sharedBridgeImpl = new L1SharedBridge({
+            _l1WethAddress: l1WethAddress,
+            _bridgehub: IBridgehub(bridgehubAddress),
+            _eraChainId: eraChainId,
+            _eraDiamondProxy: eraDiamondProxy
+        });
+        TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
+            address(sharedBridgeImpl),
+            admin,
+            abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner)
+        );
+
+        L1SharedBridge sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
+
+        vm.startPrank(owner);
+        sharedBridge.setEraLegacyBridgeLastDepositTime(0, 0);
+
+        eraLegacyBridgeLastDepositBatch = bound(eraLegacyBridgeLastDepositTxNumber, 1, type(uint256).max);
+        eraLegacyBridgeLastDepositTxNumber = 0;
+
+        vm.startPrank(owner);
+        sharedBridge.setEraLegacyBridgeLastDepositTime(
+            eraLegacyBridgeLastDepositBatch,
+            eraLegacyBridgeLastDepositTxNumber
+        );
+
+        vm.expectRevert("ShB: eLOBDB already set");
+        sharedBridge.setEraLegacyBridgeLastDepositTime(
+            eraLegacyBridgeLastDepositBatch,
+            eraLegacyBridgeLastDepositTxNumber
+        );
+
+        vm.stopPrank();
+    }
+
+    function test_eraLegacyBridgeLastDepositTxnAlreadySet(
+        uint256 eraLegacyBridgeLastDepositBatch,
+        uint256 eraLegacyBridgeLastDepositTxNumber
+    ) public {
+        L1SharedBridge sharedBridgeImpl = new L1SharedBridge({
+            _l1WethAddress: l1WethAddress,
+            _bridgehub: IBridgehub(bridgehubAddress),
+            _eraChainId: eraChainId,
+            _eraDiamondProxy: eraDiamondProxy
+        });
+        TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
+            address(sharedBridgeImpl),
+            admin,
+            abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner)
+        );
+
+        L1SharedBridge sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
+
+        vm.startPrank(owner);
+        sharedBridge.setEraLegacyBridgeLastDepositTime(0, 0);
+
+        eraLegacyBridgeLastDepositBatch = 0;
+        eraLegacyBridgeLastDepositTxNumber = bound(eraLegacyBridgeLastDepositTxNumber, 1, type(uint256).max);
+
+        vm.startPrank(owner);
+        sharedBridge.setEraLegacyBridgeLastDepositTime(
+            eraLegacyBridgeLastDepositBatch,
+            eraLegacyBridgeLastDepositTxNumber
+        );
+
+        vm.expectRevert("ShB: eLOBDTN already set");
+        sharedBridge.setEraLegacyBridgeLastDepositTime(
+            eraLegacyBridgeLastDepositBatch,
+            eraLegacyBridgeLastDepositTxNumber
+        );
+
+        vm.stopPrank();
+    }
+
     function test_initialize_wrongOwner() public {
         vm.expectRevert("ShB owner 0");
         new TransparentUpgradeableProxy(
