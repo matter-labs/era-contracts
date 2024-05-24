@@ -287,6 +287,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         bytes[] memory bytesEmptyArray;
 
         uint256 cachedProtocolVersion = protocolVersion;
+        // slither-disable-next-line unused-return
         (, uint32 minorVersion, ) = SemVer.unpackSemVer(cachedProtocolVersion);
 
         L2CanonicalTransaction memory l2ProtocolUpgradeTx = L2CanonicalTransaction({

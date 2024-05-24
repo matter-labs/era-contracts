@@ -23,6 +23,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
         );
 
         uint32 newMajorVersion;
+        // slither-disable-next-line unused-return
         (newMajorVersion, newMinorVersion, ) = SemVer.unpackSemVer(_newProtocolVersion);
         require(newMajorVersion == 0, "Major version change is not allowed");
 

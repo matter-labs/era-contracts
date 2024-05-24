@@ -141,10 +141,7 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getProtocolVersion() external view returns (uint256) {
-        (uint32 major, uint32 minor, ) = SemVer.unpackSemVer(s.protocolVersion);
-        require(major == 0, "Only 0 major version is supported right now");
-
-        return uint256(minor);
+        return s.protocolVersion;
     }
 
     /// @inheritdoc IGetters

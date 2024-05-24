@@ -85,7 +85,7 @@ interface IGetters is IZkSyncHyperchainBase {
     /// @return Whether the diamond is frozen or not
     function isDiamondStorageFrozen() external view returns (bool);
 
-    /// @return The current (minor) protocol version.
+    /// @return The current packed protocol version. To access human-readable version, use `getSemverProtocolVersion` function.
     function getProtocolVersion() external view returns (uint256);
 
     /// @return The tuple of (major, minor, patch) protocol version.
