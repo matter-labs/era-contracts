@@ -36,7 +36,7 @@ uint256 constant SEMVER_MINOR_OFFSET = 32;
 /// Note, that currently, only major version of "0" is supported.
 uint256 constant SEMVER_MAJOR_OFFSET = 64;
 
-/// @dev The maximal allowed difference between protocol versions in an upgrade. The 100 gap is needed
+/// @dev The maximal allowed difference between protocol minor versions in an upgrade. The 100 gap is needed
 /// in case a protocol version has been tested on testnet, but then not launched on mainnet, e.g.
 /// due to a bug found.
 /// We are allowed to jump at most 100 minor versions at a time. The major version is always expected to be 0.
