@@ -88,7 +88,7 @@ interface IGetters is IZkSyncHyperchainBase {
     /// @return The current protocol version
     function getProtocolVersion() external view returns (uint256);
 
-    /// @return The tuple of (patch, minor, major) protocol version.
+    /// @return The tuple of (major, minor, patch) protocol version.
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32);
 
     /// @return The upgrade system contract transaction hash, 0 if the upgrade is not initialized
