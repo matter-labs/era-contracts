@@ -4,7 +4,17 @@ pragma solidity 0.8.24;
 
 import {SEMVER_MINOR_OFFSET, SEMVER_MAJOR_OFFSET} from "../Config.sol";
 
+/**
+ * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
+ * @notice The library for managing SemVer for the protocol version.
+ */
 library SemVer {
+    /// @notice Unpacks the SemVer version from a single uint256 into major, minor and patch components.
+    /// @param _packedProtocolVersion The packed protocol version.
+    /// @return major The major version.
+    /// @return minor The minor version.
+    /// @return patch The patch version.
     function unpackSemVer(
         uint256 _packedProtocolVersion
     ) internal pure returns (uint32 major, uint32 minor, uint32 patch) {
