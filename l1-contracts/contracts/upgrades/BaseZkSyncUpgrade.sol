@@ -98,7 +98,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
             return;
         }
 
-        require(!_patchOnly, "Patch only upgrade can not set new bootloader");
+        require(!_patchOnly, "Patch only upgrade can not set new default account");
 
         L2ContractHelper.validateBytecodeHash(_l2DefaultAccountBytecodeHash);
 
