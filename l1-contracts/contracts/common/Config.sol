@@ -27,15 +27,6 @@ uint256 constant PRIORITY_OPERATION_L2_TX_TYPE = 255;
 /// @dev Denotes the type of the zkSync transaction that is used for system upgrades.
 uint256 constant SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 
-/// @dev The number of bits dedicated to the "patch" portion of the protocol version.
-/// This also defines the bit starting from which the "minor" part is located.
-uint256 constant SEMVER_MINOR_OFFSET = 32;
-
-/// @dev The number of bits dedicated to the "patch" and "minor" portions of the protocol version.
-/// This also defines the bit starting from which the "major" part is located.
-/// Note, that currently, only major version of "0" is supported.
-uint256 constant SEMVER_MAJOR_OFFSET = 64;
-
 /// @dev The maximal allowed difference between protocol versions in an upgrade. The 100 gap is needed
 /// in case a protocol version has been tested on testnet, but then not launched on mainnet, e.g.
 /// due to a bug found.

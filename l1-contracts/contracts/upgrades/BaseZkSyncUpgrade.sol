@@ -90,6 +90,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
     /// @notice Change default account bytecode hash, that is used on L2
     /// @param _l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
+    /// @param _patchOnly Whether the patch part of the protocol version semver has changed
     function _setL2DefaultAccountBytecodeHash(bytes32 _l2DefaultAccountBytecodeHash, bool _patchOnly) private {
         if (_l2DefaultAccountBytecodeHash == bytes32(0)) {
             return;
@@ -109,6 +110,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
     /// @notice Change bootloader bytecode hash, that is used on L2
     /// @param _l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
+    /// @param _patchOnly Whether the patch part of the protocol version semver has changed
     function _setL2BootloaderBytecodeHash(bytes32 _l2BootloaderBytecodeHash, bool _patchOnly) private {
         if (_l2BootloaderBytecodeHash == bytes32(0)) {
             return;
@@ -181,6 +183,10 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
     /// @notice Sets the hash of the L2 system contract upgrade transaction for the next batch to be committed
     /// @dev If the transaction is noop (i.e. its type is 0) it does nothing and returns 0.
     /// @param _l2ProtocolUpgradeTx The L2 system contract upgrade transaction.
+    /// @param _factoryDeps The factory dependencies that are used by the transaction.
+    /// @param _newMinorProtocolVersion The new minor protocol version. It must be used as the `nonce` field
+    /// of the `_l2ProtocolUpgradeTx`.
+    /// @param _patchOnly Whether the patch part of the protocol version semver has changed.
     /// @return System contracts upgrade transaction hash. Zero if no upgrade transaction is set.
     function _setL2SystemContractUpgrade(
         L2CanonicalTransaction calldata _l2ProtocolUpgradeTx,

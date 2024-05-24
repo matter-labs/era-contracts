@@ -2,7 +2,14 @@
 
 pragma solidity 0.8.24;
 
-import {SEMVER_MINOR_OFFSET, SEMVER_MAJOR_OFFSET} from "../Config.sol";
+/// @dev The number of bits dedicated to the "patch" portion of the protocol version.
+/// This also defines the bit starting from which the "minor" part is located.
+uint256 constant SEMVER_MINOR_OFFSET = 32;
+
+/// @dev The number of bits dedicated to the "patch" and "minor" portions of the protocol version.
+/// This also defines the bit starting from which the "major" part is located.
+/// Note, that currently, only major version of "0" is supported.
+uint256 constant SEMVER_MAJOR_OFFSET = 64;
 
 /**
  * @author Matter Labs
@@ -16,9 +23,8 @@ library SemVer {
     /// @return minor The minor version.
     /// @return patch The patch version.
     function unpackSemVer(
-        uint256 _packedProtocolVersion
+        uint96 _packedProtocolVersion
     ) internal pure returns (uint32 major, uint32 minor, uint32 patch) {
-        require(_packedProtocolVersion <= uint256(type(uint96).max), "Semver: version is too large");
         patch = uint32(_packedProtocolVersion);
         minor = uint32(_packedProtocolVersion >> SEMVER_MINOR_OFFSET);
         major = uint32(_packedProtocolVersion >> SEMVER_MAJOR_OFFSET);

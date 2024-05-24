@@ -87,7 +87,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @return The tuple of (major, minor, patch) protocol version.
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
-        return SemVer.unpackSemVer(protocolVersion);
+        return SemVer.unpackSemVer(uint96(protocolVersion));
     }
 
     /// @notice Returns all the registered hyperchain addresses
