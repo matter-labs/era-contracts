@@ -85,7 +85,7 @@ interface IGetters is IZkSyncHyperchainBase {
     /// @return Whether the diamond is frozen or not
     function isDiamondStorageFrozen() external view returns (bool);
 
-    /// @return The current protocol version
+    /// @return The current (minor) protocol version.
     function getProtocolVersion() external view returns (uint256);
 
     /// @return The tuple of (major, minor, patch) protocol version.

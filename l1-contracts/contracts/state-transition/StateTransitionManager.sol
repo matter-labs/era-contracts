@@ -48,7 +48,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The genesisUpgrade contract address, used to setChainId
     address public genesisUpgrade;
 
-    /// @dev The current protocolVersion
+    /// @dev The current packed protocolVersion. To access human-readable version, use `getSemverProtocolVersion` function.
     uint256 public protocolVersion;
 
     /// @dev The timestamp when protocolVersion can be last used
@@ -83,6 +83,11 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     modifier onlyOwnerOrAdmin() {
         require(msg.sender == admin || msg.sender == owner(), "STM: not owner or admin");
         _;
+    }
+
+    /// @return The tuple of (major, minor, patch) protocol version.
+    function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
+        return SemVer.unpackSemVer(protocolVersion);
     }
 
     /// @notice Returns all the registered hyperchain addresses
