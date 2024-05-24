@@ -29,6 +29,7 @@ contract ExecuteUpgradeTest is AdminTest {
         adminFacet.executeUpgrade(diamondCutData);
     }
 
+    /// TODO: This test should be removed after the migration to the semver is complete everywhere.
     function test_migrateToSemVerApproach() public {
         // Setting minor protocol version manually
         utilsFacet.util_setProtocolVersion(22);
@@ -49,7 +50,7 @@ contract ExecuteUpgradeTest is AdminTest {
             l1ContractsUpgradeCalldata: hex"",
             postUpgradeCalldata: hex"",
             upgradeTimestamp: 0,
-            newProtocolVersion: SemVer.packSemVer(0, 24, 0)
+            newProtocolVersion: SemVer.packSemVer(0, 22, 0)
         });
 
         DefaultUpgrade upgrade = new DefaultUpgrade();
