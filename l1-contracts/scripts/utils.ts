@@ -81,7 +81,6 @@ export function getLowerCaseAddress(address: string) {
 
 export function unpackStringSemVer(semver: string): [number, number, number] {
   const [major, minor, patch] = semver.split(".");
-  console.log(major, minor, patch);
   return [parseInt(major), parseInt(minor), parseInt(patch)];
 }
 

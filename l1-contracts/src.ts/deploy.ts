@@ -315,10 +315,6 @@ export class Deployer {
     const diamondCut = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
     const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_VERSION));
 
-    console.log(packSemver(0, 1000, 5));
-
-    console.log("applied protocovl version", protocolVersion);
-
     const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
 
     const initCalldata = stateTransitionManager.encodeFunctionData("initialize", [

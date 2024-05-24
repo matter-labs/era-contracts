@@ -293,7 +293,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             maxFeePerGas: uint256(0),
             maxPriorityFeePerGas: uint256(0),
             paymaster: uint256(0),
-            // Note, that the protocol version is used as "nonce" for system upgrade transactions
+            // Note, that the `minor` of the protocol version is used as "nonce" for system upgrade transactions
             nonce: uint256(minorVersion),
             value: 0,
             reserved: [uint256(0), 0, 0, 0],
@@ -318,7 +318,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
             upgradeTimestamp: 0,
-            newProtocolVersion: protocolVersion
+            newProtocolVersion: cachedProtocolVersion
         });
 
         Diamond.FacetCut[] memory emptyArray;
@@ -329,7 +329,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         });
 
         IAdmin(_chainContract).executeUpgrade(cutData);
-        emit SetChainIdUpgrade(_chainContract, l2ProtocolUpgradeTx, protocolVersion);
+        emit SetChainIdUpgrade(_chainContract, l2ProtocolUpgradeTx, cachedProtocolVersion);
     }
 
     /// @dev used to register already deployed hyperchain contracts

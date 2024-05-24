@@ -2,8 +2,9 @@
 
 pragma solidity 0.8.24;
 
-import {MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "../common/Config.sol";
 import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
+import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
+import {SemVer} from "../common/libraries/SemVer.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -11,7 +12,7 @@ import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
 abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
-    function _setNewProtocolVersion(uint256 _newProtocolVersion) internal override returns (bool patchOnly) {
+    function _setNewProtocolVersion(uint256 _newProtocolVersion) internal override returns (uint32 newMinorVersion, bool patchOnly) {
         uint256 previousProtocolVersion = s.protocolVersion;
         // IMPORTANT Genesis Upgrade difference: Note this is the only thing change > to >=
         require(
@@ -19,14 +20,14 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
             "New protocol version is not greater than the current one"
         );
 
-        (uint32 newMajor,,) = SemVer.unpackSemVer(_newProtocolVersion);
-        require(newMajor == 0, "Only major version of 0 is supported");
+        uint32 newMajorVersion;
+        (newMajorVersion, newMinorVersion,) = SemVer.unpackSemVer(_newProtocolVersion);
+        require(newMajorVersion == 0, "Major version change is not allowed");
 
-        (uint32 majorDelta, uint32 minorDelta, uint32 patchDelta) = SemVer.unpackSemVer(_newProtocolVersion - previousProtocolVersion);
+        (uint32 majorDelta, uint32 minorDelta,) = SemVer.unpackSemVer(_newProtocolVersion - previousProtocolVersion);
 
-        if (minorDelta == 0) {
-            patchOnly = true;
-        }
+        // IMPORTANT Genesis Upgrade difference: We never set patchOnly to `true` to allow to put a system upgrade transaction there.
+        patchOnly = false;
 
         // While this is implicitly enforced by other checks above, we still double check just in case
         require(majorDelta == 0, "Major version change is not allowed");

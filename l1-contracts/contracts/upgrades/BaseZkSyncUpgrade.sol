@@ -7,7 +7,7 @@ import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
-import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_PROTOCOL_VERSION_DELTA, MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
+import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
@@ -71,7 +71,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         // as the permitted delay window is reduced in the future.
         require(block.timestamp >= _proposedUpgrade.upgradeTimestamp, "Upgrade is not ready yet");
 
-        bool isPatchOnly = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
+        (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
         _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
         _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash, isPatchOnly);
@@ -79,7 +79,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         txHash = _setL2SystemContractUpgrade(
             _proposedUpgrade.l2ProtocolUpgradeTx,
             _proposedUpgrade.factoryDeps,
-            _proposedUpgrade.newProtocolVersion,
+            newMinorVersion,
             isPatchOnly
         );
 
@@ -185,7 +185,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
     function _setL2SystemContractUpgrade(
         L2CanonicalTransaction calldata _l2ProtocolUpgradeTx,
         bytes[] calldata _factoryDeps,
-        uint256 _newProtocolVersion,
+        uint32 _newMinorProtocolVersion,
         bool _patchOnly
     ) internal returns (bytes32) {
         // If the type is 0, it is considered as noop and so will not be required to be executed.
@@ -193,7 +193,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
             return bytes32(0);
         }
 
-        require(!_patchOnly, "Patch only upgrade can not set new transactions");
+        require(!_patchOnly, "Patch only upgrade can not set upgrade transaction");
 
         require(_l2ProtocolUpgradeTx.txType == SYSTEM_UPGRADE_L2_TX_TYPE, "L2 system upgrade tx type is wrong");
 
@@ -208,13 +208,10 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
         TransactionValidator.validateUpgradeTransaction(_l2ProtocolUpgradeTx);
 
-        // We expect that the upgrade transactions are only present when the minor version changes
-        (, uint32 minorVersion, ) = SemVer.unpackSemVer(_newProtocolVersion);
-
         // We want the hashes of l2 system upgrade transactions to be unique.
         // This is why we require that the `nonce` field is unique to each upgrade.
         require(
-            _l2ProtocolUpgradeTx.nonce == minorVersion,
+            _l2ProtocolUpgradeTx.nonce == _newMinorProtocolVersion,
             "The new protocol version should be included in the L2 system upgrade tx"
         );
 
@@ -244,26 +241,26 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
-    function _setNewProtocolVersion(uint256 _newProtocolVersion) internal virtual returns (bool patchOnly) {
+    function _setNewProtocolVersion(uint256 _newProtocolVersion) internal virtual returns (uint32 newMinorVersion, bool patchOnly) {
         uint256 previousProtocolVersion = s.protocolVersion;
         require(
             _newProtocolVersion > previousProtocolVersion,
             "New protocol version is not greater than the current one"
         );
 
-        (uint32 newMajor,,) = SemVer.unpackSemVer(_newProtocolVersion);
-        require(newMajor == 0, "Major version change is not allowed");
+        uint32 newMajorVersion;
+        (newMajorVersion, newMinorVersion,) = SemVer.unpackSemVer(_newProtocolVersion);
+        require(newMajorVersion == 0, "Major version change is not allowed");
 
-        (uint32 majorDelta, uint32 minorDelta, uint32 patchDelta) = SemVer.unpackSemVer(_newProtocolVersion - previousProtocolVersion);
+        (uint32 majorDelta, uint32 minorDelta,) = SemVer.unpackSemVer(_newProtocolVersion - previousProtocolVersion);
 
         if (minorDelta == 0) {
             patchOnly = true;
         }
 
+        // While this is implicitly enforced by other checks above, we still double check just in case
+        require(majorDelta == 0, "Major version change is not allowed");
         require(minorDelta <= MAX_ALLOWED_MINOR_VERSION_DELTA, "Too big protocol version difference");
-
-        require(majorChange == 0, "Major version change is not allowed")
-        require(minorChange <= MAX_ALLOWED_MINOR_VERSION_DELTA, "Too big protocol version difference");
 
         // If the minor version changes also, we need to ensure that the previous upgrade has been finalized.
         // In case the minor version does not change, we permit to keep the old upgrade transaction in the system, but it 

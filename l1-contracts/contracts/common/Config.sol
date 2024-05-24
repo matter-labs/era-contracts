@@ -30,9 +30,10 @@ uint256 constant SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 /// @dev The number of bits dedicated to the "patch" portion of the protocol version.
 /// This also defines the bit starting from which the "minor" part is located.
 uint256 constant SEMVER_MINOR_OFFSET = 32;
+
 /// @dev The number of bits dedicated to the "patch" and "minor" portions of the protocol version.
 /// This also defines the bit starting from which the "major" part is located.
-/// @notice Currently, only major version of "0" is supported.
+/// Note, that currently, only major version of "0" is supported.
 uint256 constant SEMVER_MAJOR_OFFSET = 64;
 
 /// @dev The maximal allowed difference between protocol versions in an upgrade. The 100 gap is needed
@@ -40,9 +41,6 @@ uint256 constant SEMVER_MAJOR_OFFSET = 64;
 /// due to a bug found.
 /// We are allowed to jump at most 100 minor versions at a time. The major version is always expected to be 0.
 uint256 constant MAX_ALLOWED_MINOR_VERSION_DELTA = 100;
-
-/// @dev The same as `MAX_ALLOWED_MINOR_VERSION_DELTA` but in the absolute terms for protocolUpgrade
-uint256 constant MAX_ALLOWED_PROTOCOL_VERSION_DELTA = MAX_ALLOWED_MINOR_VERSION_DELTA * (1 << SEMVER_MINOR_OFFSET);
 
 /// @dev The amount of time in seconds the validator has to process the priority transaction
 /// NOTE: The constant is set to zero for the Alpha release period
