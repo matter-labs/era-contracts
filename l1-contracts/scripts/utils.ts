@@ -91,5 +91,5 @@ export function packSemver(major: number, minor: number, patch: number) {
     throw new Error("Major version must be 0");
   }
 
-  return (minor * SEMVER_MINOR_VERSION_MULTIPLIER) + patch;
+  return minor * SEMVER_MINOR_VERSION_MULTIPLIER + patch;
 }

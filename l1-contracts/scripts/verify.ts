@@ -123,7 +123,7 @@ async function main() {
   const diamondCut = await deployer.initialZkSyncHyperchainDiamondCut([]);
   const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_VERSION));
 
-  console.log('applied protocovl version', protocolVersion);
+  console.log("applied protocovl version", protocolVersion);
 
   const initCalldata2 = stateTransitionManager.encodeFunctionData("initialize", [
     {
