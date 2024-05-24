@@ -9,7 +9,7 @@ import {Utils} from "../../../../Utils/Utils.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {SemVer} from "contracts/common/libraries/Semver.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 
 contract ExecuteUpgradeTest is AdminTest {

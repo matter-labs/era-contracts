@@ -257,6 +257,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
             _newProtocolVersion > previousProtocolVersion,
             "New protocol version is not greater than the current one"
         );
+        // slither-disable-next-line unused-return
         (uint32 previousMajorVersion, uint32 previousMinorVersion, ) = SemVer.unpackSemVer(
             SafeCast.toUint96(previousProtocolVersion)
         );
