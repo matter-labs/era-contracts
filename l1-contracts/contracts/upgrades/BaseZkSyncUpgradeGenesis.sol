@@ -40,7 +40,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
 
         // If the minor version changes also, we need to ensure that the previous upgrade has been finalized.
         // In case the minor version does not change, we permit to keep the old upgrade transaction in the system, but it
-        // must be ensured in the other parts of the upgrade that the is not overriden.
+        // must be ensured in the other parts of the upgrade that the is not overridden.
         if (!patchOnly) {
             // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
             // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
