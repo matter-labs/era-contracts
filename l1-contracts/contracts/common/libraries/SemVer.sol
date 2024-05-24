@@ -29,4 +29,17 @@ library SemVer {
         minor = uint32(_packedProtocolVersion >> SEMVER_MINOR_OFFSET);
         major = uint32(_packedProtocolVersion >> SEMVER_MAJOR_OFFSET);
     }
+
+    /// @notice Packs the SemVer version from the major, minor and patch components into a single uint96.
+    /// @param _major The major version.
+    /// @param _minor The minor version.
+    /// @param _patch The patch version.
+    /// @return packedProtocolVersion The packed protocol version.
+    function packSemVer(
+        uint32 _major,
+        uint32 _minor,
+        uint32 _patch
+    ) internal pure returns (uint96 packedProtocolVersion) {
+        packedProtocolVersion = uint96(_patch) | (uint96(_minor) << SEMVER_MINOR_OFFSET) | (uint96(_major) << SEMVER_MAJOR_OFFSET);
+    }
 }
