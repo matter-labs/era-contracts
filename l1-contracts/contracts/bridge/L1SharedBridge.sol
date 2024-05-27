@@ -544,7 +544,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         MessageParams memory _messageParams,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) internal view returns (bytes32 assetInfo, bytes memory assetData) {
+    ) internal returns (bytes32 assetInfo, bytes memory assetData) {
         (assetInfo, assetData) = _parseL2WithdrawalMessage(_chainId, _message);
         L2Message memory l2ToL1Message;
         {
@@ -571,7 +571,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     function _parseL2WithdrawalMessage(
         uint256 _chainId,
         bytes memory _l2ToL1message
-    ) internal view returns (bytes32 assetInfo, bytes memory assetData) {
+    ) internal returns (bytes32 assetInfo, bytes memory assetData) {
         // We check that the message is long enough to read the data.
         // Please note that there are two versions of the message:
         // 1. The message that is sent by `withdraw(address _l1Receiver)`
@@ -585,6 +585,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(_l2ToL1message.length >= 56, "ShB wrong msg len"); // wrong message length
         uint256 amount;
         address l1Receiver;
+        uint256 l1ReceiverBytes;
+        address parsedL1Receiver;
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {
@@ -599,15 +601,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             // this message is a token withdrawal
 
             // Check that the message length is correct.
-            // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
-            // 76 (bytes).
-            require(_l2ToL1message.length == 76, "ShB wrong msg len 2");
-            (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-            address l1Asset;
-            (l1Asset, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-            assetInfo = nativeTokenVault.getAssetInfo(l1Asset);
+            // It should be equal to the length of the function signature + address + uint256 + address = 4 + 32 + 32 + 32 =
+            // 100 (bytes).
+            require(_l2ToL1message.length == 100, "ShB wrong msg len 2");
+            (assetInfo, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-            assetData = abi.encode(amount, l1Receiver);
+            (l1ReceiverBytes, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+            parsedL1Receiver = address(uint160(uint256(l1ReceiverBytes)));
+            assetData = abi.encode(amount, parsedL1Receiver);
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
             //todo
         } else {

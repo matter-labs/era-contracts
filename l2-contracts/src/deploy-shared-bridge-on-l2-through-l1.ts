@@ -162,7 +162,7 @@ export async function deployStandardDeployerProxyOnL2ThroughL1(
   const L2StandardDeployerInterface = new Interface(hre.artifacts.readArtifactSync("L2StandardDeployer").abi);
   let proxyInitializationParams = L2StandardDeployerInterface.encodeFunctionData("initialize", [
     hashL2Bytecode(L2_STANDARD_TOKEN_PROXY_BYTECODE),
-    applyL1ToL2Alias(deployer.deployWallet.address),
+    deployer.deployWallet.address,
     false,
   ]);
 
