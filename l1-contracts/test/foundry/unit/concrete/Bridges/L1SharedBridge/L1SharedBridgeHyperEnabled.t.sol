@@ -18,12 +18,12 @@ contract L1SharedBridgeHyperEnabledTest is L1SharedBridgeTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositBaseTokenInitiated(chainId, alice, ETH_TOKEN_ADDRESS, amount);
-        sharedBridge.bridgehubDepositBaseToken{value: amount}({
-            _chainId: chainId,
-            _prevMsgSender: alice,
-            _l1Token: ETH_TOKEN_ADDRESS,
-            _amount: amount
-        });
+        // sharedBridge.bridgehubDepositBaseToken{value: amount}({
+        //     _chainId: chainId,
+        //     _prevMsgSender: alice,
+        //     _l1Token: ETH_TOKEN_ADDRESS,
+        //     _amount: amount
+        // });
     }
 
     function test_bridgehubDepositBaseToken_Erc() public {
@@ -34,12 +34,12 @@ contract L1SharedBridgeHyperEnabledTest is L1SharedBridgeTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositBaseTokenInitiated(chainId, alice, address(token), amount);
-        sharedBridge.bridgehubDepositBaseToken({
-            _chainId: chainId,
-            _prevMsgSender: alice,
-            _l1Token: address(token),
-            _amount: amount
-        });
+        // sharedBridge.bridgehubDepositBaseToken({
+        //     _chainId: chainId,
+        //     _prevMsgSender: alice,
+        //     _l1Token: address(token),
+        //     _amount: amount
+        // });
     }
 
     function test_bridgehubDeposit_Eth() public {

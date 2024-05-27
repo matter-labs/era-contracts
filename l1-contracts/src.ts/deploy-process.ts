@@ -31,39 +31,37 @@ export async function initialBridgehubDeployment(
   // Create2 factory already deployed on the public networks, only deploy it on local node
   if (isCurrentNetworkLocal()) {
     if (!deployer.isZkMode()) {
-      await deployer.deployCreate2Factory({ gasPrice, nonce });
+      await deployer.deployCreate2Factory({ gasPrice });
       nonce++;
     } else {
       await deployer.updateCreate2FactoryZkMode();
     }
 
-    await deployer.deployMulticall3(create2Salt, { gasPrice, nonce });
+    await deployer.deployMulticall3(create2Salt, { gasPrice });
     nonce++;
   }
 
   if (onlyVerifier) {
-    await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
+    await deployer.deployVerifier(create2Salt, { gasPrice });
     return;
   }
 
   await deployer.deployDefaultUpgrade(create2Salt, {
     gasPrice,
-    nonce,
   });
   nonce++;
 
   await deployer.deployGenesisUpgrade(create2Salt, {
     gasPrice,
-    nonce,
   });
   nonce++;
 
-  await deployer.deployValidatorTimelock(create2Salt, { gasPrice, nonce });
+  await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
   nonce++;
 
   // Governance will be L1 governance, but we want to deploy it here for the init process.
-  await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
-  if (deployer.isZkMode()) {
+  await deployer.deployGovernance(create2Salt, { gasPrice });
+  if (!deployer.isZkMode()) {
     // proxy admin is already deployed when SL's L2SharedBridge is registered
     await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   }

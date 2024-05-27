@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {PubdataPricingMode, SyncLayerState} from "../ZkSyncHyperchainStorage.sol";
+import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
@@ -197,12 +197,6 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     /// @inheritdoc IGetters
     function getPubdataPricingMode() external view returns (PubdataPricingMode) {
         return s.feeParams.pubdataPricingMode;
-    }
-
-    /// @inheritdoc IGetters
-    function getSyncLayerState() external view returns (SyncLayerState) {
-        // TODO: consider making private so that no one relies on it
-        // return s.syncLayerState;
     }
 
     /// @inheritdoc IGetters

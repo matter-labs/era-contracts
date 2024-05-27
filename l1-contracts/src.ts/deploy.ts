@@ -273,7 +273,7 @@ export class Deployer {
   }
 
   public async deployBridgehubImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const l1ChainId = await this.deployWallet.getChainId();
+    const l1ChainId = this.isZkMode() ? getNumberFromEnv("ETH_CLIENT_CHAIN_ID") : await this.deployWallet.getChainId();
     const contractAddress = await this.deployViaCreate2("Bridgehub", [l1ChainId], create2Salt, ethTxOptions);
 
     if (this.verbose) {
@@ -820,8 +820,7 @@ export class Deployer {
     if (this.verbose) {
       console.log("STM asset registered in L1 Shared Bridge via STM Deployment Tracker");
       console.log(
-        "CONTRACTS_STM_ASSET_INFO=",
-        await bridgehub.stmAssetInfo(this.addresses.StateTransition.StateTransitionProxy)
+        `CONTRACTS_STM_ASSET_INFO=${await bridgehub.stmAssetInfo(this.addresses.StateTransition.StateTransitionProxy)}`
       );
     }
   }
@@ -971,10 +970,17 @@ export class Deployer {
     const expectedCost = (
       await bridgehub.l2TransactionBaseCost(syncLayerChainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
     ).mul(5);
-    const chainData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [ADDRESS_ONE, "0x"]); // todo
-    const bridgehubData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [this.chainId, chainData]);
+
+    const newAdmin = this.deployWallet.address;
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut();
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
+
+    const stmData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [newAdmin, initialDiamondCut]);
+    const chainData = new ethers.utils.AbiCoder().encode(["uint256"], [ADDRESS_ONE]); // empty for now
+    const bridgehubData = new ethers.utils.AbiCoder().encode(
+      ["uint256", "bytes", "bytes"],
+      [this.chainId, stmData, chainData]
+    );
 
     // console.log("bridgehubData", bridgehubData)
     // console.log("this.addresses.ChainAssetInfo", this.addresses.ChainAssetInfo)

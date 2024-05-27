@@ -7,7 +7,7 @@ import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_GAS_PER_TRANSACTION, HyperchainCommitment, StoredBatchHashInfo, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../../../common/Config.sol";
-import {FeeParams, PubdataPricingMode, SyncLayerState} from "../ZkSyncHyperchainStorage.sol";
+import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
@@ -229,18 +229,13 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
     /// @dev we can move assets using these
     function bridgeBurn(
-        uint256 _settlementChainId,
-        uint256 _mintValue,
-        bytes32 _assetInfo,
         address _prevMsgSender,
-        bytes calldata _data
+        bytes calldata
     ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
-        (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
+        // (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
 
-        require(_prevMsgSender == s.admin, "BH: not chainAdmin");
+        require(_prevMsgSender == s.admin, "Af: not chainAdmin");
         IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
-
-        require(_newSyncLayerAdmin != address(0), "STM: admin zero");
 
         // address chainBaseToken = hyperchain.getBaseToken();
         uint256 currentProtocolVersion = s.protocolVersion;
@@ -249,99 +244,110 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
         // FIXME: this will be removed once we support the migration of the priority queue also.
         require(s.priorityQueue.getSize() == 0, "Migration is only allowed with empty priority queue");
-        bytes memory chainData = _collectChainDataForMigration();
-        bytes memory stmData = abi.encode(_newSyncLayerAdmin, currentProtocolVersion, chainData, _diamondCut); // todo
-        chainBridgeMintData = abi.encode(stmData, chainData); // todo
+        chainBridgeMintData = abi.encode(_prepareChainCommitment());
     }
 
-    function _collectChainDataForMigration() internal view returns (bytes memory chainData) {
-        // todo
+    function bridgeMint(uint256 _chainId, bytes calldata _data) external payable override {
+        HyperchainCommitment memory _commitment = abi.decode(_data, (HyperchainCommitment));
+
+        uint256 batchesExecuted = _commitment.totalBatchesExecuted;
+        uint256 batchesVerified = _commitment.totalBatchesVerified;
+        uint256 batchesCommitted = _commitment.totalBatchesCommitted;
+
+        s.totalBatchesCommitted = batchesCommitted;
+        s.totalBatchesVerified = batchesVerified;
+        s.totalBatchesExecuted = batchesExecuted;
+
+        // Some consistency checks just in case.
+        require(batchesExecuted <= batchesVerified, "Executed is not consistent with verified");
+        require(batchesVerified <= batchesCommitted, "Verified is not consistent with committed");
+
+        // In the worst case, we may need to revert all the committed batches that were not executed.
+        // This means that the stored batch hashes should be stored for [batchesExecuted; batchesCommitted] batches, i.e.
+        // there should be batchesCommitted - batchesExecuted + 1 hashes.
+        require(
+            _commitment.batchHashes.length == batchesCommitted - batchesExecuted + 1,
+            "Invalid number of batch hashes"
+        );
+
+        // Note that this part is done in O(N), i.e. it is the reponsibility of the admin of the chain to ensure that the total number of
+        // outstanding committed batches is not too long.
+        for (uint256 i = 0; i < _commitment.batchHashes.length; i++) {
+            s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];
+        }
+
+        // Currently only zero length is allowed.
+        uint256 pqHead = _commitment.priorityQueueHead;
+        s.priorityQueue.head = pqHead;
+        s.priorityQueue.tail = pqHead + _commitment.priorityQueueTxs.length;
+
+        for (uint256 i = 0; i < _commitment.priorityQueueTxs.length; i++) {
+            s.priorityQueue.data[pqHead + i] = _commitment.priorityQueueTxs[i];
+        }
+
+        s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
+        s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
+
+        emit MigrationComplete();
     }
 
-    function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {}
+    function bridgeClaimFailedBurn(
+        uint256 _chainId,
+        bytes32 _assetInfo,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external payable override {}
 
-    // /// @inheritdoc IAdmin
-    // function finalizeMigration(HyperchainCommitment memory _commitment) external onlyStateTransitionManager {
-    //     if (s.syncLayerState == SyncLayerState.MigratedFromL1) {
-    //         s.syncLayerState = SyncLayerState.ActiveOnL1;
-    //     } else if (s.syncLayerState == SyncLayerState.MigratedFromSL) {
-    //         s.syncLayerState = SyncLayerState.ActiveOnSL;
-    //     } else {
-    //         revert("Can not migrate when in active state");
-    //     }
+    // todo make internal. For now useful for testing
+    function _prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {
+        commitment.totalBatchesCommitted = s.totalBatchesCommitted;
+        commitment.totalBatchesVerified = s.totalBatchesVerified;
+        commitment.totalBatchesExecuted = s.totalBatchesExecuted;
 
-    //     uint256 batchesExecuted = _commitment.totalBatchesExecuted;
-    //     uint256 batchesVerified = _commitment.totalBatchesVerified;
-    //     uint256 batchesCommitted = _commitment.totalBatchesCommitted;
+        uint256 pqHead = s.priorityQueue.head;
+        commitment.priorityQueueHead = pqHead;
 
-    //     s.totalBatchesCommitted = batchesCommitted;
-    //     s.totalBatchesVerified = batchesVerified;
-    //     s.totalBatchesExecuted = batchesExecuted;
+        uint256 pqLength = s.priorityQueue.tail - pqHead;
+        // FIXME: this will be removed once we support the migration of any priority queue size.
+        require(pqLength <= 50, "Migration is only allowed with empty priority queue");
 
-    //     // Some consistency checks just in case.
-    //     require(batchesExecuted <= batchesVerified, "Executed is not consistent with verified");
-    //     require(batchesVerified <= batchesCommitted, "Verified is not consistent with committed");
+        PriorityOperation[] memory priorityQueueTxs = new PriorityOperation[](pqLength);
 
-    //     // In the worst case, we may need to revert all the committed batches that were not executed.
-    //     // This means that the stored batch hashes should be stored for [batchesExecuted; batchesCommitted] batches, i.e.
-    //     // there should be batchesCommitted - batchesExecuted + 1 hashes.
-    //     require(
-    //         _commitment.batchHashes.length == batchesCommitted - batchesExecuted + 1,
-    //         "Invalid number of batch hashes"
-    //     );
+        for (uint256 i = pqHead; i < s.priorityQueue.tail; i++) {
+            priorityQueueTxs[i] = s.priorityQueue.data[i];
+        }
+        commitment.priorityQueueTxs = priorityQueueTxs;
 
-    //     // Note that this part is done in O(N), i.e. it is the reponsibility of the admin of the chain to ensure that the total number of
-    //     // outstanding committed batches is not too long.
-    //     for (uint256 i = 0; i < _commitment.batchHashes.length; i++) {
-    //         s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];
-    //     }
+        commitment.l2SystemContractsUpgradeBatchNumber = s.l2SystemContractsUpgradeBatchNumber;
+        commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
 
-    //     // Currently only zero length is allowed.
-    //     uint256 pqHead = _commitment.priorityQueueHead;
-    //     s.priorityQueue.head = pqHead;
-    //     s.priorityQueue.tail = pqHead + _commitment.priorityQueueTxs.length;
+        // just in case
+        require(
+            commitment.totalBatchesExecuted <= commitment.totalBatchesVerified,
+            "Verified is not consistent with executed"
+        );
+        require(
+            commitment.totalBatchesVerified <= commitment.totalBatchesCommitted,
+            "Verified is not consistent with committed"
+        );
 
-    //     for (uint256 i = 0; i < _commitment.priorityQueueTxs.length; i++) {
-    //         s.priorityQueue.data[pqHead + i] = _commitment.priorityQueueTxs[i];
-    //     }
+        uint256 blocksToRemember = commitment.totalBatchesCommitted - commitment.totalBatchesExecuted + 1;
 
-    //     s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
-    //     s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
+        bytes32[] memory batchHashes = new bytes32[](blocksToRemember);
 
-    //     emit MigrationComplete();
-    // }
+        for (uint256 i = 0; i < blocksToRemember; i++) {
+            unchecked {
+                batchHashes[i] = s.storedBatchHashes[commitment.totalBatchesExecuted + i];
+            }
+        }
 
-    // // FI
-    // // function becomeSyncLayer() external onlyStateTransitionManager {
-    // //     require(s.syncLayerState == SyncLayerState.ActiveOnL1, "not active L1");
-    // //     // TODO: possibly additional checks
-    // //     s.syncLayerState = SyncLayerState.SyncLayerL1;
-    // // }
+        commitment.batchHashes = batchHashes;
+    }
 
-    // function startMigrationToSyncLayer(
-    //     uint256 _syncLayerChainId,
-    //     address _stmCounterPart,
-    //     address _newSyncLayerAdmin,
-    //     bytes calldata _diamondCut
-    // ) external onlyStateTransitionManager returns (bytes memory migrationCalldata) {
-    //     // TODO: add a check that there are no outstanding upgrades.
+    function readChainCommitment() external view returns (bytes memory commitment) {
+        return abi.encode(_prepareChainCommitment());
+    }
 
-    //     // FIXME: uncomment
-    //     require(s.syncLayerState == SyncLayerState.ActiveOnL1, "not active L1");
-    //     s.syncLayerState = SyncLayerState.MigratedFromL1;
-    //     s.syncLayerChainId = _syncLayerChainId;
-
-    //     HyperchainCommitment memory commitment = _prepareChainCommitment();
-
-    //     migrationCalldata = abi.encodeCall(
-    //         IStateTransitionManager.finalizeMigrationToSyncLayer,
-    //         (s.chainId, s.baseToken, _stmCounterPart, _newSyncLayerAdmin, s.protocolVersion, commitment, _diamondCut)
-    //     );
-    // }
-
-    // function storeMigrationHash(bytes32 _migrationHash) external onlyStateTransitionManager {
-    //     s.syncLayerMigrationHash = _migrationHash;
-    // }
     // function recoverFromFailedMigrationToSyncLayer(
     //     uint256 _syncLayerChainId,
     //     uint256 _l2BatchNumber,
@@ -374,94 +380,4 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     //     // We do not need to perform any additional actions, since no changes related to the chain commitment can be performed
     //     // while the chain is in the "migrated" state.
     // }
-
-    // FI
-    // function becomeSyncLayer() external onlyStateTransitionManager {
-    //     require(s.syncLayerState == SyncLayerState.ActiveOnL1, "not active L1");
-    //     // TODO: possibly additional checks
-    //     s.syncLayerState = SyncLayerState.SyncLayerL1;
-    // }
-
-    // function _prepareChainCommitment() internal returns (HyperchainCommitment memory commitment) {
-    //     commitment.totalBatchesCommitted = s.totalBatchesCommitted;
-    //     commitment.totalBatchesVerified = s.totalBatchesVerified;
-    //     commitment.totalBatchesExecuted = s.totalBatchesExecuted;
-
-    //     uint256 pqHead = s.priorityQueue.head;
-    //     commitment.priorityQueueHead = pqHead;
-
-    //     uint256 pqLength = s.priorityQueue.tail - pqHead;
-    //     // FIXME: this will be removed once we support the migration of any priority queue size.
-    //     require(pqLength <= 50, "Migration is only allowed with empty priority queue");
-
-    //     PriorityOperation[] memory priorityQueueTxs = new PriorityOperation[](pqLength);
-
-    //     for (uint256 i = pqHead; i < s.priorityQueue.tail; i++) {
-    //         priorityQueueTxs[i] = s.priorityQueue.data[i];
-    //     }
-    //     commitment.priorityQueueTxs = priorityQueueTxs;
-
-    //     commitment.l2SystemContractsUpgradeBatchNumber = s.l2SystemContractsUpgradeBatchNumber;
-    //     commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
-
-    //     // just in case
-    //     require(
-    //         commitment.totalBatchesExecuted <= commitment.totalBatchesVerified,
-    //         "Verified is not consistent with executed"
-    //     );
-    //     require(
-    //         commitment.totalBatchesVerified <= commitment.totalBatchesCommitted,
-    //         "Verified is not consistent with committed"
-    //     );
-
-    //     uint256 blocksToRemember = commitment.totalBatchesCommitted - commitment.totalBatchesExecuted + 1;
-
-    //     bytes32[] memory batchHashes = new bytes32[](blocksToRemember);
-
-    //     for (uint256 i = 0; i < blocksToRemember; i++) {
-    //         unchecked {
-    //             batchHashes[i] = s.storedBatchHashes[commitment.totalBatchesExecuted + i];
-    //         }
-    //     }
-
-    //     commitment.batchHashes = batchHashes;
-    // }
-
-    // function finalizeMigrationFromSyncLayer(uint256 _chainId) external {
-    //     // FIXME: this method should check that a certain message was sent from the SL to L1.
-    //     require(false, "TODO");
-    //     // address currentAddress = getHyperchain(_chainId);
-    //     // // On L1 we do expect that the chain is already registered.
-    //     // require(currentAddress != address(0), "STM: chain not registered");
-    //     // _finalizeMigration(
-    //     //     _chainId,
-    //     //     _baseToken,
-    //     //     _sharedBridge,
-    //     //     _admin,
-    //     //     _expectedProtocolVersion,
-    //     //     commitment
-    //     // );
-    // }
-
-    // function startMigrationToSyncLayer(
-    //     uint256 _chainId,
-    //     uint256 _syncLayerChainId,
-    //     address _newSyncLayerAdmin,
-    //     // L2TransactionRequestDirect memory _request,
-    //     bytes calldata _diamondCut
-    // ) external payable {
-    //     // TODO: Maybe check l2 diamond cut here for failing fast?
-    //     // lastMigrationTxHashes[_chainId] = canonicalHash;
-    //     // hyperchain.storeMigrationHash(canonicalHash);
-    //     // lastMigratedCommitments[_chainId] = keccak256(abi.encode(commitment));
-    //     // Now, we need to send an L1->L2 tx to the sync layer blockchain to the spawn the chain on SL.
-    //     // We just send it via a normal L-Z
-    // }
-
-    function bridgeClaimFailedBurn(
-        uint256 _chainId,
-        bytes32 _assetInfo,
-        address _prevMsgSender,
-        bytes calldata _data
-    ) external payable override {}
 }

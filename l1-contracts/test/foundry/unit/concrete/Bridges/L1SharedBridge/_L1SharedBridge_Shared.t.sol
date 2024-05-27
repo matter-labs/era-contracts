@@ -125,12 +125,12 @@ contract L1SharedBridgeTest is Test {
         sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
         vm.prank(owner);
         sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
-        vm.prank(owner);
-        sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
-        vm.prank(owner);
-        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
-        vm.prank(owner);
-        sharedBridge.setEraLegacyBridgeLastDepositTime(1, 0);
+        // vm.prank(owner);
+        // sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
+        // vm.prank(owner);
+        // sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
+        // vm.prank(owner);
+        // sharedBridge.setEraLegacyBridgeLastDepositTime(1, 0);
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
         vm.prank(owner);
@@ -147,11 +147,11 @@ contract L1SharedBridgeTest is Test {
     }
 
     function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
-        stdstore
-            .target(address(sharedBridge))
-            .sig(sharedBridge.chainBalance.selector)
-            .with_key(_chainId)
-            .with_key(_token)
-            .checked_write(_value);
+        // stdstore
+        //     .target(address(sharedBridge))
+        //     .sig(sharedBridge.chainBalance.selector)
+        //     .with_key(_chainId)
+        //     .with_key(_token)
+        //     .checked_write(_value);
     }
 }

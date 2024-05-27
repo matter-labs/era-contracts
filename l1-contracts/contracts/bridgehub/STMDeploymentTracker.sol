@@ -31,7 +31,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
-        require(msg.sender == address(BRIDGE_HUB), "ShB not BH");
+        require(msg.sender == address(BRIDGE_HUB), "STM DT: not BH");
         _;
     }
 
@@ -62,22 +62,23 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         bytes calldata _data
     ) external payable onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
         require(msg.value == 0, "STMDT: no eth allowed");
+        require(_prevMsgSender == owner(), "STMDT: not owner");
         (bool _registerOnBridgehub, address _stmL1Address, address _stmL2Address) = abi.decode(
             _data,
             (bool, address, address)
         );
 
         if (_registerOnBridgehub) {
-            _registerSTMAssetOnL2Bridgehub(_chainId, _stmL1Address, _stmL2Address);
+            request = _registerSTMAssetOnL2Bridgehub(_chainId, _stmL1Address, _stmL2Address);
         } else {
-            _registerSTMAssetOnL2SharedBridge(_chainId, _stmL1Address);
+            request = _registerSTMAssetOnL2SharedBridge(_chainId, _stmL1Address);
         }
     }
 
     function _registerSTMAssetOnL2SharedBridge(
         uint256 _chainId,
         address _stmL1Address
-    ) internal returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes memory l2TxCalldata = abi.encodeWithSelector(
             IL1SharedBridge.setAssetAddress.selector,
             bytes32(uint256(uint160(_stmL1Address))),
@@ -97,7 +98,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         uint256 _chainId,
         address _stmL1Address,
         address _stmL2Address
-    ) internal returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes memory l2TxCalldata = abi.encodeWithSelector(
             IBridgehub.setAssetAddress.selector,
             bytes32(uint256(uint160(_stmL1Address))),
@@ -106,7 +107,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
-            l2Contract: SHARED_BRIDGE.l2BridgeAddress(_chainId),
+            l2Contract: BRIDGE_HUB.bridgehubCounterParts(_chainId),
             l2Calldata: l2TxCalldata,
             factoryDeps: new bytes[](0),
             txDataHash: bytes32(0)

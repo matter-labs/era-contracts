@@ -31,9 +31,10 @@ contract ExperimentalBridgeTest is Test {
 
     function setUp() public {
         eraChainId = 9;
-        bridgeHub = new Bridgehub();
+        uint256 l1ChainId = 1;
+        bridgeHub = new Bridgehub(l1ChainId);
         bridgeOwner = makeAddr("BRIDGE_OWNER");
-        mockSTM = new DummyStateTransitionManagerWBH(address(bridgeHub));
+        mockSTM = new DummyStateTransitionManagerWBH(Bridgehub(address(bridgeHub)));
         mockChainContract = new DummyHyperchain(address(bridgeHub), eraChainId);
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));

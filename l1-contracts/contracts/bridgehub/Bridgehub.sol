@@ -118,9 +118,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @dev Used to set the assedAddress for a given assetInfo.
     function setAssetAddress(bytes32 _additionalData, address _assetAddress) external {
-        bytes32 assetInfo = keccak256(abi.encode(block.chainid, msg.sender, _additionalData)); /// todo make other asse
+        address sender = L1_CHAIN_ID == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender); // Todo: this might be dangerous. We should decide based on the tx type.
+        bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData)); /// todo make other asse
         stmAssetInfoToAddress[assetInfo] = _assetAddress;
-        // emit AssetRegistered(assetInfo, _assetAddress);
+        emit AssetRegistered(assetInfo, _assetAddress, _additionalData, msg.sender);
     }
 
     ///// Getters
@@ -403,52 +404,39 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // TODO: emit event
     }
 
-    // function finalizeMigrationToSyncLayer(
-    //     uint256 _chainId,
-    //     address _baseToken,
-    //     address _sharedBridge,
-    //     address _admin,
-    //     uint256 _expectedProtocolVersion,
-    //     HyperchainCommitment calldata _commitment,
-    //     bytes calldata _diamondCut
-    // ) external {}
-
     /// @dev we can move assets using these
     function bridgeBurn(
         uint256 _settlementChainId,
-        uint256 _mintValue,
+        uint256,
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override returns (bytes memory bridgeMintData) {
+    ) external payable override returns (bytes memory bridgehubMintData) {
         require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
 
-        (uint256 _chainId, bytes memory _chainData) = abi.decode(_data, (uint256, bytes));
+        (uint256 _chainId, bytes memory _stmData, bytes memory _chainData) = abi.decode(_data, (uint256, bytes, bytes));
         require(_assetInfo == stmAssetInfoFromChainId(_chainId), "BH: assetInfo 1");
         require(settlementLayer[_chainId] == block.chainid, "BH: not current SL");
         settlementLayer[_chainId] = _settlementChainId;
 
-        bytes memory chainBridgeMintData = IZkSyncHyperchain(getHyperchain(_chainId)).bridgeBurn(
-            _settlementChainId,
-            _mintValue,
-            _assetInfo,
-            _prevMsgSender,
-            _chainData
+        bytes memory stmMintData = IStateTransitionManager(stateTransitionManager[_chainId]).bridgeBurn(
+            _chainId,
+            _stmData
         );
-        bridgeMintData = abi.encode(_chainId, chainBridgeMintData);
+        bytes memory chainMintData = IZkSyncHyperchain(getHyperchain(_chainId)).bridgeBurn(_prevMsgSender, _chainData);
+        bridgehubMintData = abi.encode(_chainId, stmMintData, chainMintData);
         // TODO: double check that get only returns when chain id is there.
     }
 
     function bridgeMint(
         uint256 _previousSettlementChainId,
         bytes32 _assetInfo,
-        bytes calldata _data
+        bytes calldata _bridgehubMintData
     ) external payable override {
-        (uint256 _chainId, bytes memory _bridgeMintData, bytes memory _diamondCut) = abi.decode(
-            _data,
+        (uint256 _chainId, bytes memory _stmData, bytes memory _chainMintData) = abi.decode(
+            _bridgehubMintData,
             (uint256, bytes, bytes)
         );
-        (bytes memory _stmData, bytes memory _chainData) = abi.decode(_bridgeMintData, (bytes, bytes));
         address stm = stmAssetInfoToAddress[_assetInfo];
         require(stm != address(0), "BH: assetInfo 2");
         require(settlementLayer[_chainId] != block.chainid, "BH: already current SL");
@@ -457,10 +445,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         stateTransitionManager[_chainId] = stm;
         address hyperchain = getHyperchain(_chainId);
         if (hyperchain == address(0)) {
-            hyperchain = IStateTransitionManager(stm).bridgeMintNewChain(_chainId, _stmData, _diamondCut);
+            hyperchain = IStateTransitionManager(stm).bridgeMint(_chainId, _stmData);
         }
 
-        IZkSyncHyperchain(hyperchain).bridgeMint(_previousSettlementChainId, _assetInfo, _chainData);
+        IZkSyncHyperchain(hyperchain).bridgeMint(_previousSettlementChainId, _chainMintData);
     }
 
     function bridgeClaimFailedBurn(

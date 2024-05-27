@@ -105,7 +105,7 @@ async function main() {
       if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
         await deployer.registerTokenBridgehub(baseTokenAddress, useGovernance);
       }
-      await deployer.registerTokenInNativeTokenVault(baseTokenAddress, { gasPrice });
+      await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
 
       await deployer.registerHyperchain(
         baseTokenAddress,

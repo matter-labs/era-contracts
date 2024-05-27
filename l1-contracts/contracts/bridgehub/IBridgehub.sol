@@ -48,6 +48,14 @@ interface IBridgehub is IL1StandardAsset {
     /// @notice Admin changed
     event NewAdmin(address indexed oldAdmin, address indexed newAdmin);
 
+    /// @notice STM asset registered
+    event AssetRegistered(
+        bytes32 indexed assetInfo,
+        address indexed _assetAddress,
+        bytes32 indexed additionalData,
+        address sender
+    );
+
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin

@@ -9,12 +9,11 @@ import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
-import {IL1StandardAsset} from "../../bridge/interfaces/IL1StandardAsset.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IAdmin is IZkSyncHyperchainBase, IL1StandardAsset {
+interface IAdmin is IZkSyncHyperchainBase {
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin
@@ -121,4 +120,24 @@ interface IAdmin is IZkSyncHyperchainBase, IL1StandardAsset {
         L2CanonicalTransaction _l2Transaction,
         uint256 indexed _protocolVersion
     );
+
+    event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
+
+    event BridgeMint(address indexed _account, uint256 _amount);
+
+    event BridgeBurn(address indexed _account, uint256 _amount);
+
+    function bridgeBurn(
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external payable returns (bytes memory _bridgeMintData);
+
+    function bridgeClaimFailedBurn(
+        uint256 _chainId,
+        bytes32 _assetInfo,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external payable;
+
+    function bridgeMint(uint256 _chainId, bytes calldata _data) external payable;
 }

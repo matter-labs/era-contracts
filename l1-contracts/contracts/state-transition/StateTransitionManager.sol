@@ -298,7 +298,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address _baseToken,
         address _sharedBridge,
         address _admin,
-        bytes calldata _diamondCut
+        bytes memory _diamondCut
     ) internal returns (address hyperchainAddress) {
         if (getHyperchain(_chainId) != address(0)) {
             // Hyperchain already registered
@@ -391,21 +391,42 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // TODO: emit event
     }
 
-    function bridgeMintNewChain(
+    /// @dev we can move assets using these
+    function bridgeBurn(
         uint256 _chainId,
-        bytes calldata _chainData,
-        bytes calldata _diamondCut
-    ) external override onlyBridgehub returns (address hyperchainAddress) {
-        (uint256 _chainId, address _baseToken, address _admin) = abi.decode(_chainData, (uint256, address, address));
-        // solhint-disable-next-line func-named-parameters
-        hyperchainAddress = _deployNewChain(
-            _chainId,
-            _baseToken,
-            address(BRIDGE_HUB.sharedBridge()),
-            _admin,
-            _diamondCut
-            // SyncLayerState.ActiveOnL1
+        bytes calldata _data
+    ) external view override onlyBridgehub returns (bytes memory stmBridgeMintData) {
+        (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
+        require(_newSyncLayerAdmin != address(0), "STM: admin zero");
+        // todo check protocol version
+        return abi.encode(BRIDGE_HUB.baseToken(_chainId), _newSyncLayerAdmin, protocolVersion, _diamondCut);
+    }
+
+    function bridgeMint(
+        uint256 _chainId,
+        bytes calldata _stmData
+    ) external override onlyBridgehub returns (address chainAddress) {
+        (address _baseToken, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
+            _stmData,
+            (address, address, uint256, bytes)
         );
+        // todo porotocl version check
+        chainAddress = _deployNewChain({
+            _chainId: _chainId,
+            _baseToken: _baseToken,
+            _sharedBridge: address(BRIDGE_HUB.sharedBridge()),
+            _admin: _admin,
+            _diamondCut: _diamondCut
+        });
+    }
+
+    function bridgeClaimFailedBurn(
+        uint256 _chainId,
+        bytes32 _assetInfo,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external {
+        // todo
     }
 
     /// @dev This internal function is used to register a new hyperchain in the system.

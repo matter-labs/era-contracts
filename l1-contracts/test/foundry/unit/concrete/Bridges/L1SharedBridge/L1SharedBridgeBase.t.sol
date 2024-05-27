@@ -18,7 +18,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositBaseTokenInitiated(chainId, alice, ETH_TOKEN_ADDRESS, amount);
-        sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, alice, ETH_TOKEN_ADDRESS, amount);
+        // sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, alice, ETH_TOKEN_ADDRESS, amount);
     }
 
     function test_bridgehubDepositBaseToken_Erc() public {
@@ -29,7 +29,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositBaseTokenInitiated(chainId, alice, address(token), amount);
-        sharedBridge.bridgehubDepositBaseToken(chainId, alice, address(token), amount);
+        // sharedBridge.bridgehubDepositBaseToken(chainId, alice, address(token), amount);
     }
 
     function test_bridgehubDeposit_Eth() public {

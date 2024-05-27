@@ -8,10 +8,19 @@ import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, GAS_MULTIPLIER, web3Url } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import { initialBridgehubDeployment } from "../src.ts/deploy-process";
-import { ethTestConfig, getAddressFromEnv, getNumberFromEnv } from "../src.ts/utils";
+import {
+  ethTestConfig,
+  getAddressFromEnv,
+  getNumberFromEnv,
+  ADDRESS_ONE,
+  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  priorityTxMaxGasLimit,
+} from "../src.ts/utils";
+import { SYSTEM_CONFIG } from "./utils";
 
 import { Wallet as ZkWallet, Provider as ZkProvider, utils as zkUtils } from "zksync-ethers";
 import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
+import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
 import { BOOTLOADER_FORMAL_ADDRESS } from "zksync-ethers/build/src/utils";
 
 const provider = web3Provider();
@@ -110,7 +119,7 @@ async function main() {
         ownerAddress,
         verbose: true,
       });
-      await connectL1SLContracts(deployer);
+      await registerSLContractsOnL1(deployer);
     });
 
   program
@@ -162,7 +171,7 @@ async function main() {
       );
       deployer.addresses.StateTransition.DiamondInit = getAddressFromEnv("SYNC_LAYER_DIAMOND_INIT_ADDR");
 
-      const receipt = await deployer.moveChainToSyncLayer(syncLayerChainId, gasPrice, true);
+      const receipt = await deployer.moveChainToSyncLayer(syncLayerChainId, gasPrice, false);
 
       const syncLayerAddress = await stm.getHyperchain(syncLayerChainId);
 
@@ -269,7 +278,7 @@ async function main() {
         verbose: true,
       });
 
-      console.log("Enablign validators");
+      console.log("Enabling validators");
 
       // FIXME: do it in cleaner way
       deployer.addresses.ValidatorTimeLock = getAddressFromEnv("SYNC_LAYER_VALIDATOR_TIMELOCK_ADDR");
@@ -292,23 +301,12 @@ async function main() {
 
       const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
 
-      console.log("Registering the chain on bridgehub");
-
-      // // For now, only ETH is supported as base chain.
-      await (
-        await bridgehub.unsafeRegisterChain(
-          currentChainId,
-          deployer.addresses.StateTransition.StateTransitionProxy,
-          zkUtils.ETH_ADDRESS_IN_CONTRACTS
-        )
-      ).wait();
-
       // FIXME? Do we want to
       console.log("Setting default token multiplier");
 
       const hyperchain = deployer.stateTransitionContract(deployer.deployWallet);
 
-      console.log("The fefault ones");
+      console.log("The default ones token multiplier");
       await (await hyperchain.setTokenMultiplier(1, 1)).wait();
 
       console.log("Success!");
@@ -317,33 +315,97 @@ async function main() {
   await program.parseAsync(process.argv);
 }
 
-async function connectL1SLContracts(deployer: Deployer) {
+async function registerSLContractsOnL1(deployer: Deployer) {
+  /// STM asset info
+  /// l2Bridgehub in L1Bridghub
   const bridgehubOnSyncLayer = getAddressFromEnv("SYNC_LAYER_BRIDGEHUB_PROXY_ADDR");
-  const bridgeOnSyncLayer = getAddressFromEnv("SYNC_LAYER_SHARED_BRIDGE_PROXY_ADDR");
 
   const chainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
 
-  console.log(`STM on SyncLayer: ${bridgehubOnSyncLayer}`);
+  console.log(`Bridghub on SyncLayer: ${bridgehubOnSyncLayer}`);
   console.log(`SyncLayer chain Id: ${chainId}`);
 
   const l1STM = deployer.stateTransitionManagerContract(deployer.deployWallet);
   const l1Bridgehub = deployer.bridgehubContract(deployer.deployWallet);
   console.log(deployer.addresses.StateTransition.StateTransitionProxy);
+  const syncLayerAddress = await l1STM.getHyperchain(chainId);
   // this script only works when owner is the deployer
   console.log(`Registering SyncLayer chain id on the STM`);
   await deployer.executeUpgrade(
     l1STM.address,
     0,
-    l1STM.interface.encodeFunctionData("registerSyncLayer", [chainId, true])
+    l1Bridgehub.interface.encodeFunctionData("registerSyncLayer", [chainId, true])
   );
 
-  console.log(`Registering STM counter part on the SyncLayer`);
+  console.log(`Registering Bridgehub counter part on the SyncLayer`);
   await deployer.executeUpgrade(
     l1Bridgehub.address, // kl todo fix. The BH has the counterpart, the BH needs to be deployed on L2, and the STM needs to be registered in the L2 BH.
     0,
     l1Bridgehub.interface.encodeFunctionData("registerCounterpart", [chainId, bridgehubOnSyncLayer])
   );
-  console.log(`SyncLayer registration completed`);
+  console.log(`SyncLayer registration completed in L1 Bridgehub`);
+
+  const gasPrice = (await deployer.deployWallet.provider.getGasPrice()).mul(GAS_MULTIPLIER);
+  const value = (
+    await l1Bridgehub.l2TransactionBaseCost(chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
+  ).mul(10);
+  const baseTokenAddress = await l1Bridgehub.baseToken(chainId);
+  const ethIsBaseToken = baseTokenAddress == ADDRESS_ONE;
+  if (!ethIsBaseToken) {
+    const baseToken = TestnetERC20TokenFactory.connect(baseTokenAddress, this.deployWallet);
+    await (await baseToken.transfer(this.addresses.Governance, value)).wait();
+    await this.executeUpgrade(
+      baseTokenAddress,
+      0,
+      baseToken.interface.encodeFunctionData("approve", [this.addresses.Bridges.SharedBridgeProxy, value.mul(2)])
+    );
+  }
+  const stmDeploymentTracker = deployer.stmDeploymentTracker(deployer.deployWallet);
+
+  const receipt = await deployer.executeUpgrade(
+    l1Bridgehub.address,
+    value,
+    l1Bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
+      {
+        chainId,
+        mintValue: value,
+        l2Value: 0,
+        l2GasLimit: priorityTxMaxGasLimit,
+        l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+        refundRecipient: deployer.deployWallet.address,
+        secondBridgeAddress: stmDeploymentTracker.address,
+        secondBridgeValue: 0,
+        secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
+          ["bool", "address", "address"],
+          [false, l1STM.address, getAddressFromEnv("SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR")]
+        ),
+      },
+    ])
+  );
+  const l2TxHash = zkUtils.getL2HashFromPriorityOp(receipt, syncLayerAddress);
+  console.log("STM asset registered in L2SharedBridge on SL l2 tx hash: ", l2TxHash);
+  const receipt2 = await deployer.executeUpgrade(
+    l1Bridgehub.address,
+    value,
+    l1Bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
+      {
+        chainId,
+        mintValue: value,
+        l2Value: 0,
+        l2GasLimit: priorityTxMaxGasLimit,
+        l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+        refundRecipient: deployer.deployWallet.address,
+        secondBridgeAddress: stmDeploymentTracker.address,
+        secondBridgeValue: 0,
+        secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
+          ["bool", "address", "address"],
+          [true, l1STM.address, getAddressFromEnv("SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR")]
+        ),
+      },
+    ])
+  );
+  const l2TxHash2 = zkUtils.getL2HashFromPriorityOp(receipt2, syncLayerAddress);
+  console.log("STM asset registered in L2 Bridgehub on SL", l2TxHash2);
 }
 
 // TODO: maybe move it to SDK

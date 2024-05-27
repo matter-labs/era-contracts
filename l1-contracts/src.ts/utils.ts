@@ -23,9 +23,13 @@ export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111
 export const EMPTY_STRING_KECCAK = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
 
+export const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
+
 const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
 export const DIAMOND_CUT_DATA_ABI_STRING =
   "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)";
+export const HYPERCHAIN_COMMITMENT_ABI_STRING =
+  "tuple(uint256 totalBatchesExecuted, uint256 totalBatchesVerified, uint256 totalBatchesCommitted, uint256 priorityQueueHead, tuple(bytes32 canonicalTxHash,  uint64 expirationTimestamp,  uint192 layer2Tip)[] priorityQueueTxs, bytes32 l2SystemContractsUpgradeTxHash, uint256 l2SystemContractsUpgradeBatchNumber, bytes32[] batchHashes)";
 
 export function applyL1ToL2Alias(address: string): string {
   return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));

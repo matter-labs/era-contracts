@@ -86,11 +86,11 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     function finalizeDeposit(bytes32 _assetInfo, bytes memory _data) public override {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
 
-        require(
-            AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
-                AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1SharedBridge,
-            "mq"
-        );
+        // require(
+        //     AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
+        //         AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1SharedBridge,
+        //     "mq"
+        // );
 
         address asset = assetAddress[_assetInfo];
         if (asset != address(0)) {
@@ -144,6 +144,14 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         // and we use this interface so that when the switch happened the old messages could be processed
         // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _assetInfo, _bridgeMintData);
+    }
+
+    /// @dev Used to set the assedAddress for a given assetInfo.
+    function setAssetAddress(bytes32 _additionalData, address _assetAddress) external {
+        address sender = AddressAliasHelper.undoL1ToL2Alias(msg.sender); // todo not nice fix
+        bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData)); /// todo make other asse
+        assetAddress[assetInfo] = _assetAddress;
+        emit AssetRegistered(assetInfo, _assetAddress, _additionalData, sender);
     }
 
     /*//////////////////////////////////////////////////////////////
