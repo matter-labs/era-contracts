@@ -273,8 +273,6 @@ contract Verifier is IVerifier {
         _loadVerificationKey();
 
         assembly {
-            // When the `key` variable was initialized, it already meddled with the memory layout. 
-            // However, the `_loadVerificationKey` loads the VK at a fixed location, so we can safely use the locations used by it.
             let start := VK_GATE_SETUP_0_X_SLOT
             let end := VK_RECURSIVE_FLAG_SLOT
             let length := add(sub(end, start), 0x20)
