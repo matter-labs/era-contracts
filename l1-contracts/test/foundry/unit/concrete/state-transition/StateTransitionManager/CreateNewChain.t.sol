@@ -3,7 +3,6 @@ pragma solidity 0.8.24;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
 
 contract createNewChainTest is StateTransitionManagerTest {
     function test_RevertWhen_InitialDiamondCutHashMismatch() public {
