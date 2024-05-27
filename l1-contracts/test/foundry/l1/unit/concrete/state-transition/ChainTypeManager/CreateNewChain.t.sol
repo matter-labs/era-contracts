@@ -7,10 +7,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {Unauthorized, HashMismatch, ZeroAddress, ZKChainLimitReached} from "contracts/common/L1ContractErrors.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-
-import {console} from "forge-std/console.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 
 contract createNewChainTest is ChainTypeManagerTest {
     function setUp() public {

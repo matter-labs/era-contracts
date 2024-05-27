@@ -68,4 +68,22 @@ contract freezeChainTest is ChainTypeManagerTest {
         isChainFrozen = gettersFacet.isDiamondStorageFrozen();
         assertEq(isChainFrozen, false);
     }
+
+    function test_RevertWhen_UnfreezingChain() public {
+        uint256 newChainid = 10;
+        createNewChainWithId(getDiamondCutData(diamondInit), newChainid);
+
+        address newChainAddress = chainContractAddress.getHyperchain(newChainid);
+        GettersFacet gettersFacet = GettersFacet(newChainAddress);
+        bool isChainFrozen = gettersFacet.isDiamondStorageFrozen();
+        assertEq(isChainFrozen, false);
+
+        vm.stopPrank();
+        vm.startPrank(governor);
+
+        chainContractAddress.freezeChain(newChainid);
+
+        vm.expectRevert(bytes.concat("q1"));
+        chainContractAddress.unfreezeChain(newChainid);
+    }
 }

@@ -47,7 +47,7 @@ contract ChainTypeManagerTest is Test {
     address internal constant validator = address(0x5050505);
     address internal constant l1Nullifier = address(0x6060606);
     address internal newChainAdmin;
-    uint256 chainId = 112;
+    uint256 chainId = 112; // block.chain
     address internal testnetVerifier = address(new TestnetVerifier());
     bytes internal forceDeploymentsData = hex"";
 
