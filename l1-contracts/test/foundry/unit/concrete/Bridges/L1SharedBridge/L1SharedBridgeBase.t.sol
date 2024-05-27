@@ -12,6 +12,24 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAdd
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 contract L1SharedBridgeTestBase is L1SharedBridgeTest {
+    function test_pause() public {
+        vm.prank(owner);
+        sharedBridge.pause();
+        assertTrue(sharedBridge.paused());
+
+        bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
+
+        vm.expectRevert("Pausable: paused");
+        vm.prank(bridgehubAddress);
+        sharedBridge.bridgehubConfirmL2Transaction(chainId, txDataHash, txHash);
+
+        vm.prank(owner);
+        sharedBridge.unpause();
+        assertFalse(sharedBridge.paused());
+        vm.prank(bridgehubAddress);
+        sharedBridge.bridgehubConfirmL2Transaction(chainId, txDataHash, txHash);
+    }
+
     function test_success_receiveEth(uint256 amount) public {
         address stmAddress = makeAddr("stm");
 
@@ -431,6 +449,10 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     }
 
     function test_finalizeWithdrawal_EthOnEth_LegacyTx() public {
+        vm.prank(owner);
+        sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
+        vm.prank(owner);
+        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
         vm.deal(address(sharedBridge), amount);
         uint256 legacyBatchNumber = 0;
 
