@@ -59,18 +59,10 @@ object "EcAdd" {
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
 
-            // Retrieve the coordinates from the calldata
-            let x1 := calldataload(0)
-            let y1 := calldataload(32)
-            let x2 := calldataload(64)
-            let y2 := calldataload(96)
+            // Copy x1, y1, x2, y2 (4 x 32 bytes) from calldata to memory
+            calldatacopy(0, 0, 128)
 
             // We conduct all validations inside the precompileCall
-
-            mstore(0, x1)
-            mstore(32, y1)
-            mstore(64, x2)
-            mstore(96, y2)
 
             let precompileParams := unsafePackPrecompileParams(
                 0, // input offset in words

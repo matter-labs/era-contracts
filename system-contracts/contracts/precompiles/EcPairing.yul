@@ -14,9 +14,15 @@ object "EcPairing" {
             //                      CONSTANTS
             ////////////////////////////////////////////////////////////////
 
-            /// @dev The gas cost of processing ecpairing circuit precompile.
-            function ECPAIRING_GAS_COST() -> ret {
-                ret := 45000
+            /// @dev The basic gas cost of processing ecpairing circuit precompile.
+            function ECPAIRING_BASE_GAS_COST() -> ret {
+                ret := 100000
+            }
+
+            /// @dev The additional gas cost of processing ecpairing circuit precompile.
+            /// @dev Added per pair. 
+            function ECPAIRING_PAIR_GAS_COST() -> ret {
+                ret := 80000
             }
 
             /// @dev The amount of bytes necessary for encoding G1 and G2.
@@ -52,6 +58,13 @@ object "EcPairing" {
                 ret := verbatim_2i_1o("precompile", precompileParams, gasToBurn)
             }
 
+            /// @dev Calculate the cost of ecpairing precompile call.
+            /// @param pairs represent the length of the input divided by 192.
+            function ecpairingGasCost(pairs) -> ret{
+                let gasPerPairs := mul(ECPAIRING_PAIR_GAS_COST(), pairs)
+                ret := add(ECPAIRING_BASE_GAS_COST(), gasPerPairs)
+            }
+
             /// @notice Burns remaining gas until revert.
             /// @dev This function is used to burn gas in the case of a failed precompile call.
             function burnGas() {
@@ -85,7 +98,7 @@ object "EcPairing" {
                 1,              // output length in words (pairing check boolean)
                 pairs           // number of pairs
             )
-            let gasToPay := ECPAIRING_GAS_COST()
+            let gasToPay := ecpairingGasCost(pairs)
 
             let success := precompileCall(precompileParams, gasToPay)
             if not(success) {

@@ -58,16 +58,10 @@ object "EcMul" {
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
 
-            // Retrieve the coordinates from the calldata
-            let x := calldataload(0)
-            let y := calldataload(32)
-            let scalar := calldataload(64)
+            // Copy x1, y1, scalar (3 x 32 bytes) from calldata to memory
+            calldatacopy(0, 0, 96)
 
             // We conduct all validations inside the precompileCall
-
-            mstore(0, x)
-            mstore(32, y)
-            mstore(64, scalar)
 
             let precompileParams := unsafePackPrecompileParams(
                 0, // input offset in words
