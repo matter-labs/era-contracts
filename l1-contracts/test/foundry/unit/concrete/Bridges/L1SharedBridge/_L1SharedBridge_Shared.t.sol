@@ -132,12 +132,6 @@ contract L1SharedBridgeTest is Test {
         vm.prank(owner);
         sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
         vm.prank(owner);
-        sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
-        vm.prank(owner);
-        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
-        vm.prank(owner);
-        sharedBridge.setEraLegacyBridgeLastDepositTime(1, 0);
-        vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
         assertEq(sharedBridge.l2BridgeAddress(chainId), l2SharedBridge);
         vm.prank(owner);

@@ -128,6 +128,10 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
     }
 
     function test_finalizeWithdrawalLegacyErc20Bridge_EthOnEth() public {
+        vm.prank(owner);
+        sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
+        vm.prank(owner);
+        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
@@ -173,6 +177,10 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
     }
 
     function test_finalizeWithdrawalLegacyErc20Bridge_ErcOnEth() public {
+        vm.prank(owner);
+        sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
+        vm.prank(owner);
+        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
         token.mint(address(sharedBridge), amount);
 
         /// storing chainBalance
@@ -224,6 +232,8 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
     }
 
     function test_claimFailedDepositLegacyErc20Bridge_Erc() public {
+        vm.prank(owner);
+        sharedBridge.setEraLegacyBridgeLastDepositTime(1, 0);
         token.mint(address(sharedBridge), amount);
 
         // storing depositHappened[chainId][l2TxHash] = txDataHash.
