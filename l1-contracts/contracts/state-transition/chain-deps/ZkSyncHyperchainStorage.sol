@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
+// import {IStateTransitionManager} from "../IStateTransitionManager.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type

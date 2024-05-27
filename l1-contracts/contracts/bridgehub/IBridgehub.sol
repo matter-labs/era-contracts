@@ -145,6 +145,10 @@ interface IBridgehub is IL1StandardAsset {
 
     function setSharedBridge(address _sharedBridge) external;
 
+    // function relayTxThroughBH(uint256 _baseDestChainId, uint256 _destChainId, bytes calldata _dataToRelay) external;
+
+    // function registerCounterpart(uint256 chainid, address _counterpart) external;
+
     event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
 
     function registerCounterpart(uint256 _chainId, address _counterPart) external;

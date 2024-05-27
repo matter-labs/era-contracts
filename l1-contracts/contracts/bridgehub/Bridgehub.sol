@@ -162,14 +162,18 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             stateTransitionManagerIsRegistered[_stateTransitionManager],
             "Bridgehub: state transition not registered"
         );
-        require(tokenIsRegistered[_baseToken], "Bridgehub: token not registered");
-        require(address(sharedBridge) != address(0), "Bridgehub: weth bridge not set");
 
         require(stateTransitionManager[_chainId] == address(0), "Bridgehub: chainId already registered");
 
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
     }
+
+    /// FIXME: this method should not be present in the prod code.
+    // function registerCounterpart(uint256 chainid, address _counterpart) external onlyOwner {
+    //     trustedCounterparts[chainid] = _counterpart;
+    //     isTrustedCounterpart[_counterpart] = true;
+    // }
 
     /// @notice register new chain
     /// @notice for Eth the baseToken address is 1
@@ -207,6 +211,40 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         emit NewChain(_chainId, _stateTransitionManager, _admin);
         return _chainId;
     }
+
+    /// FIXME: this is a temporary method anyway
+    // function callTxOnChain(uint256 _chainId, bytes calldata _data) external {
+    //     address chainAddress = getHyperchain(_chainId);
+
+    //     (bool success, bytes memory returndata) = address(chainAddress).call(_data);
+
+    //     require(success, "Bridgehub: call failed");
+    // }
+
+    // function relayTxThroughBH(uint256 _baseDestChainId, uint256 _destChainId, bytes calldata _dataToRelay) external {
+    //     address counterpartAddr = trustedCounterparts[_baseDestChainId];
+    //     address slAddress = getHyperchain(_baseDestChainId);
+
+    //     bytes memory callData = abi.encodeCall(this.callTxOnChain, (_destChainId, _dataToRelay));
+
+    //     BridgehubL2TransactionRequest memory request = BridgehubL2TransactionRequest({
+    //         // This is a temporary branch, sender does not matte
+    //         sender: address(this),
+    //         contractL2: counterpartAddr,
+    //         mintValue: 0,
+    //         l2Value: 0,
+    //         l2Calldata: callData,
+    //         // Very large amount
+    //         l2GasLimit: 72_000_000,
+    //         // TODO: use constant for that
+    //         l2GasPerPubdataByteLimit: 800,
+    //         factoryDeps: new bytes[](0),
+    //         // Tx is free, no so refund recipient needed
+    //         refundRecipient: address(0)
+    //     });
+
+    //     IZkSyncHyperchain(slAddress).acceptFreeRequestFromBridgehub(request);
+    // }
 
     //// Mailbox forwarder
 
