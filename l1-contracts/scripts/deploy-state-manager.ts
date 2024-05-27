@@ -7,7 +7,7 @@ import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, GAS_MULTIPLIER } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-import { deployStateTransitionManager, deployVerifier, initialBridgehubDeployment } from "../src.ts/deploy-process";
+import { deployStateTransitionManager } from "../src.ts/deploy-process";
 import { ethTestConfig } from "../src.ts/utils";
 
 const provider = web3Provider();
@@ -15,16 +15,14 @@ const provider = web3Provider();
 async function main() {
   const program = new Command();
 
-  program.version("0.1.0").name("deploy").description("deploy L1 contracts");
+  program.version("0.1.0").name("deploy-state-manager").description("deploy initial state transition manager contracts");
 
   program
     .option("--private-key <private-key>")
-    .option("--chain-id <chain-id>")
     .option("--gas-price <gas-price>")
     .option("--nonce <nonce>")
     .option("--owner-address <owner-address>")
     .option("--create2-salt <create2-salt>")
-    .option("--only-verifier")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -42,7 +40,7 @@ async function main() {
         : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-      let nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
+      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
       console.log(`Using nonce: ${nonce}`);
 
       const create2Salt = cmd.create2Salt ? cmd.create2Salt : ethers.utils.hexlify(ethers.utils.randomBytes(32));
@@ -54,13 +52,7 @@ async function main() {
         verbose: true,
       });
 
-      if (cmd.onlyVerifier) {
-        await deployVerifier(deployer, gasPrice, create2Salt, nonce);
-      } else {
-        await initialBridgehubDeployment(deployer, gasPrice, create2Salt, nonce);
-        nonce = await deployWallet.getTransactionCount();
-        await deployStateTransitionManager(deployer, [], gasPrice, create2Salt, nonce);
-      }
+      await deployStateTransitionManager(deployer, [], gasPrice, create2Salt, nonce);
     });
 
   await program.parseAsync(process.argv);
