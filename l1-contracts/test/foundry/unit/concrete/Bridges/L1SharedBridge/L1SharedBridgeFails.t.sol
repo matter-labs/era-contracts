@@ -20,21 +20,76 @@ import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     using stdStorage for StdStorage;
 
-    function test_wrongEraPostDiamondUpgradeFirstBatch(uint256 eraPostUpgradeFirstBatch) public {
+    function test_setL1Erc20Bridge_alreadySet(address anotherBridge) public {
+        address bridge = makeAddr("bridge");
+        L1SharedBridge sharedBridgeImpl = new L1SharedBridge({
+            _l1WethAddress: l1WethAddress,
+            _bridgehub: IBridgehub(bridgehubAddress),
+            _eraChainId: eraChainId,
+            _eraDiamondProxy: eraDiamondProxy
+        });
+
+        TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
+            address(sharedBridgeImpl),
+            admin,
+            abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner)
+        );
+
+        L1SharedBridge sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
+
+        vm.startPrank(owner);
+
+        vm.expectRevert("ShB: legacy bridge 0");
+        sharedBridge.setL1Erc20Bridge(address(0));
+
+        sharedBridge.setL1Erc20Bridge(bridge);
+
+        vm.expectRevert("ShB: legacy bridge already set");
+        sharedBridge.setL1Erc20Bridge(anotherBridge);
+        vm.stopPrank();
+    }
+
+    function test_bridgehubDeposit_callerNotBridgeHubOrEra(address sender, uint256 chainId) public {
+        if ((chainId != eraChainId || sender != eraDiamondProxy) && sender != bridgehubAddress) {
+            vm.deal(sender, amount);
+            vm.expectRevert("L1SharedBridge: not bridgehub or era chain");
+            vm.prank(sender);
+            sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, alice, ETH_TOKEN_ADDRESS, amount);
+        }
+    }
+
+    function test_receiveEth_notSTM(uint256 amount, address caller) public {
+        address stmAddress = makeAddr("stm");
+
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, eraChainId),
+            abi.encode(stmAddress)
+        );
+
+        if (caller != stmAddress) {
+            vm.deal(caller, amount);
+            vm.prank(caller);
+            vm.expectRevert("receiveEth not state transition");
+            sharedBridge.receiveEth{value: amount}(eraChainId);
+        }
+    }
+
+    function test_setEraPostDiamondUpgradeFirstBatch_wrongValue(uint256 eraPostUpgradeFirstBatch) public {
         eraPostUpgradeFirstBatch = bound(eraPostUpgradeFirstBatch, 1, type(uint256).max);
         vm.prank(owner);
         vm.expectRevert("ShB: eFPUB already set");
         sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
     }
 
-    function test_wrongEraPostLegacyBridgeUpgradeFirstBatch(uint256 eraPostLegacyBridgeUpgradeFirstBatch) public {
+    function setEraPostLegacyBridgeUpgradeFirstBatch_wrongValue(uint256 eraPostLegacyBridgeUpgradeFirstBatch) public {
         eraPostUpgradeFirstBatch = bound(eraPostLegacyBridgeUpgradeFirstBatch, 0, type(uint256).max);
         vm.prank(owner);
         vm.expectRevert("ShB: eFPUB already set");
         sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostLegacyBridgeUpgradeFirstBatch);
     }
 
-    function test_eraLegacyBridgeLastDepositBatchAlreadySet(
+    function test_setEraLegacyBridgeLastDepositTime_batchAlreadySet(
         uint256 eraLegacyBridgeLastDepositBatch,
         uint256 eraLegacyBridgeLastDepositTxNumber
     ) public {
@@ -73,7 +128,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         vm.stopPrank();
     }
 
-    function test_eraLegacyBridgeLastDepositTxnAlreadySet(
+    function test_setEraLegacyBridgeLastDepositTime_txnSet(
         uint256 eraLegacyBridgeLastDepositBatch,
         uint256 eraLegacyBridgeLastDepositTxNumber
     ) public {
