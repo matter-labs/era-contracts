@@ -538,12 +538,6 @@ object "EVMInterpreter" {
             }
         }
         
-        // Note, that this function can overflow. It's up to the caller to ensure that it does not.
-        /*function memCost(memSizeWords) -> gasCost {
-            // The first term of the sum is the quadratic cost, the second one the linear one.
-            gasCost := add(div(mul(memSizeWords, memSizeWords), 512), mul(3, memSizeWords))
-        }*/
-        
         // This function can overflow, it is the job of the caller to ensure that it does not.
         // The argument to this function is the offset into the memory region IN BYTES.
         function expandMemory(newSize) -> gasCost {
@@ -3166,12 +3160,6 @@ object "EVMInterpreter" {
                     revert(0, 0)
                 }
             }
-            
-            // Note, that this function can overflow. It's up to the caller to ensure that it does not.
-            /*function memCost(memSizeWords) -> gasCost {
-                // The first term of the sum is the quadratic cost, the second one the linear one.
-                gasCost := add(div(mul(memSizeWords, memSizeWords), 512), mul(3, memSizeWords))
-            }*/
             
             // This function can overflow, it is the job of the caller to ensure that it does not.
             // The argument to this function is the offset into the memory region IN BYTES.
