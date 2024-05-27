@@ -17,13 +17,20 @@ struct ECPoint {
 
 /// @notice A struct that represents the verification key data.
 struct VerificationKeyData {
-    ECPoint[8] gateSetup; // 8 elements for gate setups
-    ECPoint[2] gateSelectors; // 2 elements for gate selectors
-    ECPoint[4] permutation; // 4 elements for permutations
-    ECPoint lookupSelector; // Single element for lookup selector
-    ECPoint[4] lookupTable; // 4 elements for lookup tables
-    ECPoint lookupTableType; // Single element for lookup table type
-    uint256 recursiveFlag; // Single element for recursive flag
+    /// @notice 8 points for gate setups
+    ECPoint[8] gateSetup;
+    /// @notice 2 points for gate selectors
+    ECPoint[2] gateSelectors;
+    /// @notice 4 points for permutations
+    ECPoint[4] permutation;
+    /// @notice A point element for lookup selector
+    ECPoint lookupSelector;
+    /// @notice 4 points for lookup tables
+    ECPoint[4] lookupTable;
+    /// @notice A point for lookup table type
+    ECPoint lookupTableType;
+    /// @notice A flag that denotes whether recursion is supported
+    uint256 recursiveFlag;
 }
 
 /// @title The interface of the Verifier contract, responsible for the zero knowledge proof verification.
@@ -43,7 +50,8 @@ interface IVerifier {
     /// @return vkHash The keccak256 hash of the loaded verification keys.
     function verificationKeyHash() external pure returns (bytes32);
 
-    /// @notice Returns the "packed" verification key. This `bytes` array contains all the elements
-    /// of the VK, however they are not properly ABI-encoded.
+    /// @notice Returns the verification key.
+    /// @dev IMPORTANT: The outside developers should not expect this method to always return result in the same
+    /// format. It might be changed in case of the change of the verification key format.
     function verificationKey() external pure returns (VerificationKeyData memory);
 }
