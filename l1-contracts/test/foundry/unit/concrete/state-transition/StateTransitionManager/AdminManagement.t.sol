@@ -2,7 +2,6 @@
 pragma solidity 0.8.24;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract AdminManagement is StateTransitionManagerTest {
     function test_RevertWhen_IsNotAdminOrOwner() public {
@@ -43,7 +42,6 @@ contract AdminManagement is StateTransitionManagerTest {
 
     function test_SuccessfulAcceptPendingAdmin() public {
         address newAdmin = makeAddr("newadmin");
-        address random = makeAddr("random");
 
         chainContractAddress.setPendingAdmin(newAdmin);
 
