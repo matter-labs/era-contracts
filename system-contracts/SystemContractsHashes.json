@@ -136,22 +136,22 @@
     "contractName": "EcAdd",
     "bytecodePath": "contracts-preprocessed/precompiles/artifacts/EcAdd.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/precompiles/EcAdd.yul",
-    "bytecodeHash": "0x0100000def5e3532524bed71a76c9bd124d6c59ef47266ece378b3ef63662a19",
-    "sourceCodeHash": "0x19315a3cddffdf6688aa1082138403b5182009bf33ff5f82e0a31aa36319ab6b"
+    "bytecodeHash": "0x0100000d2b6db21b0d11e76a1b0471db062298c242d0a6c77bce3c19ed3646ac",
+    "sourceCodeHash": "0x6e9d6783944ff034617e2350f74f0d984a54d566a33dca374087e53d3d8168ef"
   },
   {
     "contractName": "EcMul",
     "bytecodePath": "contracts-preprocessed/precompiles/artifacts/EcMul.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/precompiles/EcMul.yul",
-    "bytecodeHash": "0x0100000dbe6f081b39da319e9a0273a875ca51d10af9be3ae472fad4a6195d9d",
-    "sourceCodeHash": "0x92b6e3d799c25fedef47e24445aa8b9f373d8c24c63b8d7d590d7a26dedf903a"
+    "bytecodeHash": "0x0100000d2532c3d985eb48469125a696a2be24fcf8e4d676e9929fe955c2189f",
+    "sourceCodeHash": "0x5f4055836bbecd0e731fb0088f6a5cfd08855cc45a6b3f358b377064bc5e7665"
   },
   {
     "contractName": "EcPairing",
     "bytecodePath": "contracts-preprocessed/precompiles/artifacts/EcPairing.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/precompiles/EcPairing.yul",
-    "bytecodeHash": "0x010000194893da1ea22895137774c0062bb9af7e9b0aba39b71210785ed82f8d",
-    "sourceCodeHash": "0x217789f0e1f3ced13e0e0ecefd64d3a63f2cac309f648e8eb1baaeba743891d9"
+    "bytecodeHash": "0x01000019b4921cc864636858d4e9cba997a64a487ced7a540d1aca7d6592ba00",
+    "sourceCodeHash": "0x04098170e302cb746a0f7864d1105372dfb35dffebcdd9f295443c4a22067b7a"
   },
   {
     "contractName": "Ecrecover",

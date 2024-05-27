@@ -73,7 +73,7 @@ object "EcMul" {
             let gasToPay := ECMUL_GAS_COST()
 
             let success := precompileCall(precompileParams, gasToPay)
-            if not(success) {
+            if iszero(success) {
                 return(0, 0)
             }
             
