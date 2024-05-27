@@ -5,7 +5,6 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
 import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 
-
 contract DummyMailbox is IMailbox {
     address internal baseTokenBridge;
     uint256 public constant ERA_CHAIN_ID = 9;
@@ -17,6 +16,9 @@ contract DummyMailbox is IMailbox {
     function getName() external view returns (string memory) {
         return "DummyMailbox";
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 
     function proveL2MessageInclusion(
         uint256,
