@@ -34,6 +34,8 @@ contract StateTransitionManagerTest is Test {
     uint256 chainId = block.chainid;
     address internal testnetVerifier = address(new TestnetVerifier());
 
+    uint256 internal constant MAX_NUMBER_OF_HYPERCHAINS = 10;
+
     Diamond.FacetCut[] internal facetCuts;
 
     function setUp() public {
@@ -41,7 +43,7 @@ contract StateTransitionManagerTest is Test {
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(bridgehub);
-        stateTransitionManager = new StateTransitionManager(bridgehub, type(uint256).max);
+        stateTransitionManager = new StateTransitionManager(bridgehub, MAX_NUMBER_OF_HYPERCHAINS);
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new GenesisUpgrade();
 
@@ -126,12 +128,32 @@ contract StateTransitionManagerTest is Test {
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }
 
+    function getDiamondCutDataWithCustomFacets(
+        address _diamondInit,
+        Diamond.FacetCut[] memory _facetCuts
+    ) internal returns (Diamond.DiamondCutData memory) {
+        return Diamond.DiamondCutData({facetCuts: _facetCuts, initAddress: _diamondInit, initCalldata: bytes("")});
+    }
+
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal {
         vm.stopPrank();
         vm.startPrank(bridgehub);
 
         chainContractAddress.createNewChain({
             _chainId: chainId,
+            _baseToken: baseToken,
+            _sharedBridge: sharedBridge,
+            _admin: newChainAdmin,
+            _diamondCut: abi.encode(_diamondCut)
+        });
+    }
+
+    function createNewChainWithId(Diamond.DiamondCutData memory _diamondCut, uint256 id) internal {
+        vm.stopPrank();
+        vm.startPrank(bridgehub);
+
+        chainContractAddress.createNewChain({
+            _chainId: id,
             _baseToken: baseToken,
             _sharedBridge: sharedBridge,
             _admin: newChainAdmin,
