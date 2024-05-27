@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {Test} from "forge-std/Test.sol";
 
 import {Verifier} from "contracts/state-transition/Verifier.sol";
+import {VerificationKeyData} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {VerifierTest} from "contracts/dev-contracts/test/VerifierTest.sol";
 
 contract VerifierTestTest is Test {
@@ -159,6 +160,12 @@ contract VerifierTestTest is Test {
 
     function testVerificationKeyHash() public virtual {
         bytes32 verificationKeyHash = verifier.verificationKeyHash();
+        assertEq(verificationKeyHash, 0x6625fa96781746787b58306d414b1e25bd706d37d883a9b3acf57b2bd5e0de52);
+    }
+
+    function testVerificationKey() public virtual {
+        VerificationKeyData memory vkData = verifier.verificationKey();
+        bytes32 verificationKeyHash = keccak256(abi.encode(vkData));
         assertEq(verificationKeyHash, 0x6625fa96781746787b58306d414b1e25bd706d37d883a9b3acf57b2bd5e0de52);
     }
 }

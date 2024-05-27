@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {IVerifier} from "./chain-interfaces/IVerifier.sol";
+import {IVerifier, VerificationKeyData} from "./chain-interfaces/IVerifier.sol";
 
 /* solhint-disable max-line-length */
 /// @author Matter Labs
@@ -265,6 +265,21 @@ contract Verifier is IVerifier {
             let length := add(sub(end, start), 0x20)
 
             vkHash := keccak256(start, length)
+        }
+    }
+
+    /// @inheritdoc IVerifier
+    function verificationKey() external pure returns (VerificationKeyData memory) {
+        _loadVerificationKey();
+
+        assembly {
+            // When the `key` variable was initialized, it already meddled with the memory layout. 
+            // However, the `_loadVerificationKey` loads the VK at a fixed location, so we can safely use the locations used by it.
+            let start := VK_GATE_SETUP_0_X_SLOT
+            let end := VK_RECURSIVE_FLAG_SLOT
+            let length := add(sub(end, start), 0x20)
+
+            return(start, length)
         }
     }
 

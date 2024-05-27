@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {VerifierTestTest} from "./Verifier.t.sol";
+import {VerificationKeyData} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {VerifierRecursiveTest} from "contracts/dev-contracts/test/VerifierRecursiveTest.sol";
 
 contract VerifierRecursiveTestTest is VerifierTestTest {
@@ -50,6 +51,12 @@ contract VerifierRecursiveTestTest is VerifierTestTest {
 
     function testVerificationKeyHash() public override {
         bytes32 verificationKeyHash = verifier.verificationKeyHash();
+        assertEq(verificationKeyHash, 0x88b3ddc4ed85974c7e14297dcad4097169440305c05fdb6441ca8dfd77cd7fa7);
+    }
+
+    function testVerificationKey() public override {
+        VerificationKeyData memory vkData = verifier.verificationKey();
+        bytes32 verificationKeyHash = keccak256(abi.encode(vkData));
         assertEq(verificationKeyHash, 0x88b3ddc4ed85974c7e14297dcad4097169440305c05fdb6441ca8dfd77cd7fa7);
     }
 }
