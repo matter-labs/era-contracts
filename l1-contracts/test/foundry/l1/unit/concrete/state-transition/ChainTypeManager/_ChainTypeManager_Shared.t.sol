@@ -47,15 +47,17 @@ contract ChainTypeManagerTest is Test {
     address internal constant validator = address(0x5050505);
     address internal constant l1Nullifier = address(0x6060606);
     address internal newChainAdmin;
-    uint256 chainId = 112;
+    uint256 chainId = 112; // block.chain
     address internal testnetVerifier = address(new TestnetVerifier());
     bytes internal forceDeploymentsData = hex"";
+    
     uint256 eraChainId = 9;
-
+    uint256 internal constant MAX_NUMBER_OF_ZK_CHAINS = 10;
+    
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
-        bridgehub = new Bridgehub(block.chainid, governor, type(uint256).max);
+        bridgehub = new Bridgehub(block.chainid, governor, MAX_NUMBER_OF_ZK_CHAINS);
         vm.prank(governor);
         bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)));
 
@@ -156,13 +158,20 @@ contract ChainTypeManagerTest is Test {
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }
 
+    function getDiamondCutDataWithCustomFacets(
+        address _diamondInit,
+        Diamond.FacetCut[] memory _facetCuts
+    ) internal returns (Diamond.DiamondCutData memory) {
+        return Diamond.DiamondCutData({facetCuts: _facetCuts, initAddress: _diamondInit, initCalldata: bytes("")});
+    }
+
     function getCTMInitData() internal view returns (bytes memory) {
         return abi.encode(abi.encode(getDiamondCutData(diamondInit)), forceDeploymentsData);
     }
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
         vm.stopPrank();
-        vm.startPrank(address(bridgehub));
+        vm.prank(address(bridgehub));
 
         vm.mockCall(
             address(sharedBridge),
@@ -192,6 +201,23 @@ contract ChainTypeManagerTest is Test {
                 _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
                 _factoryDeps: new bytes[](0)
             });
+        
+        vm.startPrank(governor);
+    }
+
+    function createNewChainWithId(Diamond.DiamondCutData memory _diamondCut, uint256 id) internal {
+        vm.stopPrank();
+        vm.prank(address(bridgehub));
+
+        chainContractAddress.createNewChain({
+            _chainId: id,
+            _baseToken: baseToken,
+            _sharedBridge: sharedBridge,
+            _admin: newChainAdmin,
+            _diamondCut: abi.encode(_diamondCut)
+        });
+
+        vm.startPrank(governor);
     }
 
     // add this to be excluded from coverage report
