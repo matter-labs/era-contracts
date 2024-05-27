@@ -12,6 +12,21 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAdd
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 contract L1SharedBridgeTestBase is L1SharedBridgeTest {
+    function test_success_receiveEth(uint256 amount) public {
+        address stmAddress = makeAddr("stm");
+
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, eraChainId),
+            abi.encode(stmAddress)
+        );
+
+        vm.deal(stmAddress, amount);
+        vm.prank(stmAddress);
+        sharedBridge.receiveEth{value: amount}(eraChainId);
+        assertEq(address(sharedBridge).balance, amount);
+    }
+
     function test_bridgehubDepositBaseToken_Eth() public {
         vm.deal(bridgehubAddress, amount);
         vm.prank(bridgehubAddress);
@@ -19,6 +34,10 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositBaseTokenInitiated(chainId, alice, ETH_TOKEN_ADDRESS, amount);
         sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, alice, ETH_TOKEN_ADDRESS, amount);
+
+        assertEq(address(sharedBridge).balance, amount);
+        assertEq(sharedBridge.chainBalance(chainId, ETH_TOKEN_ADDRESS), amount);
+        assertEq(alice.balance, 0);
     }
 
     function test_bridgehubDepositBaseToken_Erc() public {
@@ -30,6 +49,10 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositBaseTokenInitiated(chainId, alice, address(token), amount);
         sharedBridge.bridgehubDepositBaseToken(chainId, alice, address(token), amount);
+
+        assertEq(token.balanceOf(address(sharedBridge)), amount);
+        assertEq(sharedBridge.chainBalance(chainId, address(token)), amount);
+        assertEq(token.balanceOf(alice), 0);
     }
 
     function test_bridgehubDeposit_Eth() public {
