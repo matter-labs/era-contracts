@@ -9,6 +9,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {DummyL1ERC20Bridge} from "contracts/dev-contracts/test/DummyErc20Bridge.sol";
 
 contract L1SharedBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -61,6 +62,7 @@ contract L1SharedBridgeTest is Test {
     L1SharedBridge sharedBridgeImpl;
     L1SharedBridge sharedBridge;
     address bridgehubAddress;
+    DummyL1ERC20Bridge l1Erc20Bridge;
     address l1ERC20BridgeAddress;
     address l1WethAddress;
     address l2SharedBridge;
@@ -95,7 +97,7 @@ contract L1SharedBridgeTest is Test {
         alice = makeAddr("alice");
         // bob = makeAddr("bob");
         l1WethAddress = makeAddr("weth");
-        l1ERC20BridgeAddress = makeAddr("l1ERC20Bridge");
+
         l2SharedBridge = makeAddr("l2SharedBridge");
 
         txHash = bytes32(uint256(uint160(makeAddr("txHash"))));
@@ -123,6 +125,10 @@ contract L1SharedBridgeTest is Test {
             abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner)
         );
         sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
+
+        l1Erc20Bridge = new DummyL1ERC20Bridge(address(sharedBridge));
+        l1ERC20BridgeAddress = address(l1Erc20Bridge);
+
         vm.prank(owner);
         sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
         vm.prank(owner);
@@ -133,6 +139,7 @@ contract L1SharedBridgeTest is Test {
         sharedBridge.setEraLegacyBridgeLastDepositTime(1, 0);
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
+        assertEq(sharedBridge.l2BridgeAddress(chainId), l2SharedBridge);
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(eraChainId, l2SharedBridge);
     }

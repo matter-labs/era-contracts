@@ -10,9 +10,11 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DummyMailbox} from "contracts/dev-contracts/test/DummyMailbox.sol";
+import {DummyL1ERC20Bridge} from "contracts/dev-contracts/test/DummyErc20Bridge.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
-    function test_transferFundsFromLegacyZeroETHTransfered() public {
+    function test_transferFundsFromLegacyZeroETHTransferred() public {
         address targetDiamond = makeAddr("target diamond");
         uint256 targetChainId = 31337;
 
@@ -21,18 +23,73 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         vm.expectRevert("ShB: 0 eth transferred");
         vm.prank(owner);
         sharedBridge.transferFundsFromLegacy(ETH_TOKEN_ADDRESS, targetDiamond, targetChainId);
+        assertEq(sharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), 0);
     }
 
-    function test_transferFundsFromLegacy(uint256 amount) public {
+    function test_transferFundsFromLegacyZeroTokenTransferred() public {
+        address targetDiamond = makeAddr("target diamond");
+        uint256 targetChainId = 31337;
+        address tokenAddress = address(token);
+
+        vm.mockCall(targetDiamond, abi.encodeWithSelector(IMailbox.transferEthToSharedBridge.selector), "");
+
+        vm.expectRevert("ShB: 0 amount to transfer");
+        vm.prank(owner);
+        sharedBridge.transferFundsFromLegacy(tokenAddress, targetDiamond, targetChainId);
+        assertEq(sharedBridge.chainBalance(eraChainId, tokenAddress), 0);
+    }
+
+    function test_transferTokenFundsFromLegacy(uint256 amount) public {
+        amount = bound(amount, 1, type(uint256).max);
+        token.mint(l1ERC20BridgeAddress, amount);
+        address tokenAddress = address(token);
+        assertEq(token.balanceOf(l1ERC20BridgeAddress), amount);
+
+        assertEq(sharedBridge.chainBalance(eraChainId, tokenAddress), 0);
+        vm.prank(owner);
+        sharedBridge.transferFundsFromLegacy(tokenAddress, l1ERC20BridgeAddress, eraChainId);
+        assertEq(token.balanceOf(l1ERC20BridgeAddress), 0);
+        assertEq(sharedBridge.chainBalance(eraChainId, tokenAddress), amount);
+    }
+
+    function test_transferFundsFromLegacyWrongAmount(uint256 amount) public {
+        amount = bound(amount, 1, type(uint256).max - 1);
+        token.mint(l1ERC20BridgeAddress, amount);
+        address tokenAddress = address(token);
+        assertEq(token.balanceOf(l1ERC20BridgeAddress), amount);
+
+        vm.mockCall(
+            tokenAddress,
+            abi.encodeWithSelector(IERC20.transfer.selector, address(sharedBridge), amount),
+            abi.encode(true)
+        );
+
+        assertEq(sharedBridge.chainBalance(eraChainId, tokenAddress), 0);
+
+        vm.expectRevert("ShB: wrong amount transferred");
+        vm.prank(owner);
+        sharedBridge.transferFundsFromLegacy(tokenAddress, l1ERC20BridgeAddress, 9);
+        assertEq(token.balanceOf(l1ERC20BridgeAddress), amount);
+        assertEq(sharedBridge.chainBalance(eraChainId, tokenAddress), 0);
+    }
+
+    function test_transferETHFundsFromLegacy(uint256 amount) public {
         DummyMailbox mailbox = new DummyMailbox(address(sharedBridge));
         address mailboxAddress = address(mailbox);
 
         amount = bound(amount, 1, type(uint256).max);
         vm.deal(mailboxAddress, amount);
 
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(IBridgehub.getHyperchain.selector, 9), abi.encode(mailboxAddress));
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, eraChainId),
+            abi.encode(mailboxAddress)
+        );
+
+        assertEq(sharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), 0);
         vm.prank(owner);
         sharedBridge.transferFundsFromLegacy(ETH_TOKEN_ADDRESS, mailboxAddress, 9);
+        assertEq(sharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), amount);
     }
 
     function test_depositLegacyERC20Bridge() public {
