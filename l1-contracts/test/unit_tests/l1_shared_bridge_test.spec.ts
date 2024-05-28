@@ -112,7 +112,7 @@ describe("Shared Bridge tests", () => {
     const balanceBefore = await erc20TestToken.balanceOf(await randomSigner.getAddress());
     const balanceNTVBefore = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
 
-    await l1NativeTokenVault.getAssetInfoFromLegacy(erc20TestToken.address);
+    const assetInfo = await l1NativeTokenVault.getAssetInfoFromLegacy(erc20TestToken.address);
     await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, amount.mul(10))).wait();
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
       {

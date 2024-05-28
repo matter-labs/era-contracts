@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -246,11 +247,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     function decodeLegacyData(bytes calldata _data, address _prevMsgSender) external returns (bytes32, bytes memory) {
-<<<<<<< ra/fix-erc20-test
         require(msg.sender == address(this), "ShB: only bridge");
-=======
-        require(msg.sender == address(this));
->>>>>>> kl/custom-asset-bridging
         (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
             _data,
             (address, uint256, address)
@@ -318,19 +315,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _assetData: _assetData
         });
 
-<<<<<<< ra/fix-erc20-test
         (uint256 _depositAmount, ) = abi.decode(_assetData, (uint256, address));
         bytes32 txDataHash = keccak256(abi.encode(assetInfo, abi.encode(_depositAmount, _prevMsgSender)));
         request = _requestToBridge(_chainId, _prevMsgSender, assetInfo, bridgeMintCalldata, txDataHash);
-=======
-        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, assetInfo, _assetData));
-        request = _requestToBridge({
-            _chainId: _chainId,
-            _assetInfo: assetInfo,
-            _bridgeMintCalldata: bridgeMintCalldata,
-            _txDataHash: txDataHash
-        });
->>>>>>> kl/custom-asset-bridging
 
         emit BridgehubDepositInitiated({
             chainId: _chainId,
@@ -363,12 +350,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev The request data that is passed to the bridgehub
     function _requestToBridge(
         uint256 _chainId,
+        address _prevMsgSender,
         bytes32 _assetInfo,
         bytes memory _bridgeMintCalldata,
         bytes32 _txDataHash
     ) internal returns (L2TransactionRequestTwoBridgesInner memory request) {
         // Request the finalization of the deposit on the L2 side
-        bytes memory l2TxCalldata = _getDepositL2Calldata(_assetInfo, _bridgeMintCalldata);
+        bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _assetInfo, _bridgeMintCalldata);
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
@@ -392,7 +380,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev Generate a calldata for calling the deposit finalization on the L2 bridge contract
-<<<<<<< ra/fix-erc20-test
     function _getDepositL2Calldata(
         address _l1Sender,
         bytes32 _assetInfo,
@@ -404,10 +391,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         );
         return
             abi.encodeCall(IL2Bridge.finalizeDeposit, (_l1Sender, _l2Receiver, _parsedL1Token, _amount, _gettersData));
-=======
-    function _getDepositL2Calldata(bytes32 _assetInfo, bytes memory _assetData) internal view returns (bytes memory) {
-        return abi.encodeCall(IL2Bridge.finalizeDeposit, (_assetInfo, _assetData));
->>>>>>> kl/custom-asset-bridging
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2
@@ -749,7 +732,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes32 _assetInfo;
         bytes memory bridgeMintCalldata;
 
-<<<<<<< ra/fix-erc20-test
         {
             bytes memory _assetData;
 
@@ -765,13 +747,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
             bridgeMintCalldata = abi.encode(_amount, _prevMsgSender, _l2Receiver, _getERC20Getters(_l1Asset), _l1Asset);
         }
-=======
-        bytes memory bridgeMintData = abi.encode(_amount);
-        bytes memory l2TxCalldata = _getDepositL2Calldata(
-            IL1NativeTokenVault(nativeTokenVault).getAssetInfoFromLegacy(_l1Asset),
-            bridgeMintData
-        );
->>>>>>> kl/custom-asset-bridging
 
         {
             bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _assetInfo, bridgeMintCalldata);

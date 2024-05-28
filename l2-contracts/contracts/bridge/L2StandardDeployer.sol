@@ -108,12 +108,7 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
 
         /// backwards compatible event
         emit WithdrawalInitiated(_prevMsgSender, _l1Receiver, l2Token, _amount);
-<<<<<<< ra/fix-erc20-test
         _bridgeMintData = _data;
-=======
-        // solhint-disable-next-line func-named-parameters
-        _bridgeBurnData = abi.encodePacked(_chainId, _mintValue, _assetInfo, _prevMsgSender, _data);
->>>>>>> kl/custom-asset-bridging
     }
 
     /// @dev Deploy and initialize the L2 token for the L1 counterpart
