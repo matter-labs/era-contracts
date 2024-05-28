@@ -74,8 +74,8 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
 
     function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {
         address token = tokenAddress[_assetInfo];
-        (uint256 _amount, address _l1Sender, address _l2Receiver, bytes memory erc20Data, address originToken) = abi
-            .decode(_data, (uint256, address, address, bytes, address));
+        (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken) = abi
+            .decode(_data, (address, uint256, address, bytes, address));
         address expectedToken = l2TokenAddress(originToken);
         if (token == address(0)) {
             require(

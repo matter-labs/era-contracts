@@ -196,6 +196,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev Used to set the assedAddress for a given assetInfo.
     function setAssetAddress(bytes32 _additionalData, address _assetAddress) external {
+        // Todo: update? (Least important)
         address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
         bytes32 assetInfo = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData)); /// todo make other asse
         assetAddress[assetInfo] = _assetAddress;
@@ -226,6 +227,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev for backwards compatibility and to automatically register l1 assets, and we return the correct info.
     function _getAssetProperties(bytes32 _assetInfo) internal returns (address l1Asset, bytes32 assetInfo) {
+        // Has to be fixed
         l1Asset = assetAddress[_assetInfo];
         assetInfo = _assetInfo;
         if (l1Asset == address(0) && (uint256(_assetInfo) <= type(uint160).max)) {
@@ -302,7 +304,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _assetData
         );
 
-        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, assetInfo, _assetData));
+        (uint256 _depositAmount, ) = abi.decode(_assetData, (uint256, address));
+        bytes32 txDataHash = keccak256(abi.encode(assetInfo, abi.encode(_depositAmount, _prevMsgSender)));
         request = _requestToBridge(_chainId, _prevMsgSender, assetInfo, bridgeMintCalldata, txDataHash);
 
         emit BridgehubDepositInitiated({
@@ -340,7 +343,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes32 _assetInfo,
         bytes memory _bridgeMintCalldata,
         bytes32 _txDataHash
-    ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal returns (L2TransactionRequestTwoBridgesInner memory request) {
         // Request the finalization of the deposit on the L2 side
         bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _assetInfo, _bridgeMintCalldata);
 
@@ -370,8 +373,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         address _l1Sender,
         bytes32 _assetInfo,
         bytes memory _assetData
-    ) internal pure returns (bytes memory) {
-        return abi.encodeCall(IL2Bridge.finalizeDeposit, (_assetInfo, _assetData));
+    ) internal returns (bytes memory) {
+        (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = abi.decode(
+            _assetData,
+            (uint256, address, address, bytes, address)
+        );
+        return
+            abi.encodeCall(IL2Bridge.finalizeDeposit, (_l1Sender, _l2Receiver, _parsedL1Token, _amount, _gettersData));
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2
@@ -418,7 +426,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
                 (uint256 _amount, ) = abi.decode(_assetData, (uint256, address));
                 txDataHash = keccak256(abi.encode(_depositSender, uint160(uint256(_assetInfo)), _amount));
             } else {
-                txDataHash = keccak256(abi.encode(_depositSender, _assetInfo, _assetData));
+                txDataHash = keccak256(abi.encode(_assetInfo, _assetData));
             }
             require(dataHash == txDataHash, "ShB: d.it not hap");
         }
@@ -535,7 +543,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         address l1Asset = assetAddress[assetInfo];
         IL1StandardAsset(l1Asset).bridgeMint(_chainId, assetInfo, assetData);
 
-        // emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetInfo, keccak256(assetData));
+        // emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetInfo, keccak256(assetData)); // ToDo: Shall we uncomment?
     }
 
     /// @dev Verifies the validity of a withdrawal message from L2 and returns details of the withdrawal.
@@ -640,7 +648,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        bytes32 assetInfo = bytes32(uint256(uint160(_l1Asset)));
+        bytes32 assetInfo = IL1NativeTokenVault(nativeTokenVault).getAssetInfo(_l1Asset);
         bytes memory assetData = abi.encode(_amount, _depositSender); // todo
         claimFailedBurn({
             _chainId: _chainId,
@@ -653,6 +661,21 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _l2TxNumberInBatch: _l2TxNumberInBatch,
             _merkleProof: _merkleProof
         });
+    }
+
+    /// @dev Receives and parses (name, symbol, decimals) from the token contract
+    function _getERC20Getters(address _token) internal view returns (bytes memory) {
+        if (_token == ETH_TOKEN_ADDRESS) {
+            bytes memory name = bytes("Ether");
+            bytes memory symbol = bytes("ETH");
+            bytes memory decimals = abi.encode(uint8(18));
+            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
+        }
+
+        (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
+        (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
+        (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
+        return abi.encode(data1, data2, data3);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -695,19 +718,28 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(l2BridgeAddress[ERA_CHAIN_ID] != address(0), "ShB b. n dep");
         require(_l1Asset != L1_WETH_TOKEN, "ShB: WETH deposit not supported 2");
 
-        // // Note that funds have been transferred to this contract in the legacy ERC20 bridge.
-        // if (!hyperbridgingEnabled[ERA_CHAIN_ID]) {
-        //     chainBalance[ERA_CHAIN_ID][_l1Asset] += _amount;
-        // }
-
-        bytes memory bridgeMintData = abi.encode(_amount); //todo
-        bytes memory l2TxCalldata = _getDepositL2Calldata(
-            _prevMsgSender,
-            IL1NativeTokenVault(nativeTokenVault).getAssetInfoFromLegacy(_l1Asset),
-            bridgeMintData
-        );
+        bytes32 _assetInfo;
+        bytes memory bridgeMintCalldata;
 
         {
+            bytes memory _assetData;
+
+            // Inner call to encode data to decrease local var numbers
+            try this.decodeLegacyData(abi.encode(_l1Asset, _amount, _l2Receiver), _prevMsgSender) returns (
+                bytes32 _assetInfoCatch,
+                bytes memory _assetDataCatch
+            ) {
+                (_assetInfo, _assetData) = (_assetInfoCatch, _assetDataCatch);
+            } catch {
+                (_assetInfo, _assetData) = abi.decode(abi.encode(_l1Asset, _amount, _l2Receiver), (bytes32, bytes));
+            }
+
+            bridgeMintCalldata = abi.encode(_amount, _prevMsgSender, _l2Receiver, _getERC20Getters(_l1Asset), _l1Asset);
+        }
+
+        {
+            bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _assetInfo, bridgeMintCalldata);
+
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
             // Otherwise, the refund will be sent to the specified address.
             // If the recipient is a contract on L1, the address alias will be applied.
@@ -727,9 +759,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             l2TxHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
         }
 
-        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Asset, _amount));
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-        depositHappened[ERA_CHAIN_ID][l2TxHash] = txDataHash;
+        depositHappened[ERA_CHAIN_ID][l2TxHash] = keccak256(
+            abi.encode(_assetInfo, abi.encode(_amount, _prevMsgSender))
+        ); // Tx Data Hash
 
         emit LegacyDepositInitiated({
             chainId: ERA_CHAIN_ID,
@@ -792,7 +825,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge {
-        bytes32 assetInfo = nativeTokenVault.getAssetInfoFromLegacy(_l1Asset);
+        bytes32 assetInfo = IL1NativeTokenVault(nativeTokenVault).getAssetInfoFromLegacy(_l1Asset);
         bytes memory assetData = abi.encode(_amount, _depositSender); //todo
         claimFailedBurn({
             _chainId: ERA_CHAIN_ID,

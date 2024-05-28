@@ -139,7 +139,7 @@ describe("Shared Bridge tests", () => {
         secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
           ["bytes32", "bytes"],
           [
-            await l1NativeTokenVault.getAssetInfoFromLegacy(erc20TestToken.address),
+            assetInfo,
             new ethers.utils.AbiCoder().encode(["uint256", "address"], [amount, await randomSigner.getAddress()]),
           ]
         ),
@@ -202,7 +202,7 @@ describe("Shared Bridge tests", () => {
           0,
           0,
           0,
-          ethers.utils.hexConcat([ERC20functionSignature, l1SharedBridge.address, ethers.utils.randomBytes(72 + 4)]),
+          ethers.utils.hexConcat([ERC20functionSignature, l1SharedBridge.address, ethers.utils.randomBytes(72)]),
           [ethers.constants.HashZero]
         )
     );

@@ -66,7 +66,7 @@ describe("ERC20Bridge", function () {
     const erc20StandardDeployerImpl = await deployer.deploy(await deployer.loadArtifact("L2StandardDeployer"));
     const standardDeployerInitializeData = erc20StandardDeployerImpl.interface.encodeFunctionData("initialize", [
       beaconProxyBytecodeHash,
-      deployerWallet.address, // Note on real deployment this will be the deployerWallet
+      governorWallet.address, // Note on real deployment this will be the deployerWallet
       contractsDeployedAlready,
     ]);
 
@@ -91,7 +91,7 @@ describe("ERC20Bridge", function () {
     ]);
 
     erc20Bridge = L2SharedBridgeFactory.connect(erc20BridgeProxy.address, deployerWallet);
-    erc20StandardDeployer = L2StandardDeployerFactory.connect(erc20StandardDeployerProxy.address, deployerWallet);
+    erc20StandardDeployer = L2StandardDeployerFactory.connect(erc20StandardDeployerProxy.address, governorWallet);
     await erc20StandardDeployer.setSharedBridge(erc20BridgeProxy.address);
 
     /// note in real deployment we have to transfer ownership of standard deployer here

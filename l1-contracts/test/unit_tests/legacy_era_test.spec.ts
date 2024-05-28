@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
-import { Interface } from "ethers/lib/utils";
+import { BytesLike, Interface } from "ethers/lib/utils";
 
 import type { Bridgehub, L1SharedBridge, GettersFacet, MockExecutorFacet } from "../../typechain";
 import {
@@ -46,6 +46,7 @@ describe("Legacy Era tests", function () {
   let bridgehub: Bridgehub;
   let chainId = "9"; // Hardhat config ERA_CHAIN_ID
   const functionSignature = "0x11a2ccc1";
+  let l2ToL1message: BytesLike;
 
   let mailbox: IMailbox;
   let getter: GettersFacet;
@@ -124,6 +125,14 @@ describe("Legacy Era tests", function () {
 
     const txExecute = await proxyAsMockExecutor.setExecutedBatches(1);
     await txExecute.wait();
+
+    const l1Receiver = await randomSigner.getAddress();
+    l2ToL1message = ethers.utils.hexConcat([
+      functionSignature,
+      "0x".concat(l1Receiver.slice(2).padStart(64, "0")),
+      "0x".concat(ethers.utils.parseUnits("800", 18).toHexString().slice(2).padStart(64, "0")),
+      "0x".concat(erc20TestToken.address.slice(2).padStart(64, "0")),
+    ]);
   });
 
   it("Check should initialize through governance", async () => {
@@ -178,13 +187,6 @@ describe("Legacy Era tests", function () {
   });
 
   it("Should revert on finalizing a withdrawal with wrong batch number", async () => {
-    const l1Receiver = await randomSigner.getAddress();
-    const l2ToL1message = ethers.utils.hexConcat([
-      functionSignature,
-      l1Receiver,
-      erc20TestToken.address,
-      ethers.constants.HashZero,
-    ]);
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(10, 0, 0, l2ToL1message, [])
     );
@@ -192,13 +194,6 @@ describe("Legacy Era tests", function () {
   });
 
   it("Should revert on finalizing a withdrawal with wrong length of proof", async () => {
-    const l1Receiver = await randomSigner.getAddress();
-    const l2ToL1message = ethers.utils.hexConcat([
-      functionSignature,
-      l1Receiver,
-      erc20TestToken.address,
-      ethers.constants.HashZero,
-    ]);
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(1, 0, 0, l2ToL1message, [])
     );
@@ -206,13 +201,6 @@ describe("Legacy Era tests", function () {
   });
 
   it("Should revert on finalizing a withdrawal with wrong proof", async () => {
-    const l1Receiver = await randomSigner.getAddress();
-    const l2ToL1message = ethers.utils.hexConcat([
-      functionSignature,
-      l1Receiver,
-      erc20TestToken.address,
-      ethers.constants.HashZero,
-    ]);
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge
         .connect(randomSigner)
