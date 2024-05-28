@@ -4,7 +4,7 @@ import "@nomiclabs/hardhat-ethers";
 import type { BigNumberish, providers, Signer, Wallet, Contract } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
-import { Wallet as ZkWallet } from "zksync-ethers";
+import type { Wallet as ZkWallet } from "zksync-ethers";
 
 import type { DeployedAddresses } from "./deploy-utils";
 import {
@@ -243,15 +243,12 @@ export class Deployer {
     }
     // Note: we cannot deploy using Create2, as the owner of the ProxyAdmin is msg.sender
 
-    let proxyAdmin;
-    let rec;
-
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractFactory = await hardhat.ethers.getContractFactory("ProxyAdmin", {
       signer: this.deployWallet,
     });
-    proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
-    rec = await proxyAdmin.deployTransaction.wait();
+    const proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
+    const rec = await proxyAdmin.deployTransaction.wait();
 
     if (this.verbose) {
       console.log(
@@ -686,17 +683,17 @@ export class Deployer {
     }
   }
 
-  public async sharedBridgeSetEraPostUpgradeFirstBatch(ethTxOptions: ethers.providers.TransactionRequest) {
-    const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
-    const storageSwitch = getNumberFromEnv("CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH");
-    const tx = await sharedBridge.setEraPostUpgradeFirstBatch(storageSwitch);
-    const receipt = await tx.wait();
-    if (this.verbose) {
-      console.log(`Era first post upgrade batch set, gas used: ${receipt.gasUsed.toString()}`);
-    }
-  }
+  // public async sharedBridgeSetEraPostUpgradeFirstBatch() {
+  //   const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
+  //   const storageSwitch = getNumberFromEnv("CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH");
+  //   const tx = await sharedBridge.setEraPostUpgradeFirstBatch(storageSwitch);
+  //   const receipt = await tx.wait();
+  //   if (this.verbose) {
+  //     console.log(`Era first post upgrade batch set, gas used: ${receipt.gasUsed.toString()}`);
+  //   }
+  // }
 
-  public async registerSharedBridge(ethTxOptions: ethers.providers.TransactionRequest) {
+  public async registerSharedBridge() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
     /// registering ETH as a valid token, with address 1.
@@ -711,11 +708,11 @@ export class Deployer {
     ]);
     await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
     if (this.verbose) {
-      console.log(`Shared bridge was registered in Bridgehub`);
+      console.log("Shared bridge was registered in Bridgehub");
     }
   }
 
-  public async registerTokenInNativeTokenVault(token: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async registerTokenInNativeTokenVault(token: string) {
     const nativeTokenVault = this.nativeTokenVault(this.deployWallet);
 
     const data = nativeTokenVault.interface.encodeFunctionData("registerToken", [token]);
@@ -954,7 +951,7 @@ export class Deployer {
     await this.deploySharedBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
     await this.deployNativeTokenVaultImplementation(create2Salt, { gasPrice, nonce: nonce + 2 });
     await this.deployNativeTokenVaultProxy(create2Salt, { gasPrice });
-    await this.registerSharedBridge({ gasPrice });
+    await this.registerSharedBridge();
   }
 
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {

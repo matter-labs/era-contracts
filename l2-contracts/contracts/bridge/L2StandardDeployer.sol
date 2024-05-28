@@ -6,13 +6,11 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/acces
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 import {IL2StandardDeployer} from "./interfaces/IL2StandardDeployer.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
-import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
@@ -110,7 +108,12 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
 
         /// backwards compatible event
         emit WithdrawalInitiated(_prevMsgSender, _l1Receiver, l2Token, _amount);
+<<<<<<< ra/fix-erc20-test
         _bridgeMintData = _data;
+=======
+        // solhint-disable-next-line func-named-parameters
+        _bridgeBurnData = abi.encodePacked(_chainId, _mintValue, _assetInfo, _prevMsgSender, _data);
+>>>>>>> kl/custom-asset-bridging
     }
 
     /// @dev Deploy and initialize the L2 token for the L1 counterpart

@@ -3,8 +3,8 @@ import * as hardhat from "hardhat";
 import { ethers, Wallet } from "ethers";
 import { Interface } from "ethers/lib/utils";
 
-import type { TestnetERC20Token } from "../../typechain";
-import { L1NativeTokenVault, TestnetERC20TokenFactory } from "../../typechain";
+import type { TestnetERC20Token, L1NativeTokenVault } from "../../typechain";
+import { TestnetERC20TokenFactory } from "../../typechain";
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
 import type { IL1SharedBridge } from "../../typechain/IL1SharedBridge";

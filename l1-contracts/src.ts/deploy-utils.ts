@@ -86,6 +86,7 @@ export async function deployBytecodeViaCreate2(
 export async function deployContractWithArgs(
   wallet: ethers.Wallet,
   contractName: string,
+  // eslint-disable-next-line
   args: any[],
   ethTxOptions: ethers.providers.TransactionRequest
 ) {
