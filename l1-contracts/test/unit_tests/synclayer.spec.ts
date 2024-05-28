@@ -203,32 +203,31 @@ describe("Synclayer", function () {
     );
   });
 
-  it("Check forward message to L3 on SL", async() => {
+  it("Check forward message to L3 on SL", async () => {
     const tx = {
       txType: 255,
-            from: ethers.constants.AddressZero,
-            to: ethers.constants.AddressZero,
-            gasLimit: priorityTxMaxGasLimit,
-            gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            maxFeePerGas: 1,
-            maxPriorityFeePerGas: 0,
-            paymaster: 0,
-            // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
-            nonce: 0,
-            value: 0,
-            reserved: [0 as ethers.BigNumberish, 0, 0, 0] as [ethers.BigNumberish, ethers.BigNumberish, ethers.BigNumberish, ethers.BigNumberish],
-            data: "0x",
-            signature: ethers.constants.HashZero,
-            factoryDeps: [],
-            paymasterInput: "0x",
-            reservedDynamic: "0x"
+      from: ethers.constants.AddressZero,
+      to: ethers.constants.AddressZero,
+      gasLimit: priorityTxMaxGasLimit,
+      gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      maxFeePerGas: 1,
+      maxPriorityFeePerGas: 0,
+      paymaster: 0,
+      // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
+      nonce: 0,
+      value: 0,
+      reserved: [0 as ethers.BigNumberish, 0, 0, 0] as [
+        ethers.BigNumberish,
+        ethers.BigNumberish,
+        ethers.BigNumberish,
+        ethers.BigNumberish,
+      ],
+      data: "0x",
+      signature: ethers.constants.HashZero,
+      factoryDeps: [],
+      paymasterInput: "0x",
+      reservedDynamic: "0x",
     };
-    bridgehub.forwardTransactionOnSyncLayer(
-      mintChainId,
-      tx,
-      [],
-      ethers.constants.HashZero,
-      0,
-    )
+    bridgehub.forwardTransactionOnSyncLayer(mintChainId, tx, [], ethers.constants.HashZero, 0);
   });
 });

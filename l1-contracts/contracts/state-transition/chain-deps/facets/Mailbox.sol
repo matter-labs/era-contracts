@@ -328,7 +328,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     }
 
     function _requestL2TransactionToSyncLayerFree(
-            BridgehubL2TransactionRequest memory _request
+        BridgehubL2TransactionRequest memory _request
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         WritePriorityOpParams memory params = WritePriorityOpParams({
             request: _request,
