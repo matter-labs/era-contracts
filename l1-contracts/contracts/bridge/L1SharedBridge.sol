@@ -236,9 +236,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         if (l1Asset == address(0) && (uint256(_assetInfo) <= type(uint160).max)) {
             l1Asset = address(nativeTokenVault);
             assetInfo = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetInfo));
-            nativeTokenVault.registerToken(address(uint160(uint256(_assetInfo))));
             assetAddress[_assetInfo] = l1Asset;
             assetAddress[assetInfo] = l1Asset;
+            nativeTokenVault.registerToken(address(uint160(uint256(_assetInfo))));
         } else if (uint256(_assetInfo) <= type(uint160).max) {
             assetInfo = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetInfo));
         } else {
@@ -247,7 +247,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     function decodeLegacyData(bytes calldata _data, address _prevMsgSender) external returns (bytes32, bytes memory) {
-        require(msg.sender == address(this));
+        require(msg.sender == address(this), "ShB: only bridge");
         (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
             _data,
             (address, uint256, address)
