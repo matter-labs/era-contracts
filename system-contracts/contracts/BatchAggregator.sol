@@ -9,7 +9,6 @@ import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMP
 import {UnsafeBytesCalldata} from "./libraries/UnsafeBytesCalldata.sol";
 import {ICompressor, OPERATION_BITMASK, LENGTH_BITS_OFFSET, MAX_ENUMERATION_INDEX_SIZE} from "./interfaces/ICompressor.sol";
 
-uint256 constant BYTE_BITMASK = (1<<8)-1;
 uint256 constant DERIVED_KEY_SIZE = 32;
 uint256 constant LOOSE_COMPRESION = 33;
 contract BatchAggregator is IBatchAggregator, ISystemContract {
@@ -234,11 +233,13 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             value = value>>8;
         }
     }
-    
+    function subUnchecked(uint256 a, uint256 b) view public returns(uint256) {
+        unchecked { return a - b ;}
+    }
     function compressValue(uint256 initialValue, uint256 finalValue) internal returns (bytes memory compressedDiff){
         uint8 transform = bytesLength(finalValue);
-        uint8 add = bytesLength(finalValue-initialValue);
-        uint8 sub = bytesLength(initialValue-finalValue);
+        uint8 add = bytesLength(subUnchecked(finalValue,initialValue));
+        uint8 sub = bytesLength(subUnchecked(initialValue,finalValue));
         uint8 optimal = (transform<add?transform:add);
         optimal = (optimal<sub?optimal:sub);
         compressedDiff = new bytes(optimal+1);
@@ -261,7 +262,7 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
         }
         uint8 diffPtr = optimal;
         for(uint8 i = 0;i<optimal;i+=1){
-            compressedDiff[diffPtr] = bytes1(uint8(value & BYTE_BITMASK));
+            compressedDiff[diffPtr] = bytes1(uint8(value & type(uint8).max));
             diffPtr -= 1;
         }
     }
