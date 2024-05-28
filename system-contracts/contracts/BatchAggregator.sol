@@ -249,7 +249,11 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
         compressedDiff = new bytes(optimal+1);
         uint8 mask = (optimal<<LENGTH_BITS_OFFSET);
         uint256 value;
-        if (transform==optimal){
+        if (optimal==32){
+            mask |= 0;
+            value = finalValue;
+        }
+        else if (transform==optimal){
             mask |= 3;
             value = finalValue;
         }
