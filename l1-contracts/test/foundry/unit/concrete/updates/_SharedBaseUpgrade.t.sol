@@ -9,14 +9,18 @@ import {SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 import {ISystemContext} from "contracts/state-transition/l2-deps/ISystemContext.sol";
+import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 
 contract BaseUpgrade is Test {
     L2CanonicalTransaction l2CanonicalTransaction;
     ProposedUpgrade proposedUpgrade;
 
     function _prepereProposedUpgrade() internal {
-        bytes[] memory bytesEmptyArray;
-        uint256[] memory uintEmptyArray;
+        bytes[] memory bytesEmptyArray = new bytes[](1);
+        bytesEmptyArray[0] = "11111111111111111111111111111111";
+        uint256[] memory uintEmptyArray = new uint256[](1);
+        uintEmptyArray[0] = uint256(L2ContractHelper.hashL2Bytecode(bytesEmptyArray[0]));
+
         uint256 protocolVersion = 1;
         uint256 chainId = 1;
         bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (chainId));
