@@ -78,7 +78,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             // Add batch to BatchAggregator
             IBatchAggregator(BATCH_AGGREGATOR_ADDRESS).commitBatch(
                 _newBatch.pubdataCommitments,
-                0,
+                s.chainId,
                 _newBatch.batchNumber
             );
         }

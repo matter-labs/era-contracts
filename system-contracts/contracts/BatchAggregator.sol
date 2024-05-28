@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 import {IBatchAggregator} from "./interfaces/IBatchAggregator.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE, STATE_DIFF_COMPRESSION_VERSION_NUMBER} from "./interfaces/IL1Messenger.sol";
-import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, BATCH_AGGREGATOR, STATE_DIFF_ENTRY_SIZE, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER, COMPUTATIONAL_PRICE_FOR_PUBDATA} from "./Constants.sol";
+import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, BATCH_AGGREGATOR, STATE_DIFF_ENTRY_SIZE, STATE_DIFF_AGGREGATION_INFO_SIZE, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER, COMPUTATIONAL_PRICE_FOR_PUBDATA} from "./Constants.sol";
 import {UnsafeBytesCalldata} from "./libraries/UnsafeBytesCalldata.sol";
 import {ICompressor, OPERATION_BITMASK, LENGTH_BITS_OFFSET, MAX_ENUMERATION_INDEX_SIZE} from "./interfaces/ICompressor.sol";
 
@@ -23,9 +23,10 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
     // state diff data
     mapping(uint256 => bytes[]) initialWrites;
     mapping(uint256 => bytes32[]) initialWritesSlots; 
+    /// @dev state diff:   [32bytes derived key][8bytes enum index][32bytes initial value][32bytes final value]
     mapping(uint256 => mapping(uint64 => bytes)) uncompressedWrites;
-    mapping(uint256 => mapping(uint64 => bool)) slotStatus;
-    mapping(uint256 => uint64[]) accesedSlots;
+    mapping(uint256 => mapping(uint64 => bool)) isKeyTouched;
+    mapping(uint256 => uint64[]) touchedSlots;
     
     // chain data
     mapping(uint256 => bool) chainSet;
@@ -40,26 +41,37 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
     function _sliceToUint256(bytes calldata _calldataSlice) internal pure returns (uint256 number) {
         number = uint256(bytes32(_calldataSlice));
         number >>= (256 - (_calldataSlice.length * 8));
+        
     }
 
-    function addInitialWrite(uint256 chainId, bytes calldata stateDiff, bytes calldata compressedStateDiff) internal{
-        bytes32 derivedKey = stateDiff.readBytes32(52);
-        initialWrites[chainId].push(stateDiff);
+    function addInitialWrite(uint256 chainId, bytes32 derivedKey, uint64 enumIndex, uint256 initialValue, uint256 finalValue) internal{
+        bytes memory slotData = new bytes(STATE_DIFF_AGGREGATION_INFO_SIZE);
+        assembly{
+            mstore(add(slotData,0),derivedKey)
+            mstore(add(slotData,32),enumIndex)
+            mstore(add(slotData,40),initialValue)
+            mstore(add(slotData,72),finalValue)
+        }
+        initialWrites[chainId].push(slotData);
         initialWritesSlots[chainId].push(derivedKey);
     }
-    function addRepeatedWrite(uint256 chainId, bytes calldata stateDiff, bytes calldata compressedStateDiff) internal{
-        uint64 enumIndex = stateDiff.readUint64(84);
-        if (slotStatus[chainId][enumIndex]==false){
-            uncompressedWrites[chainId][enumIndex] = stateDiff;
-            slotStatus[chainId][enumIndex] = true;
-            accesedSlots[chainId].push(enumIndex);
+    function addRepeatedWrite(uint256 chainId, bytes32 derivedKey, uint64 enumIndex, uint256 initialValue, uint256 finalValue) internal{
+        if (isKeyTouched[chainId][enumIndex]==false){
+            bytes memory slotData = new bytes(STATE_DIFF_AGGREGATION_INFO_SIZE);
+            assembly{
+                mstore(add(slotData,0),derivedKey)
+                mstore(add(slotData,32),enumIndex)
+                mstore(add(slotData,40),initialValue)
+                mstore(add(slotData,72),finalValue)
+            }
+            uncompressedWrites[chainId][enumIndex] = slotData;
+            isKeyTouched[chainId][enumIndex] = true;
+            touchedSlots[chainId].push(enumIndex);
         }
         else{
             bytes memory slotData = uncompressedWrites[chainId][enumIndex];
-            bytes32 finalValue = stateDiff.readBytes32(124);
             assembly {
-                let start := add(slotData, 0x20)
-                mstore(add(start,124),finalValue)
+                mstore(add(slotData,72),finalValue)
             }
             uncompressedWrites[chainId][enumIndex] = slotData;
         }
@@ -93,7 +105,7 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             numInitialWritesProcessed++;
 
             bytes32 derivedKey = stateDiff.readBytes32(52);
-            uint256 initValue = stateDiff.readUint256(92);
+            uint256 initialValue = stateDiff.readUint256(92);
             uint256 finalValue = stateDiff.readUint256(124);
 
             uint256 sliceStart = stateDiffPtr;
@@ -105,7 +117,7 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             uint8 len = operation == 0 ? 32 : metadata >> LENGTH_BITS_OFFSET;
         
             stateDiffPtr += len;
-            addInitialWrite(chainId, stateDiff, _compressedStateDiffs[sliceStart:stateDiffPtr]);
+            addInitialWrite(chainId, derivedKey, enumIndex, initialValue, finalValue);
         }
 
         require(numInitialWritesProcessed == numberOfInitialWrites, "Incorrect number of initial storage diffs");
@@ -117,8 +129,9 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             if (enumIndex == 0) {
                 continue;
             }
-            
-            uint256 initValue = stateDiff.readUint256(92);
+
+            bytes32 derivedKey = stateDiff.readBytes32(52);
+            uint256 initialValue = stateDiff.readUint256(92);
             uint256 finalValue = stateDiff.readUint256(124);
             uint256 sliceStart = stateDiffPtr;
             uint256 compressedEnumIndex = _sliceToUint256(
@@ -131,9 +144,9 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             stateDiffPtr += 1;
             uint8 operation = metadata & OPERATION_BITMASK;
             uint8 len = operation == 0 ? 32 : metadata >> LENGTH_BITS_OFFSET;
-        
             stateDiffPtr += len;
-            addRepeatedWrite(chainId, stateDiff, _compressedStateDiffs[sliceStart:stateDiffPtr]);
+
+            addRepeatedWrite(chainId, derivedKey, enumIndex, initialValue, finalValue);
             
         }
 
@@ -226,28 +239,28 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
         uint8 transform = bytesLength(finalValue);
         uint8 add = bytesLength(finalValue-initialValue);
         uint8 sub = bytesLength(initialValue-finalValue);
-        uint8 opt = (transform<add?transform:add);
-        opt = (opt<sub?opt:sub);
-        compressedDiff = new bytes(opt+1);
-        uint8 mask = (opt<<LENGTH_BITS_OFFSET);
+        uint8 optimal = (transform<add?transform:add);
+        optimal = (optimal<sub?optimal:sub);
+        compressedDiff = new bytes(optimal+1);
+        uint8 mask = (optimal<<LENGTH_BITS_OFFSET);
         uint256 value;
-        if (transform==opt){
+        if (transform==optimal){
             mask |= 3;
             value = finalValue;
         }
-        else if (add==opt){
+        else if (add==optimal){
             mask |= 1;
             value = finalValue-initialValue;
         }
-        else if (sub==opt){
+        else if (sub==optimal){
             mask |= 2;
             value = initialValue-finalValue;
         }
         else{
-            require(false, "Optimal operation is not transform, add or sub");
+            require(false, "optimalimal operation is not transform, add or sub");
         }
-        uint8 diffPtr = opt;
-        for(uint8 i = 0;i<opt;i+=1){
+        uint8 diffPtr = optimal;
+        for(uint8 i = 0;i<optimal;i+=1){
             compressedDiff[diffPtr] = bytes1(uint8(value & BYTE_BITMASK));
             diffPtr -= 1;
         }
@@ -256,38 +269,41 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
         for (uint256 i = 0; i < chainList.length; i += 1) {
             uint256 chainId = chainList[i];
             uint256 numberOfInitialWrites = initialWritesSlots[chainId].length;
-            uint256 numberOfRepeatedWrites = accesedSlots[chainId].length;
-            bytes memory stateDiffs = new bytes((numberOfRepeatedWrites+numberOfInitialWrites)*STATE_DIFF_ENTRY_SIZE);
+            uint256 numberOfRepeatedWrites = touchedSlots[chainId].length;
+            bytes memory stateDiffs = new bytes((numberOfRepeatedWrites+numberOfInitialWrites)*STATE_DIFF_AGGREGATION_INFO_SIZE);
             
             uint256 maxEnumIndex = 0;
             // append initial writes
             uint256 initialWritesPtr = 0;
-            for(uint256 i = 0;i<numberOfInitialWrites*STATE_DIFF_ENTRY_SIZE;i+=STATE_DIFF_ENTRY_SIZE){
+            for(uint256 i = 0;i<numberOfInitialWrites*STATE_DIFF_AGGREGATION_INFO_SIZE;i+=STATE_DIFF_AGGREGATION_INFO_SIZE){
                 bytes memory stateDiff = initialWrites[chainId][initialWritesPtr];
                 assembly{
-                    mstore(add(numberOfInitialWrites, i), stateDiff)
+                    mstore(add(stateDiffs, i), stateDiff)
                 }
                 initialWritesPtr += 1;
             }
             // append repeated writes
-            uint256 stateDiffPtr = numberOfInitialWrites*STATE_DIFF_ENTRY_SIZE;
+            uint256 stateDiffPtr = numberOfInitialWrites*STATE_DIFF_AGGREGATION_INFO_SIZE;
             for (uint256 i = 0;i<numberOfRepeatedWrites;i+=1){
-                uint64 enumIndex = accesedSlots[chainId][i];
+                uint64 enumIndex = touchedSlots[chainId][i];
                 bytes memory stateDiff = uncompressedWrites[chainId][enumIndex];
                 assembly{
                     mstore(add(numberOfInitialWrites, stateDiffPtr), stateDiff)
                 }
                 maxEnumIndex = (maxEnumIndex > enumIndex?maxEnumIndex:enumIndex);
-                stateDiffPtr += STATE_DIFF_ENTRY_SIZE;
+                stateDiffPtr += STATE_DIFF_AGGREGATION_INFO_SIZE;
             }
             uint256 enumIndexSize = bytesLength(maxEnumIndex);
-            bytes memory compressedStateDiffs = new bytes((numberOfRepeatedWrites+numberOfInitialWrites)*LOOSE_COMPRESION+numberOfRepeatedWrites*enumIndexSize+numberOfInitialWrites*DERIVED_KEY_SIZE);
+            
+            bytes memory compressedStateDiffs = new bytes(
+                (numberOfRepeatedWrites+numberOfInitialWrites)*LOOSE_COMPRESION // maximal size of metadata + compressed value
+                +numberOfRepeatedWrites*enumIndexSize                           // enumIndexSize for repeated writes
+                +numberOfInitialWrites*DERIVED_KEY_SIZE);                       // derived key for initial writes
             uint256 compressionPtr = 0;
             // compress initial writes
             uint256 compressedStateDiffSize = 0;
-            initialWritesPtr = 0;
-            for(uint256 i = 0;i<numberOfInitialWrites*STATE_DIFF_ENTRY_SIZE;i+=STATE_DIFF_ENTRY_SIZE){
-                bytes memory stateDiff = initialWrites[chainId][initialWritesPtr];
+            for(uint256 i = 0;i<numberOfInitialWrites;i+=1){
+                bytes memory stateDiff = initialWrites[chainId][i];
                 uint256 derivedKey;
                 uint256 initialValue;
                 uint256 finalValue;
@@ -305,11 +321,10 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
                     mstore(add(compressedStateDiffs, compressedStateDiffSize),compressedStateDiff)
                 }
                 compressedStateDiffSize += compressedStateDiff.length;
-                initialWritesPtr += 1;
             }
             // compress repeated writes
             for (uint256 i = 0;i<numberOfRepeatedWrites;i+=1){
-                uint64 enumIndex = accesedSlots[chainId][i];
+                uint64 enumIndex = touchedSlots[chainId][i];
                 bytes memory stateDiff = uncompressedWrites[chainId][enumIndex];
                 uint256 initialValue;
                 uint256 finalValue;
