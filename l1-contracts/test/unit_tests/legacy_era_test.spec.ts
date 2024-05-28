@@ -1,7 +1,8 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
-import { BytesLike, Interface } from "ethers/lib/utils";
+import type { BytesLike } from "ethers/lib/utils";
+import { Interface } from "ethers/lib/utils";
 
 import type { Bridgehub, L1SharedBridge, GettersFacet, MockExecutorFacet } from "../../typechain";
 import {

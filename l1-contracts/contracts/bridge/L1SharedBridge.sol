@@ -247,7 +247,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     function decodeLegacyData(bytes calldata _data, address _prevMsgSender) external returns (bytes32, bytes memory) {
-        require(msg.sender == address(this), "ShB: only bridge");
+        require(msg.sender == address(this));
         (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
             _data,
             (address, uint256, address)
@@ -317,7 +317,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
         (uint256 _depositAmount, ) = abi.decode(_assetData, (uint256, address));
         bytes32 txDataHash = keccak256(abi.encode(assetInfo, abi.encode(_depositAmount, _prevMsgSender)));
-        request = _requestToBridge(_chainId, _prevMsgSender, assetInfo, bridgeMintCalldata, txDataHash);
+        request = _requestToBridge({
+            _chainId: _chainId,
+            _prevMsgSender: _prevMsgSender,
+            _assetInfo: assetInfo,
+            _bridgeMintCalldata: bridgeMintCalldata,
+            _txDataHash: txDataHash
+        });
 
         emit BridgehubDepositInitiated({
             chainId: _chainId,
@@ -745,6 +751,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
                 (_assetInfo, _assetData) = abi.decode(abi.encode(_l1Asset, _amount, _l2Receiver), (bytes32, bytes));
             }
 
+            // solhint-disable-next-line func-named-parameters
             bridgeMintCalldata = abi.encode(_amount, _prevMsgSender, _l2Receiver, _getERC20Getters(_l1Asset), _l1Asset);
         }
 

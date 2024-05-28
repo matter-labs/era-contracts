@@ -7,7 +7,14 @@ interface IL2StandardAsset {
 
     // event BridgeMint(address indexed _account, uint256 _amount);
 
-    // event BridgeBurn(address indexed _account, uint256 _amount);
+    event BridgeBurn(
+        uint256 indexed _chainId,
+        address indexed l2Token,
+        address indexed l2Sender,
+        address _receiver,
+        uint256 _mintValue,
+        uint256 _amount
+    );
 
     function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable;
 
