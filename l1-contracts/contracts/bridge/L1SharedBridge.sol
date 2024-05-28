@@ -196,7 +196,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev Used to set the assedAddress for a given assetInfo.
     function setAssetAddress(bytes32 _additionalData, address _assetAddress) external {
-        // Todo: update? (Least important)
+        require(
+            (msg.sender == address(nativeTokenVault)) || (msg.sender == owner()),
+            "ShB: not owner or native token vault"
+        );
         address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
         bytes32 assetInfo = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData)); /// todo make other asse
         assetAddress[assetInfo] = _assetAddress;
@@ -227,17 +230,22 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev for backwards compatibility and to automatically register l1 assets, and we return the correct info.
     function _getAssetProperties(bytes32 _assetInfo) internal returns (address l1Asset, bytes32 assetInfo) {
-        // Has to be fixed
         l1Asset = assetAddress[_assetInfo];
-        assetInfo = _assetInfo;
         if (l1Asset == address(0) && (uint256(_assetInfo) <= type(uint160).max)) {
             l1Asset = address(nativeTokenVault);
             assetInfo = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetInfo));
             nativeTokenVault.registerToken(address(uint160(uint256(_assetInfo))));
+            assetAddress[_assetInfo] = l1Asset;
+            assetAddress[assetInfo] = l1Asset;
+        } else if (uint256(_assetInfo) <= type(uint160).max) {
+            assetInfo = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetInfo));
+        } else {
+            assetInfo = _assetInfo;
         }
     }
 
     function decodeLegacyData(bytes calldata _data, address _prevMsgSender) external returns (bytes32, bytes memory) {
+        require(msg.sender == address(this), "ShB: only bridge");
         (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
             _data,
             (address, uint256, address)
