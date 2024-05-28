@@ -173,11 +173,15 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
         calldataPtr += 4 + L2_TO_L1_LOG_SERIALIZE_SIZE * numberOfL2ToL1Logs;
 
         /// Check messages
+        uint256 messageSliceStart = calldataPtr;
         uint32 numberOfMessages = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-        messageStorage[chainId].push(
-            _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4 + numberOfMessages * 4]
-        );
-        calldataPtr += 4 + numberOfMessages * 4;
+        calldataPtr += 4;
+        bytes32 reconstructedChainedMessagesHash;
+        for (uint256 i = 0; i < numberOfMessages; ++i) {
+            uint32 currentMessageLength = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
+            calldataPtr += 4 + currentMessageLength;
+        }
+        messageStorage[chainId].push(_totalL2ToL1PubdataAndStateDiffs[messageSliceStart:calldataPtr]);
 
         /// Check bytecodes
         uint32 numberOfBytecodes = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
