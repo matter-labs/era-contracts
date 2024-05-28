@@ -48,15 +48,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         ERA_CHAIN_ID = _eraChainId;
     }
 
-    // /// @inheritdoc IMailbox
-    // function transferEthToSharedBridge() external onlyBaseTokenBridge {
-    //     require(s.chainId == ERA_CHAIN_ID, "Mailbox: transferEthToSharedBridge only available for Era on mailbox");
-
-    //     uint256 amount = address(this).balance;
-    //     address baseTokenBridgeAddress = s.baseTokenBridge;
-    //     IL1SharedBridge(baseTokenBridgeAddress).receiveEth{value: amount}(ERA_CHAIN_ID);
-    // }
-
     /// @notice when requesting transactions through the bridgehub
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
@@ -201,6 +192,218 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         return Math.max(l2GasPrice, minL2GasPriceBaseToken);
     }
 
+    /// @dev On L1 we have to forward to SyncLayer mailbox
+    function requestL2TransactionToSyncLayerMailbox(
+        uint256 _chainId,
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external returns (bytes32 canonicalTxHash) {
+        require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId), "Mailbox SL: not SL");
+        require(
+            IStateTransitionManager(s.stateTransitionManager).getHyperchain(_chainId) == msg.sender,
+            "Mailbox SL: not hyperchain"
+        );
+
+        BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest(
+            _chainId,
+            _transaction,
+            _factoryDeps,
+            _canonicalTxHash,
+            _expirationTimestamp
+        );
+        canonicalTxHash = _requestL2TransactionSender(wrappedRequest);
+    }
+
+    /// @dev On SL the chain's mailbox
+    function bridgehubRequestL2TransactionOnSyncLayer(
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external returns (bytes32 canonicalTxHash) {
+        _writePriorityOp(_transaction, _factoryDeps, canonicalTxHash, _expirationTimestamp);
+    }
+
+    function _wrapRequest(
+        uint256 _chainId,
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint256 _expirationTimestamp
+    ) internal view returns (BridgehubL2TransactionRequest memory) {
+        return
+            BridgehubL2TransactionRequest({
+                sender: s.bridgehub,
+                contractL2: IBridgehub(s.bridgehub).bridgehubCounterParts(s.chainId),
+                mintValue: 0,
+                l2Value: 0,
+                // Very large amount
+                l2GasLimit: 72_000_000,
+                l2Calldata: abi.encodeWithSelector(
+                    // Todo
+                    IBridgehub(s.bridgehub).forwardTransactionOnSyncLayer.selector,
+                    _chainId,
+                    _transaction,
+                    _factoryDeps,
+                    _canonicalTxHash,
+                    _expirationTimestamp
+                ),
+                // TODO: use constant for that
+                l2GasPerPubdataByteLimit: 800,
+                factoryDeps: new bytes[](0),
+                // Tx is free, no so refund recipient needed
+                refundRecipient: address(0)
+            });
+    }
+
+    function _requestL2TransactionSender(
+        BridgehubL2TransactionRequest memory _request
+    ) internal nonReentrant returns (bytes32 canonicalTxHash) {
+        // Check that the transaction is allowed by the filterer (if the filterer is set).
+        if (s.transactionFilterer != address(0)) {
+            require(
+                ITransactionFilterer(s.transactionFilterer).isTransactionAllowed({
+                    sender: _request.sender,
+                    contractL2: _request.contractL2,
+                    mintValue: _request.mintValue,
+                    l2Value: _request.l2Value,
+                    l2Calldata: _request.l2Calldata,
+                    refundRecipient: _request.refundRecipient
+                }),
+                "tf"
+            );
+        }
+
+        // Enforcing that `_request.l2GasPerPubdataByteLimit` equals to a certain constant number. This is needed
+        // to ensure that users do not get used to using "exotic" numbers for _request.l2GasPerPubdataByteLimit, e.g. 1-2, etc.
+        // VERY IMPORTANT: nobody should rely on this constant to be fixed and every contract should give their users the ability to provide the
+        // ability to provide `_request.l2GasPerPubdataByteLimit` for each independent transaction.
+        // CHANGING THIS CONSTANT SHOULD BE A CLIENT-SIDE CHANGE.
+        require(_request.l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");
+
+        WritePriorityOpParams memory params;
+        params.request = _request;
+
+        canonicalTxHash = _requestL2Transaction(params);
+    }
+
+    function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
+        BridgehubL2TransactionRequest memory request = _params.request;
+
+        require(request.factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
+        _params.txId = s.priorityQueue.getTotalPriorityTxs();
+
+        // Checking that the user provided enough ether to pay for the transaction.
+        _params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, request.l2GasPerPubdataByteLimit);
+        uint256 baseCost = _params.l2GasPrice * request.l2GasLimit;
+        require(request.mintValue >= baseCost + request.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
+
+        request.refundRecipient = AddressAliasHelper.actualRefundRecipient(request.refundRecipient, request.sender);
+        // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
+        // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
+        // slither-disable-next-line tx-origin
+        if (request.sender != tx.origin) {
+            request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
+        }
+
+        // populate missing fields
+        _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
+
+        L2CanonicalTransaction memory transaction;
+        (transaction, canonicalTxHash) = _validateTx(_params);
+
+        _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
+        if (s.syncLayer != address(0)) {
+            canonicalTxHash = IMailbox(s.syncLayer).requestL2TransactionToSyncLayerMailbox(
+                s.chainId,
+                transaction,
+                _params.request.factoryDeps,
+                canonicalTxHash,
+                _params.expirationTimestamp
+            );
+            return canonicalTxHash;
+        }
+    }
+
+    function _serializeL2Transaction(
+        WritePriorityOpParams memory _priorityOpParams
+    ) internal pure returns (L2CanonicalTransaction memory transaction) {
+        BridgehubL2TransactionRequest memory request = _priorityOpParams.request;
+        transaction = L2CanonicalTransaction({
+            txType: PRIORITY_OPERATION_L2_TX_TYPE,
+            from: uint256(uint160(request.sender)),
+            to: uint256(uint160(request.contractL2)),
+            gasLimit: request.l2GasLimit,
+            gasPerPubdataByteLimit: request.l2GasPerPubdataByteLimit,
+            maxFeePerGas: uint256(_priorityOpParams.l2GasPrice),
+            maxPriorityFeePerGas: uint256(0),
+            paymaster: uint256(0),
+            // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
+            nonce: uint256(_priorityOpParams.txId),
+            value: request.l2Value,
+            reserved: [request.mintValue, uint256(uint160(request.refundRecipient)), 0, 0],
+            data: request.l2Calldata,
+            signature: new bytes(0),
+            factoryDeps: _hashFactoryDeps(request.factoryDeps),
+            paymasterInput: new bytes(0),
+            reservedDynamic: new bytes(0)
+        });
+    }
+
+    function _validateTx(
+        WritePriorityOpParams memory _priorityOpParams
+    ) internal returns (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) {
+        transaction = _serializeL2Transaction(_priorityOpParams);
+        bytes memory transactionEncoding = abi.encode(transaction);
+        TransactionValidator.validateL1ToL2Transaction(
+            transaction,
+            transactionEncoding,
+            s.priorityTxMaxGasLimit,
+            s.feeParams.priorityTxMaxPubdata
+        );
+        canonicalTxHash = keccak256(transactionEncoding);
+    }
+
+    /// @notice Stores a transaction record in storage & send event about that
+    function _writePriorityOp(
+        L2CanonicalTransaction memory _transaction,
+        bytes[] memory _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) internal {
+        s.priorityQueue.pushBack(
+            PriorityOperation({
+                canonicalTxHash: _canonicalTxHash,
+                // FIXME: safe downcast
+                expirationTimestamp: _expirationTimestamp,
+                layer2Tip: uint192(0) // TODO: Restore after fee modeling will be stable. (SMA-1230)
+            })
+        );
+
+        // Data that is needed for the operator to simulate priority queue offchain
+        // solhint-disable-next-line func-named-parameters
+        emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, _expirationTimestamp, _transaction, _factoryDeps);
+    }
+
+    /// @notice Hashes the L2 bytecodes and returns them in the format in which they are processed by the bootloader
+    function _hashFactoryDeps(bytes[] memory _factoryDeps) internal pure returns (uint256[] memory hashedFactoryDeps) {
+        uint256 factoryDepsLen = _factoryDeps.length;
+        hashedFactoryDeps = new uint256[](factoryDepsLen);
+        for (uint256 i = 0; i < factoryDepsLen; i = i.uncheckedInc()) {
+            bytes32 hashedBytecode = L2ContractHelper.hashL2Bytecode(_factoryDeps[i]);
+
+            // Store the resulting hash sequentially in bytes.
+            assembly {
+                mstore(add(hashedFactoryDeps, mul(add(i, 1), 32)), hashedBytecode)
+            }
+        }
+    }
+
+    ///////////////////////////////////////////////////////
+    //////// Legacy Era functions
+
     /// @inheritdoc IMailbox
     function finalizeEthWithdrawal(
         uint256 _l2BatchNumber,
@@ -250,271 +453,5 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             msg.sender,
             0
         );
-    }
-
-    /// @dev On L1 we have to forward SyncLayer mailbox
-    function requestL2TransactionToSyncLayer(
-        uint256 _chainId,
-        BridgehubL2TransactionRequest calldata _request
-    ) external returns (bytes32 canonicalTxHash) {
-        require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId), "Mailbox SL: not SL");
-        require(
-            IStateTransitionManager(s.stateTransitionManager).getHyperchain(_chainId) == msg.sender,
-            "Mailbox SL: not hyperchain"
-        );
-
-        BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest(_chainId, _request);
-        canonicalTxHash = _requestL2TransactionSender(wrappedRequest);
-    }
-
-    function _wrapRequest(
-        uint256 _chainId,
-        BridgehubL2TransactionRequest calldata _request
-    ) internal view returns (BridgehubL2TransactionRequest memory) {
-        return
-            BridgehubL2TransactionRequest({
-                sender: address(this),
-                contractL2: IBridgehub(s.stateTransitionManager).bridgehubCounterParts(s.chainId),
-                mintValue: 0,
-                l2Value: 0,
-                l2GasLimit: 0,
-                l2Calldata: abi.encodeWithSelector(
-                    // Todo
-                    IBridgehub(s.bridgehub).forwardTransactionSyncLayer.selector,
-                    _chainId,
-                    _request
-                ),
-                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                factoryDeps: _request.factoryDeps,
-                refundRecipient: _request.refundRecipient
-            });
-    }
-    // Receiving as a SL-based chain
-    function freeAcceptTx(
-        L2CanonicalTransaction memory _transaction,
-        bytes[] memory _factoryDeps,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external {
-        // TODO: adequate access rights
-
-        _writePriorityOp(_transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp);
-    }
-
-    function acceptFreeRequestFromBridgehub(BridgehubL2TransactionRequest calldata _request) external {
-        WritePriorityOpParams memory params = WritePriorityOpParams({
-            request: _request,
-            txId: s.priorityQueue.getTotalPriorityTxs(),
-            l2GasPrice: 0,
-            expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
-        });
-
-        (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) = _validateTx(params);
-        _writePriorityOp(transaction, params.request.factoryDeps, canonicalTxHash, params.expirationTimestamp);
-    }
-
-    // // TODO: only allow for sync layer
-    // function relayTxSL(
-    //     address _to,
-    //     L2CanonicalTransaction memory _transaction,
-    //     bytes[] memory _factoryDeps,
-    //     bytes32 _canonicalTxHash,
-    //     uint64 _expirationTimestamp
-    // ) external {
-    //     bytes memory data = abi.encodeCall(
-    //         this.freeAcceptTx,
-    //         (_transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp)
-    //     );
-
-    //     BridgehubL2TransactionRequest memory request = BridgehubL2TransactionRequest({
-    //         // This is a temporary branch, sender does not matte
-    //         sender: msg.sender,
-    //         contractL2: _to,
-    //         mintValue: 0,
-    //         l2Value: 0,
-    //         l2Calldata: data,
-    //         // Very large amount
-    //         l2GasLimit: 72_000_000,
-    //         // TODO: use constant for that
-    //         l2GasPerPubdataByteLimit: 800,
-    //         factoryDeps: new bytes[](0),
-    //         // Tx is free, no so refund recipient needed
-    //         refundRecipient: address(0)
-    //     });
-
-    //     WritePriorityOpParams memory params = WritePriorityOpParams({
-    //         request: request,
-    //         txId: s.priorityQueue.getTotalPriorityTxs(),
-    //         l2GasPrice: 0,
-    //         expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
-    //     });
-
-    //     (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) = _validateTx(params);
-    //     _writePriorityOp(
-    //         transaction,
-    //         params.request.factoryDeps,
-    //         canonicalTxHash,
-    //         params.expirationTimestamp
-    //     );
-    // }
-
-    function _requestL2TransactionSender(
-        BridgehubL2TransactionRequest memory _request
-    ) internal nonReentrant returns (bytes32 canonicalTxHash) {
-        // Check that the transaction is allowed by the filterer (if the filterer is set).
-        if (s.transactionFilterer != address(0)) {
-            require(
-                ITransactionFilterer(s.transactionFilterer).isTransactionAllowed({
-                    sender: _request.sender,
-                    contractL2: _request.contractL2,
-                    mintValue: _request.mintValue,
-                    l2Value: _request.l2Value,
-                    l2Calldata: _request.l2Calldata,
-                    refundRecipient: _request.refundRecipient
-                }),
-                "tf"
-            );
-        }
-
-        if (s.syncLayer != address(0)) {
-            canonicalTxHash = IMailbox(s.syncLayer).requestL2TransactionToSyncLayer(s.chainId, _request);
-            return canonicalTxHash;
-        }
-        // Enforcing that `_request.l2GasPerPubdataByteLimit` equals to a certain constant number. This is needed
-        // to ensure that users do not get used to using "exotic" numbers for _request.l2GasPerPubdataByteLimit, e.g. 1-2, etc.
-        // VERY IMPORTANT: nobody should rely on this constant to be fixed and every contract should give their users the ability to provide the
-        // ability to provide `_request.l2GasPerPubdataByteLimit` for each independent transaction.
-        // CHANGING THIS CONSTANT SHOULD BE A CLIENT-SIDE CHANGE.
-        require(_request.l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");
-
-        WritePriorityOpParams memory params;
-        params.request = _request;
-
-        canonicalTxHash = _requestL2Transaction(params);
-    }
-
-    function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
-        BridgehubL2TransactionRequest memory request = _params.request;
-
-        require(request.factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
-        _params.txId = s.priorityQueue.getTotalPriorityTxs();
-
-        // Checking that the user provided enough ether to pay for the transaction.
-        _params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, request.l2GasPerPubdataByteLimit);
-        uint256 baseCost = _params.l2GasPrice * request.l2GasLimit;
-        require(request.mintValue >= baseCost + request.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
-
-        request.refundRecipient = AddressAliasHelper.actualRefundRecipient(request.refundRecipient, request.sender);
-        // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
-        // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
-        // slither-disable-next-line tx-origin
-        if (request.sender != tx.origin) {
-            request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
-        }
-
-        // populate missing fields
-        _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
-
-        L2CanonicalTransaction memory transaction;
-        (transaction, canonicalTxHash) = _validateTx(_params);
-
-        // if (s.syncLayerState == SyncLayerState.ActiveOnL1) {
-        //     _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
-        // } else if (s.syncLayerState == SyncLayerState.MigratedFromL1) {
-        //     // We also write it anyway
-        //     _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
-
-        //     _relayPriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
-        // } else {
-        //     revert("Can not be called on SL");
-        // }
-    }
-
-    function _serializeL2Transaction(
-        WritePriorityOpParams memory _priorityOpParams
-    ) internal pure returns (L2CanonicalTransaction memory transaction) {
-        BridgehubL2TransactionRequest memory request = _priorityOpParams.request;
-        transaction = L2CanonicalTransaction({
-            txType: PRIORITY_OPERATION_L2_TX_TYPE,
-            from: uint256(uint160(request.sender)),
-            to: uint256(uint160(request.contractL2)),
-            gasLimit: request.l2GasLimit,
-            gasPerPubdataByteLimit: request.l2GasPerPubdataByteLimit,
-            maxFeePerGas: uint256(_priorityOpParams.l2GasPrice),
-            maxPriorityFeePerGas: uint256(0),
-            paymaster: uint256(0),
-            // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
-            nonce: uint256(_priorityOpParams.txId),
-            value: request.l2Value,
-            reserved: [request.mintValue, uint256(uint160(request.refundRecipient)), 0, 0],
-            data: request.l2Calldata,
-            signature: new bytes(0),
-            factoryDeps: _hashFactoryDeps(request.factoryDeps),
-            paymasterInput: new bytes(0),
-            reservedDynamic: new bytes(0)
-        });
-    }
-
-    function _validateTx(
-        WritePriorityOpParams memory _priorityOpParams
-    ) internal returns (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) {
-        transaction = _serializeL2Transaction(_priorityOpParams);
-        bytes memory transactionEncoding = abi.encode(transaction);
-        TransactionValidator.validateL1ToL2Transaction(
-            transaction,
-            transactionEncoding,
-            s.priorityTxMaxGasLimit,
-            s.feeParams.priorityTxMaxPubdata
-        );
-        canonicalTxHash = keccak256(transactionEncoding);
-    }
-
-    function _relayPriorityOp(
-        L2CanonicalTransaction memory _transaction,
-        bytes[] memory _factoryDeps,
-        bytes32 _canonicalTxHash,
-        uint256 _expirationTimestamp
-    ) internal {
-        bytes memory dataToRelay = abi.encodeCall(
-            this.freeAcceptTx,
-            (_transaction, _factoryDeps, _canonicalTxHash, uint64(_expirationTimestamp))
-        );
-
-        // IBridgehub(s.bridgehub).relayTxThroughBH(s.syncLayerChainId, s.chainId, dataToRelay);
-    }
-
-    /// @notice Stores a transaction record in storage & send event about that
-    function _writePriorityOp(
-        L2CanonicalTransaction memory _transaction,
-        bytes[] memory _factoryDeps,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) internal {
-        s.priorityQueue.pushBack(
-            PriorityOperation({
-                canonicalTxHash: _canonicalTxHash,
-                // FIXME: safe downcast
-                expirationTimestamp: _expirationTimestamp,
-                layer2Tip: uint192(0) // TODO: Restore after fee modeling will be stable. (SMA-1230)
-            })
-        );
-
-        // Data that is needed for the operator to simulate priority queue offchain
-        // solhint-disable-next-line func-named-parameters
-        emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, _expirationTimestamp, _transaction, _factoryDeps);
-    }
-
-    /// @notice Hashes the L2 bytecodes and returns them in the format in which they are processed by the bootloader
-    function _hashFactoryDeps(bytes[] memory _factoryDeps) internal pure returns (uint256[] memory hashedFactoryDeps) {
-        uint256 factoryDepsLen = _factoryDeps.length;
-        hashedFactoryDeps = new uint256[](factoryDepsLen);
-        for (uint256 i = 0; i < factoryDepsLen; i = i.uncheckedInc()) {
-            bytes32 hashedBytecode = L2ContractHelper.hashL2Bytecode(_factoryDeps[i]);
-
-            // Store the resulting hash sequentially in bytes.
-            assembly {
-                mstore(add(hashedFactoryDeps, mul(add(i, 1), 32)), hashedBytecode)
-            }
-        }
     }
 }

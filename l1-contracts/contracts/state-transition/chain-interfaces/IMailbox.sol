@@ -99,9 +99,19 @@ interface IMailbox is IZkSyncHyperchainBase {
         BridgehubL2TransactionRequest calldata _request
     ) external returns (bytes32 canonicalTxHash);
 
-    function requestL2TransactionToSyncLayer(
+    function bridgehubRequestL2TransactionOnSyncLayer(
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external returns (bytes32 canonicalTxHash);
+
+    function requestL2TransactionToSyncLayerMailbox(
         uint256 _chainId,
-        BridgehubL2TransactionRequest calldata _request
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
     ) external returns (bytes32 canonicalTxHash);
 
     /// @notice Estimates the cost in Ether of requesting execution of an L2 transaction from L1

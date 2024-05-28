@@ -82,11 +82,6 @@ describe("Synclayer", function () {
     await syncLayerDeployer.registerSyncLayer();
   });
 
-  it("Check start move chain to synclayer", async () => {
-    const gasPrice = await owner.provider.getGasPrice();
-    await deployer.moveChainToSyncLayer(syncLayerDeployer.chainId.toString(), gasPrice, false);
-  });
-
   it("Check l2 registration", async () => {
     const stm = deployer.stateTransitionManagerContract(deployer.deployWallet);
     const gasPrice = await deployer.deployWallet.provider.getGasPrice();
@@ -141,6 +136,12 @@ describe("Synclayer", function () {
     // console.log("STM asset registered in L2 Bridgehub on SL");
   });
 
+  it("Check start move chain to synclayer", async () => {
+    const gasPrice = await owner.provider.getGasPrice();
+    await deployer.moveChainToSyncLayer(syncLayerDeployer.chainId.toString(), gasPrice, false);
+    expect(await bridgehub.settlementLayer(deployer.chainId)).to.equal(syncLayerDeployer.chainId);
+  });
+
   it("Check finish move chain to l1", async () => {
     const syncLayerChainId = syncLayerDeployer.chainId;
     const mintChainId = 11;
@@ -183,4 +184,27 @@ describe("Synclayer", function () {
     await bridgehub.bridgeMint(syncLayerChainId, assetInfo, bridgehubMintData);
     expect(await stateTransition.getHyperchain(mintChainId)).to.not.equal(ethers.constants.AddressZero);
   });
+
+  it("Check start message to L3 on L1", async () => {
+    const amount = ethers.utils.parseEther("2");
+    await bridgehub.requestL2TransactionDirect(
+      {
+        chainId: 9,
+        mintValue: amount,
+        l2Contract: ethers.constants.AddressZero,
+        l2Value: 0,
+        l2Calldata: "0x",
+        l2GasLimit: priorityTxMaxGasLimit,
+        l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+        factoryDeps: [],
+        refundRecipient: ethers.constants.AddressZero,
+      },
+      { value: amount }
+    );
+  });
+
+  // it("Check forward message to L3 on SL", async() => {
+  //   const amount = ethers.utils.parseEther("1");
+  //   bridgehub.forwardTransactionSyncLayer({})
+  // });
 });

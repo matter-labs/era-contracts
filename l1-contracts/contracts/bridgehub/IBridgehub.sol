@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
-import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {BridgehubL2TransactionRequest,L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {HyperchainCommitment} from "../common/Config.sol";
 import {IL1StandardAsset} from "../bridge/interfaces/IL1StandardAsset.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
@@ -124,7 +124,7 @@ interface IBridgehub is IL1StandardAsset {
 
     /// FIXME: this method should not be present in the production code.
     /// just used in code to register chain successfully until full migration is complete.
-    function unsafeRegisterChain(uint256 _chainId, address _stateTransitionManager, address _baseToken) external;
+    // function unsafeRegisterChain(uint256 _chainId, address _stateTransitionManager, address _baseToken) external;
 
     //// Registry
 
@@ -169,7 +169,13 @@ interface IBridgehub is IL1StandardAsset {
     //     bytes calldata _diamondCut
     // ) external;
 
-    function forwardTransactionSyncLayer(uint256 _chainId, BridgehubL2TransactionRequest calldata _request) external;
+    function forwardTransactionOnSyncLayer(
+        uint256 _chainId,
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external;
 
     function stmAssetInfoFromChainId(uint256 _chainId) external view returns (bytes32);
 

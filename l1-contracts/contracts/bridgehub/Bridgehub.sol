@@ -13,7 +13,7 @@ import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, HyperchainCommitment} from "../common/Config.sol";
-import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
 import {IL1NativeTokenVault} from "../bridge/interfaces/IL1NativeTokenVault.sol";
@@ -80,6 +80,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
+    //// Initialization and registration
+
     /// @inheritdoc IBridgehub
     /// @dev Please note, if the owner wants to enforce the admin change it must execute both `setPendingAdmin` and
     /// `acceptAdmin` atomically. Otherwise `admin` can set different pending admin and so fail to accept the admin rights.
@@ -110,6 +112,40 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         sharedBridge = IL1SharedBridge(_sharedBridge);
     }
 
+    /// @notice State Transition can be any contract with the appropriate interface/functionality
+    function addStateTransitionManager(address _stateTransitionManager) external onlyOwner {
+        require(!stateTransitionManagerIsRegistered[_stateTransitionManager], "BH: stm already registered");
+        stateTransitionManagerIsRegistered[_stateTransitionManager] = true;
+    }
+
+    /// @notice State Transition can be any contract with the appropriate interface/functionality
+    /// @notice this stops new Chains from using the STF, old chains are not affected
+    function removeStateTransitionManager(address _stateTransitionManager) external onlyOwner {
+        require(stateTransitionManagerIsRegistered[_stateTransitionManager], "BH: stm not registered yet");
+        stateTransitionManagerIsRegistered[_stateTransitionManager] = false;
+    }
+
+    /// @notice token can be any contract with the appropriate interface/functionality
+    function addToken(address _token) external onlyOwner {
+        require(!tokenIsRegistered[_token], "BH: token already registered");
+        tokenIsRegistered[_token] = true;
+    }
+
+    function registerCounterpart(uint256 _chainId, address _counterPart) external onlyOwner {
+        require(_counterPart != address(0), "BH: counter part zero");
+
+        bridgehubCounterParts[_chainId] = _counterPart;
+    }
+
+    function registerSyncLayer(
+        uint256 _newSyncLayerChainId,
+        bool _isWhitelisted
+    ) external onlyChainSTM(_newSyncLayerChainId) {
+        whitelistedSettlementLayers[_newSyncLayerChainId] = _isWhitelisted;
+
+        // TODO: emit event
+    }
+
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
     function setSTMDeployer(ISTMDeploymentTracker _stmDeployer) external onlyOwner {
@@ -131,42 +167,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return IStateTransitionManager(stateTransitionManager[_chainId]).getHyperchain(_chainId);
     }
 
-    //// Registry
-
-    /// @notice State Transition can be any contract with the appropriate interface/functionality
-    function addStateTransitionManager(address _stateTransitionManager) external onlyOwner {
-        require(!stateTransitionManagerIsRegistered[_stateTransitionManager], "BH: stm already registered");
-        stateTransitionManagerIsRegistered[_stateTransitionManager] = true;
+    function stmAssetInfoFromChainId(uint256 _chainId) public view override returns (bytes32) {
+        return stmAssetInfo(stateTransitionManager[_chainId]);
     }
 
-    /// @notice State Transition can be any contract with the appropriate interface/functionality
-    /// @notice this stops new Chains from using the STF, old chains are not affected
-    function removeStateTransitionManager(address _stateTransitionManager) external onlyOwner {
-        require(stateTransitionManagerIsRegistered[_stateTransitionManager], "BH: stm not registered yet");
-        stateTransitionManagerIsRegistered[_stateTransitionManager] = false;
-    }
-
-    /// @notice token can be any contract with the appropriate interface/functionality
-    function addToken(address _token) external onlyOwner {
-        require(!tokenIsRegistered[_token], "BH: token already registered");
-        tokenIsRegistered[_token] = true;
-    }
-
-    /// FIXME: this method should not be present in the production code.
-    /// just used in code to register chain successfully until full migration is complete.
-    function unsafeRegisterChain(uint256 _chainId, address _stateTransitionManager, address _baseToken) external {
-        require(_chainId != 0, "Bridgehub: chainId cannot be 0");
-        require(_chainId <= type(uint48).max, "Bridgehub: chainId too large");
-
-        require(
-            stateTransitionManagerIsRegistered[_stateTransitionManager],
-            "Bridgehub: state transition not registered"
-        );
-
-        require(stateTransitionManager[_chainId] == address(0), "Bridgehub: chainId already registered");
-
-        stateTransitionManager[_chainId] = _stateTransitionManager;
-        baseToken[_chainId] = _baseToken;
+    function stmAssetInfo(address _stmAddress) public view override returns (bytes32) {
+        return keccak256(abi.encode(L1_CHAIN_ID, address(stmDeployer), bytes32(uint256(uint160(_stmAddress)))));
     }
 
     /// FIXME: this method should not be present in the prod code.
@@ -174,6 +180,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     //     trustedCounterparts[chainid] = _counterpart;
     //     isTrustedCounterpart[_counterpart] = true;
     // }
+
+    /// New chain
 
     /// @notice register new chain
     /// @notice for Eth the baseToken address is 1
@@ -211,40 +219,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         emit NewChain(_chainId, _stateTransitionManager, _admin);
         return _chainId;
     }
-
-    /// FIXME: this is a temporary method anyway
-    // function callTxOnChain(uint256 _chainId, bytes calldata _data) external {
-    //     address chainAddress = getHyperchain(_chainId);
-
-    //     (bool success, bytes memory returndata) = address(chainAddress).call(_data);
-
-    //     require(success, "Bridgehub: call failed");
-    // }
-
-    // function relayTxThroughBH(uint256 _baseDestChainId, uint256 _destChainId, bytes calldata _dataToRelay) external {
-    //     address counterpartAddr = trustedCounterparts[_baseDestChainId];
-    //     address slAddress = getHyperchain(_baseDestChainId);
-
-    //     bytes memory callData = abi.encodeCall(this.callTxOnChain, (_destChainId, _dataToRelay));
-
-    //     BridgehubL2TransactionRequest memory request = BridgehubL2TransactionRequest({
-    //         // This is a temporary branch, sender does not matte
-    //         sender: address(this),
-    //         contractL2: counterpartAddr,
-    //         mintValue: 0,
-    //         l2Value: 0,
-    //         l2Calldata: callData,
-    //         // Very large amount
-    //         l2GasLimit: 72_000_000,
-    //         // TODO: use constant for that
-    //         l2GasPerPubdataByteLimit: 800,
-    //         factoryDeps: new bytes[](0),
-    //         // Tx is free, no so refund recipient needed
-    //         refundRecipient: address(0)
-    //     });
-
-    //     IZkSyncHyperchain(slAddress).acceptFreeRequestFromBridgehub(request);
-    // }
 
     //// Mailbox forwarder
 
@@ -418,29 +392,19 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         );
     }
 
-    function forwardTransactionSyncLayer(
+    function forwardTransactionOnSyncLayer(
         uint256 _chainId,
-        BridgehubL2TransactionRequest calldata _request
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
     ) external override {
-        require(L1_CHAIN_ID == block.chainid, "BH: not in sync layer mode");
+        require(L1_CHAIN_ID != block.chainid, "BH: not in sync layer mode");
         address hyperchain = getHyperchain(_chainId);
-        bytes32 canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(_request);
+        bytes32 canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2TransactionOnSyncLayer(_transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp);
     }
 
-    function registerCounterpart(uint256 _chainId, address _counterPart) external onlyOwner {
-        require(_counterPart != address(0), "BH: counter part zero");
-
-        bridgehubCounterParts[_chainId] = _counterPart;
-    }
-
-    function registerSyncLayer(
-        uint256 _newSyncLayerChainId,
-        bool _isWhitelisted
-    ) external onlyChainSTM(_newSyncLayerChainId) {
-        whitelistedSettlementLayers[_newSyncLayerChainId] = _isWhitelisted;
-
-        // TODO: emit event
-    }
+    /// Chain migration
 
     /// @dev we can move assets using these
     function bridgeBurn(
@@ -495,14 +459,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address _prevMsgSender,
         bytes calldata _data
     ) external payable override {}
-
-    function stmAssetInfoFromChainId(uint256 _chainId) public view override returns (bytes32) {
-        return stmAssetInfo(stateTransitionManager[_chainId]);
-    }
-
-    function stmAssetInfo(address _stmAddress) public view override returns (bytes32) {
-        return keccak256(abi.encode(L1_CHAIN_ID, address(stmDeployer), bytes32(uint256(uint160(_stmAddress)))));
-    }
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE
