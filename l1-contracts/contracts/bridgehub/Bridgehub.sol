@@ -425,7 +425,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _chainId,
             _stmData
         );
-        bytes memory chainMintData = IZkSyncHyperchain(getHyperchain(_chainId)).bridgeBurn(_prevMsgSender, _chainData);
+        bytes memory chainMintData = IZkSyncHyperchain(getHyperchain(_chainId)).bridgeBurn(getHyperchain(_settlementChainId), _prevMsgSender, _chainData);
         bridgehubMintData = abi.encode(_chainId, stmMintData, chainMintData);
         // TODO: double check that get only returns when chain id is there.
     }

@@ -229,11 +229,12 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
     /// @dev we can move assets using these
     function bridgeBurn(
+        address _syncLayer,
         address _prevMsgSender,
         bytes calldata
     ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
         // (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
-
+        require(s.syncLayer == address(0), "Af: already migrated");
         require(_prevMsgSender == s.admin, "Af: not chainAdmin");
         IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
 
@@ -244,6 +245,8 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
         // FIXME: this will be removed once we support the migration of the priority queue also.
         require(s.priorityQueue.getSize() == 0, "Migration is only allowed with empty priority queue");
+
+        s.syncLayer = _syncLayer;
         chainBridgeMintData = abi.encode(_prepareChainCommitment());
     }
 
@@ -309,7 +312,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         uint256 pqLength = s.priorityQueue.tail - pqHead;
         // FIXME: this will be removed once we support the migration of any priority queue size.
-        require(pqLength <= 50, "Migration is only allowed with empty priority queue");
+        require(pqLength <= 50, "Migration is only allowed with empty priority queue 2");
 
         PriorityOperation[] memory priorityQueueTxs = new PriorityOperation[](pqLength);
 

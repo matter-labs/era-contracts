@@ -213,7 +213,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             _canonicalTxHash,
             _expirationTimestamp
         );
-        canonicalTxHash = _requestL2TransactionSender(wrappedRequest);
+        canonicalTxHash = _requestL2TransactionToSyncLayerFree(wrappedRequest);
     }
 
     /// @dev On SL the chain's mailbox
@@ -325,6 +325,21 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             );
             return canonicalTxHash;
         }
+    }
+
+    function _requestL2TransactionToSyncLayerFree(
+            BridgehubL2TransactionRequest memory _request
+    ) internal nonReentrant returns (bytes32 canonicalTxHash) {
+        WritePriorityOpParams memory params = WritePriorityOpParams({
+            request: _request,
+            txId: s.priorityQueue.getTotalPriorityTxs(),
+            l2GasPrice: 0,
+            expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
+        });
+
+        L2CanonicalTransaction memory transaction;
+        (transaction, canonicalTxHash) = _validateTx(params);
+        _writePriorityOp(transaction, params.request.factoryDeps, canonicalTxHash, params.expirationTimestamp);
     }
 
     function _serializeL2Transaction(

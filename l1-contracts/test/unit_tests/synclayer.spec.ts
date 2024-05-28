@@ -27,12 +27,13 @@ describe("Synclayer", function () {
   let bridgehub: Bridgehub;
   let stateTransition: StateTransitionManager;
   let owner: ethers.Signer;
-  let deployer: Deployer;
+  let migratingDeployer: Deployer;
   let syncLayerDeployer: Deployer;
   // const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
   // const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
   // let forwarder: Forwarder;
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
+  let mintChainId = 11;
 
   before(async () => {
     [owner] = await hardhat.ethers.getSigners();
@@ -53,13 +54,13 @@ describe("Synclayer", function () {
 
     await owner.sendTransaction(tx);
 
-    deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, []);
+    migratingDeployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, []);
 
-    chainId = deployer.chainId;
+    chainId = migratingDeployer.chainId;
 
-    bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
+    bridgehub = BridgehubFactory.connect(migratingDeployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
     stateTransition = StateTransitionManagerFactory.connect(
-      deployer.addresses.StateTransition.StateTransitionProxy,
+      migratingDeployer.addresses.StateTransition.StateTransitionProxy,
       deployWallet
     );
 
@@ -75,24 +76,30 @@ describe("Synclayer", function () {
     );
 
     // For tests, the chainId is 9
-    deployer.chainId = 9;
+    migratingDeployer.chainId = 9;
   });
 
   it("Check register synclayer", async () => {
     await syncLayerDeployer.registerSyncLayer();
   });
 
+  it("Check start move chain to synclayer", async () => {
+    const gasPrice = await owner.provider.getGasPrice();
+    await migratingDeployer.moveChainToSyncLayer(syncLayerDeployer.chainId.toString(), gasPrice, false);
+    expect(await bridgehub.settlementLayer(migratingDeployer.chainId)).to.equal(syncLayerDeployer.chainId);
+  });
+
   it("Check l2 registration", async () => {
-    const stm = deployer.stateTransitionManagerContract(deployer.deployWallet);
-    const gasPrice = await deployer.deployWallet.provider.getGasPrice();
+    const stm = migratingDeployer.stateTransitionManagerContract(migratingDeployer.deployWallet);
+    const gasPrice = await migratingDeployer.deployWallet.provider.getGasPrice();
     const value = (
       await bridgehub.l2TransactionBaseCost(chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
-    ).mul(5);
+    ).mul(10);
     const baseTokenAddress = await bridgehub.baseToken(chainId);
-    const ethIsBaseToken = baseTokenAddress == ADDRESS_ONE;
+    // const ethIsBaseToken = baseTokenAddress == ADDRESS_ONE;
 
-    const stmDeploymentTracker = deployer.stmDeploymentTracker(deployer.deployWallet);
-    await deployer.executeUpgrade(
+    const stmDeploymentTracker = migratingDeployer.stmDeploymentTracker(migratingDeployer.deployWallet);
+    await migratingDeployer.executeUpgrade(
       bridgehub.address,
       value,
       bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
@@ -102,7 +109,7 @@ describe("Synclayer", function () {
           l2Value: 0,
           l2GasLimit: priorityTxMaxGasLimit,
           l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-          refundRecipient: deployer.deployWallet.address,
+          refundRecipient: migratingDeployer.deployWallet.address,
           secondBridgeAddress: stmDeploymentTracker.address,
           secondBridgeValue: 0,
           secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
@@ -113,7 +120,7 @@ describe("Synclayer", function () {
       ])
     );
     // console.log("STM asset registered in L2SharedBridge on SL");
-    await deployer.executeUpgrade(
+    await migratingDeployer.executeUpgrade(
       bridgehub.address,
       value,
       bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
@@ -123,7 +130,7 @@ describe("Synclayer", function () {
           l2Value: 0,
           l2GasLimit: priorityTxMaxGasLimit,
           l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-          refundRecipient: deployer.deployWallet.address,
+          refundRecipient: migratingDeployer.deployWallet.address,
           secondBridgeAddress: stmDeploymentTracker.address,
           secondBridgeValue: 0,
           secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
@@ -136,22 +143,15 @@ describe("Synclayer", function () {
     // console.log("STM asset registered in L2 Bridgehub on SL");
   });
 
-  it("Check start move chain to synclayer", async () => {
-    const gasPrice = await owner.provider.getGasPrice();
-    await deployer.moveChainToSyncLayer(syncLayerDeployer.chainId.toString(), gasPrice, false);
-    expect(await bridgehub.settlementLayer(deployer.chainId)).to.equal(syncLayerDeployer.chainId);
-  });
-
   it("Check finish move chain to l1", async () => {
     const syncLayerChainId = syncLayerDeployer.chainId;
-    const mintChainId = 11;
-    const assetInfo = await bridgehub.stmAssetInfo(deployer.addresses.StateTransition.StateTransitionProxy);
-    const diamondCutData = await deployer.initialZkSyncHyperchainDiamondCut();
+    const assetInfo = await bridgehub.stmAssetInfo(migratingDeployer.addresses.StateTransition.StateTransitionProxy);
+    const diamondCutData = await migratingDeployer.initialZkSyncHyperchainDiamondCut();
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
     const adminFacet = AdminFacetFactory.connect(
-      deployer.addresses.StateTransition.DiamondProxy,
-      deployer.deployWallet
+      migratingDeployer.addresses.StateTransition.DiamondProxy,
+      migratingDeployer.deployWallet
     );
 
     // const chainCommitment = {
@@ -175,7 +175,7 @@ describe("Synclayer", function () {
     // const chainData = await adminFacet.readChainCommitment();
     const stmData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bytes"],
-      [ADDRESS_ONE, deployer.deployWallet.address, 21, initialDiamondCut]
+      [ADDRESS_ONE, migratingDeployer.deployWallet.address, 21, initialDiamondCut]
     );
     const bridgehubMintData = ethers.utils.defaultAbiCoder.encode(
       ["uint256", "bytes", "bytes"],
@@ -189,7 +189,7 @@ describe("Synclayer", function () {
     const amount = ethers.utils.parseEther("2");
     await bridgehub.requestL2TransactionDirect(
       {
-        chainId: 9,
+        chainId: migratingDeployer.chainId,
         mintValue: amount,
         l2Contract: ethers.constants.AddressZero,
         l2Value: 0,
@@ -203,8 +203,32 @@ describe("Synclayer", function () {
     );
   });
 
-  // it("Check forward message to L3 on SL", async() => {
-  //   const amount = ethers.utils.parseEther("1");
-  //   bridgehub.forwardTransactionSyncLayer({})
-  // });
+  it("Check forward message to L3 on SL", async() => {
+    const tx = {
+      txType: 255,
+            from: ethers.constants.AddressZero,
+            to: ethers.constants.AddressZero,
+            gasLimit: priorityTxMaxGasLimit,
+            gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            maxFeePerGas: 1,
+            maxPriorityFeePerGas: 0,
+            paymaster: 0,
+            // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
+            nonce: 0,
+            value: 0,
+            reserved: [0 as ethers.BigNumberish, 0, 0, 0] as [ethers.BigNumberish, ethers.BigNumberish, ethers.BigNumberish, ethers.BigNumberish],
+            data: "0x",
+            signature: ethers.constants.HashZero,
+            factoryDeps: [],
+            paymasterInput: "0x",
+            reservedDynamic: "0x"
+    };
+    bridgehub.forwardTransactionOnSyncLayer(
+      mintChainId,
+      tx,
+      [],
+      ethers.constants.HashZero,
+      0,
+    )
+  });
 });
