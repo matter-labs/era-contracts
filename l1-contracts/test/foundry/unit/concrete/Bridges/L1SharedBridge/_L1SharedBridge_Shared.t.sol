@@ -87,6 +87,14 @@ contract L1SharedBridgeTest is Test {
     uint16 l2TxNumberInBatch;
     bytes32[] merkleProof;
 
+    modifier testPause() {
+        vm.prank(owner);
+        sharedBridge.pause();
+        assertTrue(sharedBridge.paused());
+        vm.expectRevert("Pausable: paused");
+        _;
+    }
+
     uint256 isWithdrawalFinalizedStorageLocation = uint256(8 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1 + 50);
 
     function setUp() public {
