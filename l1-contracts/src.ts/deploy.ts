@@ -829,7 +829,7 @@ export class Deployer {
     await this.executeUpgrade(hyperchain.address, 0, hyperchain.interface.encodeFunctionData("acceptAdmin"), false);
 
     if (this.verbose) {
-      console.log(`Pending admin successfully accepted`);
+      console.log("Pending admin successfully accepted");
     }
   }
 
