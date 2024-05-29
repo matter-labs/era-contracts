@@ -2,11 +2,10 @@ import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 import "@matterlabs/hardhat-zksync-ethers";
 
-import type { BigNumberish, providers, Signer, Wallet, Contract, Overrides } from "ethers";
+import type { BigNumberish, providers, Signer, Wallet, Contract } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
-import { Wallet as ZkWallet } from "zksync-ethers";
-import { ContractFactory as ZkContractFactory } from "zksync-ethers";
+import { Wallet as ZkWallet, ContractFactory as ZkContractFactory } from "zksync-ethers";
 
 import type { DeployedAddresses } from "./deploy-utils";
 import {
@@ -15,7 +14,6 @@ import {
   deployViaCreate2 as deployViaCreate2EVM,
 } from "./deploy-utils";
 import {
-  deployBytecodeViaCreate2 as deployBytecodeViaCreate2Zk,
   deployViaCreate2 as deployViaCreate2Zk,
   BUILT_IN_ZKSYNC_CREATE2_FACTORY,
   deployBytecodeViaCreate2OnPath,
@@ -499,20 +497,7 @@ export class Deployer {
     const data1 = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
       this.addresses.Bridges.ERC20BridgeProxy,
     ]);
-    // const data2 = sharedBridge.interface.encodeFunctionData("setEraPostDiamondUpgradeFirstBatch", [
-    //   process.env.CONTRACTS_ERA_POST_DIAMOND_UPGRADE_FIRST_BATCH ?? 1,
-    // ]);
-    // const data3 = sharedBridge.interface.encodeFunctionData("setEraPostLegacyBridgeUpgradeFirstBatch", [
-    //   process.env.CONTRACTS_ERA_POST_LEGACY_BRIDGE_UPGRADE_FIRST_BATCH ?? 1,
-    // ]);
-    // const data4 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [
-    //   process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_BATCH ?? 1,
-    //   process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_TX_NUMBER ?? 0,
-    // ]);
     await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data1);
-    // await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data2);
-    // await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data3);
-    // await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data4);
     if (this.verbose) {
       console.log("Shared bridge updated with ERC20Bridge address");
     }
@@ -818,7 +803,7 @@ export class Deployer {
     ]);
     const receipt = await this.executeUpgrade(this.addresses.Bridgehub.STMDeploymentTrackerProxy, 0, data1);
     if (this.verbose) {
-      console.log("STM asset registered in L1 Shared Bridge via STM Deployment Tracker");
+      console.log("STM asset registered in L1 Shared Bridge via STM Deployment Tracker", receipt.gasUsed.toString());
       console.log(
         `CONTRACTS_STM_ASSET_INFO=${await bridgehub.stmAssetInfo(this.addresses.StateTransition.StateTransitionProxy)}`
       );
@@ -959,7 +944,7 @@ export class Deployer {
     const calldata = await stm.interface.encodeFunctionData("registerSyncLayer", [this.chainId, true]);
     await this.executeUpgrade(this.addresses.StateTransition.StateTransitionProxy, 0, calldata);
     if (this.verbose) {
-      console.log(`SyncLayer registered`);
+      console.log("SyncLayer registered");
     }
   }
 
@@ -1028,7 +1013,7 @@ export class Deployer {
     const l2TxNumberInBatch = 1;
     const message = ethers.utils.defaultAbiCoder.encode(["bytes32", "bytes"], []);
     const merkleProof = ["0x00"];
-    const receipt = await sharedBridge.finalizeWithdrawal(
+    const tx = await sharedBridge.finalizeWithdrawal(
       synclayerChainId,
       l2BatchNumber,
       l2MsgIndex,
@@ -1036,6 +1021,10 @@ export class Deployer {
       message,
       merkleProof
     );
+    const receipt = await tx.wait();
+    if (this.verbose) {
+      console.log("Chain move to L1 finished", receipt.gasUsed.toString());
+    }
   }
 
   public async registerHyperchain(
@@ -1234,7 +1223,7 @@ export class Deployer {
     console.log("BlobVersionedHashRetriever is not needed within zkSync network and won't be deployed");
 
     // 0 is not allowed, we need to some random non-zero value. Let it be 0x1000000000000000000000000000000000000001
-    console.log(`CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR=0x1000000000000000000000000000000000000001`);
+    console.log("CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR=0x1000000000000000000000000000000000000001");
     this.addresses.BlobVersionedHashRetriever = "0x1000000000000000000000000000000000000001";
   }
 

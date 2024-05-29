@@ -410,6 +410,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             _stmData,
             (address, address, uint256, bytes)
         );
+        require(_protocolVersion == protocolVersion, "STM, outdated pv");
         // todo porotocl version check
         chainAddress = _deployNewChain({
             _chainId: _chainId,

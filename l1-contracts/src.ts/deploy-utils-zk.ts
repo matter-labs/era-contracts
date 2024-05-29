@@ -5,9 +5,10 @@ import { Deployer as ZkDeployer } from "@matterlabs/hardhat-zksync-deploy";
 import { ethers } from "ethers";
 import * as path from "path";
 import { IL2ContractDeployerFactory } from "../typechain/IL2ContractDeployerFactory";
-import { utils as zkUtils, ContractFactory, Wallet as ZkWallet, Provider } from "zksync-ethers";
-import { encode } from "querystring";
-import { web3Provider, web3Url } from "../scripts/utils";
+import type { Wallet as ZkWallet } from "zksync-ethers";
+import { utils as zkUtils, ContractFactory } from "zksync-ethers";
+// import { encode } from "querystring";
+// import { web3Provider, web3Url } from "../scripts/utils";
 import { ethersWalletToZkWallet, readBytecode, readInterface } from "./utils";
 
 export const BUILT_IN_ZKSYNC_CREATE2_FACTORY = "0x0000000000000000000000000000000000010000";
@@ -34,6 +35,7 @@ export async function deployBytecodeViaCreate2(
   contractName: string,
   create2Salt: string,
   ethTxOptions: ethers.providers.TransactionRequest,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args: any[],
   verbose: boolean = true
 ): Promise<[string, string]> {
@@ -94,6 +96,7 @@ export async function deployBytecodeViaCreate2OnPath(
   contractPath: string,
   create2Salt: string,
   ethTxOptions: ethers.providers.TransactionRequest,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args: any[],
   factoryDeps: string[] = [],
   verbose: boolean = true
@@ -107,7 +110,7 @@ export async function deployBytecodeViaCreate2OnPath(
   };
 
   // @ts-ignore
-  const zkDeployer = new ZkDeployer(hardhat, deployWallet);
+  // const zkDeployer = new ZkDeployer(hardhat, deployWallet);
   const bytecode = readBytecode(contractPath, contractName);
 
   const bytecodeHash = zkUtils.hashBytecode(bytecode);
@@ -149,6 +152,7 @@ export async function deployBytecodeViaCreate2OnPath(
 export async function deployContractWithArgs(
   wallet: ethers.Wallet,
   contractName: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args: any[],
   ethTxOptions: ethers.providers.TransactionRequest
 ) {

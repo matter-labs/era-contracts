@@ -11,10 +11,10 @@ import {
   defaultDeployerForTests,
   registerHyperchainWithBridgeRegistration,
 } from "../../src.ts/deploy-test-process";
-import { ethTestConfig, DIAMOND_CUT_DATA_ABI_STRING, HYPERCHAIN_COMMITMENT_ABI_STRING } from "../../src.ts/utils";
 import {
-  getAddressFromEnv,
-  getNumberFromEnv,
+  ethTestConfig,
+  DIAMOND_CUT_DATA_ABI_STRING,
+  HYPERCHAIN_COMMITMENT_ABI_STRING,
   ADDRESS_ONE,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   priorityTxMaxGasLimit,
@@ -33,7 +33,7 @@ describe("Synclayer", function () {
   // const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
   // let forwarder: Forwarder;
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
-  let mintChainId = 11;
+  const mintChainId = 11;
 
   before(async () => {
     [owner] = await hardhat.ethers.getSigners();
@@ -95,7 +95,7 @@ describe("Synclayer", function () {
     const value = (
       await bridgehub.l2TransactionBaseCost(chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
     ).mul(10);
-    const baseTokenAddress = await bridgehub.baseToken(chainId);
+    // const baseTokenAddress = await bridgehub.baseToken(chainId);
     // const ethIsBaseToken = baseTokenAddress == ADDRESS_ONE;
 
     const stmDeploymentTracker = migratingDeployer.stmDeploymentTracker(migratingDeployer.deployWallet);

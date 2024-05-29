@@ -206,13 +206,13 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             "Mailbox SL: not hyperchain"
         );
 
-        BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest(
-            _chainId,
-            _transaction,
-            _factoryDeps,
-            _canonicalTxHash,
-            _expirationTimestamp
-        );
+        BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest({
+            _chainId: _chainId,
+            _transaction: _transaction,
+            _factoryDeps: _factoryDeps,
+            _canonicalTxHash: _canonicalTxHash,
+            _expirationTimestamp: _expirationTimestamp
+        });
         canonicalTxHash = _requestL2TransactionToSyncLayerFree(wrappedRequest);
     }
 
@@ -233,6 +233,15 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes32 _canonicalTxHash,
         uint256 _expirationTimestamp
     ) internal view returns (BridgehubL2TransactionRequest memory) {
+        // solhint-disable-next-line func-named-parameters
+        bytes memory data = abi.encodeWithSelector(
+            IBridgehub(s.bridgehub).forwardTransactionOnSyncLayer.selector,
+            _chainId,
+            _transaction,
+            _factoryDeps,
+            _canonicalTxHash,
+            _expirationTimestamp
+        );
         return
             BridgehubL2TransactionRequest({
                 sender: s.bridgehub,
@@ -241,15 +250,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
                 l2Value: 0,
                 // Very large amount
                 l2GasLimit: 72_000_000,
-                l2Calldata: abi.encodeWithSelector(
-                    // Todo
-                    IBridgehub(s.bridgehub).forwardTransactionOnSyncLayer.selector,
-                    _chainId,
-                    _transaction,
-                    _factoryDeps,
-                    _canonicalTxHash,
-                    _expirationTimestamp
-                ),
+                l2Calldata: data,
                 // TODO: use constant for that
                 l2GasPerPubdataByteLimit: 800,
                 factoryDeps: new bytes[](0),
@@ -316,13 +317,13 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
         if (s.syncLayer != address(0)) {
-            canonicalTxHash = IMailbox(s.syncLayer).requestL2TransactionToSyncLayerMailbox(
-                s.chainId,
-                transaction,
-                _params.request.factoryDeps,
-                canonicalTxHash,
-                _params.expirationTimestamp
-            );
+            canonicalTxHash = IMailbox(s.syncLayer).requestL2TransactionToSyncLayerMailbox({
+                _chainId: s.chainId,
+                _transaction: transaction,
+                _factoryDeps: _params.request.factoryDeps,
+                _canonicalTxHash: canonicalTxHash,
+                _expirationTimestamp: _params.expirationTimestamp
+            });
             return canonicalTxHash;
         }
     }

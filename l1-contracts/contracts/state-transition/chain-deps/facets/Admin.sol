@@ -4,9 +4,8 @@ pragma solidity 0.8.24;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 
-import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_GAS_PER_TRANSACTION, HyperchainCommitment, StoredBatchHashInfo, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../../../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_GAS_PER_TRANSACTION, HyperchainCommitment, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
@@ -14,7 +13,7 @@ import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 import {ISystemContext} from "../../l2-deps/ISystemContext.sol";
 import {PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../common/L2ContractAddresses.sol";
-import {L2CanonicalTransaction, TxStatus} from "../../../common/Messaging.sol";
+import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 import {ProposedUpgrade} from "../../../upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "../../chain-interfaces/IVerifier.sol";
 import {IDefaultUpgrade} from "../../../upgrades/IDefaultUpgrade.sol";
@@ -250,7 +249,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         chainBridgeMintData = abi.encode(_prepareChainCommitment());
     }
 
-    function bridgeMint(uint256 _chainId, bytes calldata _data) external payable override {
+    function bridgeMint(bytes calldata _data) external payable override {
         HyperchainCommitment memory _commitment = abi.decode(_data, (HyperchainCommitment));
 
         uint256 batchesExecuted = _commitment.totalBatchesExecuted;

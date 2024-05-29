@@ -25,39 +25,38 @@ export async function initialBridgehubDeployment(
   create2Salt?: string,
   nonce?: number
 ) {
-  nonce = nonce || (await deployer.deployWallet.getTransactionCount());
   create2Salt = create2Salt || ethers.utils.hexlify(ethers.utils.randomBytes(32));
 
   // Create2 factory already deployed on the public networks, only deploy it on local node
   if (isCurrentNetworkLocal()) {
     if (!deployer.isZkMode()) {
-      await deployer.deployCreate2Factory({ gasPrice });
-      nonce++;
+      await deployer.deployCreate2Factory({ gasPrice, nonce });
+      nonce = nonce ? ++nonce : nonce;
     } else {
       await deployer.updateCreate2FactoryZkMode();
     }
 
-    await deployer.deployMulticall3(create2Salt, { gasPrice });
-    nonce++;
+    await deployer.deployMulticall3(create2Salt, { gasPrice, nonce });
+    nonce = nonce ? ++nonce : nonce;
   }
 
   if (onlyVerifier) {
-    await deployer.deployVerifier(create2Salt, { gasPrice });
+    await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
     return;
   }
 
   await deployer.deployDefaultUpgrade(create2Salt, {
     gasPrice,
   });
-  nonce++;
+  nonce = nonce ? ++nonce : nonce;
 
   await deployer.deployGenesisUpgrade(create2Salt, {
     gasPrice,
   });
-  nonce++;
+  nonce = nonce ? ++nonce : nonce;
 
   await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
-  nonce++;
+  nonce = nonce ? ++nonce : nonce;
 
   // Governance will be L1 governance, but we want to deploy it here for the init process.
   await deployer.deployGovernance(create2Salt, { gasPrice });

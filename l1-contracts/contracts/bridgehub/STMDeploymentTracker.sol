@@ -9,15 +9,8 @@ import {L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 
 import {IBridgehub, IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
-import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
-import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, HyperchainCommitment} from "../common/Config.sol";
-import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-
-import {IL1NativeTokenVault} from "../bridge/interfaces/IL1NativeTokenVault.sol";
+import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -58,7 +51,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
-        uint256 _l2Value,
+        uint256,
         bytes calldata _data
     ) external payable onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
         require(msg.value == 0, "STMDT: no eth allowed");

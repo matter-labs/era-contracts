@@ -140,5 +140,5 @@ interface IAdmin is IZkSyncHyperchainBase {
         bytes calldata _data
     ) external payable;
 
-    function bridgeMint(uint256 _chainId, bytes calldata _data) external payable;
+    function bridgeMint(bytes calldata _data) external payable;
 }

@@ -3,8 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
-import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-import {HyperchainCommitment} from "../common/Config.sol";
+import {L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {IL1StandardAsset} from "../bridge/interfaces/IL1StandardAsset.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 

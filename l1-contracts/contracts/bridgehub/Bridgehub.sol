@@ -9,10 +9,9 @@ import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2Trans
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 import {IBridgehub, IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
-import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, HyperchainCommitment} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
@@ -439,11 +438,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // TODO: double check that get only returns when chain id is there.
     }
 
-    function bridgeMint(
-        uint256 _previousSettlementChainId,
-        bytes32 _assetInfo,
-        bytes calldata _bridgehubMintData
-    ) external payable override {
+    function bridgeMint(uint256, bytes32 _assetInfo, bytes calldata _bridgehubMintData) external payable override {
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainMintData) = abi.decode(
             _bridgehubMintData,
             (uint256, bytes, bytes)
@@ -459,7 +454,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             hyperchain = IStateTransitionManager(stm).bridgeMint(_chainId, _stmData);
         }
 
-        IZkSyncHyperchain(hyperchain).bridgeMint(_previousSettlementChainId, _chainMintData);
+        IZkSyncHyperchain(hyperchain).bridgeMint(_chainMintData);
     }
 
     function bridgeClaimFailedBurn(

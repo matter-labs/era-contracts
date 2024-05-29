@@ -2,10 +2,10 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
 import { Command } from "commander";
-import { BigNumberish, Wallet, ethers } from "ethers";
+import { Wallet, ethers } from "ethers";
 import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { web3Provider, GAS_MULTIPLIER, web3Url } from "./utils";
+import { web3Provider, GAS_MULTIPLIER, SYSTEM_CONFIG } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import { initialBridgehubDeployment } from "../src.ts/deploy-process";
 import {
@@ -16,7 +16,6 @@ import {
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   priorityTxMaxGasLimit,
 } from "../src.ts/utils";
-import { SYSTEM_CONFIG } from "./utils";
 
 import { Wallet as ZkWallet, Provider as ZkProvider, utils as zkUtils } from "zksync-ethers";
 import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
@@ -44,15 +43,13 @@ async function main() {
         throw new Error("This script is only for zkSync network");
       }
 
-      let deployWallet: ethers.Wallet | ZkWallet;
-
       const provider = new ZkProvider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
-      deployWallet = cmd.privateKey
+      const deployWallet = cmd.privateKey
         ? new ZkWallet(cmd.privateKey, provider)
-        : ZkWallet.fromMnemonic(
+        : (ZkWallet.fromMnemonic(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
             "m/44'/60'/0'/0/1"
-          ).connect(provider);
+          ).connect(provider) as ethers.Wallet | ZkWallet);
 
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
@@ -185,8 +182,8 @@ async function main() {
         await deployWallet.provider.getTransaction(receipt.transactionHash)
       );
 
-      console.log("Waiting it to be finalized");
       const receiptOnSL = await (await txL2Handle).wait();
+      console.log("Finalized on SL with hash:", receiptOnSL.transactionHash);
 
       const stmOnSL = IStateTransitionManagerFactory.connect(counterPart, syncLayerProvider);
       const hyperchainAddress = await stmOnSL.getHyperchain(currentChainId);
@@ -299,8 +296,6 @@ async function main() {
       );
       deployer.addresses.Bridgehub.BridgehubProxy = getAddressFromEnv("SYNC_LAYER_BRIDGEHUB_PROXY_ADDR");
 
-      const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
-
       // FIXME? Do we want to
       console.log("Setting default token multiplier");
 
@@ -330,20 +325,20 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   console.log(deployer.addresses.StateTransition.StateTransitionProxy);
   const syncLayerAddress = await l1STM.getHyperchain(chainId);
   // this script only works when owner is the deployer
-  console.log(`Registering SyncLayer chain id on the STM`);
+  console.log("Registering SyncLayer chain id on the STM");
   await deployer.executeUpgrade(
     l1STM.address,
     0,
     l1Bridgehub.interface.encodeFunctionData("registerSyncLayer", [chainId, true])
   );
 
-  console.log(`Registering Bridgehub counter part on the SyncLayer`);
+  console.log("Registering Bridgehub counter part on the SyncLayer");
   await deployer.executeUpgrade(
     l1Bridgehub.address, // kl todo fix. The BH has the counterpart, the BH needs to be deployed on L2, and the STM needs to be registered in the L2 BH.
     0,
     l1Bridgehub.interface.encodeFunctionData("registerCounterpart", [chainId, bridgehubOnSyncLayer])
   );
-  console.log(`SyncLayer registration completed in L1 Bridgehub`);
+  console.log("SyncLayer registration completed in L1 Bridgehub");
 
   const gasPrice = (await deployer.deployWallet.provider.getGasPrice()).mul(GAS_MULTIPLIER);
   const value = (
