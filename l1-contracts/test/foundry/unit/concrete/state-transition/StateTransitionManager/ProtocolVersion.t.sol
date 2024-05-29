@@ -9,9 +9,6 @@ contract ProtocolVersion is StateTransitionManagerTest {
     function test_SuccessfulSetNewVersionUpgrade() public {
         createNewChain(getDiamondCutData(diamondInit));
 
-        vm.stopPrank();
-        vm.startPrank(governor);
-
         uint256 oldProtocolVersion = chainContractAddress.protocolVersion();
         uint256 oldProtocolVersionDeadline = chainContractAddress.protocolVersionDeadline(oldProtocolVersion);
 
@@ -34,9 +31,6 @@ contract ProtocolVersion is StateTransitionManagerTest {
     function test_SuccessfulProtocolVersionIsActive() public {
         createNewChain(getDiamondCutData(diamondInit));
 
-        vm.stopPrank();
-        vm.startPrank(governor);
-
         chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, 0, 1);
 
         assertEq(chainContractAddress.protocolVersionIsActive(0), false);
@@ -46,9 +40,6 @@ contract ProtocolVersion is StateTransitionManagerTest {
     // setProtocolVersionDeadline
     function test_SuccessfulSetProtocolVersionDeadline() public {
         createNewChain(getDiamondCutData(diamondInit));
-
-        vm.stopPrank();
-        vm.startPrank(governor);
 
         uint256 deadlineBefore = chainContractAddress.protocolVersionDeadline(0);
         assertEq(deadlineBefore, type(uint256).max);
@@ -64,9 +55,6 @@ contract ProtocolVersion is StateTransitionManagerTest {
     function test_SuccessfulExecuteUpdate() public {
         createNewChain(getDiamondCutData(diamondInit));
 
-        vm.stopPrank();
-        vm.startPrank(governor);
-
         Diamond.FacetCut[] memory customFacetCuts = new Diamond.FacetCut[](1);
         customFacetCuts[0] = Diamond.FacetCut({
             facet: facetCuts[2].facet,
@@ -81,9 +69,6 @@ contract ProtocolVersion is StateTransitionManagerTest {
     // upgradeChainFromVersion
     function test_SuccessfulUpgradeChainFromVersion() public {
         createNewChain(getDiamondCutData(diamondInit));
-
-        vm.stopPrank();
-        vm.startPrank(governor);
 
         Diamond.FacetCut[] memory customFacetCuts = new Diamond.FacetCut[](1);
         customFacetCuts[0] = Diamond.FacetCut({

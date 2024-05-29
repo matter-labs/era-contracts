@@ -5,7 +5,7 @@ import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol
 
 contract AdminManagement is StateTransitionManagerTest {
     function test_RevertWhen_IsNotAdminOrOwner() public {
-        address newAdmin = makeAddr("newadmin");
+        address newAdmin = makeAddr("newAdmin");
 
         vm.stopPrank();
         vm.prank(newAdmin);
@@ -14,13 +14,13 @@ contract AdminManagement is StateTransitionManagerTest {
     }
 
     function test_SuccessfulSetPendingAdmin() public {
-        address newAdmin = makeAddr("newadmin");
+        address newAdmin = makeAddr("newAdmin");
 
         chainContractAddress.setPendingAdmin(newAdmin);
     }
 
     function test_RevertWhen_IsNotNewAdminSender() public {
-        address newAdmin = makeAddr("newadmin");
+        address newAdmin = makeAddr("newAdmin");
         address random = makeAddr("random");
 
         chainContractAddress.setPendingAdmin(newAdmin);
@@ -41,7 +41,7 @@ contract AdminManagement is StateTransitionManagerTest {
     }
 
     function test_SuccessfulAcceptPendingAdmin() public {
-        address newAdmin = makeAddr("newadmin");
+        address newAdmin = makeAddr("newAdmin");
 
         chainContractAddress.setPendingAdmin(newAdmin);
 
