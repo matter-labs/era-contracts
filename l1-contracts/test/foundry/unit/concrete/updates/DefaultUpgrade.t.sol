@@ -10,7 +10,7 @@ import {BaseUpgradeSetters} from "./_SharedBaseUpgradeSetters.t.sol";
 
 contract DummyDefaultUpgrade is DefaultUpgrade, BaseUpgradeSetters {}
 
-contract Upgrade_v1_4_1Test is BaseUpgrade {
+contract DefaultUpgradeTest is BaseUpgrade {
     DummyDefaultUpgrade baseZkSyncUpgrade;
 
     function setUp() public {
