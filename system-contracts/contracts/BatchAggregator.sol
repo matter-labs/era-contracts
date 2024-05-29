@@ -5,13 +5,18 @@ pragma solidity 0.8.20;
 import {IBatchAggregator} from "./interfaces/IBatchAggregator.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE, STATE_DIFF_COMPRESSION_VERSION_NUMBER} from "./interfaces/IL1Messenger.sol";
-import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, BATCH_AGGREGATOR, STATE_DIFF_ENTRY_SIZE, STATE_DIFF_AGGREGATION_INFO_SIZE, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER, COMPUTATIONAL_PRICE_FOR_PUBDATA} from "./Constants.sol";
+import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, BATCH_AGGREGATOR, STATE_DIFF_ENTRY_SIZE, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER, COMPUTATIONAL_PRICE_FOR_PUBDATA, DERIVED_KEY_SIZE, LOOSE_COMPRESION} from "./Constants.sol";
 import {UnsafeBytesCalldata} from "./libraries/UnsafeBytesCalldata.sol";
 import {ICompressor, OPERATION_BITMASK, LENGTH_BITS_OFFSET, MAX_ENUMERATION_INDEX_SIZE} from "./interfaces/ICompressor.sol";
 
-uint256 constant DERIVED_KEY_SIZE = 32;
-uint256 constant LOOSE_COMPRESION = 33;
+
 contract BatchAggregator is IBatchAggregator, ISystemContract {
+    struct AggregationInfo{
+        bytes32 derivedKey;
+        uint64 enumIndex;
+        uint256 initialValue;
+        uint256 finalValue;
+    }
     using UnsafeBytesCalldata for bytes;
     bytes[] batchStorage;
     bytes[] chainData;
@@ -20,11 +25,10 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
     mapping(uint256 => bytes[]) logStorage;
     mapping(uint256 => bytes[]) bytecodeStorage;
     // state diff data
-    mapping(uint256 => mapping(bytes32 => bytes)) initialWrites;
+    mapping(uint256 => mapping(bytes32 => AggregationInfo)) initialWrites;
     mapping(uint256 => mapping(bytes32 => bool)) isInitialWrite;
     mapping(uint256 => bytes32[]) initialWritesSlots; 
-    /// @dev state diff:   [32bytes derived key][8bytes enum index][32bytes initial value][32bytes final value]
-    mapping(uint256 => mapping(uint64 => bytes)) uncompressedWrites;
+    mapping(uint256 => mapping(uint64 => AggregationInfo)) uncompressedWrites;
     mapping(uint256 => mapping(uint64 => bool)) isKeyTouched;
     mapping(uint256 => uint64[]) touchedSlots;
     
@@ -45,42 +49,36 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
     }
 
     function addInitialWrite(uint256 chainId, bytes32 derivedKey, uint64 enumIndex, uint256 initialValue, uint256 finalValue) internal{
-        bytes memory slotData = new bytes(STATE_DIFF_AGGREGATION_INFO_SIZE);
-        assembly{
-            mstore(add(slotData,0),derivedKey)
-            mstore(add(slotData,32),enumIndex)
-            mstore(add(slotData,40),initialValue)
-            mstore(add(slotData,72),finalValue)
-        }
+        AggregationInfo memory slotData = AggregationInfo({
+            derivedKey:derivedKey,
+            enumIndex:enumIndex,
+            initialValue:initialValue,
+            finalValue:finalValue
+        });
         initialWrites[chainId][derivedKey] = slotData;
         isInitialWrite[chainId][derivedKey] = true;
         initialWritesSlots[chainId].push(derivedKey);
     }
     function addRepeatedWrite(uint256 chainId, bytes32 derivedKey, uint64 enumIndex, uint256 initialValue, uint256 finalValue) internal{
         if (isInitialWrite[chainId][derivedKey]==true){
-            bytes memory slotData = initialWrites[chainId][derivedKey];
-            assembly {
-                mstore(add(slotData,72),finalValue)
-            }
+            AggregationInfo memory slotData = initialWrites[chainId][derivedKey];
+            slotData.finalValue = finalValue;
             initialWrites[chainId][derivedKey] = slotData;
         }
         else if (isKeyTouched[chainId][enumIndex]==false){
-            bytes memory slotData = new bytes(STATE_DIFF_AGGREGATION_INFO_SIZE);
-            assembly{
-                mstore(add(slotData,0),derivedKey)
-                mstore(add(slotData,32),enumIndex)
-                mstore(add(slotData,40),initialValue)
-                mstore(add(slotData,72),finalValue)
-            }
+            AggregationInfo memory slotData = AggregationInfo({
+                derivedKey:derivedKey,
+                enumIndex:enumIndex,
+                initialValue:initialValue,
+                finalValue:finalValue
+            });
             uncompressedWrites[chainId][enumIndex] = slotData;
             isKeyTouched[chainId][enumIndex] = true;
             touchedSlots[chainId].push(enumIndex);
         }
         else{
-            bytes memory slotData = uncompressedWrites[chainId][enumIndex];
-            assembly {
-                mstore(add(slotData,72),finalValue)
-            }
+            AggregationInfo memory slotData = uncompressedWrites[chainId][enumIndex];
+            slotData.finalValue = finalValue;
             uncompressedWrites[chainId][enumIndex] = slotData;
         }
     }
@@ -281,27 +279,12 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             uint256 chainId = chainList[i];
             uint256 numberOfInitialWrites = initialWritesSlots[chainId].length;
             uint256 numberOfRepeatedWrites = touchedSlots[chainId].length;
-            bytes memory stateDiffs = new bytes((numberOfRepeatedWrites+numberOfInitialWrites)*STATE_DIFF_AGGREGATION_INFO_SIZE);
             
             uint256 maxEnumIndex = 0;
-            uint256 stateDiffPtr = 0;
-            // append initial writes
-            for(uint256 i = 0;i<numberOfInitialWrites;i+=1){
-                bytes memory stateDiff = initialWrites[chainId][initialWritesSlots[chainId][i]];
-                assembly{
-                    mstore(add(stateDiffs, stateDiffPtr), stateDiff)
-                }
-                stateDiffPtr += STATE_DIFF_AGGREGATION_INFO_SIZE;
-            }
-            // append repeated writes
+            // calculate enumIndex size
             for (uint256 i = 0;i<numberOfRepeatedWrites;i+=1){
                 uint64 enumIndex = touchedSlots[chainId][i];
-                bytes memory stateDiff = uncompressedWrites[chainId][enumIndex];
-                assembly{
-                    mstore(add(numberOfInitialWrites, stateDiffPtr), stateDiff)
-                }
                 maxEnumIndex = (maxEnumIndex > enumIndex?maxEnumIndex:enumIndex);
-                stateDiffPtr += STATE_DIFF_AGGREGATION_INFO_SIZE;
             }
             uint256 enumIndexSize = bytesLength(maxEnumIndex);
             
@@ -312,10 +295,10 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             // compress initial writes
             uint256 compressedStateDiffSize = 0;
             for(uint256 i = 0;i<numberOfInitialWrites;i+=1){
-                bytes memory stateDiff = initialWrites[chainId][initialWritesSlots[chainId][i]];
-                uint256 derivedKey;
-                uint256 initialValue;
-                uint256 finalValue;
+                AggregationInfo memory stateDiff = initialWrites[chainId][initialWritesSlots[chainId][i]];
+                bytes32 derivedKey = stateDiff.derivedKey;
+                uint256 initialValue = stateDiff.initialValue;
+                uint256 finalValue = stateDiff.finalValue;
                 assembly{
                     derivedKey := mload(add(stateDiff,52))
                     initialValue := mload(add(stateDiff,92))
@@ -334,9 +317,9 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             // compress repeated writes
             for (uint256 i = 0;i<numberOfRepeatedWrites;i+=1){
                 uint64 enumIndex = touchedSlots[chainId][i];
-                bytes memory stateDiff = uncompressedWrites[chainId][enumIndex];
-                uint256 initialValue;
-                uint256 finalValue;
+                AggregationInfo memory stateDiff = initialWrites[chainId][initialWritesSlots[chainId][i]];
+                uint256 initialValue = stateDiff.initialValue;
+                uint256 finalValue = stateDiff.finalValue;
                 assembly{
                     initialValue := mload(add(stateDiff,92))
                     finalValue := mload(add(stateDiff,124))
@@ -360,7 +343,6 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
                     numberOfInitialWrites,
                     numberOfRepeatedWrites,
                     enumIndexSize,
-                    stateDiffs,
                     compressedStateDiffs
                 )
             );

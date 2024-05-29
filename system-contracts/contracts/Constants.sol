@@ -107,7 +107,8 @@ bytes32 constant CREATE_PREFIX = 0x63bae3a9951d38e8a3fbb7b70909afc1200610fc5bc55
 
 /// @dev Each state diff consists of 156 bytes of actual data and 116 bytes of unused padding, needed for circuit efficiency.
 uint256 constant STATE_DIFF_ENTRY_SIZE = 272;
-uint256 constant STATE_DIFF_AGGREGATION_INFO_SIZE = 104;
+uint256 constant DERIVED_KEY_SIZE = 32;
+uint256 constant LOOSE_COMPRESION = 33;
 
 enum SystemLogKey {
     L2_TO_L1_LOGS_TREE_ROOT_KEY,
