@@ -273,7 +273,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
             "Invalid number of batch hashes"
         );
 
-        // Note that this part is done in O(N), i.e. it is the reponsibility of the admin of the chain to ensure that the total number of
+        // Note that this part is done in O(N), i.e. it is the responsibility of the admin of the chain to ensure that the total number of
         // outstanding committed batches is not too long.
         for (uint256 i = 0; i < _commitment.batchHashes.length; i++) {
             s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];

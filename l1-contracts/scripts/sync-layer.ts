@@ -293,7 +293,7 @@ async function main() {
         await (await timelock.addValidator(currentChainId, operator)).wait();
       }
 
-      // FIXME: this method includes bridgehub manipulation, but in the future it wont.
+      // FIXME: this method includes bridgehub manipulation, but in the future it won't.
       deployer.addresses.StateTransition.StateTransitionProxy = getAddressFromEnv(
         "SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR"
       );
