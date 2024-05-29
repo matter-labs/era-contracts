@@ -166,20 +166,8 @@ contract UtilsFacet is ZkSyncHyperchainBase {
         s.totalBatchesExecuted = _numberOfBatches;
     }
 
-    function util_setl2LogsRootHash(uint256 _batchNumber, bytes32 _newHash) external {
+    function util_setL2LogsRootHash(uint256 _batchNumber, bytes32 _newHash) external {
         s.l2LogsRootHashes[_batchNumber] = _newHash;
-    }
-
-    function util_getbaseTokenGasPriceMultiplierDenominator() external returns (uint256) {
-        return s.baseTokenGasPriceMultiplierDenominator;
-    }
-
-    function util_setbaseTokenGasPriceMultiplierDenominator(uint128 _denominator) external {
-        s.baseTokenGasPriceMultiplierDenominator = _denominator;
-    }
-
-    function util_getbaseTokenGasPriceMultiplierNominator() external returns (uint256) {
-        return s.baseTokenGasPriceMultiplierNominator;
     }
 
     function util_setBaseTokenGasPriceMultiplierNominator(uint128 _nominator) external {

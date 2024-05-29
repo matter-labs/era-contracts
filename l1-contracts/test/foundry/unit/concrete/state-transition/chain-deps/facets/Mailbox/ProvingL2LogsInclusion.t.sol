@@ -12,26 +12,12 @@ import {MurkyBase} from "murky/common/MurkyBase.sol";
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 import {TxStatus} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-
-contract MerkleTree is MurkyBase {
-    /// The original Merkle tree contains the ascending sort and concat prior to hashing, so we need to override it
-    function hashLeafPairs(bytes32 left, bytes32 right) public pure override returns (bytes32 _hash) {
-        assembly {
-            mstore(0x0, left)
-            mstore(0x20, right)
-            _hash := keccak256(0x0, 0x40)
-        }
-    }
-
-    // add this to be excluded from coverage report
-    function test() internal virtual {}
-}
+import {MerkleTreeNoSort} from "test/foundry/unit/concrete/state-transition/libraries/Merkle/MerkleTreeNoSort.sol";
 
 contract MailboxL2LogsProve is MailboxTest {
     bytes32[] elements;
     MerkleTest merkle;
-    MerkleTree merkleTree;
+    MerkleTreeNoSort merkleTree;
     bytes data;
     uint256 batchNumber;
     bool isService;
@@ -41,7 +27,7 @@ contract MailboxL2LogsProve is MailboxTest {
         prepare();
 
         data = abi.encodePacked("test data");
-        merkleTree = new MerkleTree();
+        merkleTree = new MerkleTreeNoSort();
         merkle = new MerkleTest();
         batchNumber = gettersFacet.getTotalBatchesExecuted();
         isService = true;
@@ -95,7 +81,7 @@ contract MailboxL2LogsProve is MailboxTest {
 
         // Calculate the Merkle root
         bytes32 root = merkleTree.getRoot(elements);
-        utilsFacet.util_setl2LogsRootHash(batchNumber, root);
+        utilsFacet.util_setL2LogsRootHash(batchNumber, root);
 
         // Create L2 message
         L2Message memory message = L2Message({txNumberInBatch: 0, sender: sender, data: data});
@@ -156,7 +142,7 @@ contract MailboxL2LogsProve is MailboxTest {
         // Calculate the Merkle root
         bytes32 root = merkleTree.getRoot(elements);
         // Set root hash for current batch
-        utilsFacet.util_setl2LogsRootHash(batchNumber, root);
+        utilsFacet.util_setL2LogsRootHash(batchNumber, root);
 
         // Get Merkle proof for the first element
         bytes32[] memory secondLogProof = merkleTree.getProof(elements, secondLogIndex);
@@ -221,7 +207,7 @@ contract MailboxL2LogsProve is MailboxTest {
         // Calculate the Merkle root
         bytes32 root = merkleTree.getRoot(elements);
         // Set root hash for current batch
-        utilsFacet.util_setl2LogsRootHash(batchNumber, root);
+        utilsFacet.util_setL2LogsRootHash(batchNumber, root);
 
         // Get Merkle proof for the first element
         bytes32[] memory secondLogProof = merkleTree.getProof(elements, secondLogIndex);
@@ -270,7 +256,7 @@ contract MailboxL2LogsProve is MailboxTest {
         // Calculate the Merkle root
         bytes32 root = merkleTree.getRoot(elements);
         // Set root hash for current batch
-        utilsFacet.util_setl2LogsRootHash(batchNumber, root);
+        utilsFacet.util_setL2LogsRootHash(batchNumber, root);
 
         // Get Merkle proof for the first element
         bytes32[] memory secondLogProof = merkleTree.getProof(elements, secondLogIndex);

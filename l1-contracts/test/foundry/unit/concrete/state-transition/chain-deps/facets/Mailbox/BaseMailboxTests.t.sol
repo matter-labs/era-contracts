@@ -20,7 +20,7 @@ contract MailboxBaseTests is MailboxTest {
     }
 
     function test_RevertWhen_badDenominatorInL2TransactionBaseCost() public {
-        utilsFacet.util_setbaseTokenGasPriceMultiplierDenominator(0);
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(0);
         vm.expectRevert("Mailbox: baseTokenGasPriceDenominator not set");
         mailboxFacet.l2TransactionBaseCost(100, 10000, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
     }
