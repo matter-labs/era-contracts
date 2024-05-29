@@ -7,12 +7,14 @@ import { hexlify, Interface } from "ethers/lib/utils";
 import type { Wallet as ZkWallet } from "zksync-ethers";
 
 import type { DeployedAddresses } from "./deploy-utils";
+import { deployedAddressesFromEnv, deployBytecodeViaCreate2, deployViaCreate2 } from "./deploy-utils";
 import {
-  deployedAddressesFromEnv,
-  deployBytecodeViaCreate2 as deployBytecodeViaCreate2EVM,
-  deployViaCreate2 as deployViaCreate2EVM,
-} from "./deploy-utils";
-import { readBatchBootloaderBytecode, readSystemContractsBytecode, SYSTEM_CONFIG } from "../scripts/utils";
+  packSemver,
+  readBatchBootloaderBytecode,
+  readSystemContractsBytecode,
+  SYSTEM_CONFIG,
+  unpackStringSemVer,
+} from "../scripts/utils";
 import { getTokens } from "./deploy-token";
 import {
   ADDRESS_ONE,
@@ -177,7 +179,7 @@ export class Deployer {
   ) {
     // For L1 deployments we try to use constant gas limit
     ethTxOptions.gasLimit ??= 10_000_000;
-    const result = await deployViaCreate2EVM(
+    const result = await deployViaCreate2(
       this.deployWallet,
       contractName,
       args,
@@ -198,7 +200,7 @@ export class Deployer {
   ): Promise<string> {
     ethTxOptions.gasLimit ??= 10_000_000;
 
-    const result = await deployBytecodeViaCreate2EVM(
+    const result = await deployBytecodeViaCreate2(
       this.deployWallet,
       contractName,
       bytecode,
@@ -322,8 +324,7 @@ export class Deployer {
     const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
     const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
     const diamondCut = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
-    // console.log("correct initial diamond cut", diamondCut);
-    const protocolVersion = getNumberFromEnv("CONTRACTS_GENESIS_PROTOCOL_VERSION");
+    const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
 
     const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
 
