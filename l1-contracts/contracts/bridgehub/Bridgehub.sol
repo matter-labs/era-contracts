@@ -401,7 +401,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) external override {
         require(L1_CHAIN_ID != block.chainid, "BH: not in sync layer mode");
         address hyperchain = getHyperchain(_chainId);
-        bytes32 canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2TransactionOnSyncLayer(
+        IZkSyncHyperchain(hyperchain).bridgehubRequestL2TransactionOnSyncLayer(
             _transaction,
             _factoryDeps,
             _canonicalTxHash,

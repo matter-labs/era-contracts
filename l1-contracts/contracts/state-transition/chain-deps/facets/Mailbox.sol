@@ -222,8 +222,8 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external returns (bytes32 canonicalTxHash) {
-        _writePriorityOp(_transaction, _factoryDeps, canonicalTxHash, _expirationTimestamp);
+    ) external {
+        _writePriorityOp(_transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp);
     }
 
     function _wrapRequest(

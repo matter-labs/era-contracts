@@ -104,7 +104,7 @@ interface IMailbox is IZkSyncHyperchainBase {
         bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external returns (bytes32 canonicalTxHash);
+    ) external;
 
     function requestL2TransactionToSyncLayerMailbox(
         uint256 _chainId,
