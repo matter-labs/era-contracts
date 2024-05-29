@@ -4,11 +4,8 @@ pragma solidity 0.8.24;
 import {AddressAliasHelperSharedTest} from "./_AddressAliasHelper_Shared.t.sol";
 import {Test} from "forge-std/Test.sol";
 
-contract TestContract is Test {
-    function func() public pure returns (bool) {
-        return true;
-    }
-
+// Used to test when recipient is a contract
+contract TestContract {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }
