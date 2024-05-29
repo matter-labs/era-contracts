@@ -116,7 +116,6 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             uint256 initialValue = stateDiff.readUint256(92);
             uint256 finalValue = stateDiff.readUint256(124);
 
-            uint256 sliceStart = stateDiffPtr;
             require(derivedKey == _compressedStateDiffs.readBytes32(stateDiffPtr), "iw: initial key mismatch");
             stateDiffPtr += 32;
             uint8 metadata = uint8(bytes1(_compressedStateDiffs[stateDiffPtr]));
@@ -141,7 +140,6 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             bytes32 derivedKey = stateDiff.readBytes32(52);
             uint256 initialValue = stateDiff.readUint256(92);
             uint256 finalValue = stateDiff.readUint256(124);
-            uint256 sliceStart = stateDiffPtr;
             uint256 compressedEnumIndex = _sliceToUint256(
                 _compressedStateDiffs[stateDiffPtr:stateDiffPtr + _enumerationIndexSize]
             );
@@ -185,7 +183,6 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
         uint256 messageSliceStart = calldataPtr;
         uint32 numberOfMessages = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
         calldataPtr += 4;
-        bytes32 reconstructedChainedMessagesHash;
         for (uint256 i = 0; i < numberOfMessages; ++i) {
             uint32 currentMessageLength = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
             calldataPtr += 4 + currentMessageLength;
@@ -196,7 +193,6 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
         uint32 numberOfBytecodes = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
         uint256 bytecodeSliceStart = calldataPtr;
         calldataPtr += 4;
-        bytes32 reconstructedChainedL1BytecodesRevealDataHash;
         for (uint256 i = 0; i < numberOfBytecodes; ++i) {
             uint32 currentBytecodeLength = uint32(
                 bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4])
@@ -215,7 +211,6 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
                 STATE_DIFF_COMPRESSION_VERSION_NUMBER,
             "state diff compression version mismatch"
         );
-        uint256 stateDiffSliceStart = calldataPtr;
         calldataPtr++;
 
         uint24 compressedStateDiffSize = uint24(bytes3(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 3]));
@@ -228,8 +223,6 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
             compressedStateDiffSize];
         calldataPtr += compressedStateDiffSize;
 
-        bytes calldata totalL2ToL1Pubdata = _totalL2ToL1PubdataAndStateDiffs[:calldataPtr];
-
         uint32 numberOfStateDiffs = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
         calldataPtr += 4;
 
@@ -240,16 +233,16 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
 
         repackStateDiffs(chainId, numberOfStateDiffs, enumerationIndexSize, stateDiffs, compressedStateDiffs);
     }
-    function bytesLength(uint256 value) internal returns (uint8 length){
+    function bytesLength(uint256 value) pure internal returns (uint8 length){
         while(value>0){
             length += 1;
             value = value>>8;
         }
     }
-    function subUnchecked(uint256 a, uint256 b) view public returns(uint256) {
+    function subUnchecked(uint256 a, uint256 b) pure internal returns(uint256) {
         unchecked { return a - b ;}
     }
-    function compressValue(uint256 initialValue, uint256 finalValue) internal returns (bytes memory compressedDiff){
+    function compressValue(uint256 initialValue, uint256 finalValue) pure internal returns (bytes memory compressedDiff){
         uint8 transform = bytesLength(finalValue);
         uint8 add = bytesLength(subUnchecked(finalValue,initialValue));
         uint8 sub = bytesLength(subUnchecked(initialValue,finalValue));
@@ -316,7 +309,6 @@ contract BatchAggregator is IBatchAggregator, ISystemContract {
                 (numberOfRepeatedWrites+numberOfInitialWrites)*LOOSE_COMPRESION // maximal size of metadata + compressed value
                 +numberOfRepeatedWrites*enumIndexSize                           // enumIndexSize for repeated writes
                 +numberOfInitialWrites*DERIVED_KEY_SIZE);                       // derived key for initial writes
-            uint256 compressionPtr = 0;
             // compress initial writes
             uint256 compressedStateDiffSize = 0;
             for(uint256 i = 0;i<numberOfInitialWrites;i+=1){
