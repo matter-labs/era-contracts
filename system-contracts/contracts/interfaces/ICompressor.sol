@@ -25,6 +25,7 @@ interface ICompressor {
         uint256 _numberOfStateDiffs,
         uint256 _enumerationIndexSize,
         bytes calldata _stateDiffs,
-        bytes calldata _compressedStateDiffs
+        bytes calldata _compressedStateDiffs,
+        bytes memory _hyperchainData
     ) external returns (bytes32 stateDiffHash);
 }

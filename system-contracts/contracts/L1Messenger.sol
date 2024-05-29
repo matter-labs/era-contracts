@@ -194,12 +194,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     function publishPubdataAndClearState(
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
     ) external onlyCallFromBootloader {
-        // Send hyperchain batches
-        SystemContractHelper.toL1(
-            true,
-            bytes32(uint256(SystemLogKey.HYPERCHAIN_PUBDATA_KEY)),
-            keccak256(BATCH_AGGREGATOR.returnBatchesAndClearState())
-        );
+        
 
         uint256 calldataPtr = 0;
 
@@ -313,7 +308,8 @@ contract L1Messenger is IL1Messenger, ISystemContract {
             numberOfStateDiffs,
             enumerationIndexSize,
             stateDiffs,
-            compressedStateDiffs
+            compressedStateDiffs,
+            BATCH_AGGREGATOR.returnBatchesAndClearState()
         );
         //
 

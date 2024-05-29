@@ -111,7 +111,8 @@ contract Compressor is ICompressor, ISystemContract {
         uint256 _numberOfStateDiffs,
         uint256 _enumerationIndexSize,
         bytes calldata _stateDiffs,
-        bytes calldata _compressedStateDiffs
+        bytes calldata _compressedStateDiffs,
+        bytes memory _hyperchainData
     ) external onlyCallFrom(address(L1_MESSENGER_CONTRACT)) returns (bytes32 stateDiffHash) {
         // We do not enforce the operator to use the optimal, i.e. the minimally possible _enumerationIndexSize.
         // We do enforce however, that the _enumerationIndexSize is not larger than 8 bytes long, which is the
@@ -187,6 +188,8 @@ contract Compressor is ICompressor, ISystemContract {
         require(stateDiffPtr == _compressedStateDiffs.length, "Extra data in _compressedStateDiffs");
 
         stateDiffHash = EfficientCall.keccak(_stateDiffs);
+        bytes32 hyperchainHash = keccak256(_hyperchainData);
+        stateDiffHash = keccak256(abi.encode(stateDiffHash,hyperchainHash));
     }
 
     /// @notice Decode the raw compressed data into the dictionary and the encoded data.
