@@ -48,12 +48,12 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     }
 
     /// @dev registerSTMAssetOnL2SharedBridge, use via requestL2TransactionTwoBridges
+    // slither-disable-next-line locked-ether
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
         uint256,
         bytes calldata _data
-    // slither-disable-next-line locked-ether
     ) external payable onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
         require(msg.value == 0, "STMDT: no eth allowed");
         require(_prevMsgSender == owner(), "STMDT: not owner");
