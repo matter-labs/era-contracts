@@ -139,7 +139,7 @@ contract StateTransitionManagerTest is Test {
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal {
         vm.stopPrank();
-        vm.startPrank(address(bridgehub));
+        vm.prank(bridgehub);
 
         chainContractAddress.createNewChain({
             _chainId: chainId,
@@ -148,11 +148,13 @@ contract StateTransitionManagerTest is Test {
             _admin: newChainAdmin,
             _diamondCut: abi.encode(_diamondCut)
         });
+
+        vm.startPrank(governor);
     }
 
     function createNewChainWithId(Diamond.DiamondCutData memory _diamondCut, uint256 id) internal {
         vm.stopPrank();
-        vm.startPrank(bridgehub);
+        vm.prank(bridgehub);
 
         chainContractAddress.createNewChain({
             _chainId: id,
@@ -161,6 +163,8 @@ contract StateTransitionManagerTest is Test {
             _admin: newChainAdmin,
             _diamondCut: abi.encode(_diamondCut)
         });
+
+        vm.startPrank(governor);
     }
 
     // add this to be excluded from coverage report

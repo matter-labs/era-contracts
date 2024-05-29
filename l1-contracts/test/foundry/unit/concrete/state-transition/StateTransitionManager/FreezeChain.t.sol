@@ -19,9 +19,6 @@ contract freezeChainTest is StateTransitionManagerTest {
         bool isChainFrozen = gettersFacet.isDiamondStorageFrozen();
         assertEq(isChainFrozen, false);
 
-        vm.stopPrank();
-        vm.startPrank(governor);
-
         chainContractAddress.freezeChain(block.chainid);
 
         // Repeated call should revert
@@ -41,9 +38,6 @@ contract freezeChainTest is StateTransitionManagerTest {
         GettersFacet gettersFacet = GettersFacet(newChainAddress);
         bool isChainFrozen = gettersFacet.isDiamondStorageFrozen();
         assertEq(isChainFrozen, false);
-
-        vm.stopPrank();
-        vm.startPrank(governor);
 
         chainContractAddress.freezeChain(newChainid);
 
