@@ -14,9 +14,6 @@ contract StateTransitionManagerSetters is StateTransitionManagerTest {
         address chainAddress = chainContractAddress.getHyperchain(chainId);
         GettersFacet gettersFacet = GettersFacet(chainAddress);
 
-        vm.stopPrank();
-        vm.startPrank(governor);
-
         uint256 newMaxGasLimit = 1000;
         chainContractAddress.setPriorityTxMaxGasLimit(chainId, newMaxGasLimit);
 
@@ -31,9 +28,6 @@ contract StateTransitionManagerSetters is StateTransitionManagerTest {
 
         address chainAddress = chainContractAddress.getHyperchain(chainId);
         GettersFacet gettersFacet = GettersFacet(chainAddress);
-
-        vm.stopPrank();
-        vm.startPrank(governor);
 
         uint128 newNominator = 1;
         uint128 newDenominator = 1000;
@@ -52,9 +46,6 @@ contract StateTransitionManagerSetters is StateTransitionManagerTest {
 
         address chainAddress = chainContractAddress.getHyperchain(chainId);
         UtilsFacet utilsFacet = UtilsFacet(chainAddress);
-
-        vm.stopPrank();
-        vm.startPrank(governor);
 
         FeeParams memory newFeeParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Rollup,
@@ -83,9 +74,6 @@ contract StateTransitionManagerSetters is StateTransitionManagerTest {
         address chainAddress = chainContractAddress.getHyperchain(chainId);
         GettersFacet gettersFacet = GettersFacet(chainAddress);
 
-        vm.stopPrank();
-        vm.startPrank(governor);
-
         address validator = address(0x1);
         chainContractAddress.setValidator(chainId, validator, true);
 
@@ -99,9 +87,6 @@ contract StateTransitionManagerSetters is StateTransitionManagerTest {
 
         address chainAddress = chainContractAddress.getHyperchain(chainId);
         UtilsFacet utilsFacet = UtilsFacet(chainAddress);
-
-        vm.stopPrank();
-        vm.startPrank(governor);
 
         chainContractAddress.setPorterAvailability(chainId, true);
 

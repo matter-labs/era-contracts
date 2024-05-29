@@ -78,9 +78,6 @@ contract freezeChainTest is ChainTypeManagerTest {
         bool isChainFrozen = gettersFacet.isDiamondStorageFrozen();
         assertEq(isChainFrozen, false);
 
-        vm.stopPrank();
-        vm.startPrank(governor);
-
         chainContractAddress.freezeChain(newChainid);
 
         vm.expectRevert(bytes.concat("q1"));
