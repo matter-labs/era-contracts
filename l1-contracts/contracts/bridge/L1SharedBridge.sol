@@ -12,6 +12,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
+import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
 import {IL1StandardAsset} from "./interfaces/IL1StandardAsset.sol";
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 
@@ -360,7 +361,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes32 _assetInfo,
         bytes memory _bridgeMintCalldata,
         bytes32 _txDataHash
-    ) internal returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
         // Request the finalization of the deposit on the L2 side
         bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _assetInfo, _bridgeMintCalldata);
 
@@ -390,13 +391,20 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         address _l1Sender,
         bytes32 _assetInfo,
         bytes memory _assetData
-    ) internal returns (bytes memory) {
-        (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = abi.decode(
-            _assetData,
-            (uint256, address, address, bytes, address)
-        );
-        return
-            abi.encodeCall(IL2Bridge.finalizeDeposit, (_l1Sender, _l2Receiver, _parsedL1Token, _amount, _gettersData));
+    ) internal view returns (bytes memory) {
+        if (IL1NativeTokenVault(address(nativeTokenVault)).tokenAddress(_assetInfo) == address(0)) {
+            return abi.encodeCall(IL2Bridge.finalizeDeposit, (_assetInfo, _assetData));
+        } else {
+            (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = abi.decode(
+                _assetData,
+                (uint256, address, address, bytes, address)
+            );
+            return
+                abi.encodeCall(
+                    IL2BridgeLegacy.finalizeDeposit,
+                    (_l1Sender, _l2Receiver, _parsedL1Token, _amount, _gettersData)
+                );
+        }
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2
