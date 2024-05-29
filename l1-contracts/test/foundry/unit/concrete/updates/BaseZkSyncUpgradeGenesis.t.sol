@@ -24,25 +24,42 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
         baseZkSyncUpgrade.setPriorityTxMaxPubdata(1000000);
     }
 
-    function test_revertWhen_UpgradeIsNotReady() public {
-        proposedUpgrade.upgradeTimestamp = block.timestamp + 1;
+    function test_revertWhen_UpgradeIsNotReady(uint256 upgradeTimestamp) public {
+        vm.assume(upgradeTimestamp > block.timestamp);
+
+        proposedUpgrade.upgradeTimestamp = upgradeTimestamp;
 
         vm.expectRevert(bytes("Upgrade is not ready yet"));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    function test_revertWhen_ProtocolVersionShouldBeGreater() public {
-        baseZkSyncUpgrade.setProtocolVersion(2);
+    function test_revertWhen_ProtocolVersionShouldBeGreater(
+        uint256 currentProtocolVersion,
+        uint256 newProtocolVersion
+    ) public {
+        baseZkSyncUpgrade.setProtocolVersion(currentProtocolVersion);
 
-        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionShouldBeGreater.selector, 2, 1));
+        vm.assume(newProtocolVersion <= currentProtocolVersion && newProtocolVersion > 0);
+
+        proposedUpgrade.newProtocolVersion = newProtocolVersion;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ProtocolVersionShouldBeGreater.selector, currentProtocolVersion, newProtocolVersion)
+        );
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    function test_revertWhen_ProtocolVersionDeltaTooLarge() public {
-        proposedUpgrade.newProtocolVersion = 101;
+    function test_revertWhen_ProtocolVersionDeltaTooLarge(uint256 newProtocolVersion) public {
+        vm.assume(newProtocolVersion > MAX_ALLOWED_PROTOCOL_VERSION_DELTA);
+
+        proposedUpgrade.newProtocolVersion = newProtocolVersion;
 
         vm.expectRevert(
-            abi.encodeWithSelector(ProtocolVersionDeltaTooLarge.selector, 101, MAX_ALLOWED_PROTOCOL_VERSION_DELTA)
+            abi.encodeWithSelector(
+                ProtocolVersionDeltaTooLarge.selector,
+                newProtocolVersion,
+                MAX_ALLOWED_PROTOCOL_VERSION_DELTA
+            )
         );
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
@@ -54,8 +71,10 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    function test_revertWhen_PreviousUpgradeBatchNotCleared() public {
-        baseZkSyncUpgrade.setL2SystemContractsUpgradeBatchNumber(1);
+    function test_revertWhen_PreviousUpgradeBatchNotCleared(uint256 batchNumber) public {
+        vm.assume(batchNumber > 0);
+
+        baseZkSyncUpgrade.setL2SystemContractsUpgradeBatchNumber(batchNumber);
 
         vm.expectRevert(PreviousUpgradeBatchNotCleared.selector);
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
