@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
@@ -21,6 +22,7 @@ import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
 import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
+import {SemVer} from "../common/libraries/SemVer.sol";
 
 /// @title State Transition Manager contract
 /// @author Matter Labs
@@ -47,7 +49,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The genesisUpgrade contract address, used to setChainId
     address public genesisUpgrade;
 
-    /// @dev The current protocolVersion
+    /// @dev The current packed protocolVersion. To access human-readable version, use `getSemverProtocolVersion` function.
     uint256 public protocolVersion;
 
     /// @dev The timestamp when protocolVersion can be last used
@@ -82,6 +84,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     modifier onlyOwnerOrAdmin() {
         require(msg.sender == admin || msg.sender == owner(), "STM: not owner or admin");
         _;
+    }
+
+    /// @return The tuple of (major, minor, patch) protocol version.
+    function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
+        // slither-disable-next-line unused-return
+        return SemVer.unpackSemVer(SafeCast.toUint96(protocolVersion));
     }
 
     /// @notice Returns all the registered hyperchain addresses
@@ -280,6 +288,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256[] memory uintEmptyArray;
         bytes[] memory bytesEmptyArray;
 
+        uint256 cachedProtocolVersion = protocolVersion;
+        // slither-disable-next-line unused-return
+        (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(cachedProtocolVersion));
+
         L2CanonicalTransaction memory l2ProtocolUpgradeTx = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
@@ -289,8 +301,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             maxFeePerGas: uint256(0),
             maxPriorityFeePerGas: uint256(0),
             paymaster: uint256(0),
-            // Note, that the protocol version is used as "nonce" for system upgrade transactions
-            nonce: protocolVersion,
+            // Note, that the `minor` of the protocol version is used as "nonce" for system upgrade transactions
+            nonce: uint256(minorVersion),
             value: 0,
             reserved: [uint256(0), 0, 0, 0],
             data: systemContextCalldata,
@@ -314,7 +326,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
             upgradeTimestamp: 0,
-            newProtocolVersion: protocolVersion
+            newProtocolVersion: cachedProtocolVersion
         });
 
         Diamond.FacetCut[] memory emptyArray;
@@ -325,7 +337,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         });
 
         IAdmin(_chainContract).executeUpgrade(cutData);
-        emit SetChainIdUpgrade(_chainContract, l2ProtocolUpgradeTx, protocolVersion);
+        emit SetChainIdUpgrade(_chainContract, l2ProtocolUpgradeTx, cachedProtocolVersion);
     }
 
     /// @dev used to register already deployed hyperchain contracts

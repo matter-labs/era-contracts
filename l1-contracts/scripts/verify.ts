@@ -6,7 +6,7 @@ import { getNumberFromEnv, getHashFromEnv, getAddressFromEnv, ethTestConfig } fr
 import { Interface } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
 import { Wallet } from "ethers";
-import { web3Provider } from "./utils";
+import { packSemver, unpackStringSemVer, web3Provider } from "./utils";
 import { getTokens } from "../src.ts/deploy-token";
 
 const provider = web3Provider();
@@ -121,7 +121,7 @@ async function main() {
   const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
   const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
   const diamondCut = await deployer.initialZkSyncHyperchainDiamondCut([]);
-  const protocolVersion = getNumberFromEnv("CONTRACTS_GENESIS_PROTOCOL_VERSION");
+  const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
 
   const initCalldata2 = stateTransitionManager.encodeFunctionData("initialize", [
     {
