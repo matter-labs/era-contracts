@@ -91,9 +91,6 @@ contract createNewChainTest is ChainTypeManagerTest {
         uint256[] memory chainIds = chainContractAddress.getAllHyperchainChainIDs();
         assertEq(chainIds.length, MAX_NUMBER_OF_HYPERCHAINS);
 
-        vm.stopPrank();
-        vm.startPrank(governor);
-
         vm.expectRevert("STM: Hyperchain limit reached");
         chainContractAddress.registerAlreadyDeployedHyperchain(100, makeAddr("randomHyperchain"));
     }
