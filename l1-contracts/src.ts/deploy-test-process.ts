@@ -38,7 +38,7 @@ const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.js
 const testnetTokenPath = `${testConfigPath}/hardhat.json`;
 
 export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
-  process.env.CONTRACTS_GENESIS_PROTOCOL_VERSION = (21).toString();
+  process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION = "0.21.0";
   process.env.CONTRACTS_GENESIS_ROOT = ethers.constants.HashZero;
   process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = "0";
   process.env.CONTRACTS_GENESIS_BATCH_COMMITMENT = ethers.constants.HashZero;

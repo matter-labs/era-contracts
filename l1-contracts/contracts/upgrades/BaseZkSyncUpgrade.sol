@@ -2,13 +2,16 @@
 
 pragma solidity 0.8.24;
 
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+
 import {ZkSyncHyperchainBase} from "../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
-import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "../common/Config.sol";
+import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
+import {SemVer} from "../common/libraries/SemVer.sol";
 
 /// @notice The struct that represents the upgrade proposal.
 /// @param l2ProtocolUpgradeTx The system upgrade transaction.
@@ -70,15 +73,16 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         // as the permitted delay window is reduced in the future.
         require(block.timestamp >= _proposedUpgrade.upgradeTimestamp, "Upgrade is not ready yet");
 
-        _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
+        (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
         _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
-        _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash);
+        _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash, isPatchOnly);
 
         txHash = _setL2SystemContractUpgrade(
             _proposedUpgrade.l2ProtocolUpgradeTx,
             _proposedUpgrade.factoryDeps,
-            _proposedUpgrade.newProtocolVersion
+            newMinorVersion,
+            isPatchOnly
         );
 
         _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
@@ -88,10 +92,13 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
     /// @notice Change default account bytecode hash, that is used on L2
     /// @param _l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
-    function _setL2DefaultAccountBytecodeHash(bytes32 _l2DefaultAccountBytecodeHash) private {
+    /// @param _patchOnly Whether only the patch part of the protocol version semver has changed
+    function _setL2DefaultAccountBytecodeHash(bytes32 _l2DefaultAccountBytecodeHash, bool _patchOnly) private {
         if (_l2DefaultAccountBytecodeHash == bytes32(0)) {
             return;
         }
+
+        require(!_patchOnly, "Patch only upgrade can not set new default account");
 
         L2ContractHelper.validateBytecodeHash(_l2DefaultAccountBytecodeHash);
 
@@ -105,10 +112,13 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
     /// @notice Change bootloader bytecode hash, that is used on L2
     /// @param _l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
-    function _setL2BootloaderBytecodeHash(bytes32 _l2BootloaderBytecodeHash) private {
+    /// @param _patchOnly Whether only the patch part of the protocol version semver has changed
+    function _setL2BootloaderBytecodeHash(bytes32 _l2BootloaderBytecodeHash, bool _patchOnly) private {
         if (_l2BootloaderBytecodeHash == bytes32(0)) {
             return;
         }
+
+        require(!_patchOnly, "Patch only upgrade can not set new bootloader");
 
         L2ContractHelper.validateBytecodeHash(_l2BootloaderBytecodeHash);
 
@@ -167,24 +177,32 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
     /// @notice Updates the bootloader hash and the hash of the default account
     /// @param _bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
     /// @param _defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
-    function _setBaseSystemContracts(bytes32 _bootloaderHash, bytes32 _defaultAccountHash) internal {
-        _setL2BootloaderBytecodeHash(_bootloaderHash);
-        _setL2DefaultAccountBytecodeHash(_defaultAccountHash);
+    /// @param _patchOnly Whether only the patch part of the protocol version semver has changed.
+    function _setBaseSystemContracts(bytes32 _bootloaderHash, bytes32 _defaultAccountHash, bool _patchOnly) internal {
+        _setL2BootloaderBytecodeHash(_bootloaderHash, _patchOnly);
+        _setL2DefaultAccountBytecodeHash(_defaultAccountHash, _patchOnly);
     }
 
     /// @notice Sets the hash of the L2 system contract upgrade transaction for the next batch to be committed
     /// @dev If the transaction is noop (i.e. its type is 0) it does nothing and returns 0.
     /// @param _l2ProtocolUpgradeTx The L2 system contract upgrade transaction.
+    /// @param _factoryDeps The factory dependencies that are used by the transaction.
+    /// @param _newMinorProtocolVersion The new minor protocol version. It must be used as the `nonce` field
+    /// of the `_l2ProtocolUpgradeTx`.
+    /// @param _patchOnly Whether only the patch part of the protocol version semver has changed.
     /// @return System contracts upgrade transaction hash. Zero if no upgrade transaction is set.
     function _setL2SystemContractUpgrade(
         L2CanonicalTransaction calldata _l2ProtocolUpgradeTx,
         bytes[] calldata _factoryDeps,
-        uint256 _newProtocolVersion
+        uint32 _newMinorProtocolVersion,
+        bool _patchOnly
     ) internal returns (bytes32) {
         // If the type is 0, it is considered as noop and so will not be required to be executed.
         if (_l2ProtocolUpgradeTx.txType == 0) {
             return bytes32(0);
         }
+
+        require(!_patchOnly, "Patch only upgrade can not set upgrade transaction");
 
         require(_l2ProtocolUpgradeTx.txType == SYSTEM_UPGRADE_L2_TX_TYPE, "L2 system upgrade tx type is wrong");
 
@@ -202,7 +220,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         // We want the hashes of l2 system upgrade transactions to be unique.
         // This is why we require that the `nonce` field is unique to each upgrade.
         require(
-            _l2ProtocolUpgradeTx.nonce == _newProtocolVersion,
+            _l2ProtocolUpgradeTx.nonce == _newMinorProtocolVersion,
             "The new protocol version should be included in the L2 system upgrade tx"
         );
 
@@ -232,24 +250,48 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
-    function _setNewProtocolVersion(uint256 _newProtocolVersion) internal virtual {
+    function _setNewProtocolVersion(
+        uint256 _newProtocolVersion
+    ) internal virtual returns (uint32 newMinorVersion, bool patchOnly) {
         uint256 previousProtocolVersion = s.protocolVersion;
         require(
             _newProtocolVersion > previousProtocolVersion,
             "New protocol version is not greater than the current one"
         );
-        require(
-            _newProtocolVersion - previousProtocolVersion <= MAX_ALLOWED_PROTOCOL_VERSION_DELTA,
-            "Too big protocol version difference"
+        // slither-disable-next-line unused-return
+        (uint32 previousMajorVersion, uint32 previousMinorVersion, ) = SemVer.unpackSemVer(
+            SafeCast.toUint96(previousProtocolVersion)
         );
+        require(previousMajorVersion == 0, "Implementation requires that the major version is 0 at all times");
 
-        // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
-        // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
-        require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
-        require(
-            s.l2SystemContractsUpgradeBatchNumber == 0,
-            "The batch number of the previous upgrade has not been cleaned"
-        );
+        uint32 newMajorVersion;
+        // slither-disable-next-line unused-return
+        (newMajorVersion, newMinorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion));
+        require(newMajorVersion == 0, "Major must always be 0");
+
+        // Since `_newProtocolVersion > previousProtocolVersion`, and both old and new major version is 0,
+        // the difference between minor versions is >= 0.
+        uint256 minorDelta = newMinorVersion - previousMinorVersion;
+
+        if (minorDelta == 0) {
+            patchOnly = true;
+        }
+
+        // While this is implicitly enforced by other checks above, we still double check just in case
+        require(minorDelta <= MAX_ALLOWED_MINOR_VERSION_DELTA, "Too big protocol version difference");
+
+        // If the minor version changes also, we need to ensure that the previous upgrade has been finalized.
+        // In case the minor version does not change, we permit to keep the old upgrade transaction in the system, but it
+        // must be ensured in the other parts of the upgrade that the is not overridden.
+        if (!patchOnly) {
+            // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
+            // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
+            require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
+            require(
+                s.l2SystemContractsUpgradeBatchNumber == 0,
+                "The batch number of the previous upgrade has not been cleaned"
+            );
+        }
 
         s.protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
