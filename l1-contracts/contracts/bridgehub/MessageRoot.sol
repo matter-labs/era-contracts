@@ -24,16 +24,16 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
+    uint256 public chainCount;
+
+    mapping(uint256 chainId => uint256 chainIndex) public chainIndex;
+
+    mapping(uint256 chainIndex => uint256 chainId) public chainIndexToId;
+
     FullMerkle.FullTree public sharedTree;
 
     /// @dev the incremental merkle tree storing the chain message roots
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
-
-    mapping(uint256 chainId => uint256 chainIndex) public chainIndex;
-
-    uint256 public chainCount;
-
-    mapping(uint256 chainIndex => uint256 chainId) public chainIndexToId;
 
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
@@ -54,16 +54,20 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
         BRIDGE_HUB = _bridgehub;
     }
 
+    function chainMessageRoot(uint256 _chainId) external view override returns (bytes32) {
+        return chainTree[_chainId].root();
+    }
+
     /// @dev add a new chainBatchRoot to the chainTree
     function addChainBatchRoot(
         uint256 _chainId,
         bytes32 _chainBatchRoot,
-        bool _updateFMT
+        bool _updateFullTree
     ) external onlyChain(_chainId) {
         bytes32 chainRoot;
         (, chainRoot) = chainTree[_chainId].push(_chainBatchRoot);
 
-        if (_updateFMT) {
+        if (_updateFullTree) {
             sharedTree.updateLeaf(chainIndex[_chainId], chainRoot);
         }
     }

@@ -143,23 +143,8 @@ library DynamicIncrementalMerkle {
     /**
      * @dev Tree's height (set at initialization)
      */
-    function height(Bytes32PushTree storage self) internal view returns (uint256) {
-        return self._height;
-    }
 
     function root(Bytes32PushTree storage self) internal view returns (bytes32) {
         return Arrays.unsafeAccess(self._sides, self._height).value;
-    }
-
-    function nextLeafIndex(Bytes32PushTree storage self) internal view returns (uint256) {
-        return self._nextLeafIndex;
-    }
-
-    function side(Bytes32PushTree storage self, uint256 i) internal view returns (bytes32) {
-        return Arrays.unsafeAccess(self._sides, i).value;
-    }
-
-    function zeros(Bytes32PushTree storage self, uint256 i) internal view returns (bytes32) {
-        return Arrays.unsafeAccess(self._zeros, i).value;
     }
 }

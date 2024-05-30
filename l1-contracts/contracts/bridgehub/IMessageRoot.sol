@@ -7,5 +7,5 @@ import {IBridgehub} from "./IBridgehub.sol";
 interface IMessageRoot {
     function BRIDGE_HUB() external view returns (IBridgehub);
 
-    // function chainMessageRoot(uint256 _chainId) external view returns (bytes32);
+    function chainMessageRoot(uint256 _chainId) external view returns (bytes32);
 }
