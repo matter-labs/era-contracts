@@ -12,8 +12,9 @@ import type { ExecutorFacet } from "../../typechain";
 
 import type { FeeParams, L2CanonicalTransaction } from "../../src.ts/utils";
 import { ADDRESS_ONE, PubdataPricingMode, EMPTY_STRING_KECCAK } from "../../src.ts/utils";
+import { packSemver } from "../../scripts/utils";
 
-export const CONTRACTS_GENESIS_PROTOCOL_VERSION = (21).toString();
+export const CONTRACTS_GENESIS_PROTOCOL_VERSION = packSemver(0, 21, 0).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const IERC20_INTERFACE = require("@openzeppelin/contracts/build/contracts/IERC20");
 export const DEFAULT_REVERT_REASON = "VM did not revert";

@@ -131,4 +131,6 @@ interface IStateTransitionManager {
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
     ) external;
+
+    function getSemverProtocolVersion() external view returns (uint32, uint32, uint32);
 }
