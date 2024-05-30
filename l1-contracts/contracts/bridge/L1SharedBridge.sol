@@ -747,17 +747,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes memory bridgeMintCalldata;
 
         {
-            bytes memory _assetData;
-
             // Inner call to encode data to decrease local var numbers
-            try this.decodeLegacyData(abi.encode(_l1Asset, _amount, _l2Receiver), _prevMsgSender) returns (
-                bytes32 _assetInfoCatch,
-                bytes memory _assetDataCatch
-            ) {
-                (_assetInfo, _assetData) = (_assetInfoCatch, _assetDataCatch);
-            } catch {
-                (_assetInfo, _assetData) = abi.decode(abi.encode(_l1Asset, _amount, _l2Receiver), (bytes32, bytes));
+            bytes32 assetInfo = nativeTokenVault.getAssetInfo(_l1Asset);
+            if (nativeTokenVault.tokenAddress(assetInfo) == address(0)) {
+                nativeTokenVault.registerToken(_l1Asset);
             }
+            _transferAllowanceToNTV(assetInfo, _amount, _prevMsgSender);
+            bytes memory _assetData = abi.encode(_amount, _l2Receiver);
 
             // solhint-disable-next-line func-named-parameters
             bridgeMintCalldata = abi.encode(_amount, _prevMsgSender, _l2Receiver, _getERC20Getters(_l1Asset), _l1Asset);

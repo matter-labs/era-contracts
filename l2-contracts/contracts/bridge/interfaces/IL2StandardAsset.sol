@@ -9,7 +9,7 @@ interface IL2StandardAsset {
 
     event BridgeBurn(
         uint256 indexed _chainId,
-        address indexed l2Token,
+        bytes32 indexed _assetInfo,
         address indexed l2Sender,
         address _receiver,
         uint256 _mintValue,

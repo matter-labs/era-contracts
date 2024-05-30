@@ -110,7 +110,7 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         emit WithdrawalInitiated(_prevMsgSender, _l1Receiver, l2Token, _amount);
         /// New Format
         // solhint-disable-next-line func-named-parameters
-        emit BridgeBurn(_chainId, l2Token, _prevMsgSender, _l1Receiver, _mintValue, _amount);
+        emit BridgeBurn(_chainId, _assetInfo, _prevMsgSender, _l1Receiver, _mintValue, _amount);
         _bridgeMintData = _data;
     }
 
