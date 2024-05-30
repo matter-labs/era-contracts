@@ -818,8 +818,6 @@ export class Deployer {
         console.log(`Validium mode set, gas used: ${receipt5.gasUsed.toString()}`);
       }
     }
-
-    await this.transferAdminFromDeployerToGovernance();
   }
 
   public async transferAdminFromDeployerToGovernance() {
