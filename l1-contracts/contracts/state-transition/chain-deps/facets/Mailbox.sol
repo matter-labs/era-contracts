@@ -9,7 +9,7 @@ import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
-import {Merkle} from "../../libraries/Merkle.sol";
+import {Merkle} from "../../../common/libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
