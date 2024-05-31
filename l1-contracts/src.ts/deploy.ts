@@ -22,6 +22,7 @@ import {
   PubdataPricingMode,
   hashL2Bytecode,
   DIAMOND_CUT_DATA_ABI_STRING,
+  compileInitialCutHash,
 } from "./utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
@@ -98,43 +99,18 @@ export class Deployer {
       recursionCircuitsSetVksHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
     };
     const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
-    const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
-    const feeParams = {
-      pubdataPricingMode: PubdataPricingMode.Rollup,
-      batchOverheadL1Gas: SYSTEM_CONFIG.priorityTxBatchOverheadL1Gas,
-      maxPubdataPerBatch: SYSTEM_CONFIG.priorityTxPubdataPerBatch,
-      priorityTxMaxPubdata: SYSTEM_CONFIG.priorityTxMaxPubdata,
-      maxL2GasPerBatch: SYSTEM_CONFIG.priorityTxMaxGasPerBatch,
-      minimalL2GasPrice: SYSTEM_CONFIG.priorityTxMinimalGasPrice,
-    };
 
-    const diamondInitCalldata = DiamondInit.encodeFunctionData("initialize", [
-      // these first values are set in the contract
-      {
-        chainId: "0x0000000000000000000000000000000000000000000000000000000000000001",
-        bridgehub: "0x0000000000000000000000000000000000001234",
-        stateTransitionManager: "0x0000000000000000000000000000000000002234",
-        protocolVersion: "0x0000000000000000000000000000000000002234",
-        admin: "0x0000000000000000000000000000000000003234",
-        validatorTimelock: "0x0000000000000000000000000000000000004234",
-        baseToken: "0x0000000000000000000000000000000000004234",
-        baseTokenBridge: "0x0000000000000000000000000000000000004234",
-        storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
-        verifier: this.addresses.StateTransition.Verifier,
-        verifierParams,
-        l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
-        l2DefaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-        priorityTxMaxGasLimit,
-        feeParams,
-        blobVersionedHashRetriever: this.addresses.BlobVersionedHashRetriever,
-      },
-    ]);
-
-    return diamondCut(
+    return compileInitialCutHash(
       facetCuts,
+      verifierParams,
+      L2_BOOTLOADER_BYTECODE_HASH,
+      L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+      this.addresses.StateTransition.Verifier,
+      this.addresses.BlobVersionedHashRetriever,
+      +priorityTxMaxGasLimit,
       this.addresses.StateTransition.DiamondInit,
-      "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2)
+      false
     );
   }
 
