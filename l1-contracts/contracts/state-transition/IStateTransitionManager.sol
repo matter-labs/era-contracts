@@ -54,10 +54,7 @@ interface IStateTransitionManager {
     /// @notice ValidatorTimelock changed
     event NewValidatorTimelock(address indexed oldValidatorTimelock, address indexed newValidatorTimelock);
 
-    /// @notice storedBatchZero changed
-    event NewStoredBatchZero(bytes32 indexed oldStoredBatchZero, bytes32 indexed newStoredBatchZero);
-
-    /// @notice storedBatchZero changed
+    /// @notice chain creation parameters changed
     event NewChainCreationParams(
         address genesisUpgrade, 
         bytes32 genesisBatchHash,
@@ -65,9 +62,6 @@ interface IStateTransitionManager {
         bytes32 genesisBatchCommitment,
         bytes32 initialcutHash
     );
-
-    /// @notice InitialCutHash changed
-    event NewInitialCutHash(bytes32 indexed oldInitialCutHash, bytes32 indexed newInitialCutHash);
 
     /// @notice new UpgradeCutHash
     event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
