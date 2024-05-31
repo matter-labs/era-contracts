@@ -10,11 +10,7 @@ import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
 /// @param owner The address who can manage non-critical updates in the contract
 /// @param validatorTimelock The address that serves as consensus, i.e. can submit blocks to be processed
-/// @param genesisUpgrade The address that is used in the diamond cut initialize address on chain creation
-/// @param genesisBatchHash Batch hash of the genesis (initial) batch
-/// @param genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for the genesis batch
-/// @param genesisBatchCommitment The zk-proof commitment for the genesis batch
-/// @param diamondCut The diamond cut for the first upgrade transaction on the newly deployed chain
+/// @param chainCreationParams The struct that contains the fields that define how a new chain should be created
 /// @param protocolVersion The initial protocol version on the newly deployed chain
 struct StateTransitionManagerInitializeData {
     address owner;
@@ -25,6 +21,11 @@ struct StateTransitionManagerInitializeData {
 
 /// @notice The struct that contains the fields that define how a new chain should be created
 /// within this STM. 
+/// @param genesisUpgrade The address that is used in the diamond cut initialize address on chain creation
+/// @param genesisBatchHash Batch hash of the genesis (initial) batch
+/// @param genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for the genesis batch
+/// @param genesisBatchCommitment The zk-proof commitment for the genesis batch
+/// @param diamondCut The diamond cut for the first upgrade transaction on the newly deployed chain
 struct ChainCreationParams {
     address genesisUpgrade;
     bytes32 genesisBatchHash;

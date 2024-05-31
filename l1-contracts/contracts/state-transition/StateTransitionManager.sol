@@ -135,6 +135,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
     }
 
+    /// @notice Updates the parameters with which a new chain is created
+    /// @param _chainCreationParams The new chain creation parameters
     function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal {
         require(_chainCreationParams.genesisUpgrade != address(0), "STM: genesisUpgrade zero");
         require(_chainCreationParams.genesisBatchHash != bytes32(0), "STM: genesisBatchHash zero");
@@ -167,6 +169,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         );
     }
     
+    /// @notice Updates the parameters with which a new chain is created
+    /// @param _chainCreationParams The new chain creation parameters
     function updateChainCreationParams(ChainCreationParams calldata _chainCreationParams) external onlyOwner {
         _setChainCreationParams(_chainCreationParams);
     }
