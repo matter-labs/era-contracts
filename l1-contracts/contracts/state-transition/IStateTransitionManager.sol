@@ -97,8 +97,6 @@ interface IStateTransitionManager {
 
     function initialize(StateTransitionManagerInitializeData calldata _initializeData) external;
 
-    function setInitialCutHash(Diamond.DiamondCutData calldata _diamondCut) external;
-
     function setValidatorTimelock(address _validatorTimelock) external;
 
     function getChainAdmin(uint256 _chainId) external view returns (address);

@@ -11,7 +11,7 @@ import {IAdmin} from "./chain-interfaces/IAdmin.sol";
 import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
-import {IStateTransitionManager, StateTransitionManagerInitializeData} from "./IStateTransitionManager.sol";
+import {IStateTransitionManager, StateTransitionManagerInitializeData, ChainCreationParams} from "./IStateTransitionManager.sol";
 import {ISystemContext} from "./l2-deps/ISystemContext.sol";
 import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
@@ -124,31 +124,23 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         require(_initializeData.owner != address(0), "STM: owner zero");
         _transferOwnership(_initializeData.owner);
 
-        genesisUpgrade = _initializeData.genesisUpgrade;
         protocolVersion = _initializeData.protocolVersion;
         protocolVersionDeadline[_initializeData.protocolVersion] = type(uint256).max;
         validatorTimelock = _initializeData.validatorTimelock;
 
-        // We need to initialize the state hash because it is used in the commitment of the next batch
-        IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
-            batchNumber: 0,
-            batchHash: _initializeData.genesisBatchHash,
-            indexRepeatedStorageChanges: _initializeData.genesisIndexRepeatedStorageChanges,
-            numberOfLayer1Txs: 0,
-            priorityOperationsHash: EMPTY_STRING_KECCAK,
-            l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
-            timestamp: 0,
-            commitment: _initializeData.genesisBatchCommitment
-        });
-        storedBatchZero = keccak256(abi.encode(batchZero));
-        initialCutHash = keccak256(abi.encode(_initializeData.diamondCut));
+        _setChainCreationParams(_initializeData.chainCreationParams);
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
     }
-    
-    function updateChainCreationParams(ChainCreationParams calldata _chainCreationParams) external onlyOwner {
+
+    function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal {
+        require(_chainCreationParams.genesisUpgrade != address(0), "STM: genesisUpgrade zero");
+        require(_chainCreationParams.genesisBatchHash != bytes32(0), "STM: genesisBatchHash zero");
+        require(_chainCreationParams.genesisIndexRepeatedStorageChanges != uint64(0), "STM: genesisIndexRepeatedStorageChanges zero");
+        require(_chainCreationParams.genesisBatchCommitment != bytes32(0), "STM: genesisBatchCommitment zero");
+
         genesisUpgrade = _chainCreationParams.genesisUpgrade;
         
         // We need to initialize the state hash because it is used in the commitment of the next batch
@@ -173,6 +165,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             _chainCreationParams.genesisBatchCommitment,
             newInitialCutHash
         );
+    }
+    
+    function updateChainCreationParams(ChainCreationParams calldata _chainCreationParams) external onlyOwner {
+        _setChainCreationParams(_chainCreationParams);
     }
 
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
