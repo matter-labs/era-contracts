@@ -20,7 +20,7 @@ struct StateTransitionManagerInitializeData {
 }
 
 /// @notice The struct that contains the fields that define how a new chain should be created
-/// within this STM. 
+/// within this STM.
 /// @param genesisUpgrade The address that is used in the diamond cut initialize address on chain creation
 /// @param genesisBatchHash Batch hash of the genesis (initial) batch
 /// @param genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for the genesis batch
@@ -57,11 +57,11 @@ interface IStateTransitionManager {
 
     /// @notice chain creation parameters changed
     event NewChainCreationParams(
-        address genesisUpgrade, 
+        address genesisUpgrade,
         bytes32 genesisBatchHash,
         uint64 genesisIndexRepeatedStorageChanges,
         bytes32 genesisBatchCommitment,
-        bytes32 initialCutHash
+        bytes32 newInitialCutHash
     );
 
     /// @notice new UpgradeCutHash

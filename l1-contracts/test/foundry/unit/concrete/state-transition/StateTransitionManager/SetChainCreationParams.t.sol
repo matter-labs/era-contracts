@@ -48,6 +48,10 @@ contract SetChainCreationParamsTest is StateTransitionManagerTest {
         });
         bytes32 expectedStoredBatchZero = keccak256(abi.encode(newBatchZero));
 
-        assertEq(chainContractAddress.storedBatchZero(), expectedStoredBatchZero, "Stored batch zero was not set correctly");
+        assertEq(
+            chainContractAddress.storedBatchZero(),
+            expectedStoredBatchZero,
+            "Stored batch zero was not set correctly"
+        );
     }
 }

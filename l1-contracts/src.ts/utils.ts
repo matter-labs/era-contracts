@@ -7,7 +7,8 @@ import { ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
 import { DiamondInitFactory } from "../typechain";
-import { DiamondCut, FacetCut, diamondCut } from "./diamondCut";
+import type { DiamondCut, FacetCut } from "./diamondCut";
+import { diamondCut } from "./diamondCut";
 import { SYSTEM_CONFIG } from "../scripts/utils";
 
 export const testConfigPath = process.env.ZKSYNC_ENV
@@ -188,13 +189,13 @@ function checkValidInitialCutHashParams(
   l2DefaultAccountBytecodeHash: string,
   verifier: string,
   blobVersionedHashRetriever: string,
-  priorityTxMaxGasLimit: number,
+  priorityTxMaxGasLimit: number
 ) {
-  // We do not fetch the following numbers from the environment because they are very rarely changed 
+  // We do not fetch the following numbers from the environment because they are very rarely changed
   // and we want to avoid the risk of accidentally changing them.
   const EXPECTED_FACET_CUTS = 4;
   const EXPECTED_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
-  
+
   if (facetCuts.length != EXPECTED_FACET_CUTS) {
     throw new Error(`Expected ${EXPECTED_FACET_CUTS} facet cuts, got ${facetCuts.length}`);
   }
@@ -221,7 +222,9 @@ function checkValidInitialCutHashParams(
     throw new Error("Blob versioned hash retriever address is zero");
   }
   if (priorityTxMaxGasLimit !== EXPECTED_PRIORITY_TX_MAX_GAS_LIMIT) {
-    throw new Error(`Expected priority tx max gas limit to be ${EXPECTED_PRIORITY_TX_MAX_GAS_LIMIT}, got ${priorityTxMaxGasLimit}`);
+    throw new Error(
+      `Expected priority tx max gas limit to be ${EXPECTED_PRIORITY_TX_MAX_GAS_LIMIT}, got ${priorityTxMaxGasLimit}`
+    );
   }
 }
 
@@ -245,47 +248,42 @@ export function compileInitialCutHash(
       l2DefaultAccountBytecodeHash,
       verifier,
       blobVersionedHashRetriever,
-      priorityTxMaxGasLimit,
+      priorityTxMaxGasLimit
     );
   }
 
   const factory = new DiamondInitFactory();
 
   const feeParams = {
-      pubdataPricingMode: PubdataPricingMode.Rollup,
-      batchOverheadL1Gas: SYSTEM_CONFIG.priorityTxBatchOverheadL1Gas,
-      maxPubdataPerBatch: SYSTEM_CONFIG.priorityTxPubdataPerBatch,
-      priorityTxMaxPubdata: SYSTEM_CONFIG.priorityTxMaxPubdata,
-      maxL2GasPerBatch: SYSTEM_CONFIG.priorityTxMaxGasPerBatch,
-      minimalL2GasPrice: SYSTEM_CONFIG.priorityTxMinimalGasPrice,
+    pubdataPricingMode: PubdataPricingMode.Rollup,
+    batchOverheadL1Gas: SYSTEM_CONFIG.priorityTxBatchOverheadL1Gas,
+    maxPubdataPerBatch: SYSTEM_CONFIG.priorityTxPubdataPerBatch,
+    priorityTxMaxPubdata: SYSTEM_CONFIG.priorityTxMaxPubdata,
+    maxL2GasPerBatch: SYSTEM_CONFIG.priorityTxMaxGasPerBatch,
+    minimalL2GasPrice: SYSTEM_CONFIG.priorityTxMinimalGasPrice,
   };
 
-    const diamondInitCalldata = factory.interface.encodeFunctionData("initialize", [
-      // these first values are set in the contract
-      {
-        chainId: "0x0000000000000000000000000000000000000000000000000000000000000001",
-        bridgehub: "0x0000000000000000000000000000000000001234",
-        stateTransitionManager: "0x0000000000000000000000000000000000002234",
-        protocolVersion: "0x0000000000000000000000000000000000002234",
-        admin: "0x0000000000000000000000000000000000003234",
-        validatorTimelock: "0x0000000000000000000000000000000000004234",
-        baseToken: "0x0000000000000000000000000000000000004234",
-        baseTokenBridge: "0x0000000000000000000000000000000000004234",
-        storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
-        verifier,
-        verifierParams,
-        l2BootloaderBytecodeHash,
-        l2DefaultAccountBytecodeHash,
-        priorityTxMaxGasLimit,
-        feeParams,
-        blobVersionedHashRetriever,
-      },
-    ]);
+  const diamondInitCalldata = factory.interface.encodeFunctionData("initialize", [
+    // these first values are set in the contract
+    {
+      chainId: "0x0000000000000000000000000000000000000000000000000000000000000001",
+      bridgehub: "0x0000000000000000000000000000000000001234",
+      stateTransitionManager: "0x0000000000000000000000000000000000002234",
+      protocolVersion: "0x0000000000000000000000000000000000002234",
+      admin: "0x0000000000000000000000000000000000003234",
+      validatorTimelock: "0x0000000000000000000000000000000000004234",
+      baseToken: "0x0000000000000000000000000000000000004234",
+      baseTokenBridge: "0x0000000000000000000000000000000000004234",
+      storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
+      verifier,
+      verifierParams,
+      l2BootloaderBytecodeHash,
+      l2DefaultAccountBytecodeHash,
+      priorityTxMaxGasLimit,
+      feeParams,
+      blobVersionedHashRetriever,
+    },
+  ]);
 
-  return diamondCut(
-      facetCuts,
-      diamondInit,
-      "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2)
-  );
+  return diamondCut(facetCuts, diamondInit, "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2));
 }
-

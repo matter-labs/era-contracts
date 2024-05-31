@@ -10,7 +10,6 @@ import {
   packSemver,
   readBatchBootloaderBytecode,
   readSystemContractsBytecode,
-  SYSTEM_CONFIG,
   unpackStringSemVer,
 } from "../scripts/utils";
 import { getTokens } from "./deploy-token";
@@ -36,7 +35,7 @@ import { L1SharedBridgeFactory } from "../typechain/L1SharedBridgeFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
 import type { FacetCut } from "./diamondCut";
-import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
+import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
 import { ERC20Factory } from "../typechain";
 import type { Contract, Overrides } from "@ethersproject/contracts";
@@ -99,7 +98,6 @@ export class Deployer {
       recursionCircuitsSetVksHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
     };
     const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
-
 
     return compileInitialCutHash(
       facetCuts,

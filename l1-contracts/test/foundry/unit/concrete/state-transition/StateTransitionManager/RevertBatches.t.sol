@@ -98,7 +98,6 @@ contract revertBatchesTest is StateTransitionManagerTest {
             bytes32(uint256(0x01))
         );
 
-
         l2Logs = Utils.encodePacked(correctL2Logs);
         newCommitBatchInfo.timestamp = uint64(currentTimestamp);
         newCommitBatchInfo.systemLogs = l2Logs;

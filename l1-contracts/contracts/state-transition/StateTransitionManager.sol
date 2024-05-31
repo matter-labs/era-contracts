@@ -140,11 +140,14 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal {
         require(_chainCreationParams.genesisUpgrade != address(0), "STM: genesisUpgrade zero");
         require(_chainCreationParams.genesisBatchHash != bytes32(0), "STM: genesisBatchHash zero");
-        require(_chainCreationParams.genesisIndexRepeatedStorageChanges != uint64(0), "STM: genesisIndexRepeatedStorageChanges zero");
+        require(
+            _chainCreationParams.genesisIndexRepeatedStorageChanges != uint64(0),
+            "STM: genesisIndexRepeatedStorageChanges zero"
+        );
         require(_chainCreationParams.genesisBatchCommitment != bytes32(0), "STM: genesisBatchCommitment zero");
 
         genesisUpgrade = _chainCreationParams.genesisUpgrade;
-        
+
         // We need to initialize the state hash because it is used in the commitment of the next batch
         IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
             batchNumber: 0,
@@ -160,15 +163,15 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         bytes32 newInitialCutHash = keccak256(abi.encode(_chainCreationParams.diamondCut));
         initialCutHash = newInitialCutHash;
 
-        emit NewChainCreationParams(
-            _chainCreationParams.genesisUpgrade, 
-            _chainCreationParams.genesisBatchHash,
-            _chainCreationParams.genesisIndexRepeatedStorageChanges,
-            _chainCreationParams.genesisBatchCommitment,
-            newInitialCutHash
-        );
+        emit NewChainCreationParams({
+            genesisUpgrade: _chainCreationParams.genesisUpgrade,
+            genesisBatchHash: _chainCreationParams.genesisBatchHash,
+            genesisIndexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
+            genesisBatchCommitment: _chainCreationParams.genesisBatchCommitment,
+            newInitialCutHash: newInitialCutHash
+        });
     }
-    
+
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters
     function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external onlyOwner {

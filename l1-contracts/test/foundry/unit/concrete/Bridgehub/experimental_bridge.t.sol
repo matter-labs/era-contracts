@@ -7,7 +7,7 @@ import {stdStorage, StdStorage, Test} from "forge-std/Test.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import { ChainCreationParams } from "contracts/state-transition/IStateTransitionManager.sol";
+import {ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {DummyStateTransitionManagerWBH} from "contracts/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
 import {DummyHyperchain} from "contracts/dev-contracts/test/DummyHyperchain.sol";

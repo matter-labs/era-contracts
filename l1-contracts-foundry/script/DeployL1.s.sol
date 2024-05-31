@@ -433,14 +433,14 @@ contract DeployL1Script is Script {
             genesisBatchHash: config.contracts.genesisRoot,
             genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.genesisBatchCommitment,
-            diamondCut: diamondCut,
+            diamondCut: diamondCut
         });
 
         StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
             owner: config.ownerAddress,
             validatorTimelock: addresses.validatorTimelock,
-            chainCreationParams,
-            protocolVersion: config.contracts.latestProtocolVersion,
+            chainCreationParams: chainCreationParams,
+            protocolVersion: config.contracts.latestProtocolVersion
         });
 
         address contractAddress = deployViaCreate2(
