@@ -1,4 +1,5 @@
 # zkSync Era: Smart Contracts
+test
 
 [![Logo](eraLogo.svg)](https://zksync.io/)
 
