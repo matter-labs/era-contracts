@@ -73,7 +73,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
   },
   ecPairing: {
     address: "0x0000000000000000000000000000000000000008",
-    codeName: "EcMul",
+    codeName: "EcPairing",
     lang: Language.Yul,
     path: "precompiles",
   },
