@@ -8,9 +8,9 @@ import {ProtocolVersionShouldBeGreater, ProtocolVersionDeltaTooLarge, PreviousUp
 import {MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "contracts/common/Config.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
-import {BaseUpgradeSetters} from "./_SharedBaseUpgradeSetters.t.sol";
+import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 
-contract DummytBaseZkSyncUpgradeGenesis is BaseZkSyncUpgradeGenesis, BaseUpgradeSetters {}
+contract DummytBaseZkSyncUpgradeGenesis is BaseZkSyncUpgradeGenesis, BaseUpgradeUtils {}
 
 contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
     DummytBaseZkSyncUpgradeGenesis baseZkSyncUpgrade;
@@ -82,5 +82,10 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
 
     function test_SuccessUpdate() public {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+        assertEq(baseZkSyncUpgrade.getVerifier(), proposedUpgrade.verifier);
+        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
+        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 }

@@ -6,9 +6,9 @@ import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {PubdataPricingMode, FeeParams} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
-import {BaseUpgradeSetters} from "./_SharedBaseUpgradeSetters.t.sol";
+import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 
-contract DummyDefaultUpgrade is DefaultUpgrade, BaseUpgradeSetters {}
+contract DummyDefaultUpgrade is DefaultUpgrade, BaseUpgradeUtils {}
 
 contract DefaultUpgradeTest is BaseUpgrade {
     DummyDefaultUpgrade baseZkSyncUpgrade;
@@ -24,5 +24,10 @@ contract DefaultUpgradeTest is BaseUpgrade {
 
     function test_SuccessUpdate() public {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+        assertEq(baseZkSyncUpgrade.getVerifier(), proposedUpgrade.verifier);
+        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
+        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 }
