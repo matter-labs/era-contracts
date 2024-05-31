@@ -9,8 +9,7 @@ import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
-import {DummyMailbox} from "contracts/dev-contracts/test/DummyMailbox.sol";
-import {DummyL1ERC20Bridge} from "contracts/dev-contracts/test/DummyErc20Bridge.sol";
+import {DummyHyperchain} from "contracts/dev-contracts/test/DummyHyperchain.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
@@ -74,21 +73,23 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
     }
 
     function test_transferETHFundsFromLegacy(uint256 amount) public {
-        DummyMailbox mailbox = new DummyMailbox(address(sharedBridge));
-        address mailboxAddress = address(mailbox);
+        DummyHyperchain hyperchain = new DummyHyperchain(bridgehubAddress, eraChainId);
+        hyperchain.setBaseTokenBridge(address(sharedBridge));
+        hyperchain.setChainId(eraChainId);
+        address hyperchainAddress = address(hyperchain);
 
         amount = bound(amount, 1, type(uint256).max);
-        vm.deal(mailboxAddress, amount);
+        vm.deal(hyperchainAddress, amount);
 
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.getHyperchain.selector, eraChainId),
-            abi.encode(mailboxAddress)
+            abi.encode(hyperchainAddress)
         );
 
         assertEq(sharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), 0);
         vm.prank(owner);
-        sharedBridge.transferFundsFromLegacy(ETH_TOKEN_ADDRESS, mailboxAddress, 9);
+        sharedBridge.transferFundsFromLegacy(ETH_TOKEN_ADDRESS, hyperchainAddress, eraChainId);
         assertEq(sharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), amount);
     }
 

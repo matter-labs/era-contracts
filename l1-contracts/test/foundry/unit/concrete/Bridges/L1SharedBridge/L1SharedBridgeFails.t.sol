@@ -889,34 +889,34 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     }
 
     function test_finalizeWithdrawalLegacyErc20Bridge_badCaller(address caller) public {
-        if (caller != l1ERC20BridgeAddress) {
-            vm.expectRevert("ShB not legacy bridge");
-            vm.prank(caller);
-            sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
-                _l2BatchNumber: 0,
-                _l2MessageIndex: 0,
-                _l2TxNumberInBatch: 0,
-                _message: new bytes(0),
-                _merkleProof: new bytes32[](0)
-            });
-        }
+        vm.assume(caller != l1ERC20BridgeAddress);
+
+        vm.expectRevert("ShB not legacy bridge");
+        vm.prank(caller);
+        sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
+            _l2BatchNumber: 0,
+            _l2MessageIndex: 0,
+            _l2TxNumberInBatch: 0,
+            _message: new bytes(0),
+            _merkleProof: new bytes32[](0)
+        });
     }
 
     function test_claimFailedDepositLegacyErc20Bridge_badCaller(address caller) public {
-        if (caller != l1ERC20BridgeAddress) {
-            vm.expectRevert("ShB not legacy bridge");
-            vm.prank(caller);
-            sharedBridge.claimFailedDepositLegacyErc20Bridge({
-                _depositSender: address(0),
-                _l1Token: address(0),
-                _amount: 0,
-                _l2TxHash: bytes32(0),
-                _l2BatchNumber: 0,
-                _l2MessageIndex: 0,
-                _l2TxNumberInBatch: 0,
-                _merkleProof: new bytes32[](0)
-            });
-        }
+        vm.assume(caller != l1ERC20BridgeAddress);
+
+        vm.expectRevert("ShB not legacy bridge");
+        vm.prank(caller);
+        sharedBridge.claimFailedDepositLegacyErc20Bridge({
+            _depositSender: address(0),
+            _l1Token: address(0),
+            _amount: 0,
+            _l2TxHash: bytes32(0),
+            _l2BatchNumber: 0,
+            _l2MessageIndex: 0,
+            _l2TxNumberInBatch: 0,
+            _merkleProof: new bytes32[](0)
+        });
     }
 
     function test_depositLegacyERC20Bridge_paused() public testPause {
@@ -933,19 +933,19 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     }
 
     function test_depositLegacyERC20Bridge_badCaller(address caller) public {
-        if (caller != l1ERC20BridgeAddress) {
-            vm.expectRevert("ShB not legacy bridge");
-            vm.prank(caller);
-            sharedBridge.depositLegacyErc20Bridge({
-                _prevMsgSender: alice,
-                _l2Receiver: bob,
-                _l1Token: address(token),
-                _amount: amount,
-                _l2TxGasLimit: 100,
-                _l2TxGasPerPubdataByte: 100000,
-                _refundRecipient: address(0)
-            });
-        }
+        vm.assume(caller != l1ERC20BridgeAddress);
+
+        vm.expectRevert("ShB not legacy bridge");
+        vm.prank(caller);
+        sharedBridge.depositLegacyErc20Bridge({
+            _prevMsgSender: alice,
+            _l2Receiver: bob,
+            _l1Token: address(token),
+            _amount: amount,
+            _l2TxGasLimit: 100,
+            _l2TxGasPerPubdataByte: 100000,
+            _refundRecipient: address(0)
+        });
     }
 
     function test_depositLegacyERC20Bridge_l2BridgeNotDeployed() public {

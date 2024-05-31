@@ -7,9 +7,9 @@ import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
+import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-import {DummyL1ERC20Bridge} from "contracts/dev-contracts/test/DummyErc20Bridge.sol";
 
 contract L1SharedBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -62,7 +62,7 @@ contract L1SharedBridgeTest is Test {
     L1SharedBridge sharedBridgeImpl;
     L1SharedBridge sharedBridge;
     address bridgehubAddress;
-    DummyL1ERC20Bridge l1Erc20Bridge;
+    L1ERC20Bridge l1Erc20Bridge;
     address l1ERC20BridgeAddress;
     address l1WethAddress;
     address l2SharedBridge;
@@ -134,7 +134,7 @@ contract L1SharedBridgeTest is Test {
         );
         sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
 
-        l1Erc20Bridge = new DummyL1ERC20Bridge(address(sharedBridge));
+        l1Erc20Bridge = new L1ERC20Bridge(sharedBridge);
         l1ERC20BridgeAddress = address(l1Erc20Bridge);
 
         vm.prank(owner);

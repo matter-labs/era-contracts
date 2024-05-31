@@ -9,6 +9,14 @@ contract DummyHyperchain is MailboxFacet {
         s.bridgehub = bridgeHubAddress;
     }
 
+    function setChainId(uint256 _chainId) public {
+        s.chainId = _chainId;
+    }
+
+    function setBaseTokenBridge(address baseTokenBridge) public {
+        s.baseTokenBridge = baseTokenBridge;
+    }
+
     function setBridgeHubAddress(address bridgeHubAddress) public {
         s.bridgehub = bridgeHubAddress;
     }
