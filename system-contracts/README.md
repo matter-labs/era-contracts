@@ -86,6 +86,7 @@ Also, when testing these contracts, some of them should also be deployed on the 
 - [EcAdd.yul](contracts%2Fprecompiles%EcAdd.yul): uses precompile call instruction, which is address-dependent
 - [EcMul.yul](contracts%2Fprecompiles%EcMul.yul): uses precompile call instruction, which is address-dependent
 - [EcPairing.yul](contracts%2Fprecompiles%EcPairing.yul): uses precompile call instruction, which is address-dependent
+- [Modexp.yul](contracts%2Fprecompiles%Modexp.yul): uses precompile call instruction, which is address-dependent
 
 #### Test contracts/features
 
