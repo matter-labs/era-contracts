@@ -106,7 +106,6 @@ async function main() {
         await deployer.registerTokenBridgehub(baseTokenAddress, useGovernance);
       }
       await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
-
       await deployer.registerHyperchain(
         baseTokenAddress,
         cmd.validiumMode,
