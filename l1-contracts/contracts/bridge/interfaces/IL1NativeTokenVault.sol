@@ -16,5 +16,7 @@ interface IL1NativeTokenVault {
 
     function getAssetInfo(address l1TokenAddress) external view returns (bytes32);
 
+    function getERC20Getters(address _token) external view returns (bytes memory);
+
     function tokenAddress(bytes32 assetInfo) external view returns (address);
 }

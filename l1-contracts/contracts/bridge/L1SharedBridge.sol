@@ -5,7 +5,6 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -196,10 +195,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev Used to set the assedAddress for a given assetInfo.
     function setAssetAddress(bytes32 _additionalData, address _assetAddress) external {
-        require(
-            (msg.sender == address(nativeTokenVault)) || (msg.sender == owner()),
-            "ShB: not owner or native token vault"
-        );
         address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
         bytes32 assetInfo = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData)); /// todo make other asse
         assetAddress[assetInfo] = _assetAddress;
@@ -234,16 +229,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev for backwards compatibility and to automatically register l1 assets, and we return the correct info.
     function _getAssetProperties(bytes32 _assetInfo) internal returns (address l1Asset, bytes32 assetInfo) {
         l1Asset = assetAddress[_assetInfo];
+        assetInfo = _assetInfo;
         if (l1Asset == address(0) && (uint256(_assetInfo) <= type(uint160).max)) {
             l1Asset = address(nativeTokenVault);
             assetInfo = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetInfo));
-            assetAddress[_assetInfo] = l1Asset;
-            assetAddress[assetInfo] = l1Asset;
             nativeTokenVault.registerToken(address(uint160(uint256(_assetInfo))));
-        } else if (uint256(_assetInfo) <= type(uint160).max) {
-            assetInfo = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetInfo));
-        } else {
-            assetInfo = _assetInfo;
         }
     }
 
@@ -577,7 +567,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         MessageParams memory _messageParams,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) internal returns (bytes32 assetInfo, bytes memory assetData) {
+    ) internal view returns (bytes32 assetInfo, bytes memory assetData) {
         (assetInfo, assetData) = _parseL2WithdrawalMessage(_chainId, _message);
         L2Message memory l2ToL1Message;
         {
@@ -604,7 +594,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     function _parseL2WithdrawalMessage(
         uint256 _chainId,
         bytes memory _l2ToL1message
-    ) internal returns (bytes32 assetInfo, bytes memory assetData) {
+    ) internal view returns (bytes32 assetInfo, bytes memory assetData) {
         // We check that the message is long enough to read the data.
         // Please note that there are two versions of the message:
         // 1. The message that is sent by `withdraw(address _l1Receiver)`
@@ -673,7 +663,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        bytes32 assetInfo = IL1NativeTokenVault(nativeTokenVault).getAssetInfo(_l1Asset);
+        bytes32 assetInfo = nativeTokenVault.getAssetInfo(_l1Asset);
         bytes memory assetData = abi.encode(_amount, _depositSender); // todo
         claimFailedBurn({
             _chainId: _chainId,
@@ -686,21 +676,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _l2TxNumberInBatch: _l2TxNumberInBatch,
             _merkleProof: _merkleProof
         });
-    }
-
-    /// @dev Receives and parses (name, symbol, decimals) from the token contract
-    function _getERC20Getters(address _token) internal view returns (bytes memory) {
-        if (_token == ETH_TOKEN_ADDRESS) {
-            bytes memory name = bytes("Ether");
-            bytes memory symbol = bytes("ETH");
-            bytes memory decimals = abi.encode(uint8(18));
-            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
-        }
-
-        (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
-        (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
-        (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
-        return abi.encode(data1, data2, data3);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -753,10 +728,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
                 nativeTokenVault.registerToken(_l1Asset);
             }
             _transferAllowanceToNTV(assetInfo, _amount, _prevMsgSender);
-            bytes memory _assetData = abi.encode(_amount, _l2Receiver);
 
             // solhint-disable-next-line func-named-parameters
-            bridgeMintCalldata = abi.encode(_amount, _prevMsgSender, _l2Receiver, _getERC20Getters(_l1Asset), _l1Asset);
+            bridgeMintCalldata = abi.encode(
+                _amount,
+                _prevMsgSender,
+                _l2Receiver,
+                nativeTokenVault.getERC20Getters(_l1Asset),
+                _l1Asset
+            );
         }
 
         {
@@ -822,7 +802,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _message: _message,
             _merkleProof: _merkleProof
         });
-        l1Asset = IL1NativeTokenVault(nativeTokenVault).tokenAddress(assetInfo);
+        l1Asset = nativeTokenVault.tokenAddress(assetInfo);
     }
 
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on zkSync Era chain.

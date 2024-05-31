@@ -35,19 +35,21 @@ export async function publishL2StandardDeployerDependencyBytecodesOnL2(
   const L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE = hre.artifacts.readArtifactSync("UpgradeableBeacon").bytecode;
   const L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE = hre.artifacts.readArtifactSync("L2StandardERC20").bytecode;
 
-  const receipt = await publishBytecodeFromL1(
-    chainId,
-    deployer.deployWallet,
-    [
-      L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
-      L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
-      L2_STANDARD_TOKEN_PROXY_BYTECODE,
-    ],
-    gasPrice
-  );
+  const receipt = await (
+    await publishBytecodeFromL1(
+      chainId,
+      deployer.deployWallet,
+      [
+        L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
+        L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
+        L2_STANDARD_TOKEN_PROXY_BYTECODE,
+      ],
+      gasPrice
+    )
+  ).wait();
 
   if (deployer.verbose) {
-    console.log("Bytecodes published on L2, hash: ", receipt.hash);
+    console.log("Bytecodes published on L2, hash: ", receipt.transactionHash);
   }
 }
 

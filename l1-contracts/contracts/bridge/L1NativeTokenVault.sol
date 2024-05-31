@@ -117,7 +117,7 @@ contract L1NativeTokenVault is
         }
 
         // solhint-disable-next-line func-named-parameters
-        _bridgeMintData = abi.encode(amount, _prevMsgSender, _l2Receiver, _getERC20Getters(l1Token), l1Token); // to do add l2Receiver in here
+        _bridgeMintData = abi.encode(amount, _prevMsgSender, _l2Receiver, getERC20Getters(l1Token), l1Token); // to do add l2Receiver in here
     }
 
     /// @dev Transfers tokens from the depositor address to the smart contract address.
@@ -136,7 +136,7 @@ contract L1NativeTokenVault is
     }
 
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
-    function _getERC20Getters(address _token) internal view returns (bytes memory) {
+    function getERC20Getters(address _token) public view returns (bytes memory) {
         if (_token == ETH_TOKEN_ADDRESS) {
             bytes memory name = bytes("Ether");
             bytes memory symbol = bytes("ETH");
