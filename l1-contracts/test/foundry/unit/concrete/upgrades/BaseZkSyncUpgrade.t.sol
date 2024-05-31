@@ -39,9 +39,9 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         uint256 currentProtocolVersion,
         uint256 newProtocolVersion
     ) public {
-        baseZkSyncUpgrade.setProtocolVersion(currentProtocolVersion);
-
         vm.assume(newProtocolVersion <= currentProtocolVersion && newProtocolVersion > 0);
+
+        baseZkSyncUpgrade.setProtocolVersion(currentProtocolVersion);
 
         proposedUpgrade.newProtocolVersion = newProtocolVersion;
 
@@ -89,17 +89,13 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
     // The new protocol version should be included in the L2 system upgrade tx
     function test_revertWhen_NewProtocolVersionIsNotIncludedInL2SystemUpgradeTx(
-        uint256 currentProtocolVersion,
         uint256 newProtocolVersion,
         uint256 nonce
     ) public {
-        baseZkSyncUpgrade.setProtocolVersion(currentProtocolVersion);
-
-        vm.assume(
-            newProtocolVersion > currentProtocolVersion &&
-                newProtocolVersion - currentProtocolVersion < MAX_ALLOWED_PROTOCOL_VERSION_DELTA
-        );
+        vm.assume(newProtocolVersion > 1);
         vm.assume(nonce != newProtocolVersion && nonce > 0);
+
+        baseZkSyncUpgrade.setProtocolVersion(newProtocolVersion - 1);
 
         proposedUpgrade.newProtocolVersion = newProtocolVersion;
         proposedUpgrade.l2ProtocolUpgradeTx.nonce = nonce;
