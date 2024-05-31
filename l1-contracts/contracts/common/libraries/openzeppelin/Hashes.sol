@@ -16,6 +16,15 @@ library Hashes {
     }
 
     /**
+     * @dev Keccak256 hash of a sorted pair of bytes32. Frequently used when working with merkle proofs.
+     *
+     * NOTE:
+     */
+    function Keccak256(bytes32 a, bytes32 b) internal pure returns (bytes32) {
+        return  _efficientKeccak256(a, b);
+    }
+
+    /**
      * @dev Implementation of keccak256(abi.encode(a, b)) that doesn't allocate or expand memory.
      */
     function _efficientKeccak256(bytes32 a, bytes32 b) private pure returns (bytes32 value) {

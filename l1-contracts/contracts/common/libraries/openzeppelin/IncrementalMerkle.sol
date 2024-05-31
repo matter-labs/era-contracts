@@ -49,7 +49,7 @@ library DynamicIncrementalMerkle {
     }
 
     /**
-     * @dev Initialize a {Bytes32PushTree} using {Hashes-commutativeKeccak256} to hash internal nodes.
+     * @dev Initialize a {Bytes32PushTree} using {Hashes-Keccak256} to hash internal nodes.
      * The capacity of the tree (i.e. number of leaves) is set to `2**levels`.
      *
      * Calling this function on MerkleTree that was already setup and used will reset it to a blank state.
@@ -58,7 +58,7 @@ library DynamicIncrementalMerkle {
      * empty leaves. It should be a value that is not expected to be part of the tree.
      */
     function setup(Bytes32PushTree storage self, bytes32 zero) internal returns (bytes32 initialRoot) {
-        return setup(self, zero, Hashes.commutativeKeccak256); /// kl todo why not just use normal keccak, is this not an attack vector?
+        return setup(self, zero, Hashes.Keccak256); 
     }
 
     /**
@@ -99,11 +99,6 @@ library DynamicIncrementalMerkle {
         // Get leaf index
         index = self._nextLeafIndex++;
 
-        // Check if tree is full.
-        if (index > 1 << levels) {
-            Panic.panic(Panic.RESOURCE_ERROR);
-        }
-
         if (index == 1 << levels) {
             // Tree is full, reset index add new level
             bytes32 currentMaxZero = Arrays.unsafeAccess(self._zeros, levels).value;
@@ -141,7 +136,7 @@ library DynamicIncrementalMerkle {
     }
 
     /**
-     * @dev Tree's height (set at initialization)
+     * @dev Tree's root.
      */
 
     function root(Bytes32PushTree storage self) internal view returns (bytes32) {
