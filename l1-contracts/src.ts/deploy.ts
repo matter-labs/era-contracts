@@ -12,7 +12,13 @@ import {
   deployBytecodeViaCreate2 as deployBytecodeViaCreate2EVM,
   deployViaCreate2 as deployViaCreate2EVM,
 } from "./deploy-utils";
-import { readBatchBootloaderBytecode, readSystemContractsBytecode, SYSTEM_CONFIG } from "../scripts/utils";
+import {
+  packSemver,
+  readBatchBootloaderBytecode,
+  readSystemContractsBytecode,
+  SYSTEM_CONFIG,
+  unpackStringSemVer,
+} from "../scripts/utils";
 import { getTokens } from "./deploy-token";
 import {
   ADDRESS_ONE,
@@ -322,8 +328,7 @@ export class Deployer {
     const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
     const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
     const diamondCut = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
-    // console.log("correct initial diamond cut", diamondCut);
-    const protocolVersion = getNumberFromEnv("CONTRACTS_GENESIS_PROTOCOL_VERSION");
+    const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
 
     const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
 
@@ -931,6 +936,23 @@ export class Deployer {
       if (this.verbose) {
         console.log(`Validium mode set, gas used: ${receipt5.gasUsed.toString()}`);
       }
+    }
+  }
+
+  public async transferAdminFromDeployerToGovernance() {
+    const stm = this.stateTransitionManagerContract(this.deployWallet);
+    const diamondProxyAddress = await stm.getHyperchain(this.chainId);
+    const hyperchain = IZkSyncHyperchainFactory.connect(diamondProxyAddress, this.deployWallet);
+
+    const receipt = await (await hyperchain.setPendingAdmin(this.addresses.Governance)).wait();
+    if (this.verbose) {
+      console.log(`Governance set as pending admin, gas used: ${receipt.gasUsed.toString()}`);
+    }
+
+    await this.executeUpgrade(hyperchain.address, 0, hyperchain.interface.encodeFunctionData("acceptAdmin"),null, false);
+
+    if (this.verbose) {
+      console.log("Pending admin successfully accepted");
     }
   }
 
