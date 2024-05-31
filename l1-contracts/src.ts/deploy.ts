@@ -935,7 +935,24 @@ export class Deployer {
     }
   }
 
-  public async registerTokenBridgehub(tokenAddress: string, useGovernance: boolean = false) {
+  public async transferAdminFromDeployerToGovernance() {
+    const stm = this.stateTransitionManagerContract(this.deployWallet);
+    const diamondProxyAddress = await stm.getHyperchain(this.chainId);
+    const hyperchain = IZkSyncHyperchainFactory.connect(diamondProxyAddress, this.deployWallet);
+
+    const receipt = await (await hyperchain.setPendingAdmin(this.addresses.Governance)).wait();
+    if (this.verbose) {
+      console.log(`Governance set as pending admin, gas used: ${receipt.gasUsed.toString()}`);
+    }
+
+    await this.executeUpgrade(hyperchain.address, 0, hyperchain.interface.encodeFunctionData("acceptAdmin"), false);
+
+    if (this.verbose) {
+      console.log("Pending admin successfully accepted");
+    }
+  }
+
+  public async registerToken(tokenAddress: string, useGovernance: boolean = false) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
     const receipt = await this.executeDirectOrGovernance(useGovernance, bridgehub, "addToken", [tokenAddress], 0);

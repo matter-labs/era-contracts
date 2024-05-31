@@ -103,19 +103,12 @@ async function main() {
       const useGovernance = !cmd.avoidGovernance;
 
       if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
-        await deployer.registerTokenBridgehub(baseTokenAddress, useGovernance);
+        await deployer.registerToken(baseTokenAddress, useGovernance);
       }
       await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
 
-      await deployer.registerHyperchain(
-        baseTokenAddress,
-        cmd.validiumMode,
-        null,
-        gasPrice,
-        undefined,
-        undefined,
-        useGovernance
-      );
+      await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice, useGovernance);
+      await deployer.transferAdminFromDeployerToGovernance();
     });
 
   await program.parseAsync(process.argv);
