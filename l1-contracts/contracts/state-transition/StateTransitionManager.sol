@@ -171,7 +171,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters
-    function updateChainCreationParams(ChainCreationParams calldata _chainCreationParams) external onlyOwner {
+    function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external onlyOwner {
         _setChainCreationParams(_chainCreationParams);
     }
 

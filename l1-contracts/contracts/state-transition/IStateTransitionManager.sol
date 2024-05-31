@@ -100,6 +100,8 @@ interface IStateTransitionManager {
 
     function setValidatorTimelock(address _validatorTimelock) external;
 
+    function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external;
+
     function getChainAdmin(uint256 _chainId) external view returns (address);
 
     function createNewChain(
