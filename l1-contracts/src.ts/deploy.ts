@@ -945,14 +945,14 @@ export class Deployer {
       console.log(`Governance set as pending admin, gas used: ${receipt.gasUsed.toString()}`);
     }
 
-    await this.executeUpgrade(hyperchain.address, 0, hyperchain.interface.encodeFunctionData("acceptAdmin"), false);
+    await this.executeUpgrade(hyperchain.address, 0, hyperchain.interface.encodeFunctionData("acceptAdmin"),null, false);
 
     if (this.verbose) {
       console.log("Pending admin successfully accepted");
     }
   }
 
-  public async registerToken(tokenAddress: string, useGovernance: boolean = false) {
+  public async registerTokenBridgehub(tokenAddress: string, useGovernance: boolean = false) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
     const receipt = await this.executeDirectOrGovernance(useGovernance, bridgehub, "addToken", [tokenAddress], 0);
