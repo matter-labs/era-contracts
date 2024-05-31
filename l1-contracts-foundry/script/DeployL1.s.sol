@@ -24,7 +24,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
-import {StateTransitionManagerInitializeData} from "contracts/state-transition/IStateTransitionManager.sol";
+import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -428,15 +428,19 @@ contract DeployL1Script is Script {
 
         config.contracts.diamondCutData = abi.encode(diamondCut);
 
-        StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
-            owner: config.ownerAddress,
-            validatorTimelock: addresses.validatorTimelock,
+        ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: addresses.stateTransition.genesisUpgrade,
             genesisBatchHash: config.contracts.genesisRoot,
             genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.genesisBatchCommitment,
             diamondCut: diamondCut,
-            protocolVersion: config.contracts.latestProtocolVersion
+        });
+
+        StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
+            owner: config.ownerAddress,
+            validatorTimelock: addresses.validatorTimelock,
+            chainCreationParams,
+            protocolVersion: config.contracts.latestProtocolVersion,
         });
 
         address contractAddress = deployViaCreate2(
