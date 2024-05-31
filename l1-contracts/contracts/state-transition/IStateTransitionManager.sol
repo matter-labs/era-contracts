@@ -19,12 +19,18 @@ import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 struct StateTransitionManagerInitializeData {
     address owner;
     address validatorTimelock;
+    ChainCreationParams chainCreationParams;
+    uint256 protocolVersion;
+}
+
+/// @notice The struct that contains the fields that define how a new chain should be created
+/// within this STM. 
+struct ChainCreationParams {
     address genesisUpgrade;
     bytes32 genesisBatchHash;
     uint64 genesisIndexRepeatedStorageChanges;
     bytes32 genesisBatchCommitment;
     Diamond.DiamondCutData diamondCut;
-    uint256 protocolVersion;
 }
 
 interface IStateTransitionManager {
@@ -47,6 +53,18 @@ interface IStateTransitionManager {
 
     /// @notice ValidatorTimelock changed
     event NewValidatorTimelock(address indexed oldValidatorTimelock, address indexed newValidatorTimelock);
+
+    /// @notice storedBatchZero changed
+    event NewStoredBatchZero(bytes32 indexed oldStoredBatchZero, bytes32 indexed newStoredBatchZero);
+
+    /// @notice storedBatchZero changed
+    event NewChainCreationParams(
+        address genesisUpgrade, 
+        bytes32 genesisBatchHash,
+        uint64 genesisIndexRepeatedStorageChanges,
+        bytes32 genesisBatchCommitment,
+        bytes32 initialcutHash
+    );
 
     /// @notice InitialCutHash changed
     event NewInitialCutHash(bytes32 indexed oldInitialCutHash, bytes32 indexed newInitialCutHash);

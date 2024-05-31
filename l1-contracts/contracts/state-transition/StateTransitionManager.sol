@@ -147,6 +147,33 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
     }
+    
+    function updateChainCreationParams(ChainCreationParams calldata _chainCreationParams) external onlyOwner {
+        genesisUpgrade = _chainCreationParams.genesisUpgrade;
+        
+        // We need to initialize the state hash because it is used in the commitment of the next batch
+        IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
+            batchNumber: 0,
+            batchHash: _chainCreationParams.genesisBatchHash,
+            indexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
+            numberOfLayer1Txs: 0,
+            priorityOperationsHash: EMPTY_STRING_KECCAK,
+            l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            timestamp: 0,
+            commitment: _chainCreationParams.genesisBatchCommitment
+        });
+        storedBatchZero = keccak256(abi.encode(batchZero));
+        bytes32 newInitialCutHash = keccak256(abi.encode(_chainCreationParams.diamondCut));
+        initialCutHash = newInitialCutHash;
+
+        emit NewChainCreationParams(
+            _chainCreationParams.genesisUpgrade, 
+            _chainCreationParams.genesisBatchHash,
+            _chainCreationParams.genesisIndexRepeatedStorageChanges,
+            _chainCreationParams.genesisBatchCommitment,
+            newInitialCutHash
+        );
+    }
 
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
@@ -179,14 +206,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address oldValidatorTimelock = validatorTimelock;
         validatorTimelock = _validatorTimelock;
         emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
-    }
-
-    /// @dev set initial cutHash
-    function setInitialCutHash(Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
-        bytes32 oldInitialCutHash = initialCutHash;
-        bytes32 newCutHash = keccak256(abi.encode(_diamondCut));
-        initialCutHash = newCutHash;
-        emit NewInitialCutHash(oldInitialCutHash, newCutHash);
     }
 
     /// @dev set New Version with upgrade from old version
