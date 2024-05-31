@@ -253,7 +253,8 @@ export function createSystemLogs(
 export function createSystemLogsWithUpgrade(
   chainedPriorityTxHashKey?: BytesLike,
   numberOfLayer1Txs?: BigNumberish,
-  upgradeTxHash?: string
+  upgradeTxHash?: string,
+  previousBatchHash?: string
 ) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
@@ -265,7 +266,7 @@ export function createSystemLogsWithUpgrade(
       SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
       ethers.constants.HashZero
     ),
-    constructL2Log(true, L2_SYSTEM_CONTEXT_ADDRESS, SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY, ethers.constants.HashZero),
+    constructL2Log(true, L2_SYSTEM_CONTEXT_ADDRESS, SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY, previousBatchHash ? previousBatchHash : ethers.constants.HashZero),
     constructL2Log(
       true,
       L2_BOOTLOADER_ADDRESS,
@@ -311,13 +312,13 @@ export function createSystemLogsWithUpgrade(
 export function genesisStoredBatchInfo(): StoredBatchInfo {
   return {
     batchNumber: 0,
-    batchHash: ethers.constants.HashZero,
-    indexRepeatedStorageChanges: 0,
+    batchHash: '0x0000000000000000000000000000000000000000000000000000000000000001',
+    indexRepeatedStorageChanges: 1,
     numberOfLayer1Txs: 0,
     priorityOperationsHash: EMPTY_STRING_KECCAK,
     l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
     timestamp: 0,
-    commitment: ethers.constants.HashZero,
+    commitment: '0x0000000000000000000000000000000000000000000000000000000000000001',
   };
 }
 
@@ -427,7 +428,7 @@ export async function buildCommitBatchInfoWithUpgrade(
   upgradeTxHash: string
 ): Promise<CommitBatchInfo> {
   const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
-  const systemLogs = createSystemLogsWithUpgrade(info.priorityOperationsHash, info.numberOfLayer1Txs, upgradeTxHash);
+  const systemLogs = createSystemLogsWithUpgrade(info.priorityOperationsHash, info.numberOfLayer1Txs, upgradeTxHash, ethers.utils.hexlify(prevInfo.batchHash));
   systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
     true,
     L2_SYSTEM_CONTEXT_ADDRESS,
@@ -437,7 +438,7 @@ export async function buildCommitBatchInfoWithUpgrade(
 
   return {
     timestamp,
-    indexRepeatedStorageChanges: 0,
+    indexRepeatedStorageChanges: 1,
     newStateRoot: ethers.utils.randomBytes(32),
     numberOfLayer1Txs: 0,
     priorityOperationsHash: EMPTY_STRING_KECCAK,

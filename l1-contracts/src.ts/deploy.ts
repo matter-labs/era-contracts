@@ -317,15 +317,19 @@ export class Deployer {
 
     const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
 
+    const chainCreationParams = {
+      genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
+      genesisBatchHash,
+      genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
+      genesisBatchCommitment,
+      diamondCut,
+    };
+
     const initCalldata = stateTransitionManager.encodeFunctionData("initialize", [
       {
         owner: this.addresses.Governance,
         validatorTimelock: this.addresses.ValidatorTimeLock,
-        genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
-        genesisBatchHash,
-        genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
-        genesisBatchCommitment,
-        diamondCut,
+        chainCreationParams,
         protocolVersion,
       },
     ]);
