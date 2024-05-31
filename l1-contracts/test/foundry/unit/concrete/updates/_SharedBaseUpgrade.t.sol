@@ -15,25 +15,33 @@ contract BaseUpgrade is Test {
     L2CanonicalTransaction l2CanonicalTransaction;
     ProposedUpgrade proposedUpgrade;
 
+    uint256 public protocolVersion;
+    uint256 public chainId;
+
+    address public bridgeHub;
+    address public stateTransitionManager;
+    address public sharedBridge;
+
+    address verifier;
+
     function _prepereProposedUpgrade() internal {
         bytes[] memory bytesEmptyArray = new bytes[](1);
         bytesEmptyArray[0] = "11111111111111111111111111111111";
         uint256[] memory uintEmptyArray = new uint256[](1);
         uintEmptyArray[0] = uint256(L2ContractHelper.hashL2Bytecode(bytesEmptyArray[0]));
 
-        uint256 protocolVersion = 1;
-        uint256 chainId = 1;
+        protocolVersion = 1;
+        chainId = 1;
         bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (chainId));
 
-        address verifier = makeAddr("verifier");
+        verifier = makeAddr("verifier");
         bytes32 txHash = bytes32(bytes("txHash"));
 
-        bytes memory postUpgradeCalldata = abi.encode(
-            chainId,
-            makeAddr("brighehub"),
-            makeAddr("stateTransitionManager"),
-            makeAddr("sharedBridgeAddress")
-        );
+        bridgeHub = makeAddr("brigheHub");
+        stateTransitionManager = makeAddr("stateTransitionManager");
+        sharedBridge = makeAddr("sharedBridge");
+
+        bytes memory postUpgradeCalldata = abi.encode(chainId, bridgeHub, stateTransitionManager, sharedBridge);
 
         l2CanonicalTransaction = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,

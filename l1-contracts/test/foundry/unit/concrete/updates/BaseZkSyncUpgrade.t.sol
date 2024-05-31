@@ -8,9 +8,9 @@ import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerif
 import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "contracts/common/Config.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
-import {BaseUpgradeSetters} from "./_SharedBaseUpgradeSetters.t.sol";
+import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 
-contract DummyBaseZkSyncUpgrade is BaseZkSyncUpgrade, BaseUpgradeSetters {}
+contract DummyBaseZkSyncUpgrade is BaseZkSyncUpgrade, BaseUpgradeUtils {}
 
 contract BaseZkSyncUpgradeTest is BaseUpgrade {
     DummyBaseZkSyncUpgrade baseZkSyncUpgrade;
@@ -144,6 +144,10 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         proposedUpgrade.verifier = address(0);
 
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
+        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 
     function test_SuccessWith_NewVerifierParamsIsZero() public {
@@ -154,27 +158,50 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         });
 
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+        assertEq(baseZkSyncUpgrade.getVerifier(), proposedUpgrade.verifier);
+        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
+        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 
     function test_SuccessWith_L2BootloaderBytecodeHashIsZero() public {
         proposedUpgrade.bootloaderHash = bytes32(0);
 
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+        assertEq(baseZkSyncUpgrade.getVerifier(), proposedUpgrade.verifier);
+        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
     }
 
     function test_SuccessWith_L2DefaultAccountBytecodeHashIsZero() public {
         proposedUpgrade.defaultAccountHash = bytes32(0);
 
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+        assertEq(baseZkSyncUpgrade.getVerifier(), proposedUpgrade.verifier);
+        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 
     function test_SuccessWith_TxTypeIsZero() public {
         proposedUpgrade.l2ProtocolUpgradeTx.txType = 0;
 
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+        assertEq(baseZkSyncUpgrade.getVerifier(), proposedUpgrade.verifier);
+        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
+        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 
     function test_SuccessUpdate() public {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+        assertEq(baseZkSyncUpgrade.getVerifier(), proposedUpgrade.verifier);
+        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
+        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 }
