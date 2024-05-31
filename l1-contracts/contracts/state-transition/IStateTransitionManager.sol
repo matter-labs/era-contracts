@@ -61,7 +61,7 @@ interface IStateTransitionManager {
         bytes32 genesisBatchHash,
         uint64 genesisIndexRepeatedStorageChanges,
         bytes32 genesisBatchCommitment,
-        bytes32 initialcutHash
+        bytes32 initialCutHash
     );
 
     /// @notice new UpgradeCutHash

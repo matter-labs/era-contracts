@@ -72,6 +72,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     constructor(address _bridgehub, uint256 _maxNumberOfHyperchains) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
         MAX_NUMBER_OF_HYPERCHAINS = _maxNumberOfHyperchains;
+
+        // While this does not provide a protection in the production, it is needed for local testing
+        // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
+        assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
     }
 
     /// @notice only the bridgehub can call
@@ -129,10 +133,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         validatorTimelock = _initializeData.validatorTimelock;
 
         _setChainCreationParams(_initializeData.chainCreationParams);
-
-        // While this does not provide a protection in the production, it is needed for local testing
-        // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
-        assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
     }
 
     /// @notice Updates the parameters with which a new chain is created
