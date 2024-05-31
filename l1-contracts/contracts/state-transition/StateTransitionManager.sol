@@ -11,7 +11,7 @@ import {IAdmin} from "./chain-interfaces/IAdmin.sol";
 import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
-import {IStateTransitionManager, StateTransitionManagerInitializeData} from "./IStateTransitionManager.sol";
+import {IStateTransitionManager, StateTransitionManagerInitializeData, ChainCreationParams} from "./IStateTransitionManager.sol";
 import {ISystemContext} from "./l2-deps/ISystemContext.sol";
 import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
@@ -72,6 +72,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     constructor(address _bridgehub, uint256 _maxNumberOfHyperchains) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
         MAX_NUMBER_OF_HYPERCHAINS = _maxNumberOfHyperchains;
+
+        // While this does not provide a protection in the production, it is needed for local testing
+        // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
+        assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
     }
 
     /// @notice only the bridgehub can call
@@ -124,28 +128,54 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         require(_initializeData.owner != address(0), "STM: owner zero");
         _transferOwnership(_initializeData.owner);
 
-        genesisUpgrade = _initializeData.genesisUpgrade;
         protocolVersion = _initializeData.protocolVersion;
         protocolVersionDeadline[_initializeData.protocolVersion] = type(uint256).max;
         validatorTimelock = _initializeData.validatorTimelock;
 
+        _setChainCreationParams(_initializeData.chainCreationParams);
+    }
+
+    /// @notice Updates the parameters with which a new chain is created
+    /// @param _chainCreationParams The new chain creation parameters
+    function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal {
+        require(_chainCreationParams.genesisUpgrade != address(0), "STM: genesisUpgrade zero");
+        require(_chainCreationParams.genesisBatchHash != bytes32(0), "STM: genesisBatchHash zero");
+        require(
+            _chainCreationParams.genesisIndexRepeatedStorageChanges != uint64(0),
+            "STM: genesisIndexRepeatedStorageChanges zero"
+        );
+        require(_chainCreationParams.genesisBatchCommitment != bytes32(0), "STM: genesisBatchCommitment zero");
+
+        genesisUpgrade = _chainCreationParams.genesisUpgrade;
+
         // We need to initialize the state hash because it is used in the commitment of the next batch
         IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
             batchNumber: 0,
-            batchHash: _initializeData.genesisBatchHash,
-            indexRepeatedStorageChanges: _initializeData.genesisIndexRepeatedStorageChanges,
+            batchHash: _chainCreationParams.genesisBatchHash,
+            indexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: EMPTY_STRING_KECCAK,
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             timestamp: 0,
-            commitment: _initializeData.genesisBatchCommitment
+            commitment: _chainCreationParams.genesisBatchCommitment
         });
         storedBatchZero = keccak256(abi.encode(batchZero));
-        initialCutHash = keccak256(abi.encode(_initializeData.diamondCut));
+        bytes32 newInitialCutHash = keccak256(abi.encode(_chainCreationParams.diamondCut));
+        initialCutHash = newInitialCutHash;
 
-        // While this does not provide a protection in the production, it is needed for local testing
-        // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
-        assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
+        emit NewChainCreationParams({
+            genesisUpgrade: _chainCreationParams.genesisUpgrade,
+            genesisBatchHash: _chainCreationParams.genesisBatchHash,
+            genesisIndexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
+            genesisBatchCommitment: _chainCreationParams.genesisBatchCommitment,
+            newInitialCutHash: newInitialCutHash
+        });
+    }
+
+    /// @notice Updates the parameters with which a new chain is created
+    /// @param _chainCreationParams The new chain creation parameters
+    function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external onlyOwner {
+        _setChainCreationParams(_chainCreationParams);
     }
 
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
@@ -179,14 +209,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address oldValidatorTimelock = validatorTimelock;
         validatorTimelock = _validatorTimelock;
         emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
-    }
-
-    /// @dev set initial cutHash
-    function setInitialCutHash(Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
-        bytes32 oldInitialCutHash = initialCutHash;
-        bytes32 newCutHash = keccak256(abi.encode(_diamondCut));
-        initialCutHash = newCutHash;
-        emit NewInitialCutHash(oldInitialCutHash, newCutHash);
     }
 
     /// @dev set New Version with upgrade from old version
