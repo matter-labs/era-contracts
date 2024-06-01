@@ -73,5 +73,14 @@ command
   .description("deploy verifier")
   .action(async (cmd) => {
     const l1Rpc = cmd.l1Rpc ?? web3Url();
-    await deployVerifier(cmd.testnetVerifier || false, l1Rpc, cmd.create2Address, cmd.nonce, cmd.gasPrice, cmd.privateKey, cmd.file, cmd.create2Salt);
+    await deployVerifier(
+      cmd.testnetVerifier || false,
+      l1Rpc,
+      cmd.create2Address,
+      cmd.nonce,
+      cmd.gasPrice,
+      cmd.privateKey,
+      cmd.file,
+      cmd.create2Salt
+    );
   });

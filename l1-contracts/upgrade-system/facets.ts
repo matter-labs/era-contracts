@@ -25,11 +25,19 @@ async function deployFacetCut(
 
   let constructorArgs = [];
   // FIXME: maybe make it more generic
-  if (name == 'MailboxFacet') {
-    constructorArgs = [getNumberFromEnv('CONTRACTS_ERA_CHAIN_ID')];
+  if (name == "MailboxFacet") {
+    constructorArgs = [getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID")];
   }
-    
-  const [address, txHash] = await deployViaCreate2(wallet, name, constructorArgs, create2Salt, ethTxOptions, create2Address, true);
+
+  const [address, txHash] = await deployViaCreate2(
+    wallet,
+    name,
+    constructorArgs,
+    create2Salt,
+    ethTxOptions,
+    create2Address,
+    true
+  );
 
   console.log(`Deployed ${name} at ${address} with txHash ${txHash}`);
   return [address, txHash];
