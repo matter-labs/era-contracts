@@ -75,7 +75,7 @@ export async function initialBridgehubDeployment(
 
   // L2 Shared Bridge already deployed via L1 forced tx
   if (deployer.isZkMode()) {
-    await deployer.registerSharedBridge();
+    await deployer.registerAddresses();
   } else {
     await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
     await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });

@@ -7,6 +7,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
 import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -40,6 +41,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @dev used to accept the admin role
     address private pendingAdmin;
+
+    IMessageRoot public override messageRoot;
 
     ISTMDeploymentTracker public stmDeployer;
 
@@ -107,8 +110,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
-    function setSharedBridge(address _sharedBridge) external onlyOwner {
+    function setAddresses(
+        address _sharedBridge,
+        ISTMDeploymentTracker _stmDeployer,
+        IMessageRoot _messageRoot
+    ) external onlyOwner {
         sharedBridge = IL1SharedBridge(_sharedBridge);
+        stmDeployer = _stmDeployer;
+        messageRoot = _messageRoot;
+        _messageRoot.addNewChain(block.chainid);
     }
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
@@ -143,12 +153,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         whitelistedSettlementLayers[_newSyncLayerChainId] = _isWhitelisted;
 
         // TODO: emit event
-    }
-
-    /// @notice To set shared bridge, only Owner. Not done in initialize, as
-    /// the order of deployment is Bridgehub, Shared bridge, and then we call this
-    function setSTMDeployer(ISTMDeploymentTracker _stmDeployer) external onlyOwner {
-        stmDeployer = _stmDeployer;
     }
 
     /// @dev Used to set the assedAddress for a given assetInfo.
@@ -214,6 +218,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _admin: _admin,
             _diamondCut: _initData
         });
+        messageRoot.addNewChain(_chainId);
 
         emit NewChain(_chainId, _stateTransitionManager, _admin);
         return _chainId;

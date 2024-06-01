@@ -5,7 +5,6 @@ pragma solidity 0.8.24;
 import {DynamicIncrementalMerkle} from "../../common/libraries/openzeppelin/IncrementalMerkle.sol";
 import {Arrays} from "../../common/libraries/openzeppelin/Arrays.sol";
 
-
 contract IncrementalMerkleTest {
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 

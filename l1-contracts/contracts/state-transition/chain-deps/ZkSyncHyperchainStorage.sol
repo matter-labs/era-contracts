@@ -164,6 +164,6 @@ struct ZkSyncHyperchainStorage {
     uint128 baseTokenGasPriceMultiplierDenominator;
     /// @dev The optional address of the contract that has to be used for transaction filtering/whitelisting
     address transactionFilterer;
-    /// @dev
+    /// @dev address of the synclayer, only set on L1 if settling on it
     address syncLayer;
 }

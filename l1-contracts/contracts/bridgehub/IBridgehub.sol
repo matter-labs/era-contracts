@@ -6,6 +6,7 @@ import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
 import {L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {IL1StandardAsset} from "../bridge/interfaces/IL1StandardAsset.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -142,7 +143,11 @@ interface IBridgehub is IL1StandardAsset {
 
     function addToken(address _token) external;
 
-    function setSharedBridge(address _sharedBridge) external;
+    function setAddresses(
+        address _sharedBridge,
+        ISTMDeploymentTracker _stmDeployer,
+        IMessageRoot _messageRoot
+    ) external;
 
     // function relayTxThroughBH(uint256 _baseDestChainId, uint256 _destChainId, bytes calldata _dataToRelay) external;
 
@@ -182,11 +187,11 @@ interface IBridgehub is IL1StandardAsset {
 
     function stmDeployer() external view returns (ISTMDeploymentTracker);
 
-    function setSTMDeployer(ISTMDeploymentTracker _stmDeployer) external;
-
     function stmAssetInfoToAddress(bytes32 _assetInfo) external view returns (address);
 
     function setAssetAddress(bytes32 _additionalData, address _assetAddress) external;
 
     function L1_CHAIN_ID() external view returns (uint256);
+
+    function messageRoot() external view returns (IMessageRoot);
 }

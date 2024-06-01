@@ -54,6 +54,22 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
         BRIDGE_HUB = _bridgehub;
     }
 
+    /// @dev Initializes a contract for later use. Expected to be used in the proxy
+    /// @param _owner Address which can change
+    function initialize(address _owner) external reentrancyGuardInitializer initializer {
+        require(_owner != address(0), "ShB owner 0");
+        sharedTree.setup(bytes32(0));
+        _transferOwnership(_owner);
+    }
+
+    function addNewChain(uint256 _chainId) external onlyBridgehub {
+        chainIndex[_chainId] = chainCount;
+        chainIndexToId[chainCount] = _chainId;
+        chainCount++;
+        bytes32 initialHash = chainTree[_chainId].setup(keccak256("New Tree zero hash"));
+        sharedTree.pushNewLeaf(initialHash);
+    }
+
     function chainMessageRoot(uint256 _chainId) external view override returns (bytes32) {
         return chainTree[_chainId].root();
     }

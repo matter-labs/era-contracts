@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 
 import {Hashes} from "./Hashes.sol";
 import {Arrays} from "./Arrays.sol";
-import {Panic} from "./Panic.sol";
 
 /**
  * @dev Library for managing https://wikipedia.org/wiki/Merkle_Tree[Merkle Tree] data structures.
@@ -58,7 +57,7 @@ library DynamicIncrementalMerkle {
      * empty leaves. It should be a value that is not expected to be part of the tree.
      */
     function setup(Bytes32PushTree storage self, bytes32 zero) internal returns (bytes32 initialRoot) {
-        return setup(self, zero, Hashes.Keccak256); 
+        return setup(self, zero, Hashes.Keccak256);
     }
 
     /**

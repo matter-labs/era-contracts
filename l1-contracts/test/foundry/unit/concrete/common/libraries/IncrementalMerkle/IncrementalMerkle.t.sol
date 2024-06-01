@@ -41,7 +41,7 @@ contract IncrementalMerkleTestTest is Test {
         assertEq(merkleTest.index(), 2);
         assertEq(merkleTest.height(), 1);
         assertEq(merkleTest.zeros(0), zero);
-  
+
         assertEq(merkleTest.root(), keccak256(abi.encodePacked(uint256(2), uint256(zero))));
     }
 
@@ -55,7 +55,15 @@ contract IncrementalMerkleTestTest is Test {
         assertEq(merkleTest.zeros(2), keccak256(abi.encodePacked(merkleTest.zeros(1), merkleTest.zeros(1))));
         assertEq(merkleTest.side(0), bytes32((uint256(2))));
         assertEq(merkleTest.side(1), keccak256(abi.encodePacked(uint256(0), uint256(1))));
-        assertEq(merkleTest.root(), keccak256(abi.encodePacked(keccak256(abi.encodePacked(uint256(0), uint256(1))),keccak256(abi.encodePacked(uint256(2), uint256(zero))))));
+        assertEq(
+            merkleTest.root(),
+            keccak256(
+                abi.encodePacked(
+                    keccak256(abi.encodePacked(uint256(0), uint256(1))),
+                    keccak256(abi.encodePacked(uint256(2), uint256(zero)))
+                )
+            )
+        );
     }
 
     function addMoreElements(uint256 n) public {

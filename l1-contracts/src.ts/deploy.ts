@@ -270,17 +270,6 @@ export class Deployer {
     this.addresses.Governance = contractAddress;
   }
 
-  public async deployBridgehubImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const l1ChainId = this.isZkMode() ? getNumberFromEnv("ETH_CLIENT_CHAIN_ID") : await this.deployWallet.getChainId();
-    const contractAddress = await this.deployViaCreate2("Bridgehub", [l1ChainId], create2Salt, ethTxOptions);
-
-    if (this.verbose) {
-      console.log(`CONTRACTS_BRIDGEHUB_IMPL_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.Bridgehub.BridgehubImplementation = contractAddress;
-  }
-
   public async deployTransparentProxyAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     if (this.verbose) {
       console.log("Deploying Proxy Admin");
@@ -329,6 +318,17 @@ export class Deployer {
     }
   }
 
+  public async deployBridgehubImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    const l1ChainId = this.isZkMode() ? getNumberFromEnv("ETH_CLIENT_CHAIN_ID") : await this.deployWallet.getChainId();
+    const contractAddress = await this.deployViaCreate2("Bridgehub", [l1ChainId], create2Salt, ethTxOptions);
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_BRIDGEHUB_IMPL_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.Bridgehub.BridgehubImplementation = contractAddress;
+  }
+
   public async deployBridgehubProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const bridgehub = new Interface(hardhat.artifacts.readArtifactSync("Bridgehub").abi);
 
@@ -346,6 +346,40 @@ export class Deployer {
     }
 
     this.addresses.Bridgehub.BridgehubProxy = contractAddress;
+  }
+
+  public async deployMessageRootImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    const contractAddress = await this.deployViaCreate2(
+      "MessageRoot",
+      [this.addresses.Bridgehub.BridgehubProxy],
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_MESSAGE_ROOT_IMPL_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.Bridgehub.MessageRootImplementation = contractAddress;
+  }
+
+  public async deployMessageRootProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    const messageRoot = new Interface(hardhat.artifacts.readArtifactSync("MessageRoot").abi);
+
+    const initCalldata = messageRoot.encodeFunctionData("initialize", [this.addresses.Governance]);
+
+    const contractAddress = await this.deployViaCreate2(
+      "TransparentUpgradeableProxy",
+      [this.addresses.Bridgehub.MessageRootImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_MESSAGE_ROOT_PROXY_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.Bridgehub.MessageRootProxy = contractAddress;
   }
 
   public async deployStateTransitionManagerImplementation(
@@ -789,13 +823,6 @@ export class Deployer {
     this.addresses.Bridgehub.STMDeploymentTrackerProxy = contractAddress;
 
     const bridgehub = this.bridgehubContract(this.deployWallet);
-    const data0 = bridgehub.interface.encodeFunctionData("setSTMDeployer", [
-      this.addresses.Bridgehub.STMDeploymentTrackerProxy,
-    ]);
-    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, data0);
-    if (this.verbose) {
-      console.log("STM DT registered in Bridgehub");
-    }
 
     const stmDeploymentTracker = this.stmDeploymentTracker(this.deployWallet);
     const data1 = stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL1", [
@@ -820,7 +847,7 @@ export class Deployer {
     }
   }
 
-  public async registerSharedBridge() {
+  public async registerAddresses() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
     /// registering ETH as a valid token, with address 1.
@@ -830,8 +857,10 @@ export class Deployer {
       console.log("ETH token registered in Bridgehub");
     }
 
-    const upgradeData2 = await bridgehub.interface.encodeFunctionData("setSharedBridge", [
+    const upgradeData2 = await bridgehub.interface.encodeFunctionData("setAddresses", [
       this.addresses.Bridges.SharedBridgeProxy,
+      this.addresses.Bridgehub.STMDeploymentTrackerProxy,
+      this.addresses.Bridgehub.MessageRootProxy,
     ]);
     await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
     if (this.verbose) {
@@ -897,6 +926,8 @@ export class Deployer {
 
     await this.deployBridgehubImplementation(create2Salt, { gasPrice, nonce });
     await this.deployBridgehubProxy(create2Salt, { gasPrice });
+    await this.deployMessageRootImplementation(create2Salt, { gasPrice });
+    await this.deployMessageRootProxy(create2Salt, { gasPrice });
   }
 
   public async deployStateTransitionManagerContract(
@@ -1166,9 +1197,9 @@ export class Deployer {
     await this.deploySharedBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
     await this.deployNativeTokenVaultImplementation(create2Salt, { gasPrice, nonce: nonce + 2 });
     await this.deployNativeTokenVaultProxy(create2Salt, { gasPrice });
-    await this.registerSharedBridge();
     await this.deploySTMDeploymentTrackerImplementation(create2Salt, { gasPrice });
     await this.deploySTMDeploymentTrackerProxy(create2Salt, { gasPrice });
+    await this.registerAddresses();
   }
 
   public async deployL2SharedBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
@@ -1176,7 +1207,7 @@ export class Deployer {
 
     await this.deployL2SharedBridgeImplementation(create2Salt, { gasPrice, nonce: nonce });
     await this.deploySharedBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
-    await this.registerSharedBridge();
+    await this.registerAddresses();
   }
 
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {

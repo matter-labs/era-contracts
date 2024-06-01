@@ -21,7 +21,7 @@ library Hashes {
      * NOTE:
      */
     function Keccak256(bytes32 a, bytes32 b) internal pure returns (bytes32) {
-        return  _efficientKeccak256(a, b);
+        return _efficientKeccak256(a, b);
     }
 
     /**
