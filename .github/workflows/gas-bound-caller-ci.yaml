@@ -1,0 +1,97 @@
+name: GasBoundCaller CI
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build L1 artifacts
+        run: yarn gas-bound-caller build
+
+      - name: Check the correcntess of the canonical bytecode
+        run: yarn gas-bound-caller calculate-canonical-bytecode:check
+
+      - name: Create cache
+        uses: actions/cache/save@v3
+        with:
+          key: artifacts-gas-bound-caller-${{ github.sha }}
+          path: |
+            gas-bound-caller/artifacts-zk
+            gas-bound-caller/cache-zk
+            gas-bound-caller/typechain
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Lint
+        run: yarn lint:check
+
+  test:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-gas-bound-caller-${{ github.sha }}
+          path: |
+            gas-bound-caller/artifacts-zk
+            gas-bound-caller/cache-zk
+            gas-bound-caller/typechain
+
+      - name: Use era-test-node for testing
+        uses: dutterbutter/era-test-node-action@v0.1.3
+        with:
+          releaseTag: v0.0.1-vm1.5.0
+
+      # The tests of GasBoundCaller reuse utility methods of the system contracts tests,
+      # so we need to deploy those also.
+      - name: Build system contracts
+        run: yarn sc build
+
+      - name: Run tests
+        run: yarn gas-bound-caller test

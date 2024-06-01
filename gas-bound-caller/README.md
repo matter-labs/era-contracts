@@ -1,5 +1,7 @@
 # GasBoundCaller
 
+> ⚠️⚠️ The GasBoundCaller's bytecode is not yet finalized, this version is for testnet trial only ⚠️⚠️
+
 Starting from v24 On Era, the gas for pubdata is charged at the end of the execution of the entire transaction. This means that if a subcall is not trusted, it can consume a significant amount of pubdata during the process. While this may not be an issue for most contracts, there are use cases, e.g., for relayers, where it is crucial to ensure that the subcall will not spend more money than intended.
 
 The `GasBoundCaller` is a contract with the following interface:
@@ -44,8 +46,17 @@ uint256 totalGasConsumed = computeGasBefore - computeGasAfter + pubdataGasSpent;
 
 Since `GasBoundCaller` would be the contract that calls the `_to` contract, the `msg.sender` will be equal to the `GasBoundCaller`'s address. To preserve the current `msg.sender`, this contract can be inherited from and used the same way, but instead of calling `GasBoundCaller.gasBoundCall`, `this.gasBoundCall` could be called.
 
-## Deployed Address
+## Deploying on a zkSync-based chain
 
-It should be deployed via a built-in CREATE2 factory on each individual chain.
+Note, that it requires the v1.5.0 version of the contracts to be active on the network, i.e. the protocol version should be at least v24.
 
-TODO(EVM-585)
+```
+yarn deploy-on-hyperchain --private-key <private-key> --l2-rpc <rpc>
+```
+
+### Deployed addresses
+
+| Network     | Address                                                                                                                                      |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Era Testnet | [0xDaAD9137Deec2FCbB8C4aB3820553E0da60328b6](https://sepolia.explorer.zksync.io/address/0xDaAD9137Deec2FCbB8C4aB3820553E0da60328b6#contract) |
+| Era Mainnet | TODO                                                                                                                                         |
