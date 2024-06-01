@@ -14,6 +14,7 @@ const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_co
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 async function deployVerifier(
+  testnetVerifier: boolean,
   l1Rpc: string,
   create2Address: string,
   nonce?: number,
@@ -42,7 +43,7 @@ async function deployVerifier(
   ethTxOptions["gasLimit"] = 10_000_000;
   const [address, txHash] = await deployViaCreate2(
     wallet,
-    "Verifier",
+    testnetVerifier ? "TestnetVerifier" : "Verifier",
     [],
     create2Salt,
     ethTxOptions,
@@ -61,6 +62,7 @@ export const command = new Command("verifier").description("Verifier commands");
 
 command
   .command("deploy")
+  .option("--testnet-verifier")
   .option("--l1rpc <l1Rpc>")
   .option("--private-key <privateKey>")
   .option("--create2-address <create2Address>")
@@ -71,5 +73,5 @@ command
   .description("deploy verifier")
   .action(async (cmd) => {
     const l1Rpc = cmd.l1Rpc ?? web3Url();
-    await deployVerifier(l1Rpc, cmd.create2Address, cmd.nonce, cmd.gasPrice, cmd.privateKey, cmd.file, cmd.create2Salt);
+    await deployVerifier(cmd.testnetVerifier || false, l1Rpc, cmd.create2Address, cmd.nonce, cmd.gasPrice, cmd.privateKey, cmd.file, cmd.create2Salt);
   });

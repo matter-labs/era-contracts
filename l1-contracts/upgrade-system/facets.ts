@@ -9,7 +9,7 @@ import { web3Url } from "zk/build/utils";
 import { deployViaCreate2 } from "../src.ts/deploy-utils";
 import { getFacetCutsForUpgrade } from "../src.ts/diamondCut";
 import { insertGasPrice } from "./utils";
-import { ethTestConfig } from "../src.ts/utils";
+import { ethTestConfig, getNumberFromEnv } from "../src.ts/utils";
 
 async function deployFacetCut(
   wallet: ethers.Wallet,
@@ -22,7 +22,14 @@ async function deployFacetCut(
   create2Salt = create2Salt ?? ethers.constants.HashZero;
 
   ethTxOptions["gasLimit"] = 10_000_000;
-  const [address, txHash] = await deployViaCreate2(wallet, name, [], create2Salt, ethTxOptions, create2Address, true);
+
+  let constructorArgs = [];
+  // FIXME: maybe make it more generic
+  if (name == 'MailboxFacet') {
+    constructorArgs = [getNumberFromEnv('CONTRACTS_ERA_CHAIN_ID')];
+  }
+    
+  const [address, txHash] = await deployViaCreate2(wallet, name, constructorArgs, create2Salt, ethTxOptions, create2Address, true);
 
   console.log(`Deployed ${name} at ${address} with txHash ${txHash}`);
   return [address, txHash];
