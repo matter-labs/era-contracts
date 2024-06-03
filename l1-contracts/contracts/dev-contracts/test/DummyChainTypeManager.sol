@@ -10,6 +10,8 @@ import {ChainTypeManager} from "../../state-transition/ChainTypeManager.sol";
 /// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
 contract DummyChainTypeManager is ChainTypeManager {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 
     // add this to be excluded from coverage report
     function test() internal virtual {}
