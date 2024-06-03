@@ -24,7 +24,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
-import {StateTransitionManagerInitializeData} from "contracts/state-transition/IStateTransitionManager.sol";
+import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -107,7 +107,7 @@ contract DeployL1Script is Script {
         uint256 diamondInitMinimalL2GasPrice;
         address governanceSecurityCouncilAddress;
         uint256 governanceMinDelay;
-        uint256 maxNumberOfHyperchains;
+        uint256 maxNumberOfChains;
         bytes diamondCutData;
         bytes32 bootloaderHash;
         bytes32 defaultAAHash;
@@ -172,7 +172,7 @@ contract DeployL1Script is Script {
             "$.contracts.governance_security_council_address"
         );
         config.contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
-        config.contracts.maxNumberOfHyperchains = toml.readUint("$.contracts.max_number_of_hyperchains");
+        config.contracts.maxNumberOfChains = toml.readUint("$.contracts.max_number_of_chains");
         config.contracts.create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
         if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
             config.contracts.create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
@@ -361,7 +361,7 @@ contract DeployL1Script is Script {
         bytes memory bytecode = abi.encodePacked(
             type(StateTransitionManager).creationCode,
             abi.encode(addresses.bridgehub.bridgehubProxy),
-            abi.encode(config.contracts.maxNumberOfHyperchains)
+            abi.encode(config.contracts.maxNumberOfChains)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("StateTransitionManagerImplementation deployed at:", contractAddress);
@@ -428,14 +428,18 @@ contract DeployL1Script is Script {
 
         config.contracts.diamondCutData = abi.encode(diamondCut);
 
-        StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
-            owner: config.ownerAddress,
-            validatorTimelock: addresses.validatorTimelock,
+        ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: addresses.stateTransition.genesisUpgrade,
             genesisBatchHash: config.contracts.genesisRoot,
             genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.genesisBatchCommitment,
-            diamondCut: diamondCut,
+            diamondCut: diamondCut
+        });
+
+        StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
+            owner: config.ownerAddress,
+            validatorTimelock: addresses.validatorTimelock,
+            chainCreationParams: chainCreationParams,
             protocolVersion: config.contracts.latestProtocolVersion
         });
 

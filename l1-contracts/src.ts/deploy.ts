@@ -6,7 +6,12 @@ import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
 import type { DeployedAddresses } from "./deploy-utils";
 import { deployedAddressesFromEnv, deployBytecodeViaCreate2, deployViaCreate2 } from "./deploy-utils";
-import { readBatchBootloaderBytecode, readSystemContractsBytecode, SYSTEM_CONFIG } from "../scripts/utils";
+import {
+  packSemver,
+  readBatchBootloaderBytecode,
+  readSystemContractsBytecode,
+  unpackStringSemVer,
+} from "../scripts/utils";
 import { getTokens } from "./deploy-token";
 import {
   ADDRESS_ONE,
@@ -16,6 +21,7 @@ import {
   PubdataPricingMode,
   hashL2Bytecode,
   DIAMOND_CUT_DATA_ABI_STRING,
+  compileInitialCutHash,
 } from "./utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
@@ -29,9 +35,10 @@ import { L1SharedBridgeFactory } from "../typechain/L1SharedBridgeFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
 import type { FacetCut } from "./diamondCut";
-import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
+import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
 import { ERC20Factory } from "../typechain";
+import type { Contract, Overrides } from "@ethersproject/contracts";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -91,43 +98,17 @@ export class Deployer {
       recursionCircuitsSetVksHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
     };
     const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
-    const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
-    const feeParams = {
-      pubdataPricingMode: PubdataPricingMode.Rollup,
-      batchOverheadL1Gas: SYSTEM_CONFIG.priorityTxBatchOverheadL1Gas,
-      maxPubdataPerBatch: SYSTEM_CONFIG.priorityTxPubdataPerBatch,
-      priorityTxMaxPubdata: SYSTEM_CONFIG.priorityTxMaxPubdata,
-      maxL2GasPerBatch: SYSTEM_CONFIG.priorityTxMaxGasPerBatch,
-      minimalL2GasPrice: SYSTEM_CONFIG.priorityTxMinimalGasPrice,
-    };
-
-    const diamondInitCalldata = DiamondInit.encodeFunctionData("initialize", [
-      // these first values are set in the contract
-      {
-        chainId: "0x0000000000000000000000000000000000000000000000000000000000000001",
-        bridgehub: "0x0000000000000000000000000000000000001234",
-        stateTransitionManager: "0x0000000000000000000000000000000000002234",
-        protocolVersion: "0x0000000000000000000000000000000000002234",
-        admin: "0x0000000000000000000000000000000000003234",
-        validatorTimelock: "0x0000000000000000000000000000000000004234",
-        baseToken: "0x0000000000000000000000000000000000004234",
-        baseTokenBridge: "0x0000000000000000000000000000000000004234",
-        storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
-        verifier: this.addresses.StateTransition.Verifier,
-        verifierParams,
-        l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
-        l2DefaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-        priorityTxMaxGasLimit,
-        feeParams,
-        blobVersionedHashRetriever: this.addresses.BlobVersionedHashRetriever,
-      },
-    ]);
-
-    return diamondCut(
+    return compileInitialCutHash(
       facetCuts,
+      verifierParams,
+      L2_BOOTLOADER_BYTECODE_HASH,
+      L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+      this.addresses.StateTransition.Verifier,
+      this.addresses.BlobVersionedHashRetriever,
+      +priorityTxMaxGasLimit,
       this.addresses.StateTransition.DiamondInit,
-      "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2)
+      false
     );
   }
 
@@ -307,19 +288,23 @@ export class Deployer {
     const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
     const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
     const diamondCut = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
-    const protocolVersion = getNumberFromEnv("CONTRACTS_GENESIS_PROTOCOL_VERSION");
+    const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
 
     const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
+
+    const chainCreationParams = {
+      genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
+      genesisBatchHash,
+      genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
+      genesisBatchCommitment,
+      diamondCut,
+    };
 
     const initCalldata = stateTransitionManager.encodeFunctionData("initialize", [
       {
         owner: this.addresses.Governance,
         validatorTimelock: this.addresses.ValidatorTimeLock,
-        genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
-        genesisBatchHash,
-        genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
-        genesisBatchCommitment,
-        diamondCut,
+        chainCreationParams,
         protocolVersion,
       },
     ]);
@@ -451,15 +436,39 @@ export class Deployer {
     }
   }
 
+  public async executeDirectOrGovernance(
+    useGovernance: boolean,
+    contract: Contract,
+    fname: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fargs: any[],
+    value: BigNumberish,
+    overrides?: Overrides,
+    printOperation: boolean = false
+  ): Promise<ethers.ContractReceipt> {
+    if (useGovernance) {
+      const cdata = contract.interface.encodeFunctionData(fname, fargs);
+      return this.executeUpgrade(contract.address, value, cdata, printOperation);
+    } else {
+      const tx: ethers.ContractTransaction = await contract[fname](...fargs, ...(overrides ? [overrides] : []));
+      return await tx.wait();
+    }
+  }
+
   /// this should be only use for local testing
-  public async executeUpgrade(targetAddress: string, value: BigNumberish, callData: string, printFileName?: string) {
+  public async executeUpgrade(
+    targetAddress: string,
+    value: BigNumberish,
+    callData: string,
+    printOperation: boolean = false
+  ) {
     const governance = IGovernanceFactory.connect(this.addresses.Governance, this.deployWallet);
     const operation = {
       calls: [{ target: targetAddress, value: value, data: callData }],
       predecessor: ethers.constants.HashZero,
       salt: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
     };
-    if (printFileName) {
+    if (printOperation) {
       console.log("Operation:", operation);
       console.log(
         "Schedule operation: ",
@@ -477,7 +486,7 @@ export class Deployer {
       console.log("Upgrade scheduled");
     }
     const executeTX = await governance.execute(operation, { value: value });
-    await executeTX.wait();
+    const receipt = await executeTX.wait();
     if (this.verbose) {
       console.log(
         "Upgrade with target ",
@@ -486,6 +495,7 @@ export class Deployer {
         await governance.isOperationDone(await governance.hashOperation(operation))
       );
     }
+    return receipt;
   }
 
   // used for testing, mimics original deployment process.
@@ -677,7 +687,8 @@ export class Deployer {
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,
     nonce?,
-    predefinedChainId?: string
+    predefinedChainId?: string,
+    useGovernance: boolean = false
   ) {
     const gasLimit = 10_000_000;
 
@@ -691,24 +702,34 @@ export class Deployer {
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
-    const tx = await bridgehub.createNewChain(
-      inputChainId,
-      this.addresses.StateTransition.StateTransitionProxy,
-      baseTokenAddress,
-      Date.now(),
-      admin,
-      initialDiamondCut,
+    const receipt = await this.executeDirectOrGovernance(
+      useGovernance,
+      bridgehub,
+      "createNewChain",
+      [
+        inputChainId,
+        this.addresses.StateTransition.StateTransitionProxy,
+        baseTokenAddress,
+        Date.now(),
+        admin,
+        initialDiamondCut,
+      ],
+      0,
       {
         gasPrice,
         nonce,
         gasLimit,
       }
     );
-    const receipt = await tx.wait();
+
     const chainId = receipt.logs.find((log) => log.topics[0] == bridgehub.interface.getEventTopic("NewChain"))
       .topics[1];
 
     nonce++;
+    if (useGovernance) {
+      // deploying through governance requires two transactions
+      nonce++;
+    }
 
     this.addresses.BaseToken = baseTokenAddress;
 
@@ -778,11 +799,28 @@ export class Deployer {
     }
   }
 
-  public async registerToken(tokenAddress: string) {
-    const bridgehub = this.bridgehubContract(this.deployWallet);
-    const tx = await bridgehub.addToken(tokenAddress);
+  public async transferAdminFromDeployerToGovernance() {
+    const stm = this.stateTransitionManagerContract(this.deployWallet);
+    const diamondProxyAddress = await stm.getHyperchain(this.chainId);
+    const hyperchain = IZkSyncHyperchainFactory.connect(diamondProxyAddress, this.deployWallet);
 
-    const receipt = await tx.wait();
+    const receipt = await (await hyperchain.setPendingAdmin(this.addresses.Governance)).wait();
+    if (this.verbose) {
+      console.log(`Governance set as pending admin, gas used: ${receipt.gasUsed.toString()}`);
+    }
+
+    await this.executeUpgrade(hyperchain.address, 0, hyperchain.interface.encodeFunctionData("acceptAdmin"), false);
+
+    if (this.verbose) {
+      console.log("Pending admin successfully accepted");
+    }
+  }
+
+  public async registerToken(tokenAddress: string, useGovernance: boolean = false) {
+    const bridgehub = this.bridgehubContract(this.deployWallet);
+
+    const receipt = await this.executeDirectOrGovernance(useGovernance, bridgehub, "addToken", [tokenAddress], 0);
+
     if (this.verbose) {
       console.log(`Token ${tokenAddress} was registered, gas used: ${receipt.gasUsed.toString()}`);
     }

@@ -24,7 +24,7 @@ contract RegisterHyperchainScript is Script {
     struct Config {
         address deployerAddress;
         address ownerAddress;
-        uint256 hyperchainChainId;
+        uint256 chainChainId;
         bool validiumMode;
         uint256 bridgehubCreateNewChainSalt;
         address validatorSenderOperatorCommitEth;
@@ -81,20 +81,20 @@ contract RegisterHyperchainScript is Script {
 
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
 
-        config.hyperchainChainId = toml.readUint("$.hyperchain.hyperchain_chain_id");
-        config.bridgehubCreateNewChainSalt = toml.readUint("$.hyperchain.bridgehub_create_new_chain_salt");
-        config.baseToken = toml.readAddress("$.hyperchain.base_token_addr");
-        config.validiumMode = toml.readBool("$.hyperchain.validium_mode");
-        config.validatorSenderOperatorCommitEth = toml.readAddress("$.hyperchain.validator_sender_operator_commit_eth");
-        config.validatorSenderOperatorBlobsEth = toml.readAddress("$.hyperchain.validator_sender_operator_blobs_eth");
+        config.chainChainId = toml.readUint("$.chain.chain_chain_id");
+        config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
+        config.baseToken = toml.readAddress("$.chain.base_token_addr");
+        config.validiumMode = toml.readBool("$.chain.validium_mode");
+        config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
+        config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
         config.baseTokenGasPriceMultiplierNominator = uint128(
-            toml.readUint("$.hyperchain.base_token_gas_price_multiplier_nominator")
+            toml.readUint("$.chain.base_token_gas_price_multiplier_nominator")
         );
         config.baseTokenGasPriceMultiplierDenominator = uint128(
-            toml.readUint("$.hyperchain.base_token_gas_price_multiplier_denominator")
+            toml.readUint("$.chain.base_token_gas_price_multiplier_denominator")
         );
-        config.governanceMinDelay = uint256(toml.readUint("$.hyperchain.governance_min_delay"));
-        config.governanceSecurityCouncilAddress = toml.readAddress("$.hyperchain.governance_security_council_address");
+        config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
+        config.governanceSecurityCouncilAddress = toml.readAddress("$.chain.governance_security_council_address");
     }
 
     function checkTokenAddress() internal view {
@@ -153,7 +153,7 @@ contract RegisterHyperchainScript is Script {
         bytes memory data = abi.encodeCall(
             bridgehub.createNewChain,
             (
-                config.hyperchainChainId,
+                config.chainChainId,
                 config.stateTransitionProxy,
                 config.baseToken,
                 config.bridgehubCreateNewChainSalt,
@@ -192,8 +192,8 @@ contract RegisterHyperchainScript is Script {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(config.validatorTimelock);
 
         vm.startBroadcast();
-        validatorTimelock.addValidator(config.hyperchainChainId, config.validatorSenderOperatorCommitEth);
-        validatorTimelock.addValidator(config.hyperchainChainId, config.validatorSenderOperatorBlobsEth);
+        validatorTimelock.addValidator(config.chainChainId, config.validatorSenderOperatorCommitEth);
+        validatorTimelock.addValidator(config.chainChainId, config.validatorSenderOperatorBlobsEth);
         vm.stopBroadcast();
 
         console.log("Validators added");
