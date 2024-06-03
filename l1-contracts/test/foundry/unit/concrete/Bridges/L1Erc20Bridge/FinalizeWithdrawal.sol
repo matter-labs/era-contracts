@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
+import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
@@ -36,17 +37,30 @@ contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
     function test_finalizeWithdrawalSuccessfully() public {
         uint256 l2BatchNumber = 3;
         uint256 l2MessageIndex = 4;
+        uint256 txNumberInBatch = 0;
+        bytes32[] memory merkleProof;
         uint256 amount = 999;
 
         assertFalse(bridge.isWithdrawalFinalized(l2BatchNumber, l2MessageIndex));
 
-        dummySharedBridge.setDataToBeReturnedInFinalizeWithdrawal(alice, address(token), amount);
+        vm.mockCall(
+            sharedBridgeAddress,
+            abi.encodeWithSelector(
+                IL1SharedBridge.finalizeWithdrawalLegacyErc20Bridge.selector,
+                l2BatchNumber,
+                l2MessageIndex,
+                txNumberInBatch,
+                "",
+                merkleProof
+            ),
+            abi.encode(alice, address(token), amount)
+        );
 
         vm.prank(alice);
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(bridge));
         emit WithdrawalFinalized(alice, address(token), amount);
-        bytes32[] memory merkleProof;
+
         bridge.finalizeWithdrawal({
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
