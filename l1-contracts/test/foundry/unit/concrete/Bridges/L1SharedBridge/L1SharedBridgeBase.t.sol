@@ -42,6 +42,8 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         vm.deal(stmAddress, amount);
         vm.prank(stmAddress);
         sharedBridge.receiveEth{value: amount}(eraChainId);
+
+        assertEq(address(stmAddress).balance, 0);
         assertEq(address(sharedBridge).balance, amount);
     }
 
@@ -93,6 +95,10 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             amount: amount
         });
         sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, 0, bob));
+
+        assertEq(sharedBridge.chainBalance(chainId, ETH_TOKEN_ADDRESS), amount);
+        assertEq(address(sharedBridge).balance, amount);
+        assertEq(alice.balance, 0);
     }
 
     function test_bridgehubDeposit_Erc() public {
@@ -117,6 +123,10 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             amount: amount
         });
         sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(address(token), amount, bob));
+
+        assertEq(sharedBridge.chainBalance(chainId, address(token)), amount);
+        assertEq(token.balanceOf(address(sharedBridge)), amount);
+        assertEq(token.balanceOf(alice), 0);
     }
 
     function test_bridgehubConfirmL2Transaction() public {
@@ -165,6 +175,9 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             _l2TxNumberInBatch: l2TxNumberInBatch,
             _merkleProof: merkleProof
         });
+
+        assertEq(token.balanceOf(address(sharedBridge)), 0);
+        assertEq(token.balanceOf(alice), amount);
     }
 
     function test_claimFailedDeposit_Eth() public {
@@ -210,6 +223,9 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             _l2TxNumberInBatch: l2TxNumberInBatch,
             _merkleProof: merkleProof
         });
+
+        assertEq(address(sharedBridge).balance, 0);
+        assertEq(alice.balance, amount);
     }
 
     function test_finalizeWithdrawal_EthOnEth() public {
@@ -254,6 +270,9 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             _message: message,
             _merkleProof: merkleProof
         });
+
+        assertEq(address(sharedBridge).balance, 0);
+        assertEq(alice.balance, amount);
     }
 
     function test_finalizeWithdrawal_ErcOnEth() public {
@@ -303,6 +322,9 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             _message: message,
             _merkleProof: merkleProof
         });
+
+        assertEq(token.balanceOf(address(sharedBridge)), 0);
+        assertEq(token.balanceOf(alice), amount);
     }
 
     function test_finalizeWithdrawal_EthOnErc() public {
@@ -352,6 +374,9 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             _message: message,
             _merkleProof: merkleProof
         });
+
+        assertEq(address(sharedBridge).balance, 0);
+        assertEq(alice.balance, amount);
     }
 
     function test_finalizeWithdrawal_BaseErcOnErc() public {
@@ -401,6 +426,9 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             _message: message,
             _merkleProof: merkleProof
         });
+
+        assertEq(token.balanceOf(address(sharedBridge)), 0);
+        assertEq(token.balanceOf(alice), amount);
     }
 
     function test_finalizeWithdrawal_NonBaseErcOnErc() public {
@@ -446,6 +474,9 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             _message: message,
             _merkleProof: merkleProof
         });
+
+        assertEq(token.balanceOf(address(sharedBridge)), 0);
+        assertEq(token.balanceOf(alice), amount);
     }
 
     function test_finalizeWithdrawal_EthOnEth_LegacyTx() public {
@@ -507,5 +538,8 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             _message: message,
             _merkleProof: merkleProof
         });
+
+        assertEq(address(sharedBridge).balance, 0);
+        assertEq(alice.balance, amount);
     }
 }
