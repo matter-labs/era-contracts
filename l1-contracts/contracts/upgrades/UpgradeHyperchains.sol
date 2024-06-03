@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {InvalidChainId, ZeroAddress} from "./ZkSyncUpgradeErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -15,10 +16,18 @@ contract UpgradeHyperchains is BaseZkSyncUpgrade {
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         (uint256 chainId, address bridgehubAddress, address stateTransitionManager, address sharedBridgeAddress) = abi
             .decode(_proposedUpgrade.postUpgradeCalldata, (uint256, address, address, address));
-        require(chainId != 0, "UpgradeHyperchain: 1");
-        require(bridgehubAddress != address(0), "UpgradeHyperchain: 2");
-        require(stateTransitionManager != address(0), "UpgradeHyperchain: 3");
-        require(sharedBridgeAddress != address(0), "UpgradeHyperchain: 4");
+        if (chainId == 0) {
+            revert InvalidChainId();
+        }
+        if (bridgehubAddress == address(0)) {
+            revert ZeroAddress();
+        }
+        if (stateTransitionManager == address(0)) {
+            revert ZeroAddress();
+        }
+        if (sharedBridgeAddress == address(0)) {
+            revert ZeroAddress();
+        }
 
         s.chainId = chainId;
         s.bridgehub = bridgehubAddress;

@@ -18,6 +18,7 @@ import {InitializeDataNewChain} from "contracts/state-transition/chain-interface
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
 import {StateTransitionManagerInitializeData} from "contracts/state-transition/IStateTransitionManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract StateTransitionManagerTest is Test {
     StateTransitionManager internal stateTransitionManager;
@@ -89,7 +90,7 @@ contract StateTransitionManagerTest is Test {
             protocolVersion: 0
         });
 
-        vm.expectRevert(bytes.concat("STM: owner zero"));
+        vm.expectRevert(ZeroAddress.selector);
         new TransparentUpgradeableProxy(
             address(stateTransitionManager),
             admin,

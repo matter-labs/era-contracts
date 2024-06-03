@@ -8,18 +8,7 @@ import {MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
-import {
-    Unauthorized,
-    TooMuchGas,
-    PubdataBatchIsLessThanTxn,
-    InvalidPubdataPricingMode,
-    InvalidValue,
-    ChainAlreadyLive,
-    HashMismatch,
-    ValueMismatch,
-    InvalidProtocolVersion,
-    DiamondFreezeIncorrectState
-} from "../../../common/L1ContractErrors.sol";
+import {Unauthorized, TooMuchGas, PubdataPerBatchIsLessThanTxn, InvalidPubdataPricingMode, InvalidValue, ChainAlreadyLive, HashMismatch, ValueMismatch, InvalidProtocolVersion, DiamondFreezeIncorrectState} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -85,7 +74,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         // Double checking that the new fee params are valid, i.e.
         // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
         if (_newFeeParams.maxPubdataPerBatch < _newFeeParams.priorityTxMaxPubdata) {
-            revert PubdataBatchIsLessThanTxn();
+            revert PubdataPerBatchIsLessThanTxn();
         }
 
         FeeParams memory oldFeeParams = s.feeParams;
@@ -93,7 +82,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         // we cannot change pubdata pricing mode
         if (_newFeeParams.pubdataPricingMode != oldFeeParams.pubdataPricingMode) {
             revert InvalidPubdataPricingMode();
-        } 
+        }
 
         s.feeParams = _newFeeParams;
 
@@ -170,9 +159,9 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         // diamond proxy is frozen already
-        if (diamondStorage.isFrozen) { 
-            revert DiamondFreezeIncorrectState(); 
-        } 
+        if (diamondStorage.isFrozen) {
+            revert DiamondFreezeIncorrectState();
+        }
         diamondStorage.isFrozen = true;
 
         emit Freeze();
@@ -183,9 +172,9 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         // diamond proxy is not frozen
-        if (!diamondStorage.isFrozen) { 
-            revert DiamondFreezeIncorrectState(); 
-        } 
+        if (!diamondStorage.isFrozen) {
+            revert DiamondFreezeIncorrectState();
+        }
         diamondStorage.isFrozen = false;
 
         emit Unfreeze();

@@ -22,31 +22,7 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
-import {
-    Unauthorized, 
-    ZeroAddress, 
-    SharedBridgeValueAlreadySet, 
-    SharedBridgeKey, 
-    NoFundsTransferred, 
-    ZeroBalance, 
-    ValueMismatch, 
-    NonEmptyMsgValue, 
-    L2BridgeNotDeployed, 
-    TokenNotSupported, 
-    WithdrawIncorrectAmount, 
-    EmptyDeposit,
-    DepositExists,
-    AddressAlreadyUsed,
-    InvalidProof,
-    DepositDNE,
-    InsufficientFunds,
-    DepositFailed,
-    ShareadBridgeValueNotSet,
-    WithdrawalAlreadyFinalized,
-    WithdrawFailed,
-    MalformedMessage,
-    InvalidSelector
-} from "../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress, SharedBridgeValueAlreadySet, SharedBridgeKey, NoFundsTransferred, ZeroBalance, ValueMismatch, NonEmptyMsgValue, L2BridgeNotDeployed, TokenNotSupported, WithdrawIncorrectAmount, EmptyDeposit, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDNE, InsufficientFunds, DepositFailed, ShareadBridgeValueNotSet, WithdrawalAlreadyFinalized, WithdrawFailed, MalformedMessage, InvalidSelector} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -326,12 +302,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             // The token has non-standard transfer logic
             if (withdrawAmount != _depositAmount) {
                 revert WithdrawIncorrectAmount();
-            } 
+            }
         }
         // empty deposit amount
         if (amount == 0) {
             revert EmptyDeposit();
-        } 
+        }
 
         bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
         if (!hyperbridgingEnabled[_chainId]) {
@@ -539,7 +515,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
     /// @return Whether withdrawal was initiated on zkSync Era before Legacy Bridge upgrade.
     function _isEraLegacyTokenWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
-        if((_chainId == ERA_CHAIN_ID) && eraPostLegacyBridgeUpgradeFirstBatch == 0) {
+        if ((_chainId == ERA_CHAIN_ID) && eraPostLegacyBridgeUpgradeFirstBatch == 0) {
             revert ShareadBridgeValueNotSet(SharedBridgeKey.LegacyBridgeFirstBatch);
         }
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostLegacyBridgeUpgradeFirstBatch);

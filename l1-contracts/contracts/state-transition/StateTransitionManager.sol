@@ -21,12 +21,7 @@ import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
 import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
-import {
-    Unauthorized,
-    ZeroAddress,
-    HashMismatch,
-    HyperchainLimitReached
-} from "../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress, HashMismatch, HyperchainLimitReached} from "../common/L1ContractErrors.sol";
 
 /// @title State Transition Manager contract
 /// @author Matter Labs

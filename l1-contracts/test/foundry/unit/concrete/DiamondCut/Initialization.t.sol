@@ -6,6 +6,7 @@ import {RevertFallback} from "contracts/dev-contracts/RevertFallback.sol";
 import {ReturnSomething} from "contracts/dev-contracts/ReturnSomething.sol";
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {BadReturnData, MalformedCalldata, NonEmptyCalldata} from "contracts/common/L1ContractErrors.sol";
 
 contract InitializationTest is DiamondCutTest {
     address private revertFallbackAddress;
@@ -28,7 +29,7 @@ contract InitializationTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.expectRevert(abi.encodePacked("I"));
+        vm.expectRevert(MalformedCalldata.selector);
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
@@ -41,7 +42,7 @@ contract InitializationTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.expectRevert(abi.encodePacked("lp"));
+        vm.expectRevert(BadReturnData.selector);
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
@@ -54,7 +55,7 @@ contract InitializationTest is DiamondCutTest {
             initCalldata: bytes("0x11")
         });
 
-        vm.expectRevert(abi.encodePacked("H"));
+        vm.expectRevert(NonEmptyCalldata.selector);
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
@@ -67,7 +68,7 @@ contract InitializationTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.expectRevert(abi.encodePacked("lp1"));
+        vm.expectRevert(BadReturnData.selector);
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 }

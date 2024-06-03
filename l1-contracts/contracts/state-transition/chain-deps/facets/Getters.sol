@@ -10,6 +10,7 @@ import {PriorityQueue, PriorityOperation} from "../../../state-transition/librar
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
+import {InvalidSelector} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -180,7 +181,9 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     /// @inheritdoc IGetters
     function isFunctionFreezable(bytes4 _selector) external view returns (bool) {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
-        require(ds.selectorToFacet[_selector].facetAddress != address(0), "g2");
+        if (ds.selectorToFacet[_selector].facetAddress == address(0)) {
+            revert InvalidSelector(_selector);
+        }
         return ds.selectorToFacet[_selector].isFreezable;
     }
 

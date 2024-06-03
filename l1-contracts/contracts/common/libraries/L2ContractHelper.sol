@@ -34,7 +34,7 @@ library L2ContractHelper {
         // bytecode length in words must be odd
         if (bytecodeLenInWords % 2 == 0) {
             revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
-        } 
+        }
         hashedBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
         // Setting the version of the hash
         hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));

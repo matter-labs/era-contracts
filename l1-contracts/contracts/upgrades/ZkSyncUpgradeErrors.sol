@@ -6,3 +6,5 @@ error ProtocolVersionShouldBeGreater(uint256 _oldProtocolVersion, uint256 _newPr
 error ProtocolVersionDeltaTooLarge(uint256 _proposedDelta, uint256 _maxDelta);
 error PreviousUpgradeNotFinalized();
 error PreviousUpgradeBatchNotCleared();
+error InvalidChainId();
+error ZeroAddress();

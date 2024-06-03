@@ -13,20 +13,7 @@ import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyp
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {
-    Unauthorized,
-    STMAlreadyRegistered,
-    STMNotRegistered,
-    TokenAlreadyRegistered,
-    TokenNotRegistered,
-    InvalidChainId,
-    WethBridgeNotSet,
-    BridgeHubAlreadyRegistered,
-    ValueMismatch,
-    InsufficientFunds,
-    NonEmptyMsgValue,
-    AddressTooLow
-} from "../common/L1ContractErrors.sol";
+import {Unauthorized, STMAlreadyRegistered, STMNotRegistered, TokenAlreadyRegistered, TokenNotRegistered, InvalidChainId, WethBridgeNotSet, BridgeHubAlreadyRegistered, ValueMismatch, InsufficientFunds, NonEmptyMsgValue, AddressTooLow} from "../common/L1ContractErrors.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice all the ether is held by the weth bridge
@@ -145,7 +132,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (_chainId == 0) {
             revert InvalidChainId();
         }
-        if (_chainId <= type(uint48).max) {
+        if (_chainId > type(uint48).max) {
             revert InvalidChainId();
         }
 

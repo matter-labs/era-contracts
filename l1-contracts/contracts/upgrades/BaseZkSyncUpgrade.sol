@@ -9,6 +9,7 @@ import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
+import {TimeNotReached, InvalidTxType, NewProtocolVersionNotInUpgradeTxn, TooManyFactoryDeps, UnexpectedNumberOfFactoryDeps, InvalidProtocolVersion, PreviousUpgradeNotFinalized, PreviousUpgradeNotCleaned, InvalidHash} from "../common/L1ContractErrors.sol";
 
 /// @notice The struct that represents the upgrade proposal.
 /// @param l2ProtocolUpgradeTx The system upgrade transaction.
@@ -68,7 +69,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         // of the L1 block at which the upgrade occurred. This means that using timestamp as a signifier of "upgraded"
         // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade batches will be reduced
         // as the permitted delay window is reduced in the future.
-        require(block.timestamp >= _proposedUpgrade.upgradeTimestamp, "Upgrade is not ready yet");
+        if (block.timestamp < _proposedUpgrade.upgradeTimestamp) {
+            revert TimeNotReached();
+        }
 
         _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
@@ -186,7 +189,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
             return bytes32(0);
         }
 
-        require(_l2ProtocolUpgradeTx.txType == SYSTEM_UPGRADE_L2_TX_TYPE, "L2 system upgrade tx type is wrong");
+        if (_l2ProtocolUpgradeTx.txType != SYSTEM_UPGRADE_L2_TX_TYPE) {
+            revert InvalidTxType(_l2ProtocolUpgradeTx.txType);
+        }
 
         bytes memory encodedTransaction = abi.encode(_l2ProtocolUpgradeTx);
 
@@ -201,10 +206,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
         // We want the hashes of l2 system upgrade transactions to be unique.
         // This is why we require that the `nonce` field is unique to each upgrade.
-        require(
-            _l2ProtocolUpgradeTx.nonce == _newProtocolVersion,
-            "The new protocol version should be included in the L2 system upgrade tx"
-        );
+        if (_l2ProtocolUpgradeTx.nonce != _newProtocolVersion) {
+            revert NewProtocolVersionNotInUpgradeTxn();
+        }
 
         _verifyFactoryDeps(_factoryDeps, _l2ProtocolUpgradeTx.factoryDeps);
 
@@ -219,15 +223,18 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
     /// @param _factoryDeps The list of factory deps
     /// @param _expectedHashes The list of expected bytecode hashes
     function _verifyFactoryDeps(bytes[] calldata _factoryDeps, uint256[] calldata _expectedHashes) private pure {
-        require(_factoryDeps.length == _expectedHashes.length, "Wrong number of factory deps");
-        require(_factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "Factory deps can be at most 32");
+        if (_factoryDeps.length != _expectedHashes.length) {
+            revert UnexpectedNumberOfFactoryDeps();
+        }
+        if (_factoryDeps.length > MAX_NEW_FACTORY_DEPS) {
+            revert TooManyFactoryDeps();
+        }
         uint256 length = _factoryDeps.length;
 
         for (uint256 i = 0; i < length; ++i) {
-            require(
-                L2ContractHelper.hashL2Bytecode(_factoryDeps[i]) == bytes32(_expectedHashes[i]),
-                "Wrong factory dep hash"
-            );
+            if (L2ContractHelper.hashL2Bytecode(_factoryDeps[i]) != bytes32(_expectedHashes[i])) {
+                revert InvalidHash();
+            }
         }
     }
 
@@ -235,22 +242,21 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
     /// @param _newProtocolVersion The new protocol version
     function _setNewProtocolVersion(uint256 _newProtocolVersion) internal virtual {
         uint256 previousProtocolVersion = s.protocolVersion;
-        require(
-            _newProtocolVersion > previousProtocolVersion,
-            "New protocol version is not greater than the current one"
-        );
-        require(
-            _newProtocolVersion - previousProtocolVersion <= MAX_ALLOWED_PROTOCOL_VERSION_DELTA,
-            "Too big protocol version difference"
-        );
+        if (_newProtocolVersion <= previousProtocolVersion) {
+            revert InvalidProtocolVersion();
+        }
+        if (_newProtocolVersion - previousProtocolVersion > MAX_ALLOWED_PROTOCOL_VERSION_DELTA) {
+            revert InvalidProtocolVersion();
+        }
 
         // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
         // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
-        require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
-        require(
-            s.l2SystemContractsUpgradeBatchNumber == 0,
-            "The batch number of the previous upgrade has not been cleaned"
-        );
+        if (s.l2SystemContractsUpgradeTxHash != bytes32(0)) {
+            revert PreviousUpgradeNotFinalized(s.l2SystemContractsUpgradeTxHash);
+        }
+        if (s.l2SystemContractsUpgradeBatchNumber != 0) {
+            revert PreviousUpgradeNotCleaned();
+        }
 
         s.protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);

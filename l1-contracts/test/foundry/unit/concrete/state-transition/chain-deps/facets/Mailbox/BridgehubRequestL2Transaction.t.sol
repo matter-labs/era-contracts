@@ -7,6 +7,7 @@ import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransactionFiltererTrue.sol";
 import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
+import {TransactionNotAllowed} from "contracts/common/L1ContractErrors.sol";
 
 contract BridgehubRequestL2TransactionTest is MailboxTest {
     function test_successWithoutFilterer() public {
@@ -54,7 +55,7 @@ contract BridgehubRequestL2TransactionTest is MailboxTest {
 
         vm.deal(bridgehub, 100 ether);
         vm.prank(address(bridgehub));
-        vm.expectRevert(bytes("tf"));
+        vm.expectRevert(TransactionNotAllowed.selector);
         mailboxFacet.bridgehubRequestL2Transaction(req);
     }
 
