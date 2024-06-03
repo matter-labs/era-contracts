@@ -8,13 +8,11 @@ import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {FeeOnTransferToken} from "contracts/dev-contracts/FeeOnTransferToken.sol";
-import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {ReenterL1ERC20Bridge} from "contracts/dev-contracts/test/ReenterL1ERC20Bridge.sol";
 import {Utils} from "../../Utils/Utils.sol";
 
 contract L1Erc20BridgeTest is Test {
     L1ERC20Bridge internal bridge;
-    DummySharedBridge internal dummySharedBridge;
 
     ReenterL1ERC20Bridge internal reenterL1ERC20Bridge;
     L1ERC20Bridge internal bridgeReenterItself;
@@ -23,15 +21,14 @@ contract L1Erc20BridgeTest is Test {
     TestnetERC20Token internal feeOnTransferToken;
     address internal randomSigner;
     address internal alice;
-    bytes32 internal dummyL2DepositTxHash;
+    address sharedBridgeAddress;
 
     constructor() {
         randomSigner = makeAddr("randomSigner");
-        dummyL2DepositTxHash = Utils.randomBytes32("dummyL2DepositTxHash");
         alice = makeAddr("alice");
 
-        dummySharedBridge = new DummySharedBridge(dummyL2DepositTxHash);
-        bridge = new L1ERC20Bridge(IL1SharedBridge(address(dummySharedBridge)));
+        sharedBridgeAddress = makeAddr("shared bridge");
+        bridge = new L1ERC20Bridge(IL1SharedBridge(sharedBridgeAddress));
 
         reenterL1ERC20Bridge = new ReenterL1ERC20Bridge();
         bridgeReenterItself = new L1ERC20Bridge(IL1SharedBridge(address(reenterL1ERC20Bridge)));

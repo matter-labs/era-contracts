@@ -314,11 +314,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         address hyperchain = getHyperchain(_request.chainId);
 
-        require(
-            _request.secondBridgeAddress > BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
-            "Bridgehub: second bridge address too low"
-        ); // to avoid calls to precompiles
-
         // slither-disable-next-line arbitrary-send-eth
         L2TransactionRequestTwoBridgesInner memory outputRequest = IL1SharedBridge(_request.secondBridgeAddress)
             .bridgehubDeposit{value: _request.secondBridgeValue}(
@@ -332,6 +327,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         address refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
 
+        require(
+            _request.secondBridgeAddress > BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
+            "Bridgehub: second bridge address too low"
+        ); // to avoid calls to precompiles
         canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(
             BridgehubL2TransactionRequest({
                 sender: _request.secondBridgeAddress,
