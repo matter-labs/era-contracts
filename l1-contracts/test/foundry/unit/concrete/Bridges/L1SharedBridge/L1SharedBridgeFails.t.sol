@@ -67,12 +67,11 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             abi.encode(stmAddress)
         );
 
-        if (caller != stmAddress) {
-            vm.deal(caller, amount);
-            vm.prank(caller);
-            vm.expectRevert("receiveEth not state transition");
-            sharedBridge.receiveEth{value: amount}(eraChainId);
-        }
+        vm.assume(caller != stmAddress);
+        vm.deal(caller, amount);
+        vm.prank(caller);
+        vm.expectRevert("receiveEth not state transition");
+        sharedBridge.receiveEth{value: amount}(eraChainId);
     }
 
     function test_setEraPostDiamondUpgradeFirstBatch_wrongValue(uint256 eraPostUpgradeFirstBatch) public {
@@ -327,11 +326,10 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     }
 
     function test_bridgehubConfirmL2Transaction_invalidCaller(address caller) public {
-        if (caller != bridgehubAddress) {
-            vm.expectRevert("ShB not BH");
-            vm.prank(caller);
-            sharedBridge.bridgehubConfirmL2Transaction(chainId, bytes32(0), bytes32(0));
-        }
+        vm.assume(caller != bridgehubAddress);
+        vm.expectRevert("ShB not BH");
+        vm.prank(caller);
+        sharedBridge.bridgehubConfirmL2Transaction(chainId, bytes32(0), bytes32(0));
     }
 
     function test_bridgehubConfirmL2Transaction_depositAlreadyHappened() public {
