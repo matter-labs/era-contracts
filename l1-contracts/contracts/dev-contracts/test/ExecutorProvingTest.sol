@@ -8,6 +8,9 @@ import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExec
 import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     function getBatchProofPublicInput(
         bytes32 _prevBatchCommitment,
         bytes32 _currentBatchCommitment
