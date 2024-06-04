@@ -8,7 +8,7 @@ error AddressHasNoCode(address);
 error EncodingLengthMismatch();
 error IndexOutOfBounds();
 error ValuesNotEqual(uint256 expected, uint256 actual);
-error HashMismatch(bytes32 expected, uint256 actual);
+error HashMismatch(bytes32 expected, bytes32 actual);
 error IndexSizeError();
 error UnsupportedOperation();
 error InvalidNonceOrderingChange();
@@ -45,6 +45,18 @@ error FailedToChargeGas();
 error Overflow();
 error InvalidInput();
 error UnsupportedPaymasterFlow();
+// 0xd11fe36c
+error UpgradeTxMustBeFirst();
+// 0x903e89d9
+error L2BlockCannotBeZero();
+// 0xd4aa0d85
+error L2BlockNumberAlreadyUsed();
+// 0xd54b530a
+error TimestampNotEqual(uint256 expected, uint256 actual);
+// 0xd72810cc
+error InvalidL2BlockNumber();
+// 0x87cbf28a
+error L2BatchCannotBeZero();
 
 enum CodeHashReason {
     NotContractOnConstructor,

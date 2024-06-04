@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: MIT
 
-// solhint-disable reason-string, gas-custom-errors
-
 pragma solidity 0.8.20;
 
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
@@ -9,6 +7,7 @@ import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {BOOTLOADER_FORMAL_ADDRESS, SystemLogKey} from "./Constants.sol";
+import {UpgradeTxMustBeFirst, L2BlockCannotBeZero, HashMismatch, NonIncreasingTimestamp, L2BlockNumberAlreadyUsed, TimestampNotEqual, InvalidL2BlockNumber, L2BatchCannotBeZero, ValuesNotEqual} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -75,7 +74,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
 
     BlockInfo internal DEPRECATED_currentL2VirtualBlockInfo;
     uint256 internal DEPRECATED_virtualBlockUpgradeInfo;
-
 
     /// @notice Set the chainId origin.
     /// @param _newChainId The chainId
@@ -225,14 +223,20 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @param _expectedPrevL2BlockHash The expected hash of the previous L2 block.
     /// @param _isFirstInBatch Whether this method is called for the first time in the batch.
     function _upgradeL2Blocks(uint128 _l2BlockNumber, bytes32 _expectedPrevL2BlockHash, bool _isFirstInBatch) internal {
-        require(_isFirstInBatch, "Upgrade transaction must be first");
+        if (!_isFirstInBatch) {
+            revert UpgradeTxMustBeFirst();
+        }
 
         // This is how it will be commonly done in practice, but it will simplify some logic later
-        require(_l2BlockNumber > 0, "L2 block number is never expected to be zero");
+        if (_l2BlockNumber == 0) {
+            revert L2BlockCannotBeZero();
+        }
 
         unchecked {
             bytes32 correctPrevBlockHash = _calculateLegacyL2BlockHash(_l2BlockNumber - 1);
-            require(correctPrevBlockHash == _expectedPrevL2BlockHash, "The previous L2 block hash is incorrect");
+            if (correctPrevBlockHash != _expectedPrevL2BlockHash) {
+                revert HashMismatch(correctPrevBlockHash, _expectedPrevL2BlockHash);
+            }
 
             // Whenever we'll be queried about the hashes of the blocks before the upgrade,
             // we'll use batches' hashes, so we don't need to store 256 previous hashes.
@@ -279,10 +283,9 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
         // We check that the timestamp of the L2 block is consistent with the timestamp of the batch.
         if (_isFirstInBatch) {
             uint128 currentBatchTimestamp = currentBatchInfo.timestamp;
-            require(
-                _l2BlockTimestamp >= currentBatchTimestamp,
-                "The timestamp of the L2 block must be greater than or equal to the timestamp of the current batch"
-            );
+            if (_l2BlockTimestamp < currentBatchTimestamp) {
+                revert NonIncreasingTimestamp();
+            }
         }
 
         (uint128 currentL2BlockNumber, uint128 currentL2BlockTimestamp) = getL2BlockNumberAndTimestamp();
@@ -294,12 +297,15 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
 
             _setNewL2BlockData(_l2BlockNumber, _l2BlockTimestamp, _expectedPrevL2BlockHash);
         } else if (currentL2BlockNumber == _l2BlockNumber) {
-            require(!_isFirstInBatch, "Can not reuse L2 block number from the previous batch");
-            require(currentL2BlockTimestamp == _l2BlockTimestamp, "The timestamp of the same L2 block must be same");
-            require(
-                _expectedPrevL2BlockHash == _getLatest257L2blockHash(_l2BlockNumber - 1),
-                "The previous hash of the same L2 block must be same"
-            );
+            if (_isFirstInBatch) {
+                revert L2BlockNumberAlreadyUsed();
+            }
+            if (currentL2BlockTimestamp != _l2BlockTimestamp) {
+                revert TimestampNotEqual(currentL2BlockTimestamp, _l2BlockTimestamp);
+            }
+            if (_expectedPrevL2BlockHash != _getLatest257L2blockHash(_l2BlockNumber - 1)) {
+                revert HashMismatch(_getLatest257L2blockHash(_l2BlockNumber - 1), _expectedPrevL2BlockHash);
+            }
         } else if (currentL2BlockNumber + 1 == _l2BlockNumber) {
             // From the checks in _upgradeL2Blocks it is known that currentL2BlockNumber can not be 0
             bytes32 prevL2BlockHash = _getLatest257L2blockHash(currentL2BlockNumber - 1);
@@ -311,16 +317,17 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
                 currentL2BlockTxsRollingHash
             );
 
-            require(_expectedPrevL2BlockHash == pendingL2BlockHash, "The current L2 block hash is incorrect");
-            require(
-                _l2BlockTimestamp > currentL2BlockTimestamp,
-                "The timestamp of the new L2 block must be greater than the timestamp of the previous L2 block"
-            );
+            if (_expectedPrevL2BlockHash != pendingL2BlockHash) {
+                revert HashMismatch(pendingL2BlockHash, _expectedPrevL2BlockHash);
+            }
+            if (_l2BlockTimestamp <= currentL2BlockTimestamp) {
+                revert NonIncreasingTimestamp();
+            }
 
             // Since the new block is created, we'll clear out the rolling hash
             _setNewL2BlockData(_l2BlockNumber, _l2BlockTimestamp, _expectedPrevL2BlockHash);
         } else {
-            revert("Invalid new L2 block number");
+            revert InvalidL2BlockNumber();
         }
     }
 
@@ -337,7 +344,9 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
         (, uint128 currentL2BlockTimestamp) = getL2BlockNumberAndTimestamp();
 
         // The structure of the "setNewBatch" implies that currentBatchNumber > 0, but we still double check it
-        require(currentBatchNumber > 0, "The current batch number must be greater than 0");
+        if (currentBatchNumber == 0) {
+            revert L2BatchCannotBeZero();
+        }
 
         // In order to spend less pubdata, the packed version is published
         uint256 packedTimestamps = (uint256(currentBatchTimestamp) << 128) | currentL2BlockTimestamp;
@@ -353,10 +362,9 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @param _newTimestamp The timestamp of the new batch.
     function _ensureBatchConsistentWithL2Block(uint128 _newTimestamp) internal view {
         uint128 currentBlockTimestamp = currentL2BlockInfo.timestamp;
-        require(
-            _newTimestamp > currentBlockTimestamp,
-            "The timestamp of the batch must be greater than the timestamp of the previous block"
-        );
+        if (_newTimestamp <= currentBlockTimestamp) {
+            revert NonIncreasingTimestamp();
+        }
     }
 
     /// @notice Increments the current batch number and sets the new timestamp
@@ -375,8 +383,12 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
         uint256 _baseFee
     ) external onlyCallFromBootloader {
         (uint128 previousBatchNumber, uint128 previousBatchTimestamp) = getBatchNumberAndTimestamp();
-        require(_newTimestamp > previousBatchTimestamp, "Timestamps should be incremental");
-        require(previousBatchNumber + 1 == _expectedNewNumber, "The provided batch number is not correct");
+        if (_newTimestamp <= previousBatchTimestamp) {
+            revert NonIncreasingTimestamp();
+        }
+        if (previousBatchNumber + 1 != _expectedNewNumber) {
+            revert ValuesNotEqual(previousBatchNumber + 1, _expectedNewNumber);
+        }
 
         _ensureBatchConsistentWithL2Block(_newTimestamp);
 
