@@ -6,7 +6,7 @@ import {GovernanceTest} from "./_Governance_Shared.t.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 
 contract ConstructorTest is GovernanceTest {
-    function test_ReverWhen_AdminAddressIsZero() public {
+    function test_RevertWhen_AdminAddressIsZero() public {
         vm.expectRevert("Admin should be non zero address");
         new Governance(address(0), securityCouncil, 0);
     }
