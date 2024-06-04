@@ -307,7 +307,8 @@ library Diamond {
             (bool success, bytes memory data) = _init.delegatecall(_calldata);
             if (!success) {
                 // If the returndata is too small, we still want to produce some meaningful error
-                if (data.length <= 4) {
+                
+                if (data.length < 4) {
                     revert MalformedCalldata();
                 }
 

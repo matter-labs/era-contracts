@@ -176,7 +176,7 @@ describe("L2 upgrade test", function () {
         l2ProtocolUpgradeTx: noopUpgradeTransaction,
       })
     );
-    expect(revertReason).to.equal("Upgrade is not ready yet");
+    expect(revertReason).contains("TimeNotReached");
   });
 
   it("Should require correct tx type for upgrade tx", async () => {
@@ -190,7 +190,7 @@ describe("L2 upgrade test", function () {
       })
     );
 
-    expect(revertReason).to.equal("L2 system upgrade tx type is wrong");
+    expect(revertReason).contains("InvalidTxType");
   });
 
   it("Should include the new protocol version as part of nonce", async () => {
@@ -206,7 +206,7 @@ describe("L2 upgrade test", function () {
       })
     );
 
-    expect(revertReason).to.equal("The new protocol version should be included in the L2 system upgrade tx");
+    expect(revertReason).contains("NewProtocolVersionNotInUpgradeTxn");
   });
 
   it("Should ensure monotonic protocol version", async () => {
@@ -222,7 +222,7 @@ describe("L2 upgrade test", function () {
       })
     );
 
-    expect(revertReason).to.equal("New protocol version is not greater than the current one");
+    expect(revertReason).contains("InvalidProtocolVersion");
   });
 
   it("Should ensure protocol version not increasing too much", async () => {
@@ -238,7 +238,7 @@ describe("L2 upgrade test", function () {
       })
     );
 
-    expect(revertReason).to.equal("Too big protocol version difference");
+    expect(revertReason).contains("InvalidProtocolVersion");
   });
 
   it("Should validate upgrade transaction overhead", async () => {
@@ -254,7 +254,7 @@ describe("L2 upgrade test", function () {
       })
     );
 
-    expect(revertReason).to.equal("my");
+    expect(revertReason).contains("NotEnoughGas");
   });
 
   it("Should validate upgrade transaction gas max", async () => {
@@ -270,7 +270,7 @@ describe("L2 upgrade test", function () {
       })
     );
 
-    expect(revertReason).to.equal("ui");
+    expect(revertReason).contains("TooMuchGas");
   });
 
   it("Should validate upgrade transaction cannot output more pubdata than processable", async () => {
@@ -287,7 +287,7 @@ describe("L2 upgrade test", function () {
       })
     );
 
-    expect(revertReason).to.equal("uk");
+    expect(revertReason).contains("InvalidPubdataLength");
   });
 
   it("Should validate factory deps", async () => {
@@ -306,7 +306,7 @@ describe("L2 upgrade test", function () {
       })
     );
 
-    expect(revertReason).to.equal("Wrong factory dep hash");
+    expect(revertReason).contains("InvalidHash");
   });
 
   it("Should validate factory deps length match", async () => {
@@ -324,7 +324,7 @@ describe("L2 upgrade test", function () {
       })
     );
 
-    expect(revertReason).to.equal("Wrong number of factory deps");
+    expect(revertReason).contains("UnexpectedNumberOfFactoryDeps");
   });
 
   it("Should validate factory deps length isn't too large", async () => {
@@ -344,7 +344,7 @@ describe("L2 upgrade test", function () {
       })
     );
 
-    expect(revertReason).to.equal("Factory deps can be at most 32");
+    expect(revertReason).contains("TooManyFactoryDeps");
   });
 
   let l2UpgradeTxHash: string;
@@ -465,7 +465,7 @@ describe("L2 upgrade test", function () {
       executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, upgrade)
     );
     await rollBackToVersion((4 + 1 + initialProtocolVersion).toString(), stateTransitionManager, upgrade);
-    expect(revertReason).to.equal("Previous upgrade has not been finalized");
+    expect(revertReason).to.contains("PreviousUpgradeNotFinalized");
   });
 
   it("Should require that the next commit batches contains an upgrade tx", async () => {
@@ -479,7 +479,7 @@ describe("L2 upgrade test", function () {
     const revertReason = await getCallRevertReason(
       proxyExecutor.commitBatches(storedBatch2Info, [batch3InfoNoUpgradeTx])
     );
-    expect(revertReason).to.equal("b8");
+    expect(revertReason).to.contains("MissingSystemLogs");
   });
 
   it("Should ensure any additional upgrade logs go to the priority ops hash", async () => {
@@ -521,7 +521,7 @@ describe("L2 upgrade test", function () {
     const revertReason = await getCallRevertReason(
       proxyExecutor.commitBatches(storedBatch2Info, [batch3InfoNoUpgradeTx])
     );
-    expect(revertReason).to.equal("kp");
+    expect(revertReason).to.contains("LogAlreadyProcessed");
   });
 
   it("Should fail to commit when upgrade tx hash does not match", async () => {
@@ -554,7 +554,7 @@ describe("L2 upgrade test", function () {
     const revertReason = await getCallRevertReason(
       proxyExecutor.commitBatches(storedBatch2Info, [batch3InfoTwoUpgradeTx])
     );
-    expect(revertReason).to.equal("ut");
+    expect(revertReason).to.contains("TxHashMismatch");
   });
 
   it("Should commit successfully when the upgrade tx is present", async () => {

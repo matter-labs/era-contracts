@@ -120,7 +120,7 @@ error MissingSystemLogs(uint256 expected, uint256 actual);
 // 0xe85392f9
 error CanOnlyProcessOneBatch();
 // 0x55ad3fd3
-error BatchHashMismatch(bytes32 exected, bytes32 actual);
+error BatchHashMismatch(bytes32 expected, bytes32 actual);
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
 // 0x0105f9c0
