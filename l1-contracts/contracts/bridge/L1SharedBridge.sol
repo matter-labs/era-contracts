@@ -101,7 +101,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
             msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY),
-            "L1SharedBridge: msg.value not equal to amounnot bridgehub or era chain"
+            "L1SharedBridge: msg.value not equal to amount bridgehub or era chain"
         );
         _;
     }
@@ -287,11 +287,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(l2BridgeAddress[_chainId] != address(0), "ShB l2 bridge not deployed");
         bytes32 _assetInfo;
         bytes memory _assetData;
+        bytes32 txDataHash;
+        bool legacyDeposit = false;
         try this.decodeLegacyData(_data, _prevMsgSender) returns (
             bytes32 _assetInfoCatch,
             bytes memory _assetDataCatch
         ) {
             (_assetInfo, _assetData) = (_assetInfoCatch, _assetDataCatch);
+            legacyDeposit = true;
         } catch {
             (_assetInfo, _assetData) = abi.decode(_data, (bytes32, bytes));
         }
@@ -306,8 +309,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _assetData: _assetData
         });
 
-        (uint256 _depositAmount, ) = abi.decode(_assetData, (uint256, address));
-        bytes32 txDataHash = keccak256(abi.encode(assetInfo, abi.encode(_depositAmount, _prevMsgSender)));
+        if (legacyDeposit) {
+            (uint256 _depositAmount, ) = abi.decode(_assetData, (uint256, address));
+            txDataHash = keccak256(abi.encode(assetInfo, abi.encode(_depositAmount, _prevMsgSender)));
+        } else {
+            txDataHash = keccak256(abi.encode(_prevMsgSender, assetInfo, _assetData));
+        }
+
         request = _requestToBridge({
             _chainId: _chainId,
             _prevMsgSender: _prevMsgSender,
@@ -409,7 +417,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
     function claimFailedBurn(
         uint256 _chainId,
-        address _depositSender, // todo is this needed, or should it be part of assetData?
+        address _depositSender, // todo is this needed, or should it be part of assetData? AssetData I suppose
         bytes32 _assetInfo,
         bytes memory _assetData,
         bytes32 _l2TxHash,
@@ -437,6 +445,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             bytes32 assetInfo;
             bytes32 txDataHash;
             if (uint256(_assetInfo) <= type(uint160).max) {
+                // Claiming failed legacy deposit
                 assetInfo = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetInfo));
                 (uint256 _amount, ) = abi.decode(_assetData, (uint256, address));
                 txDataHash = keccak256(abi.encode(_depositSender, uint160(uint256(_assetInfo)), _amount));
@@ -640,7 +649,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /*//////////////////////////////////////////////////////////////
-            SHARED BRIDGE TOKEN BRIDGGIN LEGACY FUNCTIONS
+            SHARED BRIDGE TOKEN BRIDGING LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2
@@ -723,11 +732,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
         {
             // Inner call to encode data to decrease local var numbers
-            bytes32 assetInfo = nativeTokenVault.getAssetInfo(_l1Asset);
-            if (nativeTokenVault.tokenAddress(assetInfo) == address(0)) {
+            _assetInfo = nativeTokenVault.getAssetInfo(_l1Asset);
+            if (nativeTokenVault.tokenAddress(_assetInfo) == address(0)) {
                 nativeTokenVault.registerToken(_l1Asset);
             }
-            _transferAllowanceToNTV(assetInfo, _amount, _prevMsgSender);
+            _transferAllowanceToNTV(_assetInfo, _amount, _prevMsgSender);
 
             // solhint-disable-next-line func-named-parameters
             bridgeMintCalldata = abi.encode(
