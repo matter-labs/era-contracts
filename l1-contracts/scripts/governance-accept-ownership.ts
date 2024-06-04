@@ -67,7 +67,7 @@ async function main() {
       await transferOwnership1StepTo(deployWallet, stmAddr, ownerAddress, true);
       await transferOwnership1StepTo(deployWallet, l1SharedBridgeAddr, ownerAddress, true);
       await transferOwnership1StepTo(deployWallet, bridgehubAddr, ownerAddress, true);
-      await transferOwnership1StepTo(deployWallet, proxyAdminAddr, ownerAddress, false);
+      // await transferOwnership1StepTo(deployWallet, proxyAdminAddr, ownerAddress, false);
     });
 
   program
@@ -104,8 +104,78 @@ async function main() {
       console.log("Calldata for execution: ", executeData);
     });
 
-  await program.parseAsync(process.argv);
+
+
+    program
+    .command("transfer-pending-admin")
+    .option("--private-key <private-key>")
+    .option("--gas-price <gas-price>")
+    .option("--nonce <nonce>")
+    .option("--owner-address <owner-address>")
+    .option("--stm-addr <stateTransitionManagerAddr>")
+    .option("--bridgehub-addr <bridgehubAddr>")
+    .option("--only-verifier")
+    .action(async (cmd) => {
+      const deployWallet = cmd.privateKey
+        ? new Wallet(cmd.privateKey, provider)
+        : Wallet.fromMnemonic(
+            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+            "m/44'/60'/0'/0/1"
+          ).connect(provider);
+      console.log(`Using deployer wallet: ${deployWallet.address}`);
+
+      const ownerAddress = ethers.utils.getAddress(cmd.ownerAddress);
+      console.log(`Using owner address: ${ownerAddress}`);
+
+      const gasPrice = cmd.gasPrice
+        ? parseUnits(cmd.gasPrice, "gwei")
+        : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
+      console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
+
+      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
+      console.log(`Using nonce: ${nonce}`);
+
+      const stmAddr = ethers.utils.getAddress(cmd.stmAddr);
+      console.log("Using STM address: ", stmAddr);
+      const bridgehubAddr = ethers.utils.getAddress(cmd.bridgehubAddr);
+      console.log("Using Bridgehub address: ", bridgehubAddr);
+
+      await transferAdmin1StepTo(deployWallet, stmAddr, ownerAddress, true);
+      await transferAdmin1StepTo(deployWallet, bridgehubAddr, ownerAddress, true);
+    });
+
+    program
+    .command("accept-pending-admin")
+    .option("--stm-addr <stateTransitionManagerAddr>")
+    .option("--bridgehub-addr <bridgehubAddr>")
+    .action(async (cmd) => {
+
+
+      const stmAddr = ethers.utils.getAddress(cmd.stmAddr);
+      console.log("Using STM address: ", stmAddr);
+      const bridgehubAddr = ethers.utils.getAddress(cmd.bridgehubAddr);
+      console.log("Using Bridgehub address: ", bridgehubAddr);
+
+      const addresses = [ stmAddr, bridgehubAddr];
+
+      const govCalls = addresses.map(acceptAdminCall);
+
+      const govOperation = {
+        calls: govCalls,
+        predecessor: ethers.constants.HashZero,
+        salt: ethers.constants.HashZero,
+      };
+
+      const scheduleData = governanceInterface.encodeFunctionData("scheduleTransparent", [govOperation, 0]);
+      const executeData = governanceInterface.encodeFunctionData("execute", [govOperation]);
+
+      console.log("Calldata for scheduling: ", scheduleData);
+      console.log("Calldata for execution: ", executeData);
+});
+
+await program.parseAsync(process.argv);
 }
+
 
 main()
   .then(() => process.exit(0))
@@ -133,6 +203,35 @@ async function transferOwnership1StepTo(
 
 function acceptOwnershipCall(target: string) {
   const data = ownable2StepInterface.encodeFunctionData("acceptOwnership", []);
+  return {
+    target,
+    value: 0,
+    data,
+  };
+}
+
+async function transferAdmin1StepTo(
+  wallet: ethers.Wallet,
+  contractAddress: string,
+  newOwner: string,
+  printPendingOwner: boolean = true
+) {
+  const l1Erc20ABI = ['function setPendingAdmin(address to)'];
+  const contract = new ethers.Contract(contractAddress, l1Erc20ABI, wallet);
+  console.log("Transferring admin of contract: ", contractAddress, " to: ", newOwner);
+  const tx = await contract.setPendingAdmin(newOwner);
+  console.log("Tx hash", tx.hash);
+  await tx.wait();
+  // if (printPendingOwner) {
+  //   const newPendingOwner = await contract.pendingAdmin();
+  //   console.log("New pending owner: ", newPendingOwner);
+  // }
+}
+
+function acceptAdminCall(target: string) {
+  const abi = ['function acceptAdmin()'];
+  const interf = new Interface(abi);
+  const data = interf.encodeFunctionData("acceptAdmin", []);
   return {
     target,
     value: 0,
