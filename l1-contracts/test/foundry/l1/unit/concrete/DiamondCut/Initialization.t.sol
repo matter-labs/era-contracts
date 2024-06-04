@@ -6,7 +6,9 @@ import {RevertFallback} from "contracts/dev-contracts/RevertFallback.sol";
 import {ReturnSomething} from "contracts/dev-contracts/ReturnSomething.sol";
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {DelegateCallFailed, NonEmptyCalldata} from "contracts/common/L1ContractErrors.sol";
+import {DelegateCallFailed, BadReturnData, MalformedCalldata, NonEmptyCalldata} from "contracts/common/L1ContractErrors.sol";
+import {Utils} from "../Utils/Utils.sol";
+import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 
 contract InitializationTest is DiamondCutTest {
     address private revertFallbackAddress;
@@ -30,6 +32,24 @@ contract InitializationTest is DiamondCutTest {
         });
         bytes memory emptyBytes;
         vm.expectRevert(abi.encodeWithSelector(DelegateCallFailed.selector, emptyBytes));
+        diamondCutTestContract.diamondCut(diamondCutData);
+    }
+
+    function test_RevertWhen_DelegateCallWithWrongInitializeData() public {
+        DiamondInit diamondInit = new DiamondInit();
+        bytes memory diamondInitData = abi.encodeWithSelector(
+            diamondInit.initialize.selector,
+            Utils.makeInitializeData(address(0))
+        );
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(diamondInit),
+            initCalldata: diamondInitData
+        });
+
+        vm.expectRevert();
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 

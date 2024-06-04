@@ -53,7 +53,7 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 
-    function test_ReverWhen_MaxPriorityFeePerGasIsNotZero() public {
+    function test_RevertWhen_MaxPriorityFeePerGasIsNotZero() public {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // MaxPriorityFeePerGas must be 0 - otherwise we revert.
         testTx.maxPriorityFeePerGas = 1;

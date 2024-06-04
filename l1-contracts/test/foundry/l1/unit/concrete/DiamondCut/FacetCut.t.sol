@@ -72,6 +72,25 @@ contract FacetCutTest is DiamondCutTest {
         assertEq(numOfFacetsBefore + facetCuts.length, numOfFacetsAfter, "wrong number of facets added");
     }
 
+    function test_revertWhen_NoFunctionsForDiamondCut() public {
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: address(0),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: new bytes4[](0)
+        });
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(0),
+            initCalldata: bytes("")
+        });
+
+        vm.expectRevert(abi.encodePacked("B"));
+        diamondCutTestContract.diamondCut(diamondCutData);
+    }
+
     function test_RevertWhen_AddingFacetToOccupiedSelector() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
@@ -149,6 +168,25 @@ contract FacetCutTest is DiamondCutTest {
         });
 
         vm.expectRevert(abi.encodeWithSelector(RemoveFunctionFacetAddressNotZero.selector, address(mailboxFacet)));
+        diamondCutTestContract.diamondCut(diamondCutData);
+    }
+
+    function test_RevertWhen_RemovingFacetWithOldFacetAddressAsZero() public {
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: address(0),
+            action: Diamond.Action.Remove,
+            isFreezable: false,
+            selectors: Utils.getMailboxSelectors()
+        });
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(0),
+            initCalldata: bytes("")
+        });
+
+        vm.expectRevert(abi.encodePacked("a2"));
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
