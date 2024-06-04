@@ -13,6 +13,7 @@ import {
   readBatchBootloaderBytecode,
   readSystemContractsBytecode,
   unpackStringSemVer,
+  SYSTEM_CONFIG,
 } from "../scripts/utils";
 import { getTokens } from "./deploy-token";
 import {
