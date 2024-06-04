@@ -50,7 +50,7 @@
     "ts-node": "^10.1.0",
     "typechain": "^4.0.0",
     "typescript": "^4.6.4",
-    "zksync-ethers": "https://github.com/kelemeno/zksync-ethers#ethers-v5-feat/bridgehub"
+    "zksync-ethers": "https://github.com/zksync-sdk/zksync-ethers#ethers-v5-feat/bridgehub"
   },
   "scripts": {
     "build": "hardhat compile",
@@ -74,7 +74,11 @@
     "initialize-governance": "ts-node scripts/initialize-governance.ts",
     "migrate-governance": "ts-node scripts/migrate-governance.ts",
     "display-governance": "ts-node scripts/display-governance.ts",
-    "upgrade-system": "ts-node upgrade-system/index.ts"
+    "upgrade-system": "ts-node upgrade-system/index.ts",
+    "hyperchain-upgrade-1": "ts-node scripts/hyperchain-upgrade-1.ts",
+    "hyperchain-upgrade-2": "ts-node scripts/hyperchain-upgrade-2.ts",
+    "hyperchain-upgrade-3": "ts-node scripts/hyperchain-upgrade-3.ts",
+    "setup-legacy-bridge-era": "ts-node scripts/setup-legacy-bridge-era.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3",

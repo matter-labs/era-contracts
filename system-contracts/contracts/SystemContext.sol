@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+// solhint-disable reason-string, gas-custom-errors
+
 pragma solidity 0.8.20;
 
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
@@ -34,7 +36,9 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     uint256 public gasPrice;
 
     /// @notice The current block's gasLimit.
-    uint256 public blockGasLimit = type(uint32).max;
+    /// @dev The same limit is used for both batches and L2 blocks. At this moment this limit is not explicitly
+    /// forced by the system, rather it is the responsibility of the operator to ensure that this value is never achieved.
+    uint256 public blockGasLimit = (1 << 50);
 
     /// @notice The `block.coinbase` in the current transaction.
     /// @dev For the support of coinbase, we will use the bootloader formal address for now
@@ -103,6 +107,8 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @notice Sets the number of L2 gas that is needed to pay a single byte of pubdata.
     /// @dev This value does not have any impact on the execution and purely serves as a way for users
     /// to access the current gas price for the pubdata.
+    /// @param _gasPerPubdataByte The amount L2 gas that the operator charge the user for single byte of pubdata.
+    /// @param _basePubdataSpent The number of pubdata spent as of the start of the transaction.
     function setPubdataInfo(uint256 _gasPerPubdataByte, uint256 _basePubdataSpent) external onlyCallFromBootloader {
         basePubdataSpent = _basePubdataSpent;
         gasPerPubdataByte = _gasPerPubdataByte;
@@ -235,8 +241,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
             _setL2BlockHash(_l2BlockNumber - 1, correctPrevBlockHash);
         }
     }
-
-    
 
     /// @notice Sets the current block number and timestamp of the L2 block.
     /// @param _l2BlockNumber The number of the new L2 block.
@@ -403,7 +407,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     }
 
     function incrementTxNumberInBatch() external onlyCallFromBootloader {
-        txNumberInBlock += 1;
+        ++txNumberInBlock;
     }
 
     function resetTxNumberInBatch() external onlyCallFromBootloader {

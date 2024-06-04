@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable reason-string, gas-custom-errors
+
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
@@ -28,10 +30,10 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     event NewExecutionDelay(uint256 _newExecutionDelay);
 
     /// @notice A new validator has been added.
-    event ValidatorAdded(uint256 _chainId, address _addedValidator);
+    event ValidatorAdded(uint256 indexed _chainId, address _addedValidator);
 
     /// @notice A validator has been removed.
-    event ValidatorRemoved(uint256 _chainId, address _removedValidator);
+    event ValidatorRemoved(uint256 indexed _chainId, address _removedValidator);
 
     /// @notice Error for when an address is already a validator.
     error AddressAlreadyValidator(uint256 _chainId);
@@ -43,7 +45,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     IStateTransitionManager public stateTransitionManager;
 
     /// @dev The mapping of L2 chainId => batch number => timestamp when it was committed.
-    mapping(uint256 => LibMap.Uint32Map) internal committedBatchTimestamp;
+    mapping(uint256 chainId => LibMap.Uint32Map batchNumberToTimestampMapping) internal committedBatchTimestamp;
 
     /// @dev The address that can commit/revert/validate/execute batches.
     mapping(uint256 _chainId => mapping(address _validator => bool)) public validators;
@@ -52,12 +54,12 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     uint32 public executionDelay;
 
     /// @dev Era's chainID
-    uint256 immutable eraChainId;
+    uint256 internal immutable ERA_CHAIN_ID;
 
     constructor(address _initialOwner, uint32 _executionDelay, uint256 _eraChainId) {
         _transferOwnership(_initialOwner);
         executionDelay = _executionDelay;
-        eraChainId = _eraChainId;
+        ERA_CHAIN_ID = _eraChainId;
     }
 
     /// @notice Checks if the caller is the admin of the chain.
@@ -68,11 +70,11 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @notice Checks if the caller is a validator.
     modifier onlyValidator(uint256 _chainId) {
-        require(validators[_chainId][msg.sender] == true, "ValidatorTimelock: only validator");
+        require(validators[_chainId][msg.sender], "ValidatorTimelock: only validator");
         _;
     }
 
-    /// @dev Set new validator address.
+    /// @dev Sets a new state transition manager.
     function setStateTransitionManager(IStateTransitionManager _stateTransitionManager) external onlyOwner {
         stateTransitionManager = _stateTransitionManager;
     }
@@ -111,17 +113,8 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     function commitBatches(
         StoredBatchInfo calldata,
         CommitBatchInfo[] calldata _newBatchesData
-    ) external onlyValidator(eraChainId) {
-        unchecked {
-            // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
-            // It is safe to cast.
-            uint32 timestamp = uint32(block.timestamp);
-            for (uint256 i = 0; i < _newBatchesData.length; ++i) {
-                committedBatchTimestamp[eraChainId].set(_newBatchesData[i].batchNumber, timestamp);
-            }
-        }
-
-        _propagateToZkSyncStateTransition(eraChainId);
+    ) external onlyValidator(ERA_CHAIN_ID) {
+        _commitBatchesInner(ERA_CHAIN_ID, _newBatchesData);
     }
 
     /// @dev Records the timestamp for all provided committed batches and make
@@ -131,30 +124,35 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         StoredBatchInfo calldata,
         CommitBatchInfo[] calldata _newBatchesData
     ) external onlyValidator(_chainId) {
+        _commitBatchesInner(_chainId, _newBatchesData);
+    }
+
+    function _commitBatchesInner(uint256 _chainId, CommitBatchInfo[] calldata _newBatchesData) internal {
         unchecked {
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
             uint32 timestamp = uint32(block.timestamp);
+            // solhint-disable-next-line gas-length-in-loops
             for (uint256 i = 0; i < _newBatchesData.length; ++i) {
                 committedBatchTimestamp[_chainId].set(_newBatchesData[i].batchNumber, timestamp);
             }
         }
 
-        _propagateToZkSyncStateTransition(_chainId);
+        _propagateToZkSyncHyperchain(_chainId);
     }
 
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
-    function revertBatches(uint256) external onlyValidator(eraChainId) {
-        _propagateToZkSyncStateTransition(eraChainId);
+    function revertBatches(uint256) external onlyValidator(ERA_CHAIN_ID) {
+        _propagateToZkSyncHyperchain(ERA_CHAIN_ID);
     }
 
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
     function revertBatchesSharedBridge(uint256 _chainId, uint256) external onlyValidator(_chainId) {
-        _propagateToZkSyncStateTransition(_chainId);
+        _propagateToZkSyncHyperchain(_chainId);
     }
 
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
@@ -164,8 +162,8 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         StoredBatchInfo calldata,
         StoredBatchInfo[] calldata,
         ProofInput calldata
-    ) external onlyValidator(eraChainId) {
-        _propagateToZkSyncStateTransition(eraChainId);
+    ) external onlyValidator(ERA_CHAIN_ID) {
+        _propagateToZkSyncHyperchain(ERA_CHAIN_ID);
     }
 
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
@@ -177,26 +175,13 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         StoredBatchInfo[] calldata,
         ProofInput calldata
     ) external onlyValidator(_chainId) {
-        _propagateToZkSyncStateTransition(_chainId);
+        _propagateToZkSyncHyperchain(_chainId);
     }
 
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the hyperchain diamond contract with the same calldata.
-    function executeBatches(StoredBatchInfo[] calldata _newBatchesData) external onlyValidator(eraChainId) {
-        uint256 delay = executionDelay; // uint32
-        unchecked {
-            for (uint256 i = 0; i < _newBatchesData.length; ++i) {
-                uint256 commitBatchTimestamp = committedBatchTimestamp[eraChainId].get(_newBatchesData[i].batchNumber);
-
-                // Note: if the `commitBatchTimestamp` is zero, that means either:
-                // * The batch was committed, but not through this contract.
-                // * The batch wasn't committed at all, so execution will fail in the zkSync contract.
-                // We allow executing such batches.
-
-                require(block.timestamp >= commitBatchTimestamp + delay, "5c"); // The delay is not passed
-            }
-        }
-        _propagateToZkSyncStateTransition(eraChainId);
+    function executeBatches(StoredBatchInfo[] calldata _newBatchesData) external onlyValidator(ERA_CHAIN_ID) {
+        _executeBatchesInner(ERA_CHAIN_ID, _newBatchesData);
     }
 
     /// @dev Check that batches were committed at least X time ago and
@@ -205,8 +190,13 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         uint256 _chainId,
         StoredBatchInfo[] calldata _newBatchesData
     ) external onlyValidator(_chainId) {
+        _executeBatchesInner(_chainId, _newBatchesData);
+    }
+
+    function _executeBatchesInner(uint256 _chainId, StoredBatchInfo[] calldata _newBatchesData) internal {
         uint256 delay = executionDelay; // uint32
         unchecked {
+            // solhint-disable-next-line gas-length-in-loops
             for (uint256 i = 0; i < _newBatchesData.length; ++i) {
                 uint256 commitBatchTimestamp = committedBatchTimestamp[_chainId].get(_newBatchesData[i].batchNumber);
 
@@ -218,13 +208,13 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 require(block.timestamp >= commitBatchTimestamp + delay, "5c"); // The delay is not passed
             }
         }
-        _propagateToZkSyncStateTransition(_chainId);
+        _propagateToZkSyncHyperchain(_chainId);
     }
 
     /// @dev Call the hyperchain diamond contract with the same calldata as this contract was called.
     /// Note: it is called the hyperchain diamond contract, not delegatecalled!
-    function _propagateToZkSyncStateTransition(uint256 _chainId) internal {
-        address contractAddress = stateTransitionManager.stateTransition(_chainId);
+    function _propagateToZkSyncHyperchain(uint256 _chainId) internal {
+        address contractAddress = stateTransitionManager.getHyperchain(_chainId);
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())

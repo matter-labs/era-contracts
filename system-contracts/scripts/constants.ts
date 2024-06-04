@@ -65,6 +65,12 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     lang: Language.Yul,
     path: "precompiles",
   },
+  ecPairing: {
+    address: "0x0000000000000000000000000000000000000008",
+    codeName: "EcPairing",
+    lang: Language.Yul,
+    path: "precompiles",
+  },
   bootloader: {
     // Bootloader has EmptyContract code
     address: "0x0000000000000000000000000000000000008001",
@@ -158,6 +164,14 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
   pubdataChunkPublisher: {
     address: "0x0000000000000000000000000000000000008011",
     codeName: "PubdataChunkPublisher",
+    lang: Language.Solidity,
+  },
+  create2Factory: {
+    // This is explicitly a non-system-contract address.
+    // We do not use the same address as create2 factories on EVM, since
+    // this is a zkEVM create2 factory.
+    address: "0x0000000000000000000000000000000000010000",
+    codeName: "Create2Factory",
     lang: Language.Solidity,
   },
 } as const;

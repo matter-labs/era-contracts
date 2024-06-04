@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.24;
 
-import {ZkSyncStateTransitionBase} from "../../state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
+import {ZkSyncHyperchainBase} from "../../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
 
-contract MockExecutorFacet is ZkSyncStateTransitionBase {
+contract MockExecutorFacet is ZkSyncHyperchainBase {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 

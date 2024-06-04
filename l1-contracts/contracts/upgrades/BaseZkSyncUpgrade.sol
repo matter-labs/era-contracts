@@ -2,7 +2,9 @@
 
 pragma solidity 0.8.24;
 
-import {ZkSyncStateTransitionBase} from "../state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
+// solhint-disable reason-string, gas-custom-errors
+
+import {ZkSyncHyperchainBase} from "../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
@@ -40,7 +42,7 @@ struct ProposedUpgrade {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
-abstract contract BaseZkSyncUpgrade is ZkSyncStateTransitionBase {
+abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);
 
@@ -151,8 +153,8 @@ abstract contract BaseZkSyncUpgrade is ZkSyncStateTransitionBase {
             return;
         }
 
-        VerifierParams memory oldVerifierParams = s.verifierParams;
-        s.verifierParams = _newVerifierParams;
+        VerifierParams memory oldVerifierParams = s.__DEPRECATED_verifierParams;
+        s.__DEPRECATED_verifierParams = _newVerifierParams;
         emit NewVerifierParams(oldVerifierParams, _newVerifierParams);
     }
 
@@ -221,8 +223,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncStateTransitionBase {
     function _verifyFactoryDeps(bytes[] calldata _factoryDeps, uint256[] calldata _expectedHashes) private pure {
         require(_factoryDeps.length == _expectedHashes.length, "Wrong number of factory deps");
         require(_factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "Factory deps can be at most 32");
+        uint256 length = _factoryDeps.length;
 
-        for (uint256 i = 0; i < _factoryDeps.length; ++i) {
+        for (uint256 i = 0; i < length; ++i) {
             require(
                 L2ContractHelper.hashL2Bytecode(_factoryDeps[i]) == bytes32(_expectedHashes[i]),
                 "Wrong factory dep hash"

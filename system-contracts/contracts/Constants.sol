@@ -32,9 +32,10 @@ address constant ECRECOVER_SYSTEM_CONTRACT = address(0x01);
 address constant SHA256_SYSTEM_CONTRACT = address(0x02);
 address constant ECADD_SYSTEM_CONTRACT = address(0x06);
 address constant ECMUL_SYSTEM_CONTRACT = address(0x07);
+address constant ECPAIRING_SYSTEM_CONTRACT = address(0x08);
 
 
-/// @dev The number of ergs that need to be spent for a single byte of pubdata regardless of the pubdata price.
+/// @dev The number of gas that need to be spent for a single byte of pubdata regardless of the pubdata price.
 /// This variable is used to ensure the following:
 /// - That the long-term storage of the operator is compensated properly.
 /// - That it is not possible that the pubdata counter grows too high without spending proportional amount of computation.
@@ -55,6 +56,7 @@ IImmutableSimulator constant IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT = IImmutableSim
     address(SYSTEM_CONTRACTS_OFFSET + 0x05)
 );
 IContractDeployer constant DEPLOYER_SYSTEM_CONTRACT = IContractDeployer(address(SYSTEM_CONTRACTS_OFFSET + 0x06));
+IContractDeployer constant REAL_DEPLOYER_SYSTEM_CONTRACT = IContractDeployer(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x06));
 
 // A contract that is allowed to deploy any codehash
 // on any address. To be used only during an upgrade.
@@ -91,7 +93,7 @@ IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher
 uint256 constant MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT = 1;
 
 /// @dev The maximal msg.value that context can have
-uint256 constant MAX_MSG_VALUE = 2 ** 128 - 1;
+uint256 constant MAX_MSG_VALUE = type(uint128).max;
 
 /// @dev Prefix used during derivation of account addresses using CREATE2
 /// @dev keccak256("zksyncCreate2")

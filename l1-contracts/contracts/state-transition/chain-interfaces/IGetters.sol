@@ -4,13 +4,13 @@ pragma solidity 0.8.24;
 
 import {PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
-import {PubdataPricingMode} from "../chain-deps/ZkSyncStateTransitionStorage.sol";
-import {IZkSyncStateTransitionBase} from "./IZkSyncStateTransitionBase.sol";
+import {PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
+import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
 
 /// @title The interface of the Getters Contract that implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IGetters is IZkSyncStateTransitionBase {
+interface IGetters is IZkSyncHyperchainBase {
     /*//////////////////////////////////////////////////////////////
                             CUSTOM GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -79,6 +79,7 @@ interface IGetters is IZkSyncStateTransitionBase {
     function getL2DefaultAccountBytecodeHash() external view returns (bytes32);
 
     /// @return Verifier parameters.
+    /// @dev This function is deprecated and will soon be removed.
     function getVerifierParams() external view returns (VerifierParams memory);
 
     /// @return Whether the diamond is frozen or not

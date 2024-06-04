@@ -2,10 +2,9 @@
 
 pragma solidity 0.8.24;
 
-import {Diamond} from "../../state-transition/libraries/Diamond.sol";
-import {ZkSyncStateTransitionBase} from "../../state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
+import {ZkSyncHyperchainBase} from "../../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
 
-contract DummyAdminFacet is ZkSyncStateTransitionBase {
+contract DummyAdminFacet is ZkSyncHyperchainBase {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
@@ -15,9 +14,5 @@ contract DummyAdminFacet is ZkSyncStateTransitionBase {
 
     function dummySetValidator(address _validator) external {
         s.validators[_validator] = true;
-    }
-
-    function executeUpgrade2(Diamond.DiamondCutData calldata _diamondCut) external {
-        Diamond.diamondCut(_diamondCut);
     }
 }

@@ -9,7 +9,7 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {DummyStateTransitionManagerWBH} from "contracts/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
-import {DummyStateTransition} from "contracts/dev-contracts/test/DummyStateTransition.sol";
+import {DummyHyperchain} from "contracts/dev-contracts/test/DummyHyperchain.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 
@@ -22,7 +22,7 @@ contract ExperimentalBridgeTest is Test {
     Bridgehub bridgeHub;
     address public bridgeOwner;
     DummyStateTransitionManagerWBH mockSTM;
-    DummyStateTransition mockChainContract;
+    DummyHyperchain mockChainContract;
     DummySharedBridge mockSharedBridge;
     DummySharedBridge mockSecondSharedBridge;
     TestnetERC20Token testToken;
@@ -34,16 +34,13 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub = new Bridgehub();
         bridgeOwner = makeAddr("BRIDGE_OWNER");
         mockSTM = new DummyStateTransitionManagerWBH(address(bridgeHub));
-        mockChainContract = new DummyStateTransition(address(bridgeHub), eraChainId);
+        mockChainContract = new DummyHyperchain(address(bridgeHub), eraChainId);
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
 
         // test if the ownership of the bridgeHub is set correctly or not
         address defaultOwner = bridgeHub.owner();
-
-        // The defaultOwner should be the same as this contract address, since this is the one deploying the bridgehub contract
-        assertEq(defaultOwner, address(this));
 
         // Now, the `reentrancyGuardInitializer` should prevent anyone from calling `initialize` since we have called the constructor of the contract
         vm.expectRevert(bytes("1B"));
@@ -63,6 +60,7 @@ contract ExperimentalBridgeTest is Test {
         // The ownership can only be transferred by the current owner to a new owner via the two-step approach
 
         // Default owner calls transferOwnership
+        vm.prank(defaultOwner);
         bridgeHub.transferOwnership(bridgeOwner);
 
         // bridgeOwner calls acceptOwnership
@@ -357,6 +355,7 @@ contract ExperimentalBridgeTest is Test {
         }
 
         chainId = bound(chainId, 1, type(uint48).max);
+        vm.prank(mockSTM.owner());
         bytes memory _newChainInitData = _createNewChainInitData(
             isFreezable,
             mockSelectors,
@@ -366,8 +365,8 @@ contract ExperimentalBridgeTest is Test {
 
         // bridgeHub.createNewChain => stateTransitionManager.createNewChain => this function sets the stateTransition mapping
         // of `chainId`, let's emulate that using foundry cheatcodes or let's just use the extra function we introduced in our mockSTM
-        mockSTM.setStateTransition(chainId, address(mockChainContract));
-        assertTrue(mockSTM.stateTransition(chainId) == address(mockChainContract));
+        mockSTM.setHyperchain(chainId, address(mockChainContract));
+        assertTrue(mockSTM.getHyperchain(chainId) == address(mockChainContract));
 
         vm.startPrank(deployerAddress);
         vm.mockCall(
@@ -400,14 +399,14 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(bridgeHub.baseToken(newChainId) == address(testToken));
     }
 
-    function test_getStateTransition(uint256 mockChainId) public {
-        mockChainId = _setUpStateTransitionForChainId(mockChainId);
+    function test_getHyperchain(uint256 mockChainId) public {
+        mockChainId = _setUpHyperchainForChainId(mockChainId);
 
         // Now the following statements should be true as well:
         assertTrue(bridgeHub.stateTransitionManager(mockChainId) == address(mockSTM));
-        address returnedStateTransition = bridgeHub.getStateTransition(mockChainId);
+        address returnedHyperchain = bridgeHub.getHyperchain(mockChainId);
 
-        assertEq(returnedStateTransition, address(mockChainContract));
+        assertEq(returnedHyperchain, address(mockChainContract));
     }
 
     function test_proveL2MessageInclusion(
@@ -419,11 +418,11 @@ contract ExperimentalBridgeTest is Test {
         address randomSender,
         bytes memory randomData
     ) public {
-        mockChainId = _setUpStateTransitionForChainId(mockChainId);
+        mockChainId = _setUpHyperchainForChainId(mockChainId);
 
         // Now the following statements should be true as well:
         assertTrue(bridgeHub.stateTransitionManager(mockChainId) == address(mockSTM));
-        assertTrue(bridgeHub.getStateTransition(mockChainId) == address(mockChainContract));
+        assertTrue(bridgeHub.getHyperchain(mockChainId) == address(mockChainContract));
 
         // Creating a random L2Message::l2Message so that we pass the correct parameters to `proveL2MessageInclusion`
         L2Message memory l2Message = _createMockL2Message(randomTxNumInBatch, randomSender, randomData);
@@ -467,11 +466,11 @@ contract ExperimentalBridgeTest is Test {
         bytes32 randomKey,
         bytes32 randomValue
     ) public {
-        mockChainId = _setUpStateTransitionForChainId(mockChainId);
+        mockChainId = _setUpHyperchainForChainId(mockChainId);
 
         // Now the following statements should be true as well:
         assertTrue(bridgeHub.stateTransitionManager(mockChainId) == address(mockSTM));
-        assertTrue(bridgeHub.getStateTransition(mockChainId) == address(mockChainContract));
+        assertTrue(bridgeHub.getHyperchain(mockChainId) == address(mockChainContract));
 
         // Creating a random L2Log::l2Log so that we pass the correct parameters to `proveL2LogInclusion`
         L2Log memory l2Log = _createMockL2Log({
@@ -520,7 +519,7 @@ contract ExperimentalBridgeTest is Test {
         bool randomResultantBool,
         bool txStatusBool
     ) public {
-        randomChainId = _setUpStateTransitionForChainId(randomChainId);
+        randomChainId = _setUpHyperchainForChainId(randomChainId);
 
         TxStatus txStatus;
 
@@ -565,7 +564,7 @@ contract ExperimentalBridgeTest is Test {
         uint256 mockL2GasPerPubdataByteLimit,
         uint256 mockL2TxnCost
     ) public {
-        mockChainId = _setUpStateTransitionForChainId(mockChainId);
+        mockChainId = _setUpHyperchainForChainId(mockChainId);
 
         vm.mockCall(
             address(mockChainContract),
@@ -614,7 +613,7 @@ contract ExperimentalBridgeTest is Test {
             mockRefundRecipient: mockRefundRecipient
         });
 
-        l2TxnReqDirect.chainId = _setUpStateTransitionForChainId(l2TxnReqDirect.chainId);
+        l2TxnReqDirect.chainId = _setUpHyperchainForChainId(l2TxnReqDirect.chainId);
 
         assertTrue(!(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS));
         _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, true);
@@ -625,7 +624,7 @@ contract ExperimentalBridgeTest is Test {
         address randomCaller = makeAddr("RANDOM_CALLER");
         vm.deal(randomCaller, l2TxnReqDirect.mintValue);
 
-        assertTrue(bridgeHub.getStateTransition(l2TxnReqDirect.chainId) == address(mockChainContract));
+        assertTrue(bridgeHub.getHyperchain(l2TxnReqDirect.chainId) == address(mockChainContract));
         bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
         //BridgehubL2TransactionRequest memory bhL2TxnRequest =
         _createBhL2TxnRequest(mockRefundRecipientBH);
@@ -676,12 +675,12 @@ contract ExperimentalBridgeTest is Test {
             mockRefundRecipient: mockRefundRecipient
         });
 
-        l2TxnReqDirect.chainId = _setUpStateTransitionForChainId(l2TxnReqDirect.chainId);
+        l2TxnReqDirect.chainId = _setUpHyperchainForChainId(l2TxnReqDirect.chainId);
 
         _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, false);
         _setUpSharedBridge();
 
-        assertTrue(bridgeHub.getStateTransition(l2TxnReqDirect.chainId) == address(mockChainContract));
+        assertTrue(bridgeHub.getHyperchain(l2TxnReqDirect.chainId) == address(mockChainContract));
         bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
 
         vm.mockCall(
@@ -739,13 +738,13 @@ contract ExperimentalBridgeTest is Test {
             secondBridgeCalldata: secondBridgeCalldata
         });
 
-        l2TxnReq2BridgeOut.chainId = _setUpStateTransitionForChainId(l2TxnReq2BridgeOut.chainId);
+        l2TxnReq2BridgeOut.chainId = _setUpHyperchainForChainId(l2TxnReq2BridgeOut.chainId);
 
         _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true);
         assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == ETH_TOKEN_ADDRESS);
 
         _setUpSharedBridge();
-        assertTrue(bridgeHub.getStateTransition(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
+        assertTrue(bridgeHub.getHyperchain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
 
         uint256 callerMsgValue = l2TxnReq2BridgeOut.mintValue + l2TxnReq2BridgeOut.secondBridgeValue;
         address randomCaller = makeAddr("RANDOM_CALLER");
@@ -867,7 +866,7 @@ contract ExperimentalBridgeTest is Test {
         return abi.encode(diamondCutData);
     }
 
-    function _setUpStateTransitionForChainId(uint256 mockChainId) internal returns (uint256 mockChainIdInRange) {
+    function _setUpHyperchainForChainId(uint256 mockChainId) internal returns (uint256 mockChainIdInRange) {
         mockChainId = bound(mockChainId, 2, type(uint48).max);
         mockChainIdInRange = mockChainId;
         vm.prank(bridgeOwner);
@@ -882,8 +881,8 @@ contract ExperimentalBridgeTest is Test {
             address(mockSTM)
         );
 
-        // Now in the StateTransitionManager that has been set for our mockChainId, we set the stateTransition contract as our mockChainContract
-        mockSTM.setStateTransition(mockChainId, address(mockChainContract));
+        // Now in the StateTransitionManager that has been set for our mockChainId, we set the hyperchain contract as our mockChainContract
+        mockSTM.setHyperchain(mockChainId, address(mockChainContract));
     }
 
     function _setUpBaseTokenForChainId(uint256 mockChainId, bool tokenIsETH) internal {

@@ -41,7 +41,7 @@ contract StateTransitionManagerTest is Test {
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(bridgehub);
-        stateTransitionManager = new StateTransitionManager(bridgehub);
+        stateTransitionManager = new StateTransitionManager(bridgehub, type(uint256).max);
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new GenesisUpgrade();
 
@@ -79,7 +79,7 @@ contract StateTransitionManagerTest is Test {
         );
 
         StateTransitionManagerInitializeData memory stmInitializeDataNoGovernor = StateTransitionManagerInitializeData({
-            governor: address(0),
+            owner: address(0),
             validatorTimelock: validator,
             genesisUpgrade: address(genesisUpgradeContract),
             genesisBatchHash: bytes32(""),
@@ -89,7 +89,7 @@ contract StateTransitionManagerTest is Test {
             protocolVersion: 0
         });
 
-        vm.expectRevert(bytes.concat("StateTransition: governor zero"));
+        vm.expectRevert(bytes.concat("STM: owner zero"));
         new TransparentUpgradeableProxy(
             address(stateTransitionManager),
             admin,
@@ -97,7 +97,7 @@ contract StateTransitionManagerTest is Test {
         );
 
         StateTransitionManagerInitializeData memory stmInitializeData = StateTransitionManagerInitializeData({
-            governor: governor,
+            owner: governor,
             validatorTimelock: validator,
             genesisUpgrade: address(genesisUpgradeContract),
             genesisBatchHash: bytes32(""),
@@ -118,7 +118,7 @@ contract StateTransitionManagerTest is Test {
         vm.startPrank(governor);
     }
 
-    function getDiamondCutData(address _diamondInit) internal returns (Diamond.DiamondCutData memory) {
+    function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
         InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier);
 
         bytes memory initCalldata = abi.encode(initializeData);

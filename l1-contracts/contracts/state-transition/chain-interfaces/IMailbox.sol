@@ -2,13 +2,13 @@
 
 pragma solidity 0.8.24;
 
-import {IZkSyncStateTransitionBase} from "./IZkSyncStateTransitionBase.sol";
+import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
 import {L2CanonicalTransaction, L2Log, L2Message, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 
 /// @title The interface of the zkSync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IMailbox is IZkSyncStateTransitionBase {
+interface IMailbox is IZkSyncHyperchainBase {
     /// @notice Prove that a specific arbitrary-length message was sent in a specific L2 batch number
     /// @param _batchNumber The executed L2 batch number in which the message appeared
     /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message
@@ -97,7 +97,7 @@ interface IMailbox is IZkSyncStateTransitionBase {
 
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
-    ) external payable returns (bytes32 canonicalTxHash);
+    ) external returns (bytes32 canonicalTxHash);
 
     /// @notice Estimates the cost in Ether of requesting execution of an L2 transaction from L1
     /// @param _gasPrice expected L1 gas price at which the user requests the transaction execution
@@ -127,9 +127,4 @@ interface IMailbox is IZkSyncStateTransitionBase {
         L2CanonicalTransaction transaction,
         bytes[] factoryDeps
     );
-
-    /// @notice Emitted when the withdrawal is finalized on L1 and funds are released.
-    /// @param to The address to which the funds were sent
-    /// @param amount The amount of funds that were sent
-    event EthWithdrawalFinalized(address indexed to, uint256 amount);
 }

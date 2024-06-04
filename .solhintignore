@@ -6,6 +6,12 @@ l1-contracts/cache
 l1-contracts/cache-forge
 l1-contracts/lib
 l1-contracts/node_modules
+l1-contracts/contracts/dev-contracts
+l1-contracts/test
+
+# l1-contracts-foundry
+l1-contracts-foundry/cache
+l1-contracts-foundry/lib
 
 # l2-contracts
 l2-contracts/cache-zk
@@ -14,3 +20,5 @@ l2-contracts/node_modules
 # system-contracts
 system-contracts/contracts/openzeppelin
 system-contracts/contracts/Constants.sol
+system-contracts/contracts/test-contracts
+system-contracts/contracts-preprocessed

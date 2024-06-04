@@ -6,6 +6,7 @@ import {IBaseToken} from "./interfaces/IBaseToken.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {MSG_VALUE_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS, L1_MESSENGER_CONTRACT} from "./Constants.sol";
 import {IMailbox} from "./interfaces/IMailbox.sol";
+import {Unauthorized, InsufficientFunds} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -30,15 +31,18 @@ contract L2BaseToken is IBaseToken, ISystemContract {
     /// @dev This function also emits "Transfer" event, which might be removed
     /// later on.
     function transferFromTo(address _from, address _to, uint256 _amount) external override {
-        require(
-            msg.sender == MSG_VALUE_SYSTEM_CONTRACT ||
-                msg.sender == address(DEPLOYER_SYSTEM_CONTRACT) ||
-                msg.sender == BOOTLOADER_FORMAL_ADDRESS,
-            "Only system contracts with special access can call this method"
-        );
+        if (
+            msg.sender != MSG_VALUE_SYSTEM_CONTRACT &&
+            msg.sender != address(DEPLOYER_SYSTEM_CONTRACT) &&
+            msg.sender != BOOTLOADER_FORMAL_ADDRESS
+        ) {
+            revert Unauthorized(msg.sender);
+        }
 
         uint256 fromBalance = balance[_from];
-        require(fromBalance >= _amount, "Transfer amount exceeds balance");
+        if (fromBalance < _amount) {
+            revert InsufficientFunds(_amount, fromBalance);
+        }
         unchecked {
             balance[_from] = fromBalance - _amount;
             // Overflow not possible: the sum of all balances is capped by totalSupply, and the sum is preserved by
@@ -67,7 +71,7 @@ contract L2BaseToken is IBaseToken, ISystemContract {
         emit Mint(_account, _amount);
     }
 
-    /// @notice Initiate the ETH withdrawal, funds will be available to claim on L1 `finalizeEthWithdrawal` method.
+    /// @notice Initiate the withdrawal of the base token, funds will be available to claim on L1 `finalizeEthWithdrawal` method.
     /// @param _l1Receiver The address on L1 to receive the funds.
     function withdraw(address _l1Receiver) external payable override {
         uint256 amount = _burnMsgValue();
@@ -79,10 +83,10 @@ contract L2BaseToken is IBaseToken, ISystemContract {
         emit Withdrawal(msg.sender, _l1Receiver, amount);
     }
 
-    /// @notice Initiate the ETH withdrawal, with the sent message. The funds will be available to claim on L1 `finalizeEthWithdrawal` method.
+    /// @notice Initiate the withdrawal of the base token, with the sent message. The funds will be available to claim on L1 `finalizeEthWithdrawal` method.
     /// @param _l1Receiver The address on L1 to receive the funds.
     /// @param _additionalData Additional data to be sent to L1 with the withdrawal.
-    function withdrawWithMessage(address _l1Receiver, bytes memory _additionalData) external payable override {
+    function withdrawWithMessage(address _l1Receiver, bytes calldata _additionalData) external payable override {
         uint256 amount = _burnMsgValue();
 
         // Send the L2 log, a user could use it as proof of the withdrawal
@@ -102,7 +106,7 @@ contract L2BaseToken is IBaseToken, ISystemContract {
         // Silent burning of the ether
         unchecked {
             // This is safe, since this contract holds the ether balances, and if user
-            // send a `msg.value` it will be added to the contract (`this`) balance.
+            // sends a `msg.value` it will be added to the contract (`this`) balance.
             balance[address(this)] -= amount;
             totalSupply -= amount;
         }

@@ -2,21 +2,23 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable gas-custom-errors, reason-string
+
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";
-import {FeeParams, PubdataPricingMode} from "../ZkSyncStateTransitionStorage.sol";
-import {ZkSyncStateTransitionBase} from "./ZkSyncStateTransitionBase.sol";
+import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
+import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
-import {IZkSyncStateTransitionBase} from "../../chain-interfaces/IZkSyncStateTransitionBase.sol";
+import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
 /// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
-    /// @inheritdoc IZkSyncStateTransitionBase
+contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
+    /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "AdminFacet";
 
     /// @inheritdoc IAdmin
@@ -70,6 +72,9 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         require(_newFeeParams.maxPubdataPerBatch >= _newFeeParams.priorityTxMaxPubdata, "n6");
 
         FeeParams memory oldFeeParams = s.feeParams;
+
+        require(_newFeeParams.pubdataPricingMode == oldFeeParams.pubdataPricingMode, "n7"); // we cannot change pubdata pricing mode
+
         s.feeParams = _newFeeParams;
 
         emit NewFeeParams(oldFeeParams, _newFeeParams);
@@ -77,6 +82,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrStateTransitionManager {
+        require(_denominator != 0, "AF: denominator 0");
         uint128 oldNominator = s.baseTokenGasPriceMultiplierNominator;
         uint128 oldDenominator = s.baseTokenGasPriceMultiplierDenominator;
 
@@ -86,10 +92,11 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         emit NewBaseTokenMultiplier(oldNominator, oldDenominator, _nominator, _denominator);
     }
 
-    function setValidiumMode(PubdataPricingMode _validiumMode) external onlyAdmin {
-        require(s.totalBatchesCommitted == 0, "AdminFacet: set validium only after genesis"); // Validium mode can be set only before the first batch is committed
-        s.feeParams.pubdataPricingMode = _validiumMode;
-        emit ValidiumModeStatusUpdate(_validiumMode);
+    /// @inheritdoc IAdmin
+    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin {
+        require(s.totalBatchesCommitted == 0, "AdminFacet: set validium only after genesis"); // Validium mode can be set only before the first batch is processed
+        s.feeParams.pubdataPricingMode = _pricingMode;
+        emit ValidiumModeStatusUpdate(_pricingMode);
     }
 
     function setTransactionFilterer(address _transactionFilterer) external onlyAdmin {
@@ -102,7 +109,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
                             UPGRADE EXECUTION
     //////////////////////////////////////////////////////////////*/
 
-    /// upgrade a specific chain
+    /// @inheritdoc IAdmin
     function upgradeChainFromVersion(
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
@@ -110,19 +117,13 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         bytes32 cutHashInput = keccak256(abi.encode(_diamondCut));
         require(
             cutHashInput == IStateTransitionManager(s.stateTransitionManager).upgradeCutHash(_oldProtocolVersion),
-            "StateTransition: cutHash mismatch"
+            "AdminFacet: cutHash mismatch"
         );
 
-        require(
-            s.protocolVersion == _oldProtocolVersion,
-            "StateTransition: protocolVersion mismatch in STC when upgrading"
-        );
+        require(s.protocolVersion == _oldProtocolVersion, "AdminFacet: protocolVersion mismatch in STC when upgrading");
         Diamond.diamondCut(_diamondCut);
         emit ExecuteUpgrade(_diamondCut);
-        require(
-            s.protocolVersion > _oldProtocolVersion,
-            "StateTransition: protocolVersion mismatch in STC after upgrading"
-        );
+        require(s.protocolVersion > _oldProtocolVersion, "AdminFacet: protocolVersion mismatch in STC after upgrading");
     }
 
     /// @inheritdoc IAdmin
@@ -136,7 +137,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAdmin
-    function freezeDiamond() external onlyAdminOrStateTransitionManager {
+    function freezeDiamond() external onlyStateTransitionManager {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         require(!diamondStorage.isFrozen, "a9"); // diamond proxy is frozen already
@@ -146,7 +147,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function unfreezeDiamond() external onlyAdminOrStateTransitionManager {
+    function unfreezeDiamond() external onlyStateTransitionManager {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         require(diamondStorage.isFrozen, "a7"); // diamond proxy is not frozen

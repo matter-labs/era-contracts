@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Wallet } from "zksync-ethers";
 import * as zksync from "zksync-ethers";
-import { serialize } from "zksync-web3/build/src/utils";
+import { serialize } from "zksync-ethers/build/src/utils";
 import type { BootloaderUtilities } from "../typechain";
 import { BootloaderUtilitiesFactory } from "../typechain";
 import { TEST_BOOTLOADER_UTILITIES_ADDRESS } from "./shared/constants";
@@ -27,15 +27,12 @@ describe("BootloaderUtilities tests", function () {
         from: wallet.address,
         data: "0x",
         value: 0,
-        maxFeePerGas: 12000,
-        maxPriorityFeePerGas: 100,
         customData: {
           gasPerPubdata: zksync.utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
         },
       });
       const signedEip712Tx = await wallet.signTransaction(eip712Tx);
       const parsedEIP712tx = zksync.utils.parseTransaction(signedEip712Tx);
-
       const eip712TxData = signedTxToTransactionData(parsedEIP712tx)!;
       const expectedEIP712TxHash = parsedEIP712tx.hash;
       const expectedEIP712SignedHash = zksync.EIP712Signer.getSignedDigest(eip712Tx);
@@ -87,7 +84,10 @@ describe("BootloaderUtilities tests", function () {
       signature[64] = 29;
       txData.signature = signature;
 
-      await expect(bootloaderUtilities.getTransactionHashes(txData)).to.be.revertedWith("Invalid v value");
+      await expect(bootloaderUtilities.getTransactionHashes(txData)).to.be.revertedWithCustomError(
+        bootloaderUtilities,
+        "InvalidSig"
+      );
     });
   });
 
@@ -133,7 +133,10 @@ describe("BootloaderUtilities tests", function () {
       signature[64] = 0;
       EIP1559TxData.signature = signature;
 
-      await expect(bootloaderUtilities.getTransactionHashes(EIP1559TxData)).to.be.revertedWith("Invalid v value");
+      await expect(bootloaderUtilities.getTransactionHashes(EIP1559TxData)).to.be.revertedWithCustomError(
+        bootloaderUtilities,
+        "InvalidSig"
+      );
     });
   });
 
@@ -179,7 +182,10 @@ describe("BootloaderUtilities tests", function () {
       signature[64] = 100;
       EIP2930TxData.signature = signature;
 
-      await expect(bootloaderUtilities.getTransactionHashes(EIP2930TxData)).to.be.revertedWith("Invalid v value");
+      await expect(bootloaderUtilities.getTransactionHashes(EIP2930TxData)).to.be.revertedWithCustomError(
+        bootloaderUtilities,
+        "InvalidSig"
+      );
     });
   });
 });

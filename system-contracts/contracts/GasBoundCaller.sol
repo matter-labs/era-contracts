@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {REAL_SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
+import {InsufficientGas} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -13,19 +14,19 @@ import {REAL_SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
  * system contracts have and it can relay call to any contract, breaking potential trust in system contracts.
  */
 contract GasBoundCaller {
-    /// @notice We assume that no more than `CALL_ENTRY_OVERHEAD` ergs are used for the O(1) operations at the start
+    /// @notice We assume that no more than `CALL_ENTRY_OVERHEAD` gas are used for the O(1) operations at the start
     /// of execution of the contract, such as abi decoding the parameters, jumping to the correct function, etc.
-    uint256 constant CALL_ENTRY_OVERHEAD = 800;
-    /// @notice We assume that no more than `CALL_RETURN_OVERHEAD` ergs are used for the O(1) operations at the end of the execution,
+    uint256 internal constant CALL_ENTRY_OVERHEAD = 800;
+    /// @notice We assume that no more than `CALL_RETURN_OVERHEAD` gas are used for the O(1) operations at the end of the execution,
     /// as such relaying the return.
-    uint256 constant CALL_RETURN_OVERHEAD = 200;
+    uint256 internal constant CALL_RETURN_OVERHEAD = 200;
 
     /// @notice The function that implements limiting of the total gas expenditure of the call.
     /// @dev On Era, the gas for pubdata is charged at the end of the execution of the entire transaction, meaning
     /// that if a subcall is not trusted, it can consume lots of pubdata in the process. This function ensures that
     /// no more than  `_maxTotalGas` will be allowed to be spent by the call. To be sure, this function uses some margin
-    /// (`BOUND_CALL_OVERHEAD`) to ensure that the call will not exceed the limit, so it may actually spend a bit less than
-    /// `_maxTotalGas` in the end.
+    /// (`CALL_ENTRY_OVERHEAD` + `CALL_RETURN_OVERHEAD`) to ensure that the call will not exceed the limit, so it may
+    /// actually spend a bit less than `_maxTotalGas` in the end.
     /// @dev The entire `gas` passed to this function could be used, regardless
     /// of the `_maxTotalGas` parameter. In other words, `max(gas(), _maxTotalGas)` is the maximum amount of gas that can be spent by this function.
     /// @dev The function relays the `returndata` returned by the callee. In case the `callee` reverts, it reverts with the same error.
@@ -43,7 +44,9 @@ contract GasBoundCaller {
         // This require is more of a safety protection for the users that call this function with incorrect parameters.
         //
         // Ultimately, the entire `gas` sent to this call can be spent on compute regardless of the `_maxTotalGas` parameter.
-        require(_maxTotalGas >= gasleft(), "Gas limit is too low");
+        if (_maxTotalGas < gasleft()) {
+            revert InsufficientGas();
+        }
 
         // This is the amount of gas that can be spent *exclusively* on pubdata in addition to the `gas` provided to this function.
         uint256 pubdataAllowance = _maxTotalGas > expectedForCompute ? _maxTotalGas - expectedForCompute : 0;
@@ -70,16 +73,18 @@ contract GasBoundCaller {
             ? pubdataPublishedAfter - pubdataPublishedBefore
             : 0;
 
-        uint256 pubdataPrice = REAL_SYSTEM_CONTEXT_CONTRACT.gasPerPubdataByte();
+        uint256 pubdataGasRate = REAL_SYSTEM_CONTEXT_CONTRACT.gasPerPubdataByte();
 
-        // In case there is an overflow here, the `_maxTotalGas` wouldbn't be able to cover it anyway, so
+        // In case there is an overflow here, the `_maxTotalGas` wouldn't be able to cover it anyway, so
         // we don't mind the contract panicking here in case of it.
-        uint256 pubdataCost = pubdataPrice * pubdataSpent;
+        uint256 pubdataGas = pubdataGasRate * pubdataSpent;
 
-        if (pubdataCost != 0) {
+        if (pubdataGas != 0) {
             // Here we double check that the additional cost is not higher than the maximum allowed.
             // Note, that the `gasleft()` can be spent on pubdata too.
-            require(pubdataAllowance + gasleft() >= pubdataCost + CALL_RETURN_OVERHEAD, "Not enough gas for pubdata");
+            if (pubdataAllowance + gasleft() < pubdataGas + CALL_RETURN_OVERHEAD) {
+                revert InsufficientGas();
+            }
         }
 
         assembly {

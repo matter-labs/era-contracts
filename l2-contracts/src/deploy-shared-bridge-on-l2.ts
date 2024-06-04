@@ -3,7 +3,8 @@ import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
-import { ethTestConfig, provider } from "./utils";
+import { provider } from "./utils";
+import { ethTestConfig } from "./deploy-utils";
 
 async function main() {
   const program = new Command();

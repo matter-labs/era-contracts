@@ -62,7 +62,7 @@ describe("ValidatorTimelock tests", function () {
       dummyStateTransitionManagerContract.signer
     );
 
-    const setSTtx = await dummyStateTransitionManager.setStateTransition(chainId, dummyExecutor.address);
+    const setSTtx = await dummyStateTransitionManager.setHyperchain(chainId, dummyExecutor.address);
     await setSTtx.wait();
 
     const validatorTimelockFactory = await hardhat.ethers.getContractFactory("ValidatorTimelock");
@@ -80,7 +80,7 @@ describe("ValidatorTimelock tests", function () {
     expect(await validatorTimelock.executionDelay()).equal(0);
     expect(await validatorTimelock.validators(chainId, ethers.constants.AddressZero)).equal(false);
     expect(await validatorTimelock.stateTransitionManager()).equal(dummyStateTransitionManager.address);
-    expect(await dummyStateTransitionManager.stateTransition(chainId)).equal(dummyExecutor.address);
+    expect(await dummyStateTransitionManager.getHyperchain(chainId)).equal(dummyExecutor.address);
     expect(await dummyStateTransitionManager.getChainAdmin(chainId)).equal(await owner.getAddress());
     expect(await dummyExecutor.getAdmin()).equal(await owner.getAddress());
   });

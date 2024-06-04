@@ -9,18 +9,18 @@ contract DummyStateTransitionManagerForValidatorTimelock {
     function test() internal virtual {}
 
     address public chainAdmin;
-    address public stateTransitionChain;
+    address public hyperchainAddress;
 
-    constructor(address _chainAdmin, address _stateTransition) {
+    constructor(address _chainAdmin, address _hyperchain) {
         chainAdmin = _chainAdmin;
-        stateTransitionChain = _stateTransition;
+        hyperchainAddress = _hyperchain;
     }
 
     function getChainAdmin(uint256) external view returns (address) {
         return chainAdmin;
     }
 
-    function stateTransition(uint256) external view returns (address) {
-        return stateTransitionChain;
+    function getHyperchain(uint256) external view returns (address) {
+        return hyperchainAddress;
     }
 }

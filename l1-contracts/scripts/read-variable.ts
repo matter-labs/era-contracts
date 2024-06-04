@@ -323,7 +323,7 @@ function getVariableName(fullName: string): string {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getValue(address: string, contractName: string, name: string): Promise<any> {
   // Mapping from Contract name to fully qualified name known to hardhat
-  // e.g ZkSync => cache/solpp-generated-contracts/interfaces/IZkSync.sol
+  // e.g ZkSync => contracts/interfaces/IZkSync.sol
   const contractMap = {};
   const allContracts = await hre.artifacts.getAllFullyQualifiedNames();
   allContracts.forEach((fullName) => {

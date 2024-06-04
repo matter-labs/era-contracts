@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {Test} from "forge-std/Test.sol";
+import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -12,142 +12,18 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
-// import "forge-std/console.sol";
-
 /// We are testing all the specified revert and require cases.
-contract L1SharedBridgeFailTest is Test {
-    event BridgehubDepositBaseTokenInitiated(
-        uint256 indexed chainId,
-        address indexed from,
-        address l1Token,
-        uint256 amount
-    );
-
-    event BridgehubDepositInitiated(
-        uint256 indexed chainId,
-        bytes32 indexed txDataHash,
-        address indexed from,
-        address to,
-        address l1Token,
-        uint256 amount
-    );
-
-    event BridgehubDepositFinalized(
-        uint256 indexed chainId,
-        bytes32 indexed txDataHash,
-        bytes32 indexed l2DepositTxHash
-    );
-
-    event WithdrawalFinalizedSharedBridge(
-        uint256 indexed chainId,
-        address indexed to,
-        address indexed l1Token,
-        uint256 amount
-    );
-
-    event ClaimedFailedDepositSharedBridge(
-        uint256 indexed chainId,
-        address indexed to,
-        address indexed l1Token,
-        uint256 amount
-    );
-
-    event LegacyDepositInitiated(
-        uint256 indexed chainId,
-        bytes32 indexed l2DepositTxHash,
-        address indexed from,
-        address to,
-        address l1Token,
-        uint256 amount
-    );
-
-    L1SharedBridge sharedBridgeImpl;
-    L1SharedBridge sharedBridge;
-    address bridgehubAddress;
-    address l1ERC20BridgeAddress;
-    address l1WethAddress;
-    address l2SharedBridge;
-    TestnetERC20Token token;
-    uint256 eraFirstPostUpgradeBatch;
-
-    address owner;
-    address admin;
-    address zkSync;
-    address alice;
-    address bob;
-    uint256 chainId;
-    uint256 amount = 100;
-    bytes32 txHash;
-
-    uint256 eraChainId;
-    address eraDiamondProxy;
-    address eraErc20BridgeAddress;
-
-    uint256 l2BatchNumber;
-    uint256 l2MessageIndex;
-    uint16 l2TxNumberInBatch;
-    bytes32[] merkleProof;
-
-    // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
-    uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
-    uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
-    uint256 isWithdrawalFinalizedStorageLocation = uint256(4 - 1 + 1 + 1);
-
-    function setUp() public {
-        owner = makeAddr("owner");
-        admin = makeAddr("admin");
-        // zkSync = makeAddr("zkSync");
-        bridgehubAddress = makeAddr("bridgehub");
-        alice = makeAddr("alice");
-        // bob = makeAddr("bob");
-        l1WethAddress = makeAddr("weth");
-        l1ERC20BridgeAddress = makeAddr("l1ERC20Bridge");
-        l2SharedBridge = makeAddr("l2SharedBridge");
-
-        txHash = bytes32(uint256(uint160(makeAddr("txHash"))));
-        l2BatchNumber = uint256(uint160(makeAddr("l2BatchNumber")));
-        l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
-        l2TxNumberInBatch = uint16(uint160(makeAddr("l2TxNumberInBatch")));
-        merkleProof = new bytes32[](1);
-        eraFirstPostUpgradeBatch = 1;
-
-        chainId = 1;
-        eraChainId = 9;
-        eraDiamondProxy = makeAddr("eraDiamondProxy");
-        eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
-
-        token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
-        sharedBridgeImpl = new L1SharedBridge({
-            _l1WethAddress: l1WethAddress,
-            _bridgehub: IBridgehub(bridgehubAddress),
-            _legacyBridge: IL1ERC20Bridge(l1ERC20BridgeAddress),
-            _eraChainId: eraChainId,
-            _eraErc20BridgeAddress: eraErc20BridgeAddress,
-            _eraDiamondProxy: eraDiamondProxy
-        });
-        TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
-            address(sharedBridgeImpl),
-            admin,
-            abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner, eraFirstPostUpgradeBatch)
-        );
-        sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
-        vm.prank(owner);
-        sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
-        vm.prank(owner);
-        sharedBridge.initializeChainGovernance(eraChainId, l2SharedBridge);
-    }
-
+contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     function test_initialize_wrongOwner() public {
         vm.expectRevert("ShB owner 0");
         new TransparentUpgradeableProxy(
             address(sharedBridgeImpl),
             admin,
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(L1SharedBridge.initialize.selector, address(0), eraFirstPostUpgradeBatch)
+            abi.encodeWithSelector(L1SharedBridge.initialize.selector, address(0), eraPostUpgradeFirstBatch)
         );
     }
 
@@ -278,11 +154,7 @@ contract L1SharedBridgeFailTest is Test {
 
     function test_bridgehubConfirmL2Transaction_depositAlreadyHappened() public {
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
-        vm.store(
-            address(sharedBridge),
-            keccak256(abi.encode(txHash, keccak256(abi.encode(chainId, depositLocationInStorage)))),
-            txDataHash
-        );
+        _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         vm.prank(bridgehubAddress);
         vm.expectRevert("ShB tx hap");
         sharedBridge.bridgehubConfirmL2Transaction(chainId, txDataHash, txHash);
@@ -381,11 +253,7 @@ contract L1SharedBridgeFailTest is Test {
         vm.deal(address(sharedBridge), amount);
 
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
-        vm.store(
-            address(sharedBridge),
-            keccak256(abi.encode(txHash, keccak256(abi.encode(chainId, depositLocationInStorage)))),
-            txDataHash
-        );
+        _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         vm.mockCall(
@@ -639,7 +507,8 @@ contract L1SharedBridgeFailTest is Test {
             abi.encode(ETH_TOKEN_ADDRESS)
         );
 
-        bytes memory message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, alice, amount); /// should have more data here
+        bytes memory message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, alice, amount);
+        // should have more data here
 
         vm.expectRevert("ShB wrong msg len 2");
 
