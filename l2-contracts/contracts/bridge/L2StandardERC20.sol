@@ -167,18 +167,21 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
 
     function name() public view override returns (string memory) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
+        // solhint-disable-next-line reason-string, gas-custom-errors
         if (availableGetters.ignoreName) revert();
         return super.name();
     }
 
     function symbol() public view override returns (string memory) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
+        // solhint-disable-next-line reason-string, gas-custom-errors
         if (availableGetters.ignoreSymbol) revert();
         return super.symbol();
     }
 
     function decimals() public view override returns (uint8) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
+        // solhint-disable-next-line reason-string, gas-custom-errors
         if (availableGetters.ignoreDecimals) revert();
         return decimals_;
     }
