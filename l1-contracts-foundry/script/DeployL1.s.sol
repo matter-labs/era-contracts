@@ -369,6 +369,84 @@ contract DeployL1Script is Script {
     }
 
     function deployStateTransitionManagerProxy() internal {
+        Diamond.DiamondCutData memory diamondCut = prepareDiamondCutData();
+
+        config.contracts.diamondCutData = abi.encode(diamondCut);
+
+        StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
+            owner: config.ownerAddress,
+            validatorTimelock: addresses.validatorTimelock,
+            genesisUpgrade: addresses.stateTransition.genesisUpgrade,
+            genesisBatchHash: config.contracts.genesisRoot,
+            genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
+            genesisBatchCommitment: config.contracts.genesisBatchCommitment,
+            diamondCut: diamondCut,
+            protocolVersion: config.contracts.latestProtocolVersion
+        });
+        address contractAddress = deployViaCreate2(
+            abi.encodePacked(
+                type(TransparentUpgradeableProxy).creationCode,
+                abi.encode(
+                    addresses.stateTransition.stateTransitionImplementation,
+                    addresses.transparentProxyAdmin,
+                    abi.encodeCall(StateTransitionManager.initialize, (diamondInitData))
+                )
+            )
+        );
+        console.log("StateTransitionManagerProxy deployed at:", contractAddress);
+        addresses.stateTransition.stateTransitionProxy = contractAddress;
+    }
+
+
+    function initializeConfigForInitDataGeneration() internal {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/script-config/config-deploy-l1.toml");
+        string memory toml = vm.readFile(path);
+
+
+        addresses.stateTransition.adminFacet = toml.readAddress("$.contracts.adminFacet");
+        addresses.stateTransition.gettersFacet = toml.readAddress("$.contracts.gettersFacet");
+        addresses.stateTransition.mailboxFacet = toml.readAddress("$.contracts.mailboxFacet");
+        addresses.stateTransition.executorFacet = toml.readAddress("$.contracts.executorFacet");
+        addresses.stateTransition.diamondInit = toml.readAddress("$.contracts.diamondInit");
+        addresses.blobVersionedHashRetriever = toml.readAddress("$.contracts.blobVersionedHashRetriever");
+
+
+        config.contracts.recursionNodeLevelVkHash = toml.readBytes32("$.contracts.recursion_node_level_vk_hash");
+        config.contracts.recursionLeafLevelVkHash = toml.readBytes32("$.contracts.recursion_leaf_level_vk_hash");
+        config.contracts.recursionCircuitsSetVksHash = toml.readBytes32("$.contracts.recursion_circuits_set_vks_hash");
+
+
+        config.contracts.diamondInitPubdataPricingMode = PubdataPricingMode(
+            toml.readUint("$.contracts.diamond_init_pubdata_pricing_mode")
+        );
+        config.contracts.diamondInitBatchOverheadL1Gas = toml.readUint(
+            "$.contracts.diamond_init_batch_overhead_l1_gas"
+        );
+        config.contracts.diamondInitMaxPubdataPerBatch = toml.readUint(
+            "$.contracts.diamond_init_max_pubdata_per_batch"
+        );
+        config.contracts.diamondInitMaxL2GasPerBatch = toml.readUint("$.contracts.diamond_init_max_l2_gas_per_batch");
+        config.contracts.diamondInitPriorityTxMaxPubdata = toml.readUint(
+            "$.contracts.diamond_init_priority_tx_max_pubdata"
+        );
+        config.contracts.diamondInitMinimalL2GasPrice = toml.readUint("$.contracts.diamond_init_minimal_l2_gas_price");
+
+
+        config.contracts.priorityTxMaxGasLimit = toml.readUint("$.contracts.priority_tx_max_gas_limit");
+        config.contracts.defaultAAHash = toml.readBytes32("$.contracts.default_aa_hash");
+        config.contracts.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
+
+
+    }
+
+    function generateDiamondInitData() external {
+        initializeConfigForInitDataGeneration();
+        bytes memory initdata = abi.encode(prepareDiamondCutData());
+        console.logBytes(initdata);
+    }
+
+    function prepareDiamondCutData() internal returns (Diamond.DiamondCutData memory) {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
             facet: addresses.stateTransition.adminFacet,
@@ -425,32 +503,7 @@ contract DeployL1Script is Script {
             initAddress: addresses.stateTransition.diamondInit,
             initCalldata: abi.encode(initializeData)
         });
-
-        config.contracts.diamondCutData = abi.encode(diamondCut);
-
-        StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
-            owner: config.ownerAddress,
-            validatorTimelock: addresses.validatorTimelock,
-            genesisUpgrade: addresses.stateTransition.genesisUpgrade,
-            genesisBatchHash: config.contracts.genesisRoot,
-            genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
-            genesisBatchCommitment: config.contracts.genesisBatchCommitment,
-            diamondCut: diamondCut,
-            protocolVersion: config.contracts.latestProtocolVersion
-        });
-
-        address contractAddress = deployViaCreate2(
-            abi.encodePacked(
-                type(TransparentUpgradeableProxy).creationCode,
-                abi.encode(
-                    addresses.stateTransition.stateTransitionImplementation,
-                    addresses.transparentProxyAdmin,
-                    abi.encodeCall(StateTransitionManager.initialize, (diamondInitData))
-                )
-            )
-        );
-        console.log("StateTransitionManagerProxy deployed at:", contractAddress);
-        addresses.stateTransition.stateTransitionProxy = contractAddress;
+        return diamondCut;
     }
 
     function registerStateTransitionManager() internal {
