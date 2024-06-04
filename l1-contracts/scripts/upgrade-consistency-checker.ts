@@ -16,43 +16,43 @@ import { getCurrentFacetCutsForAdd } from "../src.ts/diamondCut";
 // 2. Getter methods in STM.
 
 // List the contracts that should become the upgrade targets
-const genesisUpgrade = "0xc6aB8b3b93f3E47fb4163eB9Dc7A61E1a5D86369";
-const validatorTimelockDeployTx = "0x420e0dddae4a1565fee430ecafa8f5ddbc3eebee2666d0c91f97a47bf054eeb4";
-const validatorTimelock = "0xc2d7a7Bd59a548249e64C1a587220c0E4F6F439E";
-const upgradeHyperchains = "0xb2963DDc6694a989B527AED0B1E19f9F0675AE4d";
+const genesisUpgrade = process.env.CONTRACTS_GENESIS_UPGRADE_ADDR!;
+const validatorTimelockDeployTx = "0xde4ef2b77241b605acaa1658ff8815df0911bf81555a80c9cbdde42fbcaaea30";
+const validatorTimelock = process.env.CONTRACTS_VALIDATOR_TIMELOCK_ADDR!;
+const upgradeHyperchains = process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR!;
 
-const verifier = "0x353Ac6bB8d608B607f0443f033e2A89aDa16bcb0";
-const proxyAdmin = "0xf2c1d17441074FFb18E9A918db81A17dB1752146";
+const verifier = process.env.CONTRACTS_VERIFIER_ADDR!;
+const proxyAdmin = process.env.CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR!;
 
-const bridgeHubImpl = "0xF9D2E98Ed518eC6Daac0579a9707d83da55D5f89";
-const bridgeHub = "0x5B5c82f4Da996e118B127880492a23391376F65c";
+const bridgeHubImpl = process.env.CONTRACTS_BRIDGEHUB_IMPL_ADDR!;
+const bridgeHub = process.env.CONTRACTS_BRIDGEHUB_PROXY_ADDR!;
 
-const executorFacet = "0x63f4c229F261c2576E8B5A405321769c08134c73";
-const adminFacet = "0x342a09385E9BAD4AD32a6220765A6c333552e565";
-const mailboxFacetDeployTx = "0x2fa6af6e9317089be2734ffae73771c8099382d390d4edbb6c35e2db7f73b152";
-const mailboxFacet = "0x7814399116C17F2750Ca99cBFD2b75bA9a0793d7";
-const gettersFacet = "0x345c6ca2F3E08445614f4299001418F125AD330a";
+const executorFacet = process.env.CONTRACTS_EXECUTOR_FACET_ADDR!;
+const adminFacet = process.env.CONTRACTS_ADMIN_FACET_ADDR!;
+const mailboxFacetDeployTx = "0x995b23564b30f1551a9705313128e282591b38a1fc9c981d3251a929b190780d";
+const mailboxFacet = process.env.CONTRACTS_MAILBOX_FACET_ADDR!;
+const gettersFacet = process.env.CONTRACTS_GETTERS_FACET_ADDR!;
 
-const diamondInit = "0x05D865AE297d236Bc5C7988328d02A00b3D38a4F";
+const diamondInit = process.env.CONTRACTS_DIAMOND_INIT_ADDR!;
 
-const stmImplDeployTx = "0x7a077accd4ee39d14b6c23ef31ece4a84c87aff41cd64fd4d2ac23a3885dd4f8";
-const stmImpl = "0x3060D61538fC91B6580e34C5b5D09651CBB9c609";
-const stmDeployTx = "0x30138b826e8f8f855e7fe9e6153d49376b53bce71c34cb2a78e186b12156c966";
-const stm = "0x280372beAAf440C52a2ed893daa14CDACc0422b8";
+const stmImplDeployTx = "0xe01c0bb497017a25c92bfc712e370e8f900554b107fe0b6022976d05c349f2b6";
+const stmImpl = process.env.CONTRACTS_STATE_TRANSITION_IMPL_ADDR!;
+const stmDeployTx = "0x514bbf46d227eee8567825bf5c8ee1855aa8a1916f7fee7b191e2e3d5ecba849";
+const stm = process.env.CONTRACTS_STATE_TRANSITION_PROXY_ADDR!;
 
-const sharedBridgeImplDeployTx = "0xd24d38cab0beb62f6de9a83cd0a5d7e339e985ba84ac6ef07a336efd79ae333a";
-const sharedBridgeImpl = "0x3819200C978d8A589a1e28A2e8fEb9a0CAD700F7";
-const sharedBridgeProxy = "0x241F19eA8CcD04515b309f1C9953A322F51891FC";
+const sharedBridgeImplDeployTx = "0x074204db79298c2f6beccae881c2ad7321c331e97fb4bd93adce2eb23bf17a17";
+const sharedBridgeImpl = process.env.CONTRACTS_L1_SHARED_BRIDGE_IMPL_ADDR!;
+const sharedBridgeProxy = process.env.CONTRACTS_L1_SHARED_BRIDGE_PROXY_ADDR!;
 
-const legacyBridgeImplDeployTx = "0xd8cca5843318ca176afd1075ca6fbb941837a641324300d3719f9189e49fd62c";
-const legacyBridgeImpl = "0xbf3d4109D65A66c629D1999fb630bE2eE16d7038";
+const legacyBridgeImplDeployTx = "0x234da786f098fa2e44b9abaf41b7045b4a25570e1a34fd01a101d23570e84d61";
+const legacyBridgeImpl = process.env.CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR!;
 
 const expectedL1WethAddress = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 const initialOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438";
-const expectedOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438";
-const expectedDelay = 0;
-const eraChainId = 324;
-const expectedSalt = "0x0000000000000000000000000000000000000000000000000000000000000000";
+const expectedOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438" //process.env.CONTRACTS_GOVERNANCE_ADDR!;
+const expectedDelay = "75600";
+const eraChainId = process.env.CONTRACTS_ERA_CHAIN_ID!;
+const expectedSalt = "0x0000000000000000000000000000000000000000000000000000000000000001";
 const expectedHyperchainAddr = "0x32400084c286cf3e17e7b677ea9583e60a000324";
 const maxNumberOfHyperchains = 100;
 const expectedStoredBatchHashZero = "0x1574fa776dec8da2071e5f20d71840bfcbd82c2bca9ad68680edfedde1710bc4";
@@ -60,16 +60,17 @@ const expectedL2BridgeAddress = "0x11f943b2c77b743AB90f4A0Ae7d5A4e7FCA3E102";
 const expectedL1LegacyBridge = "0x57891966931Eb4Bb6FB81430E6cE0A03AAbDe063";
 const expectedGenesisBatchCommitment = "0x2d00e5f8d77afcebf58a6b82ae56ba967566fe7dfbcb6760319fb0d215d18ffd";
 const expectedIndexRepeatedStorageChanges = BigNumber.from(54);
-const expectedProtocolVersion = 24;
+const expectedProtocolVersion = BigNumber.from(2).pow(32).mul(24);
+
 const expectedGenesisRoot = "0xabdb766b18a479a5c783a4b80e12686bc8ea3cc2d8a3050491b701d72370ebb5";
 const expectedRecursionNodeLevelVkHash = "0xf520cd5b37e74e19fdb369c8d676a04dce8a19457497ac6686d2bb95d94109c8";
-const expectedRecursionLeafLevelVkHash = "0x435202d277dd06ef3c64ddd99fda043fc27c2bd8b7c66882966840202c27f4f6";
+const expectedRecursionLeafLevelVkHash = "0xf9664f4324c1400fa5c3822d667f30e873f53f1b8033180cd15fe41c1e2355c6";
 const expectedRecursionCircuitsSetVksHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
 const expectedBootloaderHash = "0x010008e742608b21bf7eb23c1a9d0602047e3618b464c9b59c0fba3b3d7ab66e";
 const expectedDefaultAccountHash = "0x01000563374c277a2c1e34659a2a1e87371bb6d852ce142022d497bfb50b9e32";
 
-const validatorOne = "0x0D3250c3D5FAcb74Ac15834096397a3Ef790ec99";
-const validatorTwo = "0x3527439923a63F8C13CF72b8Fe80a77f6e572092";
+const validatorOne = process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR!;
+const validatorTwo = process.env.ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR!;
 
 const l1Provider = new ethers.providers.JsonRpcProvider(web3Url());
 
@@ -102,7 +103,7 @@ async function extractInitCode(data: string) {
   const initCode = iface.parseTransaction({ data }).args._initCode;
   const salt = iface.parseTransaction({ data }).args._salt;
   if (salt !== expectedSalt) {
-    throw new Error("Salt is not correct");
+    throw new Error(`Salt is not correct ${salt}`);
   }
 
   return initCode;
@@ -135,30 +136,30 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
   if (usedValidatorTimelock.toLowerCase() !== validatorTimelock.toLowerCase()) {
     throw new Error("Validator timelock is not correct");
   }
-  const usedGenesisUpgrade = initializeData.genesisUpgrade;
+  const usedGenesisUpgrade = initializeData.chainCreationParams.genesisUpgrade;
   if (usedGenesisUpgrade.toLowerCase() !== genesisUpgrade.toLowerCase()) {
     throw new Error("Genesis upgrade is not correct");
   }
-  const usedGenesisBatchHash = initializeData.genesisBatchHash;
+  const usedGenesisBatchHash = initializeData.chainCreationParams.genesisBatchHash;
   if (usedGenesisBatchHash.toLowerCase() !== expectedGenesisRoot.toLowerCase()) {
     throw new Error("Genesis batch hash is not correct");
   }
-  const usedGenesisIndexRepeatedStorageChanges = initializeData.genesisIndexRepeatedStorageChanges;
+  const usedGenesisIndexRepeatedStorageChanges = initializeData.chainCreationParams.genesisIndexRepeatedStorageChanges;
   if (!usedGenesisIndexRepeatedStorageChanges.eq(expectedIndexRepeatedStorageChanges)) {
     throw new Error("Genesis index repeated storage changes is not correct");
   }
 
-  const usedGenesisBatchCommitment = initializeData.genesisBatchCommitment;
+  const usedGenesisBatchCommitment = initializeData.chainCreationParams.genesisBatchCommitment;
   if (usedGenesisBatchCommitment.toLowerCase() !== expectedGenesisBatchCommitment.toLowerCase()) {
     throw new Error("Genesis batch commitment is not correct");
   }
 
   const usedProtocolVersion = initializeData.protocolVersion;
   if (!usedProtocolVersion.eq(expectedProtocolVersion)) {
-    throw new Error("Protocol version is not correct");
+    throw new Error(`Protocol version is not correct ${usedProtocolVersion}`);
   }
 
-  const diamondCut = initializeData.diamondCut;
+  const diamondCut = initializeData.chainCreationParams.diamondCut;
 
   if (diamondCut.initAddress.toLowerCase() !== diamondInit.toLowerCase()) {
     throw new Error("Diamond init address is not correct");
@@ -444,7 +445,7 @@ async function checkLegacyBridge() {
 
   await checkCorrectInitCode(legacyBridgeImplDeployTx, contract, artifact.bytecode, [sharedBridgeProxy]);
 
-  console.log("L1 shared bridge impl correct!");
+  console.log("L1 legacy bridge impl correct!");
 }
 
 async function checkProxyAdmin() {
@@ -476,7 +477,7 @@ async function main() {
     await checkIdenticalBytecode(gettersFacet, "GettersFacet");
     await checkIdenticalBytecode(adminFacet, "AdminFacet");
     await checkIdenticalBytecode(bridgeHubImpl, "Bridgehub");
-    await checkIdenticalBytecode(verifier, eraChainId == 324 ? "Verifier" : "TestnetVerifier");
+    await checkIdenticalBytecode(verifier, eraChainId == (324).toString() ? "Verifier" : "TestnetVerifier");
     await checkIdenticalBytecode(diamondInit, "DiamondInit");
 
     await checkMailbox();
