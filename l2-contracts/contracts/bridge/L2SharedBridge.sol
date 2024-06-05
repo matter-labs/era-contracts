@@ -39,7 +39,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// This is non-zero only on Era, and should not be renamed for backward compatibility with the SDKs.
     address public override l1Bridge;
 
-    uint256 internal immutable ERA_CHAIN_ID;
+    uint256 public immutable ERA_CHAIN_ID;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
@@ -59,7 +59,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         bytes32 _l2TokenProxyBytecodeHash,
         address _aliasedOwner
     ) external reinitializer(2) {
-        if (_l1Bridge == address(0)) {
+        if (_l1SharedBridge == address(0)) {
             revert EmptyAddress();
         }
 
@@ -79,10 +79,10 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
             l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
             l2TokenBeacon.transferOwnership(_aliasedOwner);
         } else {
-            if (_l1LegacyBridge == address(0)) {
+            if (_l1Bridge == address(0)) {
                 revert EmptyAddress();
             }
-            l1LegacyBridge = _l1LegacyBridge;
+            l1Bridge = _l1Bridge;
             // l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
         }
     }
@@ -103,7 +103,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
         if (
             AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
-            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1LegacyBridge
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge
         ) {
             revert InvalidCaller(msg.sender);
         }
