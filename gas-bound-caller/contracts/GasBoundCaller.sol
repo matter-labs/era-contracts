@@ -21,7 +21,7 @@ contract GasBoundCaller {
     uint256 internal constant CALL_ENTRY_OVERHEAD = 800;
     /// @notice We assume that no more than `CALL_RETURN_OVERHEAD` gas are used for the O(1) operations at the end of the execution,
     /// as such relaying the return.
-    uint256 constant CALL_RETURN_OVERHEAD = 400;
+    uint256 internal constant CALL_RETURN_OVERHEAD = 400;
 
     /// @notice The function that implements limiting of the total gas expenditure of the call.
     /// @dev On Era, the gas for pubdata is charged at the end of the execution of the entire transaction, meaning
