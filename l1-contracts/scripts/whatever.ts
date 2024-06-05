@@ -8,8 +8,7 @@ import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, GAS_MULTIPLIER } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import { ethTestConfig } from "../src.ts/utils";
-import { setInitialCutHash, upgradeProverFix } from "../src.ts/hyperchain-upgrade";
-import { IERC20Factory } from "../typechain/IERC20Factory";
+import { setInitialCutHash, upgradeProverFix, upgradeMainnetFix, transferTokensOnForkedNetwork } from "../src.ts/hyperchain-upgrade";
 
 const provider = web3Provider();
 
@@ -60,8 +59,11 @@ async function main() {
         verbose: true,
       });
 
+      // await upgradeMainnetFix(deployer, create2Salt, gasPrice);
       // await upgradeProverFix(deployer, create2Salt, gasPrice);
-      await setInitialCutHash(deployer);
+      // await setInitialCutHash(deployer);
+      // await
+      await transferTokensOnForkedNetwork(deployer)
     });
 
   await program.parseAsync(process.argv);
@@ -80,7 +82,7 @@ main()
 //   "0xfc448180d5254A55846a37c86146407Db48d2a36",
 // ];
 
-const tokenList = [
+export const tokenList = [
   "0xA49d7499271aE71cd8aB9Ac515e6694C755d400c",
   "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
   "0xfFffFffF2ba8F66D4e51811C5190992176930278",
@@ -409,4 +411,13 @@ const tokenList = [
   "0x36E66fbBce51e4cD5bd3C62B637Eb411b18949D4",
   "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3",
   "0xdBB7a34Bf10169d6d2D0d02A6cbb436cF4381BFa",
+  "0xB8c77482e45F1F44dE1745F52C74426C631bDD52",
+  "0x23eC026590d6CCCfEce04097F9B49aE6A442C3BA",
+  "0xDA7C0810cE6F8329786160bb3d1734cf6661CA6E",
+  "0x72e364F2ABdC788b7E918bc238B21f109Cd634D7",
+  "0x1B9eBb707D87fbec93C49D9f2d994Ebb60461B9b",
+  "0xd3843c6Be03520f45871874375D618b3C7923019",
+  "0xB6ff96B8A8d214544Ca0dBc9B33f7AD6503eFD32",
+  "0x2b1D36f5B61AdDAf7DA7ebbd11B35FD8cfb0DE31",
+  "0xe8A25C46d623f12B8bA08b583b6fE1bEE3eB31C9",
 ];

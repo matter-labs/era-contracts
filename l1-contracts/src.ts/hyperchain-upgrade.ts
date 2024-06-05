@@ -25,6 +25,10 @@ import {
 } from "../../l2-contracts/src/utils";
 import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
 
+import { tokenList } from "../scripts/whatever";
+import { IERC20Factory } from "../typechain/IERC20Factory";
+import { web3Provider, GAS_MULTIPLIER } from "../scripts/utils";
+
 const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/l2-contracts/artifacts-zk/");
 const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@openzeppelin/contracts/proxy/beacon");
 export const BEACON_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
@@ -340,7 +344,7 @@ export async function transferTokens(deployer: Deployer, token: string) {
     token,
     deployer.addresses.Bridges.ERC20BridgeProxy,
     "324",
-    "300000",
+    "1000000",
     { gasLimit: 25_000_000 }
   );
   await tx.wait();
@@ -373,26 +377,29 @@ export async function setInitialCutHash(deployer: Deployer) {
   // await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, calldata, true);
 }
 
+const provider = web3Provider();
+
 export async function transferTokensOnForkedNetwork(deployer: Deployer) {
-  // const startToken = 20;
+  const startToken = 20;
   // const tokens = tokenList.slice(startToken);
   // console.log(`From ${startToken}`, tokens);
-  // for (const tokenAddress of tokenList) {
-  //   const erc20contract = IERC20Factory.connect(tokenAddress, provider);
-  //   console.log(`Migrating token ${tokenAddress}`);
-  //   console.log(
-  //     `Balance before: ${await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
-  //   );
-  //   await transferTokens(deployer, tokenAddress);
-  //   console.log(
-  //     `Balance after: ${await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
-  //   );
-  // }
-  // console.log("From 0", tokenList);
-  // for (const tokenAddress of tokenList) {
-  //   const erc20contract = IERC20Factory.connect(tokenAddress, provider);
-  //   if (!(await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)).eq(0)) {
-  //     console.log(`Failed to transfer all tokens ${tokenAddress}`);
-  //   }
-  // }
+  // const tokenList = ["0x5A520e593F89c908cd2bc27D928bc75913C55C42"];
+  for (const tokenAddress of tokenList) {
+    const erc20contract = IERC20Factory.connect(tokenAddress, provider);
+    console.log(`Migrating token ${tokenAddress}`);
+    console.log(
+      `Balance before: ${await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
+    );
+    await transferTokens(deployer, tokenAddress);
+    console.log(
+      `Balance after: ${await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
+    );
+  }
+  console.log("From 0", tokenList);
+  for (const tokenAddress of tokenList) {
+    const erc20contract = IERC20Factory.connect(tokenAddress, provider);
+    if (!(await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)).eq(0)) {
+      console.log(`Failed to transfer all tokens ${tokenAddress}`);
+    }
+  }
 }
