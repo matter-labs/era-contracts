@@ -39,18 +39,24 @@ contract DeployErc20Script is Script {
     }
 
     function initializeConfig() internal {
-        // Grab config from output of l1 deployment
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/config-deploy-erc20.toml");
-        string memory toml = vm.readFile(path);
-
         config.deployerAddress = msg.sender;
+
+        string memory root = vm.projectRoot();
+
+        // Grab config from output of l1 deployment
+        string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
+        string memory toml = vm.readFile(path);
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.create2FactoryAddr = vm.parseTomlAddress(toml, "$.create2_factory_addr");
         config.create2FactorySalt = vm.parseTomlBytes32(toml, "$.create2_factory_salt");
+
+        // Grab config from custom config file
+        path = string.concat(root, "/script-config/config-deploy-erc20.toml");
+        toml = vm.readFile(path);
+
         string[] memory tokens = vm.parseTomlKeys(toml, "$.tokens");
 
         uint256 tokensLength = tokens.length;
@@ -115,9 +121,6 @@ contract DeployErc20Script is Script {
     }
 
     function saveOutput() internal {
-        vm.serializeAddress("root", "create2_factory_addr", config.create2FactoryAddr);
-        vm.serializeBytes32("root", "create2_factory_salt", config.create2FactorySalt);
-
         string memory tokens = "";
         uint256 tokensLength = config.tokens.length;
         for (uint256 i = 0; i < tokensLength; ++i) {
