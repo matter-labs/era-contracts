@@ -222,7 +222,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
         emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _assetInfo, _amount);
-        // We could use this data instead of the above
+        // ToDo We could use this data instead of the above
         // emit BridgehubMintData(bridgeMintData);
     }
 
@@ -549,6 +549,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) internal nonReentrant whenNotPaused returns (bytes32 assetInfo, uint256 amount) {
+        // ToDo: unused function param
         require(!isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");
         isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
@@ -565,9 +566,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             (assetInfo, assetData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
         }
         address l1Asset = assetAddress[assetInfo];
-        IL1StandardAsset(l1Asset).bridgeMint(_chainId, assetInfo, assetData);
+        address l1Receiver = IL1StandardAsset(l1Asset).bridgeMint(_chainId, assetInfo, assetData);
 
-        // emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetInfo, keccak256(assetData)); // ToDo: Shall we uncomment?
+        emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetInfo, keccak256(assetData));
     }
 
     /// @dev Verifies the validity of a withdrawal message from L2 and returns details of the withdrawal.
@@ -802,6 +803,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge returns (address l1Receiver, address l1Asset, uint256 amount) {
+        // ToDo: unused function param
         bytes32 assetInfo;
         (assetInfo, amount) = _finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,

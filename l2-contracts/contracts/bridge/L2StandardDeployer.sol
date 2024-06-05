@@ -70,6 +70,12 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         _transferOwnership(_aliasedOwner);
     }
 
+    function setL2TokenBeacon(address _l2TokenBeacon, bytes32 _l2TokenProxyBytecodeHash) external onlyOwner {
+        l2TokenBeacon = UpgradeableBeacon(_l2TokenBeacon);
+        l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
+        emit l2TokenBeaconUpdated(_l2TokenBeacon, _l2TokenProxyBytecodeHash);
+    }
+
     function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {
         address token = tokenAddress[_assetInfo];
         (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken) = abi

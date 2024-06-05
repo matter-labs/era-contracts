@@ -151,25 +151,29 @@ contract L1NativeTokenVault is
     }
 
     /* solhint-disable no-unused-vars */
-    function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {
-        // if (!hyperbridgingEnabled[_chainId]) { // ToDo: add logic & uncomment
-        //     // Add back
-        //     // Check that the chain has sufficient balance
-        //     require(chainBalance[_chainId][l1Token] >= _amount, "NTV not enough funds 2"); // not enough funds
-        //     chainBalance[_chainId][l1Token] -= _amount;
-        // }
+    function bridgeMint(
+        uint256 _chainId,
+        bytes32 _assetInfo,
+        bytes calldata _data
+    ) external payable override returns (address l1Receiver) {
         address l1Token = tokenAddress[_assetInfo];
-        (uint256 _amount, address l1Receiver) = abi.decode(_data, (uint256, address));
+        (uint256 _amount, address _l1Receiver) = abi.decode(_data, (uint256, address));
+        l1Receiver = _l1Receiver;
+        if (!hyperbridgingEnabled[_chainId]) {
+            // Check that the chain has sufficient balance
+            require(chainBalance[_chainId][l1Token] >= _amount, "NTV not enough funds 2"); // not enough funds
+            chainBalance[_chainId][l1Token] -= _amount;
+        }
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
             assembly {
-                callSuccess := call(gas(), l1Receiver, _amount, 0, 0, 0, 0)
+                callSuccess := call(gas(), _l1Receiver, _amount, 0, 0, 0, 0)
             }
             require(callSuccess, "NTV: withdraw failed");
         } else {
             // Withdraw funds
-            IERC20(l1Token).safeTransfer(l1Receiver, _amount);
+            IERC20(l1Token).safeTransfer(_l1Receiver, _amount);
         }
     }
 
