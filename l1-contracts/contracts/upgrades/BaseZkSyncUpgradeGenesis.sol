@@ -28,6 +28,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
         // slither-disable-next-line unused-return
         (uint32 previousMajorVersion, uint32 previousMinorVersion, ) = SemVer.unpackSemVer(
             SafeCast.toUint96(previousProtocolVersion)
+        );
 
         if (previousMajorVersion != 0) {
             revert ProtocolMajorVersionNotZero();
@@ -49,7 +50,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
 
         // While this is implicitly enforced by other checks above, we still double check just in case
         if (minorDelta > MAX_ALLOWED_MINOR_VERSION_DELTA) {
-            revert ProtocolVersionDeltaTooLarge();
+            revert ProtocolVersionDeltaTooLarge(minorDelta, MAX_ALLOWED_MINOR_VERSION_DELTA);
         }
 
         // If the minor version changes also, we need to ensure that the previous upgrade has been finalized.
