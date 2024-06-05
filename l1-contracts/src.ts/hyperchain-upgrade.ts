@@ -204,9 +204,9 @@ export async function upgradeToHyperchains3(deployer: Deployer, printFileName?: 
     process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_BATCH,
     process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_TX_NUMBER,
   ]);
-  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data2, printFileName);
-  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data3, printFileName);
-  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data4, printFileName);
+  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data2, !!printFileName);
+  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data3, !!printFileName);
+  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data4, !!printFileName);
 }
 
 async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, create2Salt?: string, nonce?: number) {
@@ -286,7 +286,7 @@ async function upgradeL2Bridge(deployer: Deployer, gasPrice: BigNumberish, print
     deployer.addresses.StateTransition.DiamondProxy,
     requiredValueForL2Tx,
     mailboxCalldata,
-    printFileName
+    !!printFileName
   );
 }
 
@@ -306,7 +306,7 @@ async function upgradeL1ERC20Bridge(deployer: Deployer, gasPrice: BigNumberish, 
       deployer.addresses.Bridges.ERC20BridgeImplementation,
     ]);
 
-    await deployer.executeUpgrade(deployer.addresses.TransparentProxyAdmin, 0, data1, printFileName);
+    await deployer.executeUpgrade(deployer.addresses.TransparentProxyAdmin, 0, data1, !!printFileName);
 
     if (deployer.verbose) {
       console.log("L1ERC20Bridge upgrade sent");
@@ -327,7 +327,7 @@ export async function transferERC20BridgeToProxyAdmin(
     deployer.addresses.TransparentProxyAdmin,
   ]);
 
-  await deployer.executeUpgrade(deployer.addresses.Bridges.ERC20BridgeProxy, 0, data1, printFileName);
+  await deployer.executeUpgrade(deployer.addresses.Bridges.ERC20BridgeProxy, 0, data1, !!printFileName);
 
   if (deployer.verbose) {
     console.log("ERC20Bridge ownership transfer sent");
@@ -350,15 +350,27 @@ export async function transferTokens(deployer: Deployer, token: string) {
 export async function upgradeProverFix(deployer: Deployer, create2Salt: string, gasPrice: BigNumberish) {
   await deployer.deployVerifier(create2Salt, { gasPrice });
   await deployer.deployExecutorFacet(create2Salt, { gasPrice });
+
   // await deployer.deployDefaultUpgrade(create2Salt, { gasPrice });  // Not needed on mainnet
+}
+
+export async function upgradeMainnetFix(deployer: Deployer, create2Salt: string, gasPrice: BigNumberish) {
+  const stm = deployer.stateTransitionManagerContract(deployer.deployWallet);
+  const tx = await stm.setNewVersionUpgrade(
+    await deployer.initialZkSyncHyperchainDiamondCut([]),
+    103079215104,
+    0,
+    103079215105
+  );
+  await tx.wait();
 }
 
 export async function setInitialCutHash(deployer: Deployer) {
   const diamondCut = await deployer.initialZkSyncHyperchainDiamondCut([]);
-  const calldata = deployer
-    .stateTransitionManagerContract(deployer.deployWallet)
-    .interface.encodeFunctionData("setInitialCutHash", [diamondCut]);
-  await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, calldata, "true");
+  // const calldata = deployer
+  //   .stateTransitionManagerContract(deployer.deployWallet)
+  //   .interface.encodeFunctionData("setInitialCutHash", [diamondCut]);
+  // await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, calldata, true);
 }
 
 export async function transferTokensOnForkedNetwork(deployer: Deployer) {

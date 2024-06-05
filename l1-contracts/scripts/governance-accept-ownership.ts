@@ -104,9 +104,7 @@ async function main() {
       console.log("Calldata for execution: ", executeData);
     });
 
-
-
-    program
+  program
     .command("transfer-pending-admin")
     .option("--private-key <private-key>")
     .option("--gas-price <gas-price>")
@@ -144,19 +142,17 @@ async function main() {
       await transferAdmin1StepTo(deployWallet, bridgehubAddr, ownerAddress, true);
     });
 
-    program
+  program
     .command("accept-pending-admin")
     .option("--stm-addr <stateTransitionManagerAddr>")
     .option("--bridgehub-addr <bridgehubAddr>")
     .action(async (cmd) => {
-
-
       const stmAddr = ethers.utils.getAddress(cmd.stmAddr);
       console.log("Using STM address: ", stmAddr);
       const bridgehubAddr = ethers.utils.getAddress(cmd.bridgehubAddr);
       console.log("Using Bridgehub address: ", bridgehubAddr);
 
-      const addresses = [ stmAddr, bridgehubAddr];
+      const addresses = [stmAddr, bridgehubAddr];
 
       const govCalls = addresses.map(acceptAdminCall);
 
@@ -171,11 +167,10 @@ async function main() {
 
       console.log("Calldata for scheduling: ", scheduleData);
       console.log("Calldata for execution: ", executeData);
-});
+    });
 
-await program.parseAsync(process.argv);
+  await program.parseAsync(process.argv);
 }
-
 
 main()
   .then(() => process.exit(0))
@@ -216,7 +211,7 @@ async function transferAdmin1StepTo(
   newOwner: string,
   printPendingOwner: boolean = true
 ) {
-  const l1Erc20ABI = ['function setPendingAdmin(address to)'];
+  const l1Erc20ABI = ["function setPendingAdmin(address to)"];
   const contract = new ethers.Contract(contractAddress, l1Erc20ABI, wallet);
   console.log("Transferring admin of contract: ", contractAddress, " to: ", newOwner);
   const tx = await contract.setPendingAdmin(newOwner);
@@ -229,7 +224,7 @@ async function transferAdmin1StepTo(
 }
 
 function acceptAdminCall(target: string) {
-  const abi = ['function acceptAdmin()'];
+  const abi = ["function acceptAdmin()"];
   const interf = new Interface(abi);
   const data = interf.encodeFunctionData("acceptAdmin", []);
   return {
