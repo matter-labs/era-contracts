@@ -151,6 +151,7 @@ fn execute_internal_bootloader_test() {
             .unwrap()
             .into_inner()
             .unwrap_or_default();
+        println!("Test Result: {:?}", test_result);
 
         if test_result.is_none() {
             test_result = Some(if let Some(requested_assert) = requested_assert {
@@ -159,13 +160,16 @@ fn execute_internal_bootloader_test() {
                         "Should have failed with {}, but run successfully.",
                         requested_assert
                     )),
-                    ExecutionResult::Revert { output } => Err(format!(
+                    ExecutionResult::Revert { output } => {
+                        println!("OUTPUT: {:?}", output);
+                        Err(format!(
                         "Should have failed with {}, but run reverted with {}.",
                         requested_assert,
                         output.to_user_friendly_string()
-                    )),
+                    ))},
                     ExecutionResult::Halt { reason } => {
                         if let Halt::UnexpectedVMBehavior(reason) = reason {
+                            println!("{:?}", reason);
                             let reason = reason.strip_prefix("Assertion error: ").unwrap();
                             if reason == requested_assert {
                                 Ok(())
