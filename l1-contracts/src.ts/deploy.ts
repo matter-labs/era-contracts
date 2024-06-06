@@ -225,16 +225,17 @@ export class Deployer {
 
     this.addresses.TransparentProxyAdmin = proxyAdmin.address;
 
-    const tx = await proxyAdmin.transferOwnership(this.addresses.Governance);
-    const receipt = await tx.wait();
+    /// Todo change back, only commented out for migration
+    // const tx = await proxyAdmin.transferOwnership(this.addresses.Governance);
+    // const receipt = await tx.wait();
 
-    if (this.verbose) {
-      console.log(
-        `ProxyAdmin ownership transferred to Governance in tx ${
-          receipt.transactionHash
-        }, gas used: ${receipt.gasUsed.toString()}`
-      );
-    }
+    // if (this.verbose) {
+    //   console.log(
+    //     `ProxyAdmin ownership transferred to Governance in tx ${
+    //       receipt.transactionHash
+    //     }, gas used: ${receipt.gasUsed.toString()}`
+    //   );
+    // }
   }
 
   public async deployBridgehubProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
