@@ -67,7 +67,7 @@ async function main() {
       await transferOwnership1StepTo(deployWallet, stmAddr, ownerAddress, true);
       await transferOwnership1StepTo(deployWallet, l1SharedBridgeAddr, ownerAddress, true);
       await transferOwnership1StepTo(deployWallet, bridgehubAddr, ownerAddress, true);
-      // await transferOwnership1StepTo(deployWallet, proxyAdminAddr, ownerAddress, false);
+      await transferOwnership1StepTo(deployWallet, proxyAdminAddr, ownerAddress, false);
     });
 
   program
@@ -138,8 +138,8 @@ async function main() {
       const bridgehubAddr = ethers.utils.getAddress(cmd.bridgehubAddr);
       console.log("Using Bridgehub address: ", bridgehubAddr);
 
-      await transferAdmin1StepTo(deployWallet, stmAddr, ownerAddress, true);
-      await transferAdmin1StepTo(deployWallet, bridgehubAddr, ownerAddress, true);
+      await transferAdmin1StepTo(deployWallet, stmAddr, ownerAddress);
+      await transferAdmin1StepTo(deployWallet, bridgehubAddr, ownerAddress);
     });
 
   program
@@ -205,22 +205,13 @@ function acceptOwnershipCall(target: string) {
   };
 }
 
-async function transferAdmin1StepTo(
-  wallet: ethers.Wallet,
-  contractAddress: string,
-  newOwner: string,
-  printPendingOwner: boolean = true
-) {
+async function transferAdmin1StepTo(wallet: ethers.Wallet, contractAddress: string, newOwner: string) {
   const l1Erc20ABI = ["function setPendingAdmin(address to)"];
   const contract = new ethers.Contract(contractAddress, l1Erc20ABI, wallet);
   console.log("Transferring admin of contract: ", contractAddress, " to: ", newOwner);
   const tx = await contract.setPendingAdmin(newOwner);
   console.log("Tx hash", tx.hash);
   await tx.wait();
-  // if (printPendingOwner) {
-  //   const newPendingOwner = await contract.pendingAdmin();
-  //   console.log("New pending owner: ", newPendingOwner);
-  // }
 }
 
 function acceptAdminCall(target: string) {

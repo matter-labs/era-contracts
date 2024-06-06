@@ -1,14 +1,15 @@
 // hardhat import should be the first import in the file
 import * as hardhat from "hardhat";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-// import { getNumberFromEnv, getHashFromEnv, getAddressFromEnv } from "../src.ts/utils";
+// import { getNumberFromEnv, getHashFromEnv, getAddressFromEnv} from "../src.ts/utils";
 import { ethTestConfig } from "../src.ts/utils";
 
 // import { Interface } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
 import { Wallet } from "ethers";
-import { packSemver, unpackStringSemVer, web3Provider } from "./utils";
-import { getTokens } from "../src.ts/deploy-token";
+// import { packSemver, unpackStringSemVer, } from "./utils";
+import { web3Provider } from "./utils";
+// import { getTokens } from "../src.ts/deploy-token";
 
 const provider = web3Provider();
 
@@ -49,7 +50,7 @@ async function main() {
     ownerAddress: deployWalletAddress,
     verbose: true,
   });
-  console.log(deployer);
+  // console.log(deployer);
   // TODO: Restore after switching to hardhat tasks (SMA-1711).
   // promises.push(verifyPromise(addresses.AllowList, [governor]));
 
@@ -75,9 +76,11 @@ async function main() {
   // const promise2 = verifyPromise(addresses.ValidatorTimeLock, [deployWalletAddress, executionDelay, eraChainId]);
   // promises.push(promise2);
 
-  // console.log("CONTRACTS_HYPERCHAIN_UPGRADE_ADDR", process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR);
   // const promise3 = verifyPromise(process.env.CONTRACTS_DEFAULT_UPGRADE_ADDR);
   // promises.push(promise3);
+
+  // const promise4 = verifyPromise(process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR);
+  // promises.push(promise4);
 
   // const promise5 = verifyPromise(addresses.TransparentProxyAdmin);
   // promises.push(promise5);
@@ -130,11 +133,13 @@ async function main() {
   //   {
   //     owner: addresses.Governance,
   //     validatorTimelock: addresses.ValidatorTimeLock,
-  //     genesisUpgrade: addresses.StateTransition.GenesisUpgrade,
-  //     genesisBatchHash,
-  //     genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
-  //     genesisBatchCommitment,
-  //     diamondCut,
+  //     chainCreationParams: {
+  //       genesisUpgrade: addresses.StateTransition.GenesisUpgrade,
+  //       genesisBatchHash,
+  //       genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
+  //       genesisBatchCommitment,
+  //       diamondCut
+  //     },
   //     protocolVersion,
   //   },
   // ]);
@@ -150,66 +155,6 @@ async function main() {
   //     diamondCut,
   //     protocolVersion,
   //   },);
-  // const promise9 = verifyPromise(addresses.StateTransition.StateTransitionProxy, [
-  //   addresses.StateTransition.StateTransitionImplementation,
-  //   addresses.TransparentProxyAdmin,
-  //   initCalldata2,
-  // ]);
-  // promises.push(promise9);
-
-  // // // bridges
-  // // // Note: do this manually and pass in  to verify:verify the following:  contract:"contracts/bridge/L1ERC20Bridge.sol:L1ERC20Bridge"
-  // const promise10 = verifyPromise(addresses.Bridges.ERC20BridgeImplementation, [addresses.Bridges.SharedBridgeProxy]);
-  // promises.push(promise10);
-
-  // const eraDiamondProxy = getAddressFromEnv("CONTRACTS_ERA_DIAMOND_PROXY_ADDR");
-  // const tokens = getTokens();
-  // const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
-
-  // const promise12 = verifyPromise(addresses.Bridges.SharedBridgeImplementation, [
-  //   l1WethToken,
-  //   addresses.Bridgehub.BridgehubProxy,
-  //   eraChainId,
-  //   eraDiamondProxy,
-  // ]);
-  // promises.push(promise12);
-  // const initCalldata4 = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi).encodeFunctionData(
-  //   "initialize",
-  //   [deployWalletAddress]
-  // );
-  // const promise13 = verifyPromise(addresses.Bridges.SharedBridgeProxy, [
-  //   addresses.Bridges.SharedBridgeImplementation,
-  //   addresses.TransparentProxyAdmin,
-  //   initCalldata4,
-  // ]);
-  // promises.push(promise13);
-
-  // const promise8 = verifyPromise(addresses.StateTransition.StateTransitionImplementation, [
-  //   addresses.Bridgehub.BridgehubProxy,
-  //   getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_HYPERCHAINS"),
-  // ]);
-  // promises.push(promise8);
-
-  // const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
-  // const genesisBatchHash = getHashFromEnv("CONTRACTS_GENESIS_ROOT"); // TODO: confusing name
-  // const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
-  // const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
-  // const diamondCut = await deployer.initialZkSyncHyperchainDiamondCut([]);
-  // const protocolVersion = getNumberFromEnv("CONTRACTS_GENESIS_PROTOCOL_VERSION");
-
-  // const initCalldata2 = stateTransitionManager.encodeFunctionData("initialize", [
-  //   {
-  //     owner: addresses.Governance,
-  //     validatorTimelock: addresses.ValidatorTimeLock,
-  //     genesisUpgrade: addresses.StateTransition.GenesisUpgrade,
-  //     genesisBatchHash,
-  //     genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
-  //     genesisBatchCommitment,
-  //     diamondCut,
-  //     protocolVersion,
-  //   },
-  // ]);
-
   // const promise9 = verifyPromise(addresses.StateTransition.StateTransitionProxy, [
   //   addresses.StateTransition.StateTransitionImplementation,
   //   addresses.TransparentProxyAdmin,

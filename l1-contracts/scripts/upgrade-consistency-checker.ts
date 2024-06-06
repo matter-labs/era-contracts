@@ -49,7 +49,7 @@ const legacyBridgeImpl = process.env.CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR!;
 
 const expectedL1WethAddress = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 const initialOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438";
-const expectedOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438" //process.env.CONTRACTS_GOVERNANCE_ADDR!;
+const expectedOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438"; //process.env.CONTRACTS_GOVERNANCE_ADDR!;
 const expectedDelay = "75600";
 const eraChainId = process.env.CONTRACTS_ERA_CHAIN_ID!;
 const expectedSalt = "0x0000000000000000000000000000000000000000000000000000000000000001";
