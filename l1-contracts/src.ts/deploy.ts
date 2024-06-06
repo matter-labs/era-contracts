@@ -926,7 +926,13 @@ export class Deployer {
       console.log(`Governance set as pending admin, gas used: ${receipt.gasUsed.toString()}`);
     }
 
-    await this.executeUpgrade(hyperchain.address, 0, hyperchain.interface.encodeFunctionData("acceptAdmin"),null, false);
+    await this.executeUpgrade(
+      hyperchain.address,
+      0,
+      hyperchain.interface.encodeFunctionData("acceptAdmin"),
+      null,
+      false
+    );
 
     if (this.verbose) {
       console.log("Pending admin successfully accepted");
