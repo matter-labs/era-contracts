@@ -100,10 +100,10 @@ contract L1SharedBridgeTest is Test {
     function setUp() public {
         owner = makeAddr("owner");
         admin = makeAddr("admin");
-        // zkSync = makeAddr("zkSync");
+        zkSync = makeAddr("zkSync");
         bridgehubAddress = makeAddr("bridgehub");
         alice = makeAddr("alice");
-        // bob = makeAddr("bob");
+        bob = makeAddr("bob");
         l1WethAddress = makeAddr("weth");
 
         l2SharedBridge = makeAddr("l2SharedBridge");

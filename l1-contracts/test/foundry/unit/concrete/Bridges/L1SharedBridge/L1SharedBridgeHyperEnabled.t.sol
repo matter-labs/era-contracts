@@ -57,7 +57,7 @@ contract L1SharedBridgeHyperEnabledTest is L1SharedBridgeTest {
             chainId: chainId,
             txDataHash: txDataHash,
             from: alice,
-            to: zkSync,
+            to: bob,
             l1Token: ETH_TOKEN_ADDRESS,
             amount: amount
         });
@@ -73,7 +73,7 @@ contract L1SharedBridgeHyperEnabledTest is L1SharedBridgeTest {
         token.mint(alice, amount);
         vm.prank(alice);
         token.approve(address(sharedBridge), amount);
-        vm.prank(bridgehubAddress);
+
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         vm.mockCall(
@@ -86,10 +86,11 @@ contract L1SharedBridgeHyperEnabledTest is L1SharedBridgeTest {
             chainId: chainId,
             txDataHash: txDataHash,
             from: alice,
-            to: zkSync,
+            to: bob,
             l1Token: address(token),
             amount: amount
         });
+        vm.prank(bridgehubAddress);
         sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(address(token), amount, bob));
     }
 
