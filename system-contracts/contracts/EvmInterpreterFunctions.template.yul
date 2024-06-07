@@ -1258,7 +1258,10 @@ function performExtCodeCopy(evmGas,oldSp) -> evmGasLeft, sp {
     }
 
     // Gets the code from the addr
-    pop(_fetchDeployedCodeWithDest(addr, offset, len,add(dest,MEM_OFFSET_INNER())))
+    if iszero(iszero(_getRawCodeHash(addr))) {
+        pop(_fetchDeployedCodeWithDest(addr, offset, len,add(dest,MEM_OFFSET_INNER())))  
+    }
+
 }
 
 function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
