@@ -34,11 +34,9 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             admin,
             abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner)
         );
-
         L1SharedBridge sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
 
         vm.startPrank(owner);
-
         vm.expectRevert("ShB: legacy bridge 0");
         sharedBridge.setL1Erc20Bridge(address(0));
 

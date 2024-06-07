@@ -103,9 +103,10 @@ contract L1SharedBridgeTest is Test {
         admin = makeAddr("admin");
         proxyAdmin = makeAddr("proxyAdmin");
         // zkSync = makeAddr("zkSync");
+        zkSync = makeAddr("zkSync");
         bridgehubAddress = makeAddr("bridgehub");
         alice = makeAddr("alice");
-        // bob = makeAddr("bob");
+        bob = makeAddr("bob");
         l1WethAddress = makeAddr("weth");
 
         l2SharedBridge = makeAddr("l2SharedBridge");

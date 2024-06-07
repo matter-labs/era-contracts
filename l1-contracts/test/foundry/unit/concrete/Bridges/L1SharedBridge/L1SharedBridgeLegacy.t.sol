@@ -235,13 +235,15 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
     function test_claimFailedDepositLegacyErc20Bridge_Erc() public {
         vm.prank(owner);
         sharedBridge.setEraLegacyBridgeLastDepositTime(1, 0);
+
+        require(token.balanceOf(address(sharedBridge)) == 0, "Token balance not set");
         token.mint(address(sharedBridge), amount);
+        require(token.balanceOf(address(sharedBridge)) == amount, "Token balance not set");
 
         // storing depositHappened[chainId][l2TxHash] = txDataHash.
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         _setSharedBridgeDepositHappened(eraChainId, txHash, txDataHash);
         require(sharedBridge.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");
-
         _setSharedBridgeChainBalance(eraChainId, address(token), amount);
 
         // Bridgehub bridgehub = new Bridgehub();
@@ -279,5 +281,141 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
             _l2TxNumberInBatch: l2TxNumberInBatch,
             _merkleProof: merkleProof
         });
+
+        assertEq(token.balanceOf(address(sharedBridge)), 0);
+        assertEq(sharedBridge.chainBalance(eraChainId, address(token)), 0);
+        assertEq(token.balanceOf(alice), amount);
+        assertEq(sharedBridge.depositHappened(eraChainId, txHash), bytes32(0));
+    }
+
+    // this test is based only on batch number of _isEraLegacyDeposit conditional statement
+    function test_claimFailedDepositLegacyErc20Bridge_batchBeforeUpdate(uint256 eraLegacyLastDepositBatch) public {
+        // minimum 1 to allow for batch number to be at least 0
+        eraLegacyLastDepositBatch = bound(eraLegacyLastDepositBatch, 1, type(uint256).max);
+
+        // initialize last era legacy bridge deposit batch to eraLagacyLastDepositBatch
+        // set last deposit tx number to 0 (it is not required in this test)
+        vm.prank(owner);
+        sharedBridge.setEraLegacyBridgeLastDepositTime(eraLegacyLastDepositBatch, 0);
+
+        // bound batch number to be at most eraLegacyLastDepositBatch - 1
+        l2BatchNumber = bound(eraLegacyLastDepositBatch, 0, eraLegacyLastDepositBatch - 1);
+
+        require(token.balanceOf(address(sharedBridge)) == 0, "Token balance not set");
+        token.mint(address(sharedBridge), amount);
+        require(token.balanceOf(address(sharedBridge)) == amount, "Token balance not set");
+
+        // we don't need to store deposit hashes for this test
+        // but we store to check wether hash was not deleted
+        bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
+        _setSharedBridgeDepositHappened(eraChainId, txHash, txDataHash);
+        require(sharedBridge.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");
+        // only chain balances are required
+        _setSharedBridgeChainBalance(eraChainId, address(token), amount);
+
+        vm.mockCall(
+            bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(
+                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                eraChainId,
+                txHash,
+                l2BatchNumber,
+                l2MessageIndex,
+                0,
+                merkleProof,
+                TxStatus.Failure
+            ),
+            abi.encode(true)
+        );
+
+        // solhint-disable-next-line func-named-parameters
+        vm.expectEmit(true, true, true, true, address(sharedBridge));
+        emit ClaimedFailedDepositSharedBridge(eraChainId, alice, address(token), amount);
+
+        vm.prank(l1ERC20BridgeAddress);
+        sharedBridge.claimFailedDepositLegacyErc20Bridge({
+            _depositSender: alice,
+            _l1Token: address(token),
+            _amount: amount,
+            _l2TxHash: txHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: 0,
+            _merkleProof: merkleProof
+        });
+
+        assertEq(token.balanceOf(address(sharedBridge)), 0);
+        assertEq(sharedBridge.chainBalance(eraChainId, address(token)), 0);
+        assertEq(token.balanceOf(alice), amount);
+        assertEq(sharedBridge.depositHappened(eraChainId, txHash), txDataHash);
+    }
+
+    // this test is based only on deposit tx number of _isEraLegacyDeposit conditional statement
+    function test_claimFailedDepositLegacyErc20Bridge_txBeforeUpdate(
+        uint256 eraLegacyLastDepositBatch,
+        uint256 eraLegacyBridgeLastDepositTxNumber
+    ) public {
+        // minimum 1 to allow for tx number in batch to be at least 0
+        eraLegacyLastDepositBatch = bound(eraLegacyLastDepositBatch, 1, type(uint256).max);
+        eraLegacyBridgeLastDepositTxNumber = bound(eraLegacyBridgeLastDepositTxNumber, 1, type(uint16).max);
+
+        vm.prank(owner);
+        sharedBridge.setEraLegacyBridgeLastDepositTime(eraLegacyLastDepositBatch, eraLegacyBridgeLastDepositTxNumber);
+
+        // bound tx number in batch to be at most eraLegacyBridgeLastDepositTxNumber - 1
+        l2BatchNumber = eraLegacyLastDepositBatch;
+        l2TxNumberInBatch = uint16(
+            bound(eraLegacyBridgeLastDepositTxNumber, 0, eraLegacyBridgeLastDepositTxNumber - 1)
+        );
+
+        require(token.balanceOf(address(sharedBridge)) == 0, "Token balance not set");
+        token.mint(address(sharedBridge), amount);
+        require(token.balanceOf(address(sharedBridge)) == amount, "Token balance not set");
+
+        // we don't need to store deposit hashes for this test
+        // but we store to check wether hash was not deleted
+        bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
+        _setSharedBridgeDepositHappened(eraChainId, txHash, txDataHash);
+        require(sharedBridge.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");
+        // only chain balances are required
+        _setSharedBridgeChainBalance(eraChainId, address(token), amount);
+
+        vm.mockCall(
+            bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(
+                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                eraChainId,
+                txHash,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2TxNumberInBatch,
+                merkleProof,
+                TxStatus.Failure
+            ),
+            abi.encode(true)
+        );
+
+        // solhint-disable-next-line func-named-parameters
+        vm.expectEmit(true, true, true, true, address(sharedBridge));
+        emit ClaimedFailedDepositSharedBridge(eraChainId, alice, address(token), amount);
+
+        vm.prank(l1ERC20BridgeAddress);
+        sharedBridge.claimFailedDepositLegacyErc20Bridge({
+            _depositSender: alice,
+            _l1Token: address(token),
+            _amount: amount,
+            _l2TxHash: txHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _merkleProof: merkleProof
+        });
+
+        assertEq(token.balanceOf(address(sharedBridge)), 0);
+        assertEq(sharedBridge.chainBalance(eraChainId, address(token)), 0);
+        assertEq(token.balanceOf(alice), amount);
+        assertEq(sharedBridge.depositHappened(eraChainId, txHash), txDataHash);
     }
 }
