@@ -23,7 +23,7 @@ contract Upgrade_v1_4_1 is BaseZkSyncUpgrade {
 
     /// This function is a copy of the "Admin.changeFeeParams" function.
     /// It is to be used once to set the new fee params for the first time as they needed for the correct functioning of the upgrade.
-    function changeFeeParams(FeeParams memory _newFeeParams) private {
+    function changeFeeParams(FeeParams memory _newFeeParams) internal {
         // Double checking that the new fee params are valid, i.e.
         // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
         require(_newFeeParams.maxPubdataPerBatch >= _newFeeParams.priorityTxMaxPubdata, "n6");
