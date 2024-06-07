@@ -61,7 +61,7 @@ export default {
       url: "https://sepolia.era.zksync.dev",
       ethNetwork: "sepolia",
       zksync: true,
-      verifyURL: 'https://sepolia.zksync.io/contract_verification'
+      verifyURL: "https://sepolia.zksync.io/contract_verification",
     },
     zkSyncTestNode: {
       url: "http://127.0.0.1:8011",

@@ -16,7 +16,7 @@ import { spawn as _spawn } from "child_process";
 import { createHash } from "crypto";
 import { CompilerDownloader } from "hardhat/internal/solidity/compiler/downloader";
 
-export type HttpMethod = 'POST' | 'GET';
+export type HttpMethod = "POST" | "GET";
 
 export interface Dependency {
   name: string;
@@ -268,7 +268,9 @@ export async function query(
   method: HttpMethod,
   endpoint: string,
   queryParams?: { [key: string]: string },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   requestBody?: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const url = new URL(endpoint);
   // Iterate through query params and add them to URL.
@@ -276,24 +278,24 @@ export async function query(
     Object.entries(queryParams).forEach(([key, value]) => url.searchParams.set(key, value));
   }
 
-  let init = {
+  const init = {
     method,
     headers: {
-      'Content-Type': 'application/json'
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(requestBody)
+    body: JSON.stringify(requestBody),
   };
   if (requestBody) {
     init.body = JSON.stringify(requestBody);
   }
 
-  let response = await fetch(url, init);
+  const response = await fetch(url, init);
   try {
     return await response.json();
   } catch (e) {
     throw {
-      error: 'Could not decode JSON in response',
-      status: `${response.status} ${response.statusText}`
+      error: "Could not decode JSON in response",
+      status: `${response.status} ${response.statusText}`,
     };
   }
 }
