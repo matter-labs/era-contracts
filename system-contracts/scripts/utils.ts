@@ -16,6 +16,8 @@ import { spawn as _spawn } from "child_process";
 import { createHash } from "crypto";
 import { CompilerDownloader } from "hardhat/internal/solidity/compiler/downloader";
 
+export type HttpMethod = 'POST' | 'GET';
+
 export interface Dependency {
   name: string;
   bytecodes: BytesLike[];
@@ -252,4 +254,46 @@ export function prepareCompilerPaths(path: string): CompilerPaths {
   const absolutePathArtifacts = `${__dirname}/../${path}/artifacts`;
 
   return new CompilerPaths(absolutePathSources, absolutePathArtifacts);
+}
+
+/**
+ * Performs an API call to the Contract verification API.
+ *
+ * @param endpoint API endpoint to call.
+ * @param queryParams Parameters for a query string.
+ * @param requestBody Request body. If provided, a POST request would be met and body would be encoded to JSON.
+ * @returns API response parsed as a JSON.
+ */
+export async function query(
+  method: HttpMethod,
+  endpoint: string,
+  queryParams?: { [key: string]: string },
+  requestBody?: any
+): Promise<any> {
+  const url = new URL(endpoint);
+  // Iterate through query params and add them to URL.
+  if (queryParams) {
+    Object.entries(queryParams).forEach(([key, value]) => url.searchParams.set(key, value));
+  }
+
+  let init = {
+    method,
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(requestBody)
+  };
+  if (requestBody) {
+    init.body = JSON.stringify(requestBody);
+  }
+
+  let response = await fetch(url, init);
+  try {
+    return await response.json();
+  } catch (e) {
+    throw {
+      error: 'Could not decode JSON in response',
+      status: `${response.status} ${response.statusText}`
+    };
+  }
 }
