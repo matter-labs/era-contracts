@@ -296,6 +296,11 @@ object "EVMInterpreter" {
         
         // Basically performs an extcodecopy, while returning the length of the bytecode.
         function _fetchDeployedCode(addr, _offset, _len) -> codeLen {
+            codeLen := _fetchDeployedCodeWithDest(addr, 0, _len, _offset)
+        }
+        
+        // Basically performs an extcodecopy, while returning the length of the bytecode.
+        function _fetchDeployedCodeWithDest(addr, _offset, _len, dest) -> codeLen {
             let codeHash := _getRawCodeHash(addr)
         
             mstore(0, codeHash)
@@ -315,7 +320,7 @@ object "EVMInterpreter" {
                 _len := codeLen
             }
         
-            returndatacopy(_offset, 32, _len)
+            returndatacopy(dest, add(32,_offset), _len)
         }
         
         // Returns the length of the bytecode.
@@ -1318,15 +1323,16 @@ object "EVMInterpreter" {
         
             let len_32 := shr(5, len)
             for {let i := 0} lt(i, len_32) { i := add(i, 1) } {
-                mstore(shl(5,i),0)
+                mstore(add(dest,shl(5,i)),0)
             }
             let size_32 := shl(5,len_32)
             let rest_32 := sub(len, size_32)
             for {let i := 0} lt(i, rest_32) { i := add(i, 1) } {
-                mstore8(add(size_32,i),0)
+                mstore8(add(dest,add(size_32,i)),0)
             }
+        
             // Gets the code from the addr
-            pop(_fetchDeployedCode(addr, add(offset, MEM_OFFSET_INNER()), len))
+            pop(_fetchDeployedCodeWithDest(addr, offset, len,add(dest,MEM_OFFSET_INNER())))
         }
         
         function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
@@ -2919,6 +2925,11 @@ object "EVMInterpreter" {
             
             // Basically performs an extcodecopy, while returning the length of the bytecode.
             function _fetchDeployedCode(addr, _offset, _len) -> codeLen {
+                codeLen := _fetchDeployedCodeWithDest(addr, 0, _len, _offset)
+            }
+            
+            // Basically performs an extcodecopy, while returning the length of the bytecode.
+            function _fetchDeployedCodeWithDest(addr, _offset, _len, dest) -> codeLen {
                 let codeHash := _getRawCodeHash(addr)
             
                 mstore(0, codeHash)
@@ -2938,7 +2949,7 @@ object "EVMInterpreter" {
                     _len := codeLen
                 }
             
-                returndatacopy(_offset, 32, _len)
+                returndatacopy(dest, add(32,_offset), _len)
             }
             
             // Returns the length of the bytecode.
@@ -3941,15 +3952,16 @@ object "EVMInterpreter" {
             
                 let len_32 := shr(5, len)
                 for {let i := 0} lt(i, len_32) { i := add(i, 1) } {
-                    mstore(shl(5,i),0)
+                    mstore(add(dest,shl(5,i)),0)
                 }
                 let size_32 := shl(5,len_32)
                 let rest_32 := sub(len, size_32)
                 for {let i := 0} lt(i, rest_32) { i := add(i, 1) } {
-                    mstore8(add(size_32,i),0)
+                    mstore8(add(dest,add(size_32,i)),0)
                 }
+            
                 // Gets the code from the addr
-                pop(_fetchDeployedCode(addr, add(offset, MEM_OFFSET_INNER()), len))
+                pop(_fetchDeployedCodeWithDest(addr, offset, len,add(dest,MEM_OFFSET_INNER())))
             }
             
             function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
