@@ -41,6 +41,7 @@ jobs:
           rm -rf ./l1-contracts/contracts/state-transition/TestnetVerifier.sol
           rm -rf ./l1-contracts/contracts/dev-contracts/test/VerifierTest.sol
           rm -rf ./l1-contracts/contracts/dev-contracts/test/VerifierRecursiveTest.sol
+          rm -rf ./l1-contracts/contracts/dev-contracts/test/DummyTestnetVerifier.sol
 
       - name: Run Slither
         run: |
