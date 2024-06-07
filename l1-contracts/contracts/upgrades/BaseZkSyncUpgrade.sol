@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 // solhint-disable reason-string, gas-custom-errors
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ZkSyncHyperchainBase} from "../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";

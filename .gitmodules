@@ -7,8 +7,16 @@
 [submodule "l1-contracts/lib/openzeppelin-contracts-upgradeable"]
 	path = l1-contracts/lib/openzeppelin-contracts-upgradeable
 	url = https://github.com/Openzeppelin/openzeppelin-contracts-upgradeable
-	branch = release-v4.9
+	branch = release-v5.0
 [submodule "l1-contracts/lib/openzeppelin-contracts"]
 	path = l1-contracts/lib/openzeppelin-contracts
+	url = https://github.com/Openzeppelin/openzeppelin-contracts
+	branch = release-v5.0
+[submodule "l1-contracts/lib/openzeppelin-contracts-upgradeable-v4"]
+	path = l1-contracts/lib/openzeppelin-contracts-upgradeable-v4
+	url = https://github.com/Openzeppelin/openzeppelin-contracts-upgradeable
+	branch = release-v4.9
+[submodule "l1-contracts/lib/openzeppelin-contracts-v4"]
+	path = l1-contracts/lib/openzeppelin-contracts-v4
 	url = https://github.com/Openzeppelin/openzeppelin-contracts
 	branch = release-v4.9
