@@ -9,8 +9,10 @@
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@nomiclabs/hardhat-etherscan": "^3.1.0",
     "@nomiclabs/hardhat-waffle": "^2.0.0",
-    "@openzeppelin/contracts": "4.9.5",
-    "@openzeppelin/contracts-upgradeable": "4.9.5",
+    "@openzeppelin/contracts": "5.0.2",
+    "@openzeppelin/contracts-upgradeable": "5.0.2",
+    "@openzeppelin/contracts-upgradeable-v4": "npm:@openzeppelin/contracts-upgradeable@4.9.5",
+    "@openzeppelin/contracts-v4": "npm:@openzeppelin/contracts@4.9.5",
     "@typechain/ethers-v5": "^2.0.0",
     "@types/argparse": "^1.0.36",
     "@types/chai": "^4.2.21",
@@ -78,7 +80,10 @@
     "hyperchain-upgrade-1": "ts-node scripts/hyperchain-upgrade-1.ts",
     "hyperchain-upgrade-2": "ts-node scripts/hyperchain-upgrade-2.ts",
     "hyperchain-upgrade-3": "ts-node scripts/hyperchain-upgrade-3.ts",
-    "setup-legacy-bridge-era": "ts-node scripts/setup-legacy-bridge-era.ts"
+    "token-migration": "ts-node scripts/token-migration.ts",
+    "setup-legacy-bridge-era": "ts-node scripts/setup-legacy-bridge-era.ts",
+    "upgrade-consistency-checker": "ts-node scripts/upgrade-consistency-checker.ts",
+    "governance-accept-ownership": "ts-node scripts/governance-accept-ownership.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3",

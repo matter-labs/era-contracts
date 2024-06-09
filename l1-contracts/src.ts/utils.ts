@@ -6,6 +6,10 @@ import type { BytesLike, BigNumberish } from "ethers";
 import { ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
+import { DiamondInitFactory } from "../typechain";
+import type { DiamondCut, FacetCut } from "./diamondCut";
+import { diamondCut } from "./diamondCut";
+import { SYSTEM_CONFIG } from "../scripts/utils";
 
 export const testConfigPath = process.env.ZKSYNC_ENV
   ? path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant")
@@ -173,4 +177,113 @@ export interface L2CanonicalTransaction {
   // Reserved dynamic type for the future use-case. Using it should be avoided,
   // But it is still here, just in case we want to enable some additional functionality.
   reservedDynamic: BytesLike;
+}
+
+// Checks that the initial cut hash params are valid.
+// Sometimes it makes sense to allow dummy values for testing purposes, but in production
+// these values should be set correctly.
+function checkValidInitialCutHashParams(
+  facetCuts: FacetCut[],
+  verifierParams: VerifierParams,
+  l2BootloaderBytecodeHash: string,
+  l2DefaultAccountBytecodeHash: string,
+  verifier: string,
+  blobVersionedHashRetriever: string,
+  priorityTxMaxGasLimit: number
+) {
+  // We do not fetch the following numbers from the environment because they are very rarely changed
+  // and we want to avoid the risk of accidentally changing them.
+  const EXPECTED_FACET_CUTS = 4;
+  const EXPECTED_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
+
+  if (facetCuts.length != EXPECTED_FACET_CUTS) {
+    throw new Error(`Expected ${EXPECTED_FACET_CUTS} facet cuts, got ${facetCuts.length}`);
+  }
+
+  if (verifierParams.recursionNodeLevelVkHash === ethers.constants.HashZero) {
+    throw new Error("Recursion node level vk hash is zero");
+  }
+  if (verifierParams.recursionLeafLevelVkHash === ethers.constants.HashZero) {
+    throw new Error("Recursion leaf level vk hash is zero");
+  }
+  if (verifierParams.recursionCircuitsSetVksHash !== ethers.constants.HashZero) {
+    throw new Error("Recursion circuits set vks hash must be zero");
+  }
+  if (l2BootloaderBytecodeHash === ethers.constants.HashZero) {
+    throw new Error("L2 bootloader bytecode hash is zero");
+  }
+  if (l2DefaultAccountBytecodeHash === ethers.constants.HashZero) {
+    throw new Error("L2 default account bytecode hash is zero");
+  }
+  if (verifier === ethers.constants.AddressZero) {
+    throw new Error("Verifier address is zero");
+  }
+  if (blobVersionedHashRetriever === ethers.constants.AddressZero) {
+    throw new Error("Blob versioned hash retriever address is zero");
+  }
+  if (priorityTxMaxGasLimit !== EXPECTED_PRIORITY_TX_MAX_GAS_LIMIT) {
+    throw new Error(
+      `Expected priority tx max gas limit to be ${EXPECTED_PRIORITY_TX_MAX_GAS_LIMIT}, got ${priorityTxMaxGasLimit}`
+    );
+  }
+}
+
+// We should either reuse code or add a test for this function.
+export function compileInitialCutHash(
+  facetCuts: FacetCut[],
+  verifierParams: VerifierParams,
+  l2BootloaderBytecodeHash: string,
+  l2DefaultAccountBytecodeHash: string,
+  verifier: string,
+  blobVersionedHashRetriever: string,
+  priorityTxMaxGasLimit: number,
+  diamondInit: string,
+  strictMode: boolean = true
+): DiamondCut {
+  if (strictMode) {
+    checkValidInitialCutHashParams(
+      facetCuts,
+      verifierParams,
+      l2BootloaderBytecodeHash,
+      l2DefaultAccountBytecodeHash,
+      verifier,
+      blobVersionedHashRetriever,
+      priorityTxMaxGasLimit
+    );
+  }
+
+  const factory = new DiamondInitFactory();
+
+  const feeParams = {
+    pubdataPricingMode: PubdataPricingMode.Rollup,
+    batchOverheadL1Gas: SYSTEM_CONFIG.priorityTxBatchOverheadL1Gas,
+    maxPubdataPerBatch: SYSTEM_CONFIG.priorityTxPubdataPerBatch,
+    priorityTxMaxPubdata: SYSTEM_CONFIG.priorityTxMaxPubdata,
+    maxL2GasPerBatch: SYSTEM_CONFIG.priorityTxMaxGasPerBatch,
+    minimalL2GasPrice: SYSTEM_CONFIG.priorityTxMinimalGasPrice,
+  };
+
+  const diamondInitCalldata = factory.interface.encodeFunctionData("initialize", [
+    // these first values are set in the contract
+    {
+      chainId: "0x0000000000000000000000000000000000000000000000000000000000000001",
+      bridgehub: "0x0000000000000000000000000000000000001234",
+      stateTransitionManager: "0x0000000000000000000000000000000000002234",
+      protocolVersion: "0x0000000000000000000000000000000000002234",
+      admin: "0x0000000000000000000000000000000000003234",
+      validatorTimelock: "0x0000000000000000000000000000000000004234",
+      baseToken: "0x0000000000000000000000000000000000004234",
+      baseTokenBridge: "0x0000000000000000000000000000000000004234",
+      storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
+      verifier,
+      verifierParams,
+      l2BootloaderBytecodeHash,
+      l2DefaultAccountBytecodeHash,
+      priorityTxMaxGasLimit,
+      feeParams,
+      blobVersionedHashRetriever,
+    },
+  ]);
+
+  return diamondCut(facetCuts, diamondInit, "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2));
 }

@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 // solhint-disable gas-custom-errors
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import {TX_SLOT_OVERHEAD_L2_GAS, MEMORY_OVERHEAD_GAS, L1_TX_INTRINSIC_L2_GAS, L1_TX_DELTA_544_ENCODING_BYTES, L1_TX_DELTA_FACTORY_DEPS_L2_GAS, L1_TX_MIN_L2_GAS_BASE, L1_TX_INTRINSIC_PUBDATA, L1_TX_DELTA_FACTORY_DEPS_PUBDATA} from "../../common/Config.sol";

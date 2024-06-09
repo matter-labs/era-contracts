@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
+import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
 
 import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
