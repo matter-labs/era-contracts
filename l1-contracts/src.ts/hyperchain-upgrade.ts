@@ -26,7 +26,10 @@ import {
 import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
 
 const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/l2-contracts/artifacts-zk/");
-const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@openzeppelin/contracts-v4/proxy/beacon");
+const openzeppelinBeaconProxyArtifactsPath = path.join(
+  contractArtifactsPath,
+  "@openzeppelin/contracts-v4/proxy/beacon"
+);
 export const BEACON_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
 
 /// In the hardhat tests we do the upgrade all at once.
