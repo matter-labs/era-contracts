@@ -20,7 +20,7 @@ const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "cont
 const l2BridgeArtifactsPath = path.join(contractArtifactsPath, "contracts/bridge/");
 const openzeppelinTransparentProxyArtifactsPath = path.join(
   contractArtifactsPath,
-  "@openzeppelin/contracts/proxy/transparent/"
+  "@openzeppelin/contracts-v4/proxy/transparent/"
 );
 
 function readInterface(path: string, fileName: string, solFileName?: string) {
