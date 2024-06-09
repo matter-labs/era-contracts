@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors
 
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IGovernance} from "./IGovernance.sol";
 
 /// @author Matter Labs

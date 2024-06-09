@@ -3,8 +3,8 @@ pragma solidity 0.8.24;
 
 import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
