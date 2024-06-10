@@ -637,6 +637,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         });
 
         assertEq(address(sharedBridge).balance, 0);
+        assertEq(sharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), 0);
         assertEq(alice.balance, amount);
     }
 }
