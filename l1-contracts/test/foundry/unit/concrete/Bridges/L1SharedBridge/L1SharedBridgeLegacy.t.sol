@@ -26,7 +26,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         assertEq(sharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), 0);
     }
 
-    function test_transferFundsFromLegac_zeroTokenTransferred() public {
+    function test_transferFundsFromLegacy_zeroTokenTransferred() public {
         address targetDiamond = makeAddr("target diamond");
         uint256 targetChainId = 31337;
         address tokenAddress = address(token);
@@ -510,7 +510,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         require(token.balanceOf(address(sharedBridge)) == amount, "Token balance not set");
 
         // we don't need to store deposit hashes for this test
-        // but we store to check wether hash was not deleted
+        // but we store to check whether hash was not deleted
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         _setSharedBridgeDepositHappened(eraChainId, txHash, txDataHash);
         require(sharedBridge.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");
@@ -577,7 +577,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         require(token.balanceOf(address(sharedBridge)) == amount, "Token balance not set");
 
         // we don't need to store deposit hashes for this test
-        // but we store to check wether hash was not deleted
+        // but we store to check whether hash was not deleted
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         _setSharedBridgeDepositHappened(eraChainId, txHash, txDataHash);
         require(sharedBridge.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");
