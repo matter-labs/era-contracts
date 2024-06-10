@@ -48,12 +48,13 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     }
 
     function test_bridgehubDepositBaseToken_callerNotBridgeHubOrEra(address caller, uint256 chainId) public {
-        if ((chainId != eraChainId || caller != eraDiamondProxy) && caller != bridgehubAddress) {
-            vm.deal(caller, amount);
-            vm.expectRevert("L1SharedBridge: not bridgehub or era chain");
-            vm.prank(caller);
-            sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, alice, ETH_TOKEN_ADDRESS, amount);
-        }
+        vm.assume(caller != bridgehubAddress);
+        vm.assume(chainId != chainId || caller != eraDiamondProxy);
+
+        vm.deal(caller, amount);
+        vm.expectRevert("L1SharedBridge: not bridgehub or era chain");
+        vm.prank(caller);
+        sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, alice, ETH_TOKEN_ADDRESS, amount);
     }
 
     function test_receiveEth_notSTM(uint256 amount, address caller) public {
