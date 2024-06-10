@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Utils} from "./Utils.sol";
 import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
@@ -47,10 +47,10 @@ contract InitializeL2WethTokenScript is Script {
         string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
         string memory toml = vm.readFile(path);
 
-        config.create2FactoryAddr = toml.readAddress("$.l1.create2_factory_addr");
-        config.create2FactorySalt = toml.readBytes32("$.l1.create2_factory_salt");
-        config.eraChainId = toml.readUint("$.l1.era_chain_id");
-        config.bridgehubProxyAddr = toml.readAddress("$.l1.bridgehub.bridgehub_proxy_addr");
+        config.create2FactoryAddr = toml.readAddress("$.create2_factory_addr");
+        config.create2FactorySalt = toml.readBytes32("$.create2_factory_salt");
+        config.eraChainId = toml.readUint("$.era_chain_id");
+        config.bridgehubProxyAddr = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
 
         // Parse some config from output of erc20 tokens deployment
         path = string.concat(root, "/script-out/output-deploy-erc20.toml");
@@ -103,7 +103,7 @@ contract InitializeL2WethTokenScript is Script {
         console.log("L2 WETH token initialized");
     }
 
-    function getL2Calldata() internal returns (bytes memory) {
+    function getL2Calldata() internal view returns (bytes memory) {
         // Low-level call is performed due to different solidity
         // compiler versions between L1 and L2
         // solhint-disable-next-line func-named-parameters

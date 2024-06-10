@@ -12,13 +12,13 @@ object "Bootloader" {
             // While we definitely cannot control the pubdata price on L1,
             // we need to check the operator does not provide any absurd numbers there
             function MAX_ALLOWED_FAIR_PUBDATA_PRICE() -> ret {
-                // 1M gwei
-                ret := 1000000000000000
+                // 2^64 - 1 gwei
+                ret := 18446744073709551615
             }
 
             function MAX_ALLOWED_FAIR_L2_GAS_PRICE() -> ret {
-                // 10k gwei
-                ret := 10000000000000
+                // 2^64 - 1 gwei
+                ret := 18446744073709551615
             }
 
             /// @dev This method ensures that the prices provided by the operator
@@ -405,7 +405,7 @@ object "Bootloader" {
             /// for the sake of simplicity we will spend 32 bytes on each
             /// of those for now.
             function MAX_MEM_SIZE() -> ret {
-                ret := 59000000
+                ret := 63800000
             }
 
             function L1_TX_INTRINSIC_L2_GAS() -> ret {

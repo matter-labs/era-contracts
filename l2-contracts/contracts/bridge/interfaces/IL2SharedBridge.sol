@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 /// @author Matter Labs
 interface IL2SharedBridge {
@@ -33,4 +33,6 @@ interface IL2SharedBridge {
     function l2TokenAddress(address _l1Token) external view returns (address);
 
     function l1Bridge() external view returns (address);
+
+    function l1SharedBridge() external view returns (address);
 }
