@@ -2,7 +2,6 @@
 import * as hardhat from "hardhat";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import { ethTestConfig, getNumberFromEnv, getHashFromEnv, getAddressFromEnv } from "../src.ts/utils";
-// import { ethTestConfig } from "../src.ts/utils";
 
 import { Interface } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
@@ -13,14 +12,14 @@ import { getTokens } from "../src.ts/deploy-token";
 const provider = web3Provider();
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function verifyPromise(address: string, constructorArguments?: Array<any>, libraries?: object): Promise<any> {
+function verifyPromise(address: string, constructorArguments?: Array<any>, libraries?: object, contract?: string): Promise<any> {
   return new Promise((resolve, reject) => {
     hardhat
       .run("verify:verify", {
         address,
         constructorArguments,
         libraries,
-        // contract:"contracts/bridge/L1ERC20Bridge.sol:L1ERC20Bridge"
+        contract
       })
       .then(() => resolve(`Successfully verified ${address}`))
       .catch((e) => reject(`Failed to verify ${address}\nError: ${e.message}`));
@@ -142,16 +141,6 @@ async function main() {
     },
   ]);
 
-  console.log("initCalldata2", {
-    owner: addresses.Governance,
-    validatorTimelock: addresses.ValidatorTimeLock,
-    genesisUpgrade: addresses.StateTransition.GenesisUpgrade,
-    genesisBatchHash,
-    genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
-    genesisBatchCommitment,
-    diamondCut,
-    protocolVersion,
-  });
   const promise9 = verifyPromise(addresses.StateTransition.StateTransitionProxy, [
     addresses.StateTransition.StateTransitionImplementation,
     addresses.TransparentProxyAdmin,
@@ -160,8 +149,7 @@ async function main() {
   promises.push(promise9);
 
   // bridges
-  // Note: do this manually and pass in  to verify:verify the following:  contract:"contracts/bridge/L1ERC20Bridge.sol:L1ERC20Bridge"
-  const promise10 = verifyPromise(addresses.Bridges.ERC20BridgeImplementation, [addresses.Bridges.SharedBridgeProxy]);
+  const promise10 = verifyPromise(addresses.Bridges.ERC20BridgeImplementation, [addresses.Bridges.SharedBridgeProxy],undefined,  "contracts/bridge/L1ERC20Bridge.sol:L1ERC20Bridge");
   promises.push(promise10);
 
   const eraDiamondProxy = getAddressFromEnv("CONTRACTS_ERA_DIAMOND_PROXY_ADDR");

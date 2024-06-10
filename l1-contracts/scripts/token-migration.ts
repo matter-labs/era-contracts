@@ -225,9 +225,6 @@ async function prepareGovernanceTokenMigrationCall(
 const provider = web3Provider();
 
 export async function transferTokensOnForkedNetwork(deployer: Deployer) {
-  // const startToken = 20;
-  // const tokens = tokenList.slice(startToken);
-  // console.log(`From ${startToken}`, tokens);
   const tokenList = ["0x5A520e593F89c908cd2bc27D928bc75913C55C42"];
   for (const tokenAddress of tokenList) {
     const erc20contract = IERC20Factory.connect(tokenAddress, provider);
