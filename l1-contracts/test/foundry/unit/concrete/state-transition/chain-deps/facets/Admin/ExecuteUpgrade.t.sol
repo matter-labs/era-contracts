@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {ERROR_ONLY_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {Utils} from "../../../../Utils/Utils.sol";
 
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -23,7 +23,7 @@ contract ExecuteUpgradeTest is AdminTest {
             initCalldata: new bytes(0)
         });
 
-        vm.expectRevert(ERROR_ONLY_STATE_TRANSITION_MANAGER);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonStateTransitionManager));
 
         vm.startPrank(nonStateTransitionManager);
         adminFacet.executeUpgrade(diamondCutData);

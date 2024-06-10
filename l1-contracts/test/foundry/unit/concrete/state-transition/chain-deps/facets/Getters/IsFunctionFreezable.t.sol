@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
+import {InvalidSelector} from "contracts/common/L1ContractErrors.sol";
 
 contract IsFunctionFreezableTest is GettersFacetTest {
     function test_revertWhen_facetAddressIzZero() public {
@@ -11,8 +12,7 @@ contract IsFunctionFreezableTest is GettersFacetTest {
 
         gettersFacetWrapper.util_setFacetAddress(selector, address(0));
 
-        vm.expectRevert(bytes.concat("g2"));
-
+        vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, selector));
         gettersFacet.isFunctionFreezable(selector);
     }
 

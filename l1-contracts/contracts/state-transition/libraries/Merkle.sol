@@ -2,9 +2,8 @@
 
 pragma solidity ^0.8.20;
 
-// solhint-disable gas-custom-errors
-
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
+import {MerklePathEmpty, MerklePathOutOfBounds, MerkleIndexOutOfBounds} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -23,9 +22,15 @@ library Merkle {
         bytes32 _itemHash
     ) internal pure returns (bytes32) {
         uint256 pathLength = _path.length;
-        require(pathLength > 0, "xc");
-        require(pathLength < 256, "bt");
-        require(_index < (1 << pathLength), "px");
+        if (pathLength == 0) {
+            revert MerklePathEmpty();
+        }
+        if (pathLength >= 256) {
+            revert MerklePathOutOfBounds();
+        }
+        if (_index >= (1 << pathLength)) {
+            revert MerkleIndexOutOfBounds();
+        }
 
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < pathLength; i = i.uncheckedInc()) {

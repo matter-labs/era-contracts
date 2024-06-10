@@ -2,12 +2,11 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager} from "./IStateTransitionManager.sol";
+import {Unauthorized, TimeNotReached} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -64,13 +63,17 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @notice Checks if the caller is the admin of the chain.
     modifier onlyChainAdmin(uint256 _chainId) {
-        require(msg.sender == stateTransitionManager.getChainAdmin(_chainId), "ValidatorTimelock: only chain admin");
+        if (msg.sender != stateTransitionManager.getChainAdmin(_chainId)) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     /// @notice Checks if the caller is a validator.
     modifier onlyValidator(uint256 _chainId) {
-        require(validators[_chainId][msg.sender], "ValidatorTimelock: only validator");
+        if (!validators[_chainId][msg.sender]) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
@@ -205,7 +208,9 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 // * The batch wasn't committed at all, so execution will fail in the zkSync contract.
                 // We allow executing such batches.
 
-                require(block.timestamp >= commitBatchTimestamp + delay, "5c"); // The delay is not passed
+                if (block.timestamp < commitBatchTimestamp + delay) {
+                    revert TimeNotReached(commitBatchTimestamp + delay, block.timestamp);
+                }
             }
         }
         _propagateToZkSyncHyperchain(_chainId);

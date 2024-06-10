@@ -98,7 +98,21 @@ export async function getCallRevertReason(promise) {
             }
           }
         } catch (_) {
-          throw e;
+          try {
+            if (
+              revertReason === "cannot estimate gas; transaction may fail or may require manual gas limit" ||
+              revertReason === DEFAULT_REVERT_REASON
+            ) {
+              if (e.error) {
+                revertReason =
+                  e.error.toString().match(/reverted with custom error '([^']*)'/)[1] || "PLACEHOLDER_STRING";
+              } else {
+                revertReason = e.toString().match(/reverted with custom error '([^']*)'/)[1] || "PLACEHOLDER_STRING";
+              }
+            }
+          } catch (_) {
+            throw e;
+          }
         }
       }
     }

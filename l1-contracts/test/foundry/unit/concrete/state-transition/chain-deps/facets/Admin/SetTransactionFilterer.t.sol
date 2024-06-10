@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract SetTransactionFiltererTest is AdminTest {
     event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
@@ -34,10 +35,11 @@ contract SetTransactionFiltererTest is AdminTest {
     }
 
     function test_revertWhen_notAdmin() public {
+        address nonAdmin = makeAddr("nonAdmin");
         address transactionFilterer = makeAddr("transactionFilterer");
 
-        vm.expectRevert("Hyperchain: not admin");
-        vm.startPrank(makeAddr("nonAdmin"));
+        vm.startPrank(nonAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonAdmin));
         adminFacet.setTransactionFilterer(transactionFilterer);
     }
 }
