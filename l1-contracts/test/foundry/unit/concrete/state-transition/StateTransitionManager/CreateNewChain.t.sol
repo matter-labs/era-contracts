@@ -3,21 +3,27 @@ pragma solidity 0.8.24;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {Unauthorized, HashMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract createNewChainTest is StateTransitionManagerTest {
     function test_RevertWhen_InitialDiamondCutHashMismatch() public {
         Diamond.DiamondCutData memory initialDiamondCutData = getDiamondCutData(sharedBridge);
+        Diamond.DiamondCutData memory correctDiamondCutData = getDiamondCutData(address(diamondInit));
 
-        vm.expectRevert(bytes("STM: initial cutHash mismatch"));
-
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                HashMismatch.selector,
+                keccak256(abi.encode(correctDiamondCutData)),
+                keccak256(abi.encode(initialDiamondCutData))
+            )
+        );
         createNewChain(initialDiamondCutData);
     }
 
     function test_RevertWhen_CalledNotByBridgehub() public {
         Diamond.DiamondCutData memory initialDiamondCutData = getDiamondCutData(diamondInit);
 
-        vm.expectRevert(bytes("STM: only bridgehub"));
-
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
         chainContractAddress.createNewChain({
             _chainId: chainId,
             _baseToken: baseToken,

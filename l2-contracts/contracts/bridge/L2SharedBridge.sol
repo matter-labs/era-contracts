@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.20;
 
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
+import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
@@ -15,7 +15,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
-import {EmptyAddress, EmptyBytes32, InvalidCaller, AddressMismatch, AmountMustBeGreaterThanZero, DeployFailed} from "../L2ContractErrors.sol";
+import {EmptyAddress, EmptyBytes32, InvalidCaller, AddressMismatch, AmountMustBeGreaterThanZero, DeployFailed} from "../errors/L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

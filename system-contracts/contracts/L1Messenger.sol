@@ -88,7 +88,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         // - at most 1 time keccakGasCost(64) when building the Merkle tree (as merkle tree can contain
         // ~2*N nodes, where the first N nodes are leaves the hash of which is calculated on the previous step).
         uint256 gasToPay = keccakGasCost(L2_TO_L1_LOG_SERIALIZE_SIZE) + 2 * keccakGasCost(64);
-        SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), 0);
+        SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), uint32(L2_TO_L1_LOG_SERIALIZE_SIZE));
     }
 
     /// @notice Internal function to send L2ToL1Log.

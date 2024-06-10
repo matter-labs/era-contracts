@@ -5,6 +5,7 @@ import {TransactionValidatorSharedTest} from "./_TransactionValidator_Shared.t.s
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {TransactionValidator} from "contracts/state-transition/libraries/TransactionValidator.sol";
+import {InvalidUpgradeTxn, UpgradeTxVerifyParam} from "contracts/common/L1ContractErrors.sol";
 
 contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
     function test_BasicRequest() public pure {
@@ -16,7 +17,7 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // only system contracts (address < 2^16) are allowed to send upgrade transactions.
         testTx.from = uint256(1000000000);
-        vm.expectRevert(bytes("ua"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.From));
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 
@@ -24,7 +25,7 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // Now the 'to' address it too large.
         testTx.to = uint256(type(uint160).max) + 100;
-        vm.expectRevert(bytes("ub"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.To));
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 
@@ -32,7 +33,7 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // Paymaster must be 0 - otherwise we revert.
         testTx.paymaster = 1;
-        vm.expectRevert(bytes("uc"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Paymaster));
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 
@@ -40,7 +41,7 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // Value must be 0 - otherwise we revert.
         testTx.value = 1;
-        vm.expectRevert(bytes("ud"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Value));
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 
@@ -48,7 +49,7 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // reserved 0 must be 0 - otherwise we revert.
         testTx.reserved[0] = 1;
-        vm.expectRevert(bytes("ue"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Reserved0));
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 
@@ -56,7 +57,7 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // reserved 1 must be a valid address
         testTx.reserved[1] = uint256(type(uint160).max) + 100;
-        vm.expectRevert(bytes("uf"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Reserved1));
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 
@@ -64,7 +65,7 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // reserved 2 must be 0 - otherwise we revert.
         testTx.reserved[2] = 1;
-        vm.expectRevert(bytes("ug"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Reserved2));
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 
@@ -72,7 +73,7 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // reserved 3 be 0 - otherwise we revert.
         testTx.reserved[3] = 1;
-        vm.expectRevert(bytes("uo"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Reserved3));
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 
@@ -80,7 +81,7 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // Signature must be 0 - otherwise we revert.
         testTx.signature = bytes("hello");
-        vm.expectRevert(bytes("uh"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.Signature));
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 
@@ -88,7 +89,7 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // PaymasterInput must be 0 - otherwise we revert.
         testTx.paymasterInput = bytes("hi");
-        vm.expectRevert(bytes("ul1"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.PaymasterInput));
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 
@@ -96,7 +97,7 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // ReservedDynamic must be 0 - otherwise we revert.
         testTx.reservedDynamic = bytes("something");
-        vm.expectRevert(bytes("um"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidUpgradeTxn.selector, UpgradeTxVerifyParam.ReservedDynamic));
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 }

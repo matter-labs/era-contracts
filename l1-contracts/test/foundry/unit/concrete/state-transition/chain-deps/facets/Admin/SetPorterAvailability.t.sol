@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {ERROR_ONLY_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract SetPorterAvailabilityTest is AdminTest {
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
@@ -12,9 +12,8 @@ contract SetPorterAvailabilityTest is AdminTest {
         address nonStateTransitionManager = makeAddr("nonStateTransitionManager");
         bool isPorterAvailable = true;
 
-        vm.expectRevert(ERROR_ONLY_STATE_TRANSITION_MANAGER);
-
         vm.startPrank(nonStateTransitionManager);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonStateTransitionManager));
         adminFacet.setPorterAvailability(isPorterAvailable);
     }
 

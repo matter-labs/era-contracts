@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
+import {WithdrawalAlreadyFinalized} from "contracts/common/L1ContractErrors.sol";
 
 contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
     using stdStorage for StdStorage;
@@ -22,7 +23,7 @@ contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
 
         assertTrue(bridge.isWithdrawalFinalized(l2BatchNumber, l2MessageIndex));
 
-        vm.expectRevert(bytes("pw"));
+        vm.expectRevert(WithdrawalAlreadyFinalized.selector);
         bytes32[] memory merkleProof;
         bridge.finalizeWithdrawal({
             _l2BatchNumber: l2BatchNumber,

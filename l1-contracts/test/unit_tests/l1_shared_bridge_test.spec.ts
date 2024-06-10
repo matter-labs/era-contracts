@@ -98,7 +98,7 @@ describe("Shared Bridge tests", () => {
         { value: mintValue }
       )
     );
-    expect(revertReason).equal("6T");
+    expect(revertReason).contains("EmptyDeposit");
   });
 
   it("Should deposit successfully", async () => {
@@ -129,7 +129,7 @@ describe("Shared Bridge tests", () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [ethers.constants.HashZero])
     );
-    expect(revertReason).equal("ShB wrong msg len");
+    expect(revertReason).contains("MalformedMessage");
   });
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
@@ -145,14 +145,14 @@ describe("Shared Bridge tests", () => {
           [ethers.constants.HashZero]
         )
     );
-    expect(revertReason).equal("ShB wrong msg len 2");
+    expect(revertReason).contains("MalformedMessage");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
     );
-    expect(revertReason).equal("ShB Incorrect message function selector");
+    expect(revertReason).contains("InvalidSelector");
   });
 
   it("Should deposit erc20 token successfully", async () => {
@@ -183,7 +183,7 @@ describe("Shared Bridge tests", () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [ethers.constants.HashZero])
     );
-    expect(revertReason).equal("ShB wrong msg len");
+    expect(revertReason).contains("MalformedMessage");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function signature", async () => {
@@ -192,7 +192,7 @@ describe("Shared Bridge tests", () => {
         .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
     );
-    expect(revertReason).equal("ShB Incorrect message function selector");
+    expect(revertReason).contains("InvalidSelector");
   });
 
   it("Should revert on finalizing a withdrawal with wrong batch number", async () => {
@@ -206,7 +206,7 @@ describe("Shared Bridge tests", () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 10, 0, 0, l2ToL1message, [])
     );
-    expect(revertReason).equal("xx");
+    expect(revertReason).contains("BatchNotExecuted");
   });
 
   it("Should revert on finalizing a withdrawal with wrong length of proof", async () => {
@@ -220,7 +220,7 @@ describe("Shared Bridge tests", () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, [])
     );
-    expect(revertReason).equal("xc");
+    expect(revertReason).contains("MerklePathEmpty");
   });
 
   it("Should revert on finalizing a withdrawal with wrong proof", async () => {
@@ -236,6 +236,6 @@ describe("Shared Bridge tests", () => {
         .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, Array(9).fill(ethers.constants.HashZero))
     );
-    expect(revertReason).equal("ShB withd w proof");
+    expect(revertReason).contains("InvalidProof");
   });
 });

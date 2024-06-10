@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
+import {EmptyDeposit, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract DepositTest is L1Erc20BridgeTest {
     event DepositInitiated(
@@ -14,7 +15,7 @@ contract DepositTest is L1Erc20BridgeTest {
     );
 
     function test_RevertWhen_depositAmountIsZero() public {
-        vm.expectRevert(bytes("0T"));
+        vm.expectRevert(EmptyDeposit.selector);
         bridge.deposit({
             _l2Receiver: randomSigner,
             _l1Token: address(token),
@@ -26,7 +27,7 @@ contract DepositTest is L1Erc20BridgeTest {
     }
 
     function test_RevertWhen_legacyDepositAmountIsZero() public {
-        vm.expectRevert(bytes("0T"));
+        vm.expectRevert(EmptyDeposit.selector);
         bridge.deposit({
             _l2Receiver: randomSigner,
             _l1Token: address(token),
@@ -84,7 +85,7 @@ contract DepositTest is L1Erc20BridgeTest {
         uint256 amount = 2;
         vm.prank(alice);
         feeOnTransferToken.approve(address(bridge), amount);
-        vm.expectRevert(bytes("3T"));
+        vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, amount, amount - 1));
         vm.prank(alice);
         bridge.deposit({
             _l2Receiver: randomSigner,
@@ -99,7 +100,7 @@ contract DepositTest is L1Erc20BridgeTest {
         uint256 amount = 4;
         vm.prank(alice);
         feeOnTransferToken.approve(address(bridge), amount);
-        vm.expectRevert(bytes("3T"));
+        vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, amount, amount - 1));
         vm.prank(alice);
         bridge.deposit({
             _l2Receiver: randomSigner,

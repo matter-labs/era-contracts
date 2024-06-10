@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {Test} from "forge-std/Test.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";

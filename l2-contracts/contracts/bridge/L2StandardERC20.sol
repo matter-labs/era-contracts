@@ -2,12 +2,12 @@
 
 pragma solidity 0.8.20;
 
-import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
-import {ERC1967Upgrade} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Upgrade.sol";
+import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
+import {ERC1967Upgrade} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Upgrade.sol";
 
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
-import {EmptyAddress, Unauthorized, NonSequentialVersion, Unimplemented} from "../L2ContractErrors.sol";
+import {EmptyAddress, Unauthorized, NonSequentialVersion} from "../errors/L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -167,19 +167,22 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
 
     function name() public view override returns (string memory) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
-        if (availableGetters.ignoreName) revert Unimplemented();
+        // solhint-disable-next-line reason-string, gas-custom-errors
+        if (availableGetters.ignoreName) revert();
         return super.name();
     }
 
     function symbol() public view override returns (string memory) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
-        if (availableGetters.ignoreSymbol) revert Unimplemented();
+        // solhint-disable-next-line reason-string, gas-custom-errors
+        if (availableGetters.ignoreSymbol) revert();
         return super.symbol();
     }
 
     function decimals() public view override returns (uint8) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
-        if (availableGetters.ignoreDecimals) revert Unimplemented();
+        // solhint-disable-next-line reason-string, gas-custom-errors
+        if (availableGetters.ignoreDecimals) revert();
         return decimals_;
     }
 

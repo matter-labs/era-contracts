@@ -58,7 +58,7 @@ describe("Compressor tests", function () {
       const COMPRESSED_BYTECODE = "0x0002" + "deadbeefdeadbeef" + "0000" + "0000" + "0000" + "0000";
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWithCustomError(compressor, "MalformedBytecode");
+      ).to.be.revertedWithCustomError(compressor, "EncodedLengthNotFourTimesSmallerThanOriginal");
     });
 
     it("should revert when there is no encoded data", async () => {
@@ -67,7 +67,7 @@ describe("Compressor tests", function () {
       const COMPRESSED_BYTECODE = "0x0002" + "deadbeefdeadbeef" + "deadbeefdeadbeef";
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWithCustomError(compressor, "MalformedBytecode");
+      ).to.be.revertedWithCustomError(compressor, "EncodedLengthNotFourTimesSmallerThanOriginal");
     });
 
     it("should revert when the encoded data length is invalid", async () => {
@@ -81,7 +81,7 @@ describe("Compressor tests", function () {
       // The length of the encodedData should be 32 / 4 = 8 bytes
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWithCustomError(compressor, "MalformedBytecode");
+      ).to.be.revertedWithCustomError(compressor, "EncodedLengthNotFourTimesSmallerThanOriginal");
     });
 
     it("should revert when the dictionary has too many entries", async () => {
@@ -102,7 +102,7 @@ describe("Compressor tests", function () {
       // The dictionary should have at most encode data length entries
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWithCustomError(compressor, "MalformedBytecode");
+      ).to.be.revertedWithCustomError(compressor, "DictionaryLengthNotFourTimesSmallerThanEncoded");
     });
 
     it("should revert when the encoded data has chunks where index is out of bounds", async () => {
@@ -123,7 +123,7 @@ describe("Compressor tests", function () {
         "0x0002" + "deadbeefdeadbeef" + "1111111111111111" + "0001" + "0000" + "0000" + "0001";
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWithCustomError(compressor, "ValuesNotEqual");
+      ).to.be.revertedWithCustomError(compressor, "EncodedAndRealBytecodeChunkNotEqual");
     });
 
     it("should revert when the bytecode length in bytes is invalid", async () => {
@@ -221,7 +221,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(4, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(1, 4, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWithCustomError(compressor, "ValuesNotEqual");
+      ).to.be.revertedWithCustomError(compressor, "DerivedKeyNotEqualToCompressedValue");
     });
 
     it("repeated write key mismatch", async () => {
