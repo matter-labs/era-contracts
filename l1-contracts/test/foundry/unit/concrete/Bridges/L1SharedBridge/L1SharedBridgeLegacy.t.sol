@@ -346,7 +346,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
             abi.encode(ETH_TOKEN_ADDRESS)
         );
 
-           // solhint-disable-next-line func-named-parameters
+        // solhint-disable-next-line func-named-parameters
         bytes memory message = abi.encodePacked(
             IL1ERC20Bridge.finalizeWithdrawal.selector,
             alice,
