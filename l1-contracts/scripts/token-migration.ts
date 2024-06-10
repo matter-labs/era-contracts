@@ -249,7 +249,7 @@ export async function transferTokensOnForkedNetwork(deployer: Deployer) {
 }
 
 /// This is used to transfer tokens from the sharedBridge.
-/// We're keeping this as we will have another migration of tokens, but it is not used atm. 
+/// We're keeping this as we will have another migration of tokens, but it is not used atm.
 export async function transferTokens(deployer: Deployer, token: string) {
   const eraChainId = "324";
   const sharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);

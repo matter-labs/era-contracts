@@ -12,14 +12,19 @@ import { getTokens } from "../src.ts/deploy-token";
 const provider = web3Provider();
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function verifyPromise(address: string, constructorArguments?: Array<any>, libraries?: object, contract?: string): Promise<any> {
+function verifyPromise(
+  address: string,
+  constructorArguments?: Array<any>,
+  libraries?: object,
+  contract?: string
+): Promise<any> {
   return new Promise((resolve, reject) => {
     hardhat
       .run("verify:verify", {
         address,
         constructorArguments,
         libraries,
-        contract
+        contract,
       })
       .then(() => resolve(`Successfully verified ${address}`))
       .catch((e) => reject(`Failed to verify ${address}\nError: ${e.message}`));
@@ -149,7 +154,12 @@ async function main() {
   promises.push(promise9);
 
   // bridges
-  const promise10 = verifyPromise(addresses.Bridges.ERC20BridgeImplementation, [addresses.Bridges.SharedBridgeProxy],undefined,  "contracts/bridge/L1ERC20Bridge.sol:L1ERC20Bridge");
+  const promise10 = verifyPromise(
+    addresses.Bridges.ERC20BridgeImplementation,
+    [addresses.Bridges.SharedBridgeProxy],
+    undefined,
+    "contracts/bridge/L1ERC20Bridge.sol:L1ERC20Bridge"
+  );
   promises.push(promise10);
 
   const eraDiamondProxy = getAddressFromEnv("CONTRACTS_ERA_DIAMOND_PROXY_ADDR");
