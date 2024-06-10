@@ -43,4 +43,34 @@ library UnsafeBytes {
             result := mload(add(_bytes, offset))
         }
     }
+
+    function readBytes(
+        bytes memory _bytes,
+        uint256 _start
+    ) internal pure returns (bytes memory result, uint256 offset) {
+        assembly {
+            // Load the length (first 32 bytes)
+            let len := mload(_bytes)
+            let index := 0
+
+            // Skip over the length field.
+            //
+            // Keep temporary variable so it can be incremented in place.
+            //
+            // NOTE: incrementing _data would result in an unusable
+            //       _data variable after this assembly block
+            let data := add(_bytes, 36)
+
+            // Iterate until the bound is not met.
+            for {
+                let end := add(data, mul(len, 0x20))
+            } lt(offset, end) {
+                data := add(data, 0x20)
+            } {
+                offset := add(_start, 0x20)
+                mstore(add(result, index), mload(add(_bytes, offset)))
+                index := add(index, 0x20)
+            }
+        }
+    }
 }

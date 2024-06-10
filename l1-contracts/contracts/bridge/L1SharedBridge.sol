@@ -195,6 +195,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev Used to set the assedAddress for a given assetInfo.
     function setAssetAddress(bytes32 _additionalData, address _assetAddress) external {
+        // ToDo: rename to vault address
         address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
         bytes32 assetInfo = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData)); /// todo make other asse
         assetAddress[assetInfo] = _assetAddress;
@@ -636,12 +637,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             // Check that the message length is correct.
             // It should be equal to the length of the function signature + address + uint256 + address = 4 + 32 + 32 + 32 =
             // 100 (bytes).
-            require(_l2ToL1message.length == 100, "ShB wrong msg len 2");
             (assetInfo, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-            (l1ReceiverBytes, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-            parsedL1Receiver = address(uint160(uint256(l1ReceiverBytes)));
-            assetData = abi.encode(amount, parsedL1Receiver);
+            (assetData, offset) = UnsafeBytes.readBytes(_l2ToL1message, offset);
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
             //todo
         } else {
