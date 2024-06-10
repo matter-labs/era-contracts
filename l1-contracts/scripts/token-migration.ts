@@ -6,6 +6,10 @@ import { web3Url } from "./utils";
 import { ethers } from "ethers";
 import { Provider, utils } from "zksync-ethers";
 
+import {Deployer} from "../src.ts/deploy";
+import { IERC20Factory } from "../typechain/IERC20Factory";
+import { web3Provider } from "../scripts/utils";
+
 async function main() {
   const program = new Command();
 
@@ -217,4 +221,44 @@ async function prepareGovernanceTokenMigrationCall(
     scheduleCalldata,
     executeCalldata,
   };
+}
+
+const provider = web3Provider();
+
+export async function transferTokensOnForkedNetwork(deployer: Deployer) {
+  // const startToken = 20;
+  // const tokens = tokenList.slice(startToken);
+  // console.log(`From ${startToken}`, tokens);
+  const tokenList = ["0x5A520e593F89c908cd2bc27D928bc75913C55C42"];
+  for (const tokenAddress of tokenList) {
+    const erc20contract = IERC20Factory.connect(tokenAddress, provider);
+    console.log(`Migrating token ${tokenAddress}`);
+    console.log(
+      `Balance before: ${await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
+    );
+    await transferTokens(deployer, tokenAddress);
+    console.log(
+      `Balance after: ${await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
+    );
+  }
+  console.log("From 0", tokenList);
+  for (const tokenAddress of tokenList) {
+    const erc20contract = IERC20Factory.connect(tokenAddress, provider);
+    if (!(await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)).eq(0)) {
+      console.log(`Failed to transfer all tokens ${tokenAddress}`);
+    }
+  }
+}
+
+export async function transferTokens(deployer: Deployer, token: string) {
+  const sharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
+  const tx = await sharedBridge.safeTransferFundsFromLegacy(
+    token,
+    deployer.addresses.Bridges.ERC20BridgeProxy,
+    "324",
+    "1000000",
+    { gasLimit: 25_000_000 }
+  );
+  await tx.wait();
+  console.log("Receipt", tx.hash);
 }
