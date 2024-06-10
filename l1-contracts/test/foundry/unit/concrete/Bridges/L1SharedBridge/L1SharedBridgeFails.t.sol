@@ -22,19 +22,17 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
 
     function test_setL1Erc20Bridge_alreadySet(address anotherBridge) public {
         address bridge = makeAddr("bridge");
-        L1SharedBridge sharedBridgeImpl = new L1SharedBridge({
+        L1SharedBridge sharedBridge = new L1SharedBridge({
             _l1WethAddress: l1WethAddress,
             _bridgehub: IBridgehub(bridgehubAddress),
             _eraChainId: eraChainId,
             _eraDiamondProxy: eraDiamondProxy
         });
 
-        TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
-            address(sharedBridgeImpl),
-            admin,
-            abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner)
-        );
-        L1SharedBridge sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
+        vm.prank(sharedBridge.owner());
+        sharedBridge.transferOwnership(owner);
+        vm.prank(owner);
+        sharedBridge.acceptOwnership();
 
         vm.startPrank(owner);
         vm.expectRevert("ShB: legacy bridge 0");
@@ -99,20 +97,6 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         uint256 eraLegacyBridgeLastDepositBatch,
         uint256 eraLegacyBridgeLastDepositTxNumber
     ) public {
-        L1SharedBridge sharedBridgeImpl = new L1SharedBridge({
-            _l1WethAddress: l1WethAddress,
-            _bridgehub: IBridgehub(bridgehubAddress),
-            _eraChainId: eraChainId,
-            _eraDiamondProxy: eraDiamondProxy
-        });
-        TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
-            address(sharedBridgeImpl),
-            admin,
-            abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner)
-        );
-
-        L1SharedBridge sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
-
         vm.startPrank(owner);
         sharedBridge.setEraLegacyBridgeLastDepositTime(0, 0);
 

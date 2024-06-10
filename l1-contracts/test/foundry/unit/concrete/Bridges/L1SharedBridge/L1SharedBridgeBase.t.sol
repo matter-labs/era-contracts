@@ -118,7 +118,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             l1Token: ETH_TOKEN_ADDRESS,
             amount: amount
         });
- 
+
         vm.prank(bridgehubAddress);
         L2TransactionRequestTwoBridgesInner memory txRequest = sharedBridge.bridgehubDeposit{value: amount}(
             chainId,
