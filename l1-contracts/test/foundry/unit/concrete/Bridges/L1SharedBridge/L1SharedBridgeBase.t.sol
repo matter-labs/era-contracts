@@ -16,7 +16,7 @@ import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract L1SharedBridgeTestBase is L1SharedBridgeTest {
-    function test_pause(address amount) public {
+    function test_pauseUnpause(address amount) public {
         vm.prank(owner);
         sharedBridge.pause();
         assertTrue(sharedBridge.paused());

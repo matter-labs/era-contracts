@@ -234,7 +234,6 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
 
         if (_token == ETH_TOKEN_ADDRESS) {
             message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, alice, amount);
-
         } else {
             message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, alice, _token, amount);
         }
@@ -246,11 +245,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
             sender = l2SharedBridge;
         }
 
-        L2Message memory l2ToL1Message = L2Message({
-            txNumberInBatch: l2TxNumberInBatch,
-            sender: sender,
-            data: message
-        });
+        L2Message memory l2ToL1Message = L2Message({txNumberInBatch: l2TxNumberInBatch, sender: sender, data: message});
 
         vm.mockCall(
             bridgehubAddress,
