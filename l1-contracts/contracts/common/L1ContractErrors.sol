@@ -227,8 +227,8 @@ error ProtocolIdNotGreater();
 error DiamondAlreadyFrozen();
 // 0xbd4455ff
 error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumber);
-// 0xec0b4118
-error CalldataLenghtTooBig();
+// 0xcf102c5a
+error CalldataLengthTooBig();
 // 0x5513177c
 error InvalidPubdataHash(bytes32 expectedHash, bytes32 provided);
 // 0xfb5c22e6
