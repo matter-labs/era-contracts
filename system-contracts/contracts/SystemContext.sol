@@ -56,12 +56,21 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
 
     /// @notice The hashes of batches.
     /// @dev It stores batch hashes for all previous batches.
+    /// The layout of this field is
+    /// {"offset":0,"slot":"8","type":"t_mapping(t_uint256,t_bytes32)"}
+    /// and it must not be changes, because batch verification in zksync-era depends on it.
     mapping(uint256 batchNumber => bytes32 batchHash) internal batchHashes;
 
     /// @notice The number and the timestamp of the current L2 block.
+    /// The layout of this field is
+    /// {"offset":0,"slot":"9","type":"t_struct(BlockInfo)1434_storage"}
+    /// and it must not be changes, because batch verification in zksync-era depends on it.
     BlockInfo internal currentL2BlockInfo;
 
     /// @notice The rolling hash of the transactions in the current L2 block.
+    /// The layout of this field is
+    /// {"offset":0,"slot":"10","type":"t_bytes32"}
+    /// and it must not be changes, because batch verification in zksync-era depends on it.
     bytes32 internal currentL2BlockTxsRollingHash;
 
     /// @notice The hashes of L2 blocks.
