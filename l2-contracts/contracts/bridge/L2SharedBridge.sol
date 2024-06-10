@@ -15,7 +15,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
-import {EmptyAddress, EmptyBytes32, InvalidCaller, AddressMismatch, AmountMustBeGreaterThanZero, DeployFailed} from "../L2ContractErrors.sol";
+import {EmptyAddress, EmptyBytes32, InvalidCaller, AddressMismatch, AmountMustBeGreaterThanZero, DeployFailed} from "../errors/L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
