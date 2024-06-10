@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 interface IBaseToken {
     function balanceOf(uint256) external view returns (uint256);

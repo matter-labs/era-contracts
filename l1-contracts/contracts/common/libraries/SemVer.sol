@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.20;
 
 /// @dev The number of bits dedicated to the "patch" portion of the protocol version.
 /// This also defines the bit starting from which the "minor" part is located.
