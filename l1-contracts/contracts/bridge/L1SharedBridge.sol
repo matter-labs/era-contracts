@@ -22,7 +22,7 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
-import {Unauthorized, ZeroAddress, SharedBridgeValueAlreadySet, SharedBridgeKey, NoFundsTransferred, ZeroBalance, ValueMismatch, NonEmptyMsgValue, L2BridgeNotSet, TokenNotSupported, WithdrawIncorrectAmount, EmptyDeposit, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDNE, InsufficientChainBalance, WithdrawalFailed, ShareadBridgeValueNotSet, WithdrawalAlreadyFinalized, WithdrawalFailed, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeBalanceMismatch} from "../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress, SharedBridgeValueAlreadySet, SharedBridgeKey, NoFundsTransferred, ZeroBalance, ValueMismatch, NonEmptyMsgValue, L2BridgeNotSet, TokenNotSupported, WithdrawIncorrectAmount, EmptyDeposit, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, InsufficientChainBalance, WithdrawalFailed, ShareadBridgeValueNotSet, WithdrawalAlreadyFinalized, WithdrawalFailed, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeBalanceMismatch} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -312,7 +312,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         if (_l1Token == ETH_TOKEN_ADDRESS) {
             amount = msg.value;
             if (_depositAmount != 0) {
-                revert WithdrawIncorrectAmount();
+                revert WithdrawIncorrectAmount(0, _depositAmount);
             }
         } else {
             if (msg.value != 0) {
@@ -323,7 +323,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             uint256 withdrawAmount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _depositAmount);
             // The token has non-standard transfer logic
             if (withdrawAmount != _depositAmount) {
-                revert WithdrawIncorrectAmount();
+                revert WithdrawIncorrectAmount(withdrawAmount, _depositAmount);
             }
         }
         // empty deposit amount
@@ -488,7 +488,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
                 bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
                 bytes32 txDataHash = keccak256(abi.encode(_depositSender, _l1Token, _amount));
                 if (dataHash != txDataHash) {
-                    revert DepositDNE();
+                    revert DepositDoesNotExist();
                 }
                 delete depositHappened[_chainId][_l2TxHash];
             }

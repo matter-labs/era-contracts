@@ -23,16 +23,16 @@ error NonEmptyMsgValue();
 error L2BridgeNotDeployed(uint256 chainId);
 // 0x06439c6b
 error TokenNotSupported(address token);
-// 0xc92b7c8f
-error WithdrawIncorrectAmount();
+// 0xd769f0a3
+error WithdrawIncorrectAmount(uint256 expectedAmt, uint256 providedAmt);
 // 0xad2fa98e
 error DepositExists();
 // 0x1ff9d522
 error AddressAlreadyUsed(address addr);
 // 0x09bde339
 error InvalidProof();
-// 0x8c04ba2d
-error DepositDNE();
+// 0xc7c9660f
+error DepositDoesNotExist();
 // 0x356680b7
 error InsufficientFunds();
 // 0x79cacff1
