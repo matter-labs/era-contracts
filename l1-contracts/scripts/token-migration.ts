@@ -2,13 +2,12 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
 import { Command } from "commander";
-import { web3Url } from "./utils";
+import { web3Url, web3Provider } from "./utils";
 import { ethers } from "ethers";
 import { Provider, utils } from "zksync-ethers";
 
-import {Deployer} from "../src.ts/deploy";
+import type { Deployer } from "../src.ts/deploy";
 import { IERC20Factory } from "../typechain/IERC20Factory";
-import { web3Provider } from "../scripts/utils";
 
 async function main() {
   const program = new Command();

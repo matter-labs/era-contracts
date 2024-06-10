@@ -1,14 +1,13 @@
 // hardhat import should be the first import in the file
 import * as hardhat from "hardhat";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-import { ethTestConfig, getNumberFromEnv, getHashFromEnv, getAddressFromEnv} from "../src.ts/utils";
+import { ethTestConfig, getNumberFromEnv, getHashFromEnv, getAddressFromEnv } from "../src.ts/utils";
 // import { ethTestConfig } from "../src.ts/utils";
 
 import { Interface } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
 import { Wallet } from "ethers";
-import { packSemver, unpackStringSemVer, } from "./utils";
-import { web3Provider } from "./utils";
+import { packSemver, unpackStringSemVer, web3Provider } from "./utils";
 import { getTokens } from "../src.ts/deploy-token";
 
 const provider = web3Provider();
@@ -137,23 +136,22 @@ async function main() {
         genesisBatchHash,
         genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
         genesisBatchCommitment,
-        diamondCut
+        diamondCut,
       },
       protocolVersion,
     },
   ]);
 
-  console.log("initCalldata2",
-    {
-      owner: addresses.Governance,
-      validatorTimelock: addresses.ValidatorTimeLock,
-      genesisUpgrade: addresses.StateTransition.GenesisUpgrade,
-      genesisBatchHash,
-      genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
-      genesisBatchCommitment,
-      diamondCut,
-      protocolVersion,
-    },);
+  console.log("initCalldata2", {
+    owner: addresses.Governance,
+    validatorTimelock: addresses.ValidatorTimeLock,
+    genesisUpgrade: addresses.StateTransition.GenesisUpgrade,
+    genesisBatchHash,
+    genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
+    genesisBatchCommitment,
+    diamondCut,
+    protocolVersion,
+  });
   const promise9 = verifyPromise(addresses.StateTransition.StateTransitionProxy, [
     addresses.StateTransition.StateTransitionImplementation,
     addresses.TransparentProxyAdmin,
