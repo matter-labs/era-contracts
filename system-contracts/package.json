@@ -9,7 +9,7 @@
     "commander": "^9.4.1",
     "ethers": "^5.7.0",
     "fast-glob": "^3.3.2",
-    "hardhat": "^2.18.3",
+    "hardhat": "=2.22.2",
     "preprocess": "^3.2.0",
     "zksync-web3": "^0.14.3"
   },
