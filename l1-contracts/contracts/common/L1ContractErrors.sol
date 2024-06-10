@@ -266,7 +266,7 @@ error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
 // 0xd7f50a9d
 error PatchCantSetUpgradeTxn();
 // 0xd2c011d6
-error L2UpgradeNonceNotEqualToNewProtocolVersion(uint256 nonce, uint256 procotolVersion);
+error L2UpgradeNonceNotEqualToNewProtocolVersion(uint256 nonce, uint256 protocolVersion);
 // 0xcb5e4247
 error L2BytecodeHashMismatch(bytes32 expected, bytes32 provided);
 // 0x88d7b498
