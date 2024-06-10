@@ -401,7 +401,9 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(dan);
         vm.warp(timestamp + executionDelay - 1);
-        vm.expectRevert(TimeNotReached.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(TimeNotReached.selector, timestamp + executionDelay, timestamp + executionDelay - 1)
+        );
         validator.executeBatches(storedBatches);
     }
 
@@ -430,7 +432,9 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(alice);
         vm.warp(timestamp + executionDelay - 1);
-        vm.expectRevert(TimeNotReached.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(TimeNotReached.selector, timestamp + executionDelay, timestamp + executionDelay - 1)
+        );
         validator.executeBatchesSharedBridge(chainId, storedBatches);
     }
 }

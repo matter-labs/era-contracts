@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
-import {NoFunctionsForDiamondCut, UndefinedDiamondCutAction, AddressHasNoCode, FacetExists, ZeroAddress, NonZeroAddress, SelectorsMustAllHaveSameFreezability, NonEmptyCalldata, MalformedCalldata, BadReturnData} from "../../common/L1ContractErrors.sol";
+import {NoFunctionsForDiamondCut, UndefinedDiamondCutAction, AddressHasNoCode, FacetExists, ZeroAddress, SelectorsMustAllHaveSameFreezability, NonEmptyCalldata, ReplaceFunctionFacetAddressZero, RemoveFunctionFacetAddressNotZero, DelegateCallFailed} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -170,7 +170,7 @@ library Diamond {
             SelectorToFacet memory oldFacet = ds.selectorToFacet[selector];
             // it is impossible to replace the facet with zero address
             if (oldFacet.facetAddress == address(0)) {
-                revert ZeroAddress();
+                revert ReplaceFunctionFacetAddressZero();
             }
 
             _removeOneFunction(oldFacet.facetAddress, selector);
@@ -187,7 +187,7 @@ library Diamond {
 
         // facet address must be zero
         if (_facet != address(0)) {
-            revert NonZeroAddress(_facet);
+            revert RemoveFunctionFacetAddressNotZero(_facet);
         }
 
         uint256 selectorsLength = _selectors.length;
@@ -309,7 +309,7 @@ library Diamond {
                 // If the returndata is too small, we still want to produce some meaningful error
 
                 if (data.length < 4) {
-                    revert MalformedCalldata();
+                    revert DelegateCallFailed(data);
                 }
 
                 assembly {
@@ -320,10 +320,10 @@ library Diamond {
             // Check that called contract returns magic value to make sure that contract logic
             // supposed to be used as diamond cut initializer.
             if (data.length != 32) {
-                revert BadReturnData();
+                revert DelegateCallFailed(data);
             }
             if (abi.decode(data, (bytes32)) != DIAMOND_INIT_SUCCESS_RETURN_VALUE) {
-                revert BadReturnData();
+                revert DelegateCallFailed(data);
             }
         }
     }

@@ -2,17 +2,11 @@
 
 pragma solidity ^0.8.20;
 
-<<<<<<< HEAD
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-=======
-// solhint-disable gas-custom-errors
-
 import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
->>>>>>> protocol-defense
 
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import {TX_SLOT_OVERHEAD_L2_GAS, MEMORY_OVERHEAD_GAS, L1_TX_INTRINSIC_L2_GAS, L1_TX_DELTA_544_ENCODING_BYTES, L1_TX_DELTA_FACTORY_DEPS_L2_GAS, L1_TX_MIN_L2_GAS_BASE, L1_TX_INTRINSIC_PUBDATA, L1_TX_DELTA_FACTORY_DEPS_PUBDATA} from "../../common/Config.sol";
-import {TooMuchGas, InvalidPubdataLength, InvalidUpgradeTxn, UpgradeTxVerifyParam, NotEnoughGas} from "../../common/L1ContractErrors.sol";
+import {TooMuchGas, InvalidUpgradeTxn, UpgradeTxVerifyParam, PubdataGreaterThanLimit, ValidateTxnNotEnoughGas, TxnBodyGasLimitNotEnoughGas} from "../../common/L1ContractErrors.sol";
 
 /// @title zkSync Library for validating L1 -> L2 transactions
 /// @author Matter Labs
@@ -37,7 +31,7 @@ library TransactionValidator {
         }
         // Ensuring that the transaction cannot output more pubdata than is processable
         if (l2GasForTxBody / _transaction.gasPerPubdataByteLimit > _priorityTxMaxPubdata) {
-            revert InvalidPubdataLength();
+            revert PubdataGreaterThanLimit(_priorityTxMaxPubdata, l2GasForTxBody / _transaction.gasPerPubdataByteLimit);
         }
 
         // Ensuring that the transaction covers the minimal costs for its processing:
@@ -49,7 +43,7 @@ library TransactionValidator {
                 _transaction.gasPerPubdataByteLimit
             ) > l2GasForTxBody
         ) {
-            revert NotEnoughGas();
+            revert ValidateTxnNotEnoughGas();
         }
     }
 
@@ -152,7 +146,7 @@ library TransactionValidator {
 
         // provided gas limit doesn't cover transaction overhead
         if (_totalGasLimit < overhead) {
-            revert NotEnoughGas();
+            revert TxnBodyGasLimitNotEnoughGas();
         }
         unchecked {
             // We enforce the fact that `_totalGasLimit >= overhead` explicitly above.

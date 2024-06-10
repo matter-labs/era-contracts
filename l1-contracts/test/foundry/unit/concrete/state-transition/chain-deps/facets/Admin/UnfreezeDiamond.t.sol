@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {Unauthorized, DiamondFreezeIncorrectState} from "contracts/common/L1ContractErrors.sol";
+import {DiamondAlreadyFrozen, Unauthorized, DiamondFreezeIncorrectState} from "contracts/common/L1ContractErrors.sol";
 
 contract UnfreezeDiamondTest is AdminTest {
     event Unfreeze();
@@ -21,7 +21,7 @@ contract UnfreezeDiamondTest is AdminTest {
 
         utilsFacet.util_setIsFrozen(false);
 
-        vm.expectRevert(DiamondFreezeIncorrectState.selector);
+        vm.expectRevert(DiamondAlreadyFrozen.selector);
 
         vm.startPrank(admin);
         adminFacet.unfreezeDiamond();

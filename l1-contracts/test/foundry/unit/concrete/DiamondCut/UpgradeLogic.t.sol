@@ -14,7 +14,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
-import {Unauthorized, DiamondFreezeIncorrectState} from "contracts/common/L1ContractErrors.sol";
+import {DiamondAlreadyFrozen, Unauthorized, DiamondFreezeIncorrectState} from "contracts/common/L1ContractErrors.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
     DiamondProxy private diamondProxy;
@@ -128,14 +128,14 @@ contract UpgradeLogicTest is DiamondCutTest {
 
         proxyAsAdmin.freezeDiamond();
 
-        vm.expectRevert(DiamondFreezeIncorrectState.selector);
+        vm.expectRevert(DiamondAlreadyFrozen.selector);
         proxyAsAdmin.freezeDiamond();
     }
 
     function test_RevertWhen_UnfreezingWhenNotFrozen() public {
         vm.startPrank(stateTransitionManager);
 
-        vm.expectRevert(DiamondFreezeIncorrectState.selector);
+        vm.expectRevert(DiamondAlreadyFrozen.selector);
         proxyAsAdmin.unfreezeDiamond();
     }
 

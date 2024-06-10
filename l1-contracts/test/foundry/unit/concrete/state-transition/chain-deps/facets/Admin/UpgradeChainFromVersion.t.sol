@@ -6,7 +6,7 @@ import {AdminTest} from "./_Admin_Shared.t.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
-import {InvalidProtocolVersion, ValueMismatch, Unauthorized, HashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {ProtocolIdMismatch, ProtocolIdNotGreater, InvalidProtocolVersion, ValueMismatch, Unauthorized, HashMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract UpgradeChainFromVersionTest is AdminTest {
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
@@ -74,7 +74,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
         );
 
         vm.startPrank(admin);
-        vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, uint256(2), oldProtocolVersion));
+        vm.expectRevert(abi.encodeWithSelector(ProtocolIdMismatch.selector, uint256(2), oldProtocolVersion));
         adminFacet.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
     }
 
@@ -99,7 +99,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
             abi.encode(cutHashInput)
         );
 
-        vm.expectRevert(InvalidProtocolVersion.selector);
+        vm.expectRevert(ProtocolIdNotGreater.selector);
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit ExecuteUpgrade(diamondCutData);

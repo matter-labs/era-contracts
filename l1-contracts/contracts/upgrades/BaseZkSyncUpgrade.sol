@@ -11,7 +11,7 @@ import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {TimeNotReached, InvalidTxType, NewProtocolVersionNotInUpgradeTxn, TooManyFactoryDeps, UnexpectedNumberOfFactoryDeps, InvalidProtocolVersion, PreviousUpgradeNotFinalized, PreviousUpgradeNotCleaned, InvalidHash} from "../common/L1ContractErrors.sol";
+import {ProtocolVersionMinorDeltaTooBig, TimeNotReached, InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, TooManyFactoryDeps, UnexpectedNumberOfFactoryDeps, ProtocolVersionTooSmall, PreviousUpgradeNotFinalized, PreviousUpgradeNotCleaned, L2BytecodeHashMismatch, PatchCantSetUpgradeTxn, PreviousProtocolMajorVersionNotZero, NewProtocolMajorVersionNotZero, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetBootloader} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
 /// @notice The struct that represents the upgrade proposal.
@@ -73,7 +73,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade batches will be reduced
         // as the permitted delay window is reduced in the future.
         if (block.timestamp < _proposedUpgrade.upgradeTimestamp) {
-            revert TimeNotReached();
+            revert TimeNotReached(_proposedUpgrade.upgradeTimestamp, block.timestamp);
         }
 
         (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
@@ -101,7 +101,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
             return;
         }
 
-        require(!_patchOnly, "Patch only upgrade can not set new default account");
+        if (_patchOnly) {
+            revert PatchUpgradeCantSetDefaultAccount();
+        }
 
         L2ContractHelper.validateBytecodeHash(_l2DefaultAccountBytecodeHash);
 
@@ -121,7 +123,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
             return;
         }
 
-        require(!_patchOnly, "Patch only upgrade can not set new bootloader");
+        if (_patchOnly) {
+            revert PatchUpgradeCantSetBootloader();
+        }
 
         L2ContractHelper.validateBytecodeHash(_l2BootloaderBytecodeHash);
 
@@ -205,15 +209,12 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
             return bytes32(0);
         }
 
-<<<<<<< HEAD
         if (_l2ProtocolUpgradeTx.txType != SYSTEM_UPGRADE_L2_TX_TYPE) {
             revert InvalidTxType(_l2ProtocolUpgradeTx.txType);
         }
-=======
-        require(!_patchOnly, "Patch only upgrade can not set upgrade transaction");
-
-        require(_l2ProtocolUpgradeTx.txType == SYSTEM_UPGRADE_L2_TX_TYPE, "L2 system upgrade tx type is wrong");
->>>>>>> protocol-defense
+        if (_patchOnly) {
+            revert PatchCantSetUpgradeTxn();
+        }
 
         bytes memory encodedTransaction = abi.encode(_l2ProtocolUpgradeTx);
 
@@ -228,16 +229,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
         // We want the hashes of l2 system upgrade transactions to be unique.
         // This is why we require that the `nonce` field is unique to each upgrade.
-<<<<<<< HEAD
-        if (_l2ProtocolUpgradeTx.nonce != _newProtocolVersion) {
-            revert NewProtocolVersionNotInUpgradeTxn();
+        if (_l2ProtocolUpgradeTx.nonce != _newMinorProtocolVersion) {
+            revert L2UpgradeNonceNotEqualToNewProtocolVersion(_l2ProtocolUpgradeTx.nonce, _newMinorProtocolVersion);
         }
-=======
-        require(
-            _l2ProtocolUpgradeTx.nonce == _newMinorProtocolVersion,
-            "The new protocol version should be included in the L2 system upgrade tx"
-        );
->>>>>>> protocol-defense
 
         _verifyFactoryDeps(_factoryDeps, _l2ProtocolUpgradeTx.factoryDeps);
 
@@ -262,7 +256,10 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
         for (uint256 i = 0; i < length; ++i) {
             if (L2ContractHelper.hashL2Bytecode(_factoryDeps[i]) != bytes32(_expectedHashes[i])) {
-                revert InvalidHash();
+                revert L2BytecodeHashMismatch(
+                    L2ContractHelper.hashL2Bytecode(_factoryDeps[i]),
+                    bytes32(_expectedHashes[i])
+                );
             }
         }
     }
@@ -273,36 +270,23 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         uint256 _newProtocolVersion
     ) internal virtual returns (uint32 newMinorVersion, bool patchOnly) {
         uint256 previousProtocolVersion = s.protocolVersion;
-<<<<<<< HEAD
         if (_newProtocolVersion <= previousProtocolVersion) {
-            revert InvalidProtocolVersion();
+            revert ProtocolVersionTooSmall();
         }
-        if (_newProtocolVersion - previousProtocolVersion > MAX_ALLOWED_PROTOCOL_VERSION_DELTA) {
-            revert InvalidProtocolVersion();
-        }
-
-        // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
-        // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
-        if (s.l2SystemContractsUpgradeTxHash != bytes32(0)) {
-            revert PreviousUpgradeNotFinalized(s.l2SystemContractsUpgradeTxHash);
-        }
-        if (s.l2SystemContractsUpgradeBatchNumber != 0) {
-            revert PreviousUpgradeNotCleaned();
-=======
-        require(
-            _newProtocolVersion > previousProtocolVersion,
-            "New protocol version is not greater than the current one"
-        );
         // slither-disable-next-line unused-return
         (uint32 previousMajorVersion, uint32 previousMinorVersion, ) = SemVer.unpackSemVer(
             SafeCast.toUint96(previousProtocolVersion)
         );
-        require(previousMajorVersion == 0, "Implementation requires that the major version is 0 at all times");
+        if (previousMajorVersion != 0) {
+            revert PreviousProtocolMajorVersionNotZero();
+        }
 
         uint32 newMajorVersion;
         // slither-disable-next-line unused-return
         (newMajorVersion, newMinorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion));
-        require(newMajorVersion == 0, "Major must always be 0");
+        if (newMajorVersion != 0) {
+            revert NewProtocolMajorVersionNotZero();
+        }
 
         // Since `_newProtocolVersion > previousProtocolVersion`, and both old and new major version is 0,
         // the difference between minor versions is >= 0.
@@ -313,7 +297,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         }
 
         // While this is implicitly enforced by other checks above, we still double check just in case
-        require(minorDelta <= MAX_ALLOWED_MINOR_VERSION_DELTA, "Too big protocol version difference");
+        if (minorDelta > MAX_ALLOWED_MINOR_VERSION_DELTA) {
+            revert ProtocolVersionMinorDeltaTooBig(MAX_ALLOWED_MINOR_VERSION_DELTA, minorDelta);
+        }
 
         // If the minor version changes also, we need to ensure that the previous upgrade has been finalized.
         // In case the minor version does not change, we permit to keep the old upgrade transaction in the system, but it
@@ -321,12 +307,12 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         if (!patchOnly) {
             // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
             // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
-            require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
-            require(
-                s.l2SystemContractsUpgradeBatchNumber == 0,
-                "The batch number of the previous upgrade has not been cleaned"
-            );
->>>>>>> protocol-defense
+            if (s.l2SystemContractsUpgradeTxHash != bytes32(0)) {
+                revert PreviousUpgradeNotFinalized(s.l2SystemContractsUpgradeTxHash);
+            }
+            if (s.l2SystemContractsUpgradeBatchNumber != 0) {
+                revert PreviousUpgradeNotCleaned();
+            }
         }
 
         s.protocolVersion = _newProtocolVersion;

@@ -11,7 +11,7 @@ import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "../../../common/L2ContractAddresses.sol";
 import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
-import {ValueMismatch, InvalidPubdataMode, InvalidHash, InvalidPubdataLength, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, MissingSystemLogs, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeOverflow, InvalidNumberOfBlobs, VerifyProofCommittedVerifiedMismatch, InvalidProof, RevertedBatchBeforeNewBatch, CantRevertExecutedBatch, PointEvalFailed, EmptyBlobVersionHash, NonEmptyBlobVersionHash, BlobHashCommitmentError} from "../../../common/L1ContractErrors.sol";
+import {BatchNumberMismatch, TimeNotReached, TooManyBlobs, ValueMismatch, InvalidPubdataMode, InvalidHash, InvalidPubdataLength, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, MissingSystemLogs, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifyProofCommittedVerifiedMismatch, InvalidProof, RevertedBatchBeforeNewBatch, CantRevertExecutedBatch, PointEvalFailed, EmptyBlobVersionHash, NonEmptyBlobVersionHash, BlobHashCommitmentError, CalldataLenghtTooBig, InvalidPubdataHash, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, PubdataCommitmentsEmpty, PointEvalCallFailed, PubdataCommitmentsTooBig, InvalidPubdataCommitmentsSize} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -36,7 +36,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     ) internal view returns (StoredBatchInfo memory) {
         // only commit next batch
         if (_newBatch.batchNumber != _previousBatch.batchNumber + 1) {
-            revert ValueMismatch(_previousBatch.batchNumber + 1, _newBatch.batchNumber);
+            revert BatchNumberMismatch(_previousBatch.batchNumber + 1, _newBatch.batchNumber);
         }
 
         uint8 pubdataSource = uint8(bytes1(_newBatch.pubdataCommitments[0]));
@@ -60,7 +60,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
                 revert InvalidHash();
             }
             if (_newBatch.pubdataCommitments.length != 1) {
-                revert InvalidPubdataLength();
+                revert CalldataLenghtTooBig();
             }
             for (uint8 i = uint8(SystemLogKey.BLOB_ONE_HASH_KEY); i <= uint8(SystemLogKey.BLOB_SIX_HASH_KEY); ++i) {
                 logOutput.blobHashes[i - uint8(SystemLogKey.BLOB_ONE_HASH_KEY)] = bytes32(0);
@@ -77,7 +77,10 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
                 logOutput.pubdataHash !=
                 keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32])
             ) {
-                revert InvalidHash();
+                revert InvalidPubdataHash(
+                    keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32]),
+                    logOutput.pubdataHash
+                );
             }
             blobCommitments[0] = bytes32(
                 _newBatch.pubdataCommitments[_newBatch.pubdataCommitments.length - 32:_newBatch
@@ -151,11 +154,11 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // - The timestamp of the last L2 block is not too big.
         // New batch timestamp is too small
         if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > batchTimestamp) {
-            revert TimestampError();
+            revert TimeNotReached(batchTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
         }
         // The last L2 block timestamp is too big
         if (lastL2BlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
-            revert TimestampError();
+            revert L2TimestampTooBig();
         }
     }
 
@@ -236,6 +239,10 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 uint8 blobNumber = uint8(logKey) - uint8(SystemLogKey.BLOB_ONE_HASH_KEY);
+
+                if (blobNumber >= MAX_NUMBER_OF_BLOBS) {
+                    revert TooManyBlobs();
+                }
 
                 logOutput.blobHashes[blobNumber] = logValue;
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
@@ -409,7 +416,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         bytes32 priorityOperationsHash = _collectOperationsFromPriorityQueue(_storedBatch.numberOfLayer1Txs);
         if (priorityOperationsHash != _storedBatch.priorityOperationsHash) {
-            revert TxHashMismatch();
+            revert PriorityOperationsRollingHashMismatch();
         }
 
         // Save root hash of L2 -> L1 logs tree
@@ -616,7 +623,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         bytes32[] memory _blobHashes
     ) internal pure returns (bytes memory) {
         if (_batch.systemLogs.length > MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES) {
-            revert SystemLogsSizeOverflow();
+            revert SystemLogsSizeTooBig();
         }
 
         bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
@@ -693,7 +700,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // We verify that the point evaluation precompile call was successful by testing the latter 32 bytes of the
         // response is equal to BLS_MODULUS as defined in https://eips.ethereum.org/EIPS/eip-4844#point-evaluation-precompile
         if (!success) {
-            revert PointEvalFailed(precompileInput);
+            revert PointEvalCallFailed(precompileInput);
         }
         (, uint256 result) = abi.decode(data, (uint256, uint256));
         if (result != BLS_MODULUS) {
@@ -712,13 +719,13 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         uint256 versionedHashIndex = 0;
 
         if (_pubdataCommitments.length == 0) {
-            revert InvalidPubdataLength();
+            revert PubdataCommitmentsEmpty();
         }
         if (_pubdataCommitments.length > PUBDATA_COMMITMENT_SIZE * MAX_NUMBER_OF_BLOBS) {
-            revert InvalidPubdataLength();
+            revert PubdataCommitmentsTooBig();
         }
         if (_pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE != 0) {
-            revert InvalidPubdataLength();
+            revert InvalidPubdataCommitmentsSize();
         }
         blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
 

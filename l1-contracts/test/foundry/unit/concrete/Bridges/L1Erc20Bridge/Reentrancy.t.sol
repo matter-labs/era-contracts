@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
 import {ReenterL1ERC20Bridge} from "contracts/dev-contracts/test/ReenterL1ERC20Bridge.sol";
-import {SlotOccupied} from "contracts/common/L1ContractErrors.sol";
+import {SlotOccupied, Reentrancy} from "contracts/common/L1ContractErrors.sol";
 
 contract ReentrancyTest is L1Erc20BridgeTest {
     using stdStorage for StdStorage;
@@ -16,7 +16,7 @@ contract ReentrancyTest is L1Erc20BridgeTest {
         token.approve(address(bridgeReenterItself), amount);
 
         vm.prank(alice);
-        vm.expectRevert(SlotOccupied.selector);
+        vm.expectRevert(Reentrancy.selector);
         bridgeReenterItself.deposit({
             _l2Receiver: randomSigner,
             _l1Token: address(token),
@@ -33,7 +33,7 @@ contract ReentrancyTest is L1Erc20BridgeTest {
         token.approve(address(bridgeReenterItself), amount);
 
         vm.prank(alice);
-        vm.expectRevert(SlotOccupied.selector);
+        vm.expectRevert(Reentrancy.selector);
         bridgeReenterItself.deposit({
             _l2Receiver: randomSigner,
             _l1Token: address(token),
@@ -55,7 +55,7 @@ contract ReentrancyTest is L1Erc20BridgeTest {
 
         vm.prank(alice);
         bytes32[] memory merkleProof;
-        vm.expectRevert(SlotOccupied.selector);
+        vm.expectRevert(Reentrancy.selector);
         bridgeReenterItself.claimFailedDeposit({
             _depositSender: alice,
             _l1Token: address(token),
@@ -72,7 +72,7 @@ contract ReentrancyTest is L1Erc20BridgeTest {
         uint256 l2MessageIndex = 4;
 
         vm.prank(alice);
-        vm.expectRevert(SlotOccupied.selector);
+        vm.expectRevert(Reentrancy.selector);
         bytes32[] memory merkleProof;
         bridgeReenterItself.finalizeWithdrawal({
             _l2BatchNumber: l2BatchNumber,

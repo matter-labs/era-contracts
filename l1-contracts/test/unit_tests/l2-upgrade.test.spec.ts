@@ -179,7 +179,7 @@ describe.only("L2 upgrade test", function () {
         l2ProtocolUpgradeTx: noopUpgradeTransaction,
       })
     );
-    expect(bootloaderRevertReason).to.equal("Patch only upgrade can not set new bootloader");
+    expect(bootloaderRevertReason).to.contain("PatchUpgradeCantSetBootloader");
 
     const defaultAccountRevertReason = await getCallRevertReason(
       executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
@@ -188,7 +188,7 @@ describe.only("L2 upgrade test", function () {
         l2ProtocolUpgradeTx: noopUpgradeTransaction,
       })
     );
-    expect(defaultAccountRevertReason).to.equal("Patch only upgrade can not set new default account");
+    expect(defaultAccountRevertReason).to.contain("PatchUpgradeCantSetDefaultAccount");
   });
 
   it("Should not allow upgrade transaction during patch upgrade", async () => {
@@ -205,7 +205,7 @@ describe.only("L2 upgrade test", function () {
         l2ProtocolUpgradeTx: someTx,
       })
     );
-    expect(bootloaderRevertReason).to.equal("Patch only upgrade can not set upgrade transaction");
+    expect(bootloaderRevertReason).to.contain("PatchCantSetUpgradeTxn");
   });
 
   it("Should not allow major version change", async () => {
@@ -223,7 +223,7 @@ describe.only("L2 upgrade test", function () {
         l2ProtocolUpgradeTx: someTx,
       })
     );
-    expect(bootloaderRevertReason).to.equal("Major must always be 0");
+    expect(bootloaderRevertReason).to.contain("NewProtocolMajorVersionNotZero");
   });
 
   it("Timestamp should behave correctly", async () => {
@@ -271,7 +271,7 @@ describe.only("L2 upgrade test", function () {
       })
     );
 
-    expect(revertReason).contains("NewProtocolVersionNotInUpgradeTxn");
+    expect(revertReason).contains("L2UpgradeNonceNotEqualToNewProtocolVersion");
   });
 
   it("Should ensure monotonic protocol version", async () => {
@@ -287,7 +287,7 @@ describe.only("L2 upgrade test", function () {
       })
     );
 
-    expect(revertReason).contains("InvalidProtocolVersion");
+    expect(revertReason).contains("ProtocolVersionTooSmall");
   });
 
   it("Should ensure protocol version not increasing too much", async () => {
@@ -303,7 +303,7 @@ describe.only("L2 upgrade test", function () {
       })
     );
 
-    expect(revertReason).contains("InvalidProtocolVersion");
+    expect(revertReason).contains("ProtocolVersionMinorDeltaTooBig");
   });
 
   it("Should validate upgrade transaction overhead", async () => {
@@ -352,7 +352,7 @@ describe.only("L2 upgrade test", function () {
       })
     );
 
-    expect(revertReason).contains("InvalidPubdataLength");
+    expect(revertReason).contains("PubdataGreaterThanLimit");
   });
 
   it("Should validate factory deps", async () => {
@@ -371,7 +371,7 @@ describe.only("L2 upgrade test", function () {
       })
     );
 
-    expect(revertReason).contains("InvalidHash");
+    expect(revertReason).contains("L2BytecodeHashMismatch");
   });
 
   it("Should validate factory deps length match", async () => {

@@ -2,15 +2,8 @@
 
 pragma solidity 0.8.24;
 
-<<<<<<< HEAD
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-=======
-// solhint-disable reason-string, gas-custom-errors
-
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
->>>>>>> protocol-defense
 
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {IBridgehub, IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
@@ -20,7 +13,7 @@ import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyp
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {Unauthorized, STMAlreadyRegistered, STMNotRegistered, TokenAlreadyRegistered, TokenNotRegistered, InvalidChainId, WethBridgeNotSet, BridgeHubAlreadyRegistered, ValueMismatch, InsufficientFunds, NonEmptyMsgValue, AddressTooLow} from "../common/L1ContractErrors.sol";
+import {Unauthorized, STMAlreadyRegistered, STMNotRegistered, TokenAlreadyRegistered, TokenNotRegistered, ZeroChainId, ChainIdTooBig, BridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue} from "../common/L1ContractErrors.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice all the ether is held by the weth bridge
@@ -137,10 +130,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes calldata _initData
     ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256) {
         if (_chainId == 0) {
-            revert InvalidChainId();
+            revert ZeroChainId();
         }
         if (_chainId > type(uint48).max) {
-            revert InvalidChainId();
+            revert ChainIdTooBig();
         }
 
         if (!stateTransitionManagerIsRegistered[_stateTransitionManager]) {
@@ -150,7 +143,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             revert TokenNotRegistered(_baseToken);
         }
         if (address(sharedBridge) == address(0)) {
-            revert WethBridgeNotSet();
+            revert BridgeNotSet();
         }
 
         if (stateTransitionManager[_chainId] != address(0)) {
@@ -242,11 +235,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             address token = baseToken[_request.chainId];
             if (token == ETH_TOKEN_ADDRESS) {
                 if (msg.value != _request.mintValue) {
-                    revert InsufficientFunds();
+                    revert MsgValueMismatch(_request.mintValue, msg.value);
                 }
             } else {
                 if (msg.value != 0) {
-                    revert NonEmptyMsgValue();
+                    revert MsgValueMismatch(0, msg.value);
                 }
             }
 
@@ -293,12 +286,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             uint256 baseTokenMsgValue;
             if (token == ETH_TOKEN_ADDRESS) {
                 if (msg.value != _request.mintValue + _request.secondBridgeValue) {
-                    revert InsufficientFunds();
+                    revert MsgValueMismatch(_request.mintValue + _request.secondBridgeValue, msg.value);
                 }
                 baseTokenMsgValue = _request.mintValue;
             } else {
                 if (msg.value != _request.secondBridgeValue) {
-                    revert NonEmptyMsgValue();
+                    revert MsgValueMismatch(_request.secondBridgeValue, msg.value);
                 }
                 baseTokenMsgValue = 0;
             }
@@ -323,7 +316,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         );
 
         if (outputRequest.magicValue != TWO_BRIDGES_MAGIC_VALUE) {
-            revert ValueMismatch(uint256(TWO_BRIDGES_MAGIC_VALUE), uint256(outputRequest.magicValue));
+            revert WrongMagicValue(uint256(TWO_BRIDGES_MAGIC_VALUE), uint256(outputRequest.magicValue));
         }
 
         address refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);

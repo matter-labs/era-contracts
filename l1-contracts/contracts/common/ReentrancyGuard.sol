@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import {SlotOccupied} from "./L1ContractErrors.sol";
+import {SlotOccupied, NotInitializedReentrancyGuard, Reentrancy} from "./L1ContractErrors.sol";
 
 /**
  * @custom:security-contact security@matterlabs.dev
@@ -76,8 +76,11 @@ abstract contract ReentrancyGuard {
         }
 
         // On the first call to nonReentrant, _notEntered will be true
+        if (_status == 0) {
+            revert NotInitializedReentrancyGuard();
+        }
         if (_status != _NOT_ENTERED) {
-            revert SlotOccupied();
+            revert Reentrancy();
         }
 
         // Any calls to nonReentrant after this point will fail

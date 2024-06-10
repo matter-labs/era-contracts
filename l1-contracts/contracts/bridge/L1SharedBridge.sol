@@ -22,7 +22,7 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
-import {Unauthorized, ZeroAddress, SharedBridgeValueAlreadySet, SharedBridgeKey, NoFundsTransferred, ZeroBalance, ValueMismatch, NonEmptyMsgValue, L2BridgeNotDeployed, TokenNotSupported, WithdrawIncorrectAmount, EmptyDeposit, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDNE, InsufficientFunds, DepositFailed, ShareadBridgeValueNotSet, WithdrawalAlreadyFinalized, WithdrawFailed, MalformedMessage, InvalidSelector} from "../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress, SharedBridgeValueAlreadySet, SharedBridgeKey, NoFundsTransferred, ZeroBalance, ValueMismatch, NonEmptyMsgValue, L2BridgeNotSet, TokenNotSupported, WithdrawIncorrectAmount, EmptyDeposit, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDNE, InsufficientChainBalance, WithdrawalFailed, ShareadBridgeValueNotSet, WithdrawalAlreadyFinalized, WithdrawalFailed, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeBalanceMismatch} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -116,7 +116,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @notice Checks that the message sender is the shared bridge itself.
     modifier onlySelf() {
-        require(msg.sender == address(this), "ShB not shared bridge");
+        if (msg.sender != address(this)) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
@@ -201,13 +203,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             }
             IL1ERC20Bridge(_target).transferTokenToSharedBridge(_token);
             uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
-<<<<<<< HEAD
-            if (balanceAfter - balanceBefore != legacyBridgeBalance) {
-                revert ValueMismatch(balanceAfter - balanceBefore, legacyBridgeBalance);
+            if (balanceAfter - balanceBefore < legacyBridgeBalance) {
+                revert SharedBridgeBalanceMismatch();
             }
-=======
-            require(balanceAfter - balanceBefore >= legacyBridgeBalance, "ShB: wrong amount transferred");
->>>>>>> protocol-defense
             chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + legacyBridgeBalance;
         }
     }
@@ -296,7 +294,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         returns (L2TransactionRequestTwoBridgesInner memory request)
     {
         if (l2BridgeAddress[_chainId] == address(0)) {
-            revert L2BridgeNotDeployed(_chainId);
+            revert L2BridgeNotSet(_chainId);
         }
 
         (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
@@ -499,7 +497,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         if (!hyperbridgingEnabled[_chainId]) {
             // check that the chain has sufficient balance
             if (chainBalance[_chainId][_l1Token] < _amount) {
-                revert InsufficientFunds();
+                revert InsufficientChainBalance();
             }
             chainBalance[_chainId][_l1Token] -= _amount;
         }
@@ -512,7 +510,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
                 callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
             }
             if (!callSuccess) {
-                revert DepositFailed();
+                revert WithdrawalFailed();
             }
         } else {
             IERC20(_l1Token).safeTransfer(_depositSender, _amount);
@@ -641,7 +639,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             // Check that the chain has sufficient balance
             if (chainBalance[_chainId][l1Token] < amount) {
                 // not enough funds
-                revert InsufficientFunds();
+                revert InsufficientChainBalance();
             }
             chainBalance[_chainId][l1Token] -= amount;
         }
@@ -653,7 +651,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
                 callSuccess := call(gas(), l1Receiver, amount, 0, 0, 0, 0)
             }
             if (!callSuccess) {
-                revert WithdrawFailed();
+                revert WithdrawalFailed();
             }
         } else {
             // Withdraw funds
@@ -711,7 +709,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         // So the data is expected to be at least 56 bytes long.
         // wrong message length
         if (_l2ToL1message.length < 56) {
-            revert MalformedMessage();
+            revert L2WithdrawalMessageWrongLength(_l2ToL1message.length);
         }
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
@@ -729,7 +727,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
             // 76 (bytes).
             if (_l2ToL1message.length != 76) {
-                revert MalformedMessage();
+                revert L2WithdrawalMessageWrongLength(_l2ToL1message.length);
             }
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
@@ -777,7 +775,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         address _refundRecipient
     ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 l2TxHash) {
         if (l2BridgeAddress[ERA_CHAIN_ID] == address(0)) {
-            revert L2BridgeNotDeployed(ERA_CHAIN_ID);
+            revert L2BridgeNotSet(ERA_CHAIN_ID);
         }
         if (_l1Token == L1_WETH_TOKEN) {
             revert TokenNotSupported(L1_WETH_TOKEN);

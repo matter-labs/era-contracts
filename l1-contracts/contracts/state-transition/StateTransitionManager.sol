@@ -22,7 +22,7 @@ import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
 import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
-import {Unauthorized, ZeroAddress, HashMismatch, HyperchainLimitReached} from "../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress, HashMismatch, HyperchainLimitReached, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
 /// @title State Transition Manager contract
@@ -146,13 +146,18 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters
     function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal {
-        require(_chainCreationParams.genesisUpgrade != address(0), "STM: genesisUpgrade zero");
-        require(_chainCreationParams.genesisBatchHash != bytes32(0), "STM: genesisBatchHash zero");
-        require(
-            _chainCreationParams.genesisIndexRepeatedStorageChanges != uint64(0),
-            "STM: genesisIndexRepeatedStorageChanges zero"
-        );
-        require(_chainCreationParams.genesisBatchCommitment != bytes32(0), "STM: genesisBatchCommitment zero");
+        if (_chainCreationParams.genesisUpgrade == address(0)) {
+            revert GenesisUpgradeZero();
+        }
+        if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
+            revert GenesisBatchHashZero();
+        }
+        if (_chainCreationParams.genesisIndexRepeatedStorageChanges == uint64(0)) {
+            revert GenesisIndexStorageZero();
+        }
+        if (_chainCreationParams.genesisBatchCommitment == bytes32(0)) {
+            revert GenesisBatchCommitmentZero();
+        }
 
         genesisUpgrade = _chainCreationParams.genesisUpgrade;
 

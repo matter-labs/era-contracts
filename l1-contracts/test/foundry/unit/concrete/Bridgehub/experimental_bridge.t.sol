@@ -16,7 +16,7 @@ import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 
 import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS} from "contracts/common/Config.sol";
-import {SlotOccupied, STMAlreadyRegistered, TokenAlreadyRegistered, Unauthorized, NonEmptyMsgValue, STMNotRegistered, InvalidChainId} from "contracts/common/L1ContractErrors.sol";
+import {MsgValueMismatch, SlotOccupied, STMAlreadyRegistered, TokenAlreadyRegistered, Unauthorized, NonEmptyMsgValue, STMNotRegistered, InvalidChainId} from "contracts/common/L1ContractErrors.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -701,7 +701,7 @@ contract ExperimentalBridgeTest is Test {
         vm.deal(randomCaller, 1 ether);
 
         vm.prank(randomCaller);
-        vm.expectRevert(NonEmptyMsgValue.selector);
+        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, 0, randomCaller.balance));
         bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
 
         // Now, let's call the same function with zero msg.value

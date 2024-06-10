@@ -209,7 +209,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 // We allow executing such batches.
 
                 if (block.timestamp < commitBatchTimestamp + delay) {
-                    revert TimeNotReached();
+                    revert TimeNotReached(commitBatchTimestamp + delay, block.timestamp);
                 }
             }
         }

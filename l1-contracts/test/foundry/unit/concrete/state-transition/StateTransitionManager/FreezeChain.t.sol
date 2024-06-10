@@ -21,11 +21,11 @@ contract freezeChainTest is StateTransitionManagerTest {
         chainContractAddress.freezeChain(block.chainid);
 
         // Repeated call should revert
-        vm.expectRevert(abi.encodeWithSelector(FacetIsFrozen.selector, IAdmin.freezeDiamond.selector)); // storage frozen
+        vm.expectRevert(bytes("q1")); // storage frozen
         chainContractAddress.freezeChain(block.chainid);
 
         // Call fails as storage is frozen
-        vm.expectRevert(abi.encodeWithSelector(FacetIsFrozen.selector, GettersFacet.isDiamondStorageFrozen.selector));
+        vm.expectRevert(bytes("q1"));
         isChainFrozen = gettersFacet.isDiamondStorageFrozen();
     }
 }

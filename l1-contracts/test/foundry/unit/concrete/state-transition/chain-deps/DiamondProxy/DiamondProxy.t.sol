@@ -60,7 +60,7 @@ contract DiamondProxyTest is Test {
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
-        vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, block.chainid, block.chainid + 1));
+        vm.expectRevert(bytes("pr"));
         new DiamondProxy(block.chainid + 1, diamondCutData);
     }
 
@@ -108,7 +108,7 @@ contract DiamondProxyTest is Test {
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
         TestFacet testFacet = TestFacet(address(diamondProxy));
 
-        vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, TestFacet.func.selector));
+        vm.expectRevert(bytes("F"));
         testFacet.func();
     }
 
@@ -127,7 +127,7 @@ contract DiamondProxyTest is Test {
 
         utilsFacet.util_setIsFrozen(true);
 
-        vm.expectRevert(abi.encodeWithSelector(FacetIsFrozen.selector, TestFacet.func.selector));
+        vm.expectRevert(bytes("q1"));
         testFacet.func();
     }
 
@@ -168,7 +168,7 @@ contract DiamondProxyTest is Test {
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
         TestFacet testFacet = TestFacet(address(diamondProxy));
 
-        vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, TestFacet.func.selector));
+        vm.expectRevert(bytes("F"));
         testFacet.func();
     }
 }

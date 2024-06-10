@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import {BytecodeError, MalformedBytecode} from "../L1ContractErrors.sol";
+import {BytecodeError, MalformedBytecode, LengthIsNotDivisibleBy32} from "../L1ContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -23,7 +23,7 @@ library L2ContractHelper {
     function hashL2Bytecode(bytes memory _bytecode) internal pure returns (bytes32 hashedBytecode) {
         // Note that the length of the bytecode must be provided in 32-byte words.
         if (_bytecode.length % 32 != 0) {
-            revert MalformedBytecode(BytecodeError.Length);
+            revert LengthIsNotDivisibleBy32(_bytecode.length);
         }
 
         uint256 bytecodeLenInWords = _bytecode.length / 32;

@@ -14,7 +14,7 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, WithdrawIncorrectAmount, EmptyDeposit, L2BridgeNotDeployed, WithdrawIncorrectAmount, InvalidProof, NoFundsTransferred, InsufficientFunds, DepositDNE, WithdrawalAlreadyFinalized, InsufficientFunds, MalformedMessage, InvalidSelector} from "contracts/common/L1ContractErrors.sol";
+import {L2BridgeNotSet, L2WithdrawalMessageWrongLength, InsufficientChainBalance, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, WithdrawIncorrectAmount, EmptyDeposit, L2BridgeNotDeployed, WithdrawIncorrectAmount, InvalidProof, NoFundsTransferred, InsufficientFunds, DepositDNE, WithdrawalAlreadyFinalized, InsufficientFunds, MalformedMessage, InvalidSelector} from "contracts/common/L1ContractErrors.sol";
 
 /// We are testing all the specified revert and require cases.
 contract L1SharedBridgeFailTest is L1SharedBridgeTest {
@@ -67,7 +67,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
             abi.encode(address(token))
         );
-        vm.expectRevert(abi.encodeWithSelector(L2BridgeNotDeployed.selector, chainId));
+        vm.expectRevert(abi.encodeWithSelector(L2BridgeNotSet.selector, chainId));
         // solhint-disable-next-line func-named-parameters
         sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, 0, bob));
     }
@@ -268,7 +268,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             abi.encode(true)
         );
 
-        vm.expectRevert(InsufficientFunds.selector);
+        vm.expectRevert(InsufficientChainBalance.selector);
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
@@ -418,7 +418,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             abi.encode(true)
         );
 
-        vm.expectRevert(InsufficientFunds.selector);
+        vm.expectRevert(InsufficientChainBalance.selector);
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
@@ -481,7 +481,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
 
         bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector);
 
-        vm.expectRevert(MalformedMessage.selector);
+        vm.expectRevert(abi.encodeWithSelector(L2WithdrawalMessageWrongLength.selector, message.length));
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
@@ -504,7 +504,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         bytes memory message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, alice, amount);
         // should have more data here
 
-        vm.expectRevert(MalformedMessage.selector);
+        vm.expectRevert(abi.encodeWithSelector(L2WithdrawalMessageWrongLength.selector, message.length));
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
             _l2BatchNumber: l2BatchNumber,
@@ -546,7 +546,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(eraChainId, address(0));
 
-        vm.expectRevert(abi.encodeWithSelector(L2BridgeNotDeployed.selector, eraChainId));
+        vm.expectRevert(abi.encodeWithSelector(L2BridgeNotSet.selector, eraChainId));
         vm.prank(l1ERC20BridgeAddress);
         sharedBridge.depositLegacyErc20Bridge({
             _prevMsgSender: alice,

@@ -55,8 +55,6 @@ error TokenAlreadyRegistered(address token);
 error TokenNotRegistered(address token);
 // 0x7a47c9a2
 error InvalidChainId();
-// 0xe4ed5fcc
-error WethBridgeNotSet();
 // 0x6cf12312
 error BridgeHubAlreadyRegistered();
 // 0x1eee5481
@@ -79,8 +77,6 @@ error PreviousOperationNotExecuted();
 error HashMismatch(bytes32 expected, bytes32 actual);
 // 0xb615c2b1
 error HyperchainLimitReached();
-// 0x71dcf049
-error TimeNotReached();
 // 0xf0b4e88f
 error TooMuchGas();
 // 0x59170bf0
@@ -127,8 +123,6 @@ error UpgradeBatchNumberIsNotZero();
 error NonSequentialBatch();
 // 0x00c6ead2
 error CantExecuteUnprovenBatches();
-// 0x213eb372
-error SystemLogsSizeOverflow();
 // 0xd8e9405c
 error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 numHashes);
 // 0x2dbdba00
@@ -193,14 +187,112 @@ error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 error NotEnoughGas();
 // 0x5cb29523
 error InvalidTxType(uint256 txType);
-// 0x4ee1b0ed
-error NewProtocolVersionNotInUpgradeTxn();
 // 0x07218375
 error UnexpectedNumberOfFactoryDeps();
 // 0x101ba748
 error PreviousUpgradeNotFinalized(bytes32 txHash);
 // 0xa0f47245
 error PreviousUpgradeNotCleaned();
+// 0x826fb11e
+error InsufficientChainBalance();
+// 0x27fcd9d1
+error WithdrawalFailed();
+// 0x97e1359e
+error L2WithdrawalMessageWrongLength(uint256 messageLen);
+// 0xff8811ff
+error L2BridgeNotSet(uint256 chainId);
+// 0xc84885d4
+error ZeroChainId();
+// 0x8f620a06
+error ChainIdTooBig();
+// 0x733fa4c3
+error BridgeNotSet();
+// 0x4a094431
+error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
+// 0x15e8e429
+error WrongMagicValue(uint256 expectedMagicValue, uint256 providedMagicValue);
+// 0xdd7e3621
+error NotInitializedReentrancyGuard();
+// 0xab143c06
+error Reentrancy();
+// 0xe37d2c02
+error LengthIsNotDivisibleBy32(uint256 length);
+// 0x0a8ed92c
+error DenominatorIsZero();
+// 0xa461f651
+error ProtocolIdMismatch(uint256 expectedProtocolVersion, uint256 providedProtocolId);
+// 0x64f94ec2
+error ProtocolIdNotGreater();
+// 0x0e7ee319
+error DiamondAlreadyFrozen();
+// 0xbd4455ff
+error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumber);
+// 0xec0b4118
+error CalldataLenghtTooBig();
+// 0x5513177c
+error InvalidPubdataHash(bytes32 expectedHash, bytes32 provided);
+// 0xfb5c22e6
+error L2TimestampTooBig();
+// 0xf640f0e5
+error TooManyBlobs();
+// 0xd5a99014
+error PriorityOperationsRollingHashMismatch();
+// 0xae43b424
+error SystemLogsSizeTooBig();
+// 0x8d5851de
+error PointEvalCallFailed(bytes);
+// 0x53dee67b
+error PubdataCommitmentsEmpty();
+// 0x7734c31a
+error PubdataCommitmentsTooBig();
+// 0x53e6d04d
+error InvalidPubdataCommitmentsSize();
+// 0x32eb8b2f
+error LegacyMethodIsSupportedOnlyForEra();
+// 0x3580370c
+error ReplaceFunctionFacetAddressZero();
+// 0x667d17de
+error RemoveFunctionFacetAddressNotZero(address facet);
+// 0xf7a01e4d
+error DelegateCallFailed(bytes returnData);
+// 0x959f26fb
+error PubdataGreaterThanLimit(uint256 limit, uint256 length);
+// 0x2e311df8
+error TxnBodyGasLimitNotEnoughGas();
+// 0x47b3b145
+error ValidateTxnNotEnoughGas();
+// 0x08753982
+error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
+// 0xd7f50a9d
+error PatchCantSetUpgradeTxn();
+// 0xd2c011d6
+error L2UpgradeNonceNotEqualToNewProtocolVersion(uint256 nonce, uint256 procotolVersion);
+// 0xcb5e4247
+error L2BytecodeHashMismatch(bytes32 expected, bytes32 provided);
+// 0x88d7b498
+error ProtocolVersionTooSmall();
+// 0x56d45b12
+error ProtocolVersionTooBig();
+// 0x5c598b60
+error PreviousProtocolMajorVersionNotZero();
+// 0x72ea85ad
+error NewProtocolMajorVersionNotZero();
+// 0xd328c12a
+error ProtocolVersionMinorDeltaTooBig(uint256 limit, uint256 proposed);
+// 0x559cc34e
+error PatchUpgradeCantSetDefaultAccount();
+// 0x962fd7d0
+error PatchUpgradeCantSetBootloader();
+// 0xc1d9246c
+error SharedBridgeBalanceMismatch();
+// 0x3a1a8589
+error GenesisUpgradeZero();
+// 0x7940c83f
+error GenesisBatchHashZero();
+// 0xb4fc6835
+error GenesisIndexStorageZero();
+// 0x6d4a7df8
+error GenesisBatchCommitmentZero();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

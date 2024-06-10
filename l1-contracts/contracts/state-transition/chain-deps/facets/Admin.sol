@@ -8,7 +8,7 @@ import {MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
-import {Unauthorized, TooMuchGas, PubdataPerBatchIsLessThanTxn, InvalidPubdataPricingMode, InvalidValue, ChainAlreadyLive, HashMismatch, ValueMismatch, InvalidProtocolVersion, DiamondFreezeIncorrectState} from "../../../common/L1ContractErrors.sol";
+import {Unauthorized, TooMuchGas, PubdataPerBatchIsLessThanTxn, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -92,7 +92,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     /// @inheritdoc IAdmin
     function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrStateTransitionManager {
         if (_denominator == 0) {
-            revert InvalidValue();
+            revert DenominatorIsZero();
         }
         uint128 oldNominator = s.baseTokenGasPriceMultiplierNominator;
         uint128 oldDenominator = s.baseTokenGasPriceMultiplierDenominator;
@@ -135,12 +135,12 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         }
 
         if (s.protocolVersion != _oldProtocolVersion) {
-            revert ValueMismatch(s.protocolVersion, _oldProtocolVersion);
+            revert ProtocolIdMismatch(s.protocolVersion, _oldProtocolVersion);
         }
         Diamond.diamondCut(_diamondCut);
         emit ExecuteUpgrade(_diamondCut);
         if (s.protocolVersion <= _oldProtocolVersion) {
-            revert InvalidProtocolVersion();
+            revert ProtocolIdNotGreater();
         }
     }
 
@@ -160,7 +160,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         // diamond proxy is frozen already
         if (diamondStorage.isFrozen) {
-            revert DiamondFreezeIncorrectState();
+            revert DiamondAlreadyFrozen();
         }
         diamondStorage.isFrozen = true;
 
@@ -173,7 +173,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         // diamond proxy is not frozen
         if (!diamondStorage.isFrozen) {
-            revert DiamondFreezeIncorrectState();
+            revert DiamondAlreadyFrozen();
         }
         diamondStorage.isFrozen = false;
 
