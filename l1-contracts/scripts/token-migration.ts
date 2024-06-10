@@ -224,7 +224,10 @@ async function prepareGovernanceTokenMigrationCall(
 
 const provider = web3Provider();
 
+/// used together with anvil for local fork tests. Not used at the moment, will be used for next token migration.
+// https://www.notion.so/matterlabs/Mainnet-shared-bridge-token-fork-test-aac05561dda64fb4ad38c40d2f479378?pvs=4
 export async function transferTokensOnForkedNetwork(deployer: Deployer) {
+  // the list of tokens that need to be migrated, use output from `get-confirmed-tokens` command
   const tokenList = ["0x5A520e593F89c908cd2bc27D928bc75913C55C42"];
   for (const tokenAddress of tokenList) {
     const erc20contract = IERC20Factory.connect(tokenAddress, provider);
@@ -237,7 +240,6 @@ export async function transferTokensOnForkedNetwork(deployer: Deployer) {
       `Balance after: ${await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
     );
   }
-  console.log("From 0", tokenList);
   for (const tokenAddress of tokenList) {
     const erc20contract = IERC20Factory.connect(tokenAddress, provider);
     if (!(await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)).eq(0)) {
@@ -246,12 +248,15 @@ export async function transferTokensOnForkedNetwork(deployer: Deployer) {
   }
 }
 
+/// This is used to transfer tokens from the sharedBridge.
+/// We're keeping this as we will have another migration of tokens, but it is not used atm. 
 export async function transferTokens(deployer: Deployer, token: string) {
+  const eraChainId = "324";
   const sharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
   const tx = await sharedBridge.safeTransferFundsFromLegacy(
     token,
     deployer.addresses.Bridges.ERC20BridgeProxy,
-    "324",
+    eraChainId,
     "1000000",
     { gasLimit: 25_000_000 }
   );
