@@ -6,7 +6,7 @@ import {SystemContractHelper, ADDRESS_MASK} from "./SystemContractHelper.sol";
 import {SystemContractsCaller, CalldataForwardingMode, RAW_FAR_CALL_BY_REF_CALL_ADDRESS, SYSTEM_CALL_BY_REF_CALL_ADDRESS, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, MIMIC_CALL_BY_REF_CALL_ADDRESS} from "./SystemContractsCaller.sol";
 import {Utils} from "./Utils.sol";
 import {SHA256_SYSTEM_CONTRACT, KECCAK256_SYSTEM_CONTRACT, MSG_VALUE_SYSTEM_CONTRACT} from "../Constants.sol";
-import {InvalidData} from "../SystemContractErrors.sol";
+import {Keccak256InvalidReturnData, ShaInvalidReturnData} from "../SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -38,7 +38,7 @@ library EfficientCall {
     function keccak(bytes calldata _data) internal view returns (bytes32) {
         bytes memory returnData = staticCall(gasleft(), KECCAK256_SYSTEM_CONTRACT, _data);
         if (returnData.length != 32) {
-            revert InvalidData();
+            revert Keccak256InvalidReturnData();
         }
         return bytes32(returnData);
     }
@@ -49,7 +49,7 @@ library EfficientCall {
     function sha(bytes calldata _data) internal view returns (bytes32) {
         bytes memory returnData = staticCall(gasleft(), SHA256_SYSTEM_CONTRACT, _data);
         if (returnData.length != 32) {
-            revert InvalidData();
+            revert ShaInvalidReturnData();
         }
         return bytes32(returnData);
     }

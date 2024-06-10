@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 // 0x8e4a23d6
 error Unauthorized(address);
@@ -89,6 +89,18 @@ error Overflow();
 error InvalidInput();
 // 0xff15b069
 error UnsupportedPaymasterFlow();
+// 0x2bfbfc11
+error EncodedLengthNotFourTimesSmallerThanOriginal();
+// 0xdb02de6c
+error DictionaryLengthNotFourTimesSmallerThanEncoded();
+// 0xc06d5cb2
+error EncodedAndRealBytecodeChunkNotEqual(uint64 expected, uint64 provided);
+// 0x9be48d8d
+error DerivedKeyNotEqualToCompressedValue(bytes32 expected, bytes32 provided);
+// 0xf4a271b5
+error Keccak256InvalidReturnData();
+// 0x3adb5f1d
+error ShaInvalidReturnData();
 
 enum CodeHashReason {
     NotContractOnConstructor,
