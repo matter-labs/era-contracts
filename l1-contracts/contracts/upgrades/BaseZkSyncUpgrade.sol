@@ -255,11 +255,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         uint256 length = _factoryDeps.length;
 
         for (uint256 i = 0; i < length; ++i) {
-            if (L2ContractHelper.hashL2Bytecode(_factoryDeps[i]) != bytes32(_expectedHashes[i])) {
-                revert L2BytecodeHashMismatch(
-                    L2ContractHelper.hashL2Bytecode(_factoryDeps[i]),
-                    bytes32(_expectedHashes[i])
-                );
+            bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[i]);
+            if (bytecodeHash != bytes32(_expectedHashes[i])) {
+                revert L2BytecodeHashMismatch(bytecodeHash, bytes32(_expectedHashes[i]));
             }
         }
     }

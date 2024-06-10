@@ -205,8 +205,8 @@ error L2BridgeNotSet(uint256 chainId);
 error ZeroChainId();
 // 0x8f620a06
 error ChainIdTooBig();
-// 0x733fa4c3
-error BridgeNotSet();
+// 0x856d5b77
+error SharedBridgeNotSet();
 // 0x4a094431
 error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 // 0x15e8e429
@@ -293,6 +293,8 @@ error GenesisBatchHashZero();
 error GenesisIndexStorageZero();
 // 0x6d4a7df8
 error GenesisBatchCommitmentZero();
+// 0xa2d4b16c
+error RemoveFunctionFacetAddressZero();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

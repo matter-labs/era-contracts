@@ -13,7 +13,7 @@ import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyp
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {Unauthorized, STMAlreadyRegistered, STMNotRegistered, TokenAlreadyRegistered, TokenNotRegistered, ZeroChainId, ChainIdTooBig, BridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue} from "../common/L1ContractErrors.sol";
+import {Unauthorized, STMAlreadyRegistered, STMNotRegistered, TokenAlreadyRegistered, TokenNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue} from "../common/L1ContractErrors.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice all the ether is held by the weth bridge
@@ -143,7 +143,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             revert TokenNotRegistered(_baseToken);
         }
         if (address(sharedBridge) == address(0)) {
-            revert BridgeNotSet();
+            revert SharedBridgeNotSet();
         }
 
         if (stateTransitionManager[_chainId] != address(0)) {

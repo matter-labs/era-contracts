@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
-import {NoFunctionsForDiamondCut, UndefinedDiamondCutAction, AddressHasNoCode, FacetExists, ZeroAddress, SelectorsMustAllHaveSameFreezability, NonEmptyCalldata, ReplaceFunctionFacetAddressZero, RemoveFunctionFacetAddressNotZero, DelegateCallFailed} from "../../common/L1ContractErrors.sol";
+import {NoFunctionsForDiamondCut, UndefinedDiamondCutAction, AddressHasNoCode, FacetExists, RemoveFunctionFacetAddressZero, SelectorsMustAllHaveSameFreezability, NonEmptyCalldata, ReplaceFunctionFacetAddressZero, RemoveFunctionFacetAddressNotZero, DelegateCallFailed} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -196,7 +196,7 @@ library Diamond {
             SelectorToFacet memory oldFacet = ds.selectorToFacet[selector];
             // Can't delete a non-existent facet
             if (oldFacet.facetAddress == address(0)) {
-                revert ZeroAddress();
+                revert RemoveFunctionFacetAddressZero();
             }
 
             _removeOneFunction(oldFacet.facetAddress, selector);
