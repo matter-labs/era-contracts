@@ -56,9 +56,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         if (pricingMode == PubdataPricingMode.Validium) {
             // skipping data validation for validium, we just check that the data is empty
-            if (logOutput.pubdataHash != 0x00) {
-                revert InvalidHash();
-            }
             if (_newBatch.pubdataCommitments.length != 1) {
                 revert CalldataLengthTooBig();
             }
