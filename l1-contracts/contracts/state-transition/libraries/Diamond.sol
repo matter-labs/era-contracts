@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.20;
 
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {NoFunctionsForDiamondCut, UndefinedDiamondCutAction, AddressHasNoCode, FacetExists, ZeroAddress, NonZeroAddress, SelectorsMustAllHaveSameFreezability, NonEmptyCalldata, MalformedCalldata, BadReturnData} from "../../common/L1ContractErrors.sol";
 

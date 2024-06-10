@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
@@ -16,7 +16,7 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {GenesisUpgrade} from "contracts/upgrades/GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
-import {StateTransitionManagerInitializeData} from "contracts/state-transition/IStateTransitionManager.sol";
+import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
@@ -79,14 +79,18 @@ contract StateTransitionManagerTest is Test {
             })
         );
 
+        ChainCreationParams memory chainCreationParams = ChainCreationParams({
+            genesisUpgrade: address(genesisUpgradeContract),
+            genesisBatchHash: bytes32(uint256(0x01)),
+            genesisIndexRepeatedStorageChanges: 0x01,
+            genesisBatchCommitment: bytes32(uint256(0x01)),
+            diamondCut: getDiamondCutData(address(diamondInit))
+        });
+
         StateTransitionManagerInitializeData memory stmInitializeDataNoGovernor = StateTransitionManagerInitializeData({
             owner: address(0),
             validatorTimelock: validator,
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(""),
-            genesisIndexRepeatedStorageChanges: 0,
-            genesisBatchCommitment: bytes32(""),
-            diamondCut: getDiamondCutData(address(diamondInit)),
+            chainCreationParams: chainCreationParams,
             protocolVersion: 0
         });
 
@@ -100,11 +104,7 @@ contract StateTransitionManagerTest is Test {
         StateTransitionManagerInitializeData memory stmInitializeData = StateTransitionManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(""),
-            genesisIndexRepeatedStorageChanges: 0,
-            genesisBatchCommitment: bytes32(""),
-            diamondCut: getDiamondCutData(address(diamondInit)),
+            chainCreationParams: chainCreationParams,
             protocolVersion: 0
         });
 

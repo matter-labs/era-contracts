@@ -103,7 +103,9 @@ describe("Legacy Era tests", function () {
       deployer.addresses.StateTransition.DiamondProxy
     );
 
-    const proxyAdminInterface = new Interface(hardhat.artifacts.readArtifactSync("ProxyAdmin").abi);
+    const proxyAdminInterface = new Interface(
+      hardhat.artifacts.readArtifactSync("@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin").abi
+    );
     const calldata = proxyAdminInterface.encodeFunctionData("upgrade(address,address)", [
       deployer.addresses.Bridges.SharedBridgeProxy,
       sharedBridge.address,

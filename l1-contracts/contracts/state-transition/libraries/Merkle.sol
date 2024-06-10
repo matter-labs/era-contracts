@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.20;
 
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {MerklePathEmpty, MerklePathOutOfBounds, MerkleIndexOutOfBounds} from "../../common/L1ContractErrors.sol";

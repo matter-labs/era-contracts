@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager} from "./IStateTransitionManager.sol";

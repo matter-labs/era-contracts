@@ -1,23 +1,22 @@
-import type { SystemContext, GasBoundCallerTester } from "../typechain";
-import { GasBoundCallerTesterFactory, SystemContextFactory } from "../typechain";
-import { REAL_SYSTEM_CONTEXT_ADDRESS } from "./shared/constants";
-import { deployContractOnAddress, getWallets } from "./shared/utils";
+import { REAL_SYSTEM_CONTEXT_ADDRESS } from "../../system-contracts/test/shared/constants";
+import { deployContractOnAddress, getWallets } from "../../system-contracts/test/shared/utils";
+import type { GasBoundCallerTester } from "../typechain";
+import { GasBoundCallerTesterFactory } from "../typechain";
+import type { ISystemContext } from "../typechain/ISystemContext";
+import { ISystemContextFactory } from "../typechain/ISystemContextFactory";
 import { expect } from "chai";
-import { prepareEnvironment } from "./shared/mocks";
 
 describe("GasBoundCaller tests", function () {
   let tester: GasBoundCallerTester;
-  let systemContext: SystemContext;
+  let systemContext: ISystemContext;
   before(async () => {
-    await prepareEnvironment();
-
     // Note, that while the gas bound caller itself does not need to be in kernel space,
     // it does help a lot for easier testing, so the tester is in kernel space.
     const GAS_BOUND_CALLER_TESTER_ADDRESS = "0x000000000000000000000000000000000000ffff";
     await deployContractOnAddress(GAS_BOUND_CALLER_TESTER_ADDRESS, "GasBoundCallerTester");
 
     tester = GasBoundCallerTesterFactory.connect(GAS_BOUND_CALLER_TESTER_ADDRESS, getWallets()[0]);
-    systemContext = SystemContextFactory.connect(REAL_SYSTEM_CONTEXT_ADDRESS, getWallets()[0]);
+    systemContext = ISystemContextFactory.connect(REAL_SYSTEM_CONTEXT_ADDRESS, getWallets()[0]);
   });
 
   it("Test entry overhead", async () => {
@@ -61,9 +60,14 @@ describe("GasBoundCaller tests", function () {
   it("Should work correctly if gas provided is enough to cover both gas and pubdata", async () => {
     // This tx should succeed, since enough gas was provided to it
     await (
-      await tester.gasBoundCall(tester.address, 80_000_000, tester.interface.encodeFunctionData("spender", [0, 100]), {
-        gasLimit: 80_000_000,
-      })
+      await tester.gasBoundCall(
+        tester.address,
+        80_000_000,
+        tester.interface.encodeFunctionData("spender", [0, 100, "0x"]),
+        {
+          gasLimit: 80_000_000,
+        }
+      )
     ).wait();
   });
 
@@ -78,7 +82,9 @@ describe("GasBoundCaller tests", function () {
           gasSpentOnPubdata,
           tester.address,
           gasSpentOnPubdata,
-          tester.interface.encodeFunctionData("spender", [0, pubdataToSend]),
+          tester.interface.encodeFunctionData("spender", [0, pubdataToSend, "0x"]),
+          "0x",
+          gasSpentOnPubdata,
           {
             gasLimit: 80_000_000,
           }
@@ -97,7 +103,9 @@ describe("GasBoundCaller tests", function () {
         gasSpentOnPubdata,
         tester.address,
         80_000_000,
-        tester.interface.encodeFunctionData("spender", [0, pubdataToSend]),
+        tester.interface.encodeFunctionData("spender", [0, pubdataToSend, "0x12345678"]),
+        "0x12345678",
+        gasSpentOnPubdata,
         {
           // Since we'll also spend some funds on execution, this
           gasLimit: 80_000_000,

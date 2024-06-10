@@ -62,6 +62,9 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             if (_newBatch.pubdataCommitments.length != 1) {
                 revert InvalidPubdataLength();
             }
+            for (uint8 i = uint8(SystemLogKey.BLOB_ONE_HASH_KEY); i <= uint8(SystemLogKey.BLOB_SIX_HASH_KEY); ++i) {
+                logOutput.blobHashes[i - uint8(SystemLogKey.BLOB_ONE_HASH_KEY)] = bytes32(0);
+            }
         } else if (pubdataSource == uint8(PubdataSource.Blob)) {
             // In this scenario, pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
             blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], logOutput.blobHashes);

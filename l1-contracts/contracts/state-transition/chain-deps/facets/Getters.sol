@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
+
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
@@ -11,6 +13,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
 import {InvalidSelector} from "../../../common/L1ContractErrors.sol";
+import {SemVer} from "../../../common/libraries/SemVer.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -142,6 +145,12 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     /// @inheritdoc IGetters
     function getProtocolVersion() external view returns (uint256) {
         return s.protocolVersion;
+    }
+
+    /// @inheritdoc IGetters
+    function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
+        // slither-disable-next-line unused-return
+        return SemVer.unpackSemVer(SafeCast.toUint96(s.protocolVersion));
     }
 
     /// @inheritdoc IGetters
