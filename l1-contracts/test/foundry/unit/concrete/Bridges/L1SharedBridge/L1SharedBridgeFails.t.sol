@@ -325,7 +325,6 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
 
     function test_claimFialedDeposit_paused() public testPause {
         vm.prank(bridgehubAddress);
-
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
@@ -501,48 +500,15 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     function test_finalizeWithdrawal_paused() public {
         vm.prank(owner);
         sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
-        vm.deal(address(sharedBridge), amount);
-        uint256 legacyBatchNumber = 0;
-
-        vm.mockCall(
-            l1ERC20BridgeAddress,
-            abi.encodeWithSelector(IL1ERC20Bridge.isWithdrawalFinalized.selector),
-            abi.encode(false)
-        );
-
-        vm.store(
-            address(sharedBridge),
-            keccak256(
-                abi.encode(
-                    l2MessageIndex,
-                    keccak256(
-                        abi.encode(
-                            legacyBatchNumber,
-                            keccak256(abi.encode(eraChainId, isWithdrawalFinalizedStorageLocation))
-                        )
-                    )
-                )
-            ),
-            bytes32(uint256(1))
-        );
-
-        bytes memory message = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector,
-            alice,
-            address(token),
-            amount
-        );
-
         vm.prank(owner);
         sharedBridge.pause();
-
         vm.expectRevert("Pausable: paused");
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
-            _l2BatchNumber: legacyBatchNumber,
+            _l2BatchNumber: 0,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,
-            _message: message,
+            _message: new bytes(0),
             _merkleProof: merkleProof
         });
     }
