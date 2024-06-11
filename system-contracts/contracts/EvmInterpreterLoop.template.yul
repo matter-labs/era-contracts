@@ -351,6 +351,9 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         size, sp := popStackItem(sp)
 
+        checkMultipleOverflow(offset,size,MEM_OFFSET_INNER())
+        checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER())
+
         checkMemOverflow(add(add(offset, size), MEM_OFFSET_INNER()))
         checkMemOverflow(add(add(destOffset, size), MEM_OFFSET_INNER()))
 
@@ -386,6 +389,7 @@ for { } true { } {
         dst := add(dst, MEM_OFFSET_INNER())
         offset := add(add(offset, BYTECODE_OFFSET()), 32)
 
+        checkOverflow(dst,len)
         checkMemOverflow(add(dst, len))
         // Check bytecode overflow
         if gt(add(offset, len), sub(MEM_OFFSET(), 1)) {
@@ -446,6 +450,7 @@ for { } true { } {
         if gt(add(offset, len), LAST_RETURNDATA_SIZE_OFFSET()) {
             revert(0, 0)
         }
+        checkMultipleOverflow(offset,len,MEM_OFFSET_INNER())
         checkMemOverflow(add(add(dest, MEM_OFFSET_INNER()), len))
 
         // minimum_word_size = (size + 31) / 32
@@ -1048,6 +1053,8 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         size, sp := popStackItem(sp)
 
+        checkMultipleOverflow(offset, size,MEM_OFFSET_INNER())
+
         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
 
         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
@@ -1068,6 +1075,8 @@ for { } true { } {
         size, sp := popStackItem(sp)
         topic1, sp := popStackItem(sp)
 
+        checkMultipleOverflow(offset, size,MEM_OFFSET_INNER())
+
         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
 
         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
@@ -1086,6 +1095,8 @@ for { } true { } {
         let offset, size
         offset, sp := popStackItem(sp)
         size, sp := popStackItem(sp)
+
+        checkMultipleOverflow(offset, size,MEM_OFFSET_INNER())
 
         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
 
@@ -1112,6 +1123,8 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         size, sp := popStackItem(sp)
 
+        checkMultipleOverflow(offset, size,MEM_OFFSET_INNER())
+
         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
 
         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
@@ -1137,6 +1150,8 @@ for { } true { } {
         let offset, size
         offset, sp := popStackItem(sp)
         size, sp := popStackItem(sp)
+
+        checkMultipleOverflow(offset, size,MEM_OFFSET_INNER())
 
         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
 

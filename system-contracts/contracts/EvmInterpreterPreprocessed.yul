@@ -543,6 +543,19 @@ object "EVMInterpreter" {
             }
         }
         
+        function checkMultipleOverflow(data1,data2,data3) {
+            checkOverflow(data1,data2)
+            checkOverflow(data1,data3)
+            checkOverflow(data2,data3)
+            checkOverflow(add(data1,data2), data3)
+        }
+        
+        function checkOverflow(data1,data2) {
+            if lt(add(data1,data2),data2) {
+                revert(0,0)
+            }
+        }
+        
         // This function can overflow, it is the job of the caller to ensure that it does not.
         // The argument to this function is the offset into the memory region IN BYTES.
         function expandMemory(newSize) -> gasCost {
@@ -911,6 +924,9 @@ object "EVMInterpreter" {
             retOffset, sp := popStackItem(sp)
             retSize, sp := popStackItem(sp)
         
+            checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER())
+            checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER())
+        
             checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()))
             checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()))
         
@@ -1058,6 +1074,9 @@ object "EVMInterpreter" {
             argsOffset := add(argsOffset,MEM_OFFSET_INNER())
             retOffset := add(retOffset,MEM_OFFSET_INNER())
         
+            checkOverflow(argsOffset,argsSize)
+            checkOverflow(retOffset,retSize)
+        
             checkMemOverflow(add(argsOffset, argsSize))
             checkMemOverflow(add(retOffset, retSize))
         
@@ -1090,6 +1109,9 @@ object "EVMInterpreter" {
             argsSize, sp := popStackItem(sp)
             retOffset, sp := popStackItem(sp)
             retSize, sp := popStackItem(sp)
+        
+            checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER())
+            checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER())
         
             checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()))
             checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()))
@@ -1351,6 +1373,8 @@ object "EVMInterpreter" {
             offset, sp := popStackItem(sp)
             size, sp := popStackItem(sp)
         
+            checkMultipleOverflow(offset, size, MEM_OFFSET_INNER())
+        
             checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)))
         
             if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
@@ -1394,6 +1418,8 @@ object "EVMInterpreter" {
             offset, sp := popStackItem(sp)
             size, sp := popStackItem(sp)
             salt, sp := popStackItem(sp)
+        
+            checkMultipleOverflow(offset, size, MEM_OFFSET_INNER())
         
             checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)))
         
@@ -1794,6 +1820,9 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
             
+                    checkMultipleOverflow(offset,size,MEM_OFFSET_INNER())
+                    checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER())
+            
                     checkMemOverflow(add(add(offset, size), MEM_OFFSET_INNER()))
                     checkMemOverflow(add(add(destOffset, size), MEM_OFFSET_INNER()))
             
@@ -1829,6 +1858,7 @@ object "EVMInterpreter" {
                     dst := add(dst, MEM_OFFSET_INNER())
                     offset := add(add(offset, BYTECODE_OFFSET()), 32)
             
+                    checkOverflow(dst,len)
                     checkMemOverflow(add(dst, len))
                     // Check bytecode overflow
                     if gt(add(offset, len), sub(MEM_OFFSET(), 1)) {
@@ -1889,6 +1919,7 @@ object "EVMInterpreter" {
                     if gt(add(offset, len), LAST_RETURNDATA_SIZE_OFFSET()) {
                         revert(0, 0)
                     }
+                    checkMultipleOverflow(offset,len,MEM_OFFSET_INNER())
                     checkMemOverflow(add(add(dest, MEM_OFFSET_INNER()), len))
             
                     // minimum_word_size = (size + 31) / 32
@@ -2491,6 +2522,8 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
             
+                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER())
+            
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
@@ -2511,6 +2544,8 @@ object "EVMInterpreter" {
                     size, sp := popStackItem(sp)
                     topic1, sp := popStackItem(sp)
             
+                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER())
+            
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
@@ -2529,6 +2564,8 @@ object "EVMInterpreter" {
                     let offset, size
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
+            
+                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER())
             
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
             
@@ -2555,6 +2592,8 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
             
+                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER())
+            
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
@@ -2580,6 +2619,8 @@ object "EVMInterpreter" {
                     let offset, size
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
+            
+                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER())
             
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
             
@@ -3175,6 +3216,19 @@ object "EVMInterpreter" {
                 }
             }
             
+            function checkMultipleOverflow(data1,data2,data3) {
+                checkOverflow(data1,data2)
+                checkOverflow(data1,data3)
+                checkOverflow(data2,data3)
+                checkOverflow(add(data1,data2), data3)
+            }
+            
+            function checkOverflow(data1,data2) {
+                if lt(add(data1,data2),data2) {
+                    revert(0,0)
+                }
+            }
+            
             // This function can overflow, it is the job of the caller to ensure that it does not.
             // The argument to this function is the offset into the memory region IN BYTES.
             function expandMemory(newSize) -> gasCost {
@@ -3543,6 +3597,9 @@ object "EVMInterpreter" {
                 retOffset, sp := popStackItem(sp)
                 retSize, sp := popStackItem(sp)
             
+                checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER())
+                checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER())
+            
                 checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()))
                 checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()))
             
@@ -3690,6 +3747,9 @@ object "EVMInterpreter" {
                 argsOffset := add(argsOffset,MEM_OFFSET_INNER())
                 retOffset := add(retOffset,MEM_OFFSET_INNER())
             
+                checkOverflow(argsOffset,argsSize)
+                checkOverflow(retOffset,retSize)
+            
                 checkMemOverflow(add(argsOffset, argsSize))
                 checkMemOverflow(add(retOffset, retSize))
             
@@ -3722,6 +3782,9 @@ object "EVMInterpreter" {
                 argsSize, sp := popStackItem(sp)
                 retOffset, sp := popStackItem(sp)
                 retSize, sp := popStackItem(sp)
+            
+                checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER())
+                checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER())
             
                 checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()))
                 checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()))
@@ -3983,6 +4046,8 @@ object "EVMInterpreter" {
                 offset, sp := popStackItem(sp)
                 size, sp := popStackItem(sp)
             
+                checkMultipleOverflow(offset, size, MEM_OFFSET_INNER())
+            
                 checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)))
             
                 if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
@@ -4026,6 +4091,8 @@ object "EVMInterpreter" {
                 offset, sp := popStackItem(sp)
                 size, sp := popStackItem(sp)
                 salt, sp := popStackItem(sp)
+            
+                checkMultipleOverflow(offset, size, MEM_OFFSET_INNER())
             
                 checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)))
             
@@ -4437,6 +4504,9 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
             
+                    checkMultipleOverflow(offset,size,MEM_OFFSET_INNER())
+                    checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER())
+            
                     checkMemOverflow(add(add(offset, size), MEM_OFFSET_INNER()))
                     checkMemOverflow(add(add(destOffset, size), MEM_OFFSET_INNER()))
             
@@ -4472,6 +4542,7 @@ object "EVMInterpreter" {
                     dst := add(dst, MEM_OFFSET_INNER())
                     offset := add(add(offset, BYTECODE_OFFSET()), 32)
             
+                    checkOverflow(dst,len)
                     checkMemOverflow(add(dst, len))
                     // Check bytecode overflow
                     if gt(add(offset, len), sub(MEM_OFFSET(), 1)) {
@@ -4532,6 +4603,7 @@ object "EVMInterpreter" {
                     if gt(add(offset, len), LAST_RETURNDATA_SIZE_OFFSET()) {
                         revert(0, 0)
                     }
+                    checkMultipleOverflow(offset,len,MEM_OFFSET_INNER())
                     checkMemOverflow(add(add(dest, MEM_OFFSET_INNER()), len))
             
                     // minimum_word_size = (size + 31) / 32
@@ -5134,6 +5206,8 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
             
+                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER())
+            
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
@@ -5154,6 +5228,8 @@ object "EVMInterpreter" {
                     size, sp := popStackItem(sp)
                     topic1, sp := popStackItem(sp)
             
+                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER())
+            
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
@@ -5172,6 +5248,8 @@ object "EVMInterpreter" {
                     let offset, size
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
+            
+                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER())
             
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
             
@@ -5198,6 +5276,8 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
             
+                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER())
+            
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
@@ -5223,6 +5303,8 @@ object "EVMInterpreter" {
                     let offset, size
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
+            
+                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER())
             
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
             
