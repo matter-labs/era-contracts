@@ -13,9 +13,6 @@ contract freezeChainTest is StateTransitionManagerTest {
         bool isChainFrozen = gettersFacet.isDiamondStorageFrozen();
         assertEq(isChainFrozen, false);
 
-        vm.stopPrank();
-        vm.startPrank(governor);
-
         chainContractAddress.freezeChain(block.chainid);
 
         // Repeated call should revert
@@ -25,5 +22,20 @@ contract freezeChainTest is StateTransitionManagerTest {
         // Call fails as storage is frozen
         vm.expectRevert(bytes.concat("q1"));
         isChainFrozen = gettersFacet.isDiamondStorageFrozen();
+    }
+
+    function test_RevertWhen_UnfreezingChain() public {
+        uint256 newChainid = 10;
+        createNewChainWithId(getDiamondCutData(diamondInit), newChainid);
+
+        address newChainAddress = chainContractAddress.getHyperchain(newChainid);
+        GettersFacet gettersFacet = GettersFacet(newChainAddress);
+        bool isChainFrozen = gettersFacet.isDiamondStorageFrozen();
+        assertEq(isChainFrozen, false);
+
+        chainContractAddress.freezeChain(newChainid);
+
+        vm.expectRevert(bytes.concat("q1"));
+        chainContractAddress.unfreezeChain(newChainid);
     }
 }

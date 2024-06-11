@@ -210,7 +210,7 @@ library Utils {
     }
 
     function getGettersSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](29);
+        bytes4[] memory selectors = new bytes4[](31);
         selectors[0] = GettersFacet.getVerifier.selector;
         selectors[1] = GettersFacet.getAdmin.selector;
         selectors[2] = GettersFacet.getPendingAdmin.selector;
@@ -240,6 +240,8 @@ library Utils {
         selectors[26] = GettersFacet.getTotalBatchesVerified.selector;
         selectors[27] = GettersFacet.getTotalBatchesExecuted.selector;
         selectors[28] = GettersFacet.getL2SystemContractsUpgradeTxHash.selector;
+        selectors[29] = GettersFacet.baseTokenGasPriceMultiplierDenominator.selector;
+        selectors[30] = GettersFacet.baseTokenGasPriceMultiplierNominator.selector;
         return selectors;
     }
 
