@@ -82,7 +82,7 @@ export class Deployer {
     this.chainId = parseInt(process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID!);
   }
 
-  public async initialZkSyncHyperchainDiamondCut(extraFacets?: FacetCut[], checkOnchain: boolean = false) {
+  public async initialZkSyncHyperchainDiamondCut(extraFacets?: FacetCut[], compareDiamondCutHash: boolean = false) {
     let facetCuts: FacetCut[] = Object.values(
       await getCurrentFacetCutsForAdd(
         this.addresses.StateTransition.AdminFacet,
@@ -112,7 +112,7 @@ export class Deployer {
       false
     );
 
-    if (checkOnchain) {
+    if (compareDiamondCutHash) {
       const hash = ethers.utils.keccak256(
         ethers.utils.defaultAbiCoder.encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCut])
       );
@@ -705,7 +705,7 @@ export class Deployer {
     validiumMode: boolean,
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,
-    checkOnchain: boolean = false,
+    compareDiamondCutHash: boolean = false,
     nonce?,
     predefinedChainId?: string,
     useGovernance: boolean = false
@@ -719,7 +719,7 @@ export class Deployer {
 
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
-    const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets, checkOnchain);
+    const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets, compareDiamondCutHash);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
     const receipt = await this.executeDirectOrGovernance(
