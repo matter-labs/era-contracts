@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable gas-custom-errors, reason-string
+
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";

@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable gas-custom-errors, reason-string
+
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
@@ -100,8 +102,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function getAllHyperchains() public view override returns (address[] memory chainAddresses) {
         uint256[] memory keys = hyperchainMap.keys();
         chainAddresses = new address[](keys.length);
-        for (uint256 i = 0; i < keys.length; i++) {
-            chainAddresses[i] = hyperchainMap.get(keys[i]);
+        uint256 keysLength = keys.length;
+        for (uint256 i = 0; i < keysLength; ++i) {
+            chainAddresses[i] = hyperchainMap.get(i);
         }
     }
 

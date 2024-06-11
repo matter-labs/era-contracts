@@ -37,14 +37,17 @@ describe("PubdataChunkPublisher tests", () => {
 
   describe("chunkAndPublishPubdata", () => {
     it("non-L1Messenger failed to call", async () => {
-      await expect(pubdataChunkPublisher.chunkAndPublishPubdata("0x1337")).to.be.revertedWith("Inappropriate caller");
+      await expect(pubdataChunkPublisher.chunkAndPublishPubdata("0x1337")).to.be.revertedWithCustomError(
+        pubdataChunkPublisher,
+        "Unauthorized"
+      );
     });
 
     it("Too Much Pubdata", async () => {
       const pubdata = genRandHex(blobSizeInBytes * maxNumberBlobs + 1);
       await expect(
         pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata)
-      ).to.be.revertedWith("pubdata should fit in 6 blobs");
+      ).to.be.revertedWithCustomError(pubdataChunkPublisher, "TooMuchPubdata");
     });
 
     it("Publish 1 Blob", async () => {

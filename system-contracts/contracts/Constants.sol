@@ -35,7 +35,7 @@ address constant ECMUL_SYSTEM_CONTRACT = address(0x07);
 address constant ECPAIRING_SYSTEM_CONTRACT = address(0x08);
 
 
-/// @dev The number of ergs that need to be spent for a single byte of pubdata regardless of the pubdata price.
+/// @dev The number of gas that need to be spent for a single byte of pubdata regardless of the pubdata price.
 /// This variable is used to ensure the following:
 /// - That the long-term storage of the operator is compensated properly.
 /// - That it is not possible that the pubdata counter grows too high without spending proportional amount of computation.

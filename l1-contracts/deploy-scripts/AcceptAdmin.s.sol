@@ -16,7 +16,7 @@ contract AcceptAdmin is Script {
         address governor;
     }
 
-    Config config;
+    Config internal config;
 
     function initConfig() public {
         string memory root = vm.projectRoot();

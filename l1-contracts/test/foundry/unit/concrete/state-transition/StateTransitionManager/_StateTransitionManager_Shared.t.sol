@@ -118,7 +118,7 @@ contract StateTransitionManagerTest is Test {
         vm.startPrank(governor);
     }
 
-    function getDiamondCutData(address _diamondInit) internal returns (Diamond.DiamondCutData memory) {
+    function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
         InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier);
 
         bytes memory initCalldata = abi.encode(initializeData);

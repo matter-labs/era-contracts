@@ -100,7 +100,7 @@ library RLPEncoder {
                 hbs += 2;
             }
             if (_number > type(uint8).max) {
-                hbs += 1;
+                ++hbs;
             }
         }
     }

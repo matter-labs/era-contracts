@@ -3,9 +3,11 @@ import path from "path";
 import { renderFile } from "template-file";
 import { glob } from "fast-glob";
 import { Command } from "commander";
+import { needsRecompilation, deleteDir, setCompilationTime, isFolderEmpty } from "./utils";
 
 const CONTRACTS_DIR = "contracts";
 const OUTPUT_DIR = "contracts-preprocessed";
+const TIMESTAMP_FILE = "last_compilation_preprocessing.timestamp"; // File to store the last compilation time
 
 const params = {
   SYSTEM_CONTRACTS_OFFSET: "0x8000",
@@ -15,6 +17,18 @@ async function preprocess(testMode: boolean) {
   if (testMode) {
     console.log("\x1b[31mWarning: test mode for the preprocessing being used!\x1b[0m");
     params.SYSTEM_CONTRACTS_OFFSET = "0x9000";
+  }
+
+  const timestampFilePath = path.join(process.cwd(), TIMESTAMP_FILE);
+  const folderToCheck = path.join(process.cwd(), CONTRACTS_DIR);
+
+  if ((await isFolderEmpty(OUTPUT_DIR)) || needsRecompilation(folderToCheck, timestampFilePath) || testMode) {
+    console.log("Preprocessing needed.");
+    deleteDir(OUTPUT_DIR);
+    setCompilationTime(timestampFilePath);
+  } else {
+    console.log("Preprocessing not needed.");
+    return;
   }
 
   const contracts = await glob(

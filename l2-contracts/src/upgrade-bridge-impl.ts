@@ -352,7 +352,7 @@ async function main() {
         REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT
       );
 
-      console.log(`Base cost for priority tx with max ergs: ${ethers.utils.formatEther(neededValue)} ETH`);
+      console.log(`Base cost for priority tx with max gas: ${ethers.utils.formatEther(neededValue)} ETH`);
     });
 
   await program.parseAsync(process.argv);
