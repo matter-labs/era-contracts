@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "license": "MIT",
   "devDependencies": {
-    "@matterlabs/hardhat-zksync-deploy": "^0.6.5",
+    "@matterlabs/hardhat-zksync-deploy": "^0.7.0",
     "@matterlabs/hardhat-zksync-solc": "^0.3.15",
-    "@matterlabs/hardhat-zksync-verify": "^0.2.0",
+    "@matterlabs/hardhat-zksync-verify": "^0.4.0",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.6",
     "@nomicfoundation/hardhat-ethers": "^3.0.4",
     "@nomicfoundation/hardhat-verify": "^1.1.0",
@@ -28,7 +28,7 @@
     "ts-node": "^10.1.0",
     "typechain": "^4.0.0",
     "typescript": "^5.2.2",
-    "zksync-web3": "^0.15.4"
+    "zksync-ethers": "5.8.0-beta.5"
   },
   "scripts": {
     "build": "hardhat compile",
