@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable reason-string, gas-custom-errors
+
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
@@ -37,10 +39,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     IBridgehub public immutable override BRIDGE_HUB;
 
     /// @dev Era's chainID
-    uint256 immutable ERA_CHAIN_ID;
+    uint256 internal immutable ERA_CHAIN_ID;
 
     /// @dev The address of zkSync Era diamond proxy contract.
-    address immutable ERA_DIAMOND_PROXY;
+    address internal immutable ERA_DIAMOND_PROXY;
 
     /// @dev Stores the first batch number on the zkSync Era Diamond Proxy that was settled after Diamond proxy upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade Eth withdrawals. Withdrawals from batches older
@@ -110,6 +112,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         _;
     }
 
+    /// @notice Checks that the message sender is the shared bridge itself.
+    modifier onlySelf() {
+        require(msg.sender == address(this), "ShB not shared bridge");
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
@@ -161,7 +169,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process
-    function transferFundsFromLegacy(address _token, address _target, uint256 _targetChainId) external onlyOwner {
+    function transferFundsFromLegacy(address _token, address _target, uint256 _targetChainId) external onlySelf {
         if (_token == ETH_TOKEN_ADDRESS) {
             uint256 balanceBefore = address(this).balance;
             IMailbox(_target).transferEthToSharedBridge();
@@ -177,8 +185,22 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             require(legacyBridgeBalance > 0, "ShB: 0 amount to transfer");
             IL1ERC20Bridge(_target).transferTokenToSharedBridge(_token);
             uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
-            require(balanceAfter - balanceBefore == legacyBridgeBalance, "ShB: wrong amount transferred");
+            require(balanceAfter - balanceBefore >= legacyBridgeBalance, "ShB: wrong amount transferred");
             chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + legacyBridgeBalance;
+        }
+    }
+
+    /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process.
+    /// @dev Unlike `transferFundsFromLegacy` is provides a concrete limit on the gas used for the transfer and even if it will fail, it will not revert the whole transaction.
+    function safeTransferFundsFromLegacy(
+        address _token,
+        address _target,
+        uint256 _targetChainId,
+        uint256 _gasPerToken
+    ) external onlyOwner {
+        try this.transferFundsFromLegacy{gas: _gasPerToken}(_token, _target, _targetChainId) {} catch {
+            // A reasonable amount of gas will be provided to transfer the token.
+            // If the transfer fails, we don't want to revert the whole transaction.
         }
     }
 
