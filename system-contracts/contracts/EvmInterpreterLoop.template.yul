@@ -450,8 +450,7 @@ for { } true { } {
         // The addition offset + size overflows.
         // offset + size is larger than RETURNDATASIZE.
         checkOverflow(offset,len)
-        let rdz := mload(LAST_RETURNDATA_SIZE_OFFSET())
-        if gt(add(offset, len), rdz) {
+        if gt(add(offset, len), mload(LAST_RETURNDATA_SIZE_OFFSET())) {
             revert(0, 0)
         }
 
