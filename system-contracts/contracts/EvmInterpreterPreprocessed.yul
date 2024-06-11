@@ -1918,11 +1918,11 @@ object "EVMInterpreter" {
                     // TODO: check if these conditions are met
                     // The addition offset + size overflows.
                     // offset + size is larger than RETURNDATASIZE.
-                    if gt(add(offset, len), LAST_RETURNDATA_SIZE_OFFSET()) {
+                    checkOverflow(offset,len)
+                    let rdz := mload(LAST_RETURNDATA_SIZE_OFFSET())
+                    if gt(add(offset, len), rdz) {
                         revert(0, 0)
                     }
-                    checkMultipleOverflow(offset,len,MEM_OFFSET_INNER())
-                    checkMemOverflow(add(add(dest, MEM_OFFSET_INNER()), len))
             
                     // minimum_word_size = (size + 31) / 32
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
@@ -4604,11 +4604,11 @@ object "EVMInterpreter" {
                     // TODO: check if these conditions are met
                     // The addition offset + size overflows.
                     // offset + size is larger than RETURNDATASIZE.
-                    if gt(add(offset, len), LAST_RETURNDATA_SIZE_OFFSET()) {
+                    checkOverflow(offset,len)
+                    let rdz := mload(LAST_RETURNDATA_SIZE_OFFSET())
+                    if gt(add(offset, len), rdz) {
                         revert(0, 0)
                     }
-                    checkMultipleOverflow(offset,len,MEM_OFFSET_INNER())
-                    checkMemOverflow(add(add(dest, MEM_OFFSET_INNER()), len))
             
                     // minimum_word_size = (size + 31) / 32
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
