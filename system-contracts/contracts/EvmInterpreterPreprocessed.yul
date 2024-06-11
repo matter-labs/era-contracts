@@ -2665,10 +2665,11 @@ object "EVMInterpreter" {
             
             
                     checkOverflow(offset,size)
-                    ensureAcceptableMemLocation(add(offset,size))
+                    //checkMemOverflow(add(offset,size))
                     evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
             
                     returnLen := size
+                    checkOverflow(offset,MEM_OFFSET_INNER())
                     returnOffset := add(MEM_OFFSET_INNER(), offset)
                     break
                 }
@@ -5355,10 +5356,11 @@ object "EVMInterpreter" {
             
             
                     checkOverflow(offset,size)
-                    ensureAcceptableMemLocation(add(offset,size))
+                    //checkMemOverflow(add(offset,size))
                     evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
             
                     returnLen := size
+                    checkOverflow(offset,MEM_OFFSET_INNER())
                     returnOffset := add(MEM_OFFSET_INNER(), offset)
                     break
                 }
@@ -5415,6 +5417,7 @@ object "EVMInterpreter" {
             if eq(isCallerEVM, 1) {
                 // Includes gas
                 returnOffset := sub(returnOffset, 32)
+                checkOverflow(returnLen, 32)
                 returnLen := add(returnLen, 32)
 
                 mstore(returnOffset, evmGasLeft)

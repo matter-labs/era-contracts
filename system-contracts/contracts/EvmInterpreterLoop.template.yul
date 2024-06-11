@@ -1196,10 +1196,11 @@ for { } true { } {
 
 
         checkOverflow(offset,size)
-        ensureAcceptableMemLocation(add(offset,size))
+        //checkMemOverflow(add(offset,size))
         evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
 
         returnLen := size
+        checkOverflow(offset,MEM_OFFSET_INNER())
         returnOffset := add(MEM_OFFSET_INNER(), offset)
         break
     }
