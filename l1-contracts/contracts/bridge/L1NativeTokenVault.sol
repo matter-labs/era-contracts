@@ -160,11 +160,11 @@ contract L1NativeTokenVault is
         address l1Token = tokenAddress[_assetInfo];
         (uint256 amount, address l1Receiver) = abi.decode(_data, (uint256, address));
         _l1Receiver = l1Receiver;
-        if (!hyperbridgingEnabled[_chainId]) {
-            // Check that the chain has sufficient balance
-            require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
-            chainBalance[_chainId][l1Token] -= amount;
-        }
+        // if (!hyperbridgingEnabled[_chainId]) {
+        //     // Check that the chain has sufficient balance
+        //     require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
+        //     chainBalance[_chainId][l1Token] -= amount;
+        // }
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)

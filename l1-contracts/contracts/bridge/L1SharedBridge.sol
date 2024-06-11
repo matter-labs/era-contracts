@@ -638,11 +638,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             // It should be equal to the length of the function signature + address + uint256 + address = 4 + 32 + 32 + 32 =
             // 100 (bytes).
             (assetInfo, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
-            (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-            (l1ReceiverBytes, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-            parsedL1Receiver = address(uint160(uint256(l1ReceiverBytes)));
-            assetData = abi.encode(amount, parsedL1Receiver);
-            // assetData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
+            // (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+            // (l1ReceiverBytes, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+            // parsedL1Receiver = address(uint160(uint256(l1ReceiverBytes)));
+            // assetData = abi.encode(amount, parsedL1Receiver);
+            assetData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
             //todo
         } else {
