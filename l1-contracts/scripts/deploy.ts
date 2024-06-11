@@ -1,14 +1,16 @@
+// hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
 import { Command } from "commander";
 import { Wallet, ethers } from "ethers";
 import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import * as fs from "fs";
-import * as path from "path";
-import { web3Provider } from "./utils";
+import { web3Provider, GAS_MULTIPLIER } from "./utils";
+import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
+import { initialBridgehubDeployment } from "../src.ts/deploy-process";
+import { ethTestConfig } from "../src.ts/utils";
 
 const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 async function main() {
   const program = new Command();
@@ -17,6 +19,7 @@ async function main() {
 
   program
     .option("--private-key <private-key>")
+    .option("--chain-id <chain-id>")
     .option("--gas-price <gas-price>")
     .option("--nonce <nonce>")
     .option("--owner-address <owner-address>")
@@ -35,56 +38,24 @@ async function main() {
       const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
       console.log(`Using owner address: ${ownerAddress}`);
 
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
+      const gasPrice = cmd.gasPrice
+        ? parseUnits(cmd.gasPrice, "gwei")
+        : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-      let nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
+      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
       console.log(`Using nonce: ${nonce}`);
 
       const create2Salt = cmd.create2Salt ? cmd.create2Salt : ethers.utils.hexlify(ethers.utils.randomBytes(32));
 
       const deployer = new Deployer({
         deployWallet,
+        addresses: deployedAddressesFromEnv(),
         ownerAddress,
         verbose: true,
       });
 
-      // Create2 factory already deployed on the public networks, only deploy it on local node
-      if (process.env.CHAIN_ETH_NETWORK === "localhost") {
-        await deployer.deployCreate2Factory({ gasPrice, nonce });
-        nonce++;
-
-        await deployer.deployMulticall3(create2Salt, { gasPrice, nonce });
-        nonce++;
-      }
-
-      if (cmd.onlyVerifier) {
-        await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
-        return;
-      }
-
-      // Deploy diamond upgrade init contract if needed
-      const diamondUpgradeContractVersion = cmd.diamondUpgradeInit || 1;
-      if (diamondUpgradeContractVersion) {
-        await deployer.deployDiamondUpgradeInit(create2Salt, diamondUpgradeContractVersion, {
-          gasPrice,
-          nonce,
-        });
-        nonce++;
-      }
-
-      await deployer.deployDefaultUpgrade(create2Salt, {
-        gasPrice,
-        nonce,
-      });
-      nonce++;
-
-      await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice, nonce: nonce++ });
-      await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
-      await deployer.deployZkSyncContract(create2Salt, gasPrice, nonce + 1);
-      await deployer.deployBridgeContracts(create2Salt, gasPrice); // Do not pass nonce, since it was increment after deploying zkSync contracts
-      await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
-      await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
+      await initialBridgehubDeployment(deployer, [], gasPrice, cmd.onlyVerifier, create2Salt, nonce);
     });
 
   await program.parseAsync(process.argv);

@@ -1,39 +1,37 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import "../../zksync/libraries/PriorityQueue.sol";
+import {PriorityQueue, PriorityOperation} from "../../state-transition/libraries/PriorityQueue.sol";
 
 contract PriorityQueueTest {
-    using PriorityQueue for PriorityQueue.Queue;
-
     PriorityQueue.Queue priorityQueue;
 
     function getFirstUnprocessedPriorityTx() external view returns (uint256) {
-        return priorityQueue.getFirstUnprocessedPriorityTx();
+        return PriorityQueue.getFirstUnprocessedPriorityTx(priorityQueue);
     }
 
     function getTotalPriorityTxs() external view returns (uint256) {
-        return priorityQueue.getTotalPriorityTxs();
+        return PriorityQueue.getTotalPriorityTxs(priorityQueue);
     }
 
     function getSize() external view returns (uint256) {
-        return priorityQueue.getSize();
+        return PriorityQueue.getSize(priorityQueue);
     }
 
     function isEmpty() external view returns (bool) {
-        return priorityQueue.isEmpty();
+        return PriorityQueue.isEmpty(priorityQueue);
     }
 
     function pushBack(PriorityOperation memory _operation) external {
-        return priorityQueue.pushBack(_operation);
+        return PriorityQueue.pushBack(priorityQueue, _operation);
     }
 
     function front() external view returns (PriorityOperation memory) {
-        return priorityQueue.front();
+        return PriorityQueue.front(priorityQueue);
     }
 
     function popFront() external returns (PriorityOperation memory operation) {
-        return priorityQueue.popFront();
+        return PriorityQueue.popFront(priorityQueue);
     }
 }

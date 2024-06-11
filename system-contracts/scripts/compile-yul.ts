@@ -1,15 +1,18 @@
+// hardhat import should be the first import in the file
 import type { CompilerPaths } from "./utils";
-import { spawn, compilerLocation, prepareCompilerPaths } from "./utils";
+import { spawn, compilerLocation, prepareCompilerPaths, getSolcLocation } from "./utils";
 import * as fs from "fs";
 import { Command } from "commander";
 
 const COMPILER_VERSION = "1.3.18";
-const IS_COMPILER_PRE_RELEASE = false;
+const IS_COMPILER_PRE_RELEASE = true;
 
 export async function compileYul(paths: CompilerPaths, file: string) {
+  const solcCompilerPath = await getSolcLocation();
+
   const zksolcLocation = await compilerLocation(COMPILER_VERSION, IS_COMPILER_PRE_RELEASE);
   await spawn(
-    `${zksolcLocation} ${paths.absolutePathSources}/${file} --optimization 3 --system-mode --yul --bin --overwrite -o ${paths.absolutePathArtifacts}`
+    `${zksolcLocation} ${paths.absolutePathSources}/${file} --solc ${solcCompilerPath} --optimization 3 --system-mode --yul --bin --overwrite -o ${paths.absolutePathArtifacts}`
   );
 }
 

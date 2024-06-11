@@ -1,17 +1,18 @@
-pragma solidity 0.8.20;
+// SPDX-License-Identifier: MIT
 
-import {ExecutorFacet} from "../../zksync/facets/Executor.sol";
-import {VerifierParams} from "../../zksync/Storage.sol";
-import {LogProcessingOutput} from "../../zksync/interfaces/IExecutor.sol";
-import {PubdataSource} from "../../zksync/interfaces/IExecutor.sol";
+pragma solidity 0.8.24;
+
+import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
+import {PubdataPricingMode} from "../../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
+import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
     function getBatchProofPublicInput(
         bytes32 _prevBatchCommitment,
-        bytes32 _currentBatchCommitment,
-        VerifierParams memory _verifierParams
+        bytes32 _currentBatchCommitment
     ) external pure returns (uint256) {
-        return _getBatchProofPublicInput(_prevBatchCommitment, _currentBatchCommitment, _verifierParams);
+        return _getBatchProofPublicInput(_prevBatchCommitment, _currentBatchCommitment);
     }
 
     function createBatchCommitment(
@@ -25,7 +26,8 @@ contract ExecutorProvingTest is ExecutorFacet {
 
     function processL2Logs(
         CommitBatchInfo calldata _newBatch,
-        bytes32 _expectedSystemContractUpgradeTxHash
+        bytes32 _expectedSystemContractUpgradeTxHash,
+        PubdataPricingMode
     ) external pure returns (LogProcessingOutput memory logOutput) {
         return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
     }

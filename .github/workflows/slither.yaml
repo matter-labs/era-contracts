@@ -1,0 +1,48 @@
+name: Slither scanner
+
+on: pull_request
+
+jobs:
+  slither-l1:
+    name: Slither check for L1 contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.8
+
+      - name: Install Slither
+        run: |
+          pip install slither-analyzer
+
+      - name: Use Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Remove non-compiled files
+        run: |
+          rm -rf ./l1-contracts/contracts/state-transition/utils/
+          rm -rf ./l1-contracts/contracts/state-transition/Verifier.sol
+          rm -rf ./l1-contracts/contracts/state-transition/TestnetVerifier.sol
+          rm -rf ./l1-contracts/contracts/dev-contracts/test/VerifierTest.sol
+          rm -rf ./l1-contracts/contracts/dev-contracts/test/VerifierRecursiveTest.sol
+
+      - name: Run Slither
+        run: |
+          cd l1-contracts
+          slither --config ./slither.config.json .

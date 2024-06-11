@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 library AddressAliasHelper {
     uint160 constant offset = uint160(0x1111000000000000000000000000000000001111);
@@ -38,6 +38,28 @@ library AddressAliasHelper {
     function undoL1ToL2Alias(address l2Address) internal pure returns (address l1Address) {
         unchecked {
             l1Address = address(uint160(l2Address) - offset);
+        }
+    }
+
+    /// @notice Utility function used to calculate the correct refund recipient
+    /// @param _refundRecipient the address that should receive the refund
+    /// @param _prevMsgSender the address that triggered the tx to L2
+    /// @return _recipient the corrected address that should receive the refund
+    function actualRefundRecipient(
+        address _refundRecipient,
+        address _prevMsgSender
+    ) internal view returns (address _recipient) {
+        if (_refundRecipient == address(0)) {
+            // If the `_refundRecipient` is not provided, we use the `_prevMsgSender` as the recipient.
+            // slither-disable-next-line tx-origin
+            _recipient = _prevMsgSender == tx.origin
+                ? _prevMsgSender
+                : AddressAliasHelper.applyL1ToL2Alias(_prevMsgSender);
+        } else if (_refundRecipient.code.length > 0) {
+            // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
+            _recipient = AddressAliasHelper.applyL1ToL2Alias(_refundRecipient);
+        } else {
+            _recipient = _refundRecipient;
         }
     }
 }

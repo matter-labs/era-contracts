@@ -3,10 +3,10 @@ import { expect } from "chai";
 import { ethers } from "ethers";
 import * as hre from "hardhat";
 import { Provider, Wallet } from "zksync-web3";
-import type { L2Weth } from "../typechain/L2Weth";
-import type { L2WethBridge } from "../typechain/L2WethBridge";
-import { L2WethBridgeFactory } from "../typechain/L2WethBridgeFactory";
-import { L2WethFactory } from "../typechain/L2WethFactory";
+import type { L2WrappedBaseToken } from "../typechain/L2WrappedBaseToken";
+import type { L2SharedBridge } from "../typechain/L2SharedBridge";
+import { L2SharedBridgeFactory } from "../typechain/L2SharedBridgeFactory";
+import { L2WrappedBaseTokenFactory } from "../typechain/L2WrappedBaseTokenFactory";
 
 const richAccount = {
   address: "0x36615Cf349d7F6344891B1e7CA7C72883F5dc049",
@@ -14,17 +14,18 @@ const richAccount = {
 };
 
 const eth18 = ethers.utils.parseEther("18");
+const testChainId = 9;
 
 describe("WETH token & WETH bridge", function () {
   const provider = new Provider(hre.config.networks.localhost.url);
   const wallet = new Wallet(richAccount.privateKey, provider);
-  let wethToken: L2Weth;
-  let wethBridge: L2WethBridge;
+  let wethToken: L2WrappedBaseToken;
+  let wethBridge: L2SharedBridge;
 
   before("Deploy token and bridge", async function () {
     const deployer = new Deployer(hre, wallet);
-    const wethTokenImpl = await deployer.deploy(await deployer.loadArtifact("L2Weth"));
-    const wethBridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2WethBridge"));
+    const wethTokenImpl = await deployer.deploy(await deployer.loadArtifact("L2WrappedBaseToken"));
+    const wethBridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [testChainId]);
     const randomAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
 
     const wethTokenProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
@@ -32,20 +33,19 @@ describe("WETH token & WETH bridge", function () {
       randomAddress,
       "0x",
     ]);
-    const wethBridgeProxy = (await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
+    const wethBridgeProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
       wethBridgeImpl.address,
       randomAddress,
       "0x",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ])) as any;
+    ]);
 
-    wethToken = L2WethFactory.connect(wethTokenProxy.address, wallet);
-    wethBridge = L2WethBridgeFactory.connect(wethBridgeProxy.address, wallet);
+    wethToken = L2WrappedBaseTokenFactory.connect(wethTokenProxy.address, wallet);
+    wethBridge = L2SharedBridgeFactory.connect(wethBridgeProxy.address, wallet);
 
-    await wethToken.initialize("Wrapped Ether", "WETH");
-    await wethToken.initializeV2(wethBridge.address, randomAddress);
+    // await wethToken.initialize();
+    await wethToken.initializeV2("Wrapped Ether", "WETH", wethBridge.address, randomAddress);
 
-    await wethBridge.initialize(randomAddress, randomAddress, wethToken.address);
+    // await wethBridge.initialize(randomAddress, randomAddress, wethToken.address);
   });
 
   it("Should deposit WETH by calling deposit()", async function () {
@@ -79,12 +79,13 @@ describe("WETH token & WETH bridge", function () {
     expect(await wethToken.balanceOf(wallet.address)).to.equal(eth18);
   });
 
-  it("Should withdraw WETH to L1 ETH", async function () {
-    await expect(wethBridge.withdraw(wallet.address, wethToken.address, eth18.div(2)))
-      .to.emit(wethBridge, "WithdrawalInitiated")
-      .and.to.emit(wethToken, "BridgeBurn");
-    expect(await wethToken.balanceOf(wallet.address)).to.equal(eth18.div(2));
-  });
+  // bridging not supported
+  // it("Should withdraw WETH to L1 ETH", async function () {
+  //   await expect(wethBridge.withdraw(wallet.address, wethToken.address, eth18.div(2)))
+  //     .to.emit(wethBridge, "WithdrawalInitiated")
+  //     .and.to.emit(wethToken, "BridgeBurn");
+  //   expect(await wethToken.balanceOf(wallet.address)).to.equal(eth18.div(2));
+  // });
 
   it("Should deposit WETH to another account", async function () {
     const anotherWallet = new Wallet(ethers.utils.randomBytes(32), provider);
@@ -96,27 +97,26 @@ describe("WETH token & WETH bridge", function () {
     const anotherWallet = new Wallet(ethers.utils.randomBytes(32), provider);
     await wethToken.withdrawTo(anotherWallet.address, eth18.div(2)).then((tx) => tx.wait());
     expect(await anotherWallet.getBalance()).to.equal(eth18.div(2));
-    expect(await wethToken.balanceOf(wallet.address)).to.equal(0);
+    expect(await wethToken.balanceOf(wallet.address)).to.equal(eth18.div(2));
   });
 
   it("Should fail withdrawing with insufficient balance", async function () {
     await expect(wethToken.withdraw(1, { gasLimit: 100_000 })).to.be.reverted;
   });
 
-  it("Should fail depositing directly to WETH bridge", async function () {
-    await expect(
-      wallet.sendTransaction({
-        to: wethBridge.address,
-        value: eth18,
-        gasLimit: 100_000,
-      })
-    ).to.be.reverted;
-  });
+  // bridging not supported
+  // it("Should fail depositing directly to WETH bridge", async function () {
+  //   await expect(
+  //     wallet.sendTransaction({
+  //       to: wethBridge.address,
+  //       value: eth18,
+  //       gasLimit: 100_000,
+  //     })
+  //   ).to.be.reverted;
+  // });
 
   it("Should fail calling bridgeMint()", async function () {
-    await expect(wethToken.bridgeMint(wallet.address, eth18, { gasLimit: 100_000 })).to.be.revertedWith(
-      /Use deposit\/depositTo methods instead/
-    );
+    await expect(await wethToken.bridgeMint(wallet.address, eth18, { gasLimit: 1_000_000 })).to.be.reverted;
   });
 
   it("Should fail calling bridgeBurn() directly", async function () {

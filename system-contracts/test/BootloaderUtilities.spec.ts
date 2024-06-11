@@ -1,8 +1,8 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import type { Wallet } from "zksync-web3";
-import * as zksync from "zksync-web3";
-import { serialize } from "zksync-web3/build/src/utils";
+import type { Wallet } from "zksync-ethers";
+import * as zksync from "zksync-ethers";
+import { serialize } from "zksync-ethers/build/src/utils";
 import type { BootloaderUtilities } from "../typechain";
 import { BootloaderUtilitiesFactory } from "../typechain";
 import { TEST_BOOTLOADER_UTILITIES_ADDRESS } from "./shared/constants";
@@ -27,15 +27,12 @@ describe("BootloaderUtilities tests", function () {
         from: wallet.address,
         data: "0x",
         value: 0,
-        maxFeePerGas: 12000,
-        maxPriorityFeePerGas: 100,
         customData: {
           gasPerPubdata: zksync.utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
         },
       });
       const signedEip712Tx = await wallet.signTransaction(eip712Tx);
       const parsedEIP712tx = zksync.utils.parseTransaction(signedEip712Tx);
-
       const eip712TxData = signedTxToTransactionData(parsedEIP712tx)!;
       const expectedEIP712TxHash = parsedEIP712tx.hash;
       const expectedEIP712SignedHash = zksync.EIP712Signer.getSignedDigest(eip712Tx);

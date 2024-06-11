@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 /// @dev The formal address of the initial program of the system: the bootloader
 address constant L2_BOOTLOADER_ADDRESS = address(0x8001);
@@ -24,7 +24,7 @@ address constant L2_FORCE_DEPLOYER_ADDR = address(0x8007);
 address constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = address(0x8008);
 
 /// @dev The address of the eth token system contract
-address constant L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR = address(0x800a);
+address constant L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR = address(0x800a);
 
 /// @dev The address of the context system contract
 address constant L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR = address(0x800b);

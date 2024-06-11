@@ -1,4 +1,4 @@
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 /**
  * @title Singleton Factory (EIP-2470)
@@ -7,6 +7,9 @@ pragma solidity 0.8.20;
  * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH)
  */
 contract SingletonFactory {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     /**
      * @notice Deploys `_initCode` using `_salt` for defining the deterministic address.
      * @param _initCode Initialization code.

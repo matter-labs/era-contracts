@@ -3,16 +3,9 @@ import * as hre from "hardhat";
 
 import { Command } from "commander";
 import { Wallet, ethers } from "ethers";
-import * as fs from "fs";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
-import * as path from "path";
-import { getNumberFromEnv, web3Provider } from "../../l1-contracts/scripts/utils";
-import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
-
-const PRIORITY_TX_MAX_GAS_LIMIT = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
-const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA, provider, priorityTxMaxGasLimit } from "./utils";
+import { ethTestConfig } from "./deploy-shared-bridge-on-l2-through-l1";
 
 function getContractBytecode(contractName: string) {
   return hre.artifacts.readArtifactSync(contractName).bytecode;
@@ -25,9 +18,11 @@ async function main() {
 
   program
     .option("--private-key <private-key>")
+    .option("--chain-id <chain-id>")
     .option("--nonce <nonce>")
     .option("--gas-price <gas-price>")
     .action(async (cmd) => {
+      const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
       const wallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(
@@ -43,19 +38,23 @@ async function main() {
       console.log(`Using gas price: ${gasPrice}`);
 
       const deployer = new Deployer({ deployWallet: wallet });
-      const zkSync = deployer.zkSyncContract(wallet);
+      const bridgehub = deployer.bridgehubContract(wallet);
 
-      const publishL2ERC20BridgeTx = await zkSync.requestL2Transaction(
-        ethers.constants.AddressZero,
-        0,
-        "0x",
-        PRIORITY_TX_MAX_GAS_LIMIT,
-        REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-        [getContractBytecode("L2ERC20Bridge")],
-        wallet.address,
+      const publishL2SharedBridgeTx = await bridgehub.requestL2TransactionDirect(
+        {
+          chainId,
+          l2Contract: ethers.constants.AddressZero,
+          mintValue: 0,
+          l2Value: 0,
+          l2Calldata: "0x",
+          l2GasLimit: priorityTxMaxGasLimit,
+          l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+          factoryDeps: [getContractBytecode("L2SharedBridge")],
+          refundRecipient: wallet.address,
+        },
         { nonce, gasPrice }
       );
-      await publishL2ERC20BridgeTx.wait();
+      await publishL2SharedBridgeTx.wait();
     });
 
   await program.parseAsync(process.argv);

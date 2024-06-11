@@ -24,7 +24,7 @@ object "EcAdd" {
 
             /// @notice Constant function for the pre-computation of R^2 % N for the Montgomery REDC algorithm.
             /// @dev R^2 is the Montgomery residue of the value 2^512.
-            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further detals.
+            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further details.
             /// @dev This value was precomputed using Python.
             /// @return ret The value R^2 modulus the curve field order.
             function R2_MOD_P() -> ret {
@@ -33,7 +33,7 @@ object "EcAdd" {
 
             /// @notice Constant function for the pre-computation of N' for the Montgomery REDC algorithm.
             /// @dev N' is a value such that NN' = -1 mod R, with N being the curve field order.
-            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further detals.
+            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further details.
             /// @dev This value was precomputed using Python.
             /// @return ret The value N'.
             function N_PRIME() -> ret {
@@ -124,7 +124,7 @@ object "EcAdd" {
             /// @dev Let `base` be a number in Montgomery Form, then base = a*R mod P() being `a` the base number (not in Montgomery Form)
             /// @dev Let `inv` be the inverse of a number `a` in Montgomery Form, then inv = a^(-1)*R mod P()
             /// @dev The original binary extended euclidean algorithms takes a number a and returns a^(-1) mod N
-            /// @dev In our case N is P(), and we'd like the input and output to be in Montgomery Form (a*R mod P() 
+            /// @dev In our case N is P(), and we'd like the input and output to be in Montgomery Form (a*R mod P()
             /// @dev and a^(-1)*R mod P() respectively).
             /// @dev If we just pass the input as a number in Montgomery Form the result would be a^(-1)*R^(-1) mod P(),
             /// @dev but we want it to be a^(-1)*R mod P().
@@ -264,7 +264,7 @@ object "EcAdd" {
             }
 
             /// @notice Computes the Montgomery modular inverse skipping the Montgomery reduction step.
-            /// @dev The Montgomery reduction step is skept because a modification in the binary extended Euclidean algorithm is used to compute the modular inverse.
+            /// @dev The Montgomery reduction step is skipped because a modification in the binary extended Euclidean algorithm is used to compute the modular inverse.
             /// @dev See the function `binaryExtendedEuclideanAlgorithm` for further details.
             /// @param a The field element in Montgomery form to compute the modular inverse of.
             /// @return invmod The result of the Montgomery modular inverse (in Montgomery form).

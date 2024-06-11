@@ -1,13 +1,11 @@
 import { expect } from "chai";
-import * as ethers from "ethers";
+import type * as ethers from "ethers";
 import * as hardhat from "hardhat";
+
 import type { AdminFacetTest } from "../../typechain";
 import { AdminFacetTestFactory, GovernanceFactory } from "../../typechain";
-import { getCallRevertReason } from "./utils";
 
-function randomAddress() {
-  return ethers.utils.hexlify(ethers.utils.randomBytes(20));
-}
+import { getCallRevertReason, randomAddress } from "./utils";
 
 describe("Admin facet tests", function () {
   let adminFacetTest: AdminFacetTest;
@@ -20,12 +18,12 @@ describe("Admin facet tests", function () {
 
     const governanceContract = await contractFactory.deploy();
     const governance = GovernanceFactory.connect(governanceContract.address, governanceContract.signer);
-    await adminFacetTest.setPendingGovernor(governance.address);
+    await adminFacetTest.setPendingAdmin(governance.address);
 
     randomSigner = (await hardhat.ethers.getSigners())[1];
   });
 
-  it("governor successfully set validator", async () => {
+  it("StateTransitionManager successfully set validator", async () => {
     const validatorAddress = randomAddress();
     await adminFacetTest.setValidator(validatorAddress, true);
 
@@ -38,10 +36,10 @@ describe("Admin facet tests", function () {
     const revertReason = await getCallRevertReason(
       adminFacetTest.connect(randomSigner).setValidator(validatorAddress, true)
     );
-    expect(revertReason).equal("1k");
+    expect(revertReason).equal("Hyperchain: not state transition manager");
   });
 
-  it("governor successfully set porter availability", async () => {
+  it("StateTransitionManager successfully set porter availability", async () => {
     await adminFacetTest.setPorterAvailability(true);
 
     const porterAvailability = await adminFacetTest.getPorterAvailability();
@@ -50,10 +48,10 @@ describe("Admin facet tests", function () {
 
   it("random account fails to set porter availability", async () => {
     const revertReason = await getCallRevertReason(adminFacetTest.connect(randomSigner).setPorterAvailability(false));
-    expect(revertReason).equal("1g");
+    expect(revertReason).equal("Hyperchain: not state transition manager");
   });
 
-  it("governor successfully set priority transaction max gas limit", async () => {
+  it("StateTransitionManager successfully set priority transaction max gas limit", async () => {
     const gasLimit = "12345678";
     await adminFacetTest.setPriorityTxMaxGasLimit(gasLimit);
 
@@ -66,42 +64,42 @@ describe("Admin facet tests", function () {
     const revertReason = await getCallRevertReason(
       adminFacetTest.connect(randomSigner).setPriorityTxMaxGasLimit(gasLimit)
     );
-    expect(revertReason).equal("1g");
+    expect(revertReason).equal("Hyperchain: not state transition manager");
   });
 
-  describe("change governor", function () {
-    let newGovernor: ethers.Signer;
+  describe("change admin", function () {
+    let newAdmin: ethers.Signer;
 
     before(async () => {
-      newGovernor = (await hardhat.ethers.getSigners())[2];
+      newAdmin = (await hardhat.ethers.getSigners())[2];
     });
 
-    it("set pending governor", async () => {
-      const proposedGovernor = await randomSigner.getAddress();
-      await adminFacetTest.setPendingGovernor(proposedGovernor);
+    it("set pending admin", async () => {
+      const proposedAdmin = await randomSigner.getAddress();
+      await adminFacetTest.setPendingAdmin(proposedAdmin);
 
-      const pendingGovernor = await adminFacetTest.getPendingGovernor();
-      expect(pendingGovernor).equal(proposedGovernor);
+      const pendingAdmin = await adminFacetTest.getPendingAdmin();
+      expect(pendingAdmin).equal(proposedAdmin);
     });
 
-    it("reset pending governor", async () => {
-      const proposedGovernor = await newGovernor.getAddress();
-      await adminFacetTest.setPendingGovernor(proposedGovernor);
+    it("reset pending admin", async () => {
+      const proposedAdmin = await newAdmin.getAddress();
+      await adminFacetTest.setPendingAdmin(proposedAdmin);
 
-      const pendingGovernor = await adminFacetTest.getPendingGovernor();
-      expect(pendingGovernor).equal(proposedGovernor);
+      const pendingAdmin = await adminFacetTest.getPendingAdmin();
+      expect(pendingAdmin).equal(proposedAdmin);
     });
 
-    it("failed to accept governor from not proposed account", async () => {
-      const revertReason = await getCallRevertReason(adminFacetTest.connect(randomSigner).acceptGovernor());
+    it("failed to accept admin from not proposed account", async () => {
+      const revertReason = await getCallRevertReason(adminFacetTest.connect(randomSigner).acceptAdmin());
       expect(revertReason).equal("n4");
     });
 
-    it("accept governor from proposed account", async () => {
-      await adminFacetTest.connect(newGovernor).acceptGovernor();
+    it("accept admin from proposed account", async () => {
+      await adminFacetTest.connect(newAdmin).acceptAdmin();
 
-      const governor = await adminFacetTest.getGovernor();
-      expect(governor).equal(await newGovernor.getAddress());
+      const admin = await adminFacetTest.getAdmin();
+      expect(admin).equal(await newAdmin.getAddress());
     });
   });
 });
