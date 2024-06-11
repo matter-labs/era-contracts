@@ -47,12 +47,14 @@ library UnsafeBytes {
     function readRemainingBytes(
         bytes memory _bytes,
         uint256 _start
-    ) internal pure returns (bytes memory) {
+    ) public pure returns (bytes memory result) {
+        uint256 arrayLen = _bytes.length - _start;
+        result = new bytes(arrayLen);
+
         assembly {
             // Load the length (first 32 bytes)
             let len := mload(_bytes)
-            let res := mload(0x40)       // get free memory pointer
-            let index := 0x40
+            let index := 0x20
 
             let offset := add(_start, 0x20)
 
@@ -62,14 +64,14 @@ library UnsafeBytes {
             } lt(add(_bytes, sub(offset, 0x20)), end) {
                 offset := add(offset, 0x20)
             } {
-                mstore(add(res, index), mload(add(_bytes, offset)))    // first 32 bytes
+                mstore(add(result, index), mload(add(_bytes, offset)))    // first 32 bytes
                 index := add(index, 0x20)
             }
 
-            mstore(res, 0x20)             // return data offset : abi encoding
-            mstore(add(res, 0x20), sub(index, 0x40)) // store length
-            mstore(0x40, add(res, index)) // update free memory pointer
-            return (res, index)           // return 
+            // mstore(result, 0x20)             // return data offset : abi encoding
+            // mstore(add(result, 0x20), sub(index, 0x40)) // store length
+            // mstore(0x40, add(result, index)) // update free memory pointer
+            // return (result, index)           // return 
         }
     }
 }
