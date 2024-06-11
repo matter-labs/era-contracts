@@ -44,34 +44,12 @@ library UnsafeBytes {
         }
     }
 
-    function readRemainingBytes(
-        bytes memory _bytes,
-        uint256 _start
-    ) public pure returns (bytes memory result) {
+    function readRemainingBytes(bytes memory _bytes, uint256 _start) internal pure returns (bytes memory result) {
         uint256 arrayLen = _bytes.length - _start;
         result = new bytes(arrayLen);
 
         assembly {
-            // Load the length (first 32 bytes)
-            let len := mload(_bytes)
-            let index := 0x20
-
-            let offset := add(_start, 0x20)
-
-            // Iterate until the bound is not met.
-            for {
-                let end := add(_bytes, len)
-            } lt(add(_bytes, sub(offset, 0x20)), end) {
-                offset := add(offset, 0x20)
-            } {
-                mstore(add(result, index), mload(add(_bytes, offset)))    // first 32 bytes
-                index := add(index, 0x20)
-            }
-
-            // mstore(result, 0x20)             // return data offset : abi encoding
-            // mstore(add(result, 0x20), sub(index, 0x40)) // store length
-            // mstore(0x40, add(result, index)) // update free memory pointer
-            // return (result, index)           // return 
+            mcopy(add(result, 0x20), add(_bytes, add(0x20, _start)), arrayLen)
         }
     }
 }

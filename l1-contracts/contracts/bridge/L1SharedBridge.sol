@@ -391,7 +391,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes32 _assetInfo,
         bytes memory _assetData
     ) internal view returns (bytes memory) {
-        if (IL1NativeTokenVault(address(nativeTokenVault)).tokenAddress(_assetInfo) == address(0)) {
+        if (nativeTokenVault.tokenAddress(_assetInfo) == address(0)) {
             return abi.encodeCall(IL2Bridge.finalizeDeposit, (_assetInfo, _assetData));
         } else {
             (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = abi.decode(
@@ -839,7 +839,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge {
-        bytes32 assetInfo = IL1NativeTokenVault(nativeTokenVault).getAssetInfoFromLegacy(_l1Asset);
+        bytes32 assetInfo = nativeTokenVault.getAssetInfoFromLegacy(_l1Asset);
         bytes memory assetData = abi.encode(_amount, _depositSender); //todo
         claimFailedBurn({
             _chainId: ERA_CHAIN_ID,

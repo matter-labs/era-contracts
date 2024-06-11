@@ -113,8 +113,8 @@ contract L1NativeTokenVault is
         }
         require(amount != 0, "6T"); // empty deposit amount
 
-        if (L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
-            chainBalance[_chainId][l1Token] += _depositAmount;
+        if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
+            chainBalance[_chainId][l1Token] += amount;
         }
 
         // solhint-disable-next-line func-named-parameters
@@ -160,11 +160,11 @@ contract L1NativeTokenVault is
         address l1Token = tokenAddress[_assetInfo];
         (uint256 amount, address l1Receiver) = abi.decode(_data, (uint256, address));
         _l1Receiver = l1Receiver;
-        // if (!hyperbridgingEnabled[_chainId]) {
-        //     // Check that the chain has sufficient balance
-        //     require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
-        //     chainBalance[_chainId][l1Token] -= amount;
-        // }
+        if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
+            // Check that the chain has sufficient balance
+            require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
+            chainBalance[_chainId][l1Token] -= amount;
+        }
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
@@ -201,7 +201,7 @@ contract L1NativeTokenVault is
             // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
         }
 
-        if (L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
+        if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
             // check that the chain has sufficient balance
             require(chainBalance[_chainId][l1Token] >= _amount, "NTV n funds");
             chainBalance[_chainId][l1Token] -= _amount;
