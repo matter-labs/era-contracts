@@ -282,6 +282,8 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         size, sp := popStackItem(sp)
 
+
+        checkMultipleOverflow(offset,size,MEM_OFFSET_INNER())
         let keccak := keccak256(add(MEM_OFFSET_INNER(), offset), size)
 
         // When an offset is first accessed (either read or write), memory may trigger 
