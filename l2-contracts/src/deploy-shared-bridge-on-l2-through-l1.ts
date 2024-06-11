@@ -18,6 +18,7 @@ import { ethTestConfig } from "./deploy-utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import * as hre from "hardhat";
+import { L2StandardDeployerFactory } from "../typechain/L2StandardDeployerFactory";
 
 export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2SharedBridge").abi;
 export const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
@@ -34,19 +35,21 @@ export async function publishL2StandardDeployerDependencyBytecodesOnL2(
   const L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE = hre.artifacts.readArtifactSync("UpgradeableBeacon").bytecode;
   const L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE = hre.artifacts.readArtifactSync("L2StandardERC20").bytecode;
 
-  const receipt = await publishBytecodeFromL1(
-    chainId,
-    deployer.deployWallet,
-    [
-      L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
-      L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
-      L2_STANDARD_TOKEN_PROXY_BYTECODE,
-    ],
-    gasPrice
-  );
+  const receipt = await (
+    await publishBytecodeFromL1(
+      chainId,
+      deployer.deployWallet,
+      [
+        L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
+        L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
+        L2_STANDARD_TOKEN_PROXY_BYTECODE,
+      ],
+      gasPrice
+    )
+  ).wait();
 
   if (deployer.verbose) {
-    console.log("Bytecodes published on L2, hash: ", receipt.hash);
+    console.log("Bytecodes published on L2, hash: ", receipt.transactionHash);
   }
 }
 
@@ -157,7 +160,7 @@ export async function deployStandardDeployerProxyOnL2ThroughL1(
   const L2StandardDeployerInterface = new Interface(hre.artifacts.readArtifactSync("L2StandardDeployer").abi);
   const proxyInitializationParams = L2StandardDeployerInterface.encodeFunctionData("initialize", [
     hashL2Bytecode(L2_STANDARD_TOKEN_PROXY_BYTECODE),
-    applyL1ToL2Alias(deployer.deployWallet.address),
+    deployer.deployWallet.address,
     false,
   ]);
 

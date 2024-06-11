@@ -107,17 +107,18 @@ contract L1NativeTokenVault is
             require(msg.value == 0, "NTV m.v > 0 b d.it");
             amount = _depositAmount;
 
+            // ToDo: rename
             uint256 withdrawAmount = _depositFunds(_prevMsgSender, IERC20(l1Token), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
             require(withdrawAmount == _depositAmount, "3T"); // The token has non-standard transfer logic
         }
         require(amount != 0, "6T"); // empty deposit amount
 
-        if (L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
-            chainBalance[_chainId][l1Token] += _depositAmount;
+        if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
+            chainBalance[_chainId][l1Token] += amount;
         }
 
         // solhint-disable-next-line func-named-parameters
-        _bridgeMintData = abi.encode(amount, _prevMsgSender, _l2Receiver, _getERC20Getters(l1Token), l1Token); // to do add l2Receiver in here
+        _bridgeMintData = abi.encode(amount, _prevMsgSender, _l2Receiver, getERC20Getters(l1Token), l1Token); // to do add l2Receiver in here
     }
 
     /// @dev Transfers tokens from the depositor address to the smart contract address.
@@ -136,7 +137,7 @@ contract L1NativeTokenVault is
     }
 
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
-    function _getERC20Getters(address _token) internal view returns (bytes memory) {
+    function getERC20Getters(address _token) public view returns (bytes memory) {
         if (_token == ETH_TOKEN_ADDRESS) {
             bytes memory name = bytes("Ether");
             bytes memory symbol = bytes("ETH");
@@ -151,25 +152,29 @@ contract L1NativeTokenVault is
     }
 
     /* solhint-disable no-unused-vars */
-    function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {
-        // if (!hyperbridgingEnabled[_chainId]) { // ToDo: add logic & uncomment
-        //     // Add back
-        //     // Check that the chain has sufficient balance
-        //     require(chainBalance[_chainId][l1Token] >= _amount, "NTV not enough funds 2"); // not enough funds
-        //     chainBalance[_chainId][l1Token] -= _amount;
-        // }
+    function bridgeMint(
+        uint256 _chainId,
+        bytes32 _assetInfo,
+        bytes calldata _data
+    ) external payable override returns (address _l1Receiver) {
         address l1Token = tokenAddress[_assetInfo];
-        (uint256 _amount, address l1Receiver) = abi.decode(_data, (uint256, address));
+        (uint256 amount, address l1Receiver) = abi.decode(_data, (uint256, address));
+        _l1Receiver = l1Receiver;
+        if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
+            // Check that the chain has sufficient balance
+            require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
+            chainBalance[_chainId][l1Token] -= amount;
+        }
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
             assembly {
-                callSuccess := call(gas(), l1Receiver, _amount, 0, 0, 0, 0)
+                callSuccess := call(gas(), l1Receiver, amount, 0, 0, 0, 0)
             }
             require(callSuccess, "NTV: withdraw failed");
         } else {
             // Withdraw funds
-            IERC20(l1Token).safeTransfer(l1Receiver, _amount);
+            IERC20(l1Token).safeTransfer(l1Receiver, amount);
         }
     }
 
@@ -196,7 +201,7 @@ contract L1NativeTokenVault is
             // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
         }
 
-        if (L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
+        if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
             // check that the chain has sufficient balance
             require(chainBalance[_chainId][l1Token] >= _amount, "NTV n funds");
             chainBalance[_chainId][l1Token] -= _amount;

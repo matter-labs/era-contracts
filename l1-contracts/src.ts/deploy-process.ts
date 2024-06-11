@@ -89,7 +89,7 @@ export async function registerHyperchain(
   if (!(await deployer.bridgehubContract(deployer.deployWallet).tokenIsRegistered(baseTokenAddress))) {
     await deployer.registerTokenBridgehub(baseTokenAddress, useGovernance);
   }
-  await deployer.registerTokenInNativeTokenVault(baseTokenAddress, { gasPrice });
+  await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
   await deployer.registerHyperchain(
     baseTokenAddress,
     validiumMode,

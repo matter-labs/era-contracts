@@ -7,16 +7,13 @@ import { hexlify, Interface } from "ethers/lib/utils";
 import type { Wallet as ZkWallet } from "zksync-ethers";
 
 import type { DeployedAddresses } from "./deploy-utils";
-import {
-  deployedAddressesFromEnv,
-  deployBytecodeViaCreate2 as deployBytecodeViaCreate2EVM,
-  deployViaCreate2 as deployViaCreate2EVM,
-} from "./deploy-utils";
+import { deployedAddressesFromEnv, deployBytecodeViaCreate2, deployViaCreate2 } from "./deploy-utils";
 import {
   packSemver,
   readBatchBootloaderBytecode,
   readSystemContractsBytecode,
   unpackStringSemVer,
+  SYSTEM_CONFIG,
 } from "../scripts/utils";
 import { getTokens } from "./deploy-token";
 import {
@@ -156,7 +153,7 @@ export class Deployer {
   ) {
     // For L1 deployments we try to use constant gas limit
     ethTxOptions.gasLimit ??= 10_000_000;
-    const result = await deployViaCreate2EVM(
+    const result = await deployViaCreate2(
       this.deployWallet,
       contractName,
       args,
@@ -177,7 +174,7 @@ export class Deployer {
   ): Promise<string> {
     ethTxOptions.gasLimit ??= 10_000_000;
 
-    const result = await deployBytecodeViaCreate2EVM(
+    const result = await deployBytecodeViaCreate2(
       this.deployWallet,
       contractName,
       bytecode,
@@ -804,7 +801,6 @@ export class Deployer {
     useGovernance: boolean = false
   ) {
     const txOptions = { gasLimit: 10_000_000 };
-
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
     const bridgehub = this.bridgehubContract(this.deployWallet);

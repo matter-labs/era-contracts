@@ -70,6 +70,12 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         _transferOwnership(_aliasedOwner);
     }
 
+    function setL2TokenBeacon(address _l2TokenBeacon, bytes32 _l2TokenProxyBytecodeHash) external onlyOwner {
+        l2TokenBeacon = UpgradeableBeacon(_l2TokenBeacon);
+        l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
+        emit l2TokenBeaconUpdated(_l2TokenBeacon, _l2TokenProxyBytecodeHash);
+    }
+
     function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {
         address token = tokenAddress[_assetInfo];
         (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken) = abi
@@ -99,7 +105,7 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override onlyBridge returns (bytes memory _bridgeBurnData) {
+    ) external payable override onlyBridge returns (bytes memory _bridgeMintData) {
         (uint256 _amount, address _l1Receiver) = abi.decode(_data, (uint256, address));
         require(_amount > 0, "Amount cannot be zero");
 
@@ -108,8 +114,10 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
 
         /// backwards compatible event
         emit WithdrawalInitiated(_prevMsgSender, _l1Receiver, l2Token, _amount);
+        /// New Format
         // solhint-disable-next-line func-named-parameters
-        _bridgeBurnData = abi.encodePacked(_chainId, _mintValue, _assetInfo, _prevMsgSender, _data);
+        emit BridgeBurn(_chainId, _assetInfo, _prevMsgSender, _l1Receiver, _mintValue, _amount);
+        _bridgeMintData = _data;
     }
 
     /// @dev Deploy and initialize the L2 token for the L1 counterpart

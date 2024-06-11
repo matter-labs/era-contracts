@@ -106,7 +106,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// where tokens would be unlocked
     /// @param _assetInfo The L2 token address which is withdrawn
     /// @param _assetData The data that is passed to the asset contract
-    function withdraw(bytes32 _assetInfo, bytes calldata _assetData) external override {
+    function withdraw(bytes32 _assetInfo, bytes memory _assetData) public override {
         address asset = assetAddress[_assetInfo];
         bytes memory _bridgeMintData;
 
@@ -178,7 +178,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
             )
         );
         bytes memory data = abi.encode(_amount, _l1Receiver);
-        this.withdraw(assetInfo, data);
+        withdraw(assetInfo, data);
     }
 
     function getL1TokenAddress(address _l2Token) public view returns (address) {
