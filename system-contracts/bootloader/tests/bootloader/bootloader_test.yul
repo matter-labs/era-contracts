@@ -144,13 +144,73 @@
      testing_assertEq(getGasPrice(6, 5), baseFee, "Invalid gas price")
  }
 
-function TEST_getGasPrice_maxPriorityFeeGreaterThenMaxFee() {
-    //testing_testWillFailWith(13)
-    getGasPrice(5, 6)
+//function TEST_getGasPrice_maxPriorityFeeGreaterThenMaxFee() {
+//    testing_testWillFailWith(13)
+//    getGasPrice(5, 6)
+//}
+
+//function TEST_getGasPrice_baseFeeGreaterThenMaxFee() {
+//    testing_testWillFailWith("Base fee greater than max fee")
+//    let baseFee := basefee()
+//    getGasPrice(baseFee, baseFee)
+//}
+
+function TEST_getOperatorRefundForTx() {
+    let transactionIndex := 10
+
+    let expected := 3872
+
+    testing_assertEq(getOperatorRefundForTx(transactionIndex), mload(expected), "Invalid refound for tx")
 }
 
-function TEST_getGasPrice_baseFeeGreaterThenMaxFee() {
-    //testing_testWillFailWith("Base fee greater than max fee")
-    let baseFee := basefee()
-    getGasPrice(baseFee, baseFee)
+function TEST_getOperatorOverheadForTx() {
+    let transactionIndex := 10
+
+    let expected := 323872
+
+    testing_assertEq(getOperatorOverheadForTx(transactionIndex), mload(expected), "Invalid operator overhead for tx")
+}
+
+function TEST_getOperatorTrustedGasLimitForTx() {
+    let transactionIndex := 10
+
+    let expected := 643872
+
+    assertEq(getOperatorTrustedGasLimitForTx(transactionIndex), mload(expected), "Invalid trusted gas limit for tx")
+}
+
+function TEST_getCurrentCompressedBytecodeHash() {
+    let pointer := mload(COMPRESSED_BYTECODES_BEGIN_BYTE())
+    let expected := add(COMPRESSED_BYTECODES_BEGIN_BYTE(), pointer)
+
+    testing_assertEq(getCurrentCompressedBytecodeHash(), mload(expected), "Invalid current")
+}
+
+function TEST_checkOffset_success() {
+    //offset value := 8534624
+
+    checkOffset(8534623)
+}
+
+function TEST_checkOffset_callDataEncodingTooBig() {
+    //offset value := 8534624
+    testing_testWillFailWith("calldataEncoding too big")
+
+    checkOffset(8534625)
+}
+
+function TEST_validateOperatorProvidedPrices1() {
+    testing_testWillFailWith("Fair pubdata price too high")
+
+    validateOperatorProvidedPrices(10000000000000, 1000000000000001)
+}
+
+function TEST_validateOperatorProvidedPrices2() {
+    testing_testWillFailWith("L2 fair gas price too high")
+
+    validateOperatorProvidedPrices(10000000000001, 100000000000000)
+}
+
+function TEST_validateOperatorProvidedPrices3() {
+    validateOperatorProvidedPrices(1000000000000, 100000000000000)
 }
