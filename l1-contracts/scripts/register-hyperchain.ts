@@ -103,7 +103,16 @@ async function main() {
         await deployer.registerToken(baseTokenAddress, useGovernance);
       }
 
-      await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice, true);
+      await deployer.registerHyperchain(
+        baseTokenAddress,
+        cmd.validiumMode,
+        null,
+        gasPrice,
+        true,
+        null,
+        null,
+        useGovernance
+      );
       await deployer.transferAdminFromDeployerToGovernance();
     });
 
