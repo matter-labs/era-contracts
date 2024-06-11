@@ -610,10 +610,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         // Please note that there are two versions of the message:
         // 1. The message that is sent by `withdraw(address _l1Receiver)`
         // It should be equal to the length of the bytes4 function signature + address l1Receiver + uint256 amount = 4 + 20 + 32 = 56 (bytes).
-        // 2. The message that is sent by `withdrawWithMessage(address _l1Receiver, bytes calldata _additionalData)`
-        // It should be equal to the length of the following:
-        // bytes4 function signature + address l1Receiver + uint256 amount + address l2Sender + bytes _additionalData =
-        // = 4 + 20 + 32 + 32 + _additionalData.length >= 68 (bytes).
+        // 2. The message that is encoded by `getL1WithdrawMessage(bytes32 _assetInfo, bytes memory _bridgeMintData)`
+        // No length is assume. The assetInfo is decoded and the mintData is passed to respective assetHandler
 
         // So the data is expected to be at least 56 bytes long.
         require(_l2ToL1message.length >= 56, "ShB wrong msg len"); // wrong message length
@@ -633,15 +631,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
 
             // this message is a token withdrawal
-
-            // Check that the message length is correct.
-            // It should be equal to the length of the function signature + address + uint256 + address = 4 + 32 + 32 + 32 =
-            // 100 (bytes).
             (assetInfo, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
-            // (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-            // (l1ReceiverBytes, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-            // parsedL1Receiver = address(uint160(uint256(l1ReceiverBytes)));
-            // assetData = abi.encode(amount, parsedL1Receiver);
             assetData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
             //todo
