@@ -50,21 +50,22 @@ describe("KnownCodesStorage tests", function () {
 
   describe("markBytecodeAsPublished", function () {
     it("non-compressor failed to call", async () => {
-      await expect(knownCodesStorage.markBytecodeAsPublished(BYTECODE_HASH_1)).to.be.revertedWith(
-        "Callable only by the compressor"
+      await expect(knownCodesStorage.markBytecodeAsPublished(BYTECODE_HASH_1)).to.be.revertedWithCustomError(
+        knownCodesStorage,
+        "Unauthorized"
       );
     });
 
     it("incorrectly formatted bytecode hash failed to call", async () => {
       await expect(
         knownCodesStorage.connect(compressorAccount).markBytecodeAsPublished(INCORRECTLY_FORMATTED_HASH)
-      ).to.be.revertedWith("Incorrectly formatted bytecodeHash");
+      ).to.be.revertedWithCustomError(knownCodesStorage, "MalformedBytecode");
     });
 
     it("invalid length bytecode hash failed to call", async () => {
       await expect(
         knownCodesStorage.connect(compressorAccount).markBytecodeAsPublished(INVALID_LENGTH_HASH)
-      ).to.be.revertedWith("Code length in words must be odd");
+      ).to.be.revertedWithCustomError(knownCodesStorage, "MalformedBytecode");
     });
 
     it("successfully marked", async () => {
@@ -85,9 +86,9 @@ describe("KnownCodesStorage tests", function () {
 
   describe("markFactoryDeps", function () {
     it("non-bootloader failed to call", async () => {
-      await expect(knownCodesStorage.markFactoryDeps(false, [BYTECODE_HASH_2, BYTECODE_HASH_3])).to.be.revertedWith(
-        "Callable only by the bootloader"
-      );
+      await expect(
+        knownCodesStorage.markFactoryDeps(false, [BYTECODE_HASH_2, BYTECODE_HASH_3])
+      ).to.be.revertedWithCustomError(knownCodesStorage, "CallerMustBeBootloader");
     });
 
     it("incorrectly formatted bytecode hash failed to call", async () => {
@@ -95,13 +96,13 @@ describe("KnownCodesStorage tests", function () {
         knownCodesStorage
           .connect(bootloaderAccount)
           .markFactoryDeps(true, [BYTECODE_HASH_2, INCORRECTLY_FORMATTED_HASH])
-      ).to.be.revertedWith("Incorrectly formatted bytecodeHash");
+      ).to.be.revertedWithCustomError(knownCodesStorage, "MalformedBytecode");
     });
 
     it("invalid length bytecode hash failed to call", async () => {
       await expect(
         knownCodesStorage.connect(bootloaderAccount).markFactoryDeps(false, [INVALID_LENGTH_HASH, BYTECODE_HASH_3])
-      ).to.be.revertedWith("Code length in words must be odd");
+      ).to.be.revertedWithCustomError(knownCodesStorage, "MalformedBytecode");
     });
 
     it("successfully marked", async () => {
