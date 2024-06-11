@@ -21,7 +21,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         vm.mockCall(targetDiamond, abi.encodeWithSelector(IMailbox.transferEthToSharedBridge.selector), "");
 
         vm.expectRevert("ShB: 0 eth transferred");
-        vm.prank(owner);
+        vm.prank(address(sharedBridge));
         sharedBridge.transferFundsFromLegacy(ETH_TOKEN_ADDRESS, targetDiamond, targetChainId);
         assertEq(sharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), 0);
     }
@@ -34,7 +34,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         vm.mockCall(targetDiamond, abi.encodeWithSelector(IMailbox.transferEthToSharedBridge.selector), "");
 
         vm.expectRevert("ShB: 0 amount to transfer");
-        vm.prank(owner);
+        vm.prank(address(sharedBridge));
         sharedBridge.transferFundsFromLegacy(tokenAddress, targetDiamond, targetChainId);
         assertEq(sharedBridge.chainBalance(eraChainId, tokenAddress), 0);
     }
@@ -54,7 +54,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         assertEq(sharedBridge.chainBalance(eraChainId, tokenAddress), 0);
 
         vm.expectRevert("ShB: wrong amount transferred");
-        vm.prank(owner);
+        vm.prank(address(sharedBridge));
         sharedBridge.transferFundsFromLegacy(tokenAddress, l1ERC20BridgeAddress, 9);
         assertEq(token.balanceOf(l1ERC20BridgeAddress), amount);
         assertEq(sharedBridge.chainBalance(eraChainId, tokenAddress), 0);
@@ -66,7 +66,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         address tokenAddress = address(token);
         assertEq(token.balanceOf(l1ERC20BridgeAddress), amount);
 
-        vm.prank(owner);
+        vm.prank(address(sharedBridge));
         sharedBridge.transferFundsFromLegacy(tokenAddress, l1ERC20BridgeAddress, eraChainId);
 
         assertEq(token.balanceOf(l1ERC20BridgeAddress), 0);
@@ -89,7 +89,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
             abi.encode(hyperchainAddress)
         );
 
-        vm.prank(owner);
+        vm.prank(address(sharedBridge));
         sharedBridge.transferFundsFromLegacy(ETH_TOKEN_ADDRESS, hyperchainAddress, eraChainId);
 
         assertEq(sharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), amount);
