@@ -532,6 +532,7 @@ for { } true { } {
         let expansionGas := expandMemory(offset) // TODO: add +32 here
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
+        checkOverflow(offset,MEM_OFFSET_INNER())
         let memValue := mload(add(MEM_OFFSET_INNER(), offset))
         sp := pushStackItem(sp, memValue)
     }
@@ -546,6 +547,7 @@ for { } true { } {
         let expansionGas := expandMemory(offset) // TODO: add +32 here
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
+        checkOverflow(offset,MEM_OFFSET_INNER())
         mstore(add(MEM_OFFSET_INNER(), offset), value)
     }
     case 0x53 { // OP_MSTORE8
@@ -559,6 +561,7 @@ for { } true { } {
         let expansionGas := expandMemory(offset) // TODO: add +1 here
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
+        checkOverflow(offset,MEM_OFFSET_INNER())
         mstore8(add(MEM_OFFSET_INNER(), offset), value)
     }
     case 0x54 { // OP_SLOAD
@@ -1191,8 +1194,9 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         size, sp := popStackItem(sp)
 
-        ensureAcceptableMemLocation(offset)
-        ensureAcceptableMemLocation(size)
+
+        checkOverflow(offset,size)
+        ensureAcceptableMemLocation(add(offset,size))
         evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
 
         returnLen := size
