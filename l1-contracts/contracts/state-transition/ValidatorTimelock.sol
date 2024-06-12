@@ -52,7 +52,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     uint32 public executionDelay;
 
     /// @dev Era's chainID
-    uint256 immutable ERA_CHAIN_ID;
+    uint256 internal immutable ERA_CHAIN_ID;
 
     constructor(address _initialOwner, uint32 _executionDelay, uint256 _eraChainId) {
         _transferOwnership(_initialOwner);
