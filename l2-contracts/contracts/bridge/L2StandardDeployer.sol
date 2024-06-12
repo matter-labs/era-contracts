@@ -14,6 +14,8 @@ import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
+import {EmptyAddress, EmptyBytes32, InvalidCaller, AddressMismatch, Bytes32Mismatch, AmountMustBeGreaterThanZero, DeployFailed} from "../L2ContractErrors.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
@@ -57,8 +59,12 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         address _aliasedOwner,
         bool _contractsDeployedAlready
     ) external reinitializer(2) {
-        require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
-        require(_aliasedOwner != address(0), "sf");
+        if (_l2TokenProxyBytecodeHash == bytes32(0)) {
+            revert EmptyBytes32();
+        }
+        if (_aliasedOwner == address(0)) {
+            revert EmptyAddress();
+        }
 
         if (!_contractsDeployedAlready) {
             address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
@@ -82,15 +88,17 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
             .decode(_data, (address, uint256, address, bytes, address));
         address expectedToken = l2TokenAddress(originToken);
         if (token == address(0)) {
-            require(
-                _assetInfo ==
-                    keccak256(
-                        abi.encode(_chainId, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(originToken))))
-                    ),
-                "gg"
-            ); // Make sure that a NativeTokenVault sent the message
+            bytes32 expectedAssetInfo = keccak256(
+                abi.encode(_chainId, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(originToken))))
+            );
+            if (_assetInfo != expectedAssetInfo){
+                // Make sure that a NativeTokenVault sent the message
+                revert Bytes32Mismatch(_assetInfo, expectedAssetInfo);
+            }; 
             address deployedToken = _deployL2Token(originToken, erc20Data);
-            require(deployedToken == expectedToken, "mt");
+            if (deployedToken != expectedL2Token) {
+                revert AddressMismatch(expectedL2Token, deployedToken);
+            }
             tokenAddress[_assetInfo] = expectedToken;
         }
 
@@ -107,7 +115,7 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         bytes calldata _data
     ) external payable override onlyBridge returns (bytes memory _bridgeMintData) {
         (uint256 _amount, address _l1Receiver) = abi.decode(_data, (uint256, address));
-        require(_amount > 0, "Amount cannot be zero");
+        require(_amount > 0, "Amount cannot be zero"); // todo 
 
         address l2Token = tokenAddress[_assetInfo];
         IL2StandardToken(l2Token).bridgeBurn(_prevMsgSender, _amount);
@@ -145,7 +153,9 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         );
 
         // The deployment should be successful and return the address of the proxy
-        require(success, "mk");
+        if (!success) {
+            revert DeployFailed();
+        }
         proxy = BeaconProxy(abi.decode(returndata, (address)));
     }
 
