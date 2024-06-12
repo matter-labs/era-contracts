@@ -90,6 +90,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev A mapping assetInfo => assetAddress
     mapping(bytes32 _assetInfo => address _assetAddress) public assetAddress;
 
+    /// @dev A mapping assetInfo => the asset deployment tracker address
+    mapping(bytes32 _assetInfo => address _assetDeploymentTracker) public assetDeploymentTracker;
+
     /// @dev Address of native token vault
     IL1NativeTokenVault public nativeTokenVault;
 
@@ -196,12 +199,48 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev Used to set the assedAddress for a given assetInfo.
-    function setAssetAddress(bytes32 _additionalData, address _assetAddress) external {
+    function setAssetAddressInitial(bytes32 _additionalData, address _assetAddress) external {
         // ToDo: rename to vault address
         address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
         bytes32 assetInfo = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData)); /// todo make other asse
         assetAddress[assetInfo] = _assetAddress;
-        emit AssetRegistered(assetInfo, _assetAddress, _additionalData, sender);
+        assetDeploymentTracker[assetInfo] = sender;
+        emit AssetRegisteredInitial(assetInfo, _assetAddress, _additionalData, sender);
+    }
+
+    function setAssetAddressOnCounterPart(
+        uint256 _chainId,
+        uint256 _mintValue,
+        uint256 _l2TxGasLimit,
+        uint256 _l2TxGasPerPubdataByte,
+        address _refundRecipient,
+        bytes32 _assetInfo,
+        address _assetAddressOnCounterPart
+    ) external payable onlyOwner returns (bytes32 l2TxHash) {
+        require(msg.sender == assetDeploymentTracker[_assetInfo], "ShB: only ADT");
+        bytes32 baseTokenAssetInfo = BRIDGE_HUB.baseTokenAssetInfo(_chainId);
+        address baseToken = assetAddress[baseTokenAssetInfo];
+        IL1StandardAsset(baseToken).bridgeBurn{value: msg.value}({
+            _chainId: _chainId,
+            _mintValue: 0,
+            _assetInfo: baseTokenAssetInfo,
+            _prevMsgSender: msg.sender,
+            _data: abi.encode(_mintValue, address(0))
+        });
+        bytes memory l2Calldata = abi.encodeCall(IL2Bridge.setAssetAddress, (_assetInfo, _assetAddressOnCounterPart));
+
+        L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
+            chainId: _chainId,
+            l2Contract: l2BridgeAddress[_chainId],
+            mintValue: _mintValue, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
+            l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
+            l2Calldata: l2Calldata,
+            l2GasLimit: _l2TxGasLimit,
+            l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
+            factoryDeps: new bytes[](0),
+            refundRecipient: _refundRecipient
+        });
+        l2TxHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
     }
 
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.

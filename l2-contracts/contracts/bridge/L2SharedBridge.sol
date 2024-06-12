@@ -51,6 +51,18 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @dev A mapping l2 token address => l1 token address
     mapping(bytes32 assetInfo => address assetAddress) public override assetAddress;
 
+    /// @notice Checks that the message sender is the legacy bridge.
+    modifier onlyL1Bridge() {
+        // Only the L1 bridge counterpart can initiate and finalize the deposit.
+        if (
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge
+        ) {
+            revert InvalidCaller(msg.sender);
+        }
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
     constructor(uint256 _eraChainId, uint256 _l1ChainId) {
@@ -91,21 +103,13 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @param _l1Token The address of the token that was locked on the L1
     // / @param _amount Total amount of tokens deposited from L1
     /// @param _data The additional data that user can pass with the deposit
-    function finalizeDeposit(bytes32 _assetInfo, bytes memory _data) public override {
-        // Only the L1 bridge counterpart can initiate and finalize the deposit.
-
-        if (
-            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
-            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge
-        ) {
-            revert InvalidCaller(msg.sender);
-        }
-
+    function finalizeDeposit(bytes32 _assetInfo, bytes memory _data) public override onlyL1Bridge {
         address asset = assetAddress[_assetInfo];
         if (asset != address(0)) {
             IL2StandardAsset(asset).bridgeMint(L1_CHAIN_ID, _assetInfo, _data);
         } else {
             IL2StandardAsset(standardDeployer).bridgeMint(L1_CHAIN_ID, _assetInfo, _data);
+            assetAddress[_assetInfo] = address(standardDeployer);
         }
 
         emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetInfo, keccak256(_data));
@@ -153,6 +157,12 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         // and we use this interface so that when the switch happened the old messages could be processed
         // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _assetInfo, _bridgeMintData);
+    }
+
+    /// @dev Used to set the assedAddress for a given assetInfo.
+    function setAssetAddress(bytes32 _assetInfo, address _assetAddress) external onlyL1Bridge {
+        assetAddress[_assetInfo] = _assetAddress;
+        emit AssetRegistered(_assetInfo, _assetAddress);
     }
 
     /*//////////////////////////////////////////////////////////////

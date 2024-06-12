@@ -13,4 +13,6 @@ interface IL2Bridge {
     function l2TokenAddress(address _l1Token) external view returns (address);
 
     function l1Bridge() external view returns (address);
+
+    function setAssetAddress(bytes32 _assetInfo, address _assetAddress) external;
 }

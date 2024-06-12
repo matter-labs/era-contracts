@@ -84,7 +84,7 @@ contract L1NativeTokenVault is
         bytes32 assetInfo = keccak256(
             abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, uint256(uint160(_l1Token)))
         );
-        L1_SHARED_BRIDGE.setAssetAddress(bytes32(uint256(uint160(_l1Token))), address(this));
+        L1_SHARED_BRIDGE.setAssetAddressInitial(bytes32(uint256(uint160(_l1Token))), address(this));
         tokenAddress[assetInfo] = _l1Token;
     }
 

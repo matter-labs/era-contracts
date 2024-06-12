@@ -57,11 +57,16 @@ interface IL1SharedBridge {
         bytes32 assetDataHash
     );
 
-    event AssetRegistered(
+    event AssetRegisteredInitial(
         bytes32 indexed assetInfo,
         address indexed _assetAddress,
         bytes32 indexed additionalData,
         address sender
+    );
+
+    event AssetRegistered(
+        bytes32 indexed assetInfo,
+        address indexed _assetAddress
     );
 
     function isWithdrawalFinalized(
@@ -165,7 +170,7 @@ interface IL1SharedBridge {
 
     function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
 
-    function setAssetAddress(bytes32 _additionalData, address _assetAddress) external;
+    function setAssetAddressInitial(bytes32 _additionalData, address _assetAddress) external;
 
     function assetAddress(bytes32 _assetInfo) external view returns (address);
 
