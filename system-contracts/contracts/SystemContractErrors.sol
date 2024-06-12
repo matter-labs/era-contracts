@@ -16,9 +16,8 @@ error EncodingLengthMismatch();
 error IndexOutOfBounds();
 // 0x460b9939
 error ValuesNotEqual(uint256 expected, uint256 actual);
-// 0x86302004
-error HashMismatch(bytes32 expected, uint256 actual);
-// 0x122e73e9
+// 0x0b08d5be
+error HashMismatch(bytes32 expected, bytes32 actual);
 error IndexSizeError();
 // 0x9ba6061b
 error UnsupportedOperation();
@@ -90,6 +89,18 @@ error Overflow();
 error InvalidInput();
 // 0xff15b069
 error UnsupportedPaymasterFlow();
+// 0xd11fe36c
+error UpgradeTxMustBeFirst();
+// 0x903e89d9
+error L2BlockCannotBeZero();
+// 0xd4aa0d85
+error L2BlockNumberAlreadyUsed();
+// 0xd54b530a
+error TimestampNotEqual(uint256 expected, uint256 actual);
+// 0xd72810cc
+error InvalidL2BlockNumber();
+// 0x87cbf28a
+error L2BatchCannotBeZero();
 // 0x2bfbfc11
 error EncodedLengthNotFourTimesSmallerThanOriginal();
 // 0xdb02de6c
