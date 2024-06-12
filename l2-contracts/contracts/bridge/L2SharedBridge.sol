@@ -71,7 +71,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         if (_l1SharedBridge == address(0)) {
             revert EmptyAddress();
         }
-        if (_standardDeployer == address(0)) {
+        if (address(_standardDeployer) == address(0)) {
             revert EmptyAddress();
         }
 

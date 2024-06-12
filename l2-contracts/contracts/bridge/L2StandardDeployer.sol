@@ -14,7 +14,7 @@ import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
-import {EmptyAddress, EmptyBytes32, AddressMismatch, Bytes32Mismatch, DeployFailed} from "../L2ContractErrors.sol";
+import {EmptyAddress, EmptyBytes32, AddressMismatch, Bytes32Mismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -89,7 +89,7 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
     function setL2TokenBeacon(address _l2TokenBeacon, bytes32 _l2TokenProxyBytecodeHash) external onlyOwner {
         l2TokenBeacon = UpgradeableBeacon(_l2TokenBeacon);
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
-        emit l2TokenBeaconUpdated(_l2TokenBeacon, _l2TokenProxyBytecodeHash);
+        emit L2TokenBeaconUpdated(_l2TokenBeacon, _l2TokenProxyBytecodeHash);
     }
 
     function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {
@@ -106,8 +106,8 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
                 revert Bytes32Mismatch(_assetInfo, expectedAssetInfo);
             }
             address deployedToken = _deployL2Token(originToken, erc20Data);
-            if (deployedToken != expectedL2Token) {
-                revert AddressMismatch(expectedL2Token, deployedToken);
+            if (deployedToken != expectedToken) {
+                revert AddressMismatch(expectedToken, deployedToken);
             }
             tokenAddress[_assetInfo] = expectedToken;
         }
