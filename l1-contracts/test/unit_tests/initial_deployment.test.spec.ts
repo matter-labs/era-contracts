@@ -11,7 +11,7 @@ import { ethTestConfig } from "../../src.ts/utils";
 
 import type { Deployer } from "../../src.ts/deploy";
 
-describe("Initial deployment", function () {
+describe("Initial deployment test", function () {
   let bridgehub: Bridgehub;
   let stateTransition: StateTransitionManager;
   let owner: ethers.Signer;

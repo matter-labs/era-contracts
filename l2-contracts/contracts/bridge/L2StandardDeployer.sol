@@ -14,7 +14,7 @@ import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
-import {EmptyAddress, EmptyBytes32, InvalidCaller, AddressMismatch, Bytes32Mismatch, AmountMustBeGreaterThanZero, DeployFailed} from "../L2ContractErrors.sol";
+import {EmptyAddress, EmptyBytes32, AddressMismatch, Bytes32Mismatch, DeployFailed} from "../L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -33,7 +33,10 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
     mapping(bytes32 assetInfo => address tokenAddress) public override tokenAddress;
 
     modifier onlyBridge() {
-        require(msg.sender == address(l2Bridge), "SD: only Bridge"); // Only L2 bridge can call this method
+        if (msg.sender != address(l2Bridge)) {
+            revert InvalidCaller(msg.sender);
+            // Only L2 bridge can call this method
+        }
         _;
     }
 
@@ -45,8 +48,15 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
 
     /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
     function setSharedBridge(IL2SharedBridge _sharedBridge) external onlyOwner {
-        require(address(l2Bridge) == address(0), "SD: shared bridge already set");
-        require(address(_sharedBridge) != address(0), "SD: shared bridge 0");
+        if (address(l2Bridge) != address(0)) {
+            // "SD: shared bridge already set";
+            revert AddressMismatch(address(0), address(l2Bridge));
+        }
+        if (address(_sharedBridge) == address(0)) {
+            // "SD: shared bridge 0");
+            revert EmptyAddress();
+        }
+
         l2Bridge = _sharedBridge;
     }
 
@@ -115,7 +125,10 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         bytes calldata _data
     ) external payable override onlyBridge returns (bytes memory _bridgeMintData) {
         (uint256 _amount, address _l1Receiver) = abi.decode(_data, (uint256, address));
-        require(_amount > 0, "Amount cannot be zero"); // todo
+        if (_amount > 0) {
+            revert AmountMustBeGreaterThanZero();
+            // "Amount cannot be zero");
+        }
 
         address l2Token = tokenAddress[_assetInfo];
         IL2StandardToken(l2Token).bridgeBurn(_prevMsgSender, _amount);

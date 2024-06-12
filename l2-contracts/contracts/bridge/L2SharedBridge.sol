@@ -16,7 +16,7 @@ import {IL2StandardDeployer} from "./interfaces/IL2StandardDeployer.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../L2ContractHelper.sol";
 
-import {EmptyAddress, EmptyBytes32, InvalidCaller, AddressMismatch, AmountMustBeGreaterThanZero, DeployFailed} from "../L2ContractErrors.sol";
+import {EmptyAddress, InvalidCaller} from "../L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -41,10 +41,10 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     address public override l1Bridge;
 
     /// @dev Chain ID of Era for legacy reasons
-    uint256 immutable ERA_CHAIN_ID;
+    uint256 public immutable ERA_CHAIN_ID;
 
     /// @dev Chain ID of L1 for bridging reasons
-    uint256 immutable L1_CHAIN_ID;
+    uint256 public immutable L1_CHAIN_ID;
 
     IL2StandardDeployer public standardDeployer;
 

@@ -21,7 +21,7 @@ interface IL2StandardDeployer is IL2StandardAsset {
         uint256 amount
     );
 
-    event l2TokenBeaconUpdated(address l2TokenBeacon, bytes32 l2TokenProxyBytecodeHash);
+    event L2TokenBeaconUpdated(address l2TokenBeacon, bytes32 l2TokenProxyBytecodeHash);
 
     function l2Bridge() external view returns (IL2SharedBridge);
 
