@@ -34,7 +34,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     string public constant override getName = "MailboxFacet";
 
     /// @dev Era's chainID
-    uint256 immutable ERA_CHAIN_ID;
+    uint256 internal immutable ERA_CHAIN_ID;
 
     constructor(uint256 _eraChainId) {
         ERA_CHAIN_ID = _eraChainId;
