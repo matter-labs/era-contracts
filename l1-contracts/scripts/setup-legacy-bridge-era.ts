@@ -92,7 +92,7 @@ async function main() {
       );
 
       const l2SharedBridgeAddress = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR");
-      const l2StandardDeployerAddress = getAddressFromEnv("CONTRACTS_L2_STANDARD_DEPLOYER_PROXY_ADDR");
+      const L2NonNativeVaultAddress = getAddressFromEnv("CONTRACTS_L2_STANDARD_DEPLOYER_PROXY_ADDR");
       const l2TokenBytecodeHash = hashL2Bytecode(beaconProxy.bytecode);
       const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
       // For the server to start up.
@@ -103,12 +103,12 @@ async function main() {
       // Wait a bit more after the server is ready to ensure that all of its components are ready.
       await sleep(2);
 
-      const l2StandardDeployer = new ethers.Contract(
-        l2StandardDeployerAddress,
+      const L2NonNativeVault = new ethers.Contract(
+        L2NonNativeVaultAddress,
         ["function l2TokenBeacon() view returns (address)"],
         l2Provider
       );
-      const l2TokenBeacon = await l2StandardDeployer.l2TokenBeacon();
+      const l2TokenBeacon = await L2NonNativeVault.l2TokenBeacon();
 
       console.log("Retrieved storage values for TestERC20Bridge:");
       console.log("l2SharedBridgeAddress:", l2SharedBridgeAddress);

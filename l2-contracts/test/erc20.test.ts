@@ -5,8 +5,8 @@ import * as hre from "hardhat";
 import { Provider, Wallet } from "zksync-ethers";
 import { hashBytecode } from "zksync-ethers/build/utils";
 import { unapplyL1ToL2Alias } from "./test-utils";
-import type { L2SharedBridge, L2StandardDeployer, L2StandardERC20 } from "../typechain";
-import { L2SharedBridgeFactory, L2StandardDeployerFactory, L2StandardERC20Factory } from "../typechain";
+import type { L2SharedBridge, L2NonNativeVault, L2StandardERC20 } from "../typechain";
+import { L2SharedBridgeFactory, L2NonNativeVaultFactory, L2StandardERC20Factory } from "../typechain";
 
 const richAccount = [
   {
@@ -43,7 +43,7 @@ describe("ERC20Bridge", function () {
   const testChainId = 9;
 
   let erc20Bridge: L2SharedBridge;
-  let erc20StandardDeployer: L2StandardDeployer;
+  let erc20AssetHandler: L2NonNativeVault;
   let erc20Token: L2StandardERC20;
   let contractsDeployedAlready: boolean = false;
 
@@ -58,16 +58,16 @@ describe("ERC20Bridge", function () {
     await deployer.deploy(await deployer.loadArtifact("BeaconProxy"), [l2Erc20TokenBeacon.address, "0x"]);
     const beaconProxyBytecodeHash = hashBytecode((await deployer.loadArtifact("BeaconProxy")).bytecode);
     const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [testChainId, 1]);
-    const erc20StandardDeployerImpl = await deployer.deploy(await deployer.loadArtifact("L2StandardDeployer"));
-    const standardDeployerInitializeData = erc20StandardDeployerImpl.interface.encodeFunctionData("initialize", [
+    const erc20AssetHandlerImpl = await deployer.deploy(await deployer.loadArtifact("L2NonNativeVault"));
+    const assetHandlerInitializeData = erc20AssetHandlerImpl.interface.encodeFunctionData("initialize", [
       beaconProxyBytecodeHash,
       governorWallet.address, // Note on real deployment this will be the deployerWallet
       contractsDeployedAlready,
     ]);
 
-    const erc20StandardDeployerProxy = await deployer.deploy(
+    const erc20AssetHandlerProxy = await deployer.deploy(
       await deployer.loadArtifact("TransparentUpgradeableProxy"),
-      [erc20StandardDeployerImpl.address, proxyAdminWallet.address, standardDeployerInitializeData]
+      [erc20AssetHandlerImpl.address, proxyAdminWallet.address, assetHandlerInitializeData]
     );
 
     contractsDeployedAlready = true;
@@ -76,7 +76,7 @@ describe("ERC20Bridge", function () {
       unapplyL1ToL2Alias(l1BridgeWallet.address),
       // ethers.constants.AddressZero,
       unapplyL1ToL2Alias(governorWallet.address), // note on real deployment this will be the governor
-      erc20StandardDeployerProxy.address,
+      erc20AssetHandlerProxy.address,
     ]);
 
     const erc20BridgeProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
@@ -86,8 +86,8 @@ describe("ERC20Bridge", function () {
     ]);
 
     erc20Bridge = L2SharedBridgeFactory.connect(erc20BridgeProxy.address, deployerWallet);
-    erc20StandardDeployer = L2StandardDeployerFactory.connect(erc20StandardDeployerProxy.address, governorWallet);
-    await erc20StandardDeployer.setSharedBridge(erc20BridgeProxy.address);
+    erc20AssetHandler = L2NonNativeVaultFactory.connect(erc20AssetHandlerProxy.address, governorWallet);
+    await erc20AssetHandler.setSharedBridge(erc20BridgeProxy.address);
 
     /// note in real deployment we have to transfer ownership of standard deployer here
   });
@@ -107,8 +107,8 @@ describe("ERC20Bridge", function () {
         encodedTokenData("TestToken", "TT", 18)
       )
     ).wait();
-    const l2TokenInfo = tx.events.find((event) => event.event === "FinalizeDepositSharedBridge").args.assetInfo;
-    const l2TokenAddress = await erc20StandardDeployer.tokenAddress(l2TokenInfo);
+    const l2TokenInfo = tx.events.find((event) => event.event === "FinalizeDepositSharedBridge").args.assetIdentifier;
+    const l2TokenAddress = await erc20AssetHandler.tokenAddress(l2TokenInfo);
     // Checking the correctness of the balance:
     erc20Token = L2StandardERC20Factory.connect(l2TokenAddress, deployerWallet);
     expect(await erc20Token.balanceOf(l2Receiver.address)).to.equal(100);
