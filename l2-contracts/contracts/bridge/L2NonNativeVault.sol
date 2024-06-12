@@ -8,7 +8,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
-import {IL2NonNativeVault} from "./interfaces/IL2NonNativeVault.sol";
+import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
@@ -20,7 +20,7 @@ import {EmptyAddress, EmptyBytes32, AddressMismatch, Bytes32Mismatch, DeployFail
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2NonNativeVault is IL2NonNativeVault, Ownable2StepUpgradeable {
+contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     IL2SharedBridge public override l2Bridge;
 
     /// @dev Contract that stores the implementation address for token.
@@ -30,7 +30,7 @@ contract L2NonNativeVault is IL2NonNativeVault, Ownable2StepUpgradeable {
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
 
-    mapping(bytes32 assetIdentifier => address tokenAddress) public override tokenAddress;
+    mapping(bytes32 assetId => address tokenAddress) public override tokenAddress;
 
     modifier onlyBridge() {
         if (msg.sender != address(l2Bridge)) {
@@ -92,24 +92,24 @@ contract L2NonNativeVault is IL2NonNativeVault, Ownable2StepUpgradeable {
         emit L2TokenBeaconUpdated(_l2TokenBeacon, _l2TokenProxyBytecodeHash);
     }
 
-    function bridgeMint(uint256 _chainId, bytes32 _assetIdentifier, bytes calldata _data) external payable override {
-        address token = tokenAddress[_assetIdentifier];
+    function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable override {
+        address token = tokenAddress[_assetId];
         (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken) = abi
             .decode(_data, (address, uint256, address, bytes, address));
         address expectedToken = l2TokenAddress(originToken);
         if (token == address(0)) {
-            bytes32 expectedassetIdentifier = keccak256(
+            bytes32 expectedassetId = keccak256(
                 abi.encode(_chainId, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(originToken))))
             );
-            if (_assetIdentifier != expectedassetIdentifier) {
+            if (_assetId != expectedassetId) {
                 // Make sure that a NativeTokenVault sent the message
-                revert Bytes32Mismatch(_assetIdentifier, expectedassetIdentifier);
+                revert Bytes32Mismatch(_assetId, expectedassetId);
             }
             address deployedToken = _deployL2Token(originToken, erc20Data);
             if (deployedToken != expectedToken) {
                 revert AddressMismatch(expectedToken, deployedToken);
             }
-            tokenAddress[_assetIdentifier] = expectedToken;
+            tokenAddress[_assetId] = expectedToken;
         }
 
         IL2StandardToken(expectedToken).bridgeMint(_l2Receiver, _amount);
@@ -120,7 +120,7 @@ contract L2NonNativeVault is IL2NonNativeVault, Ownable2StepUpgradeable {
     function bridgeBurn(
         uint256 _chainId,
         uint256 _mintValue,
-        bytes32 _assetIdentifier,
+        bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable override onlyBridge returns (bytes memory _bridgeMintData) {
@@ -130,14 +130,14 @@ contract L2NonNativeVault is IL2NonNativeVault, Ownable2StepUpgradeable {
             // "Amount cannot be zero");
         }
 
-        address l2Token = tokenAddress[_assetIdentifier];
+        address l2Token = tokenAddress[_assetId];
         IL2StandardToken(l2Token).bridgeBurn(_prevMsgSender, _amount);
 
         /// backwards compatible event
         emit WithdrawalInitiated(_prevMsgSender, _l1Receiver, l2Token, _amount);
         /// New Format
         // solhint-disable-next-line func-named-parameters
-        emit BridgeBurn(_chainId, _assetIdentifier, _prevMsgSender, _l1Receiver, _mintValue, _amount);
+        emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _l1Receiver, _mintValue, _amount);
         _bridgeMintData = _data;
     }
 

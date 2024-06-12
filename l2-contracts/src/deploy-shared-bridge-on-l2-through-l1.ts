@@ -18,12 +18,12 @@ import { ethTestConfig } from "./deploy-utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import * as hre from "hardhat";
-import { L2NonNativeVaultFactory } from "../typechain/L2NonNativeVaultFactory";
+import { L2NativeTokenVaultFactory } from "../typechain/L2NativeTokenVaultFactory";
 
 export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2SharedBridge").abi;
 export const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
 
-export async function publishL2NonNativeVaultDependencyBytecodesOnL2(
+export async function publishL2NativeTokenVaultDependencyBytecodesOnL2(
   deployer: Deployer,
   chainId: string,
   gasPrice: BigNumberish
@@ -99,27 +99,27 @@ export async function deployL2ProxyAdmin(deployer: Deployer, chainId: string, ga
 
 export async function deployAssetHandlerImplOnL2ThroughL1(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
   if (deployer.verbose) {
-    console.log("Deploying L2NonNativeVault Implementation");
+    console.log("Deploying L2NativeTokenVault Implementation");
   }
 
-  const L2NonNativeVaultImplementationBytecode = hre.artifacts.readArtifactSync("L2NonNativeVault").bytecode;
+  const L2NativeTokenVaultImplementationBytecode = hre.artifacts.readArtifactSync("L2NativeTokenVault").bytecode;
 
-  if (!L2NonNativeVaultImplementationBytecode) {
-    throw new Error("L2NonNativeVaultImplementationBytecode not found");
+  if (!L2NativeTokenVaultImplementationBytecode) {
+    throw new Error("L2NativeTokenVaultImplementationBytecode not found");
   }
   if (deployer.verbose) {
-    console.log("Computing L2NonNativeVault Implementation Address");
+    console.log("Computing L2NativeTokenVault Implementation Address");
   }
-  const L2NonNativeVaultImplAddress = computeL2Create2Address(
+  const L2NativeTokenVaultImplAddress = computeL2Create2Address(
     deployer.deployWallet,
-    L2NonNativeVaultImplementationBytecode,
+    L2NativeTokenVaultImplementationBytecode,
     "0x00",
     ethers.constants.HashZero
   );
-  deployer.addresses.Bridges.L2NonNativeVaultImplementation = L2NonNativeVaultImplAddress;
+  deployer.addresses.Bridges.L2NativeTokenVaultImplementation = L2NativeTokenVaultImplAddress;
   if (deployer.verbose) {
-    console.log(`L2NonNativeVault Implementation Address: ${L2NonNativeVaultImplAddress}`);
-    console.log("Deploying L2NonNativeVault Implementation");
+    console.log(`L2NativeTokenVault Implementation Address: ${L2NativeTokenVaultImplAddress}`);
+    console.log("Deploying L2NativeTokenVault Implementation");
   }
 
   /// L2StandardTokenProxy bytecode. We need this bytecode to be accessible on the L2, it is enough to add to factoryDeps
@@ -129,7 +129,7 @@ export async function deployAssetHandlerImplOnL2ThroughL1(deployer: Deployer, ch
   const tx2 = await create2DeployFromL1(
     chainId,
     deployer.deployWallet,
-    L2NonNativeVaultImplementationBytecode,
+    L2NativeTokenVaultImplementationBytecode,
     "0x00",
     ethers.constants.HashZero,
     priorityTxMaxGasLimit,
@@ -139,8 +139,8 @@ export async function deployAssetHandlerImplOnL2ThroughL1(deployer: Deployer, ch
 
   await tx2.wait();
   if (deployer.verbose) {
-    console.log("Deployed L2NonNativeVault Implementation");
-    console.log(`CONTRACTS_L2_STANDARD_DEPLOYER_IMPL_ADDR=${L2NonNativeVaultImplAddress}`);
+    console.log("Deployed L2NativeTokenVault Implementation");
+    console.log(`CONTRACTS_L2_STANDARD_DEPLOYER_IMPL_ADDR=${L2NativeTokenVaultImplAddress}`);
   }
 }
 
@@ -150,22 +150,22 @@ export async function deployAssetHandlerProxyOnL2ThroughL1(
   gasPrice: BigNumberish
 ) {
   if (deployer.verbose) {
-    console.log("Deploying L2NonNativeVault Proxy");
+    console.log("Deploying L2NativeTokenVault Proxy");
   }
 
-  const L2NonNativeVaultInterface = new Interface(hre.artifacts.readArtifactSync("L2NonNativeVault").abi);
-  const proxyInitializationParams = L2NonNativeVaultInterface.encodeFunctionData("initialize", [
+  const L2NativeTokenVaultInterface = new Interface(hre.artifacts.readArtifactSync("L2NativeTokenVault").abi);
+  const proxyInitializationParams = L2NativeTokenVaultInterface.encodeFunctionData("initialize", [
     hashL2Bytecode(L2_STANDARD_TOKEN_PROXY_BYTECODE),
     deployer.deployWallet.address,
     false,
   ]);
 
   /// prepare constructor data
-  const L2NonNativeVaultProxyConstructorData = ethers.utils.arrayify(
+  const L2NativeTokenVaultProxyConstructorData = ethers.utils.arrayify(
     new ethers.utils.AbiCoder().encode(
       ["address", "address", "bytes"],
       [
-        deployer.addresses.Bridges.L2NonNativeVaultImplementation,
+        deployer.addresses.Bridges.L2NativeTokenVaultImplementation,
         deployer.addresses.L2ProxyAdmin,
         proxyInitializationParams,
       ]
@@ -175,22 +175,22 @@ export async function deployAssetHandlerProxyOnL2ThroughL1(
   /// loading TransparentUpgradeableProxy bytecode
   const L2_STANDARD_DEPLOYER_PROXY_BYTECODE = hre.artifacts.readArtifactSync("TransparentUpgradeableProxy").bytecode;
 
-  /// compute L2NonNativeVaultProxy address
-  const L2NonNativeVaultProxyAddress = computeL2Create2Address(
+  /// compute L2NativeTokenVaultProxy address
+  const L2NativeTokenVaultProxyAddress = computeL2Create2Address(
     deployer.deployWallet,
     L2_STANDARD_DEPLOYER_PROXY_BYTECODE,
-    L2NonNativeVaultProxyConstructorData,
+    L2NativeTokenVaultProxyConstructorData,
     ethers.constants.HashZero
   );
-  deployer.addresses.Bridges.L2NonNativeVaultProxy = L2NonNativeVaultProxyAddress;
+  deployer.addresses.Bridges.L2NativeTokenVaultProxy = L2NativeTokenVaultProxyAddress;
 
-  /// deploy L2NonNativeVaultProxy
+  /// deploy L2NativeTokenVaultProxy
   // TODO: request from API how many L2 gas needs for the transaction.
   const tx3 = await create2DeployFromL1(
     chainId,
     deployer.deployWallet,
     L2_STANDARD_DEPLOYER_PROXY_BYTECODE,
-    L2NonNativeVaultProxyConstructorData,
+    L2NativeTokenVaultProxyConstructorData,
     ethers.constants.HashZero,
     priorityTxMaxGasLimit,
     gasPrice,
@@ -198,45 +198,45 @@ export async function deployAssetHandlerProxyOnL2ThroughL1(
   );
   await tx3.wait();
   if (deployer.verbose) {
-    console.log(`CONTRACTS_L2_STANDARD_DEPLOYER_PROXY_ADDR=${L2NonNativeVaultProxyAddress}`);
+    console.log(`CONTRACTS_L2_STANDARD_DEPLOYER_PROXY_ADDR=${L2NativeTokenVaultProxyAddress}`);
   }
 }
 
 export async function setSharedBridgeInAssetHandler(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
-  const L2NonNativeVault = L2NonNativeVaultFactory.connect(
-    deployer.addresses.Bridges.L2NonNativeVaultProxy,
+  const L2NativeTokenVault = L2NativeTokenVaultFactory.connect(
+    deployer.addresses.Bridges.L2NativeTokenVaultProxy,
     deployer.deployWallet
   );
 
   const tx1 = await requestL2TransactionDirect(
     chainId,
     deployer.deployWallet,
-    deployer.addresses.Bridges.L2NonNativeVaultProxy,
-    L2NonNativeVault.interface.encodeFunctionData("setSharedBridge", [deployer.addresses.Bridges.L2SharedBridgeProxy]),
+    deployer.addresses.Bridges.L2NativeTokenVaultProxy,
+    L2NativeTokenVault.interface.encodeFunctionData("setSharedBridge", [deployer.addresses.Bridges.L2SharedBridgeProxy]),
     priorityTxMaxGasLimit
   );
   await tx1.wait();
   if (deployer.verbose) {
-    console.log("Set L2SharedBridge in L2NonNativeVault");
+    console.log("Set L2SharedBridge in L2NativeTokenVault");
   }
 
   const tx2 = await requestL2TransactionDirect(
     chainId,
     deployer.deployWallet,
-    deployer.addresses.Bridges.L2NonNativeVaultProxy,
-    L2NonNativeVault.interface.encodeFunctionData("transferOwnership", [deployer.addresses.Governance]),
+    deployer.addresses.Bridges.L2NativeTokenVaultProxy,
+    L2NativeTokenVault.interface.encodeFunctionData("transferOwnership", [deployer.addresses.Governance]),
     priorityTxMaxGasLimit
   );
   await tx2.wait();
   if (deployer.verbose) {
-    console.log("Transferred L2NonNativeVault ownership to governance");
+    console.log("Transferred L2NativeTokenVault ownership to governance");
   }
 
   await deployer.executeUpgradeOnL2(
     chainId,
-    deployer.addresses.Bridges.L2NonNativeVaultProxy,
+    deployer.addresses.Bridges.L2NativeTokenVaultProxy,
     gasPrice,
-    L2NonNativeVault.interface.encodeFunctionData("acceptOwnership"),
+    L2NativeTokenVault.interface.encodeFunctionData("acceptOwnership"),
     priorityTxMaxGasLimit
   );
 }
@@ -306,7 +306,7 @@ export async function deploySharedBridgeProxyOnL2ThroughL1(
   const proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
     l1SharedBridge.address,
     deployer.addresses.Bridges.ERC20BridgeProxy,
-    deployer.addresses.Bridges.L2NonNativeVaultProxy,
+    deployer.addresses.Bridges.L2NativeTokenVaultProxy,
   ]);
 
   /// prepare constructor data
@@ -372,7 +372,7 @@ export async function deploySharedBridgeOnL2ThroughL1(
   gasPrice: BigNumberish,
   skipInitializeChainGovernance: boolean
 ) {
-  await publishL2NonNativeVaultDependencyBytecodesOnL2(deployer, chainId, gasPrice);
+  await publishL2NativeTokenVaultDependencyBytecodesOnL2(deployer, chainId, gasPrice);
   await deployL2ProxyAdmin(deployer, chainId, gasPrice);
   await deployAssetHandlerImplOnL2ThroughL1(deployer, chainId, gasPrice);
   await deployAssetHandlerProxyOnL2ThroughL1(deployer, chainId, gasPrice);

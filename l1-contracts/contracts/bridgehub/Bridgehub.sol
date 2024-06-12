@@ -38,8 +38,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev used to accept the admin role
     address private pendingAdmin;
 
-    /// @notice chainID => baseTokenassetIdentifier
-    mapping(uint256 _chainId => bytes32) public baseTokenassetIdentifier;
+    /// @notice chainID => baseTokenAssetId
+    mapping(uint256 _chainId => bytes32) public baseTokenAssetId;
 
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {}
@@ -143,7 +143,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
-        baseTokenassetIdentifier[_chainId] = IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetIdentifier(
+        baseTokenAssetId[_chainId] = IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetId(
             _baseToken
         );
 
@@ -236,7 +236,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             // slither-disable-next-line arbitrary-send-eth
             sharedBridge.bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
-                IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetIdentifierFromLegacy(token),
+                IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetIdFromLegacy(token),
                 msg.sender,
                 _request.mintValue - msg.value
             );
@@ -287,7 +287,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             // slither-disable-next-line arbitrary-send-eth
             sharedBridge.bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
-                IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetIdentifierFromLegacy(token),
+                IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetIdFromLegacy(token),
                 msg.sender,
                 _request.mintValue - baseTokenMsgValue
             );

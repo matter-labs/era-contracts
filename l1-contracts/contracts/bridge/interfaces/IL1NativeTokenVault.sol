@@ -12,11 +12,11 @@ interface IL1NativeTokenVault {
 
     function registerToken(address _l1Token) external;
 
-    function getAssetIdentifierFromLegacy(address l1TokenAddress) external view returns (bytes32);
+    function getAssetIdFromLegacy(address l1TokenAddress) external view returns (bytes32);
 
-    function getAssetIdentifier(address l1TokenAddress) external view returns (bytes32);
+    function getAssetId(address l1TokenAddress) external view returns (bytes32);
 
     function getERC20Getters(address _token) external view returns (bytes memory);
 
-    function tokenAddress(bytes32 assetIdentifier) external view returns (address);
+    function tokenAddress(bytes32 assetId) external view returns (address);
 }

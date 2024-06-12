@@ -9,19 +9,19 @@ interface IL2AssetHandler {
 
     event BridgeBurn(
         uint256 indexed _chainId,
-        bytes32 indexed _assetIdentifier,
+        bytes32 indexed _assetId,
         address indexed l2Sender,
         address _receiver,
         uint256 _mintValue,
         uint256 _amount
     );
 
-    function bridgeMint(uint256 _chainId, bytes32 _assetIdentifier, bytes calldata _data) external payable;
+    function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable;
 
     function bridgeBurn(
         uint256 _chainId,
         uint256 _mintValue,
-        bytes32 _assetIdentifier,
+        bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);
