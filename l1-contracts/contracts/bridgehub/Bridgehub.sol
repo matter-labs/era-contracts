@@ -14,6 +14,8 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice all the ether is held by the weth bridge
     IL1SharedBridge public sharedBridge;
