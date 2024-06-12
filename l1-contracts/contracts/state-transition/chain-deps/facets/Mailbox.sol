@@ -13,6 +13,7 @@ import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {Merkle} from "../../../common/libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
+import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
@@ -39,6 +40,7 @@ import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBas
 contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
+    using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "MailboxFacet";
@@ -399,6 +401,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
                 layer2Tip: uint192(0) // TODO: Restore after fee modeling will be stable. (SMA-1230)
             })
         );
+        s.priorityTree.push(canonicalTxHash);
 
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters

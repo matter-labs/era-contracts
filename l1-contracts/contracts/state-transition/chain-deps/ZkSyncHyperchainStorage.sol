@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 // import {IStateTransitionManager} from "../IStateTransitionManager.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
+import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
@@ -156,4 +157,6 @@ struct ZkSyncHyperchainStorage {
     bytes32 baseTokenAssetId;
     /// @dev address of the synclayer, only set on L1 if settling on it
     address syncLayer;
+    /// @dev Priority tree, the new data structure for priority queue
+    PriorityTree.Tree priorityTree;
 }
