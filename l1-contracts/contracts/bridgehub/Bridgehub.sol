@@ -16,6 +16,9 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @dev The Bridgehub contract serves as the primary entry point for L1<->L2 communication, 
+/// facilitating interactions between end user and bridges.
+/// It also manages state transition managers, base tokens, and chain registrations.
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice all the ether is held by the weth bridge
     IL1SharedBridge public sharedBridge;

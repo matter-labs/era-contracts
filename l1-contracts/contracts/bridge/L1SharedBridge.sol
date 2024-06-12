@@ -182,6 +182,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
     }
 
+    /// @dev Accepts ether only from the hyperchain associated with the specified chain ID.
+    /// @param _chainId The chain ID corresponding to the hyperchain allowed to send ether.
     function receiveEth(uint256 _chainId) external payable {
         require(BRIDGE_HUB.getHyperchain(_chainId) == msg.sender, "receiveEth not state transition");
     }
