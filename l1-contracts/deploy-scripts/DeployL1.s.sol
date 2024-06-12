@@ -24,7 +24,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
-import {StateTransitionManagerInitializeData} from "contracts/state-transition/IStateTransitionManager.sol";
+import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -32,13 +32,15 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
 
 contract DeployL1Script is Script {
     using stdToml for string;
 
-    address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    address constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+    address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
+    // solhint-disable-next-line gas-struct-packing
     struct DeployedAddresses {
         BridgehubDeployedAddresses bridgehub;
         StateTransitionDeployedAddresses stateTransition;
@@ -50,11 +52,13 @@ contract DeployL1Script is Script {
         address create2Factory;
     }
 
+    // solhint-disable-next-line gas-struct-packing
     struct BridgehubDeployedAddresses {
         address bridgehubImplementation;
         address bridgehubProxy;
     }
 
+    // solhint-disable-next-line gas-struct-packing
     struct StateTransitionDeployedAddresses {
         address stateTransitionProxy;
         address stateTransitionImplementation;
@@ -69,6 +73,7 @@ contract DeployL1Script is Script {
         address diamondProxy;
     }
 
+    // solhint-disable-next-line gas-struct-packing
     struct BridgesDeployedAddresses {
         address erc20BridgeImplementation;
         address erc20BridgeProxy;
@@ -76,6 +81,7 @@ contract DeployL1Script is Script {
         address sharedBridgeProxy;
     }
 
+    // solhint-disable-next-line gas-struct-packing
     struct Config {
         uint256 l1ChainId;
         uint256 eraChainId;
@@ -86,6 +92,7 @@ contract DeployL1Script is Script {
         TokensConfig tokens;
     }
 
+    // solhint-disable-next-line gas-struct-packing
     struct ContractsConfig {
         bytes32 create2FactorySalt;
         address create2FactoryAddr;
@@ -107,7 +114,7 @@ contract DeployL1Script is Script {
         uint256 diamondInitMinimalL2GasPrice;
         address governanceSecurityCouncilAddress;
         uint256 governanceMinDelay;
-        uint256 maxNumberOfHyperchains;
+        uint256 maxNumberOfChains;
         bytes diamondCutData;
         bytes32 bootloaderHash;
         bytes32 defaultAAHash;
@@ -117,8 +124,8 @@ contract DeployL1Script is Script {
         address tokenWethAddress;
     }
 
-    Config config;
-    DeployedAddresses addresses;
+    Config internal config;
+    DeployedAddresses internal addresses;
 
     function run() public {
         console.log("Deploying L1 contracts");
@@ -172,7 +179,7 @@ contract DeployL1Script is Script {
             "$.contracts.governance_security_council_address"
         );
         config.contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
-        config.contracts.maxNumberOfHyperchains = toml.readUint("$.contracts.max_number_of_hyperchains");
+        config.contracts.maxNumberOfChains = toml.readUint("$.contracts.max_number_of_chains");
         config.contracts.create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
         if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
             config.contracts.create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
@@ -216,7 +223,7 @@ contract DeployL1Script is Script {
 
         if (isConfigured) {
             if (config.contracts.create2FactoryAddr.code.length == 0) {
-                revert("Create2Factory configured address is empty");
+                revert AddressHasNoCode(config.contracts.create2FactoryAddr);
             }
             contractAddress = config.contracts.create2FactoryAddr;
             console.log("Using configured Create2Factory address:", contractAddress);
@@ -361,7 +368,7 @@ contract DeployL1Script is Script {
         bytes memory bytecode = abi.encodePacked(
             type(StateTransitionManager).creationCode,
             abi.encode(addresses.bridgehub.bridgehubProxy),
-            abi.encode(config.contracts.maxNumberOfHyperchains)
+            abi.encode(config.contracts.maxNumberOfChains)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("StateTransitionManagerImplementation deployed at:", contractAddress);
@@ -428,14 +435,18 @@ contract DeployL1Script is Script {
 
         config.contracts.diamondCutData = abi.encode(diamondCut);
 
-        StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
-            owner: config.ownerAddress,
-            validatorTimelock: addresses.validatorTimelock,
+        ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: addresses.stateTransition.genesisUpgrade,
             genesisBatchHash: config.contracts.genesisRoot,
             genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.genesisBatchCommitment,
-            diamondCut: diamondCut,
+            diamondCut: diamondCut
+        });
+
+        StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
+            owner: config.ownerAddress,
+            validatorTimelock: addresses.validatorTimelock,
+            chainCreationParams: chainCreationParams,
             protocolVersion: config.contracts.latestProtocolVersion
         });
 

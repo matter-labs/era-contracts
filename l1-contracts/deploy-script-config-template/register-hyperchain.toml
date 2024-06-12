@@ -1,6 +1,6 @@
 owner_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
-[hyperchain]
-hyperchain_chain_id = 9
+[chain]
+chain_chain_id = 9
 base_token_addr = "0x0000000000000000000000000000000000000001"
 bridgehub_create_new_chain_salt = 0
 validium_mode = false

@@ -84,7 +84,8 @@ export async function registerHyperchain(
   extraFacets: FacetCut[],
   gasPrice: BigNumberish,
   baseTokenName?: string,
-  chainId?: string
+  chainId?: string,
+  useGovernance: boolean = false
 ) {
   const testnetTokens = getTokens();
 
@@ -93,7 +94,15 @@ export async function registerHyperchain(
     : ADDRESS_ONE;
 
   if (!(await deployer.bridgehubContract(deployer.deployWallet).tokenIsRegistered(baseTokenAddress))) {
-    await deployer.registerToken(baseTokenAddress);
+    await deployer.registerToken(baseTokenAddress, useGovernance);
   }
-  await deployer.registerHyperchain(baseTokenAddress, validiumMode, extraFacets, gasPrice, null, chainId);
+  await deployer.registerHyperchain(
+    baseTokenAddress,
+    validiumMode,
+    extraFacets,
+    gasPrice,
+    null,
+    chainId,
+    useGovernance
+  );
 }
