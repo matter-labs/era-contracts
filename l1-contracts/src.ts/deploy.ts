@@ -27,23 +27,24 @@ import {
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   compileInitialCutHash,
 } from "./utils";
+import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
+import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
+import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
+import { ProxyAdminFactory } from "../typechain/ProxyAdminFactory";
+
+import { IZkSyncHyperchainFactory } from "../typechain/IZkSyncHyperchainFactory";
+import { L1SharedBridgeFactory } from "../typechain/L1SharedBridgeFactory";
+
+import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
+import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
+
 import type { FacetCut } from "./diamondCut";
 import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
 import { ERC20Factory, StateTransitionManagerFactory } from "../typechain";
 
-import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
-import { ProxyAdminFactory } from "../typechain/ProxyAdminFactory";
-import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
-import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
-
-import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IL1SharedBridgeFactory } from "../typechain/IL1SharedBridgeFactory";
-import { L1SharedBridgeFactory } from "../typechain/L1SharedBridgeFactory";
 import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
-import { IZkSyncHyperchainFactory } from "../typechain/IZkSyncHyperchainFactory";
-
-import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
 
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
 
@@ -91,7 +92,7 @@ export class Deployer {
     this.deployedLogPrefix = config.deployedLogPrefix ?? "CONTRACTS";
   }
 
-  public async initialZkSyncHyperchainDiamondCut(extraFacets?: FacetCut[]) {
+  public async initialZkSyncHyperchainDiamondCut(extraFacets?: FacetCut[], compareDiamondCutHash: boolean = false) {
     let facetCuts: FacetCut[] = Object.values(
       await getCurrentFacetCutsForAdd(
         this.addresses.StateTransition.AdminFacet,
@@ -109,7 +110,7 @@ export class Deployer {
     };
     const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
 
-    return compileInitialCutHash(
+    const diamondCut = compileInitialCutHash(
       facetCuts,
       verifierParams,
       L2_BOOTLOADER_BYTECODE_HASH,
@@ -120,6 +121,25 @@ export class Deployer {
       this.addresses.StateTransition.DiamondInit,
       false
     );
+
+    if (compareDiamondCutHash) {
+      const hash = ethers.utils.keccak256(
+        ethers.utils.defaultAbiCoder.encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCut])
+      );
+
+      console.log(`Diamond cut hash: ${hash}`);
+      const stm = StateTransitionManagerFactory.connect(
+        this.addresses.StateTransition.StateTransitionProxy,
+        this.deployWallet
+      );
+
+      const hashFromSTM = await stm.initialCutHash();
+      if (hash != hashFromSTM) {
+        throw new Error(`Has from STM ${hashFromSTM} does not match the computed hash ${hash}`);
+      }
+    }
+
+    return diamondCut;
   }
 
   public async deployCreate2Factory(ethTxOptions?: ethers.providers.TransactionRequest) {
@@ -796,6 +816,7 @@ export class Deployer {
     validiumMode: boolean,
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,
+    compareDiamondCutHash: boolean = false,
     nonce?,
     predefinedChainId?: string,
     useGovernance: boolean = false
@@ -811,7 +832,7 @@ export class Deployer {
       (await stateTransitionManager.getHyperchain(inputChainId)) != ethers.constants.AddressZero;
 
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
-    const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
+    const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets, compareDiamondCutHash);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
     const receipt = await this.executeDirectOrGovernance(
@@ -865,7 +886,8 @@ export class Deployer {
         console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${diamondProxyAddress}`);
       }
     }
-    this.chainId = parseInt(chainId, 16);
+    const intChainId = parseInt(chainId, 16);
+    this.chainId = intChainId;
 
     const validatorOneAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
     const validatorTwoAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
@@ -897,18 +919,25 @@ export class Deployer {
     }
 
     const diamondProxy = this.stateTransitionContract(this.deployWallet);
-    const tx4 = await diamondProxy.setTokenMultiplier(1, 1);
-    const receipt4 = await tx4.wait();
-    if (this.verbose) {
-      console.log(`BaseTokenMultiplier set ${diamondProxy.address}, gas used: ${receipt4.gasUsed.toString()}`);
-    }
-
-    if (validiumMode) {
-      const tx5 = await diamondProxy.setPubdataPricingMode(PubdataPricingMode.Validium);
-      const receipt5 = await tx5.wait();
+    // if we are using governance, the deployer will not be the admin, so we can't call the diamond proxy directly
+    if (admin == this.deployWallet.address) {
+      const tx4 = await diamondProxy.setTokenMultiplier(1, 1);
+      const receipt4 = await tx4.wait();
       if (this.verbose) {
-        console.log(`Validium mode set, gas used: ${receipt5.gasUsed.toString()}`);
+        console.log(`BaseTokenMultiplier set, gas used: ${receipt4.gasUsed.toString()}`);
       }
+
+      if (validiumMode) {
+        const tx5 = await diamondProxy.setPubdataPricingMode(PubdataPricingMode.Validium);
+        const receipt5 = await tx5.wait();
+        if (this.verbose) {
+          console.log(`Validium mode set, gas used: ${receipt5.gasUsed.toString()}`);
+        }
+      }
+    } else {
+      console.warn(
+        "BaseTokenMultiplier and Validium mode can't be set through the governance, please set it separately, using the admin account"
+      );
     }
   }
 
