@@ -20,10 +20,7 @@ interface IL2SharedBridge {
         address sender
     );
 
-    event AssetRegistered(
-        bytes32 indexed assetInfo,
-        address indexed _assetAddress
-    );
+    event AssetRegistered(bytes32 indexed assetInfo, address indexed _assetAddress);
 
     function finalizeDeposit(bytes32 _assetInfo, bytes calldata _data) external;
 

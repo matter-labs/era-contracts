@@ -220,6 +220,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(msg.sender == assetDeploymentTracker[_assetInfo], "ShB: only ADT");
         bytes32 baseTokenAssetInfo = BRIDGE_HUB.baseTokenAssetInfo(_chainId);
         address baseToken = assetAddress[baseTokenAssetInfo];
+        // slither-disable-next-line unused-return
         IL1StandardAsset(baseToken).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
             _mintValue: 0,
@@ -253,8 +254,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     ) external payable virtual onlyBridgehubOrEra(_chainId) whenNotPaused {
         (address l1Asset, bytes32 assetInfo) = _getAssetProperties(_assetInfo);
         _transferAllowanceToNTV(assetInfo, _amount, _prevMsgSender);
-        /* solhint-disable no-unused-vars */
-        bytes memory bridgeMintData = IL1StandardAsset(l1Asset).bridgeBurn{value: msg.value}({
+        /* solhint-disable unused-return */
+        IL1StandardAsset(l1Asset).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
             _mintValue: 0,
             _assetInfo: assetInfo,
@@ -658,8 +659,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(_l2ToL1message.length >= 56, "ShB wrong msg len"); // wrong message length
         uint256 amount;
         address l1Receiver;
-        uint256 l1ReceiverBytes;
-        address parsedL1Receiver;
+        // uint256 l1ReceiverBytes;
+        // address parsedL1Receiver;
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {
