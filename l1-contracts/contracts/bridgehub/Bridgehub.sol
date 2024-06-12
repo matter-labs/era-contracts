@@ -143,9 +143,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
-        baseTokenAssetId[_chainId] = IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetId(
-            _baseToken
-        );
+        baseTokenAssetId[_chainId] = IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetId(_baseToken);
 
         IStateTransitionManager(_stateTransitionManager).createNewChain({
             _chainId: _chainId,

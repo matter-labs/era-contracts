@@ -212,7 +212,9 @@ export async function setSharedBridgeInAssetHandler(deployer: Deployer, chainId:
     chainId,
     deployer.deployWallet,
     deployer.addresses.Bridges.L2NativeTokenVaultProxy,
-    L2NativeTokenVault.interface.encodeFunctionData("setSharedBridge", [deployer.addresses.Bridges.L2SharedBridgeProxy]),
+    L2NativeTokenVault.interface.encodeFunctionData("setSharedBridge", [
+      deployer.addresses.Bridges.L2SharedBridgeProxy,
+    ]),
     priorityTxMaxGasLimit
   );
   await tx1.wait();

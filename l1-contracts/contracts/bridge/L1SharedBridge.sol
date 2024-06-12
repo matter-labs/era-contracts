@@ -273,16 +273,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev for backwards compatibility and to automatically register l1 assets, and we return the correct info.
-    function _getAssetHandlerProperties(
-        bytes32 _assetId
-    ) internal returns (address l1AssetHandler, bytes32 assetId) {
+    function _getAssetHandlerProperties(bytes32 _assetId) internal returns (address l1AssetHandler, bytes32 assetId) {
         l1AssetHandler = assetHandlerAddress[_assetId];
         assetId = _assetId;
         if (l1AssetHandler == address(0) && (uint256(_assetId) <= type(uint160).max)) {
             l1AssetHandler = address(nativeTokenVault);
-            assetId = keccak256(
-                abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetId)
-            );
+            assetId = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetId));
             nativeTokenVault.registerToken(address(uint160(uint256(_assetId))));
         }
     }
@@ -339,10 +335,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes memory _assetData;
         bytes32 txDataHash;
         bool legacyDeposit = false;
-        try this.decodeLegacyData(_data, _prevMsgSender) returns (
-            bytes32 _assetIdCatch,
-            bytes memory _assetDataCatch
-        ) {
+        try this.decodeLegacyData(_data, _prevMsgSender) returns (bytes32 _assetIdCatch, bytes memory _assetDataCatch) {
             (_assetId, _assetData) = (_assetIdCatch, _assetDataCatch);
             legacyDeposit = true;
         } catch {
@@ -499,9 +492,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             bytes32 txDataHash;
             if (uint256(_assetId) <= type(uint160).max) {
                 // Claiming failed legacy deposit
-                assetId = keccak256(
-                    abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetId)
-                );
+                assetId = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetId));
                 (uint256 _amount, ) = abi.decode(_assetData, (uint256, address));
                 txDataHash = keccak256(abi.encode(_depositSender, uint160(uint256(_assetId)), _amount));
             } else {
@@ -817,9 +808,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
 
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-        depositHappened[ERA_CHAIN_ID][l2TxHash] = keccak256(
-            abi.encode(_assetId, abi.encode(_amount, _prevMsgSender))
-        ); // Tx Data Hash
+        depositHappened[ERA_CHAIN_ID][l2TxHash] = keccak256(abi.encode(_assetId, abi.encode(_amount, _prevMsgSender))); // Tx Data Hash
 
         emit LegacyDepositInitiated({
             chainId: ERA_CHAIN_ID,
