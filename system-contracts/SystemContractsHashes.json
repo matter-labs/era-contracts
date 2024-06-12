@@ -56,6 +56,13 @@
     "sourceCodeHash": "0xc88a4210dda96bc21fc852860fb74a4efeb0cc4101ffe6d928551cab46d15263"
   },
   {
+    "contractName": "GasBoundCaller",
+    "bytecodePath": "artifacts-zk/contracts-preprocessed/GasBoundCaller.sol/GasBoundCaller.json",
+    "sourceCodePath": "contracts-preprocessed/GasBoundCaller.sol",
+    "bytecodeHash": "0x010000abbab74213f27d4d7f132761f7315ad84dd2239195f336aa910c9c92fc",
+    "sourceCodeHash": "0x7774719fe82d1664af19f3f30e9ca2223784374367d32399638671722e9da850"
+  },
+  {
     "contractName": "ImmutableSimulator",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/ImmutableSimulator.sol/ImmutableSimulator.json",
     "sourceCodePath": "contracts-preprocessed/ImmutableSimulator.sol",
