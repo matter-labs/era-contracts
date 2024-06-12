@@ -91,10 +91,10 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
             bytes32 expectedAssetInfo = keccak256(
                 abi.encode(_chainId, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(originToken))))
             );
-            if (_assetInfo != expectedAssetInfo){
+            if (_assetInfo != expectedAssetInfo) {
                 // Make sure that a NativeTokenVault sent the message
                 revert Bytes32Mismatch(_assetInfo, expectedAssetInfo);
-            }; 
+            }
             address deployedToken = _deployL2Token(originToken, erc20Data);
             if (deployedToken != expectedL2Token) {
                 revert AddressMismatch(expectedL2Token, deployedToken);
@@ -115,7 +115,7 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         bytes calldata _data
     ) external payable override onlyBridge returns (bytes memory _bridgeMintData) {
         (uint256 _amount, address _l1Receiver) = abi.decode(_data, (uint256, address));
-        require(_amount > 0, "Amount cannot be zero"); // todo 
+        require(_amount > 0, "Amount cannot be zero"); // todo
 
         address l2Token = tokenAddress[_assetInfo];
         IL2StandardToken(l2Token).bridgeBurn(_prevMsgSender, _amount);
