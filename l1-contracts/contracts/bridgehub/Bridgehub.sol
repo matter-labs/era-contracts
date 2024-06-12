@@ -158,6 +158,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     //// Mailbox forwarder
 
     /// @notice forwards function call to Mailbox based on ChainId
+    /// @param _chainId The chain ID of the hyperchain where to prove L2 message inclusion.
+    /// @param _batchNumber The executed L2 batch number in which the message appeared
+    /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _message Information about the sent message: sender address, the message itself, tx index in the L2 batch where the message was sent
+    /// @param _proof Merkle proof for inclusion of L2 log that was sent with the message
+    /// @return Whether the proof is valid
     function proveL2MessageInclusion(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -170,6 +176,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
+    /// @param _chainId The chain ID of the hyperchain where to prove L2 log inclusion.
+    /// @param _batchNumber The executed L2 batch number in which the log appeared
+    /// @param _index The position of the l2log in the L2 logs Merkle tree
+    /// @param _log Information about the sent log
+    /// @param _proof Merkle proof for inclusion of the L2 log
+    /// @return Whether the proof is correct and L2 log is included in batch
     function proveL2LogInclusion(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -182,6 +194,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
+    /// @param _chainId The chain ID of the hyperchain where to prove L1->L2 tx status.
+    /// @param _l2TxHash The L2 canonical transaction hash
+    /// @param _l2BatchNumber The L2 batch number where the transaction was processed
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
+    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction
+    /// @param _status The execution status of the L1 -> L2 transaction (true - success & 0 - fail)
+    /// @return Whether the proof is correct and the transaction was actually executed with provided status
+    /// NOTE: It may return `false` for incorrect proof, but it doesn't mean that the L1 -> L2 transaction has an opposite status!
     function proveL1ToL2TransactionStatus(
         uint256 _chainId,
         bytes32 _l2TxHash,
