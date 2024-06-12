@@ -13,6 +13,7 @@ import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "../../../common/L2ContractAddresses.sol";
 import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
+import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -23,6 +24,7 @@ import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBas
 contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
+    using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "ExecutorFacet";
@@ -334,6 +336,14 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         }
     }
 
+    function _rollingHash(bytes32[] calldata _hashes) internal pure returns (bytes32) {
+        bytes32 hash = EMPTY_STRING_KECCAK;
+        for (uint256 i = 0; i < _hashes.length; i = i.uncheckedInc()) {
+            hash = keccak256(abi.encode(hash, _hashes[i]));
+        }
+        return hash;
+    }
+
     /// @dev Executes one batch
     /// @dev 1. Processes all pending operations (Complete priority requests)
     /// @dev 2. Finalizes batch on Ethereum
@@ -353,23 +363,70 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
     }
 
+    // TODO: once we use this method, the normal priorityQueue becomes unusable since we didn't pop the elements
+    function _executeOneBatch(
+        StoredBatchInfo memory _storedBatch,
+        PriorityOpsBatchInfo calldata _priorityOpsData,
+        uint256 _executedBatchIdx
+    ) internal {
+        uint256 currentBatchNumber = _storedBatch.batchNumber;
+        require(currentBatchNumber == s.totalBatchesExecuted + _executedBatchIdx + 1, "k"); // Execute batches in order
+        require(
+            _hashStoredBatchInfo(_storedBatch) == s.storedBatchHashes[currentBatchNumber],
+            "exe10" // executing batch should be committed
+        );
+
+        bytes32 priorityOperationsRollingHash = _rollingHash(_priorityOpsData.itemHashes);
+        require(priorityOperationsRollingHash == _storedBatch.priorityOperationsHash, "x");
+        // TODO: pop the elements from the queue?
+        s.priorityTree.processBatch(_priorityOpsData);
+
+        // Save root hash of L2 -> L1 logs tree
+        s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
+    }
+
     /// @inheritdoc IExecutor
+    // function executeBatchesSharedBridge(
+    //     uint256,
+    //     StoredBatchInfo[] calldata _batchesData
+    // ) external nonReentrant onlyValidator {
+    //     _executeBatches(_batchesData, emptyPriorityOpsData());
+    // }
+
+    /// @inheritdoc IExecutor
+    // function executeBatches(StoredBatchInfo[] calldata _batchesData) external nonReentrant onlyValidator {
+    //     _executeBatches(_batchesData, emptyPriorityOpsData());
+    // }
+
     function executeBatchesSharedBridge(
         uint256,
-        StoredBatchInfo[] calldata _batchesData
+        StoredBatchInfo[] calldata _batchesData,
+        PriorityOpsBatchInfo[] calldata _priorityOpsData
     ) external nonReentrant onlyValidator {
-        _executeBatches(_batchesData);
+        _executeBatches(_batchesData, _priorityOpsData);
     }
 
-    /// @inheritdoc IExecutor
-    function executeBatches(StoredBatchInfo[] calldata _batchesData) external nonReentrant onlyValidator {
-        _executeBatches(_batchesData);
+    function executeBatches(
+        StoredBatchInfo[] calldata _batchesData,
+        PriorityOpsBatchInfo[] calldata _priorityOpsData
+   ) external nonReentrant onlyValidator {
+        _executeBatches(_batchesData, _priorityOpsData);
     }
 
-    function _executeBatches(StoredBatchInfo[] calldata _batchesData) internal {
+    function _executeBatches(StoredBatchInfo[] calldata _batchesData, PriorityOpsBatchInfo[] calldata _priorityOpsData) internal {
         uint256 nBatches = _batchesData.length;
+        uint256 nPriorityOpsDatas = _priorityOpsData.length;
+        if (nPriorityOpsDatas != 0) {
+            require(nBatches == nPriorityOpsDatas, "");
+            require(s.priorityTree.startIndex <= s.priorityQueue.getFirstUnprocessedPriorityTx(), "");
+        }
+
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
-            _executeOneBatch(_batchesData[i], i);
+            if (nPriorityOpsDatas != 0) {
+                _executeOneBatch(_batchesData[i], _priorityOpsData[i], i);
+            } else {
+                _executeOneBatch(_batchesData[i], i);
+            }
             emit BlockExecution(_batchesData[i].batchNumber, _batchesData[i].batchHash, _batchesData[i].commitment);
         }
 

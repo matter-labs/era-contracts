@@ -8,11 +8,16 @@ import {Diamond} from "../libraries/Diamond.sol";
 import {ZkSyncHyperchainBase} from "./facets/ZkSyncHyperchainBase.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
 import {InitializeData, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
+import {PriorityQueue} from "../libraries/PriorityQueue.sol";
+import {PriorityTree} from "../libraries/PriorityTree.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
 /// @dev The deployment process takes care of this contract's initialization.
 contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
+    using PriorityQueue for PriorityQueue.Queue;
+    using PriorityTree for PriorityTree.Tree;
+
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
     constructor() reentrancyGuardInitializer {}
 
@@ -48,6 +53,8 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
         s.priorityTxMaxGasLimit = _initializeData.priorityTxMaxGasLimit;
         s.feeParams = _initializeData.feeParams;
         s.blobVersionedHashRetriever = _initializeData.blobVersionedHashRetriever;
+        // TODO - how to do this during the upgrade?
+        s.priorityTree.setup(keccak256(''), s.priorityQueue.getTotalPriorityTxs());
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
