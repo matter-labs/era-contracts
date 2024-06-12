@@ -752,6 +752,26 @@
     sinon-chai "^3.7.0"
     undici "^5.14.0"
 
+"@matterlabs/hardhat-zksync-verify@0.6.1":
+  version "0.6.1"
+  resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-verify/-/hardhat-zksync-verify-0.6.1.tgz#3fd83f4177ac0b138656ed93d4756ec27f1d329d"
+  integrity sha512-W9gI4k1UnuQ2MaBnK1f7E8Z2C4uHxpeDkzmB/ZCKClai2A3vK2jAbfqiQbX0HvuLq2OOq4dbx83KehAXjXoHlw==
+  dependencies:
+    "@ethersproject/abi" "^5.1.2"
+    "@ethersproject/address" "5.7.0"
+    "@matterlabs/hardhat-zksync-solc" "^1.1.4"
+    "@nomicfoundation/hardhat-verify" "^2.0.0"
+    "@openzeppelin/contracts" "^4.9.2"
+    axios "^1.6.2"
+    cbor "^8.1.0"
+    chai "^4.3.6"
+    chalk "4.1.2"
+    debug "^4.1.1"
+    hardhat "^2.14.0"
+    sinon "^17.0.1"
+    sinon-chai "^3.7.0"
+    zksync-ethers "^5.0.0"
+
 "@matterlabs/hardhat-zksync-verify@^0.2.0":
   version "0.2.2"
   resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-verify/-/hardhat-zksync-verify-0.2.2.tgz#daa34bc4404096ed0f44461ee366c1cb0e5a4f2f"
@@ -7516,6 +7536,13 @@ yocto-queue@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/yocto-queue/-/yocto-queue-1.0.0.tgz#7f816433fb2cbc511ec8bf7d263c3b58a1a3c251"
   integrity sha512-9bnSc/HEW2uRy67wc+T8UwauLuPJVn28jb+GtJY16iiKWyvmYJRXVT4UamsAEGQfPohgr2q4Tq0sQbQlxTfi1g==
+
+zksync-ethers@^5.0.0:
+  version "5.8.0"
+  resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.8.0.tgz#ff054345048f851c33cb6efcf2094f40d4da6063"
+  integrity sha512-/4qI5UElh0lspu0ew2IXBCO+O9kXEzZOM7JqvlfRWWGIUKZ+EDXnjIPgkH0y5/MnMT3FDq9koAAUCyZVWqHUJg==
+  dependencies:
+    ethers "~5.7.0"
 
 "zksync-ethers@https://github.com/zksync-sdk/zksync-ethers#ethers-v5-feat/bridgehub":
   version "5.1.0"
