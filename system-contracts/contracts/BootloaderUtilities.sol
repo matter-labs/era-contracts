@@ -6,6 +6,7 @@ import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 import {Transaction, TransactionHelper, EIP_712_TX_TYPE, LEGACY_TX_TYPE, EIP_2930_TX_TYPE, EIP_1559_TX_TYPE} from "./libraries/TransactionHelper.sol";
 import {RLPEncoder} from "./libraries/RLPEncoder.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
+import {UnsupportedTxType, InvalidSig, SigField} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -34,7 +35,7 @@ contract BootloaderUtilities is IBootloaderUtilities {
         } else if (_transaction.txType == EIP_2930_TX_TYPE) {
             txHash = encodeEIP2930TransactionHash(_transaction);
         } else {
-            revert("Unsupported tx type");
+            revert UnsupportedTxType(_transaction.txType);
         }
     }
 
@@ -89,7 +90,9 @@ contract BootloaderUtilities is IBootloaderUtilities {
         bytes memory vEncoded;
         {
             uint256 vInt = uint256(uint8(_transaction.signature[64]));
-            require(vInt == 27 || vInt == 28, "Invalid v value");
+            if (vInt != 27 && vInt != 28) {
+                revert InvalidSig(SigField.V, vInt);
+            }
 
             // If the `chainId` is specified in the transaction, then the `v` value is encoded as
             // `35 + y + 2 * chainId == vInt + 8 + 2 * chainId`, where y - parity bit (see EIP-155).
@@ -190,7 +193,9 @@ contract BootloaderUtilities is IBootloaderUtilities {
         bytes memory vEncoded;
         {
             uint256 vInt = uint256(uint8(_transaction.signature[64]));
-            require(vInt == 27 || vInt == 28, "Invalid v value");
+            if (vInt != 27 && vInt != 28) {
+                revert InvalidSig(SigField.V, vInt);
+            }
 
             vEncoded = RLPEncoder.encodeUint256(vInt - 27);
         }
@@ -287,7 +292,9 @@ contract BootloaderUtilities is IBootloaderUtilities {
         bytes memory vEncoded;
         {
             uint256 vInt = uint256(uint8(_transaction.signature[64]));
-            require(vInt == 27 || vInt == 28, "Invalid v value");
+            if (vInt != 27 && vInt != 28) {
+                revert InvalidSig(SigField.V, vInt);
+            }
 
             vEncoded = RLPEncoder.encodeUint256(vInt - 27);
         }

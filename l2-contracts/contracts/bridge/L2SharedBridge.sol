@@ -16,6 +16,8 @@ import {IL2StandardDeployer} from "./interfaces/IL2StandardDeployer.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../L2ContractHelper.sol";
 
+import {EmptyAddress, EmptyBytes32, InvalidCaller, AddressMismatch, AmountMustBeGreaterThanZero, DeployFailed} from "../L2ContractErrors.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
@@ -66,13 +68,19 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         address _l1Bridge,
         IL2StandardDeployer _standardDeployer
     ) external reinitializer(2) {
-        require(_l1SharedBridge != address(0), "bf");
-        require(address(_standardDeployer) != address(0), "cf");
+        if (_l1SharedBridge == address(0)) {
+            revert EmptyAddress();
+        }
+        if (_standardDeployer == address(0)) {
+            revert EmptyAddress();
+        }
 
         l1SharedBridge = _l1SharedBridge;
         standardDeployer = _standardDeployer;
         if (block.chainid == ERA_CHAIN_ID) {
-            require(_l1Bridge != address(0), "bf2");
+            if (_l1Bridge == address(0)) {
+                revert EmptyAddress();
+            }
             l1Bridge = _l1Bridge;
         }
     }
@@ -86,11 +94,12 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     function finalizeDeposit(bytes32 _assetInfo, bytes memory _data) public override {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
 
-        require(
-            AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
-                AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1SharedBridge,
-            "mq"
-        );
+        if (
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge
+        ) {
+            revert InvalidCaller(msg.sender);
+        }
 
         address asset = assetAddress[_assetInfo];
         if (asset != address(0)) {

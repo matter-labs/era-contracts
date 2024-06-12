@@ -46,8 +46,9 @@ describe("Compressor tests", function () {
 
   describe("publishCompressedBytecode", function () {
     it("should revert when it's a non-bootloader call", async () => {
-      await expect(compressor.publishCompressedBytecode("0x", "0x0000")).to.be.revertedWith(
-        "Callable only by the bootloader"
+      await expect(compressor.publishCompressedBytecode("0x", "0x0000")).to.be.revertedWithCustomError(
+        compressor,
+        "CallerMustBeBootloader"
       );
     });
 
@@ -57,7 +58,7 @@ describe("Compressor tests", function () {
       const COMPRESSED_BYTECODE = "0x0002" + "deadbeefdeadbeef" + "0000" + "0000" + "0000" + "0000";
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWith("Encoded data length should be 4 times shorter than the original bytecode");
+      ).to.be.revertedWithCustomError(compressor, "MalformedBytecode");
     });
 
     it("should revert when there is no encoded data", async () => {
@@ -66,7 +67,7 @@ describe("Compressor tests", function () {
       const COMPRESSED_BYTECODE = "0x0002" + "deadbeefdeadbeef" + "deadbeefdeadbeef";
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWith("Encoded data length should be 4 times shorter than the original bytecode");
+      ).to.be.revertedWithCustomError(compressor, "MalformedBytecode");
     });
 
     it("should revert when the encoded data length is invalid", async () => {
@@ -80,7 +81,7 @@ describe("Compressor tests", function () {
       // The length of the encodedData should be 32 / 4 = 8 bytes
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWith("Encoded data length should be 4 times shorter than the original bytecode");
+      ).to.be.revertedWithCustomError(compressor, "MalformedBytecode");
     });
 
     it("should revert when the dictionary has too many entries", async () => {
@@ -101,7 +102,7 @@ describe("Compressor tests", function () {
       // The dictionary should have at most encode data length entries
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWith("Dictionary should have at most the same number of entries as the encoded data");
+      ).to.be.revertedWithCustomError(compressor, "MalformedBytecode");
     });
 
     it("should revert when the encoded data has chunks where index is out of bounds", async () => {
@@ -112,7 +113,7 @@ describe("Compressor tests", function () {
       // The dictionary has only 1 entry, so at the last entry of the encoded data the chunk index is out of bounds
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWith("Encoded chunk index is out of bounds");
+      ).to.be.revertedWithCustomError(compressor, "IndexOutOfBounds");
     });
 
     it("should revert when the encoded data has chunks that does not match the original bytecode", async () => {
@@ -122,7 +123,7 @@ describe("Compressor tests", function () {
         "0x0002" + "deadbeefdeadbeef" + "1111111111111111" + "0001" + "0000" + "0000" + "0001";
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWith("Encoded chunk does not match the original bytecode");
+      ).to.be.revertedWithCustomError(compressor, "ValuesNotEqual");
     });
 
     it("should revert when the bytecode length in bytes is invalid", async () => {
@@ -131,7 +132,7 @@ describe("Compressor tests", function () {
       const COMPRESSED_BYTECODE = "0x0001" + "deadbeefdeadbeef" + "0000" + "0000" + "0000";
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWith("po");
+      ).to.be.revertedWithCustomError(compressor, "MalformedBytecode");
     });
 
     it("should revert when the bytecode length in words is odd", async () => {
@@ -140,7 +141,7 @@ describe("Compressor tests", function () {
       const COMPRESSED_BYTECODE = "0x0001" + "deadbeefdeadbeef" + "0000".repeat(4 * 2);
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWith("pr");
+      ).to.be.revertedWithCustomError(compressor, "MalformedBytecode");
     });
 
     // Test case with too big bytecode is unrealistic because API cannot accept so much data.
@@ -183,8 +184,9 @@ describe("Compressor tests", function () {
 
   describe("verifyCompressedStateDiffs", function () {
     it("non l1 messenger failed to call", async () => {
-      await expect(compressor.verifyCompressedStateDiffs(0, 8, "0x", "0x0000")).to.be.revertedWith(
-        "Inappropriate caller"
+      await expect(compressor.verifyCompressedStateDiffs(0, 8, "0x", "0x0000")).to.be.revertedWithCustomError(
+        compressor,
+        "Unauthorized"
       );
     });
 
@@ -202,7 +204,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(9, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(1, 9, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWith("enumeration index size is too large");
+      ).to.be.revertedWithCustomError(compressor, "IndexSizeError");
     });
 
     it("initial write key mismatch", async () => {
@@ -219,7 +221,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(4, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(1, 4, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWith("iw: initial key mismatch");
+      ).to.be.revertedWithCustomError(compressor, "ValuesNotEqual");
     });
 
     it("repeated write key mismatch", async () => {
@@ -236,7 +238,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(8, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(1, 8, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWith("rw: enum key mismatch");
+      ).to.be.revertedWithCustomError(compressor, "ValuesNotEqual");
     });
 
     it("no compression value mismatch", async () => {
@@ -259,7 +261,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(3, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(2, 3, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWith("transform or no compression: compressed and final mismatch");
+      ).to.be.revertedWithCustomError(compressor, "ValuesNotEqual");
     });
 
     it("transform value mismatch", async () => {
@@ -282,7 +284,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(2, 1, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWith("transform or no compression: compressed and final mismatch");
+      ).to.be.revertedWithCustomError(compressor, "ValuesNotEqual");
     });
 
     it("add value mismatch", async () => {
@@ -299,7 +301,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(1, 1, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWith("add: initial plus converted not equal to final");
+      ).to.be.revertedWithCustomError(compressor, "ValuesNotEqual");
     });
 
     it("sub value mismatch", async () => {
@@ -316,7 +318,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(1, 1, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWith("sub: initial minus converted not equal to final");
+      ).to.be.revertedWithCustomError(compressor, "ValuesNotEqual");
     });
 
     it("invalid operation", async () => {
@@ -335,7 +337,7 @@ describe("Compressor tests", function () {
       compressedStateDiffs = compressedStateDiffsCharArray.join("");
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(1, 1, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWith("unsupported operation");
+      ).to.be.revertedWithCustomError(compressor, "UnsupportedOperation");
     });
 
     it("Incorrect number of initial storage diffs", async () => {
@@ -363,7 +365,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(2, 1, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWith("Incorrect number of initial storage diffs");
+      ).to.be.revertedWithCustomError(compressor, "ValuesNotEqual");
     });
 
     it("Extra data in compressed state diffs", async () => {
@@ -391,7 +393,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(2, 1, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWith("Extra data in _compressedStateDiffs");
+      ).to.be.revertedWithCustomError(compressor, "ValuesNotEqual");
     });
 
     it("successfully verified", async () => {
