@@ -820,18 +820,6 @@ export class Deployer {
           console.log(`Validium mode set, gas used: ${receipt5.gasUsed.toString()}`);
         }
       }
-    } else if (useGovernance) {
-      await this.executeUpgrade(
-        stateTransitionManager.address,
-        0,
-        stateTransitionManager.interface.encodeFunctionData("setTokenMultiplier", [intChainId, 1, 1])
-      );
-      console.log("BaseTokenMultiplier set through the governance");
-      if (validiumMode) {
-        console.warn(
-          "Validium mode can't be set through the governance, please set it separately, using the admin account"
-        );
-      }
     } else {
       console.warn(
         "BaseTokenMultiplier and Validium mode can't be set through the governance, please set it separately, using the admin account"
