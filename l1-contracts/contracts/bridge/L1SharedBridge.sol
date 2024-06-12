@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable reason-string, gas-custom-errors
+
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
@@ -110,6 +112,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         _;
     }
 
+    /// @notice Checks that the message sender is the shared bridge itself.
+    modifier onlySelf() {
+        require(msg.sender == address(this), "ShB not shared bridge");
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
@@ -164,7 +172,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     /// @param _target The hyperchain or bridge contract address from where to transfer funds.
     /// @param _targetChainId The chain ID of the corresponding hyperchain.
-    function transferFundsFromLegacy(address _token, address _target, uint256 _targetChainId) external onlyOwner {
+    function transferFundsFromLegacy(address _token, address _target, uint256 _targetChainId) external onlySelf {
         if (_token == ETH_TOKEN_ADDRESS) {
             uint256 balanceBefore = address(this).balance;
             IMailbox(_target).transferEthToSharedBridge();
@@ -180,8 +188,22 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             require(legacyBridgeBalance > 0, "ShB: 0 amount to transfer");
             IL1ERC20Bridge(_target).transferTokenToSharedBridge(_token);
             uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
-            require(balanceAfter - balanceBefore == legacyBridgeBalance, "ShB: wrong amount transferred");
+            require(balanceAfter - balanceBefore >= legacyBridgeBalance, "ShB: wrong amount transferred");
             chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + legacyBridgeBalance;
+        }
+    }
+
+    /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process.
+    /// @dev Unlike `transferFundsFromLegacy` is provides a concrete limit on the gas used for the transfer and even if it will fail, it will not revert the whole transaction.
+    function safeTransferFundsFromLegacy(
+        address _token,
+        address _target,
+        uint256 _targetChainId,
+        uint256 _gasPerToken
+    ) external onlyOwner {
+        try this.transferFundsFromLegacy{gas: _gasPerToken}(_token, _target, _targetChainId) {} catch {
+            // A reasonable amount of gas will be provided to transfer the token.
+            // If the transfer fails, we don't want to revert the whole transaction.
         }
     }
 
@@ -240,7 +262,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _chainId The chain ID of the hyperchain to which deposit.
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
     /// @param _l2Value The L2 `msg.value` from the L1 -> L2 deposit transaction.
-    /// @param _data The calldata for the second bridge deposit. 
+    /// @param _data The calldata for the second bridge deposit.
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
@@ -308,7 +330,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
     /// @param _chainId The chain ID of the hyperchain to which confirm the deposit.
     /// @param _txDataHash The keccak256 hash of abi.encode(msgSender, l1Token, amount)
-    /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit. 
+    /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,
@@ -418,7 +440,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             {
                 // Deposits that happened before the upgrade cannot be checked here, they have to be claimed and checked in the legacyBridge
                 bool weCanCheckDepositHere = !_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch);
-                // Double claims are not possible, as we this check except for legacy bridge withdrawals
+                // Double claims are not possible, as depositHappened is checked here for all except legacy deposits (which have to happen through the legacy bridge)
                 // Funds claimed before the update will still be recorded in the legacy bridge
                 // Note we double check NEW deposits if they are called from the legacy bridge
                 notCheckedInLegacyBridgeOrWeCanCheckDeposit = (!_checkedInLegacyBridge) || weCanCheckDepositHere;

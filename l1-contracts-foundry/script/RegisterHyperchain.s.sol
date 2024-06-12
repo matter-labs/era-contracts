@@ -15,12 +15,13 @@ import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interf
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {ZksyncContract, MissingAddress, AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
 
 contract RegisterHyperchainScript is Script {
     using stdToml for string;
 
-    address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    bytes32 constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
+    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+    bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
 
     struct Config {
         ContractsConfig contracts;
@@ -49,6 +50,7 @@ contract RegisterHyperchainScript is Script {
         uint128 baseTokenGasPriceMultiplierDenominator;
     }
 
+    // solhint-disable-next-line gas-struct-packing
     struct AddressesConfig {
         address baseToken;
         address bridgehub;
@@ -64,7 +66,7 @@ contract RegisterHyperchainScript is Script {
         address newDiamondProxy;
     }
 
-    Config config;
+    Config internal config;
 
     function run() public {
         console.log("Deploying Hyperchain");
@@ -146,7 +148,7 @@ contract RegisterHyperchainScript is Script {
 
     function checkTokenAddress() internal {
         if (config.addresses.baseToken == address(0)) {
-            revert("Token address is not set");
+            revert MissingAddress(ZksyncContract.BaseToken);
         }
 
         // Check if it's ethereum address
@@ -155,7 +157,7 @@ contract RegisterHyperchainScript is Script {
         }
 
         if (config.addresses.baseToken.code.length == 0) {
-            revert("Token address is not a contract address");
+            revert AddressHasNoCode(config.addresses.baseToken);
         }
 
         console.log("Using base token address:", config.addresses.baseToken);
@@ -248,14 +250,15 @@ contract RegisterHyperchainScript is Script {
         // Get new diamond proxy address from emitted events
         Vm.Log[] memory logs = vm.getRecordedLogs();
         address diamondProxyAddress;
-        for (uint256 i = 0; i < logs.length; i++) {
+        uint256 logsLength = logs.length;
+        for (uint256 i = 0; i < logsLength; ++i) {
             if (logs[i].topics[0] == STATE_TRANSITION_NEW_CHAIN_HASH) {
                 diamondProxyAddress = address(uint160(uint256(logs[i].topics[2])));
                 break;
             }
         }
         if (diamondProxyAddress == address(0)) {
-            revert("Diamond proxy address not found");
+            revert MissingAddress(ZksyncContract.DiamondProxy);
         }
         config.addresses.newDiamondProxy = diamondProxyAddress;
     }

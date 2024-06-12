@@ -7,7 +7,6 @@ import {IExecutor} from "./IExecutor.sol";
 import {IGetters} from "./IGetters.sol";
 import {IMailbox} from "./IMailbox.sol";
 
-// kl to do remove this, needed for the server for now
 import {Diamond} from "../libraries/Diamond.sol";
 
 interface IZkSyncHyperchain is IAdmin, IExecutor, IGetters, IMailbox {

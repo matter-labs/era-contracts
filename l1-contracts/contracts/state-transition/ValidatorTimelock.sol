@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable reason-string, gas-custom-errors
+
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
@@ -130,6 +132,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
             uint32 timestamp = uint32(block.timestamp);
+            // solhint-disable-next-line gas-length-in-loops
             for (uint256 i = 0; i < _newBatchesData.length; ++i) {
                 committedBatchTimestamp[_chainId].set(_newBatchesData[i].batchNumber, timestamp);
             }
@@ -193,6 +196,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     function _executeBatchesInner(uint256 _chainId, StoredBatchInfo[] calldata _newBatchesData) internal {
         uint256 delay = executionDelay; // uint32
         unchecked {
+            // solhint-disable-next-line gas-length-in-loops
             for (uint256 i = 0; i < _newBatchesData.length; ++i) {
                 uint256 commitBatchTimestamp = committedBatchTimestamp[_chainId].get(_newBatchesData[i].batchNumber);
 

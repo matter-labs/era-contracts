@@ -8,9 +8,9 @@ import { ethers } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
-import type { types } from "zksync-web3";
-import { Provider, Wallet } from "zksync-web3";
-import { hashBytecode } from "zksync-web3/build/src/utils";
+import type { types } from "zksync-ethers";
+import { Provider, Wallet } from "zksync-ethers";
+import { hashBytecode } from "zksync-ethers/build/utils";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
 import type { Dependency, DeployedDependency } from "./utils";
 import { checkMarkers, filterPublishedFactoryDeps, getBytecodes, publishFactoryDeps, readYulBytecode } from "./utils";
@@ -19,7 +19,7 @@ const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_co
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 // Maximum length of the combined length of dependencies
-const MAX_COMBINED_LENGTH = 90000;
+const MAX_COMBINED_LENGTH = 125000;
 
 const DEFAULT_ACCOUNT_CONTRACT_NAME = "DefaultAccount";
 const BOOTLOADER_CONTRACT_NAME = "Bootloader";

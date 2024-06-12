@@ -1,5 +1,9 @@
+use circuit_definitions::snark_wrapper::franklin_crypto::bellman::plonk::better_better_cs::setup::VerificationKey;
+use circuit_definitions::snark_wrapper::franklin_crypto::bellman::pairing::bn256::Bn256;
+use circuit_definitions::circuit_definitions::aux_layer::ZkSyncSnarkWrapperCircuit;
 use handlebars::Handlebars;
 use serde_json::json;
+use zksync_crypto::calculate_verification_key_hash;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
@@ -122,8 +126,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let verifier_contract_template = fs::read_to_string("data/verifier_contract_template.txt")?;
 
+    let verification_key = fs::read_to_string(&opt.input_path)
+        .expect(&format!("Unable to read from {}", &opt.input_path));
+
+    let verification_key: VerificationKey<Bn256, ZkSyncSnarkWrapperCircuit> =
+        serde_json::from_str(&verification_key).unwrap();
+
+    let vk_hash = hex::encode(calculate_verification_key_hash(verification_key).to_fixed_bytes());
+
     let verifier_contract_template =
-        insert_residue_elements_and_commitments(&verifier_contract_template, &vk)?;
+        insert_residue_elements_and_commitments(&verifier_contract_template, &vk, &vk_hash)?;
 
     let mut file = File::create(opt.output_path)?;
 
@@ -134,6 +146,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn insert_residue_elements_and_commitments(
     template: &str,
     vk: &HashMap<String, Value>,
+    vk_hash: &str,
 ) -> Result<String, Box<dyn Error>> {
     let reg = Handlebars::new();
     let residue_g2_elements = generate_residue_g2_elements(vk);
@@ -145,7 +158,8 @@ fn insert_residue_elements_and_commitments(
     Ok(reg.render_template(
         &verifier_contract_template,
         &json!({"residue_g2_elements": residue_g2_elements,
-                        "commitments": commitments}),
+                        "commitments": commitments,
+                        "vk_hash": vk_hash}),
     )?)
 }
 

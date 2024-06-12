@@ -1,5 +1,5 @@
 use multivm::vm_latest::{
-    constants::{BOOTLOADER_HEAP_PAGE, VM_HOOK_PARAMS_START_POSITION},
+    constants::{BOOTLOADER_HEAP_PAGE, get_vm_hook_start_position_latest},
     HistoryMode, SimpleMemory,
 };
 
@@ -26,7 +26,7 @@ pub(crate) enum TestVmHook {
 
 // Number of 32-bytes slots that are reserved for test hooks (passing information between bootloader test code and the VM).
 const TEST_HOOKS: u32 = 5;
-const TEST_HOOK_ENUM_POSITION: u32 = VM_HOOK_PARAMS_START_POSITION - 1;
+const TEST_HOOK_ENUM_POSITION: u32 = get_vm_hook_start_position_latest() - 1;
 const TEST_HOOK_START: u32 = TEST_HOOK_ENUM_POSITION - TEST_HOOKS;
 
 pub fn get_vm_hook_params<H: HistoryMode>(memory: &SimpleMemory<H>) -> Vec<U256> {
