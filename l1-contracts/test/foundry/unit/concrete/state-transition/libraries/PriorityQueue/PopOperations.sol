@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {PriorityQueueSharedTest} from "./_PriorityQueue_Shared.t.sol";
 import {PriorityOperation} from "contracts/dev-contracts/test/PriorityQueueTest.sol";
+import {QueueIsEmpty} from "contracts/common/L1ContractErrors.sol";
 
 contract PopOperationsTest is PriorityQueueSharedTest {
     uint256 public constant NUMBER_OPERATIONS = 10;
@@ -67,7 +68,7 @@ contract PopOperationsTest is PriorityQueueSharedTest {
         assertTrue(priorityQueue.isEmpty());
 
         // And now let's go over the limit and fail.
-        vm.expectRevert(bytes.concat("s"));
+        vm.expectRevert(QueueIsEmpty.selector);
         priorityQueue.popFront();
     }
 }

@@ -4,10 +4,11 @@ pragma solidity 0.8.24;
 
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 import {PriorityOperation} from "contracts/state-transition/libraries/PriorityQueue.sol";
+import {QueueIsEmpty} from "contracts/common/L1ContractErrors.sol";
 
 contract GetPriorityQueueFrontOperationTest is GettersFacetTest {
     function test_revertWhen_queueIsEmpty() public {
-        vm.expectRevert(bytes.concat("D"));
+        vm.expectRevert(QueueIsEmpty.selector);
         gettersFacet.priorityQueueFrontOperation();
     }
 

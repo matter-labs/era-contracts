@@ -11,6 +11,7 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
+import {MalformedCalldata, ZeroAddress, TooMuchGas} from "contracts/common/L1ContractErrors.sol";
 
 contract InitializeTest is DiamondInitTest {
     function test_revertWhen_verifierIsZeroAddress() public {
@@ -23,7 +24,7 @@ contract InitializeTest is DiamondInitTest {
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
-        vm.expectRevert(bytes.concat("vt"));
+        vm.expectRevert(ZeroAddress.selector);
         new DiamondProxy(block.chainid, diamondCutData);
     }
 
@@ -37,7 +38,7 @@ contract InitializeTest is DiamondInitTest {
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
-        vm.expectRevert(bytes.concat("vy"));
+        vm.expectRevert(ZeroAddress.selector);
         new DiamondProxy(block.chainid, diamondCutData);
     }
 
@@ -51,7 +52,7 @@ contract InitializeTest is DiamondInitTest {
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
-        vm.expectRevert(bytes.concat("hc"));
+        vm.expectRevert(ZeroAddress.selector);
         new DiamondProxy(block.chainid, diamondCutData);
     }
 
@@ -65,7 +66,7 @@ contract InitializeTest is DiamondInitTest {
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
-        vm.expectRevert(bytes.concat("vu"));
+        vm.expectRevert(TooMuchGas.selector);
         new DiamondProxy(block.chainid, diamondCutData);
     }
 

@@ -8,7 +8,7 @@ import {Utils} from "./libraries/Utils.sol";
 import {UnsafeBytesCalldata} from "./libraries/UnsafeBytesCalldata.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {L1_MESSENGER_CONTRACT, STATE_DIFF_ENTRY_SIZE, KNOWN_CODE_STORAGE_CONTRACT} from "./Constants.sol";
-import {MalformedBytecode, BytecodeError, IndexOutOfBounds, IndexSizeError, ValuesNotEqual, UnsupportedOperation} from "./SystemContractErrors.sol";
+import {DerivedKeyNotEqualToCompressedValue, EncodedAndRealBytecodeChunkNotEqual, DictionaryLengthNotFourTimesSmallerThanEncoded, EncodedLengthNotFourTimesSmallerThanOriginal, IndexOutOfBounds, IndexSizeError, ValuesNotEqual, UnsupportedOperation} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -50,11 +50,11 @@ contract Compressor is ICompressor, ISystemContract {
             (bytes calldata dictionary, bytes calldata encodedData) = _decodeRawBytecode(_rawCompressedData);
 
             if (encodedData.length * 4 != _bytecode.length) {
-                revert MalformedBytecode(BytecodeError.Length);
+                revert EncodedLengthNotFourTimesSmallerThanOriginal();
             }
 
             if (dictionary.length / 8 > encodedData.length / 2) {
-                revert MalformedBytecode(BytecodeError.DictionaryLength);
+                revert DictionaryLengthNotFourTimesSmallerThanEncoded();
             }
 
             // solhint-disable-next-line gas-length-in-loops
@@ -68,7 +68,7 @@ contract Compressor is ICompressor, ISystemContract {
                 uint64 realChunk = _bytecode.readUint64(encodedDataPointer * 4);
 
                 if (encodedChunk != realChunk) {
-                    revert ValuesNotEqual(realChunk, encodedChunk);
+                    revert EncodedAndRealBytecodeChunkNotEqual(realChunk, encodedChunk);
                 }
             }
         }
@@ -143,8 +143,9 @@ contract Compressor is ICompressor, ISystemContract {
             bytes32 derivedKey = stateDiff.readBytes32(52);
             uint256 initValue = stateDiff.readUint256(92);
             uint256 finalValue = stateDiff.readUint256(124);
-            if (derivedKey != _compressedStateDiffs.readBytes32(stateDiffPtr)) {
-                revert ValuesNotEqual(uint256(derivedKey), _compressedStateDiffs.readUint256(stateDiffPtr));
+            bytes32 compressedDerivedKey = _compressedStateDiffs.readBytes32(stateDiffPtr);
+            if (derivedKey != compressedDerivedKey) {
+                revert DerivedKeyNotEqualToCompressedValue(derivedKey, compressedDerivedKey);
             }
             stateDiffPtr += 32;
 

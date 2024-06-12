@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract AcceptAdminTest is AdminTest {
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
@@ -11,9 +12,8 @@ contract AcceptAdminTest is AdminTest {
     function test_revertWhen_calledByNonPendingAdmin() public {
         address nonPendingAdmin = makeAddr("nonPendingAdmin");
 
-        vm.expectRevert(bytes.concat("n4"));
-
         vm.startPrank(nonPendingAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonPendingAdmin));
         adminFacet.acceptAdmin();
     }
 

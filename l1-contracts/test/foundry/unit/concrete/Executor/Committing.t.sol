@@ -9,6 +9,7 @@ import {IExecutor, MAX_NUMBER_OF_BLOBS} from "contracts/state-transition/chain-i
 import {SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {TimeNotReached, BatchNumberMismatch, PubdataCommitmentsTooBig, InvalidPubdataCommitmentsSize, PubdataCommitmentsEmpty, L2TimestampTooBig, EmptyBlobVersionHash, CanOnlyProcessOneBatch, TimestampError, LogAlreadyProcessed, InvalidLogSender, UnexpectedSystemLog, HashMismatch, BatchHashMismatch, ValueMismatch, MissingSystemLogs, InvalidPubdataLength, NonEmptyBlobVersionHash, BlobHashCommitmentError} from "contracts/common/L1ContractErrors.sol";
 
 contract CommittingTest is ExecutorTest {
     function test_RevertWhen_CommittingWithWrongLastCommittedBatchData() public {
@@ -20,7 +21,13 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes.concat("i"));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BatchHashMismatch.selector,
+                keccak256(abi.encode(genesisStoredBatchInfo)),
+                keccak256(abi.encode(wrongGenesisStoredBatchInfo))
+            )
+        );
         executor.commitBatches(wrongGenesisStoredBatchInfo, newCommitBatchInfoArray);
     }
 
@@ -33,7 +40,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes.concat("f"));
+        vm.expectRevert(abi.encodeWithSelector(BatchNumberMismatch.selector, uint256(1), uint256(2)));
         executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
@@ -56,7 +63,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes.concat("tb"));
+        vm.expectRevert(TimestampError.selector);
         executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
@@ -79,7 +86,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes.concat("h1"));
+        vm.expectRevert(abi.encodeWithSelector(TimeNotReached.selector, 1, 2));
         executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
@@ -102,7 +109,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes.concat("h2"));
+        vm.expectRevert(abi.encodeWithSelector(L2TimestampTooBig.selector));
         executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
@@ -124,7 +131,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes.concat("l"));
+        vm.expectRevert(abi.encodeWithSelector(HashMismatch.selector, wrongPreviousBatchHash, bytes32(0)));
         executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
@@ -140,7 +147,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes.concat("b7"));
+        vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 8191, 8183));
         executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
@@ -166,7 +173,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes.concat("kp"));
+        vm.expectRevert(abi.encodeWithSelector(LogAlreadyProcessed.selector, 3));
         executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
@@ -188,7 +195,13 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes.concat("sc"));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                InvalidLogSender.selector,
+                address(0),
+                uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)
+            )
+        );
         executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
@@ -210,7 +223,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes.concat("t"));
+        vm.expectRevert(abi.encodeWithSelector(HashMismatch.selector, wrongChainedPriorityHash, keccak256("")));
         executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
@@ -232,7 +245,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes.concat("ta"));
+        vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, uint256(bytes32(bytes1(0x01))), uint256(2)));
         executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
@@ -245,14 +258,14 @@ contract CommittingTest is ExecutorTest {
         );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = abi.encodePacked(bytes4(0x00000008), wrongL2Logs);
+        wrongNewCommitBatchInfo.systemLogs = abi.encodePacked(wrongL2Logs);
 
         IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes.concat("ul"));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedSystemLog.selector, uint256(119)));
         executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
@@ -290,7 +303,7 @@ contract CommittingTest is ExecutorTest {
 
             vm.prank(validator);
 
-            vm.expectRevert(errors[i]);
+            vm.expectRevert(abi.encodeWithSelector(InvalidLogSender.selector, wrongAddress, i));
             executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
         }
     }
@@ -308,7 +321,8 @@ contract CommittingTest is ExecutorTest {
 
             vm.prank(validator);
 
-            vm.expectRevert(bytes.concat("b7"));
+            uint256 allLogsProcessed = uint256(8191);
+            vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 8191, allLogsProcessed ^ (1 << i)));
             executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
         }
     }
@@ -506,7 +520,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes("e4"));
+        vm.expectRevert(abi.encodeWithSelector(CanOnlyProcessOneBatch.selector));
         executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
     }
 
@@ -530,7 +544,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes("pl"));
+        vm.expectRevert(PubdataCommitmentsEmpty.selector);
         executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
     }
 
@@ -555,7 +569,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes("bs"));
+        vm.expectRevert(InvalidPubdataCommitmentsSize.selector);
         executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
     }
 
@@ -580,7 +594,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes("bd"));
+        vm.expectRevert(PubdataCommitmentsTooBig.selector);
         executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
     }
 
@@ -624,7 +638,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes("lh"));
+        vm.expectRevert(abi.encodeWithSelector(NonEmptyBlobVersionHash.selector, uint256(1)));
         executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         vm.clearMockedCalls();
@@ -661,7 +675,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes("vh"));
+        vm.expectRevert(abi.encodeWithSelector(EmptyBlobVersionHash.selector, 0));
         executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         vm.clearMockedCalls();
@@ -706,7 +720,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes("lh"));
+        vm.expectRevert(abi.encodeWithSelector(NonEmptyBlobVersionHash.selector, uint256(1)));
         executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         vm.clearMockedCalls();
@@ -769,7 +783,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes("bh"));
+        vm.expectRevert(abi.encodeWithSelector(BlobHashCommitmentError.selector, uint256(1), true, false));
         executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
     }
 
@@ -819,7 +833,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes("bh"));
+        vm.expectRevert(abi.encodeWithSelector(BlobHashCommitmentError.selector, uint256(1), false, true));
         executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         vm.clearMockedCalls();
