@@ -1,7 +1,7 @@
 // hardhat import should be the first import in the file
 import * as hardhat from "hardhat";
 
-const EXPECTED_ADDRESS = '0xc706EC7dfA5D4Dc87f29f859094165E8290530f5';
+const EXPECTED_ADDRESS = "0xc706EC7dfA5D4Dc87f29f859094165E8290530f5";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function verifyPromise(address: string, constructorArguments?: Array<any>, libraries?: object): Promise<any> {
