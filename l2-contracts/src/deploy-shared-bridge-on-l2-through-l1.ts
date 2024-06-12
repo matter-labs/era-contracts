@@ -97,11 +97,7 @@ export async function deployL2ProxyAdmin(deployer: Deployer, chainId: string, ga
   }
 }
 
-export async function deployAssetHandlerImplOnL2ThroughL1(
-  deployer: Deployer,
-  chainId: string,
-  gasPrice: BigNumberish
-) {
+export async function deployAssetHandlerImplOnL2ThroughL1(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
   if (deployer.verbose) {
     console.log("Deploying L2NonNativeVault Implementation");
   }
@@ -216,9 +212,7 @@ export async function setSharedBridgeInAssetHandler(deployer: Deployer, chainId:
     chainId,
     deployer.deployWallet,
     deployer.addresses.Bridges.L2NonNativeVaultProxy,
-    L2NonNativeVault.interface.encodeFunctionData("setSharedBridge", [
-      deployer.addresses.Bridges.L2SharedBridgeProxy,
-    ]),
+    L2NonNativeVault.interface.encodeFunctionData("setSharedBridge", [deployer.addresses.Bridges.L2SharedBridgeProxy]),
     priorityTxMaxGasLimit
   );
   await tx1.wait();

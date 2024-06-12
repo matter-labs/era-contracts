@@ -65,10 +65,11 @@ describe("ERC20Bridge", function () {
       contractsDeployedAlready,
     ]);
 
-    const erc20AssetHandlerProxy = await deployer.deploy(
-      await deployer.loadArtifact("TransparentUpgradeableProxy"),
-      [erc20AssetHandlerImpl.address, proxyAdminWallet.address, assetHandlerInitializeData]
-    );
+    const erc20AssetHandlerProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
+      erc20AssetHandlerImpl.address,
+      proxyAdminWallet.address,
+      assetHandlerInitializeData,
+    ]);
 
     contractsDeployedAlready = true;
 

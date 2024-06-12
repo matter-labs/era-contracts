@@ -228,7 +228,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _prevMsgSender: msg.sender,
             _data: abi.encode(_mintValue, address(0))
         });
-        bytes memory l2Calldata = abi.encodeCall(IL2Bridge.setAssetHandlerAddress, (_assetIdentifier, _assetAddressOnCounterPart));
+        bytes memory l2Calldata = abi.encodeCall(
+            IL2Bridge.setAssetHandlerAddress,
+            (_assetIdentifier, _assetAddressOnCounterPart)
+        );
 
         L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
             chainId: _chainId,
@@ -270,12 +273,16 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev for backwards compatibility and to automatically register l1 assets, and we return the correct info.
-    function _getAssetHandlerProperties(bytes32 _assetIdentifier) internal returns (address l1AssetHandler, bytes32 assetIdentifier) {
+    function _getAssetHandlerProperties(
+        bytes32 _assetIdentifier
+    ) internal returns (address l1AssetHandler, bytes32 assetIdentifier) {
         l1AssetHandler = assetHandlerAddress[_assetIdentifier];
         assetIdentifier = _assetIdentifier;
         if (l1AssetHandler == address(0) && (uint256(_assetIdentifier) <= type(uint160).max)) {
             l1AssetHandler = address(nativeTokenVault);
-            assetIdentifier = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetIdentifier));
+            assetIdentifier = keccak256(
+                abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetIdentifier)
+            );
             nativeTokenVault.registerToken(address(uint160(uint256(_assetIdentifier))));
         }
     }
@@ -342,7 +349,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             (_assetIdentifier, _assetData) = abi.decode(_data, (bytes32, bytes));
         }
 
-        require(BRIDGE_HUB.baseToken(_chainId) != assetHandlerAddress[_assetIdentifier], "ShB: baseToken deposit not supported");
+        require(
+            BRIDGE_HUB.baseToken(_chainId) != assetHandlerAddress[_assetIdentifier],
+            "ShB: baseToken deposit not supported"
+        );
 
         (bytes memory bridgeMintCalldata, bytes32 assetIdentifier) = _burn({
             _chainId: _chainId,
@@ -489,7 +499,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             bytes32 txDataHash;
             if (uint256(_assetIdentifier) <= type(uint160).max) {
                 // Claiming failed legacy deposit
-                assetIdentifier = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetIdentifier));
+                assetIdentifier = keccak256(
+                    abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetIdentifier)
+                );
                 (uint256 _amount, ) = abi.decode(_assetData, (uint256, address));
                 txDataHash = keccak256(abi.encode(_depositSender, uint160(uint256(_assetIdentifier)), _amount));
             } else {
