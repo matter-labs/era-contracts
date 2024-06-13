@@ -199,13 +199,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev Used to set the assedAddress for a given assetId.
-    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetAddress) external {
+    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external {
         // ToDo: rename to vault address
         address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
         bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData)); /// todo make other asse
-        assetHandlerAddress[assetId] = _assetAddress;
+        assetHandlerAddress[assetId] = _assetHandlerAddress;
         assetDeploymentTracker[assetId] = sender;
-        emit AssetHandlerRegisteredInitial(assetId, _assetAddress, _additionalData, sender);
+        emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _additionalData, sender);
     }
 
     function setAssetHandlerAddressOnCounterPart(
@@ -300,10 +300,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     function _transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) internal {
         // assetId might be padded token address, or it might be asset info (get token from NTV)
-        // do the transfer if allowance is bigger than amount
         address l1TokenAddress = nativeTokenVault.tokenAddress(_assetId);
+        if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
+            return;
+        }
         IERC20 l1Token = IERC20(l1TokenAddress);
 
+        // do the transfer if allowance is bigger than amount
         if (l1Token.allowance(_prevMsgSender, address(this)) >= _amount) {
             // slither-disable-next-line arbitrary-send-erc20
             l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
