@@ -24,14 +24,14 @@ interface IL1SharedBridge {
         uint256 indexed chainId,
         bytes32 indexed txDataHash,
         address indexed from,
-        bytes32 assetInfo,
+        bytes32 assetId,
         bytes32 bridgeMintCalldataHash
     );
 
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,
         address indexed from,
-        bytes32 assetInfo,
+        bytes32 assetId,
         uint256 amount
     );
 
@@ -46,25 +46,25 @@ interface IL1SharedBridge {
     event WithdrawalFinalizedSharedBridge(
         uint256 indexed chainId,
         address indexed to,
-        bytes32 indexed assetInfo,
+        bytes32 indexed assetId,
         bytes32 assetDataHash
     );
 
     event ClaimedFailedDepositSharedBridge(
         uint256 indexed chainId,
         address indexed to,
-        bytes32 indexed assetInfo,
+        bytes32 indexed assetId,
         bytes32 assetDataHash
     );
 
-    event AssetRegisteredInitial(
-        bytes32 indexed assetInfo,
-        address indexed _assetAddress,
+    event AssetHandlerRegisteredInitial(
+        bytes32 indexed assetId,
+        address indexed assetHandlerAddress,
         bytes32 indexed additionalData,
         address sender
     );
 
-    event AssetRegistered(bytes32 indexed assetInfo, address indexed _assetAddress);
+    event AssetHandlerRegistered(bytes32 indexed assetId, address indexed assetHandlerAddress);
 
     function isWithdrawalFinalized(
         uint256 _chainId,
@@ -154,7 +154,7 @@ interface IL1SharedBridge {
 
     function bridgehubDepositBaseToken(
         uint256 _chainId,
-        bytes32 _assetInfo,
+        bytes32 _assetId,
         address _prevMsgSender,
         uint256 _amount
     ) external payable;
@@ -167,9 +167,9 @@ interface IL1SharedBridge {
 
     function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
 
-    function setAssetAddressInitial(bytes32 _additionalData, address _assetAddress) external;
+    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external;
 
-    function assetAddress(bytes32 _assetInfo) external view returns (address);
+    function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 
     function nativeTokenVault() external view returns (IL1NativeTokenVault);
 
@@ -178,7 +178,7 @@ interface IL1SharedBridge {
     function claimFailedBurn(
         uint256 _chainId,
         address _depositSender,
-        bytes32 _assetInfo,
+        bytes32 _assetId,
         bytes calldata _tokenData,
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,

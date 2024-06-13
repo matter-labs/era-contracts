@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-interface IL1StandardAsset {
+interface IL1AssetHandler {
     event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
 
     event BridgeMint(address indexed _account, uint256 _amount);
@@ -11,21 +11,21 @@ interface IL1StandardAsset {
 
     function bridgeMint(
         uint256 _chainId,
-        bytes32 _assetInfo,
+        bytes32 _assetId,
         bytes calldata _data
     ) external payable returns (address l1Receiver);
 
     function bridgeBurn(
         uint256 _chainId,
         uint256 _mintValue,
-        bytes32 _assetInfo,
+        bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);
 
     function bridgeClaimFailedBurn(
         uint256 _chainId,
-        bytes32 _assetInfo,
+        bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable;

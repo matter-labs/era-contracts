@@ -13,7 +13,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {IL1StandardAsset} from "./interfaces/IL1StandardAsset.sol";
+import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
 
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {ETH_TOKEN_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
@@ -24,7 +24,7 @@ import {ETH_TOKEN_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/C
 /// @dev Designed for use with a proxy for upgradability.
 contract L1NativeTokenVault is
     IL1NativeTokenVault,
-    IL1StandardAsset,
+    IL1AssetHandler,
     ReentrancyGuard,
     Ownable2StepUpgradeable,
     PausableUpgradeable
@@ -46,8 +46,8 @@ contract L1NativeTokenVault is
     /// NOTE: this function may be removed in the future, don't rely on it!
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 
-    /// @dev A mapping assetInfo => tokenAddress
-    mapping(bytes32 assetInfo => address tokenAddress) public tokenAddress;
+    /// @dev A mapping assetId => tokenAddress
+    mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridge() {
@@ -81,11 +81,11 @@ contract L1NativeTokenVault is
     /// @notice Allows the bridge to register a token address for the vault.
     function registerToken(address _l1Token) external {
         require(_l1Token == ETH_TOKEN_ADDRESS || _l1Token.code.length > 0, "NTV: empty token");
-        bytes32 assetInfo = keccak256(
+        bytes32 assetId = keccak256(
             abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, uint256(uint160(_l1Token)))
         );
-        L1_SHARED_BRIDGE.setAssetAddressInitial(bytes32(uint256(uint160(_l1Token))), address(this));
-        tokenAddress[assetInfo] = _l1Token;
+        L1_SHARED_BRIDGE.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_l1Token))), address(this));
+        tokenAddress[assetId] = _l1Token;
     }
 
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
@@ -93,14 +93,14 @@ contract L1NativeTokenVault is
     function bridgeBurn(
         uint256 _chainId,
         uint256,
-        bytes32 _assetInfo,
+        bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable override onlyBridge whenNotPaused returns (bytes memory _bridgeMintData) {
         (uint256 _depositAmount, address _l2Receiver) = abi.decode(_data, (uint256, address));
 
         uint256 amount;
-        address l1Token = tokenAddress[_assetInfo];
+        address l1Token = tokenAddress[_assetId];
         if (l1Token == ETH_TOKEN_ADDRESS) {
             amount = msg.value;
             require(_depositAmount == 0 || _depositAmount == amount, "L1NTV: msg.value not equal to amount");
@@ -156,10 +156,10 @@ contract L1NativeTokenVault is
     /* solhint-disable no-unused-vars */
     function bridgeMint(
         uint256 _chainId,
-        bytes32 _assetInfo,
+        bytes32 _assetId,
         bytes calldata _data
     ) external payable override returns (address _l1Receiver) {
-        address l1Token = tokenAddress[_assetInfo];
+        address l1Token = tokenAddress[_assetId];
         (uint256 amount, address l1Receiver) = abi.decode(_data, (uint256, address));
         _l1Receiver = l1Receiver;
         if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
@@ -182,12 +182,12 @@ contract L1NativeTokenVault is
 
     function bridgeClaimFailedBurn(
         uint256 _chainId,
-        bytes32 _assetInfo,
+        bytes32 _assetId,
         address,
         bytes calldata _data
     ) external payable override {
         (uint256 _amount, address _depositSender) = abi.decode(_data, (uint256, address));
-        address l1Token = tokenAddress[_assetInfo];
+        address l1Token = tokenAddress[_assetId];
         require(_amount > 0, "y1");
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
@@ -210,14 +210,14 @@ contract L1NativeTokenVault is
         }
     }
 
-    function getAssetInfoFromLegacy(address _l1TokenAddress) public view override returns (bytes32) {
-        if (tokenAddress[getAssetInfo(_l1TokenAddress)] != address(0)) {
-            return getAssetInfo(_l1TokenAddress);
+    function getAssetIdFromLegacy(address _l1TokenAddress) public view override returns (bytes32) {
+        if (tokenAddress[getAssetId(_l1TokenAddress)] != address(0)) {
+            return getAssetId(_l1TokenAddress);
         }
         return bytes32(uint256(uint160(_l1TokenAddress)));
     }
 
-    function getAssetInfo(address _l1TokenAddress) public view override returns (bytes32) {
+    function getAssetId(address _l1TokenAddress) public view override returns (bytes32) {
         return
             keccak256(
                 abi.encode(

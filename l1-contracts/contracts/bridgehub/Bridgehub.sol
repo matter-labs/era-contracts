@@ -38,8 +38,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev used to accept the admin role
     address private pendingAdmin;
 
-    /// @notice chainID => baseTokenAssetInfo
-    mapping(uint256 _chainId => bytes32) public baseTokenAssetInfo;
+    /// @notice chainID => baseTokenAssetId
+    mapping(uint256 _chainId => bytes32) public baseTokenAssetId;
 
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {}
@@ -143,7 +143,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
-        baseTokenAssetInfo[_chainId] = IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetInfo(_baseToken);
+        baseTokenAssetId[_chainId] = IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetId(_baseToken);
 
         IStateTransitionManager(_stateTransitionManager).createNewChain({
             _chainId: _chainId,
@@ -234,7 +234,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             // slither-disable-next-line arbitrary-send-eth
             sharedBridge.bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
-                IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetInfoFromLegacy(token),
+                IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetIdFromLegacy(token),
                 msg.sender,
                 _request.mintValue - msg.value
             );
@@ -285,7 +285,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             // slither-disable-next-line arbitrary-send-eth
             sharedBridge.bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
-                IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetInfoFromLegacy(token),
+                IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetIdFromLegacy(token),
                 msg.sender,
                 _request.mintValue - baseTokenMsgValue
             );

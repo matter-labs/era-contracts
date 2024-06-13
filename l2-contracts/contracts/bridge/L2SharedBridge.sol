@@ -8,10 +8,10 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
-import {IL2StandardAsset} from "./interfaces/IL2StandardAsset.sol";
+import {IL2AssetHandler} from "./interfaces/IL2AssetHandler.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
-import {IL2StandardDeployer} from "./interfaces/IL2StandardDeployer.sol";
+import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../L2ContractHelper.sol";
@@ -46,10 +46,10 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @dev Chain ID of L1 for bridging reasons
     uint256 public immutable L1_CHAIN_ID;
 
-    IL2StandardDeployer public standardDeployer;
+    IL2NativeTokenVault public nativeTokenVault;
 
     /// @dev A mapping l2 token address => l1 token address
-    mapping(bytes32 assetInfo => address assetAddress) public override assetAddress;
+    mapping(bytes32 assetId => address assetHandlerAddress) public override assetHandlerAddress;
 
     /// @notice Checks that the message sender is the legacy bridge.
     modifier onlyL1Bridge() {
@@ -74,21 +74,21 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
     /// @param _l1SharedBridge The address of the L1 Bridge contract.
     /// @param _l1Bridge The address of the legacy L1 Bridge contract.
-    /// @param _standardDeployer The address of the standardDeployer contract.
+    /// @param _assetHandler The address of the nativeTokenVault contract.
     function initialize(
         address _l1SharedBridge,
         address _l1Bridge,
-        IL2StandardDeployer _standardDeployer
+        IL2NativeTokenVault _assetHandler
     ) external reinitializer(2) {
         if (_l1SharedBridge == address(0)) {
             revert EmptyAddress();
         }
-        if (address(_standardDeployer) == address(0)) {
+        if (address(_assetHandler) == address(0)) {
             revert EmptyAddress();
         }
 
         l1SharedBridge = _l1SharedBridge;
-        standardDeployer = _standardDeployer;
+        nativeTokenVault = _assetHandler;
         if (block.chainid == ERA_CHAIN_ID) {
             if (_l1Bridge == address(0)) {
                 revert EmptyAddress();
@@ -103,66 +103,66 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @param _l1Token The address of the token that was locked on the L1
     // / @param _amount Total amount of tokens deposited from L1
     /// @param _data The additional data that user can pass with the deposit
-    function finalizeDeposit(bytes32 _assetInfo, bytes memory _data) public override onlyL1Bridge {
-        address asset = assetAddress[_assetInfo];
-        if (asset != address(0)) {
-            IL2StandardAsset(asset).bridgeMint(L1_CHAIN_ID, _assetInfo, _data);
+    function finalizeDeposit(bytes32 _assetId, bytes memory _data) public override onlyL1Bridge {
+        address assetHandler = assetHandlerAddress[_assetId];
+        if (assetHandler != address(0)) {
+            IL2AssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _data);
         } else {
-            IL2StandardAsset(standardDeployer).bridgeMint(L1_CHAIN_ID, _assetInfo, _data);
-            assetAddress[_assetInfo] = address(standardDeployer);
+            IL2AssetHandler(nativeTokenVault).bridgeMint(L1_CHAIN_ID, _assetId, _data);
+            assetHandlerAddress[_assetId] = address(nativeTokenVault);
         }
 
-        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetInfo, keccak256(_data));
+        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, keccak256(_data));
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked
-    /// @param _assetInfo The L2 token address which is withdrawn
-    /// @param _assetData The data that is passed to the asset contract
-    function withdraw(bytes32 _assetInfo, bytes memory _assetData) public override {
-        address asset = assetAddress[_assetInfo];
+    /// @param _assetId The L2 token address which is withdrawn
+    /// @param _assetData The data that is passed to the asset handler contract
+    function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
+        address assetHandler = assetHandlerAddress[_assetId];
         bytes memory _bridgeMintData;
 
         /// should the address not be set already? Or do we need this to do it automatically.
-        if (asset != address(0)) {
-            _bridgeMintData = IL2StandardAsset(asset).bridgeBurn({
+        if (assetHandler != address(0)) {
+            _bridgeMintData = IL2AssetHandler(assetHandler).bridgeBurn({
                 _chainId: L1_CHAIN_ID,
                 _mintValue: 0,
-                _assetInfo: _assetInfo,
+                _assetId: _assetId,
                 _prevMsgSender: msg.sender,
                 _data: _assetData
             });
         } else {
-            _bridgeMintData = IL2StandardAsset(standardDeployer).bridgeBurn({
+            _bridgeMintData = IL2AssetHandler(nativeTokenVault).bridgeBurn({
                 _chainId: L1_CHAIN_ID,
                 _mintValue: 0,
-                _assetInfo: _assetInfo,
+                _assetId: _assetId,
                 _prevMsgSender: msg.sender,
                 _data: _assetData
             });
         }
 
-        bytes memory message = _getL1WithdrawMessage(_assetInfo, _bridgeMintData);
+        bytes memory message = _getL1WithdrawMessage(_assetId, _bridgeMintData);
         L2ContractHelper.sendMessageToL1(message);
 
-        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, msg.sender, _assetInfo, keccak256(_assetData));
+        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, msg.sender, _assetId, keccak256(_assetData));
     }
 
     /// @dev Encode the message for l2ToL1log sent with withdraw initialization
     function _getL1WithdrawMessage(
-        bytes32 _assetInfo,
+        bytes32 _assetId,
         bytes memory _bridgeMintData
     ) internal pure returns (bytes memory) {
         // note we use the IL1ERC20Bridge.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
         // and we use this interface so that when the switch happened the old messages could be processed
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _assetInfo, _bridgeMintData);
+        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _assetId, _bridgeMintData);
     }
 
-    /// @dev Used to set the assedAddress for a given assetInfo.
-    function setAssetAddress(bytes32 _assetInfo, address _assetAddress) external onlyL1Bridge {
-        assetAddress[_assetInfo] = _assetAddress;
-        emit AssetRegistered(_assetInfo, _assetAddress);
+    /// @dev Used to set the assedAddress for a given assetId.
+    function setAssetHandlerAddress(bytes32 _assetId, address _assetAddress) external onlyL1Bridge {
+        assetHandlerAddress[_assetId] = _assetAddress;
+        emit AssetHandlerRegistered(_assetId, _assetAddress);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -177,19 +177,19 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         bytes calldata _data
     ) external override {
         // onlyBridge {
-        bytes32 assetInfo = keccak256(
+        bytes32 assetId = keccak256(
             abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
         );
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encode(_l1Sender, _amount, _l2Receiver, _data, _l1Token);
-        finalizeDeposit(assetInfo, data);
+        finalizeDeposit(assetId, data);
     }
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
         if (l1TokenAddress[_l2Token] == address(0)) {
             getL1TokenAddress(_l2Token);
         }
-        bytes32 assetInfo = keccak256(
+        bytes32 assetId = keccak256(
             abi.encode(
                 L1_CHAIN_ID,
                 NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS,
@@ -197,7 +197,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
             )
         );
         bytes memory data = abi.encode(_amount, _l1Receiver);
-        withdraw(assetInfo, data);
+        withdraw(assetId, data);
     }
 
     function getL1TokenAddress(address _l2Token) public view returns (address) {
@@ -206,6 +206,6 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
 
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view returns (address) {
-        return standardDeployer.l2TokenAddress(_l1Token);
+        return nativeTokenVault.l2TokenAddress(_l1Token);
     }
 }
