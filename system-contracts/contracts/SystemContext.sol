@@ -64,7 +64,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @notice The number and the timestamp of the current L2 block.
     /// The layout of this field is
     /// {"offset":0,"slot":"9","type":"t_struct(BlockInfo)1434_storage"}
-    /// and it must not be changes, because batch verification in zksync-era depends on it.
+    /// and it must not be changed, because batch verification in zksync-era depends on it.
     BlockInfo internal currentL2BlockInfo;
 
     /// @notice The rolling hash of the transactions in the current L2 block.
