@@ -320,7 +320,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// registration
-    
+
     /// @dev used to register already deployed hyperchain contracts
     /// @param _chainId the chain's id
     /// @param _hyperchain the chain's contract address

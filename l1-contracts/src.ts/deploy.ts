@@ -6,7 +6,11 @@ import type { BigNumberish, providers, Signer, Wallet } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
 import type { DeployedAddresses } from "./deploy-utils";
-import { deployedAddressesFromEnv, deployBytecodeViaCreate2 as deployBytecodeViaCreate2EVM, deployViaCreate2 as deployViaCreate2EVM } from "./deploy-utils";
+import {
+  deployedAddressesFromEnv,
+  deployBytecodeViaCreate2 as deployBytecodeViaCreate2EVM,
+  deployViaCreate2 as deployViaCreate2EVM,
+} from "./deploy-utils";
 import { deployViaCreate2 as deployViaCreate2Zk } from "./deploy-utils-zk";
 import {
   packSemver,
