@@ -202,7 +202,7 @@ export async function deployAssetHandlerProxyOnL2ThroughL1(
   }
 }
 
-export async function setSharedBridgeInAssetHandler(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
+export async function setSharedBridgeInNativeTokenVault(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
   const L2NativeTokenVault = L2NativeTokenVaultFactory.connect(
     deployer.addresses.Bridges.L2NativeTokenVaultProxy,
     deployer.deployWallet
@@ -380,7 +380,7 @@ export async function deploySharedBridgeOnL2ThroughL1(
   await deployAssetHandlerProxyOnL2ThroughL1(deployer, chainId, gasPrice);
   await deploySharedBridgeImplOnL2ThroughL1(deployer, chainId, gasPrice);
   await deploySharedBridgeProxyOnL2ThroughL1(deployer, chainId, gasPrice);
-  await setSharedBridgeInAssetHandler(deployer, chainId, gasPrice);
+  await setSharedBridgeInNativeTokenVault(deployer, chainId, gasPrice);
   if (!skipInitializeChainGovernance) {
     await initializeChainGovernance(deployer, chainId);
   }

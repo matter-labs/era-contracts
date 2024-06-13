@@ -88,10 +88,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     mapping(uint256 chainId => bool enabled) public hyperbridgingEnabled;
 
     /// @dev A mapping assetId => assetHandlerAddress
-    mapping(bytes32 _assetId => address _assetAddress) public assetHandlerAddress;
+    mapping(bytes32 assetId => address assetHandlerAddress) public assetHandlerAddress;
 
     /// @dev A mapping assetId => the asset deployment tracker address
-    mapping(bytes32 _assetId => address _assetDeploymentTracker) public assetDeploymentTracker;
+    mapping(bytes32 assetId => address assetDeploymentTracker) public assetDeploymentTracker;
 
     /// @dev Address of native token vault
     IL1NativeTokenVault public nativeTokenVault;
@@ -255,7 +255,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         address _prevMsgSender,
         uint256 _amount
     ) external payable virtual onlyBridgehubOrEra(_chainId) whenNotPaused {
-        (address l1AssetHandler, bytes32 assetId) = _getAssetHandlerProperties(_assetId);
+        (address l1AssetHandler, bytes32 assetId) = _getAssetProperties(_assetId);
         _transferAllowanceToNTV(assetId, _amount, _prevMsgSender);
         // slither-disable-next-line unused-return
         IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
@@ -273,7 +273,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev for backwards compatibility and to automatically register l1 assets, and we return the correct info.
-    function _getAssetHandlerProperties(bytes32 _assetId) internal returns (address l1AssetHandler, bytes32 assetId) {
+    function _getAssetProperties(bytes32 _assetId) internal returns (address l1AssetHandler, bytes32 assetId) {
         l1AssetHandler = assetHandlerAddress[_assetId];
         assetId = _assetId;
         if (l1AssetHandler == address(0) && (uint256(_assetId) <= type(uint160).max)) {
@@ -335,8 +335,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes memory _assetData;
         bytes32 txDataHash;
         bool legacyDeposit = false;
-        try this.decodeLegacyData(_data, _prevMsgSender) returns (bytes32 _assetIdCatch, bytes memory _assetDataCatch) {
-            (_assetId, _assetData) = (_assetIdCatch, _assetDataCatch);
+        try this.decodeLegacyData(_data, _prevMsgSender) returns (
+            bytes32 _assetIdDecoded,
+            bytes memory _assetDataDecoded
+        ) {
+            (_assetId, _assetData) = (_assetIdDecoded, _assetDataDecoded);
             legacyDeposit = true;
         } catch {
             (_assetId, _assetData) = abi.decode(_data, (bytes32, bytes));
@@ -388,7 +391,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes memory _assetData
     ) internal returns (bytes memory bridgeMintCalldata, bytes32 assetId) {
         address l1AssetHandler;
-        (l1AssetHandler, assetId) = _getAssetHandlerProperties(_assetId);
+        (l1AssetHandler, assetId) = _getAssetProperties(_assetId);
         bridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
             _mintValue: _l2Value,

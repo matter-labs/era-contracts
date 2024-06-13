@@ -120,12 +120,12 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @param _assetId The L2 token address which is withdrawn
     /// @param _assetData The data that is passed to the asset contract
     function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
-        address asset = assetHandlerAddress[_assetId];
+        address assetHandler = assetHandlerAddress[_assetId];
         bytes memory _bridgeMintData;
 
         /// should the address not be set already? Or do we need this to do it automatically.
-        if (asset != address(0)) {
-            _bridgeMintData = IL2AssetHandler(asset).bridgeBurn({
+        if (assetHandler != address(0)) {
+            _bridgeMintData = IL2AssetHandler(assetHandler).bridgeBurn({
                 _chainId: L1_CHAIN_ID,
                 _mintValue: 0,
                 _assetId: _assetId,

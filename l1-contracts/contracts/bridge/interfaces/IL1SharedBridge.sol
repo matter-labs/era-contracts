@@ -59,12 +59,12 @@ interface IL1SharedBridge {
 
     event AssetHandlerRegisteredInitial(
         bytes32 indexed assetId,
-        address indexed _assetAddress,
+        address indexed assetHandlerAddress,
         bytes32 indexed additionalData,
         address sender
     );
 
-    event AssetHandlerRegistered(bytes32 indexed assetId, address indexed _assetAddress);
+    event AssetHandlerRegistered(bytes32 indexed assetId, address indexed assetHandlerAddress);
 
     function isWithdrawalFinalized(
         uint256 _chainId,
