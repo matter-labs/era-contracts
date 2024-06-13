@@ -180,7 +180,7 @@ contract L1NativeTokenVault is
         }
     }
 
-    function bridgeClaimFailedBurn(
+    function recoverFromFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
         address,

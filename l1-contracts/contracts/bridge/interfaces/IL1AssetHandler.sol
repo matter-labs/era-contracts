@@ -23,7 +23,7 @@ interface IL1AssetHandler {
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);
 
-    function bridgeClaimFailedBurn(
+    function recoverFromFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
         address _prevMsgSender,
