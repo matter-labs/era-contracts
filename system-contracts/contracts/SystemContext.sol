@@ -70,7 +70,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @notice The rolling hash of the transactions in the current L2 block.
     /// The layout of this field is
     /// {"offset":0,"slot":"10","type":"t_bytes32"}
-    /// and it must not be changes, because batch verification in zksync-era depends on it.
+    /// and it must not be changed, because batch verification in zksync-era depends on it.
     bytes32 internal currentL2BlockTxsRollingHash;
 
     /// @notice The hashes of L2 blocks.
