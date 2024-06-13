@@ -20,7 +20,7 @@ import { Wallet as ZkWallet, Provider as ZkProvider, utils as zkUtils } from "zk
 import { IAdmin } from "../typechain/IAdmin";
 import { IAdminFactory } from "../typechain/IAdminFactory";
 import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
-import { BOOTLOADER_FORMAL_ADDRESS } from "zksync-ethers/build/src/utils";
+import { BOOTLOADER_FORMAL_ADDRESS } from "zksync-ethers/build/utils";
 
 const provider = web3Provider();
 
