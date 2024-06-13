@@ -6,7 +6,8 @@ import type { BigNumberish, providers, Signer, Wallet } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
 import type { DeployedAddresses } from "./deploy-utils";
-import { deployedAddressesFromEnv, deployBytecodeViaCreate2, deployViaCreate2 } from "./deploy-utils";
+import { deployedAddressesFromEnv, deployBytecodeViaCreate2 as deployBytecodeViaCreate2EVM, deployViaCreate2 as deployViaCreate2EVM } from "./deploy-utils";
+import { deployViaCreate2 as deployViaCreate2Zk } from "./deploy-utils-zk";
 import {
   packSemver,
   readBatchBootloaderBytecode,
@@ -38,8 +39,10 @@ import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory"
 import type { FacetCut } from "./diamondCut";
 import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
-import { ERC20Factory } from "../typechain";
+import { ERC20Factory, StateTransitionManagerFactory } from "../typechain";
 import type { Contract, Overrides } from "@ethersproject/contracts";
+import { BUILT_IN_ZKSYNC_CREATE2_FACTORY } from "./deploy-utils-zk";
+import { Wallet as ZkWallet, ContractFactory as ZkContractFactory } from "zksync-ethers";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -755,6 +758,7 @@ export class Deployer {
         ...txOptions,
       }
     );
+    return;
 
     const chainId = receipt.logs.find((log) => log.topics[0] == bridgehub.interface.getEventTopic("NewChain"))
       .topics[1];

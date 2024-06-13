@@ -291,23 +291,27 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev setPriorityTxMaxGasLimit for the specified chain
-    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// @dev setTokenMultiplier for the specified chain
-    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setTokenMultiplier(_nominator, _denominator);
+    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).setTokenMultiplier(_nominator, _denominator);
     }
 
     /// @dev changeFeeParams for the specified chain
-    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).changeFeeParams(_newFeeParams);
+    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).changeFeeParams(_newFeeParams);
     }
 
     /// @dev setValidator for the specified chain
-    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwnerOrAdmin {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setValidator(_validator, _active);
+    function setValidator(uint256 _chainId, address _validator, bool _active) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).setValidator(_validator, _active);
     }
 
     /// @dev setPorterAvailability for the specified chain
@@ -316,65 +320,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// registration
-
-    /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
-    function _setChainIdUpgrade(uint256 _chainId, address _chainContract) internal {
-        bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (_chainId));
-        uint256[] memory uintEmptyArray;
-        bytes[] memory bytesEmptyArray;
-
-        uint256 cachedProtocolVersion = protocolVersion;
-        // slither-disable-next-line unused-return
-        (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(cachedProtocolVersion));
-
-        L2CanonicalTransaction memory l2ProtocolUpgradeTx = L2CanonicalTransaction({
-            txType: SYSTEM_UPGRADE_L2_TX_TYPE,
-            from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
-            to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)),
-            gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
-            gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            maxFeePerGas: uint256(0),
-            maxPriorityFeePerGas: uint256(0),
-            paymaster: uint256(0),
-            // Note, that the `minor` of the protocol version is used as "nonce" for system upgrade transactions
-            nonce: uint256(minorVersion),
-            value: 0,
-            reserved: [uint256(0), 0, 0, 0],
-            data: systemContextCalldata,
-            signature: new bytes(0),
-            factoryDeps: uintEmptyArray,
-            paymasterInput: new bytes(0),
-            reservedDynamic: new bytes(0)
-        });
-
-        ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
-            factoryDeps: bytesEmptyArray,
-            bootloaderHash: bytes32(0),
-            defaultAccountHash: bytes32(0),
-            verifier: address(0),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: new bytes(0),
-            upgradeTimestamp: 0,
-            newProtocolVersion: cachedProtocolVersion
-        });
-
-        Diamond.FacetCut[] memory emptyArray;
-        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
-            facetCuts: emptyArray,
-            initAddress: genesisUpgrade,
-            initCalldata: abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
-        });
-
-        IAdmin(_chainContract).executeUpgrade(cutData);
-        emit SetChainIdUpgrade(_chainContract, l2ProtocolUpgradeTx, cachedProtocolVersion);
-    }
-
+    
     /// @dev used to register already deployed hyperchain contracts
     /// @param _chainId the chain's id
     /// @param _hyperchain the chain's contract address

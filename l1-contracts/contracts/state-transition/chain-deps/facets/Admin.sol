@@ -18,6 +18,8 @@ import {L2CanonicalTransaction, TxStatus} from "../../../common/Messaging.sol";
 import {ProposedUpgrade} from "../../../upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "../../chain-interfaces/IVerifier.sol";
 import {IDefaultUpgrade} from "../../../upgrades/IDefaultUpgrade.sol";
+import {SemVer} from "../../../common/libraries/SemVer.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -303,7 +305,10 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
     function setChainIdUpgrade(address _genesisUpgrade) external onlyStateTransitionManager {
-        uint256 currentProtocolVersion = s.protocolVersion;
+        uint256 cachedProtocolVersion = s.protocolVersion;
+        // slither-disable-next-line unused-return
+        (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(cachedProtocolVersion));
+
         uint256 chainId = s.chainId;
 
         bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (chainId));
@@ -320,7 +325,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
             maxPriorityFeePerGas: uint256(0),
             paymaster: uint256(0),
             // Note, that the protocol version is used as "nonce" for system upgrade transactions
-            nonce: currentProtocolVersion,
+            nonce: minorVersion,
             value: 0,
             reserved: [uint256(0), 0, 0, 0],
             data: systemContextCalldata,
@@ -344,7 +349,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
             upgradeTimestamp: 0,
-            newProtocolVersion: currentProtocolVersion
+            newProtocolVersion: cachedProtocolVersion
         });
 
         Diamond.FacetCut[] memory emptyArray;
@@ -355,7 +360,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         });
 
         Diamond.diamondCut(cutData);
-        emit SetChainIdUpgrade(address(this), l2ProtocolUpgradeTx, currentProtocolVersion);
+        emit SetChainIdUpgrade(address(this), l2ProtocolUpgradeTx, cachedProtocolVersion);
     }
 
     /*//////////////////////////////////////////////////////////////
