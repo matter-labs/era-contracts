@@ -12,8 +12,6 @@ interface IL1NativeTokenVault {
 
     function registerToken(address _l1Token) external;
 
-    function getAssetIdFromLegacy(address l1TokenAddress) external view returns (bytes32);
-
     function getAssetId(address l1TokenAddress) external view returns (bytes32);
 
     function getERC20Getters(address _token) external view returns (bytes memory);

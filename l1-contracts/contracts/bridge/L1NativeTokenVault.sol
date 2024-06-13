@@ -210,13 +210,6 @@ contract L1NativeTokenVault is
         }
     }
 
-    function getAssetIdFromLegacy(address _l1TokenAddress) public view override returns (bytes32) {
-        if (tokenAddress[getAssetId(_l1TokenAddress)] != address(0)) {
-            return getAssetId(_l1TokenAddress);
-        }
-        return bytes32(uint256(uint160(_l1TokenAddress)));
-    }
-
     function getAssetId(address _l1TokenAddress) public view override returns (bytes32) {
         return
             keccak256(

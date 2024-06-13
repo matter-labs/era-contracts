@@ -92,7 +92,7 @@ describe("Shared Bridge tests", () => {
           secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
             ["bytes32", "bytes"],
             [
-              await l1NativeTokenVault.getAssetIdFromLegacy(erc20TestToken.address),
+              await l1NativeTokenVault.getAssetId(erc20TestToken.address),
               new ethers.utils.AbiCoder().encode(["uint256", "address"], [0, await randomSigner.getAddress()]),
             ]
           ),
@@ -112,7 +112,7 @@ describe("Shared Bridge tests", () => {
     const balanceBefore = await erc20TestToken.balanceOf(await randomSigner.getAddress());
     const balanceNTVBefore = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
 
-    const assetId = await l1NativeTokenVault.getAssetIdFromLegacy(erc20TestToken.address);
+    const assetId = await l1NativeTokenVault.getAssetId(erc20TestToken.address);
     await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, amount.mul(10))).wait();
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
       {
@@ -149,7 +149,6 @@ describe("Shared Bridge tests", () => {
     const balanceBefore = await erc20TestToken.balanceOf(await randomSigner.getAddress());
     const balanceNTVBefore = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
 
-    await l1NativeTokenVault.getAssetIdFromLegacy(erc20TestToken.address);
     await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, amount.mul(10))).wait();
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
       {
@@ -226,7 +225,7 @@ describe("Shared Bridge tests", () => {
         secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
           ["bytes32", "bytes"],
           [
-            await l1NativeTokenVault.getAssetIdFromLegacy(erc20TestToken.address),
+            await l1NativeTokenVault.getAssetId(erc20TestToken.address),
             new ethers.utils.AbiCoder().encode(["uint256", "address"], [amount, await randomSigner.getAddress()]),
           ]
         ),

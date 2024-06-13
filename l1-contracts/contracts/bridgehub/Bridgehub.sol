@@ -234,7 +234,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             // slither-disable-next-line arbitrary-send-eth
             sharedBridge.bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
-                IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetIdFromLegacy(token),
+                baseTokenAssetId[_request.chainId],
                 msg.sender,
                 _request.mintValue
             );
@@ -285,7 +285,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             // slither-disable-next-line arbitrary-send-eth
             sharedBridge.bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
-                IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetIdFromLegacy(token),
+                baseTokenAssetId[_request.chainId],
                 msg.sender,
                 _request.mintValue
             );

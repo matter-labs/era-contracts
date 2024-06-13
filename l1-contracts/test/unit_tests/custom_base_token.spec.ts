@@ -146,7 +146,7 @@ describe("Custom base token chain and bridge tests", () => {
       secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
         ["bytes32", "bytes", "address"],
         [
-          await l1NativeTokenVault.getAssetIdFromLegacy(altTokenAddress),
+          ethers.utils.hexZeroPad(altTokenAddress, 32),
           new ethers.utils.AbiCoder().encode(["uint256"], [altTokenAmount]),
           await randomSigner.getAddress(),
         ]
