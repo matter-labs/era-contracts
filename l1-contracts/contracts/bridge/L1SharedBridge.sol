@@ -102,6 +102,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         _;
     }
 
+    /// @notice Checks that the message sender is the bridgehub.
+    modifier onlyThis() {
+        require(msg.sender == address(this), "ShB: only self");
+        _;
+    }
+
     /// @notice Checks that the message sender is the bridgehub or zkSync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
@@ -151,33 +157,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             eraLegacyBridgeLastDepositTxNumber = _eraLegacyBridgeLastDepositTxNumber;
         }
     }
-
-    // /// @dev This sets the first post diamond upgrade batch for era, used to check old eth withdrawals
-    // /// @param _eraPostDiamondUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after diamond proxy upgrade.
-    // function setEraPostDiamondUpgradeFirstBatch(uint256 _eraPostDiamondUpgradeFirstBatch) external onlyOwner {
-    //     require(eraPostDiamondUpgradeFirstBatch == 0, "ShB: eFPUB already set");
-    //     eraPostDiamondUpgradeFirstBatch = _eraPostDiamondUpgradeFirstBatch;
-    // }
-
-    // /// @dev This sets the first post upgrade batch for era, used to check old token withdrawals
-    // /// @param _eraPostLegacyBridgeUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after legacy bridge upgrade.
-    // function setEraPostLegacyBridgeUpgradeFirstBatch(uint256 _eraPostLegacyBridgeUpgradeFirstBatch) external onlyOwner {
-    //     require(eraPostLegacyBridgeUpgradeFirstBatch == 0, "ShB: eFPUB already set");
-    //     eraPostLegacyBridgeUpgradeFirstBatch = _eraPostLegacyBridgeUpgradeFirstBatch;
-    // }
-
-    // /// @dev This sets the first post upgrade batch for era, used to check old withdrawals
-    // /// @param  _eraLegacyBridgeLastDepositBatch The the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge
-    // /// @param _eraLegacyBridgeLastDepositTxNumber The tx number in the _eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge
-    // function setEraLegacyBridgeLastDepositTime(
-    //     uint256 _eraLegacyBridgeLastDepositBatch,
-    //     uint256 _eraLegacyBridgeLastDepositTxNumber
-    // ) external onlyOwner {
-    //     require(eraLegacyBridgeLastDepositBatch == 0, "ShB: eLOBDB already set");
-    //     require(eraLegacyBridgeLastDepositTxNumber == 0, "ShB: eLOBDTN already set");
-    //     eraLegacyBridgeLastDepositBatch = _eraLegacyBridgeLastDepositBatch;
-    //     eraLegacyBridgeLastDepositTxNumber = _eraLegacyBridgeLastDepositTxNumber;
-    // }
 
     /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
     function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
@@ -260,10 +239,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         // slither-disable-next-line unused-return
         IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
-            _mintValue: 0,
+            _mintValue: _amount,
             _assetId: assetId,
             _prevMsgSender: _prevMsgSender,
-            _data: abi.encode(_amount, address(0))
+            _data: abi.encode(_amount - msg.value, address(0))
         });
 
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
@@ -272,10 +251,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         // emit BridgehubMintData(bridgeMintData);
     }
 
-    /// @dev for backwards compatibility and to automatically register l1 assets, and we return the correct info.
+    /// @dev For backwards compatibility we pad the l1Token to become a bytes32 assetId.
+    /// @dev We deal with this case here. We also register the asset.
     function _getAssetProperties(bytes32 _assetId) internal returns (address l1AssetHandler, bytes32 assetId) {
         l1AssetHandler = assetHandlerAddress[_assetId];
         assetId = _assetId;
+        // if the assetHandler is not registered, and the assetId is in fact an address, we register it in the NTV
         if (l1AssetHandler == address(0) && (uint256(_assetId) <= type(uint160).max)) {
             l1AssetHandler = address(nativeTokenVault);
             assetId = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetId));
@@ -283,8 +264,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
     }
 
-    function decodeLegacyData(bytes calldata _data, address _prevMsgSender) external returns (bytes32, bytes memory) {
-        require(msg.sender == address(this), "ShB: only bridge");
+    function handleLegacyData(
+        bytes calldata _data,
+        address _prevMsgSender
+    ) external onlyThis returns (bytes32, bytes memory) {
         (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
             _data,
             (address, uint256, address)
@@ -335,7 +318,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes memory _assetData;
         bytes32 txDataHash;
         bool legacyDeposit = false;
-        try this.decodeLegacyData(_data, _prevMsgSender) returns (
+        try this.handleLegacyData(_data, _prevMsgSender) returns (
             bytes32 _assetIdDecoded,
             bytes memory _assetDataDecoded
         ) {

@@ -236,7 +236,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                 _request.chainId,
                 IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetIdFromLegacy(token),
                 msg.sender,
-                _request.mintValue - msg.value
+                _request.mintValue
             );
         }
 
@@ -287,7 +287,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                 _request.chainId,
                 IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetIdFromLegacy(token),
                 msg.sender,
-                _request.mintValue - baseTokenMsgValue
+                _request.mintValue
             );
         }
 

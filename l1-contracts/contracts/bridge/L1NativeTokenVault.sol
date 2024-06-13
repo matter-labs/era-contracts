@@ -110,8 +110,8 @@ contract L1NativeTokenVault is
             amount = _depositAmount;
 
             // ToDo: rename
-            uint256 withdrawAmount = _depositFunds(_prevMsgSender, IERC20(l1Token), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
-            require(withdrawAmount == _depositAmount, "3T"); // The token has non-standard transfer logic
+            uint256 expectedDepositAmount = _depositFunds(_prevMsgSender, IERC20(l1Token), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
+            require(expectedDepositAmount == _depositAmount, "3T"); // The token has non-standard transfer logic
         }
         require(amount != 0, "6T"); // empty deposit amount
 
@@ -128,6 +128,7 @@ contract L1NativeTokenVault is
     function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));
         address from = _from;
+        // in the legacy scenario the SharedBridge was granting the allowance, we have to transfer from them instead of the user
         if (_token.allowance(address(L1_SHARED_BRIDGE), address(this)) > 0) {
             from = address(L1_SHARED_BRIDGE);
         }
