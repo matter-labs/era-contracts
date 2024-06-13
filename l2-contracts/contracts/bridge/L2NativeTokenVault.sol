@@ -98,12 +98,12 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
             .decode(_data, (address, uint256, address, bytes, address));
         address expectedToken = l2TokenAddress(originToken);
         if (token == address(0)) {
-            bytes32 expectedassetId = keccak256(
+            bytes32 expectedAssetId = keccak256(
                 abi.encode(_chainId, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(originToken))))
             );
-            if (_assetId != expectedassetId) {
+            if (_assetId != expectedAssetId) {
                 // Make sure that a NativeTokenVault sent the message
-                revert Bytes32Mismatch(_assetId, expectedassetId);
+                revert Bytes32Mismatch(_assetId, expectedAssetId);
             }
             address deployedToken = _deployL2Token(originToken, erc20Data);
             if (deployedToken != expectedToken) {

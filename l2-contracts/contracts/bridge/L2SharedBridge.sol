@@ -104,9 +104,9 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     // / @param _amount Total amount of tokens deposited from L1
     /// @param _data The additional data that user can pass with the deposit
     function finalizeDeposit(bytes32 _assetId, bytes memory _data) public override onlyL1Bridge {
-        address asset = assetHandlerAddress[_assetId];
-        if (asset != address(0)) {
-            IL2AssetHandler(asset).bridgeMint(L1_CHAIN_ID, _assetId, _data);
+        address assetHandler = assetHandlerAddress[_assetId];
+        if (assetHandler != address(0)) {
+            IL2AssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _data);
         } else {
             IL2AssetHandler(nativeTokenVault).bridgeMint(L1_CHAIN_ID, _assetId, _data);
             assetHandlerAddress[_assetId] = address(nativeTokenVault);
@@ -118,7 +118,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked
     /// @param _assetId The L2 token address which is withdrawn
-    /// @param _assetData The data that is passed to the asset contract
+    /// @param _assetData The data that is passed to the asset handler contract
     function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
         address assetHandler = assetHandlerAddress[_assetId];
         bytes memory _bridgeMintData;

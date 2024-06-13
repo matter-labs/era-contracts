@@ -167,7 +167,7 @@ interface IL1SharedBridge {
 
     function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
 
-    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetAddress) external;
+    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external;
 
     function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 
