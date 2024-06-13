@@ -175,7 +175,7 @@ interface IL1SharedBridge {
 
     function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external;
 
-    function claimFailedBurn(
+    function recoverFromFailedTransfer(
         uint256 _chainId,
         address _depositSender,
         bytes32 _assetId,
