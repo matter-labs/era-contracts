@@ -758,7 +758,6 @@ export class Deployer {
         ...txOptions,
       }
     );
-    return;
 
     const chainId = receipt.logs.find((log) => log.topics[0] == bridgehub.interface.getEventTopic("NewChain"))
       .topics[1];
