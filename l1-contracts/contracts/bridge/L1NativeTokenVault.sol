@@ -109,9 +109,8 @@ contract L1NativeTokenVault is
             require(msg.value == 0, "NTV m.v > 0 b d.it");
             amount = _depositAmount;
 
-            // ToDo: rename
-            uint256 withdrawAmount = _depositFunds(_prevMsgSender, IERC20(l1Token), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
-            require(withdrawAmount == _depositAmount, "3T"); // The token has non-standard transfer logic
+            uint256 transferredAmount = _depositFunds(_prevMsgSender, IERC20(l1Token), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
+            require(transferredAmount == _depositAmount, "3T"); // The token has non-standard transfer logic
         }
         require(amount != 0, "6T"); // empty deposit amount
 
@@ -180,7 +179,7 @@ contract L1NativeTokenVault is
         }
     }
 
-    function bridgeClaimFailedBurn(
+    function recoverFromFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
         address,

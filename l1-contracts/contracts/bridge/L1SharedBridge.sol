@@ -276,6 +276,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     function _getAssetProperties(bytes32 _assetId) internal returns (address l1AssetHandler, bytes32 assetId) {
         l1AssetHandler = assetHandlerAddress[_assetId];
         assetId = _assetId;
+        // Check if no asset handler is set && if the passed id is the address
         if (l1AssetHandler == address(0) && (uint256(_assetId) <= type(uint160).max)) {
             l1AssetHandler = address(nativeTokenVault);
             assetId = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetId));
@@ -300,13 +301,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     function _transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) internal {
         // assetId might be padded token address, or it might be asset info (get token from NTV)
         // do the transfer if allowance is bigger than amount
-        address asset = assetHandlerAddress[_assetId];
         address l1TokenAddress = nativeTokenVault.tokenAddress(_assetId);
-        if (asset == address(0) && (uint256(_assetId) <= type(uint160).max)) {
-            l1TokenAddress = address(uint160(uint256(_assetId)));
-        } else if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
-            return;
-        }
         IERC20 l1Token = IERC20(l1TokenAddress);
 
         if (l1Token.allowance(_prevMsgSender, address(this)) >= _amount) {
@@ -345,10 +340,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             (_assetId, _assetData) = abi.decode(_data, (bytes32, bytes));
         }
 
-        require(
-            BRIDGE_HUB.baseToken(_chainId) != assetHandlerAddress[_assetId],
-            "ShB: baseToken deposit not supported"
-        );
+        require(BRIDGE_HUB.baseTokenAssetId(_chainId) != _assetId, "ShB: baseToken deposit not supported");
 
         (bytes memory bridgeMintCalldata, bytes32 assetId) = _burn({
             _chainId: _chainId,
@@ -464,7 +456,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
-    function claimFailedBurn(
+    function recoverFromFailedTransfer(
         uint256 _chainId,
         address _depositSender, // todo is this needed, or should it be part of transferData? AssetData I suppose
         bytes32 _assetId,
@@ -505,7 +497,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
         delete depositHappened[_chainId][_l2TxHash];
 
-        IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeClaimFailedBurn(
+        IL1AssetHandler(assetHandlerAddress[_assetId]).recoverFromFailedTransfer(
             _chainId,
             _assetId,
             _depositSender,
@@ -714,7 +706,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     ) external override {
         bytes32 assetId = nativeTokenVault.getAssetId(_l1Asset);
         bytes memory transferData = abi.encode(_amount, _depositSender); // todo
-        claimFailedBurn({
+        recoverFromFailedTransfer({
             _chainId: _chainId,
             _depositSender: _depositSender,
             _assetId: assetId,
@@ -877,7 +869,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     ) external override onlyLegacyBridge {
         bytes32 assetId = nativeTokenVault.getAssetIdFromLegacy(_l1Asset);
         bytes memory transferData = abi.encode(_amount, _depositSender); //todo
-        claimFailedBurn({
+        recoverFromFailedTransfer({
             _chainId: ERA_CHAIN_ID,
             _depositSender: _depositSender,
             _assetId: assetId,
