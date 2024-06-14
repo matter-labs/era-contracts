@@ -20,12 +20,10 @@ If the call to the `_to` address succeeds, the `GasBoundCaller` will ensure that
 
 Summing up the information from the previous chapter, the `GasBoundCaller` should be used in the following way:
 
-TODO(EVM-585): switch `addr` with address.
-
 ```solidity
 uint256 computeGasBefore = gasleft();
 
-(bool success, bytes memory returnData) = address(this).call{gas: _gasToPass}(abi.encodeWithSelector(GasBoundCaller.gasBoundCall.selector, _to, _maxTotalGas, _data));
+(bool success, bytes memory returnData) = address(0xc706EC7dfA5D4Dc87f29f859094165E8290530f5).call{gas: _gasToPass}(abi.encodeWithSelector(GasBoundCaller.gasBoundCall.selector, _to, _maxTotalGas, _data));
 
 uint256 pubdataGasSpent;
 if (success) {
