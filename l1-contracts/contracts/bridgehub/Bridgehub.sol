@@ -13,11 +13,14 @@ import {IL1NativeTokenVault} from "../bridge/interfaces/IL1NativeTokenVault.sol"
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+    /// @notice the asset id of Eth
+    bytes32 internal immutable ETH_TOKEN_ASSET_ID;
+    
     /// @notice all the ether is held by the weth bridge
     IL1SharedBridge public sharedBridge;
 
@@ -42,7 +45,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     mapping(uint256 _chainId => bytes32) public baseTokenAssetId;
 
     /// @notice to avoid parity hack
-    constructor() reentrancyGuardInitializer {}
+    constructor() reentrancyGuardInitializer {
+        ETH_TOKEN_ASSET_ID = keccak256(
+            abi.encode(
+                block.chainid,
+                NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS,
+                bytes32(uint256(uint160(ETH_TOKEN_ADDRESS)))
+            )
+        );
+    }
 
     /// @notice used to initialize the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
@@ -143,6 +154,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
+        /// For now all base tokens have to use the NTV. 
         baseTokenAssetId[_chainId] = IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetId(_baseToken);
 
         IStateTransitionManager(_stateTransitionManager).createNewChain({
@@ -224,8 +236,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         L2TransactionRequestDirect calldata _request
     ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
         {
-            address token = baseToken[_request.chainId];
-            if (token == ETH_TOKEN_ADDRESS) {
+            bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
+            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
                 require(msg.value == _request.mintValue, "Bridgehub: msg.value mismatch 1");
             } else {
                 require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
@@ -234,7 +246,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             // slither-disable-next-line arbitrary-send-eth
             sharedBridge.bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
-                baseTokenAssetId[_request.chainId],
+                tokenAssetId,
                 msg.sender,
                 _request.mintValue
             );
@@ -270,9 +282,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
         {
-            address token = baseToken[_request.chainId];
+            bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
             uint256 baseTokenMsgValue;
-            if (token == ETH_TOKEN_ADDRESS) {
+            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
                 require(
                     msg.value == _request.mintValue + _request.secondBridgeValue,
                     "Bridgehub: msg.value mismatch 2"

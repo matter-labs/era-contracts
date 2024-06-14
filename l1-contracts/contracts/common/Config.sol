@@ -106,6 +106,9 @@ address constant ETH_TOKEN_ADDRESS = address(1);
 
 bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
 
+/// @dev A virtual address, used in the assetId calculation for native assets.
+/// This is needed for automatice bridging, i.e. without deploying the AssetHandler contract,
+/// if the assetId can be calculated with this address then it is in fact an NTV asset
 address constant NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS = address(2);
 
 /// @dev https://eips.ethereum.org/EIPS/eip-1352
