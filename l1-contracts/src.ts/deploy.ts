@@ -567,7 +567,10 @@ export class Deployer {
       this.addresses.Bridgehub.BridgehubProxy,
       ethIsBaseToken ? value : 0,
       l1Calldata,
-      ethTxOptions,
+      {
+        ...ethTxOptions,
+        gasPrice
+      },
       printOperation
     );
     return receipt;
