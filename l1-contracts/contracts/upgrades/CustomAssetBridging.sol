@@ -4,7 +4,6 @@ pragma solidity 0.8.24;
 
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
-import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -16,7 +15,7 @@ contract CustomAssetBridging is BaseZkSyncUpgrade {
         // (uint256 chainId, address bridgehubAddress, address stateTransitionManager, address sharedBridgeAddress) = abi
         //     .decode(_proposedUpgrade.postUpgradeCalldata, (uint256, address, address, address));
 
-        // s.baseTokenAssetId = 
+        // s.baseTokenAssetId =
 
         super.upgrade(_proposedUpgrade);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;

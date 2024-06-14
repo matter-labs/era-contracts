@@ -128,7 +128,10 @@ contract L1NativeTokenVault is
         uint256 balanceBefore = _token.balanceOf(address(this));
         address from = _from;
         // in the legacy scenario the SharedBridge was granting the allowance, we have to transfer from them instead of the user
-        if (_token.allowance(address(L1_SHARED_BRIDGE), address(this)) > 0) {
+        if (
+            _token.allowance(address(L1_SHARED_BRIDGE), address(this)) >= _amount &&
+            _token.allowance(_from, address(this)) < _amount
+        ) {
             from = address(L1_SHARED_BRIDGE);
         }
         // slither-disable-next-line arbitrary-send-erc20

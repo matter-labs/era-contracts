@@ -20,7 +20,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice the asset id of Eth
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
-    
+
     /// @notice all the ether is held by the weth bridge
     IL1SharedBridge public sharedBridge;
 
@@ -47,11 +47,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {
         ETH_TOKEN_ASSET_ID = keccak256(
-            abi.encode(
-                block.chainid,
-                NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS,
-                bytes32(uint256(uint160(ETH_TOKEN_ADDRESS)))
-            )
+            abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
         );
     }
 
@@ -154,7 +150,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
-        /// For now all base tokens have to use the NTV. 
+        /// For now all base tokens have to use the NTV.
         baseTokenAssetId[_chainId] = IL1NativeTokenVault(sharedBridge.nativeTokenVault()).getAssetId(_baseToken);
 
         IStateTransitionManager(_stateTransitionManager).createNewChain({
