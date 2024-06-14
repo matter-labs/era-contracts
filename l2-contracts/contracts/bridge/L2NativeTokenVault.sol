@@ -127,7 +127,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         bytes calldata _data
     ) external payable override onlyBridge returns (bytes memory _bridgeMintData) {
         (uint256 _amount, address _l1Receiver) = abi.decode(_data, (uint256, address));
-        if (_amount > 0) {
+        if (_amount == 0) {
             // "Amount cannot be zero");
             revert AmountMustBeGreaterThanZero();
         }
