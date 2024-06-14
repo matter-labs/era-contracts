@@ -46,6 +46,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @dev Chain ID of L1 for bridging reasons
     uint256 public immutable L1_CHAIN_ID;
 
+    /// @dev the contract responsible for handling tokens native to a single chain.
     IL2NativeTokenVault public nativeTokenVault;
 
     /// @dev A mapping l2 token address => l1 token address
@@ -79,7 +80,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         address _l1SharedBridge,
         address _l1Bridge,
         IL2NativeTokenVault _assetHandler
-    ) external reinitializer(2) {
+    ) external reinitializer(3) {
         if (_l1SharedBridge == address(0)) {
             revert EmptyAddress();
         }
@@ -93,7 +94,9 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
             if (_l1Bridge == address(0)) {
                 revert EmptyAddress();
             }
-            l1Bridge = _l1Bridge;
+            if (l1Bridge == address(0)) {
+                l1Bridge = _l1Bridge;
+            }
         }
     }
 
@@ -124,23 +127,13 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         bytes memory _bridgeMintData;
 
         /// should the address not be set already? Or do we need this to do it automatically.
-        if (assetHandler != address(0)) {
-            _bridgeMintData = IL2AssetHandler(assetHandler).bridgeBurn({
-                _chainId: L1_CHAIN_ID,
-                _mintValue: 0,
-                _assetId: _assetId,
-                _prevMsgSender: msg.sender,
-                _data: _assetData
-            });
-        } else {
-            _bridgeMintData = IL2AssetHandler(nativeTokenVault).bridgeBurn({
-                _chainId: L1_CHAIN_ID,
-                _mintValue: 0,
-                _assetId: _assetId,
-                _prevMsgSender: msg.sender,
-                _data: _assetData
-            });
-        }
+        _bridgeMintData = IL2AssetHandler(assetHandler).bridgeBurn({
+            _chainId: L1_CHAIN_ID,
+            _mintValue: 0,
+            _assetId: _assetId,
+            _prevMsgSender: msg.sender,
+            _data: _assetData
+        });
 
         bytes memory message = _getL1WithdrawMessage(_assetId, _bridgeMintData);
         L2ContractHelper.sendMessageToL1(message);

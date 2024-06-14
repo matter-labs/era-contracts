@@ -46,7 +46,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         _disableInitializers();
     }
 
-    /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
+    /// @dev Sets the L2SharedBridge contract address. Should be called only once.
     function setSharedBridge(IL2SharedBridge _sharedBridge) external onlyOwner {
         if (address(l2Bridge) != address(0)) {
             // "SD: shared bridge already set";
@@ -126,8 +126,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     ) external payable override onlyBridge returns (bytes memory _bridgeMintData) {
         (uint256 _amount, address _l1Receiver) = abi.decode(_data, (uint256, address));
         if (_amount > 0) {
-            revert AmountMustBeGreaterThanZero();
             // "Amount cannot be zero");
+            revert AmountMustBeGreaterThanZero();
         }
 
         address l2Token = tokenAddress[_assetId];
