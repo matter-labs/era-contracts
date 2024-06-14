@@ -496,7 +496,7 @@ export class Deployer {
     if (this.verbose) {
       console.log("Upgrade scheduled");
     }
-    const executeTX = await governance.execute(operation, { value: value });
+    const executeTX = await governance.execute(operation, { ...ethTxOptions, value: value });
     const receipt = await executeTX.wait();
     if (this.verbose) {
       console.log(
@@ -830,7 +830,6 @@ export class Deployer {
       0,
       {
         gasPrice,
-        nonce,
         ...txOptions,
       }
     );
