@@ -27,7 +27,7 @@ async function main() {
     .option("--diamond-upgrade-init <version>")
     .option("--only-verifier")
     .action(async (cmd) => {
-    let  deployWallet = cmd.privateKey
+      const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,

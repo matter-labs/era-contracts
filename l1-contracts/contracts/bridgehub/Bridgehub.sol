@@ -9,7 +9,6 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
-import {IL1NativeTokenVault} from "../bridge/interfaces/IL1NativeTokenVault.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
