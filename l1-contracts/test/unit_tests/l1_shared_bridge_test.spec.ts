@@ -69,7 +69,9 @@ describe("Shared Bridge tests", () => {
     erc20TestToken = TestnetERC20TokenFactory.connect(tokenAddress, owner);
 
     await erc20TestToken.mint(await randomSigner.getAddress(), ethers.utils.parseUnits("10000", 18));
-    await erc20TestToken.connect(randomSigner).approve(l1SharedBridge.address, ethers.utils.parseUnits("10000", 18));
+    await erc20TestToken
+      .connect(randomSigner)
+      .approve(l1NativeTokenVault.address, ethers.utils.parseUnits("10000", 18));
 
     await l1NativeTokenVault.registerToken(erc20TestToken.address);
   });

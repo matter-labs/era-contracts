@@ -9,6 +9,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
+import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -56,6 +57,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @dev Deprecated storage variable related to deposit limitations.
     mapping(address => mapping(address => uint256)) private __DEPRECATED_totalDepositedAmountPerUser;
 
+    /// @dev The native token vault, which handles the token transfers. We sohuld deposit to it
+    IL1NativeTokenVault public override NATIVE_TOKEN_VAULT;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(IL1SharedBridge _sharedBridge) reentrancyGuardInitializer {
@@ -63,7 +67,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     }
 
     /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
-    function initialize() external reentrancyGuardInitializer {}
+    function initialize(IL1NativeTokenVault _nativeTokenVault) external reentrancyGuardInitializer {
+        NATIVE_TOKEN_VAULT = _nativeTokenVault;
+    }
 
     /// @dev transfer token to shared bridge as part of upgrade
     function transferTokenToSharedBridge(address _token) external {
@@ -151,7 +157,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         address _refundRecipient
     ) public payable nonReentrant returns (bytes32 l2TxHash) {
         require(_amount != 0, "0T"); // empty deposit
-        uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
+        uint256 amount = _depositFundsToNTV(msg.sender, IERC20(_l1Token), _amount);
         require(amount == _amount, "3T"); // The token has non-standard transfer logic
 
         l2TxHash = SHARED_BRIDGE.depositLegacyErc20Bridge{value: msg.value}({
@@ -168,12 +174,12 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, _amount);
     }
 
-    /// @dev Transfers tokens from the depositor address to the shared bridge address.
+    /// @dev Transfers tokens from the depositor address to the native token vault address.
     /// @return The difference between the contract balance before and after the transferring of funds.
-    function _depositFundsToSharedBridge(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
-        uint256 balanceBefore = _token.balanceOf(address(SHARED_BRIDGE));
-        _token.safeTransferFrom(_from, address(SHARED_BRIDGE), _amount);
-        uint256 balanceAfter = _token.balanceOf(address(SHARED_BRIDGE));
+    function _depositFundsToNTV(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
+        uint256 balanceBefore = _token.balanceOf(address(NATIVE_TOKEN_VAULT));
+        _token.safeTransferFrom(_from, address(NATIVE_TOKEN_VAULT), _amount);
+        uint256 balanceAfter = _token.balanceOf(address(NATIVE_TOKEN_VAULT));
 
         return balanceAfter - balanceBefore;
     }

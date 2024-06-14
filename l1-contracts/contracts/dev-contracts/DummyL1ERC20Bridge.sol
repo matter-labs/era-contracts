@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {L1ERC20Bridge} from "../bridge/L1ERC20Bridge.sol";
 import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
+import {IL1NativeTokenVault} from "../bridge/interfaces/IL1NativeTokenVault.sol";
 
 contract DummyL1ERC20Bridge is L1ERC20Bridge {
     constructor(IL1SharedBridge _l1SharedBridge) L1ERC20Bridge(_l1SharedBridge) {}

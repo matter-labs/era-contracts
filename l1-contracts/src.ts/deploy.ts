@@ -577,7 +577,8 @@ export class Deployer {
   // we don't use the real implementation, as we need the address to be independent
   public async deployERC20BridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const initCalldata = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi).encodeFunctionData(
-      "initialize"
+      "initialize",
+      [this.addresses.Bridges.NativeTokenVaultProxy]
     );
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",

@@ -256,7 +256,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             : _assetId;
         l1AssetHandler = assetHandlerAddress[_assetId];
         // Check if no asset handler is set
-        if (l1AssetHandler == address(0)) {
+        if (l1AssetHandler == address(0) && uint256(_assetId) <= type(uint160).max) {
             l1AssetHandler = address(nativeTokenVault);
             nativeTokenVault.registerToken(address(uint160(uint256(_assetId))));
         }
@@ -757,7 +757,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         {
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-            _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
 
             // solhint-disable-next-line func-named-parameters
             bridgeMintCalldata = abi.encode(
