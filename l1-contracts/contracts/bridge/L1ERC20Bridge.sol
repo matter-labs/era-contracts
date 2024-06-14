@@ -25,7 +25,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @dev The shared bridge that is now used for all bridging, replacing the legacy contract.
     IL1SharedBridge public immutable override SHARED_BRIDGE;
 
-    /// @dev The native token vault, which handles the token transfers. We sohuld deposit to it
+    /// @dev The native token vault, which handles the token transfers. We should deposit to it
     IL1NativeTokenVault public immutable override NATIVE_TOKEN_VAULT;
 
     /// @dev A mapping L2 batch number => message number => flag.

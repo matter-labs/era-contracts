@@ -456,7 +456,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
-        address _depositSender, // todo is this needed, or should it be part of transferData? AssetData I suppose
+        address _depositSender,
         bytes32 _assetId,
         bytes memory _assetData,
         bytes32 _l2TxHash,
