@@ -14,12 +14,11 @@ import {
   deployViaCreate2 as deployViaCreate2EVM,
 } from "./deploy-utils";
 import {
-  deployViaCreate2 as deployViaCreate2Zk,
-  BUILT_IN_ZKSYNC_CREATE2_FACTORY,
-  deployBytecodeViaCreate2OnPath,
-  L2_SHARED_BRIDGE_PATH,
-} from "./deploy-utils-zk";
-import { readBatchBootloaderBytecode, readSystemContractsBytecode, SYSTEM_CONFIG } from "../scripts/utils";
+  packSemver,
+  readBatchBootloaderBytecode,
+  readSystemContractsBytecode,
+  unpackStringSemVer,
+} from "../scripts/utils";
 import { getTokens } from "./deploy-token";
 import {
   ADDRESS_ONE,
@@ -30,9 +29,10 @@ import {
   hashL2Bytecode,
   DIAMOND_CUT_DATA_ABI_STRING,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  compileInitialCutHash,
 } from "./utils";
 import type { FacetCut } from "./diamondCut";
-import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
+import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
 import { ERC20Factory, StateTransitionManagerFactory } from "../typechain";
 
@@ -51,6 +51,7 @@ import { IZkSyncHyperchainFactory } from "../typechain/IZkSyncHyperchainFactory"
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
 
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
+import { BUILT_IN_ZKSYNC_CREATE2_FACTORY } from "./deploy-utils-zk";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -117,45 +118,17 @@ export class Deployer {
       recursionCircuitsSetVksHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
     };
     const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
-    const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
-    const feeParams = {
-      pubdataPricingMode: PubdataPricingMode.Rollup,
-      batchOverheadL1Gas: SYSTEM_CONFIG.priorityTxBatchOverheadL1Gas,
-      maxPubdataPerBatch: SYSTEM_CONFIG.priorityTxPubdataPerBatch,
-      priorityTxMaxPubdata: SYSTEM_CONFIG.priorityTxMaxPubdata,
-      maxL2GasPerBatch: SYSTEM_CONFIG.priorityTxMaxGasPerBatch,
-      minimalL2GasPrice: SYSTEM_CONFIG.priorityTxMinimalGasPrice,
-    };
-
-    const diamondInitCalldata = DiamondInit.encodeFunctionData("initialize", [
-      // these first values are set in the contract
-      {
-        chainId: "0x0000000000000000000000000000000000000000000000000000000000000001",
-        bridgehub: "0x0000000000000000000000000000000000001234",
-        stateTransitionManager: "0x0000000000000000000000000000000000002234",
-        protocolVersion: "0x0000000000000000000000000000000000002234",
-        admin: "0x0000000000000000000000000000000000003234",
-        validatorTimelock: "0x0000000000000000000000000000000000004234",
-        baseToken: "0x0000000000000000000000000000000000004234",
-        baseTokenBridge: "0x0000000000000000000000000000000000004234",
-        storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
-        // The exact value is not important as it will be overridden by the STM
-        // syncLayerState: 0,
-        verifier: this.addresses.StateTransition.Verifier,
-        verifierParams,
-        l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
-        l2DefaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-        priorityTxMaxGasLimit,
-        feeParams,
-        blobVersionedHashRetriever: this.addresses.BlobVersionedHashRetriever,
-      },
-    ]);
-
-    return diamondCut(
+    return compileInitialCutHash(
       facetCuts,
+      verifierParams,
+      L2_BOOTLOADER_BYTECODE_HASH,
+      L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+      this.addresses.StateTransition.Verifier,
+      this.addresses.BlobVersionedHashRetriever,
+      +priorityTxMaxGasLimit,
       this.addresses.StateTransition.DiamondInit,
-      "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2)
+      false
     );
   }
 
@@ -378,20 +351,23 @@ export class Deployer {
     const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
     const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
     const diamondCut = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
-    // console.log("correct initial diamond cut", diamondCut);
-    const protocolVersion = getNumberFromEnv("CONTRACTS_GENESIS_PROTOCOL_VERSION");
+    const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
 
     const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
+
+    const chainCreationParams = {
+      genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
+      genesisBatchHash,
+      genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
+      genesisBatchCommitment,
+      diamondCut,
+    };
 
     const initCalldata = stateTransitionManager.encodeFunctionData("initialize", [
       {
         owner: this.addresses.Governance,
         validatorTimelock: this.addresses.ValidatorTimeLock,
-        genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
-        genesisBatchHash,
-        genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
-        genesisBatchCommitment,
-        diamondCut,
+        chainCreationParams,
         protocolVersion,
       },
     ]);
@@ -1146,6 +1122,23 @@ export class Deployer {
       if (this.verbose) {
         console.log(`Validium mode set, gas used: ${receipt5.gasUsed.toString()}`);
       }
+    }
+  }
+
+  public async transferAdminFromDeployerToGovernance() {
+    const stm = this.stateTransitionManagerContract(this.deployWallet);
+    const diamondProxyAddress = await stm.getHyperchain(this.chainId);
+    const hyperchain = IZkSyncHyperchainFactory.connect(diamondProxyAddress, this.deployWallet);
+
+    const receipt = await (await hyperchain.setPendingAdmin(this.addresses.Governance)).wait();
+    if (this.verbose) {
+      console.log(`Governance set as pending admin, gas used: ${receipt.gasUsed.toString()}`);
+    }
+
+    await this.executeUpgrade(hyperchain.address, 0, hyperchain.interface.encodeFunctionData("acceptAdmin"), false);
+
+    if (this.verbose) {
+      console.log("Pending admin successfully accepted");
     }
   }
 

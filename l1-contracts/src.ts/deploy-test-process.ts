@@ -7,7 +7,7 @@ import * as ethers from "ethers";
 import type { BigNumberish, Wallet } from "ethers";
 import { Interface } from "ethers/lib/utils";
 import * as zkethers from "zksync-ethers";
-import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
+import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/utils";
 import * as fs from "fs";
 
 import type { FacetCut } from "./diamondCut";
@@ -39,10 +39,10 @@ const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.js
 const testnetTokenPath = `${testConfigPath}/hardhat.json`;
 
 export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
-  process.env.CONTRACTS_GENESIS_PROTOCOL_VERSION = (21).toString();
-  process.env.CONTRACTS_GENESIS_ROOT = ethers.constants.HashZero;
-  process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = "0";
-  process.env.CONTRACTS_GENESIS_BATCH_COMMITMENT = ethers.constants.HashZero;
+  process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION = "0.21.0";
+  process.env.CONTRACTS_GENESIS_ROOT = "0x0000000000000000000000000000000000000000000000000000000000000001";
+  process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = "1";
+  process.env.CONTRACTS_GENESIS_BATCH_COMMITMENT = "0x0000000000000000000000000000000000000000000000000000000000000001";
   // process.env.CONTRACTS_GENESIS_UPGRADE_ADDR = ADDRESS_ONE;
   process.env.CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT = "72000000";
   process.env.CONTRACTS_FRI_RECURSION_NODE_LEVEL_VK_HASH = ethers.constants.HashZero;

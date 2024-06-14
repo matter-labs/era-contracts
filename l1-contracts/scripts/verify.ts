@@ -1,30 +1,31 @@
 // hardhat import should be the first import in the file
 import * as hardhat from "hardhat";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-import {
-  getNumberFromEnv,
-  getHashFromEnv,
-  getAddressFromEnv,
-  isCurrentNetworkLocal,
-  ethTestConfig,
-} from "../src.ts/utils";
+import { ethTestConfig, getNumberFromEnv, getHashFromEnv, getAddressFromEnv } from "../src.ts/utils";
 
 import { Interface } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
 import { Wallet } from "ethers";
-import { web3Provider } from "./utils";
+import { packSemver, unpackStringSemVer, web3Provider } from "./utils";
 import { getTokens } from "../src.ts/deploy-token";
 
 const provider = web3Provider();
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function verifyPromise(address: string, constructorArguments?: Array<any>, libraries?: object): Promise<any> {
+function verifyPromise(
+  address: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructorArguments?: Array<any>,
+  libraries?: object,
+  contract?: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
   return new Promise((resolve, reject) => {
     hardhat
       .run("verify:verify", {
         address,
         constructorArguments,
         libraries,
+        contract,
       })
       .then(() => resolve(`Successfully verified ${address}`))
       .catch((e) => reject(`Failed to verify ${address}\nError: ${e.message}`));
@@ -78,9 +79,11 @@ async function main() {
   const promise2 = verifyPromise(addresses.ValidatorTimeLock, [deployWalletAddress, executionDelay, eraChainId]);
   promises.push(promise2);
 
-  console.log("CONTRACTS_HYPERCHAIN_UPGRADE_ADDR", process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR);
-  const promise3 = verifyPromise(process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR);
+  const promise3 = verifyPromise(process.env.CONTRACTS_DEFAULT_UPGRADE_ADDR);
   promises.push(promise3);
+
+  const promise4 = verifyPromise(process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR);
+  promises.push(promise4);
 
   const promise5 = verifyPromise(addresses.TransparentProxyAdmin);
   promises.push(promise5);
@@ -127,17 +130,19 @@ async function main() {
   const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
   const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
   const diamondCut = await deployer.initialZkSyncHyperchainDiamondCut([]);
-  const protocolVersion = getNumberFromEnv("CONTRACTS_GENESIS_PROTOCOL_VERSION");
+  const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
 
   const initCalldata2 = stateTransitionManager.encodeFunctionData("initialize", [
     {
       owner: addresses.Governance,
       validatorTimelock: addresses.ValidatorTimeLock,
-      genesisUpgrade: addresses.StateTransition.GenesisUpgrade,
-      genesisBatchHash,
-      genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
-      genesisBatchCommitment,
-      diamondCut,
+      chainCreationParams: {
+        genesisUpgrade: addresses.StateTransition.GenesisUpgrade,
+        genesisBatchHash,
+        genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
+        genesisBatchCommitment,
+        diamondCut,
+      },
       protocolVersion,
     },
   ]);
@@ -150,8 +155,12 @@ async function main() {
   promises.push(promise9);
 
   // bridges
-  // Note: do this manually and pass in  to verify:verify the following:  contract:"contracts/bridge/L1ERC20Bridge.sol:L1ERC20Bridge"
-  const promise10 = verifyPromise(addresses.Bridges.ERC20BridgeImplementation, [addresses.Bridges.SharedBridgeProxy]);
+  const promise10 = verifyPromise(
+    addresses.Bridges.ERC20BridgeImplementation,
+    [addresses.Bridges.SharedBridgeProxy],
+    undefined,
+    "contracts/bridge/L1ERC20Bridge.sol:L1ERC20Bridge"
+  );
   promises.push(promise10);
 
   const eraDiamondProxy = getAddressFromEnv("CONTRACTS_ERA_DIAMOND_PROXY_ADDR");

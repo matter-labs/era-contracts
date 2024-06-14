@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable gas-custom-errors, reason-string
+
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT, BLOB_SIZE_BYTES} from "../../chain-interfaces/IExecutor.sol";
@@ -52,7 +54,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         if (pricingMode == PubdataPricingMode.Validium) {
             // skipping data validation for validium, we just check that the data is empty
             require(_newBatch.pubdataCommitments.length == 1, "EF: v0l");
-            for (uint8 i = uint8(SystemLogKey.BLOB_ONE_HASH_KEY); i <= uint8(SystemLogKey.BLOB_SIX_HASH_KEY); i++) {
+            for (uint8 i = uint8(SystemLogKey.BLOB_ONE_HASH_KEY); i <= uint8(SystemLogKey.BLOB_SIX_HASH_KEY); ++i) {
                 logOutput.blobHashes[i - uint8(SystemLogKey.BLOB_ONE_HASH_KEY)] = bytes32(0);
             }
         } else if (pubdataSource == uint8(PubdataSource.Blob)) {
@@ -148,7 +150,8 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         uint256 processedLogs;
 
         // linear traversal of the logs
-        for (uint256 i = 0; i < emittedL2Logs.length; i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE)) {
+        uint256 logsLength = emittedL2Logs.length;
+        for (uint256 i = 0; i < logsLength; i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE)) {
             // Extract the values to be compared to/used such as the log sender, key, and value
             // slither-disable-next-line unused-return
             (address logSender, ) = UnsafeBytes.readAddress(emittedL2Logs, i + L2_LOG_ADDRESS_OFFSET);
@@ -214,7 +217,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function commitBatches(
-        StoredBatchInfo memory _lastCommittedBatchData,
+        StoredBatchInfo calldata _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) external nonReentrant onlyValidator {
         _commitBatches(_lastCommittedBatchData, _newBatchesData);
@@ -223,7 +226,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     /// @inheritdoc IExecutor
     function commitBatchesSharedBridge(
         uint256, // _chainId
-        StoredBatchInfo memory _lastCommittedBatchData,
+        StoredBatchInfo calldata _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) external nonReentrant onlyValidator {
         _commitBatches(_lastCommittedBatchData, _newBatchesData);
@@ -271,6 +274,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) internal {
+        // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
             _lastCommittedBatchData = _commitOneBatch(_lastCommittedBatchData, _newBatchesData[i], bytes32(0));
 
@@ -303,6 +307,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // Save the batch number where the upgrade transaction was executed.
         s.l2SystemContractsUpgradeBatchNumber = _newBatchesData[0].batchNumber;
 
+        // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
             // The upgrade transaction must only be included in the first batch.
             bytes32 expectedUpgradeTxHash = i == 0 ? _systemContractUpgradeTxHash : bytes32(0);
@@ -568,7 +573,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         blobAuxOutputWords = new bytes32[](2 * TOTAL_BLOBS_IN_COMMITMENT);
 
-        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
+        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; ++i) {
             blobAuxOutputWords[i * 2] = _blobHashes[i];
             blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
         }
@@ -624,6 +629,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         require(_pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE == 0, "bs");
         blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
 
+        // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _pubdataCommitments.length; i += PUBDATA_COMMITMENT_SIZE) {
             bytes32 blobVersionedHash = _getBlobVersionedHash(versionedHashIndex);
 
@@ -645,7 +651,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             blobCommitments[versionedHashIndex] = keccak256(
                 abi.encodePacked(blobVersionedHash, _pubdataCommitments[i:i + PUBDATA_COMMITMENT_COMMITMENT_OFFSET])
             );
-            versionedHashIndex += 1;
+            ++versionedHashIndex;
         }
 
         // This check is required because we want to ensure that there aren't any extra blobs trying to be published.
@@ -655,7 +661,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         // We verify that for each set of blobHash/blobCommitment are either both empty
         // or there are values for both.
-        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
+        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; ++i) {
             require(
                 (_blobHashes[i] == bytes32(0) && blobCommitments[i] == bytes32(0)) ||
                     (_blobHashes[i] != bytes32(0) && blobCommitments[i] != bytes32(0)),

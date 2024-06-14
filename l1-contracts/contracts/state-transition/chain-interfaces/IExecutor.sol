@@ -88,6 +88,7 @@ interface IExecutor is IZkSyncHyperchainBase {
     /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch
     /// @param timestamp Rollup batch timestamp, have the same format as Ethereum batch constant
     /// @param commitment Verified input for the zkSync circuit
+    // solhint-disable-next-line gas-struct-packing
     struct StoredBatchInfo {
         uint64 batchNumber;
         bytes32 batchHash;

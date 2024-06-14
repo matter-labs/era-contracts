@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {Diamond} from "./libraries/Diamond.sol";
-// import {L2CanonicalTransaction} from "../common/Messaging.sol";
+import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
@@ -12,33 +12,41 @@ import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
 /// @param owner The address who can manage non-critical updates in the contract
 /// @param validatorTimelock The address that serves as consensus, i.e. can submit blocks to be processed
+/// @param chainCreationParams The struct that contains the fields that define how a new chain should be created
+/// @param protocolVersion The initial protocol version on the newly deployed chain
+struct StateTransitionManagerInitializeData {
+    address owner;
+    address validatorTimelock;
+    ChainCreationParams chainCreationParams;
+    uint256 protocolVersion;
+}
+
+/// @notice The struct that contains the fields that define how a new chain should be created
+/// within this STM.
 /// @param genesisUpgrade The address that is used in the diamond cut initialize address on chain creation
 /// @param genesisBatchHash Batch hash of the genesis (initial) batch
 /// @param genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for the genesis batch
 /// @param genesisBatchCommitment The zk-proof commitment for the genesis batch
 /// @param diamondCut The diamond cut for the first upgrade transaction on the newly deployed chain
-/// @param protocolVersion The initial protocol version on the newly deployed chain
-struct StateTransitionManagerInitializeData {
-    address owner;
-    address validatorTimelock;
+// solhint-disable-next-line gas-struct-packing
+struct ChainCreationParams {
     address genesisUpgrade;
     bytes32 genesisBatchHash;
     uint64 genesisIndexRepeatedStorageChanges;
     bytes32 genesisBatchCommitment;
     Diamond.DiamondCutData diamondCut;
-    uint256 protocolVersion;
 }
 
 interface IStateTransitionManager {
     /// @dev Emitted when a new Hyperchain is added
     event NewHyperchain(uint256 indexed _chainId, address indexed _hyperchainContract);
 
-    // /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
-    // event SetChainIdUpgrade(
-    //     address indexed _hyperchain,
-    //     L2CanonicalTransaction _l2Transaction,
-    //     uint256 indexed _protocolVersion
-    // );
+    /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
+    event SetChainIdUpgrade(
+        address indexed _hyperchain,
+        L2CanonicalTransaction _l2Transaction,
+        uint256 indexed _protocolVersion
+    );
 
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
@@ -50,8 +58,14 @@ interface IStateTransitionManager {
     /// @notice ValidatorTimelock changed
     event NewValidatorTimelock(address indexed oldValidatorTimelock, address indexed newValidatorTimelock);
 
-    /// @notice InitialCutHash changed
-    event NewInitialCutHash(bytes32 indexed oldInitialCutHash, bytes32 indexed newInitialCutHash);
+    /// @notice chain creation parameters changed
+    event NewChainCreationParams(
+        address genesisUpgrade,
+        bytes32 genesisBatchHash,
+        uint64 genesisIndexRepeatedStorageChanges,
+        bytes32 genesisBatchCommitment,
+        bytes32 newInitialCutHash
+    );
 
     /// @notice new UpgradeCutHash
     event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
@@ -87,9 +101,9 @@ interface IStateTransitionManager {
 
     function initialize(StateTransitionManagerInitializeData calldata _initializeData) external;
 
-    function setInitialCutHash(Diamond.DiamondCutData calldata _diamondCut) external;
-
     function setValidatorTimelock(address _validatorTimelock) external;
+
+    function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external;
 
     function getChainAdmin(uint256 _chainId) external view returns (address);
 
@@ -152,4 +166,5 @@ interface IStateTransitionManager {
         address _prevMsgSender,
         bytes calldata _data
     ) external;
+    function getSemverProtocolVersion() external view returns (uint32, uint32, uint32);
 }

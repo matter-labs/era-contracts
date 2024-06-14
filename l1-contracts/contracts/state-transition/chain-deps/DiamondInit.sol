@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable gas-custom-errors
+
 import {Diamond} from "../libraries/Diamond.sol";
 import {ZkSyncHyperchainBase} from "./facets/ZkSyncHyperchainBase.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";

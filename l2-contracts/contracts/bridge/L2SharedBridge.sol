@@ -16,6 +16,8 @@ import {IL2StandardDeployer} from "./interfaces/IL2StandardDeployer.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../L2ContractHelper.sol";
 
+import {EmptyAddress, EmptyBytes32, InvalidCaller, AddressMismatch, AmountMustBeGreaterThanZero, DeployFailed} from "../L2ContractErrors.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
@@ -60,19 +62,25 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
     /// @param _l1SharedBridge The address of the L1 Bridge contract.
     /// @param _l1Bridge The address of the legacy L1 Bridge contract.
-    /// @param _standardDeployer The address of the standardDeployer contract.
+    /// @param _assetHandler The address of the standardDeployer contract.
     function initialize(
         address _l1SharedBridge,
         address _l1Bridge,
-        IL2StandardDeployer _standardDeployer
+        IL2StandardDeployer _assetHandler
     ) external reinitializer(2) {
-        require(_l1SharedBridge != address(0), "bf");
-        require(address(_standardDeployer) != address(0), "cf");
+        if (_l1SharedBridge == address(0)) {
+            revert EmptyAddress();
+        }
+        if (address(_assetHandler) == address(0)) {
+            revert EmptyAddress();
+        }
 
         l1SharedBridge = _l1SharedBridge;
-        standardDeployer = _standardDeployer;
+        standardDeployer = _assetHandler;
         if (block.chainid == ERA_CHAIN_ID) {
-            require(_l1Bridge != address(0), "bf2");
+            if (_l1Bridge == address(0)) {
+                revert EmptyAddress();
+            }
             l1Bridge = _l1Bridge;
         }
     }

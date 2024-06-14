@@ -116,6 +116,7 @@ async function main() {
         undefined,
         useGovernance
       );
+      await deployer.transferAdminFromDeployerToGovernance();
     });
 
   await program.parseAsync(process.argv);

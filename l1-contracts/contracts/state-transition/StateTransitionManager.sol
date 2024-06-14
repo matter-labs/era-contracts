@@ -2,7 +2,10 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable gas-custom-errors, reason-string
+
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
@@ -12,8 +15,8 @@ import {IAdmin} from "./chain-interfaces/IAdmin.sol";
 // import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
-import {IStateTransitionManager, StateTransitionManagerInitializeData} from "./IStateTransitionManager.sol";
-// import {ISystemContext} from "./l2-deps/ISystemContext.sol";
+import {IStateTransitionManager, StateTransitionManagerInitializeData, ChainCreationParams} from "./IStateTransitionManager.sol";
+import {ISystemContext} from "./l2-deps/ISystemContext.sol";
 import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 // import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
@@ -21,8 +24,9 @@ import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 // import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
-// import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT, HyperchainCommitment} from "../common/Config.sol";
+import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
+import {SemVer} from "../common/libraries/SemVer.sol";
 
 /// @title State Transition Manager contract
 /// @author Matter Labs
@@ -49,7 +53,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The genesisUpgrade contract address, used to setChainId
     address public genesisUpgrade;
 
-    /// @dev The current protocolVersion
+    /// @dev The current packed protocolVersion. To access human-readable version, use `getSemverProtocolVersion` function.
     uint256 public protocolVersion;
 
     /// @dev The timestamp when protocolVersion can be last used
@@ -79,6 +83,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     constructor(IBridgehub _bridgehub, uint256 _maxNumberOfHyperchains) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
         MAX_NUMBER_OF_HYPERCHAINS = _maxNumberOfHyperchains;
+
+        // While this does not provide a protection in the production, it is needed for local testing
+        // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
+        assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
     }
 
     /// @notice only the bridgehub can call
@@ -93,12 +101,19 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         _;
     }
 
+    /// @return The tuple of (major, minor, patch) protocol version.
+    function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
+        // slither-disable-next-line unused-return
+        return SemVer.unpackSemVer(SafeCast.toUint96(protocolVersion));
+    }
+
     /// @notice Returns all the registered hyperchain addresses
     function getAllHyperchains() public view override returns (address[] memory chainAddresses) {
         uint256[] memory keys = hyperchainMap.keys();
         chainAddresses = new address[](keys.length);
-        for (uint256 i = 0; i < keys.length; i++) {
-            chainAddresses[i] = hyperchainMap.get(keys[i]);
+        uint256 keysLength = keys.length;
+        for (uint256 i = 0; i < keysLength; ++i) {
+            chainAddresses[i] = hyperchainMap.get(i);
         }
     }
 
@@ -125,28 +140,54 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         require(_initializeData.owner != address(0), "STM: owner zero");
         _transferOwnership(_initializeData.owner);
 
-        genesisUpgrade = _initializeData.genesisUpgrade;
         protocolVersion = _initializeData.protocolVersion;
         protocolVersionDeadline[_initializeData.protocolVersion] = type(uint256).max;
         validatorTimelock = _initializeData.validatorTimelock;
 
+        _setChainCreationParams(_initializeData.chainCreationParams);
+    }
+
+    /// @notice Updates the parameters with which a new chain is created
+    /// @param _chainCreationParams The new chain creation parameters
+    function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal {
+        require(_chainCreationParams.genesisUpgrade != address(0), "STM: genesisUpgrade zero");
+        require(_chainCreationParams.genesisBatchHash != bytes32(0), "STM: genesisBatchHash zero");
+        require(
+            _chainCreationParams.genesisIndexRepeatedStorageChanges != uint64(0),
+            "STM: genesisIndexRepeatedStorageChanges zero"
+        );
+        require(_chainCreationParams.genesisBatchCommitment != bytes32(0), "STM: genesisBatchCommitment zero");
+
+        genesisUpgrade = _chainCreationParams.genesisUpgrade;
+
         // We need to initialize the state hash because it is used in the commitment of the next batch
         IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
             batchNumber: 0,
-            batchHash: _initializeData.genesisBatchHash,
-            indexRepeatedStorageChanges: _initializeData.genesisIndexRepeatedStorageChanges,
+            batchHash: _chainCreationParams.genesisBatchHash,
+            indexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: EMPTY_STRING_KECCAK,
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             timestamp: 0,
-            commitment: _initializeData.genesisBatchCommitment
+            commitment: _chainCreationParams.genesisBatchCommitment
         });
         storedBatchZero = keccak256(abi.encode(batchZero));
-        initialCutHash = keccak256(abi.encode(_initializeData.diamondCut));
+        bytes32 newInitialCutHash = keccak256(abi.encode(_chainCreationParams.diamondCut));
+        initialCutHash = newInitialCutHash;
 
-        // While this does not provide a protection in the production, it is needed for local testing
-        // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
-        assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
+        emit NewChainCreationParams({
+            genesisUpgrade: _chainCreationParams.genesisUpgrade,
+            genesisBatchHash: _chainCreationParams.genesisBatchHash,
+            genesisIndexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
+            genesisBatchCommitment: _chainCreationParams.genesisBatchCommitment,
+            newInitialCutHash: newInitialCutHash
+        });
+    }
+
+    /// @notice Updates the parameters with which a new chain is created
+    /// @param _chainCreationParams The new chain creation parameters
+    function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external onlyOwner {
+        _setChainCreationParams(_chainCreationParams);
     }
 
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
@@ -180,14 +221,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address oldValidatorTimelock = validatorTimelock;
         validatorTimelock = _validatorTimelock;
         emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
-    }
-
-    /// @dev set initial cutHash
-    function setInitialCutHash(Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
-        bytes32 oldInitialCutHash = initialCutHash;
-        bytes32 newCutHash = keccak256(abi.encode(_diamondCut));
-        initialCutHash = newCutHash;
-        emit NewInitialCutHash(oldInitialCutHash, newCutHash);
     }
 
     /// @dev set New Version with upgrade from old version
@@ -257,23 +290,27 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev setPriorityTxMaxGasLimit for the specified chain
-    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// @dev setTokenMultiplier for the specified chain
-    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setTokenMultiplier(_nominator, _denominator);
+    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).setTokenMultiplier(_nominator, _denominator);
     }
 
     /// @dev changeFeeParams for the specified chain
-    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).changeFeeParams(_newFeeParams);
+    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).changeFeeParams(_newFeeParams);
     }
 
     /// @dev setValidator for the specified chain
-    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwnerOrAdmin {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setValidator(_validator, _active);
+    function setValidator(uint256 _chainId, address _validator, bool _active) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).setValidator(_validator, _active);
     }
 
     /// @dev setPorterAvailability for the specified chain
