@@ -3,9 +3,13 @@
 pragma solidity 0.8.20;
 
 interface IL2AssetHandler {
-    // event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
-
-    // event BridgeMint(address indexed _account, uint256 _amount);
+    event BridgeMint(
+        uint256 indexed _chainId,
+        bytes32 indexed _assetId,
+        address indexed _sender,
+        address _l2Receiver,
+        uint256 _amount
+    );
 
     event BridgeBurn(
         uint256 indexed _chainId,

@@ -11,10 +11,16 @@ interface IL1AssetHandler {
     event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
 
     /// @dev Emitted when a token is minted
-    event BridgeMint(address indexed _account, uint256 _amount);
+    event BridgeMint(uint256 indexed _chainId, bytes32 indexed _assetId, address _l1Receiver, uint256 _amount);
 
     /// @dev Emitted when a token is burned
-    event BridgeBurn(address indexed _account, uint256 _amount);
+    event BridgeBurn(
+        uint256 indexed _chainId,
+        bytes32 indexed _assetId,
+        address indexed l1Sender,
+        address _l2receiver,
+        uint256 _amount
+    );
 
     /// @param _chainId the chainId that the message is from
     /// @param _assetId the assetId of the asset being bridged

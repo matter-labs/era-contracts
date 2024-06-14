@@ -60,14 +60,10 @@ export async function mintTokens(
   tokens: TokenDescription[],
   wallet: Wallet,
   nonce: number,
-  mnemonic: string,
-  mnemonic2?: string
+  mnemonics: string[]
 ): Promise<L1Token[]> {
-  const targetAddresses = [
-    wallet.address,
-    ...getTestAddresses(mnemonic),
-    ...(mnemonic2 ? getTestAddresses(mnemonic2) : []),
-  ];
+  const addressArray = mnemonics.map(getTestAddresses).flat();
+  const targetAddresses = [wallet.address, ...addressArray];
 
   const results = [];
   const promises = [];

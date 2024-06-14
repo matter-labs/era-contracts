@@ -46,6 +46,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @dev Chain ID of L1 for bridging reasons
     uint256 public immutable L1_CHAIN_ID;
 
+    /// @dev The contract responsible for handling tokens native to a single chain.
     IL2NativeTokenVault public nativeTokenVault;
 
     /// @dev A mapping l2 token address => l1 token address
@@ -79,7 +80,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         address _l1SharedBridge,
         address _l1Bridge,
         IL2NativeTokenVault _assetHandler
-    ) external reinitializer(2) {
+    ) external reinitializer(3) {
         if (_l1SharedBridge == address(0)) {
             revert EmptyAddress();
         }
@@ -93,26 +94,25 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
             if (_l1Bridge == address(0)) {
                 revert EmptyAddress();
             }
-            l1Bridge = _l1Bridge;
+            if (l1Bridge == address(0)) {
+                l1Bridge = _l1Bridge;
+            }
         }
     }
 
     /// @notice Finalize the deposit and mint funds
-    /// @param _l1Sender The account address that initiated the deposit on L1
-    // / @param _l2Receiver The account address that would receive minted ether
-    /// @param _l1Token The address of the token that was locked on the L1
-    // / @param _amount Total amount of tokens deposited from L1
-    /// @param _data The additional data that user can pass with the deposit
-    function finalizeDeposit(bytes32 _assetId, bytes memory _data) public override onlyL1Bridge {
+    /// @param _assetId The encoding of the asset on L2
+    /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken)
+    function finalizeDeposit(bytes32 _assetId, bytes memory _transferData) public override onlyL1Bridge {
         address assetHandler = assetHandlerAddress[_assetId];
         if (assetHandler != address(0)) {
-            IL2AssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _data);
+            IL2AssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
         } else {
-            IL2AssetHandler(nativeTokenVault).bridgeMint(L1_CHAIN_ID, _assetId, _data);
+            IL2AssetHandler(nativeTokenVault).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
             assetHandlerAddress[_assetId] = address(nativeTokenVault);
         }
 
-        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, keccak256(_data));
+        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, keccak256(_transferData));
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -121,26 +121,13 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @param _assetData The data that is passed to the asset handler contract
     function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
         address assetHandler = assetHandlerAddress[_assetId];
-        bytes memory _bridgeMintData;
-
-        /// should the address not be set already? Or do we need this to do it automatically.
-        if (assetHandler != address(0)) {
-            _bridgeMintData = IL2AssetHandler(assetHandler).bridgeBurn({
-                _chainId: L1_CHAIN_ID,
-                _mintValue: 0,
-                _assetId: _assetId,
-                _prevMsgSender: msg.sender,
-                _data: _assetData
-            });
-        } else {
-            _bridgeMintData = IL2AssetHandler(nativeTokenVault).bridgeBurn({
-                _chainId: L1_CHAIN_ID,
-                _mintValue: 0,
-                _assetId: _assetId,
-                _prevMsgSender: msg.sender,
-                _data: _assetData
-            });
-        }
+        bytes memory _bridgeMintData = IL2AssetHandler(assetHandler).bridgeBurn({
+            _chainId: L1_CHAIN_ID,
+            _mintValue: 0,
+            _assetId: _assetId,
+            _prevMsgSender: msg.sender,
+            _data: _assetData
+        });
 
         bytes memory message = _getL1WithdrawMessage(_assetId, _bridgeMintData);
         L2ContractHelper.sendMessageToL1(message);
@@ -160,6 +147,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     }
 
     /// @dev Used to set the assedAddress for a given assetId.
+    /// @dev Will be used by ZK Gateway
     function setAssetHandlerAddress(bytes32 _assetId, address _assetAddress) external onlyL1Bridge {
         assetHandlerAddress[_assetId] = _assetAddress;
         emit AssetHandlerRegistered(_assetId, _assetAddress);

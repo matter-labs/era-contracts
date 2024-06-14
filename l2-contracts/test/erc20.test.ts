@@ -93,12 +93,12 @@ describe("ERC20Bridge", function () {
   });
 
   it("Should finalize deposit ERC20 deposit", async function () {
-    const erc20BridgeWithL1Bridge = L2SharedBridgeFactory.connect(erc20Bridge.address, l1BridgeWallet); // Todo: why this name?
+    const erc20BridgeWithL1BridgeWallet = L2SharedBridgeFactory.connect(erc20Bridge.address, l1BridgeWallet);
 
     const l1Depositor = ethers.Wallet.createRandom();
     const l2Receiver = ethers.Wallet.createRandom();
     const tx = await (
-      await erc20BridgeWithL1Bridge["finalizeDeposit(address,address,address,uint256,bytes)"](
+      await erc20BridgeWithL1BridgeWallet["finalizeDeposit(address,address,address,uint256,bytes)"](
         // Depositor and l2Receiver can be any here
         l1Depositor.address,
         l2Receiver.address,

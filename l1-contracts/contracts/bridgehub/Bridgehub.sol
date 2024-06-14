@@ -40,8 +40,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev used to accept the admin role
     address private pendingAdmin;
 
-    /// @notice chainID => baseTokenAssetId
-    mapping(uint256 _chainId => bytes32) public baseTokenAssetId;
+    /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
+    mapping(uint256 _chainId => bytes32 _baseTokenAssetId) public baseTokenAssetId;
 
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {
