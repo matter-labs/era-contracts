@@ -423,7 +423,7 @@ export class Deployer {
   ) {
     const contractAddress = await this.deployViaCreate2(
       dummy ? "DummyL1ERC20Bridge" : "L1ERC20Bridge",
-      [this.addresses.Bridges.SharedBridgeProxy],
+      [this.addresses.Bridges.SharedBridgeProxy, this.addresses.Bridges.NativeTokenVaultProxy],
       create2Salt,
       ethTxOptions
     );
@@ -564,8 +564,7 @@ export class Deployer {
   // we don't use the real implementation, as we need the address to be independent
   public async deployERC20BridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const initCalldata = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi).encodeFunctionData(
-      "initialize",
-      [this.addresses.Bridges.NativeTokenVaultProxy]
+      "initialize"
     );
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",

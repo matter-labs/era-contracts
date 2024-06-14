@@ -120,6 +120,8 @@ contract L1NativeTokenVault is
 
         // solhint-disable-next-line func-named-parameters
         _bridgeMintData = abi.encode(amount, _prevMsgSender, _l2Receiver, getERC20Getters(l1Token), l1Token); // to do add l2Receiver in here
+        // solhint-disable-next-line func-named-parameters
+        emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _l2Receiver, amount);
     }
 
     /// @dev Transfers tokens from the depositor address to the smart contract address.
@@ -182,6 +184,8 @@ contract L1NativeTokenVault is
             // Withdraw funds
             IERC20(l1Token).safeTransfer(_l1Receiver, amount);
         }
+        // solhint-disable-next-line func-named-parameters
+        emit BridgeMint(_chainId, _assetId, _l1Receiver, amount);
     }
 
     ///  @inheritdoc IL1AssetHandler
