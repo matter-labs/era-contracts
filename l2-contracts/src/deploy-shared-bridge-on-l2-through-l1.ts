@@ -140,7 +140,7 @@ export async function deployAssetHandlerImplOnL2ThroughL1(deployer: Deployer, ch
   await tx2.wait();
   if (deployer.verbose) {
     console.log("Deployed L2NativeTokenVault Implementation");
-    console.log(`CONTRACTS_L2_STANDARD_DEPLOYER_IMPL_ADDR=${L2NativeTokenVaultImplAddress}`);
+    console.log(`CONTRACTS_L2_NATIVE_TOKEN_VAULT_IMPL_ADDR=${L2NativeTokenVaultImplAddress}`);
   }
 }
 
@@ -173,12 +173,12 @@ export async function deployAssetHandlerProxyOnL2ThroughL1(
   );
 
   /// loading TransparentUpgradeableProxy bytecode
-  const L2_STANDARD_DEPLOYER_PROXY_BYTECODE = hre.artifacts.readArtifactSync("TransparentUpgradeableProxy").bytecode;
+  const L2_NATIVE_TOKEN_VAULT_PROXY_BYTECODE = hre.artifacts.readArtifactSync("TransparentUpgradeableProxy").bytecode;
 
   /// compute L2NativeTokenVaultProxy address
   const L2NativeTokenVaultProxyAddress = computeL2Create2Address(
     deployer.deployWallet,
-    L2_STANDARD_DEPLOYER_PROXY_BYTECODE,
+    L2_NATIVE_TOKEN_VAULT_PROXY_BYTECODE,
     L2NativeTokenVaultProxyConstructorData,
     ethers.constants.HashZero
   );
@@ -189,7 +189,7 @@ export async function deployAssetHandlerProxyOnL2ThroughL1(
   const tx3 = await create2DeployFromL1(
     chainId,
     deployer.deployWallet,
-    L2_STANDARD_DEPLOYER_PROXY_BYTECODE,
+    L2_NATIVE_TOKEN_VAULT_PROXY_BYTECODE,
     L2NativeTokenVaultProxyConstructorData,
     ethers.constants.HashZero,
     priorityTxMaxGasLimit,
@@ -198,7 +198,7 @@ export async function deployAssetHandlerProxyOnL2ThroughL1(
   );
   await tx3.wait();
   if (deployer.verbose) {
-    console.log(`CONTRACTS_L2_STANDARD_DEPLOYER_PROXY_ADDR=${L2NativeTokenVaultProxyAddress}`);
+    console.log(`CONTRACTS_L2_NATIVE_TOKEN_VAULT_PROXY_ADDR=${L2NativeTokenVaultProxyAddress}`);
   }
 }
 

@@ -66,7 +66,7 @@ async function main() {
     .option("--validium-mode")
     .option("--base-token-name <base-token-name>")
     .option("--base-token-address <base-token-address>")
-    .option("---avoid-governance <avoid-governance>")
+    .option("--use-governance")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -97,10 +97,8 @@ async function main() {
       await checkTokenAddress(baseTokenAddress);
       console.log(`Using base token address: ${baseTokenAddress}`);
 
-      const useGovernance = !cmd.avoidGovernance;
-
       if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
-        await deployer.registerTokenBridgehub(baseTokenAddress, useGovernance);
+        await deployer.registerTokenBridgehub(baseTokenAddress, cmd.useGovernance);
       }
       await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
       await deployer.registerHyperchain(
@@ -111,7 +109,7 @@ async function main() {
         true,
         null,
         null,
-        useGovernance
+        cmd.useGovernance
       );
       await deployer.transferAdminFromDeployerToGovernance();
     });

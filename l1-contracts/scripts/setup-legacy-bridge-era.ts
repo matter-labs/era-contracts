@@ -92,7 +92,7 @@ async function main() {
       );
 
       const l2SharedBridgeAddress = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR");
-      const L2NativeTokenVaultAddress = getAddressFromEnv("CONTRACTS_L2_STANDARD_DEPLOYER_PROXY_ADDR");
+      const L2NativeTokenVaultAddress = getAddressFromEnv("CONTRACTS_L2_NATIVE_TOKEN_VAULT_PROXY_ADDR");
       const l2TokenBytecodeHash = hashL2Bytecode(beaconProxy.bytecode);
       const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
       // For the server to start up.
