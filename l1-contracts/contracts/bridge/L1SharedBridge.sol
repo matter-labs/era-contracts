@@ -295,8 +295,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
         IERC20 l1Token = IERC20(l1TokenAddress);
 
-        // do the transfer if allowance is bigger than amount
-        if (l1Token.allowance(_prevMsgSender, address(this)) >= _amount) {
+        // Do the transfer if allowance to Shared bridge is bigger than amount
+        // And if there is not enough allowance for the NTV
+        if (
+            l1Token.allowance(_prevMsgSender, address(this)) >= _amount &&
+            l1Token.allowance(_prevMsgSender, address(nativeTokenVault)) < _amount
+        ) {
             // slither-disable-next-line arbitrary-send-erc20
             l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
             l1Token.safeIncreaseAllowance(address(nativeTokenVault), _amount);
