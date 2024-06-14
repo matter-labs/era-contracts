@@ -556,7 +556,7 @@ export class Deployer {
       l1Calldata,
       {
         ...ethTxOptions,
-        gasPrice
+        gasPrice,
       },
       printOperation
     );
