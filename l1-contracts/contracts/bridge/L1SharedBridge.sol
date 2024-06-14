@@ -242,7 +242,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _mintValue: _amount,
             _assetId: assetId,
             _prevMsgSender: _prevMsgSender,
-            _data: abi.encode(_amount - msg.value, address(0))
+            _data: abi.encode(_amount, address(0))
         });
 
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
@@ -442,7 +442,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
-    function recoverFromFailedTransfer(
+    function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         address _depositSender, // todo is this needed, or should it be part of transferData? AssetData I suppose
         bytes32 _assetId,
@@ -483,7 +483,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
         delete depositHappened[_chainId][_l2TxHash];
 
-        IL1AssetHandler(assetHandlerAddress[_assetId]).recoverFromFailedTransfer(
+        IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(
             _chainId,
             _assetId,
             _depositSender,
@@ -692,7 +692,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     ) external override {
         bytes32 assetId = nativeTokenVault.getAssetId(_l1Asset);
         bytes memory transferData = abi.encode(_amount, _depositSender); // todo
-        recoverFromFailedTransfer({
+        bridgeRecoverFailedTransfer({
             _chainId: _chainId,
             _depositSender: _depositSender,
             _assetId: assetId,
@@ -854,7 +854,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge {
         bytes memory transferData = abi.encode(_amount, _depositSender); //todo
-        recoverFromFailedTransfer({
+        bridgeRecoverFailedTransfer({
             _chainId: ERA_CHAIN_ID,
             _depositSender: _depositSender,
             _assetId: bytes32(uint256(uint160(_l1Asset))),

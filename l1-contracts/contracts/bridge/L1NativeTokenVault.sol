@@ -77,19 +77,19 @@ contract L1NativeTokenVault is
         _transferOwnership(_owner);
     }
 
-    /// @dev We want to be able to bridge naitive tokens automatically, this means registering them on the fly
+    /// @dev We want to be able to bridge native tokens automatically, this means registering them on the fly
     /// @notice Allows the bridge to register a token address for the vault.
+    /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
     function registerToken(address _l1Token) external {
         require(_l1Token == ETH_TOKEN_ADDRESS || _l1Token.code.length > 0, "NTV: empty token");
-        bytes32 assetId = keccak256(
-            abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, uint256(uint160(_l1Token)))
-        );
+        bytes32 assetId = getAssetId(_l1Token);
         L1_SHARED_BRIDGE.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_l1Token))), address(this));
         tokenAddress[assetId] = _l1Token;
     }
 
+    /// @inheritdoc IL1AssetHandler
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
-    /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
+    /// @dev here _data is the _depositAmount and the _l2Receiver
     function bridgeBurn(
         uint256 _chainId,
         uint256,
@@ -103,7 +103,7 @@ contract L1NativeTokenVault is
         address l1Token = tokenAddress[_assetId];
         if (l1Token == ETH_TOKEN_ADDRESS) {
             amount = msg.value;
-            require(_depositAmount == 0 || _depositAmount == amount, "L1NTV: msg.value not equal to amount");
+            require(_depositAmount == amount, "L1NTV: msg.value not equal to amount");
         } else {
             // The Bridgehub also checks this, but we want to be sure
             require(msg.value == 0, "NTV m.v > 0 b d.it");
@@ -153,15 +153,16 @@ contract L1NativeTokenVault is
         return abi.encode(data1, data2, data3);
     }
 
-    /* solhint-disable no-unused-vars */
+    ///  @inheritdoc IL1AssetHandler
     function bridgeMint(
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
-    ) external payable override returns (address _l1Receiver) {
+    ) external payable override onlyBridge whenNotPaused returns (address _l1Receiver) {
+        // here we are minting the tokens after the bridgeBurn has happened on an L2, so we can assume the l1Token is not zero
         address l1Token = tokenAddress[_assetId];
-        (uint256 amount, address l1Receiver) = abi.decode(_data, (uint256, address));
-        _l1Receiver = l1Receiver;
+        uint256 amount;
+        (amount, _l1Receiver) = abi.decode(_data, (uint256, address));
         if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
             // Check that the chain has sufficient balance
             require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
@@ -171,21 +172,22 @@ contract L1NativeTokenVault is
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
             assembly {
-                callSuccess := call(gas(), l1Receiver, amount, 0, 0, 0, 0)
+                callSuccess := call(gas(), _l1Receiver, amount, 0, 0, 0, 0)
             }
             require(callSuccess, "NTV: withdraw failed");
         } else {
             // Withdraw funds
-            IERC20(l1Token).safeTransfer(l1Receiver, amount);
+            IERC20(l1Token).safeTransfer(_l1Receiver, amount);
         }
     }
 
-    function recoverFromFailedTransfer(
+    ///  @inheritdoc IL1AssetHandler
+    function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
         address,
         bytes calldata _data
-    ) external payable override {
+    ) external payable override onlyBridge whenNotPaused {
         (uint256 _amount, address _depositSender) = abi.decode(_data, (uint256, address));
         address l1Token = tokenAddress[_assetId];
         require(_amount > 0, "y1");

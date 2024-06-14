@@ -9,12 +9,20 @@ interface IL1AssetHandler {
 
     event BridgeBurn(address indexed _account, uint256 _amount);
 
+    /// @param _chainId the chainId that the message is from
+    /// @param _assetId the assetId of the asset being bridged
+    /// @param _data the actual data specified for the function
     function bridgeMint(
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
     ) external payable returns (address l1Receiver);
 
+    /// @param _chainId the chainId that the message will be sent to
+    /// param mintValue the amount of base tokens to be minted on L2, will be used by Weth AssetHandler
+    /// @param _assetId the assetId of the asset being bridged
+    /// @param _prevMsgSender the original caller of the Bridgehub, 
+    /// @param _data the actual data specified for the function
     function bridgeBurn(
         uint256 _chainId,
         uint256 _mintValue,
@@ -23,7 +31,10 @@ interface IL1AssetHandler {
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);
 
-    function recoverFromFailedTransfer(
+    /// @param _chainId the chainId that the message will be sent to
+    /// @param _assetId the assetId of the asset being bridged
+    /// @param _prevMsgSender the original caller of the Bridgehub/// @param _data the actual data specified for the function
+    function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
         address _prevMsgSender,
