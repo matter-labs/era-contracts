@@ -14,7 +14,7 @@ import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
-import {EmptyAddress, EmptyBytes32, AddressMismatch, Bytes32Mismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../L2ContractErrors.sol";
+import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -46,7 +46,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         _disableInitializers();
     }
 
-    /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
+    /// @dev Sets the Shared Bridge contract address. Should be called only once.
     function setSharedBridge(IL2SharedBridge _sharedBridge) external onlyOwner {
         if (address(l2Bridge) != address(0)) {
             // "SD: shared bridge already set";
@@ -103,7 +103,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
             );
             if (_assetId != expectedAssetId) {
                 // Make sure that a NativeTokenVault sent the message
-                revert Bytes32Mismatch(_assetId, expectedAssetId);
+                revert AssetIdMismatch(_assetId, expectedAssetId);
             }
             address deployedToken = _deployL2Token(originToken, erc20Data);
             if (deployedToken != expectedToken) {
@@ -115,6 +115,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         IL2StandardToken(expectedToken).bridgeMint(_l2Receiver, _amount);
         /// backwards compatible event
         emit FinalizeDeposit(_l1Sender, _l2Receiver, expectedToken, _amount);
+        // solhint-disable-next-line func-named-parameters
+        emit BridgeMint(_chainId, _assetId, _l1Sender, _l2Receiver, _amount);
     }
 
     function bridgeBurn(
@@ -126,8 +128,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     ) external payable override onlyBridge returns (bytes memory _bridgeMintData) {
         (uint256 _amount, address _l1Receiver) = abi.decode(_data, (uint256, address));
         if (_amount > 0) {
-            revert AmountMustBeGreaterThanZero();
             // "Amount cannot be zero");
+            revert AmountMustBeGreaterThanZero();
         }
 
         address l2Token = tokenAddress[_assetId];
@@ -135,7 +137,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
 
         /// backwards compatible event
         emit WithdrawalInitiated(_prevMsgSender, _l1Receiver, l2Token, _amount);
-        /// New Format
         // solhint-disable-next-line func-named-parameters
         emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _l1Receiver, _mintValue, _amount);
         _bridgeMintData = _data;
