@@ -440,20 +440,7 @@ export class Deployer {
     const data1 = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
       this.addresses.Bridges.ERC20BridgeProxy,
     ]);
-    // const data2 = sharedBridge.interface.encodeFunctionData("setEraPostDiamondUpgradeFirstBatch", [
-    //   process.env.CONTRACTS_ERA_POST_DIAMOND_UPGRADE_FIRST_BATCH ?? 1,
-    // ]);
-    // const data3 = sharedBridge.interface.encodeFunctionData("setEraPostLegacyBridgeUpgradeFirstBatch", [
-    //   process.env.CONTRACTS_ERA_POST_LEGACY_BRIDGE_UPGRADE_FIRST_BATCH ?? 1,
-    // ]);
-    // const data4 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [
-    //   process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_BATCH ?? 1,
-    //   process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_TX_NUMBER ?? 0,
-    // ]);
     await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data1);
-    // await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data2);
-    // await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data3);
-    // await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data4);
     if (this.verbose) {
       console.log("Shared bridge updated with ERC20Bridge address");
     }
@@ -682,16 +669,6 @@ export class Deployer {
       console.log("Native token vault set in shared bridge");
     }
   }
-
-  // public async sharedBridgeSetEraPostUpgradeFirstBatch() {
-  //   const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
-  //   const storageSwitch = getNumberFromEnv("CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH");
-  //   const tx = await sharedBridge.setEraPostUpgradeFirstBatch(storageSwitch);
-  //   const receipt = await tx.wait();
-  //   if (this.verbose) {
-  //     console.log(`Era first post upgrade batch set, gas used: ${receipt.gasUsed.toString()}`);
-  //   }
-  // }
 
   public async registerSharedBridge() {
     const bridgehub = this.bridgehubContract(this.deployWallet);

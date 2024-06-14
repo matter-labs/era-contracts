@@ -57,7 +57,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @dev Deprecated storage variable related to deposit limitations.
     mapping(address => mapping(address => uint256)) private __DEPRECATED_totalDepositedAmountPerUser;
 
-    /// @dev The native token vault, which handles the token transfers. We sohuld deposit to it
+    /// @dev The native token vault, which handles the token transfers. We should deposit to it
     IL1NativeTokenVault public override NATIVE_TOKEN_VAULT;
 
     /// @dev Contract is expected to be used as proxy implementation.

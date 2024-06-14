@@ -62,7 +62,6 @@ describe("Custom base token chain and bridge tests", () => {
 
     // prepare the bridge
     l1SharedBridge = IL1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
-    // await deployer.
   });
 
   it("Should have correct base token", async () => {
