@@ -14,7 +14,9 @@ fs_permissions = [
     { access = "read", path = "../l2-contracts/artifacts-zk/" },
     { access = "read", path = "./script-config" },
     { access = "read-write", path = "./script-out" },
-    { access = "read", path = "./out" }
+    { access = "read", path = "./out" },
+    { access = "read", path = "./test/foundry/integration/deploy-scripts/script-config/" },
+    { access = "read-write", path = "./test/foundry/integration/deploy-scripts/script-out/" },
 ]
 cache_path = 'cache-forge'
 test = 'test/foundry'
