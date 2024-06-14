@@ -201,7 +201,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         address _assetAddressOnCounterPart
     ) external payable returns (bytes32 l2TxHash) {
         require(msg.sender == assetDeploymentTracker[_assetId] || msg.sender == owner(), "ShB: only ADT or owner");
-        require(l2BridgeAddress[_chainId] != address(0), "ShB: chain governance not initalized");
+        require(l2BridgeAddress[_chainId] != address(0), "ShB: chain governance not initialized");
 
         bytes memory l2Calldata = abi.encodeCall(
             IL2Bridge.setAssetHandlerAddress,
@@ -597,6 +597,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             (assetId, transferData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
         }
         address l1AssetHandler = assetHandlerAddress[assetId];
+        // slither-disable-next-line unused-return
         IL1AssetHandler(l1AssetHandler).bridgeMint(_chainId, assetId, transferData);
         (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
 
