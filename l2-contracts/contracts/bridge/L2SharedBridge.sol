@@ -101,7 +101,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @param _l1Sender The account address that initiated the deposit on L1
     /// @param _l2Receiver The account address that would receive minted ether
     /// @param _l1Token The address of the token that was locked on the L1
-    // / @param _amount Total amount of tokens deposited from L1
+    /// @param _amount Total amount of tokens deposited from L1
     /// @param _data The additional data that user can pass with the deposit
     function finalizeDeposit(bytes32 _assetId, bytes memory _data) public override onlyL1Bridge {
         address assetHandler = assetHandlerAddress[_assetId];
