@@ -50,7 +50,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
-        _setSharedBridgeChainBalance(eraChainId, ETH_TOKEN_ADDRESS, amount);
+        _setNativeTokenVaultChainBalance(eraChainId, ETH_TOKEN_ADDRESS, amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
@@ -80,7 +80,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit WithdrawalFinalizedSharedBridge(eraChainId, alice, ETH_TOKEN_ADDRESS, amount);
+        emit WithdrawalFinalizedSharedBridge(eraChainId, alice, ETH_TOKEN_ASSET_ID, amount);
         vm.prank(l1ERC20BridgeAddress);
         sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
             _l2BatchNumber: l2BatchNumber,
@@ -95,7 +95,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         token.mint(address(sharedBridge), amount);
 
         /// storing chainBalance
-        _setSharedBridgeChainBalance(eraChainId, address(token), amount);
+        _setNativeTokenVaultChainBalance(eraChainId, address(token), amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
@@ -131,7 +131,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit WithdrawalFinalizedSharedBridge(eraChainId, alice, address(token), amount);
+        emit WithdrawalFinalizedSharedBridge(eraChainId, alice, tokenAssetId, amount);
         vm.prank(l1ERC20BridgeAddress);
         sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
             _l2BatchNumber: l2BatchNumber,
@@ -150,7 +150,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         _setSharedBridgeDepositHappened(eraChainId, txHash, txDataHash);
         require(sharedBridge.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");
 
-        _setSharedBridgeChainBalance(eraChainId, address(token), amount);
+        _setNativeTokenVaultChainBalance(eraChainId, address(token), amount);
 
         // Bridgehub bridgehub = new Bridgehub();
         // vm.store(address(bridgehub),  bytes32(uint256(5 +2)), bytes32(uint256(31337)));
@@ -173,13 +173,13 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         );
 
         // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit ClaimedFailedDepositSharedBridge(eraChainId, alice, address(token), amount);
+        vm.expectEmit(true, true, true, false, address(sharedBridge));
+        emit ClaimedFailedDepositSharedBridge(eraChainId, alice, (tokenAssetId), bytes32(0));
         vm.prank(l1ERC20BridgeAddress);
 
         sharedBridge.claimFailedDepositLegacyErc20Bridge({
             _depositSender: alice,
-            _l1Token: address(token),
+            _l1Asset: address(token),
             _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,

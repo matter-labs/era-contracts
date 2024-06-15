@@ -12,6 +12,9 @@ interface IL1NativeTokenVault {
     /// @notice The L1SharedBridge contract
     function L1_SHARED_BRIDGE() external view returns (IL1SharedBridge);
 
+    /// @notice The weth contract
+    function L1_WETH_TOKEN() external view returns (address);
+
     /// @notice Used to register a token in the vault
     function registerToken(address _l1Token) external;
 

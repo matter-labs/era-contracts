@@ -84,7 +84,7 @@ contract DepositTest is L1Erc20BridgeTest {
         uint256 amount = 2;
         vm.prank(alice);
         feeOnTransferToken.approve(address(bridge), amount);
-        vm.expectRevert(bytes("3T"));
+        vm.expectRevert(bytes("5T"));
         vm.prank(alice);
         bridge.deposit({
             _l2Receiver: randomSigner,
@@ -99,7 +99,7 @@ contract DepositTest is L1Erc20BridgeTest {
         uint256 amount = 4;
         vm.prank(alice);
         feeOnTransferToken.approve(address(bridge), amount);
-        vm.expectRevert(bytes("3T"));
+        vm.expectRevert(bytes("5T"));
         vm.prank(alice);
         bridge.deposit({
             _l2Receiver: randomSigner,

@@ -31,6 +31,9 @@ contract L1NativeTokenVault is
 {
     using SafeERC20 for IERC20;
 
+    /// @dev The address of the WETH token on L1.
+    address public immutable override L1_WETH_TOKEN;
+
     /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
     IL1SharedBridge public immutable override L1_SHARED_BRIDGE;
 
@@ -63,8 +66,13 @@ contract L1NativeTokenVault is
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IL1SharedBridge _l1SharedBridge, uint256 _eraChainId) reentrancyGuardInitializer {
+    constructor(
+        address _l1WethAddress,
+        IL1SharedBridge _l1SharedBridge,
+        uint256 _eraChainId
+    ) reentrancyGuardInitializer {
         _disableInitializers();
+        L1_WETH_TOKEN = _l1WethAddress;
         ERA_CHAIN_ID = _eraChainId;
         L1_SHARED_BRIDGE = _l1SharedBridge;
     }
@@ -81,6 +89,7 @@ contract L1NativeTokenVault is
     /// @notice Allows the bridge to register a token address for the vault.
     /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
     function registerToken(address _l1Token) external {
+        require(_l1Token != L1_WETH_TOKEN, "NTV: WETH deposit not supported");
         require(_l1Token == ETH_TOKEN_ADDRESS || _l1Token.code.length > 0, "NTV: empty token");
         bytes32 assetId = getAssetId(_l1Token);
         L1_SHARED_BRIDGE.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_l1Token))), address(this));
@@ -117,7 +126,7 @@ contract L1NativeTokenVault is
             amount = _depositAmount;
 
             uint256 expectedDepositAmount = _depositFunds(_prevMsgSender, IERC20(l1Token), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
-            require(expectedDepositAmount == _depositAmount, "3T"); // The token has non-standard transfer logic
+            require(expectedDepositAmount == _depositAmount, "5T"); // The token has non-standard transfer logic
         }
         require(amount != 0, "6T"); // empty deposit amount
 
