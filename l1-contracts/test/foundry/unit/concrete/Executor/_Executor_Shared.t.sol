@@ -20,6 +20,7 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract ExecutorTest is Test {
     address internal owner;
@@ -126,6 +127,7 @@ contract ExecutorTest is Test {
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
         blobVersionedHashRetriever = makeAddr("blobVersionedHashRetriever");
+        DummyBridgehub dummyBridgehub = new DummyBridgehub();
 
         eraChainId = 9;
 
@@ -160,7 +162,7 @@ contract ExecutorTest is Test {
         InitializeData memory params = InitializeData({
             // TODO REVIEW
             chainId: eraChainId,
-            bridgehub: makeAddr("bridgehub"),
+            bridgehub: address(dummyBridgehub),
             stateTransitionManager: address(stateTransitionManager),
             protocolVersion: 0,
             admin: owner,

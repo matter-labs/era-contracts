@@ -13,6 +13,7 @@ import {DummyStateTransitionManagerWBH} from "contracts/dev-contracts/test/Dummy
 import {DummyHyperchain} from "contracts/dev-contracts/test/DummyHyperchain.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
+import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 
 import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS} from "contracts/common/Config.sol";
@@ -27,6 +28,7 @@ contract ExperimentalBridgeTest is Test {
     DummySharedBridge mockSharedBridge;
     DummySharedBridge mockSecondSharedBridge;
     TestnetERC20Token testToken;
+    L1NativeTokenVault ntv;
 
     uint256 eraChainId;
 
@@ -34,10 +36,14 @@ contract ExperimentalBridgeTest is Test {
         eraChainId = 9;
         bridgeHub = new Bridgehub();
         bridgeOwner = makeAddr("BRIDGE_OWNER");
+        address weth = makeAddr("WETH");
         mockSTM = new DummyStateTransitionManagerWBH(address(bridgeHub));
         mockChainContract = new DummyHyperchain(address(bridgeHub), eraChainId);
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
+        ntv = new L1NativeTokenVault(weth, IL1SharedBridge(address(mockSharedBridge)), eraChainId);
+        mockSharedBridge.setNativeTokenVault(ntv);
+        mockSecondSharedBridge.setNativeTokenVault(ntv);
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
 
         // test if the ownership of the bridgeHub is set correctly or not

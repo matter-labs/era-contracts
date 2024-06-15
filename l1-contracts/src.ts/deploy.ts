@@ -629,9 +629,12 @@ export class Deployer {
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
+    const tokens = getTokens();
+    const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
+
     const contractAddress = await this.deployViaCreate2(
       "L1NativeTokenVault",
-      [this.addresses.Bridges.SharedBridgeProxy, eraChainId],
+      [l1WethToken, this.addresses.Bridges.SharedBridgeProxy, eraChainId],
       create2Salt,
       ethTxOptions
     );
