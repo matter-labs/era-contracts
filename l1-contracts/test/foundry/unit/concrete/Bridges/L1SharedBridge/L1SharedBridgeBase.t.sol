@@ -31,9 +31,15 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
 
     function test_bridgehubDeposit_Eth() public {
         _setBaseTokenAssetId(tokenAssetId);
-        
+
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
-        bytes memory mintCalldata =  abi.encode(amount, alice, bob, nativeTokenVault.getERC20Getters(address(ETH_TOKEN_ADDRESS)), address(ETH_TOKEN_ADDRESS));
+        bytes memory mintCalldata = abi.encode(
+            amount,
+            alice,
+            bob,
+            nativeTokenVault.getERC20Getters(address(ETH_TOKEN_ADDRESS)),
+            address(ETH_TOKEN_ADDRESS)
+        );
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         vm.prank(bridgehubAddress);
