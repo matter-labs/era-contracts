@@ -32,7 +32,7 @@ contract DummySharedBridge {
     address l1TokenReturnInFinalizeWithdrawal;
     uint256 amountReturnInFinalizeWithdrawal;
 
-        /// @dev A mapping assetId => assetHandlerAddress
+    /// @dev A mapping assetId => assetHandlerAddress
     /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset
     /// @dev P.S. this liquidity was locked directly in SharedBridge before
     mapping(bytes32 assetId => address assetHandlerAddress) public assetHandlerAddress;

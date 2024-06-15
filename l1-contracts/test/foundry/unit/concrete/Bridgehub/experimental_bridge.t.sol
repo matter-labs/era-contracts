@@ -35,9 +35,9 @@ contract ExperimentalBridgeTest is Test {
     uint256 eraChainId;
 
     bytes32 ETH_TOKEN_ASSET_ID =
-    keccak256(
-        abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
-    );
+        keccak256(
+            abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
+        );
 
     function setUp() public {
         eraChainId = 9;

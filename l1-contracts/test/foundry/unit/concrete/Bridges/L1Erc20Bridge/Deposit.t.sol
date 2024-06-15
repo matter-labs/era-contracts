@@ -83,7 +83,11 @@ contract DepositTest is L1Erc20BridgeTest {
 
     function test_RevertWhen_depositTransferAmountIsDifferent() public {
         uint256 amount = 2;
-        vm.mockCall(address(feeOnTransferToken), abi.encodeWithSelector(IERC20.balanceOf.selector), abi.encode(amount + 1));
+        vm.mockCall(
+            address(feeOnTransferToken),
+            abi.encodeWithSelector(IERC20.balanceOf.selector),
+            abi.encode(amount + 1)
+        );
         vm.prank(alice);
         feeOnTransferToken.approve(address(bridge), amount);
         vm.expectRevert(bytes("3T"));
@@ -99,7 +103,11 @@ contract DepositTest is L1Erc20BridgeTest {
 
     function test_RevertWhen_legacyDepositTransferAmountIsDifferent() public {
         uint256 amount = 4;
-        vm.mockCall(address(feeOnTransferToken), abi.encodeWithSelector(IERC20.balanceOf.selector), abi.encode(amount + 1));
+        vm.mockCall(
+            address(feeOnTransferToken),
+            abi.encodeWithSelector(IERC20.balanceOf.selector),
+            abi.encode(amount + 1)
+        );
         vm.prank(alice);
         feeOnTransferToken.approve(address(bridge), amount);
         vm.expectRevert(bytes("3T"));
