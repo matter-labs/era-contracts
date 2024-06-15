@@ -16,7 +16,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     function test_bridgehubDepositBaseToken_Eth() public {
         vm.prank(bridgehubAddress);
         // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, false, address(sharedBridge));
+        vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositBaseTokenInitiated(chainId, alice, ETH_TOKEN_ASSET_ID, amount);
         sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, ETH_TOKEN_ASSET_ID, alice, amount);
     }
@@ -24,24 +24,25 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     function test_bridgehubDepositBaseToken_Erc() public {
         vm.prank(bridgehubAddress);
         // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, false, address(sharedBridge));
+        vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositBaseTokenInitiated(chainId, alice, tokenAssetId, amount);
         sharedBridge.bridgehubDepositBaseToken(chainId, tokenAssetId, alice, amount);
     }
 
     function test_bridgehubDeposit_Eth() public {
         _setBaseTokenAssetId(tokenAssetId);
-        vm.prank(bridgehubAddress);
-
+        
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
+        bytes memory mintCalldata =  abi.encode(amount, alice, bob, nativeTokenVault.getERC20Getters(address(ETH_TOKEN_ADDRESS)), address(ETH_TOKEN_ADDRESS));
         // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, false, address(sharedBridge));
+        vm.expectEmit(true, true, true, true, address(sharedBridge));
+        vm.prank(bridgehubAddress);
         emit BridgehubDepositInitiated({
             chainId: chainId,
             txDataHash: txDataHash,
             from: alice,
             assetId: ETH_TOKEN_ASSET_ID,
-            bridgeMintCalldata: abi.encode(amount, bob)
+            bridgeMintCalldata: mintCalldata
         });
         sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, amount, bob));
     }
