@@ -204,8 +204,13 @@ contract L1SharedBridgeTest is Test {
 
         vm.mockCall(
             address(nativeTokenVault),
-            abi.encodeWithSelector(IL1NativeTokenVault.tokenAddress.selector),
+            abi.encodeWithSelector(IL1NativeTokenVault.tokenAddress.selector, tokenAssetId),
             abi.encode(address(token))
+        );
+        vm.mockCall(
+            address(nativeTokenVault),
+            abi.encodeWithSelector(IL1NativeTokenVault.tokenAddress.selector, ETH_TOKEN_ASSET_ID),
+            abi.encode(address(ETH_TOKEN_ADDRESS))
         );
     }
 

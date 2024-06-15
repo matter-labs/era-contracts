@@ -21,6 +21,7 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 
 contract ExecutorTest is Test {
     address internal owner;
@@ -36,6 +37,7 @@ contract ExecutorTest is Test {
     uint256 internal currentTimestamp;
     IExecutor.CommitBatchInfo internal newCommitBatchInfo;
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
+    DummyEraBaseTokenBridge internal sharedBridge;
 
     uint256 eraChainId;
 
@@ -128,6 +130,7 @@ contract ExecutorTest is Test {
         randomSigner = makeAddr("randomSigner");
         blobVersionedHashRetriever = makeAddr("blobVersionedHashRetriever");
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
+        sharedBridge = new DummyEraBaseTokenBridge();
 
         eraChainId = 9;
 
@@ -168,7 +171,7 @@ contract ExecutorTest is Test {
             admin: owner,
             validatorTimelock: validator,
             baseToken: ETH_TOKEN_ADDRESS,
-            baseTokenBridge: address(new DummyEraBaseTokenBridge()),
+            baseTokenBridge: address(sharedBridge),
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
             verifier: IVerifier(testnetVerifier), // verifier
             verifierParams: VerifierParams({
@@ -251,6 +254,12 @@ contract ExecutorTest is Test {
             systemLogs: l2Logs,
             pubdataCommitments: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
+
+        vm.mockCall(
+            address(sharedBridge),
+            abi.encodeWithSelector(IL1SharedBridge.bridgehubDepositBaseToken.selector),
+            abi.encode(true)
+        );
     }
 
     // add this to be excluded from coverage report

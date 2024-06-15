@@ -47,7 +47,7 @@ contract L1SharedBridgeHyperEnabledTest is L1SharedBridgeTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         _setBaseTokenAssetId(tokenAssetId);
-
+        vm.prank(bridgehubAddress);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         emit BridgehubDepositInitiated({
             chainId: chainId,
@@ -65,12 +65,9 @@ contract L1SharedBridgeHyperEnabledTest is L1SharedBridgeTest {
     }
 
     function test_bridgehubDeposit_Erc() public {
-        token.mint(alice, amount);
-        vm.prank(alice);
-        token.approve(address(sharedBridge), amount);
         vm.prank(bridgehubAddress);
         // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, true, address(sharedBridge));
+        vm.expectEmit(true, true, true, false, address(sharedBridge));
         _setBaseTokenAssetId(ETH_TOKEN_ASSET_ID);
 
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));

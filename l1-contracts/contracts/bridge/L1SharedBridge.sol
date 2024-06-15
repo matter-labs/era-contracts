@@ -858,7 +858,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bridgeRecoverFailedTransfer({
             _chainId: ERA_CHAIN_ID,
             _depositSender: _depositSender,
-            _assetId: bytes32(uint256(uint160(_l1Asset))),
+            _assetId: nativeTokenVault.getAssetId(_l1Asset),
             _assetData: transferData,
             _l2TxHash: _l2TxHash,
             _l2BatchNumber: _l2BatchNumber,

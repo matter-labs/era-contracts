@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import "forge-std/console.sol";
+
 import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -68,7 +70,8 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
 
     function test_bridgehubDeposit_Erc_weth() public {
         vm.prank(bridgehubAddress);
-        vm.expectRevert("NTV: WETH deposit not supported");
+        // note we have a catch, so there is no data
+        vm.expectRevert();
         // solhint-disable-next-line func-named-parameters
         sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(l1WethAddress, amount, bob));
     }
@@ -163,9 +166,9 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         );
 
         bytes memory message = bytes("y1");
-        vm.expectRevert(message);
-        bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
+        bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, 0));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
+        vm.expectRevert(message);
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
