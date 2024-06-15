@@ -7,6 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {IL1NativeTokenVault} from "../../bridge/L1NativeTokenVault.sol";
+import {NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../../common/Config.sol";
 
 contract DummySharedBridge {
     IL1NativeTokenVault public nativeTokenVault;
@@ -30,6 +31,11 @@ contract DummySharedBridge {
     address l1ReceiverReturnInFinalizeWithdrawal;
     address l1TokenReturnInFinalizeWithdrawal;
     uint256 amountReturnInFinalizeWithdrawal;
+
+        /// @dev A mapping assetId => assetHandlerAddress
+    /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset
+    /// @dev P.S. this liquidity was locked directly in SharedBridge before
+    mapping(bytes32 assetId => address assetHandlerAddress) public assetHandlerAddress;
 
     constructor(bytes32 _dummyL2DepositTxHash) {
         dummyL2DepositTxHash = _dummyL2DepositTxHash;
@@ -136,5 +142,14 @@ contract DummySharedBridge {
         require(address(nativeTokenVault) == address(0), "ShB: legacy bridge already set");
         require(address(_nativeTokenVault) != address(0), "ShB: legacy bridge 0");
         nativeTokenVault = _nativeTokenVault;
+    }
+
+    /// @dev Used to set the assedAddress for a given assetId.
+    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external {
+        address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
+        bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData));
+        assetHandlerAddress[assetId] = _assetHandlerAddress;
+        // assetDeploymentTracker[assetId] = sender;
+        // emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _additionalData, sender);
     }
 }

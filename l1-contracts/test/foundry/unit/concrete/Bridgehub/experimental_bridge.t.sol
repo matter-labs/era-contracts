@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {stdStorage, StdStorage, Test} from "forge-std/Test.sol";
+import "forge-std/console.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
@@ -16,7 +17,7 @@ import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 
 import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
-import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -29,8 +30,14 @@ contract ExperimentalBridgeTest is Test {
     DummySharedBridge mockSecondSharedBridge;
     TestnetERC20Token testToken;
     L1NativeTokenVault ntv;
+    bytes32 tokenAssetId;
 
     uint256 eraChainId;
+
+    bytes32 ETH_TOKEN_ASSET_ID =
+    keccak256(
+        abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
+    );
 
     function setUp() public {
         eraChainId = 9;
@@ -45,6 +52,10 @@ contract ExperimentalBridgeTest is Test {
         mockSharedBridge.setNativeTokenVault(ntv);
         mockSecondSharedBridge.setNativeTokenVault(ntv);
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
+        vm.prank(address(ntv));
+        ntv.registerToken(ETH_TOKEN_ADDRESS);
+        ntv.registerToken(address(testToken));
+        tokenAssetId = ntv.getAssetId(address(testToken));
 
         // test if the ownership of the bridgeHub is set correctly or not
         address defaultOwner = bridgeHub.owner();
@@ -647,6 +658,18 @@ contract ExperimentalBridgeTest is Test {
         mockChainContract.setBridgeHubAddress(address(bridgeHub));
         assertTrue(mockChainContract.getBridgeHubAddress() == address(bridgeHub));
 
+        bytes32 baseTokenAssetIdLocation = bytes32(uint256(208));
+        vm.store(
+            address(bridgeHub),
+            keccak256(abi.encode(l2TxnReqDirect.chainId, baseTokenAssetIdLocation)),
+            ETH_TOKEN_ASSET_ID
+        );
+        vm.mockCall(
+            address(mockSharedBridge),
+            abi.encodeWithSelector(IL1SharedBridge.bridgehubDepositBaseToken.selector),
+            abi.encode(true)
+        );
+
         vm.txGasPrice(0.05 ether);
 
         vm.prank(randomCaller);
@@ -718,7 +741,18 @@ contract ExperimentalBridgeTest is Test {
         testToken.transfer(address(this), l2TxnReqDirect.mintValue);
         assertEq(testToken.balanceOf(address(this)), l2TxnReqDirect.mintValue);
         testToken.approve(address(mockSharedBridge), l2TxnReqDirect.mintValue);
-
+        bytes32 baseTokenAssetIdLocation = bytes32(uint256(208));
+        vm.store(
+            address(bridgeHub),
+            keccak256(abi.encode(l2TxnReqDirect.chainId, baseTokenAssetIdLocation)),
+            tokenAssetId
+        );
+        //bytes32 resultantHash =
+        vm.mockCall(
+            address(mockSharedBridge),
+            abi.encodeWithSelector(IL1SharedBridge.bridgehubDepositBaseToken.selector),
+            abi.encode(true)
+        );
         resultantHash = bridgeHub.requestL2TransactionDirect(l2TxnReqDirect);
 
         assertEq(canonicalHash, resultantHash);
@@ -758,17 +792,27 @@ contract ExperimentalBridgeTest is Test {
         vm.deal(randomCaller, callerMsgValue);
 
         mockChainContract.setBridgeHubAddress(address(bridgeHub));
+        {
+            bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
 
-        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
-
-        vm.mockCall(
-            address(mockChainContract),
-            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
-            abi.encode(canonicalHash)
+            vm.mockCall(
+                address(mockChainContract),
+                abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
+                abi.encode(canonicalHash)
+            );
+        }
+        bytes32 baseTokenAssetIdLocation = bytes32(uint256(208));
+        vm.store(
+            address(bridgeHub),
+            keccak256(abi.encode(l2TxnReq2BridgeOut.chainId, baseTokenAssetIdLocation)),
+            ETH_TOKEN_ASSET_ID
         );
-
+        vm.mockCall(
+            address(mockSharedBridge),
+            abi.encodeWithSelector(IL1SharedBridge.bridgehubDepositBaseToken.selector),
+            abi.encode(true)
+        );
         vm.prank(randomCaller);
-        //bytes32 resultantHash =
         bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
 
         assertTrue(true);
