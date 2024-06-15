@@ -103,6 +103,13 @@ contract L1NativeTokenVault is
         address l1Token = tokenAddress[_assetId];
         if (l1Token == ETH_TOKEN_ADDRESS) {
             amount = msg.value;
+
+            // In the old SDK/contracts the user had to always provide `0` as the deposit amount for ETH token, while
+            // ultimately the provided `msg.value` was used as the deposit amount. This check is needed for backwards compatibility.
+            if (_depositAmount == 0) {
+                _depositAmount = amount;
+            }
+
             require(_depositAmount == amount, "L1NTV: msg.value not equal to amount");
         } else {
             // The Bridgehub also checks this, but we want to be sure
