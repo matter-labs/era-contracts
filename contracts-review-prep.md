@@ -14,7 +14,7 @@ In order to achieve it, we separated the liquidity managing logic from the Share
 ### New concepts
 
 - assetHandler => contract that manages liquidity (burns/mints, locks/unlocks) for specific token (or a set of them)
-- assetId => identifier to track bridged assets accross chains linked to specific asset handler
+- assetId => identifier to track bridged assets across chains linked to specific asset handler
 
 ## Known Issues
 
@@ -68,7 +68,7 @@ We will either add the method or provide a different solution.
     } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
         //todo
 
-Currently, the support of old selector with ERC20 is completed, but the new format with chainId in the `finalizeWithdraw` selector hasn't been implented in the `_parseL2WithdrawalMessage` function.
+Currently, the support of old selector with ERC20 is completed, but the new format with chainId in the `finalizeWithdraw` selector hasn't been implemented in the `_parseL2WithdrawalMessage` function.
 
 ### Custom Errors not implemented
 
