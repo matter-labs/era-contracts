@@ -18,6 +18,10 @@ In order to achieve it, we separated the liquidity managing logic from the Share
 
 ## Known Issues
 
+### storage layout
+
+L2SharedBridge will be a system contract, L2NativeTokenVault will replace it ( the storage layout is still not yet backwards compatible)
+
 ### bridgehubDeposit API change
 
 > /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
@@ -58,7 +62,7 @@ This one could be used in theory if the data has new format, but still uses the 
 > require(!\_isEraLegacyEthWithdrawal(\_chainId, \_l2BatchNumber), "ShB: legacy eth withdrawal");
 
 No method to finalize an old withdrawal.
-We will either add the method or provide a different solution.
+We will manually finalize all legacy withdrawals before the upgrade, i.e. withdrawals that happened before the previous Bridgehub upgrade.
 
 ### empty branch when matching function signatures
 
@@ -75,3 +79,8 @@ Currently, the support of old selector with ERC20 is completed, but the new form
 > require(expectedDepositAmount == \_depositAmount, "3T"); // The token has non-standard transfer logic
 
 Custom errors will be introduced for all contracts.
+
+## Migration plan
+
+- Bulkheads will need o be migrated
+- Tokens will have to be transferred
