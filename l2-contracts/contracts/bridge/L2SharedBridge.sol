@@ -174,9 +174,6 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     }
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
-        if (l1TokenAddress[_l2Token] == address(0)) {
-            getL1TokenAddress(_l2Token);
-        }
         bytes32 assetId = keccak256(
             abi.encode(
                 L1_CHAIN_ID,

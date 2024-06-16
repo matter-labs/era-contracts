@@ -39,9 +39,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     mapping(address account => mapping(address l1Token => mapping(bytes32 depositL2TxHash => uint256 amount)))
         public depositAmount;
 
-    /// @dev The address that is used as a L2 bridge counterpart in zkSync Era.
+    /// @dev The address that is used as a L2 native token vault in zkSync Era.
     // slither-disable-next-line uninitialized-state
-    address public l2Bridge;
+    address public l2NativeTokenVault;
 
     /// @dev The address that is used as a beacon for L2 tokens in zkSync Era.
     // slither-disable-next-line uninitialized-state
@@ -86,7 +86,13 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         bytes32 constructorInputHash = keccak256(abi.encode(l2TokenBeacon, ""));
         bytes32 salt = bytes32(uint256(uint160(_l1Token)));
 
-        return L2ContractHelper.computeCreate2Address(l2Bridge, salt, l2TokenProxyBytecodeHash, constructorInputHash);
+        return
+            L2ContractHelper.computeCreate2Address(
+                l2NativeTokenVault,
+                salt,
+                l2TokenProxyBytecodeHash,
+                constructorInputHash
+            );
     }
 
     /*//////////////////////////////////////////////////////////////
