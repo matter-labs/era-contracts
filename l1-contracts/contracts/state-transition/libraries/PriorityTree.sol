@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
 
 import {DynamicIncrementalMerkle} from "../../common/libraries/openzeppelin/IncrementalMerkle.sol";
 import {Merkle} from "./Merkle.sol";
@@ -15,6 +18,7 @@ library PriorityTree {
     struct Tree {
         uint256 startIndex;
         uint256 unprocessedIndex; // relative to `startIndex`
+        mapping(bytes32 => bool) historicalRoots;
         DynamicIncrementalMerkle.Bytes32PushTree tree;
     }
 
@@ -36,7 +40,8 @@ library PriorityTree {
 
     /// @notice Add the priority operation to the end of the priority queue
     function push(Tree storage _tree, bytes32 _hash) internal {
-        _tree.tree.push(_hash);
+        (, bytes32 newRoot) = _tree.tree.push(_hash);
+        _tree.historicalRoots[newRoot] = true;
     }
 
     function setup(Tree storage _tree, bytes32 _zero, uint256 _startIndex) internal {
@@ -54,7 +59,7 @@ library PriorityTree {
             _tree.unprocessedIndex,
             _priorityOpsData.itemHashes
         );
-        require(expectedRoot == _tree.tree.root(), "");
+        require(_tree.historicalRoots[expectedRoot], "");
         _tree.unprocessedIndex += _priorityOpsData.itemHashes.length;
     }
 }
