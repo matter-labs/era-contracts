@@ -17,7 +17,7 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
     /// @param _pubdata The total l2 to l1 pubdata that will be sent via L1 blobs.
     /// @dev Note: This is an early implementation, in the future we plan to support up to 16 blobs per l1 batch.
     /// @dev We always publish 6 system logs even if our pubdata fits into a single blob. This makes processing logs on L1 easier.
-    function chunkAndPublishPubdata(bytes calldata _pubdata) external onlyCallFrom(address(L1_MESSENGER_CONTRACT)) {
+    function chunkAndPublishPubdata(bytes calldata _pubdata) external onlyCallFrom(address(L1_MESSENGER_CONTRACT)) returns (uint8) {
         if (_pubdata.length > BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS) {
             revert TooMuchPubdata(BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS, _pubdata.length);
         }
@@ -34,12 +34,15 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
             calldatacopy(ptr, _pubdata.offset, _pubdata.length)
         }
 
+        uint8 blobsUsed;
         for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; ++i) {
             uint256 start = BLOB_SIZE_BYTES * i;
 
             // We break if the pubdata isn't enough to cover all 6 blobs. On L1 it is expected that the hash
             // will be bytes32(0) if a blob isn't going to be used.
             if (start >= _pubdata.length) {
+                blobsUsed = i;
+
                 break;
             }
 
@@ -60,5 +63,7 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
                 blobHashes[i]
             );
         }
+
+        return blobsUsed;
     }
 }
