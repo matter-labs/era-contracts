@@ -8,15 +8,16 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_GAS_PER_TRANSACTION, HyperchainCommitment, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT, COMPLEX_UPGRADER_ADDR, GENESIS_UPGRADE_ADDR} from "../../../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_GAS_PER_TRANSACTION, HyperchainCommitment, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
-import {IComplexUpgrader} from "../../l2-deps/IComplexUpgrader.sol";
-import {IGenesisUpgrade} from "../../l2-deps/IGenesisUpgrade.sol";
+// import {IComplexUpgrader} from "../../l2-deps/IComplexUpgrader.sol";
+// import {IGenesisUpgrade} from "../../l2-deps/IGenesisUpgrade.sol";
+import {ISystemContext} from "../../l2-deps/ISystemContext.sol";
 // import {PriorityOperation} from "../../libraries/PriorityQueue.sol";
-import {L2_FORCE_DEPLOYER_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../common/L2ContractAddresses.sol"; //, COMPLEX_UPGRADER_ADDR, GENESIS_UPGRADE_ADDR
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 import {ProposedUpgrade} from "../../../upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "../../chain-interfaces/IVerifier.sol";
@@ -154,28 +155,30 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         uint256 chainId = s.chainId;
 
-        bytes memory genesisUpgradeCalldata = abi.encodeCall(IGenesisUpgrade.upgrade, (chainId)); //todo
-        bytes memory complexUpgraderCalldata = abi.encodeCall(
-            IComplexUpgrader.upgrade,
-            (GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata)
-        );
+        // bytes memory genesisUpgradeCalldata = abi.encodeCall(IGenesisUpgrade.upgrade, (chainId)); //todo
+        // bytes memory complexUpgraderCalldata = abi.encodeCall(
+        //     IComplexUpgrader.upgrade,
+        //     (GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata)
+        // );
+        bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (chainId));
+
         uint256[] memory uintEmptyArray;
         bytes[] memory bytesEmptyArray;
 
         L2CanonicalTransaction memory l2ProtocolUpgradeTx = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
-            to: uint256(uint160(COMPLEX_UPGRADER_ADDR)),
+            to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)), //COMPLEX_UPGRADER_ADDR
             gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
             gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             maxFeePerGas: uint256(0),
             maxPriorityFeePerGas: uint256(0),
             paymaster: uint256(0),
             // Note, that the protocol version is used as "nonce" for system upgrade transactions
-            nonce: minorVersion,
+            nonce: uint256(minorVersion),
             value: 0,
             reserved: [uint256(0), 0, 0, 0],
-            data: complexUpgraderCalldata,
+            data: systemContextCalldata,
             signature: new bytes(0),
             factoryDeps: uintEmptyArray,
             paymasterInput: new bytes(0),
