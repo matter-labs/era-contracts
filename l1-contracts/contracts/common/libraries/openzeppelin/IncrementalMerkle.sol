@@ -96,6 +96,7 @@ library DynamicIncrementalMerkle {
         function(bytes32, bytes32) view returns (bytes32) fnHash = self._fnHash;
 
         // Get leaf index
+        // solhint-disable-next-line gas-increment-by-one
         index = self._nextLeafIndex++;
 
         if (index == 1 << levels) {
@@ -111,7 +112,7 @@ library DynamicIncrementalMerkle {
         // Rebuild branch from leaf to root
         uint256 currentIndex = index;
         bytes32 currentLevelHash = leaf;
-        for (uint32 i = 0; i < levels; i++) {
+        for (uint32 i = 0; i < levels; ++i) {
             // Reaching the parent node, is currentLevelHash the left child?
             bool isLeft = currentIndex % 2 == 0;
 

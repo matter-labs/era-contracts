@@ -37,6 +37,7 @@ library FullMerkle {
     }
 
     function pushNewLeaf(FullTree storage self, bytes32 _leaf) internal returns (bytes32 newRoot) {
+        // solhint-disable-next-line gas-increment-by-one
         uint256 index = self._leafNumber++;
 
         if ((index == 1 << self._height)) {
@@ -65,6 +66,7 @@ library FullMerkle {
     }
 
     function updateLeaf(FullTree storage self, uint256 _index, bytes32 _itemHash) internal returns (bytes32) {
+        // solhint-disable-next-line gas-custom-errors
         uint256 maxNodeNumber = self._leafNumber - 1;
         require(_index <= maxNodeNumber, "FMT, wrong index");
         self._nodes[0][_index] = _itemHash;
@@ -86,6 +88,7 @@ library FullMerkle {
     }
 
     function updateAllLeaves(FullTree storage self, bytes32[] memory _newLeaves) internal returns (bytes32) {
+        // solhint-disable-next-line gas-custom-errors
         require(_newLeaves.length == self._leafNumber, "FMT, wrong length");
         return updateAllNodesAtHeight(self, 0, _newLeaves);
     }
@@ -100,7 +103,8 @@ library FullMerkle {
             return _newNodes[0];
         }
         bytes32[] memory _newRow;
-        for (uint256 i; i < _newNodes.length; i = i.uncheckedAdd(2)) {
+        uint256 length = _newNodes.length;
+        for (uint256 i; i < length; i = i.uncheckedAdd(2)) {
             self._nodes[_height][i] = _newNodes[i];
             self._nodes[_height][i + 1] = _newNodes[i + 1];
             _newRow[i / 2] = _efficientHash(_newNodes[i], _newNodes[i + 1]);

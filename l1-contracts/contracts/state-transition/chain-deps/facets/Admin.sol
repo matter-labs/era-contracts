@@ -286,7 +286,8 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         // Note that this part is done in O(N), i.e. it is the responsibility of the admin of the chain to ensure that the total number of
         // outstanding committed batches is not too long.
-        for (uint256 i = 0; i < _commitment.batchHashes.length; i++) {
+        uint256 length = _commitment.batchHashes.length;
+        for (uint256 i = 0; i < length; ++i) {
             s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];
         }
 
@@ -295,7 +296,8 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         s.priorityQueue.head = pqHead;
         s.priorityQueue.tail = pqHead + _commitment.priorityQueueTxs.length;
 
-        for (uint256 i = 0; i < _commitment.priorityQueueTxs.length; i++) {
+        length = _commitment.priorityQueueTxs.length;
+        for (uint256 i = 0; i < length; ++i) {
             s.priorityQueue.data[pqHead + i] = _commitment.priorityQueueTxs[i];
         }
 
@@ -327,7 +329,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         PriorityOperation[] memory priorityQueueTxs = new PriorityOperation[](pqLength);
 
-        for (uint256 i = pqHead; i < s.priorityQueue.tail; i++) {
+        for (uint256 i = pqHead; i < s.priorityQueue.tail; ++i) {
             priorityQueueTxs[i] = s.priorityQueue.data[i];
         }
         commitment.priorityQueueTxs = priorityQueueTxs;
@@ -349,7 +351,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         bytes32[] memory batchHashes = new bytes32[](blocksToRemember);
 
-        for (uint256 i = 0; i < blocksToRemember; i++) {
+        for (uint256 i = 0; i < blocksToRemember; ++i) {
             unchecked {
                 batchHashes[i] = s.storedBatchHashes[commitment.totalBatchesExecuted + i];
             }
