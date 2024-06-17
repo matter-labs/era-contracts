@@ -105,6 +105,22 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         emit NewTransactionFilterer(oldTransactionFilterer, _transactionFilterer);
     }
 
+    /// @inheritdoc IAdmin
+    function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external onlyAdmin {
+        // Note that we do allow the zero address for the L2DAValidator, as it may not be needed, e.g. 
+        // when a Validium with no extra DA layer is used.
+        require(_l1DAValidator != address(0), "AdminFacet: L1DAValidator address is zero");
+
+        address oldL1DAValidator = s.l1DAValidator;
+        address oldL2DAValidator = s.l2DAValidator;
+
+        s.l1DAValidator = _l1DAValidator;
+        s.l2DAValidator = _l2DAValidator;
+
+        emit NewL1DAValidator(oldL1DAValidator, _l1DAValidator);
+        emit NewL2DAValidator(oldL2DAValidator, _l2DAValidator);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             UPGRADE EXECUTION
     //////////////////////////////////////////////////////////////*/

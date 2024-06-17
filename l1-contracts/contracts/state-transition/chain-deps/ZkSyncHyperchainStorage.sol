@@ -151,4 +151,10 @@ struct ZkSyncHyperchainStorage {
     uint128 baseTokenGasPriceMultiplierDenominator;
     /// @dev The optional address of the contract that has to be used for transaction filtering/whitelisting
     address transactionFilterer;
+    /// @dev The address of the l1DAValidator contract. 
+    /// This contract is responsible for the verification of the correctness of the DA on L1.
+    address l1DAValidator;
+    /// @dev The address of the contract on L2 that is responsible for the data availability verification.
+    /// This contract sends `l2DAValidatorOutputHash` to L1 via L2->L1 system log and it will routed to the `l1DAValidator` contract.
+    address l2DAValidator;
 }
