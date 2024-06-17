@@ -3979,7 +3979,11 @@ object "Bootloader" {
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function protocolUpgradeTxHashKey() -> ret {
-                ret := 13
+                ret := 7
+            }
+
+            function usedL2DAValidatorLogKey() -> ret {
+                ret := 9
             }
 
             ////////////////////////////////////////////////////////////////////////////
@@ -4189,6 +4193,7 @@ object "Bootloader" {
             // Sending system logs (to be processed on L1)
             sendToL1Native(true, chainedPriorityTxnHashLogKey(), mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
             sendToL1Native(true, numberOfLayer1TxsLogKey(), mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)))
+            sendToL1Native(true, usedL2DAValidatorLogKey(), mload(L2_DA_VALIDATOR_ADDR_BEGIN_BYTE()))
 
             l1MessengerPublishingCall()
         }
