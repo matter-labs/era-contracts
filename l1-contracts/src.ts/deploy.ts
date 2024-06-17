@@ -1,6 +1,6 @@
 import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
-import "@matterlabs/hardhat-zksync-ethers";
+// import "@matterlabs/hardhat-zksync-ethers";
 
 import type { BigNumberish, providers, Signer, Wallet, Contract } from "ethers";
 import { ethers } from "ethers";
