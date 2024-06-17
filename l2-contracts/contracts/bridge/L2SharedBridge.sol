@@ -8,13 +8,15 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
-import {IL2StandardAsset} from "./interfaces/IL2StandardAsset.sol";
+import {IL2AssetHandler} from "./interfaces/IL2AssetHandler.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
-import {IL2StandardDeployer} from "./interfaces/IL2StandardDeployer.sol";
+import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../L2ContractHelper.sol";
+
+import {EmptyAddress, InvalidCaller} from "../L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -39,15 +41,28 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     address public override l1Bridge;
 
     /// @dev Chain ID of Era for legacy reasons
-    uint256 immutable ERA_CHAIN_ID;
+    uint256 public immutable ERA_CHAIN_ID;
 
     /// @dev Chain ID of L1 for bridging reasons
-    uint256 immutable L1_CHAIN_ID;
+    uint256 public immutable L1_CHAIN_ID;
 
-    IL2StandardDeployer public standardDeployer;
+    /// @dev The contract responsible for handling tokens native to a single chain.
+    IL2NativeTokenVault public nativeTokenVault;
 
     /// @dev A mapping l2 token address => l1 token address
-    mapping(bytes32 assetInfo => address assetAddress) public override assetAddress;
+    mapping(bytes32 assetId => address assetHandlerAddress) public override assetHandlerAddress;
+
+    /// @notice Checks that the message sender is the legacy bridge.
+    modifier onlyL1Bridge() {
+        // Only the L1 bridge counterpart can initiate and finalize the deposit.
+        if (
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge
+        ) {
+            revert InvalidCaller(msg.sender);
+        }
+        _;
+    }
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
@@ -60,91 +75,82 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
     /// @param _l1SharedBridge The address of the L1 Bridge contract.
     /// @param _l1Bridge The address of the legacy L1 Bridge contract.
-    /// @param _standardDeployer The address of the standardDeployer contract.
+    /// @param _assetHandler The address of the nativeTokenVault contract.
     function initialize(
         address _l1SharedBridge,
         address _l1Bridge,
-        IL2StandardDeployer _standardDeployer
-    ) external reinitializer(2) {
-        require(_l1SharedBridge != address(0), "bf");
-        require(address(_standardDeployer) != address(0), "cf");
+        IL2NativeTokenVault _assetHandler
+    ) external reinitializer(3) {
+        if (_l1SharedBridge == address(0)) {
+            revert EmptyAddress();
+        }
+        if (address(_assetHandler) == address(0)) {
+            revert EmptyAddress();
+        }
 
         l1SharedBridge = _l1SharedBridge;
-        standardDeployer = _standardDeployer;
+        nativeTokenVault = _assetHandler;
         if (block.chainid == ERA_CHAIN_ID) {
-            require(_l1Bridge != address(0), "bf2");
-            l1Bridge = _l1Bridge;
+            if (_l1Bridge == address(0)) {
+                revert EmptyAddress();
+            }
+            if (l1Bridge == address(0)) {
+                l1Bridge = _l1Bridge;
+            }
         }
     }
 
     /// @notice Finalize the deposit and mint funds
-    /// @param _l1Sender The account address that initiated the deposit on L1
-    // / @param _l2Receiver The account address that would receive minted ether
-    /// @param _l1Token The address of the token that was locked on the L1
-    // / @param _amount Total amount of tokens deposited from L1
-    /// @param _data The additional data that user can pass with the deposit
-    function finalizeDeposit(bytes32 _assetInfo, bytes memory _data) public override {
-        // Only the L1 bridge counterpart can initiate and finalize the deposit.
-
-        // require(
-        //     AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
-        //         AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1SharedBridge,
-        //     "mq"
-        // );
-
-        address asset = assetAddress[_assetInfo];
-        if (asset != address(0)) {
-            IL2StandardAsset(asset).bridgeMint(L1_CHAIN_ID, _assetInfo, _data);
+    /// @param _assetId The encoding of the asset on L2
+    /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken)
+    function finalizeDeposit(bytes32 _assetId, bytes memory _transferData) public override onlyL1Bridge {
+        address assetHandler = assetHandlerAddress[_assetId];
+        if (assetHandler != address(0)) {
+            IL2AssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
         } else {
-            IL2StandardAsset(standardDeployer).bridgeMint(L1_CHAIN_ID, _assetInfo, _data);
-            // Todo: registerAsset at L2StandardDeployer with NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS
+            IL2AssetHandler(nativeTokenVault).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
+            assetHandlerAddress[_assetId] = address(nativeTokenVault);
         }
 
-        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetInfo, keccak256(_data));
+        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, keccak256(_transferData));
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked
-    /// @param _assetInfo The L2 token address which is withdrawn
-    /// @param _assetData The data that is passed to the asset contract
-    function withdraw(bytes32 _assetInfo, bytes calldata _assetData) external override {
-        address asset = assetAddress[_assetInfo];
-        bytes memory _bridgeMintData;
+    /// @param _assetId The L2 token address which is withdrawn
+    /// @param _assetData The data that is passed to the asset handler contract
+    function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
+        address assetHandler = assetHandlerAddress[_assetId];
+        bytes memory _bridgeMintData = IL2AssetHandler(assetHandler).bridgeBurn({
+            _chainId: L1_CHAIN_ID,
+            _mintValue: 0,
+            _assetId: _assetId,
+            _prevMsgSender: msg.sender,
+            _data: _assetData
+        });
 
-        /// should the address not be set already? Or do we need this to do it automatically.
-        if (asset != address(0)) {
-            _bridgeMintData = IL2StandardAsset(asset).bridgeBurn({
-                _chainId: L1_CHAIN_ID,
-                _mintValue: 0,
-                _assetInfo: _assetInfo,
-                _prevMsgSender: msg.sender,
-                _data: _assetData
-            });
-        } else {
-            _bridgeMintData = IL2StandardAsset(standardDeployer).bridgeBurn({
-                _chainId: L1_CHAIN_ID,
-                _mintValue: 0,
-                _assetInfo: _assetInfo,
-                _prevMsgSender: msg.sender,
-                _data: _assetData
-            });
-        }
-
-        bytes memory message = _getL1WithdrawMessage(_assetInfo, _bridgeMintData);
+        bytes memory message = _getL1WithdrawMessage(_assetId, _bridgeMintData);
         L2ContractHelper.sendMessageToL1(message);
 
-        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, msg.sender, _assetInfo, keccak256(_assetData));
+        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, msg.sender, _assetId, keccak256(_assetData));
     }
 
     /// @dev Encode the message for l2ToL1log sent with withdraw initialization
     function _getL1WithdrawMessage(
-        bytes32 _assetInfo,
+        bytes32 _assetId,
         bytes memory _bridgeMintData
     ) internal pure returns (bytes memory) {
         // note we use the IL1ERC20Bridge.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
         // and we use this interface so that when the switch happened the old messages could be processed
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _assetInfo, _bridgeMintData);
+        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _assetId, _bridgeMintData);
+    }
+
+    /// @dev Used to set the assedAddress for a given assetId.
+    /// @dev Will be used by ZK Gateway
+    function setAssetHandlerAddress(bytes32 _assetId, address _assetAddress) external onlyL1Bridge {
+        assetHandlerAddress[_assetId] = _assetAddress;
+        emit AssetHandlerRegistered(_assetId, _assetAddress);
     }
 
     /// @dev Used to set the assedAddress for a given assetInfo.
@@ -167,19 +173,16 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         bytes calldata _data
     ) external override {
         // onlyBridge {
-        bytes32 assetInfo = keccak256(
+        bytes32 assetId = keccak256(
             abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
         );
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encode(_l1Sender, _amount, _l2Receiver, _data, _l1Token);
-        finalizeDeposit(assetInfo, data);
+        finalizeDeposit(assetId, data);
     }
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
-        if (l1TokenAddress[_l2Token] == address(0)) {
-            getL1TokenAddress(_l2Token);
-        }
-        bytes32 assetInfo = keccak256(
+        bytes32 assetId = keccak256(
             abi.encode(
                 L1_CHAIN_ID,
                 NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS,
@@ -187,7 +190,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
             )
         );
         bytes memory data = abi.encode(_amount, _l1Receiver);
-        this.withdraw(assetInfo, data);
+        withdraw(assetId, data);
     }
 
     function getL1TokenAddress(address _l2Token) public view returns (address) {
@@ -196,6 +199,6 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
 
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view returns (address) {
-        return standardDeployer.l2TokenAddress(_l1Token);
+        return nativeTokenVault.l2TokenAddress(_l1Token);
     }
 }

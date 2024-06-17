@@ -2,8 +2,9 @@
 
 pragma solidity 0.8.24;
 
-import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
+// solhint-disable gas-custom-errors, reason-string
 
+import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_GAS_PER_TRANSACTION, HyperchainCommitment, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT, COMPLEX_UPGRADER_ADDR, GENESIS_UPGRADE_ADDR} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
@@ -26,8 +27,6 @@ import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBas
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
-    using PriorityQueue for PriorityQueue.Queue;
-
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "AdminFacet";
 

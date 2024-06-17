@@ -63,6 +63,9 @@ describe("Diamond proxy tests", function () {
     const diamondProxyTestFactory = await hardhat.ethers.getContractFactory("DiamondProxyTest");
     const diamondProxyTestContract = await diamondProxyTestFactory.deploy();
 
+    const dummyBridgehubFactory = await hardhat.ethers.getContractFactory("DummyBridgehub");
+    const dummyBridgehub = await dummyBridgehubFactory.deploy();
+
     diamondProxyTest = DiamondProxyTestFactory.connect(
       diamondProxyTestContract.address,
       diamondProxyTestContract.signer
@@ -84,7 +87,7 @@ describe("Diamond proxy tests", function () {
     const diamondInitCalldata = diamondInit.interface.encodeFunctionData("initialize", [
       {
         chainId,
-        bridgehub: "0x0000000000000000000000000000000000000001",
+        bridgehub: dummyBridgehub.address,
         stateTransitionManager: await owner.getAddress(),
         protocolVersion: 0,
         admin: governorAddress,
@@ -99,7 +102,6 @@ describe("Diamond proxy tests", function () {
         priorityTxMaxGasLimit: 500000, // priority tx max L2 gas limit
         feeParams: defaultFeeParams(),
         blobVersionedHashRetriever: "0x0000000000000000000000000000000000000001",
-        syncLayerState: 0,
       },
     ]);
 

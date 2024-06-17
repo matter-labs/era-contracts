@@ -2,10 +2,13 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable gas-custom-errors
+
 import {Diamond} from "../libraries/Diamond.sol";
 import {ZkSyncHyperchainBase} from "./facets/ZkSyncHyperchainBase.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
 import {InitializeData, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
+import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
@@ -47,7 +50,7 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
         s.feeParams = _initializeData.feeParams;
         s.blobVersionedHashRetriever = _initializeData.blobVersionedHashRetriever;
 
-        // s.syncLayerState = _initializeData.syncLayerState;
+        s.baseTokenAssetId = IBridgehub(_initializeData.bridgehub).baseTokenAssetId(_initializeData.chainId);
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages

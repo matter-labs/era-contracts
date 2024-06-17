@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable reason-string, gas-custom-errors
+
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
@@ -18,7 +20,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, ETH_TOKEN_ADDRESS, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
@@ -42,7 +44,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     string public constant override getName = "MailboxFacet";
 
     /// @dev Era's chainID
-    uint256 immutable ERA_CHAIN_ID;
+    uint256 public immutable ERA_CHAIN_ID;
 
     constructor(uint256 _eraChainId) {
         ERA_CHAIN_ID = _eraChainId;
@@ -59,7 +61,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     function proveL2MessageInclusion(
         uint256 _batchNumber,
         uint256 _index,
-        L2Message memory _message,
+        L2Message calldata _message,
         bytes32[] calldata _proof
     ) public view returns (bool) {
         return _proveL2LogInclusion(_batchNumber, _index, _L2MessageToLog(_message), _proof);
@@ -69,7 +71,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     function proveL2LogInclusion(
         uint256 _batchNumber,
         uint256 _index,
-        L2Log memory _log,
+        L2Log calldata _log,
         bytes32[] calldata _proof
     ) external view returns (bool) {
         return _proveL2LogInclusion(_batchNumber, _index, _log, _proof);
@@ -105,16 +107,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         return _proveL2LogInclusion(_l2BatchNumber, _l2MessageIndex, l2Log, _merkleProof);
     }
 
-    // /// @inheritdoc IMailbox
-    function proveL1ToL2TransactionStatusViaSyncLayer(
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof,
-        TxStatus _status
-    ) public view returns (bool) {}
-
     /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
     function _proveL2LogInclusion(
         uint256 _batchNumber,
@@ -143,7 +135,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     }
 
     /// @dev Convert arbitrary-length message to the raw l2 log
-    function _L2MessageToLog(L2Message memory _message) internal pure returns (L2Log memory) {
+    function _L2MessageToLog(L2Message calldata _message) internal pure returns (L2Log memory) {
         return
             L2Log({
                 l2ShardId: 0,
@@ -465,9 +457,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         );
         IL1SharedBridge(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
-            (IL1SharedBridge(s.baseTokenBridge).nativeTokenVault()).getAssetInfo(ETH_TOKEN_ADDRESS),
+            s.baseTokenAssetId,
             msg.sender,
-            0
+            msg.value
         );
     }
 }

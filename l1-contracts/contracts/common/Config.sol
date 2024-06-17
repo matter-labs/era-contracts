@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-import {PriorityOperation} from "../state-transition/libraries/PriorityQueue.sol";
-
 /// @dev `keccak256("")`
 bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
@@ -29,10 +27,11 @@ uint256 constant PRIORITY_OPERATION_L2_TX_TYPE = 255;
 /// @dev Denotes the type of the zkSync transaction that is used for system upgrades.
 uint256 constant SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 
-/// @dev The maximal allowed difference between protocol versions in an upgrade. The 100 gap is needed
+/// @dev The maximal allowed difference between protocol minor versions in an upgrade. The 100 gap is needed
 /// in case a protocol version has been tested on testnet, but then not launched on mainnet, e.g.
 /// due to a bug found.
-uint256 constant MAX_ALLOWED_PROTOCOL_VERSION_DELTA = 100;
+/// We are allowed to jump at most 100 minor versions at a time. The major version is always expected to be 0.
+uint256 constant MAX_ALLOWED_MINOR_VERSION_DELTA = 100;
 
 /// @dev The amount of time in seconds the validator has to process the priority transaction
 /// NOTE: The constant is set to zero for the Alpha release period
@@ -107,6 +106,9 @@ address constant ETH_TOKEN_ADDRESS = address(1);
 
 bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
 
+/// @dev A virtual address, used in the assetId calculation for native assets.
+/// This is needed for automatic bridging, i.e. without deploying the AssetHandler contract,
+/// if the assetId can be calculated with this address then it is in fact an NTV asset
 address constant NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS = address(2);
 
 /// @dev https://eips.ethereum.org/EIPS/eip-1352

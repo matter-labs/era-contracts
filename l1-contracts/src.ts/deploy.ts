@@ -19,7 +19,9 @@ import {
   deployBytecodeViaCreate2OnPath,
   L2_SHARED_BRIDGE_PATH,
 } from "./deploy-utils-zk";
-import { readBatchBootloaderBytecode, readSystemContractsBytecode, SYSTEM_CONFIG } from "../scripts/utils";
+import {   packSemver,
+  readBatchBootloaderBytecode, readSystemContractsBytecode,  unpackStringSemVer,
+  SYSTEM_CONFIG } from "../scripts/utils";
 import { getTokens } from "./deploy-token";
 import {
   ADDRESS_ONE,
@@ -30,25 +32,27 @@ import {
   hashL2Bytecode,
   DIAMOND_CUT_DATA_ABI_STRING,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  compileInitialCutHash,
 } from "./utils";
+import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
+import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
+import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
+import { ProxyAdminFactory } from "../typechain/ProxyAdminFactory";
+
+import { IZkSyncHyperchainFactory } from "../typechain/IZkSyncHyperchainFactory";
+import { L1SharedBridgeFactory } from "../typechain/L1SharedBridgeFactory";
+
+import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
+import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
+
 import type { FacetCut } from "./diamondCut";
-import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
+import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
 import { ERC20Factory, StateTransitionManagerFactory } from "../typechain";
 
-import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
-import { ProxyAdminFactory } from "../typechain/ProxyAdminFactory";
-import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
-import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
-
-import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IL1SharedBridgeFactory } from "../typechain/IL1SharedBridgeFactory";
-import { L1SharedBridgeFactory } from "../typechain/L1SharedBridgeFactory";
 import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
 import { ISTMDeploymentTrackerFactory } from "../typechain/ISTMDeploymentTrackerFactory";
-import { IZkSyncHyperchainFactory } from "../typechain/IZkSyncHyperchainFactory";
-
-import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
 
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
 
@@ -100,7 +104,7 @@ export class Deployer {
     this.deployedLogPrefix = config.deployedLogPrefix ?? "CONTRACTS";
   }
 
-  public async initialZkSyncHyperchainDiamondCut(extraFacets?: FacetCut[]) {
+  public async initialZkSyncHyperchainDiamondCut(extraFacets?: FacetCut[], compareDiamondCutHash: boolean = false) {
     let facetCuts: FacetCut[] = Object.values(
       await getCurrentFacetCutsForAdd(
         this.addresses.StateTransition.AdminFacet,
@@ -117,46 +121,37 @@ export class Deployer {
       recursionCircuitsSetVksHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
     };
     const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
-    const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
-    const feeParams = {
-      pubdataPricingMode: PubdataPricingMode.Rollup,
-      batchOverheadL1Gas: SYSTEM_CONFIG.priorityTxBatchOverheadL1Gas,
-      maxPubdataPerBatch: SYSTEM_CONFIG.priorityTxPubdataPerBatch,
-      priorityTxMaxPubdata: SYSTEM_CONFIG.priorityTxMaxPubdata,
-      maxL2GasPerBatch: SYSTEM_CONFIG.priorityTxMaxGasPerBatch,
-      minimalL2GasPrice: SYSTEM_CONFIG.priorityTxMinimalGasPrice,
-    };
-
-    const diamondInitCalldata = DiamondInit.encodeFunctionData("initialize", [
-      // these first values are set in the contract
-      {
-        chainId: "0x0000000000000000000000000000000000000000000000000000000000000001",
-        bridgehub: "0x0000000000000000000000000000000000001234",
-        stateTransitionManager: "0x0000000000000000000000000000000000002234",
-        protocolVersion: "0x0000000000000000000000000000000000002234",
-        admin: "0x0000000000000000000000000000000000003234",
-        validatorTimelock: "0x0000000000000000000000000000000000004234",
-        baseToken: "0x0000000000000000000000000000000000004234",
-        baseTokenBridge: "0x0000000000000000000000000000000000004234",
-        storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
-        // The exact value is not important as it will be overridden by the STM
-        // syncLayerState: 0,
-        verifier: this.addresses.StateTransition.Verifier,
-        verifierParams,
-        l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
-        l2DefaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-        priorityTxMaxGasLimit,
-        feeParams,
-        blobVersionedHashRetriever: this.addresses.BlobVersionedHashRetriever,
-      },
-    ]);
-
-    return diamondCut(
+    const diamondCut = compileInitialCutHash(
       facetCuts,
+      verifierParams,
+      L2_BOOTLOADER_BYTECODE_HASH,
+      L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+      this.addresses.StateTransition.Verifier,
+      this.addresses.BlobVersionedHashRetriever,
+      +priorityTxMaxGasLimit,
       this.addresses.StateTransition.DiamondInit,
-      "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2)
+      false
     );
+
+    if (compareDiamondCutHash) {
+      const hash = ethers.utils.keccak256(
+        ethers.utils.defaultAbiCoder.encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCut])
+      );
+
+      console.log(`Diamond cut hash: ${hash}`);
+      const stm = StateTransitionManagerFactory.connect(
+        this.addresses.StateTransition.StateTransitionProxy,
+        this.deployWallet
+      );
+
+      const hashFromSTM = await stm.initialCutHash();
+      if (hash != hashFromSTM) {
+        throw new Error(`Has from STM ${hashFromSTM} does not match the computed hash ${hash}`);
+      }
+    }
+
+    return diamondCut;
   }
 
   public async updateCreate2FactoryZkMode() {
@@ -412,20 +407,23 @@ export class Deployer {
     const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
     const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
     const diamondCut = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
-    // console.log("correct initial diamond cut", diamondCut);
-    const protocolVersion = getNumberFromEnv("CONTRACTS_GENESIS_PROTOCOL_VERSION");
+    const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
 
     const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
+
+    const chainCreationParams = {
+      genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
+      genesisBatchHash,
+      genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
+      genesisBatchCommitment,
+      diamondCut,
+    };
 
     const initCalldata = stateTransitionManager.encodeFunctionData("initialize", [
       {
         owner: this.addresses.Governance,
         validatorTimelock: this.addresses.ValidatorTimeLock,
-        genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
-        genesisBatchHash,
-        genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
-        genesisBatchCommitment,
-        diamondCut,
+        chainCreationParams,
         protocolVersion,
       },
     ]);
@@ -514,7 +512,7 @@ export class Deployer {
   ) {
     const contractAddress = await this.deployViaCreate2(
       dummy ? "DummyL1ERC20Bridge" : "L1ERC20Bridge",
-      [this.addresses.Bridges.SharedBridgeProxy],
+      [this.addresses.Bridges.SharedBridgeProxy, this.addresses.Bridges.NativeTokenVaultProxy],
       create2Salt,
       ethTxOptions
     );
@@ -589,7 +587,7 @@ export class Deployer {
     if (this.verbose) {
       console.log("Upgrade scheduled");
     }
-    const executeTX = await governance.execute(operation, { value: value });
+    const executeTX = await governance.execute(operation, { ...ethTxOptions, value: value });
     const receipt = await executeTX.wait();
     if (this.verbose) {
       console.log(
@@ -647,7 +645,10 @@ export class Deployer {
       this.addresses.Bridgehub.BridgehubProxy,
       ethIsBaseToken ? value : 0,
       l1Calldata,
-      ethTxOptions,
+      {
+        ...ethTxOptions,
+        gasPrice,
+      },
       printOperation
     );
     return receipt;
@@ -695,31 +696,6 @@ export class Deployer {
     this.addresses.Bridges.SharedBridgeImplementation = contractAddress;
   }
 
-  public async deployL2SharedBridgeImplementation(
-    create2Salt: string,
-    ethTxOptions: ethers.providers.TransactionRequest
-  ) {
-    const tokens = getTokens();
-    const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
-    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
-    const eraDiamondProxy = getAddressFromEnv("CONTRACTS_ERA_DIAMOND_PROXY_ADDR");
-    const contractAddress = await deployBytecodeViaCreate2OnPath(
-      this.deployWallet as ZkWallet,
-      "L1SharedBridge",
-      L2_SHARED_BRIDGE_PATH,
-      create2Salt,
-      ethTxOptions,
-      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, eraChainId, eraDiamondProxy]
-    );
-
-    if (this.verbose) {
-      console.log(`With era chain id ${eraChainId} and era diamond proxy ${eraDiamondProxy}`);
-      console.log(`CONTRACTS_L1_SHARED_BRIDGE_IMPL_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.Bridges.SharedBridgeImplementation = contractAddress[0];
-  }
-
   public async deploySharedBridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const initCalldata = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi).encodeFunctionData(
       "initialize",
@@ -744,9 +720,12 @@ export class Deployer {
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
+    const tokens = getTokens();
+    const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
+
     const contractAddress = await this.deployViaCreate2(
       "L1NativeTokenVault",
-      [this.addresses.Bridges.SharedBridgeProxy, eraChainId],
+      [l1WethToken, this.addresses.Bridges.SharedBridgeProxy, eraChainId],
       create2Salt,
       ethTxOptions
     );
@@ -1063,6 +1042,7 @@ export class Deployer {
     validiumMode: boolean,
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,
+    compareDiamondCutHash: boolean = false,
     nonce?,
     predefinedChainId?: string,
     useGovernance: boolean = false
@@ -1079,7 +1059,7 @@ export class Deployer {
       (await stateTransitionManager.getHyperchain(inputChainId)) != ethers.constants.AddressZero;
 
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
-    const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
+    const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets, compareDiamondCutHash);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
     const receipt = await this.executeDirectOrGovernance(
@@ -1097,7 +1077,6 @@ export class Deployer {
       0,
       {
         gasPrice,
-        nonce,
         ...txOptions,
       }
     );
@@ -1133,7 +1112,8 @@ export class Deployer {
         console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${diamondProxyAddress}`);
       }
     }
-    this.chainId = parseInt(chainId, 16);
+    const intChainId = parseInt(chainId, 16);
+    this.chainId = intChainId;
 
     const validatorOneAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
     const validatorTwoAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
@@ -1165,18 +1145,48 @@ export class Deployer {
     }
 
     const diamondProxy = this.stateTransitionContract(this.deployWallet);
-    const tx4 = await diamondProxy.setTokenMultiplier(1, 1);
-    const receipt4 = await tx4.wait();
+    // if we are using governance, the deployer will not be the admin, so we can't call the diamond proxy directly
+    if (admin == this.deployWallet.address) {
+      const tx4 = await diamondProxy.setTokenMultiplier(1, 1);
+      const receipt4 = await tx4.wait();
+      if (this.verbose) {
+        console.log(`BaseTokenMultiplier set, gas used: ${receipt4.gasUsed.toString()}`);
+      }
+
+      if (validiumMode) {
+        const tx5 = await diamondProxy.setPubdataPricingMode(PubdataPricingMode.Validium);
+        const receipt5 = await tx5.wait();
+        if (this.verbose) {
+          console.log(`Validium mode set, gas used: ${receipt5.gasUsed.toString()}`);
+        }
+      }
+    } else {
+      console.warn(
+        "BaseTokenMultiplier and Validium mode can't be set through the governance, please set it separately, using the admin account"
+      );
+    }
+  }
+
+  public async transferAdminFromDeployerToGovernance() {
+    const stm = this.stateTransitionManagerContract(this.deployWallet);
+    const diamondProxyAddress = await stm.getHyperchain(this.chainId);
+    const hyperchain = IZkSyncHyperchainFactory.connect(diamondProxyAddress, this.deployWallet);
+
+    const receipt = await (await hyperchain.setPendingAdmin(this.addresses.Governance)).wait();
     if (this.verbose) {
-      console.log(`BaseTokenMultiplier set ${diamondProxy.address}, gas used: ${receipt4.gasUsed.toString()}`);
+      console.log(`Governance set as pending admin, gas used: ${receipt.gasUsed.toString()}`);
     }
 
-    if (validiumMode) {
-      const tx5 = await diamondProxy.setPubdataPricingMode(PubdataPricingMode.Validium);
-      const receipt5 = await tx5.wait();
-      if (this.verbose) {
-        console.log(`Validium mode set, gas used: ${receipt5.gasUsed.toString()}`);
-      }
+    await this.executeUpgrade(
+      hyperchain.address,
+      0,
+      hyperchain.interface.encodeFunctionData("acceptAdmin"),
+      null,
+      false
+    );
+
+    if (this.verbose) {
+      console.log("Pending admin successfully accepted");
     }
   }
 
@@ -1199,14 +1209,6 @@ export class Deployer {
     await this.deployNativeTokenVaultProxy(create2Salt, { gasPrice });
     await this.deploySTMDeploymentTrackerImplementation(create2Salt, { gasPrice });
     await this.deploySTMDeploymentTrackerProxy(create2Salt, { gasPrice });
-    await this.registerAddresses();
-  }
-
-  public async deployL2SharedBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
-    nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
-
-    await this.deployL2SharedBridgeImplementation(create2Salt, { gasPrice, nonce: nonce });
-    await this.deploySharedBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
     await this.registerAddresses();
   }
 

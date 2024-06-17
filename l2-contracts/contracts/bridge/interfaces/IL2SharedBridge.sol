@@ -4,30 +4,31 @@ pragma solidity 0.8.20;
 
 /// @author Matter Labs
 interface IL2SharedBridge {
-    event FinalizeDepositSharedBridge(uint256 chainId, bytes32 indexed assetInfo, bytes32 assetDataHash);
+    event FinalizeDepositSharedBridge(uint256 chainId, bytes32 indexed assetId, bytes32 assetDataHash);
 
     event WithdrawalInitiatedSharedBridge(
         uint256 chainId,
         address indexed l2Sender,
-        bytes32 indexed assetInfo,
+        bytes32 indexed assetId,
         bytes32 assetDataHash
     );
 
-    /// @notice asset registered
-    event AssetRegistered(
-        bytes32 indexed assetInfo,
+    event AssetHandlerRegisteredInitial(
+        bytes32 indexed assetId,
         address indexed _assetAddress,
         bytes32 indexed additionalData,
         address sender
     );
 
-    function finalizeDeposit(bytes32 _assetInfo, bytes calldata _data) external;
+    event AssetHandlerRegistered(bytes32 indexed assetId, address indexed _assetAddress);
 
-    function withdraw(bytes32 _assetInfo, bytes calldata _data) external;
+    function finalizeDeposit(bytes32 _assetId, bytes calldata _data) external;
+
+    function withdraw(bytes32 _assetId, bytes calldata _data) external;
 
     function l1Bridge() external view returns (address);
 
-    function assetAddress(bytes32 _assetInfo) external view returns (address);
+    function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 
     function l1SharedBridge() external view returns (address);
 

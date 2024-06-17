@@ -33,7 +33,7 @@
     "ethjs": "^0.4.0",
     "fs": "^0.0.1-security",
     "handlebars": "^4.7.6",
-    "hardhat": "^2.18.3",
+    "hardhat": "=2.22.2",
     "hardhat-contract-sizer": "^2.0.2",
     "hardhat-gas-reporter": "^1.0.9",
     "hardhat-typechain": "^0.3.3",
@@ -50,7 +50,7 @@
     "ts-node": "^10.1.0",
     "typechain": "^4.0.0",
     "typescript": "^4.6.4",
-    "zksync-ethers": "https://github.com/zksync-sdk/zksync-ethers#ethers-v5-feat/bridgehub"
+    "zksync-ethers": "5.8.0-beta.5"
   },
   "scripts": {
     "build": "hardhat compile",
@@ -80,13 +80,8 @@
     "upgrade-consistency-checker": "ts-node scripts/upgrade-consistency-checker.ts",
     "governance-accept-ownership": "ts-node scripts/governance-accept-ownership.ts",
     "sync-layer": "ts-node scripts/sync-layer.ts",
-    "size-contracts": "hardhat size-contracts"
   },
   "dependencies": {
-    "@matterlabs/hardhat-zksync-deploy": "0.6.5",
-    "@matterlabs/hardhat-zksync-ethers": "^1.0.0",
-    "@matterlabs/hardhat-zksync-solc": "^1.1.4",
-    "@matterlabs/hardhat-zksync-verify": "^1.4.2",
     "dotenv": "^16.0.3",
     "solhint-plugin-prettier": "^0.0.5"
   }

@@ -59,24 +59,12 @@ struct FeeParams {
     uint64 minimalL2GasPrice;
 }
 
-// enum SyncLayerState {
-//     /// This is a hyperchain copy on L1, while the chain settles on L1
-//     ActiveOnL1,
-//     /// This is a hyperchain copy on the synclayer, when the chain settles on synclayer
-//     ActiveOnSL,
-//     /// This is a hyperchain copy on L1, while the chain settles on synclayer
-//     MigratedFromL1,
-//     /// This is a hyperchain copy on the synclayer, while the chain settles on L1
-//     MigratedFromSL,
-//     /// This is a hyperchain that serves as a synclayer itself.
-//     SyncLayerL1
-// }
-
 /// @dev storing all storage variables for hyperchain diamond facets
 /// NOTE: It is used in a proxy, so it is possible to add new variables to the end
 /// but NOT to modify already existing variables or change their order.
 /// NOTE: variables prefixed with '__DEPRECATED_' are deprecated and shouldn't be used.
 /// Their presence is maintained for compatibility and to prevent storage collision.
+// solhint-disable-next-line gas-struct-packing
 struct ZkSyncHyperchainStorage {
     /// @dev Storage of variables needed for deprecated diamond cut facet
     uint256[7] __DEPRECATED_diamondCutStorage;
@@ -164,6 +152,8 @@ struct ZkSyncHyperchainStorage {
     uint128 baseTokenGasPriceMultiplierDenominator;
     /// @dev The optional address of the contract that has to be used for transaction filtering/whitelisting
     address transactionFilterer;
+    /// @dev the Asset Id of the baseToken
+    bytes32 baseTokenAssetId;
     /// @dev address of the synclayer, only set on L1 if settling on it
     address syncLayer;
 }
