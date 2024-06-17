@@ -295,8 +295,6 @@ export function compileInitialCutHash(
       baseToken: "0x0000000000000000000000000000000000004234",
       baseTokenBridge: "0x0000000000000000000000000000000000004234",
       storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
-      // The exact value is not important as it will be overriden by the STM
-      syncLayerState: 0,
       verifier,
       verifierParams,
       l2BootloaderBytecodeHash,
