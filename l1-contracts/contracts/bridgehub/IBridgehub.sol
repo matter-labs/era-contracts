@@ -4,8 +4,9 @@ pragma solidity 0.8.24;
 
 import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
 import {L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-import {IL1StandardAsset} from "../bridge/interfaces/IL1StandardAsset.sol";
+import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -39,7 +40,7 @@ struct L2TransactionRequestTwoBridgesInner {
     bytes32 txDataHash;
 }
 
-interface IBridgehub is IL1StandardAsset {
+interface IBridgehub is IL1AssetHandler {
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
@@ -72,7 +73,7 @@ interface IBridgehub is IL1StandardAsset {
 
     function baseToken(uint256 _chainId) external view returns (address);
 
-    function baseTokenAssetInfo(uint256 _chainId) external view returns (bytes32);
+    function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
     function sharedBridge() external view returns (IL1SharedBridge);
 
@@ -142,7 +143,11 @@ interface IBridgehub is IL1StandardAsset {
 
     function addToken(address _token) external;
 
-    function setSharedBridge(address _sharedBridge) external;
+    function setAddresses(
+        address _sharedBridge,
+        ISTMDeploymentTracker _stmDeployer,
+        IMessageRoot _messageRoot
+    ) external;
 
     // function relayTxThroughBH(uint256 _baseDestChainId, uint256 _destChainId, bytes calldata _dataToRelay) external;
 
@@ -182,11 +187,11 @@ interface IBridgehub is IL1StandardAsset {
 
     function stmDeployer() external view returns (ISTMDeploymentTracker);
 
-    function setSTMDeployer(ISTMDeploymentTracker _stmDeployer) external;
-
     function stmAssetInfoToAddress(bytes32 _assetInfo) external view returns (address);
 
-    function setAssetAddress(bytes32 _additionalData, address _assetAddress) external;
+    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetAddress) external;
 
     function L1_CHAIN_ID() external view returns (uint256);
+
+    function messageRoot() external view returns (IMessageRoot);
 }

@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable reason-string, gas-custom-errors
+
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
@@ -24,6 +26,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
+        // solhint-disable-next-line gas-custom-errors
         require(msg.sender == address(BRIDGE_HUB), "STM DT: not BH");
         _;
     }
@@ -42,9 +45,11 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     }
 
     function registerSTMAssetOnL1(address _stmAddress) external onlyOwner {
+        // solhint-disable-next-line gas-custom-errors
+
         require(BRIDGE_HUB.stateTransitionManagerIsRegistered(_stmAddress), "STMDT: stm not registered");
-        SHARED_BRIDGE.setAssetAddress(bytes32(uint256(uint160(_stmAddress))), address(BRIDGE_HUB));
-        BRIDGE_HUB.setAssetAddress(bytes32(uint256(uint160(_stmAddress))), _stmAddress);
+        SHARED_BRIDGE.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_stmAddress))), address(BRIDGE_HUB));
+        BRIDGE_HUB.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_stmAddress))), _stmAddress);
     }
 
     /// @dev registerSTMAssetOnL2SharedBridge, use via requestL2TransactionTwoBridges
@@ -55,7 +60,11 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         uint256,
         bytes calldata _data
     ) external payable onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
+        // solhint-disable-next-line gas-custom-errors
+
         require(msg.value == 0, "STMDT: no eth allowed");
+        // solhint-disable-next-line gas-custom-errors
+
         require(_prevMsgSender == owner(), "STMDT: not owner");
         (bool _registerOnBridgehub, address _stmL1Address, address _stmL2Address) = abi.decode(
             _data,
@@ -74,7 +83,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         address _stmL1Address
     ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes memory l2TxCalldata = abi.encodeWithSelector(
-            IL1SharedBridge.setAssetAddress.selector,
+            IL1SharedBridge.setAssetHandlerAddressInitial.selector,
             bytes32(uint256(uint160(_stmL1Address))),
             BRIDGE_HUB.bridgehubCounterParts(_chainId)
         );
@@ -94,7 +103,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         address _stmL2Address
     ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes memory l2TxCalldata = abi.encodeWithSelector(
-            IBridgehub.setAssetAddress.selector,
+            IBridgehub.setAssetHandlerAddressInitial.selector,
             bytes32(uint256(uint160(_stmL1Address))),
             _stmL2Address
         );

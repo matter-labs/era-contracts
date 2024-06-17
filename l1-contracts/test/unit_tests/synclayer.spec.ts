@@ -175,7 +175,7 @@ describe("Synclayer", function () {
     // const chainData = await adminFacet.readChainCommitment();
     const stmData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bytes"],
-      [ADDRESS_ONE, migratingDeployer.deployWallet.address, 21, initialDiamondCut]
+      [ADDRESS_ONE, migratingDeployer.deployWallet.address, await stateTransition.protocolVersion(), initialDiamondCut]
     );
     const bridgehubMintData = ethers.utils.defaultAbiCoder.encode(
       ["uint256", "bytes", "bytes"],

@@ -7,26 +7,19 @@ pragma solidity 0.8.24;
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
 import {IAdmin} from "./chain-interfaces/IAdmin.sol";
-// import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager, StateTransitionManagerInitializeData, ChainCreationParams} from "./IStateTransitionManager.sol";
-import {ISystemContext} from "./l2-deps/ISystemContext.sol";
 import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
-// import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
-// import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-// import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT, HyperchainCommitment} from "../common/Config.sol";
-import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
+import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 /// @title State Transition Manager contract
 /// @author Matter Labs
@@ -35,7 +28,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /// @notice Address of the bridgehub
-    IBridgehub public immutable BRIDGE_HUB;
+    address public immutable BRIDGE_HUB;
 
     /// @notice The total number of hyperchains can be created/connected to this STM.
     /// This is the temporary security measure.
@@ -47,7 +40,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The batch zero hash, calculated at initialization
     bytes32 public storedBatchZero;
 
-    /// @dev The stored cutData for diamond cut used at creating the chain
+    /// @dev The stored cutData for diamond cut
     bytes32 public initialCutHash;
 
     /// @dev The genesisUpgrade contract address, used to setChainId
@@ -71,16 +64,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The address to accept the admin role
     address private pendingAdmin;
 
-    /// @dev The stored cutData for diamond cut, differs on each settlement chain.
-    // todo: this is only used to check the cutHash before migrating, do we want this?. We could s
-    mapping(uint256 settlementChainId => bytes32 cutHash) public migrationCutHash;
-
-    // mapping(uint256 chainId => bytes32 lastMigrationTxHash) lastMigrationTxHashes;
-    // mapping(uint256 chainId => bytes32 lastChainCommitment) lastMigratedCommitments;
-
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub, uint256 _maxNumberOfHyperchains) reentrancyGuardInitializer {
+    constructor(address _bridgehub, uint256 _maxNumberOfHyperchains) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
         MAX_NUMBER_OF_HYPERCHAINS = _maxNumberOfHyperchains;
 
@@ -91,7 +77,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
-        require(msg.sender == address(BRIDGE_HUB), "STM: only bridgehub");
+        require(msg.sender == BRIDGE_HUB, "STM: only bridgehub");
         _;
     }
 
@@ -241,7 +227,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev check that the protocolVersion is active
-    function protocolVersionIsActive(uint256 _protocolVersion) public view override returns (bool) {
+    function protocolVersionIsActive(uint256 _protocolVersion) external view override returns (bool) {
         return block.timestamp <= protocolVersionDeadline[_protocolVersion];
     }
 
@@ -423,7 +409,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // TODO: Maybe `get` already ensured its existence.
         require(syncLayerAddress != address(0), "STM: sync layer not registered");
 
-        BRIDGE_HUB.registerSyncLayer(_newSyncLayerChainId, _isWhitelisted);
+        IBridgehub(BRIDGE_HUB).registerSyncLayer(_newSyncLayerChainId, _isWhitelisted);
 
         // TODO: emit event
     }
@@ -436,7 +422,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
         require(_newSyncLayerAdmin != address(0), "STM: admin zero");
         // todo check protocol version
-        return abi.encode(BRIDGE_HUB.baseToken(_chainId), _newSyncLayerAdmin, protocolVersion, _diamondCut);
+        return abi.encode(IBridgehub(BRIDGE_HUB).baseToken(_chainId), _newSyncLayerAdmin, protocolVersion, _diamondCut);
     }
 
     function bridgeMint(
@@ -452,7 +438,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         chainAddress = _deployNewChain({
             _chainId: _chainId,
             _baseToken: _baseToken,
-            _sharedBridge: address(BRIDGE_HUB.sharedBridge()),
+            _sharedBridge: address(IBridgehub(BRIDGE_HUB).sharedBridge()),
             _admin: _admin,
             _diamondCut: _diamondCut
         });

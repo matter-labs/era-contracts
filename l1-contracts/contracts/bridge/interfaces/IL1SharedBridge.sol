@@ -24,14 +24,14 @@ interface IL1SharedBridge {
         uint256 indexed chainId,
         bytes32 indexed txDataHash,
         address indexed from,
-        bytes32 assetInfo,
-        bytes32 bridgeMintCalldataHash
+        bytes32 assetId,
+        bytes bridgeMintCalldata
     );
 
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,
         address indexed from,
-        bytes32 assetInfo,
+        bytes32 assetId,
         uint256 amount
     );
 
@@ -46,23 +46,25 @@ interface IL1SharedBridge {
     event WithdrawalFinalizedSharedBridge(
         uint256 indexed chainId,
         address indexed to,
-        bytes32 indexed assetInfo,
-        bytes32 assetDataHash
+        bytes32 indexed assetId,
+        uint256 amount
     );
 
     event ClaimedFailedDepositSharedBridge(
         uint256 indexed chainId,
         address indexed to,
-        bytes32 indexed assetInfo,
+        bytes32 indexed assetId,
         bytes32 assetDataHash
     );
 
-    event AssetRegistered(
-        bytes32 indexed assetInfo,
-        address indexed _assetAddress,
+    event AssetHandlerRegisteredInitial(
+        bytes32 indexed assetId,
+        address indexed assetHandlerAddress,
         bytes32 indexed additionalData,
         address sender
     );
+
+    event AssetHandlerRegistered(bytes32 indexed assetId, address indexed assetHandlerAddress);
 
     function isWithdrawalFinalized(
         uint256 _chainId,
@@ -120,15 +122,6 @@ interface IL1SharedBridge {
         bytes32[] calldata _merkleProof
     ) external;
 
-    // function setEraPostDiamondUpgradeFirstBatch(uint256 _eraPostDiamondUpgradeFirstBatch) external;
-
-    // function setEraPostLegacyBridgeUpgradeFirstBatch(uint256 _eraPostLegacyBridgeUpgradeFirstBatch) external;
-
-    // function setEraLegacyBridgeLastDepositTime(
-    //     uint256 _eraLegacyBridgeLastDepositBatch,
-    //     uint256 _eraLegacyBridgeLastDepositTxNumber
-    // ) external;
-
     function L1_WETH_TOKEN() external view returns (address);
 
     function BRIDGE_HUB() external view returns (IBridgehub);
@@ -152,7 +145,7 @@ interface IL1SharedBridge {
 
     function bridgehubDepositBaseToken(
         uint256 _chainId,
-        bytes32 _assetInfo,
+        bytes32 _assetId,
         address _prevMsgSender,
         uint256 _amount
     ) external payable;
@@ -161,22 +154,20 @@ interface IL1SharedBridge {
 
     function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external;
 
-    // function receiveEth(uint256 _chainId) external payable;
-
     function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
 
-    function setAssetAddress(bytes32 _additionalData, address _assetAddress) external;
+    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external;
 
-    function assetAddress(bytes32 _assetInfo) external view returns (address);
+    function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 
     function nativeTokenVault() external view returns (IL1NativeTokenVault);
 
     function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external;
 
-    function claimFailedBurn(
+    function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         address _depositSender,
-        bytes32 _assetInfo,
+        bytes32 _assetId,
         bytes calldata _tokenData,
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,

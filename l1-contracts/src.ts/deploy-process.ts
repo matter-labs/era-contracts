@@ -65,17 +65,14 @@ export async function initialBridgehubDeployment(
     await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   }
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
-  if (deployer.isZkMode()) {
-    await deployer.updateBlobVersionedHashRetrieverZkMode();
-  } else {
-    await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
-  }
+
+  await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
   await deployer.deployStateTransitionManagerContract(create2Salt, extraFacets, gasPrice);
   await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
 
   // L2 Shared Bridge already deployed via L1 forced tx
   if (deployer.isZkMode()) {
-    await deployer.registerSharedBridge();
+    await deployer.registerAddresses();
   } else {
     await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
     await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
@@ -108,6 +105,7 @@ export async function registerHyperchain(
     validiumMode,
     extraFacets,
     gasPrice,
+    false,
     null,
     chainId,
     useGovernance

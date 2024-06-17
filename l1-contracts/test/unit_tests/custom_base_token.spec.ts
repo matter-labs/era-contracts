@@ -3,13 +3,12 @@ import * as hardhat from "hardhat";
 import { ethers, Wallet } from "ethers";
 import { Interface } from "ethers/lib/utils";
 
-import type { TestnetERC20Token, L1NativeTokenVault } from "../../typechain";
+import type { TestnetERC20Token } from "../../typechain";
 import { TestnetERC20TokenFactory } from "../../typechain";
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
 import type { IL1SharedBridge } from "../../typechain/IL1SharedBridge";
 import { IL1SharedBridgeFactory } from "../../typechain/IL1SharedBridgeFactory";
-import { L1NativeTokenVaultFactory } from "../../typechain/L1NativeTokenVaultFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
@@ -24,7 +23,6 @@ describe("Custom base token chain and bridge tests", () => {
   let deployWallet: Wallet;
   let deployer: Deployer;
   let l1SharedBridge: IL1SharedBridge;
-  let l1NativeTokenVault: L1NativeTokenVault;
   let bridgehub: IBridgehub;
   let baseToken: TestnetERC20Token;
   let baseTokenAddress: string;
@@ -64,11 +62,6 @@ describe("Custom base token chain and bridge tests", () => {
 
     // prepare the bridge
     l1SharedBridge = IL1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
-    l1NativeTokenVault = L1NativeTokenVaultFactory.connect(
-      deployer.addresses.Bridges.NativeTokenVaultProxy,
-      deployWallet
-    );
-    // await deployer.
   });
 
   it("Should have correct base token", async () => {
@@ -146,7 +139,7 @@ describe("Custom base token chain and bridge tests", () => {
       secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
         ["bytes32", "bytes", "address"],
         [
-          await l1NativeTokenVault.getAssetInfoFromLegacy(altTokenAddress),
+          ethers.utils.hexZeroPad(altTokenAddress, 32),
           new ethers.utils.AbiCoder().encode(["uint256"], [altTokenAmount]),
           await randomSigner.getAddress(),
         ]

@@ -6,7 +6,7 @@ import {Diamond} from "./libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+// import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 /// @notice Struct that holds all data needed for initializing STM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
@@ -73,7 +73,7 @@ interface IStateTransitionManager {
     /// @notice new ProtocolVersion
     event NewProtocolVersion(uint256 indexed oldProtocolVersion, uint256 indexed newProtocolVersion);
 
-    function BRIDGE_HUB() external view returns (IBridgehub);
+    function BRIDGE_HUB() external view returns (address);
 
     function setPendingAdmin(address _newPendingAdmin) external;
 
@@ -148,6 +148,8 @@ interface IStateTransitionManager {
         Diamond.DiamondCutData calldata _diamondCut
     ) external;
 
+    function getSemverProtocolVersion() external view returns (uint32, uint32, uint32);
+
     function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
 
     event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
@@ -166,5 +168,4 @@ interface IStateTransitionManager {
         address _prevMsgSender,
         bytes calldata _data
     ) external;
-    function getSemverProtocolVersion() external view returns (uint32, uint32, uint32);
 }

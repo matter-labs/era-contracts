@@ -11,7 +11,7 @@ import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
-import {Merkle} from "../../libraries/Merkle.sol";
+import {Merkle} from "../../../common/libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
@@ -20,7 +20,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, ETH_TOKEN_ADDRESS, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
@@ -106,16 +106,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         });
         return _proveL2LogInclusion(_l2BatchNumber, _l2MessageIndex, l2Log, _merkleProof);
     }
-
-    // /// @inheritdoc IMailbox
-    function proveL1ToL2TransactionStatusViaSyncLayer(
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof,
-        TxStatus _status
-    ) public view returns (bool) {}
 
     /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
     function _proveL2LogInclusion(
@@ -306,7 +296,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         request.refundRecipient = AddressAliasHelper.actualRefundRecipient(request.refundRecipient, request.sender);
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
-        // solhint-disable avoid-tx-origin
         // slither-disable-next-line tx-origin
         if (request.sender != tx.origin) {
             request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
@@ -468,9 +457,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         );
         IL1SharedBridge(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
-            (IL1SharedBridge(s.baseTokenBridge).nativeTokenVault()).getAssetInfo(ETH_TOKEN_ADDRESS),
+            s.baseTokenAssetId,
             msg.sender,
-            0
+            msg.value
         );
     }
 }

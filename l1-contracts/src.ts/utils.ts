@@ -10,7 +10,7 @@ import { DiamondInitFactory } from "../typechain";
 import type { DiamondCut, FacetCut } from "./diamondCut";
 import { diamondCut } from "./diamondCut";
 import { SYSTEM_CONFIG, web3Url } from "../scripts/utils";
-import { Wallet as ZkWallet, ContractFactory as ZkContractFactory, Provider } from "zksync-ethers";
+import { Wallet as ZkWallet, Provider } from "zksync-ethers";
 
 export const testConfigPath = process.env.ZKSYNC_ENV
   ? path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant")
@@ -22,6 +22,7 @@ export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.jso
 
 export const SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 export const ADDRESS_ONE = "0x0000000000000000000000000000000000000001";
+export const ETH_ADDRESS_IN_CONTRACTS = ADDRESS_ONE;
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 export const EMPTY_STRING_KECCAK = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
@@ -294,8 +295,6 @@ export function compileInitialCutHash(
       baseToken: "0x0000000000000000000000000000000000004234",
       baseTokenBridge: "0x0000000000000000000000000000000000004234",
       storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
-      // The exact value is not important as it will be overriden by the STM
-      // syncLayerState: 0,
       verifier,
       verifierParams,
       l2BootloaderBytecodeHash,

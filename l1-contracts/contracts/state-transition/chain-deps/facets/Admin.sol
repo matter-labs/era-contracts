@@ -4,23 +4,24 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
-import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
+import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_GAS_PER_TRANSACTION, HyperchainCommitment, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../../../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_GAS_PER_TRANSACTION, HyperchainCommitment, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT, COMPLEX_UPGRADER_ADDR, GENESIS_UPGRADE_ADDR} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
-import {ISystemContext} from "../../l2-deps/ISystemContext.sol";
-import {PriorityOperation} from "../../libraries/PriorityQueue.sol";
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {IComplexUpgrader} from "../../l2-deps/IComplexUpgrader.sol";
+import {IGenesisUpgrade} from "../../l2-deps/IGenesisUpgrade.sol";
+// import {PriorityOperation} from "../../libraries/PriorityQueue.sol";
+import {L2_FORCE_DEPLOYER_ADDR} from "../../../common/L2ContractAddresses.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 import {ProposedUpgrade} from "../../../upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "../../chain-interfaces/IVerifier.sol";
 import {IDefaultUpgrade} from "../../../upgrades/IDefaultUpgrade.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -153,14 +154,18 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         uint256 chainId = s.chainId;
 
-        bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (chainId));
+        bytes memory genesisUpgradeCalldata = abi.encodeCall(IGenesisUpgrade.upgrade, (chainId)); //todo
+        bytes memory complexUpgraderCalldata = abi.encodeCall(
+            IComplexUpgrader.upgrade,
+            (GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata)
+        );
         uint256[] memory uintEmptyArray;
         bytes[] memory bytesEmptyArray;
 
         L2CanonicalTransaction memory l2ProtocolUpgradeTx = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
-            to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)),
+            to: uint256(uint160(COMPLEX_UPGRADER_ADDR)),
             gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
             gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             maxFeePerGas: uint256(0),
@@ -170,7 +175,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
             nonce: minorVersion,
             value: 0,
             reserved: [uint256(0), 0, 0, 0],
-            data: systemContextCalldata,
+            data: complexUpgraderCalldata,
             signature: new bytes(0),
             factoryDeps: uintEmptyArray,
             paymasterInput: new bytes(0),
@@ -281,7 +286,8 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         // Note that this part is done in O(N), i.e. it is the responsibility of the admin of the chain to ensure that the total number of
         // outstanding committed batches is not too long.
-        for (uint256 i = 0; i < _commitment.batchHashes.length; i++) {
+        uint256 length = _commitment.batchHashes.length;
+        for (uint256 i = 0; i < length; ++i) {
             s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];
         }
 
@@ -290,7 +296,8 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         s.priorityQueue.head = pqHead;
         s.priorityQueue.tail = pqHead + _commitment.priorityQueueTxs.length;
 
-        for (uint256 i = 0; i < _commitment.priorityQueueTxs.length; i++) {
+        length = _commitment.priorityQueueTxs.length;
+        for (uint256 i = 0; i < length; ++i) {
             s.priorityQueue.data[pqHead + i] = _commitment.priorityQueueTxs[i];
         }
 
@@ -322,7 +329,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         PriorityOperation[] memory priorityQueueTxs = new PriorityOperation[](pqLength);
 
-        for (uint256 i = pqHead; i < s.priorityQueue.tail; i++) {
+        for (uint256 i = pqHead; i < s.priorityQueue.tail; ++i) {
             priorityQueueTxs[i] = s.priorityQueue.data[i];
         }
         commitment.priorityQueueTxs = priorityQueueTxs;
@@ -344,7 +351,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         bytes32[] memory batchHashes = new bytes32[](blocksToRemember);
 
-        for (uint256 i = 0; i < blocksToRemember; i++) {
+        for (uint256 i = 0; i < blocksToRemember; ++i) {
             unchecked {
                 batchHashes[i] = s.storedBatchHashes[commitment.totalBatchesExecuted + i];
             }

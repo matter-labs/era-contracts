@@ -8,17 +8,19 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
-import {IL2StandardDeployer} from "./interfaces/IL2StandardDeployer.sol";
+import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
+import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../L2ContractErrors.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
+contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     IL2SharedBridge public override l2Bridge;
 
     /// @dev Contract that stores the implementation address for token.
@@ -28,10 +30,13 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
 
-    mapping(bytes32 assetInfo => address tokenAddress) public override tokenAddress;
+    mapping(bytes32 assetId => address tokenAddress) public override tokenAddress;
 
     modifier onlyBridge() {
-        require(msg.sender == address(l2Bridge), "SD: only Bridge"); // Only L2 bridge can call this method
+        if (msg.sender != address(l2Bridge)) {
+            revert InvalidCaller(msg.sender);
+            // Only L2 bridge can call this method
+        }
         _;
     }
 
@@ -41,10 +46,17 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         _disableInitializers();
     }
 
-    /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
+    /// @dev Sets the Shared Bridge contract address. Should be called only once.
     function setSharedBridge(IL2SharedBridge _sharedBridge) external onlyOwner {
-        require(address(l2Bridge) == address(0), "SD: shared bridge already set");
-        require(address(_sharedBridge) != address(0), "SD: shared bridge 0");
+        if (address(l2Bridge) != address(0)) {
+            // "SD: shared bridge already set";
+            revert AddressMismatch(address(0), address(l2Bridge));
+        }
+        if (address(_sharedBridge) == address(0)) {
+            // "SD: shared bridge 0");
+            revert EmptyAddress();
+        }
+
         l2Bridge = _sharedBridge;
     }
 
@@ -57,8 +69,12 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         address _aliasedOwner,
         bool _contractsDeployedAlready
     ) external reinitializer(2) {
-        require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
-        require(_aliasedOwner != address(0), "sf");
+        if (_l2TokenProxyBytecodeHash == bytes32(0)) {
+            revert EmptyBytes32();
+        }
+        if (_aliasedOwner == address(0)) {
+            revert EmptyAddress();
+        }
 
         if (!_contractsDeployedAlready) {
             address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
@@ -70,46 +86,60 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         _transferOwnership(_aliasedOwner);
     }
 
-    function bridgeMint(uint256 _chainId, bytes32 _assetInfo, bytes calldata _data) external payable override {
-        address token = tokenAddress[_assetInfo];
+    function setL2TokenBeacon(address _l2TokenBeacon, bytes32 _l2TokenProxyBytecodeHash) external onlyOwner {
+        l2TokenBeacon = UpgradeableBeacon(_l2TokenBeacon);
+        l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
+        emit L2TokenBeaconUpdated(_l2TokenBeacon, _l2TokenProxyBytecodeHash);
+    }
+
+    function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable override {
+        address token = tokenAddress[_assetId];
         (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken) = abi
             .decode(_data, (address, uint256, address, bytes, address));
         address expectedToken = l2TokenAddress(originToken);
         if (token == address(0)) {
-            require(
-                _assetInfo ==
-                    keccak256(
-                        abi.encode(_chainId, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(originToken))))
-                    ),
-                "gg"
-            ); // Make sure that a NativeTokenVault sent the message
+            bytes32 expectedAssetId = keccak256(
+                abi.encode(_chainId, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(originToken))))
+            );
+            if (_assetId != expectedAssetId) {
+                // Make sure that a NativeTokenVault sent the message
+                revert AssetIdMismatch(_assetId, expectedAssetId);
+            }
             address deployedToken = _deployL2Token(originToken, erc20Data);
-            require(deployedToken == expectedToken, "mt");
-            tokenAddress[_assetInfo] = expectedToken;
+            if (deployedToken != expectedToken) {
+                revert AddressMismatch(expectedToken, deployedToken);
+            }
+            tokenAddress[_assetId] = expectedToken;
         }
 
         IL2StandardToken(expectedToken).bridgeMint(_l2Receiver, _amount);
         /// backwards compatible event
         emit FinalizeDeposit(_l1Sender, _l2Receiver, expectedToken, _amount);
+        // solhint-disable-next-line func-named-parameters
+        emit BridgeMint(_chainId, _assetId, _l1Sender, _l2Receiver, _amount);
     }
 
     function bridgeBurn(
         uint256 _chainId,
         uint256 _mintValue,
-        bytes32 _assetInfo,
+        bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override onlyBridge returns (bytes memory _bridgeBurnData) {
+    ) external payable override onlyBridge returns (bytes memory _bridgeMintData) {
         (uint256 _amount, address _l1Receiver) = abi.decode(_data, (uint256, address));
-        require(_amount > 0, "Amount cannot be zero");
+        if (_amount == 0) {
+            // "Amount cannot be zero");
+            revert AmountMustBeGreaterThanZero();
+        }
 
-        address l2Token = tokenAddress[_assetInfo];
+        address l2Token = tokenAddress[_assetId];
         IL2StandardToken(l2Token).bridgeBurn(_prevMsgSender, _amount);
 
         /// backwards compatible event
         emit WithdrawalInitiated(_prevMsgSender, _l1Receiver, l2Token, _amount);
         // solhint-disable-next-line func-named-parameters
-        _bridgeBurnData = abi.encodePacked(_chainId, _mintValue, _assetInfo, _prevMsgSender, _data);
+        emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _l1Receiver, _mintValue, _amount);
+        _bridgeMintData = _data;
     }
 
     /// @dev Deploy and initialize the L2 token for the L1 counterpart
@@ -137,7 +167,9 @@ contract L2StandardDeployer is IL2StandardDeployer, Ownable2StepUpgradeable {
         );
 
         // The deployment should be successful and return the address of the proxy
-        require(success, "mk");
+        if (!success) {
+            revert DeployFailed();
+        }
         proxy = BeaconProxy(abi.decode(returndata, (address)));
     }
 
