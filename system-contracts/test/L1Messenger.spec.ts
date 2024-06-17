@@ -4,8 +4,8 @@ import { L1MessengerFactory } from "../typechain";
 import { prepareEnvironment, setResult } from "./shared/mocks";
 import type { StateDiff } from "./shared/utils";
 import { compressStateDiffs, deployContractOnAddress, encodeStateDiffs, getCode, getWallets } from "./shared/utils";
-import { utils } from "zksync-web3";
-import type { Wallet } from "zksync-web3";
+import { utils } from "zksync-ethers";
+import type { Wallet } from "zksync-ethers";
 import {
   TEST_KNOWN_CODE_STORAGE_CONTRACT_ADDRESS,
   TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS,
