@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
 import {L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-import {IL1StandardAsset} from "../bridge/interfaces/IL1StandardAsset.sol";
+import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 
@@ -40,7 +40,7 @@ struct L2TransactionRequestTwoBridgesInner {
     bytes32 txDataHash;
 }
 
-interface IBridgehub {
+interface IBridgehub is IL1AssetHandler {
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
@@ -189,7 +189,7 @@ interface IBridgehub {
 
     function stmAssetInfoToAddress(bytes32 _assetInfo) external view returns (address);
 
-    function setAssetAddress(bytes32 _additionalData, address _assetAddress) external;
+    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetAddress) external;
 
     function L1_CHAIN_ID() external view returns (uint256);
 

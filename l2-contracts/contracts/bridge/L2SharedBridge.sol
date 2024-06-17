@@ -153,14 +153,6 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         emit AssetHandlerRegistered(_assetId, _assetAddress);
     }
 
-    /// @dev Used to set the assedAddress for a given assetInfo.
-    function setAssetAddress(bytes32 _additionalData, address _assetAddress) external {
-        address sender = AddressAliasHelper.undoL1ToL2Alias(msg.sender); // todo not nice fix
-        bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData)); /// todo make other asse
-        assetAddress[assetInfo] = _assetAddress;
-        emit AssetRegistered(assetInfo, _assetAddress, _additionalData, sender);
-    }
-
     /*//////////////////////////////////////////////////////////////
                             LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/

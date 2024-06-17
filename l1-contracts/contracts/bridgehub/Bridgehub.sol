@@ -22,6 +22,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice the asset id of Eth
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
+    /// @dev The chain id of L1, this contract will be deployed on multiple layers.
+    uint256 public immutable L1_CHAIN_ID;
+
     /// @notice all the ether is held by the weth bridge
     IL1SharedBridge public sharedBridge;
 
@@ -62,7 +65,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     mapping(uint256 chainId => address bridgehubCounterPart) public bridgehubCounterParts;
 
     /// @notice to avoid parity hack
-    constructor() reentrancyGuardInitializer {
+    constructor(uint256 _l1ChainId) reentrancyGuardInitializer {
+        _disableInitializers();
+        L1_CHAIN_ID = _l1ChainId;
         ETH_TOKEN_ASSET_ID = keccak256(
             abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
         );
@@ -75,6 +80,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     modifier onlyOwnerOrAdmin() {
         require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
+        _;
+    }
+
+    modifier onlyChainSTM(uint256 _chainId) {
+        require(msg.sender == stateTransitionManager[_chainId], "BH: not chain STM");
         _;
     }
 
@@ -160,7 +170,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @dev Used to set the assedAddress for a given assetInfo.
-    function setAssetAddress(bytes32 _additionalData, address _assetAddress) external {
+    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetAddress) external {
         address sender = L1_CHAIN_ID == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender); // Todo: this might be dangerous. We should decide based on the tx type.
         bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData)); /// todo make other asse
         stmAssetInfoToAddress[assetInfo] = _assetAddress;
@@ -430,14 +440,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function bridgeBurn(
         uint256 _settlementChainId,
         uint256,
-        bytes32 _assetInfo,
+        bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable override returns (bytes memory bridgehubMintData) {
         require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
 
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainData) = abi.decode(_data, (uint256, bytes, bytes));
-        require(_assetInfo == stmAssetInfoFromChainId(_chainId), "BH: assetInfo 1");
+        require(_assetId == stmAssetInfoFromChainId(_chainId), "BH: assetInfo 1");
         require(settlementLayer[_chainId] == block.chainid, "BH: not current SL");
         settlementLayer[_chainId] = _settlementChainId;
 
@@ -454,12 +464,16 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // TODO: double check that get only returns when chain id is there.
     }
 
-    function bridgeMint(uint256, bytes32 _assetInfo, bytes calldata _bridgehubMintData) external payable override {
+    function bridgeMint(
+        uint256,
+        bytes32 _assetId,
+        bytes calldata _bridgehubMintData
+    ) external payable override returns (address l1Receiver) {
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainMintData) = abi.decode(
             _bridgehubMintData,
             (uint256, bytes, bytes)
         );
-        address stm = stmAssetInfoToAddress[_assetInfo];
+        address stm = stmAssetInfoToAddress[_assetId];
         require(stm != address(0), "BH: assetInfo 2");
         require(settlementLayer[_chainId] != block.chainid, "BH: already current SL");
 
@@ -471,11 +485,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         }
 
         IZkSyncHyperchain(hyperchain).bridgeMint(_chainMintData);
+        return address(0);
     }
 
-    function bridgeClaimFailedBurn(
+    function bridgeRecoverFailedTransfer(
         uint256 _chainId,
-        bytes32 _assetInfo,
+        bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable override {}

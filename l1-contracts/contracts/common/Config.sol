@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+import {PriorityOperation} from "../state-transition/libraries/PriorityQueue.sol";
+
 /// @dev `keccak256("")`
 bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 

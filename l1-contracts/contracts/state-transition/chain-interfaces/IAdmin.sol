@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IZkSyncHyperchainBase} from "../chain-interfaces/IZkSyncHyperchainBase.sol";
+import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
@@ -64,6 +65,8 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @dev Both the admin and the STM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
 
+    function setChainIdUpgrade(address _genesisUpgrade) external;
+
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
 
@@ -99,6 +102,9 @@ interface IAdmin is IZkSyncHyperchainBase {
 
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
+
+    /// TODO: maybe include some params
+    event MigrationComplete();
 
     /// @notice Emitted when the contract is frozen.
     event Freeze();

@@ -16,12 +16,16 @@ import {
 import {
   deployViaCreate2 as deployViaCreate2Zk,
   BUILT_IN_ZKSYNC_CREATE2_FACTORY,
-  deployBytecodeViaCreate2OnPath,
-  L2_SHARED_BRIDGE_PATH,
+  // deployBytecodeViaCreate2OnPath,
+  // L2_SHARED_BRIDGE_PATH,
 } from "./deploy-utils-zk";
-import {   packSemver,
-  readBatchBootloaderBytecode, readSystemContractsBytecode,  unpackStringSemVer,
-  SYSTEM_CONFIG } from "../scripts/utils";
+import {
+  packSemver,
+  readBatchBootloaderBytecode,
+  readSystemContractsBytecode,
+  unpackStringSemVer,
+  SYSTEM_CONFIG,
+} from "../scripts/utils";
 import { getTokens } from "./deploy-token";
 import {
   ADDRESS_ONE,

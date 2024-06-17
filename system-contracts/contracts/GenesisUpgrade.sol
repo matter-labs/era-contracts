@@ -9,8 +9,8 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
 /// @notice The contract that can be used for deterministic contract deployment.
-contract GenesisUpgrade { 
-    function genesisUpgrade(uint256 _chainId, IContractDeployer.ForceDeployment[] calldata _forceDeployments){
+contract GenesisUpgrade {
+    function genesisUpgrade(uint256 _chainId, IContractDeployer.ForceDeployment[] calldata _forceDeployments) external {
         require(_chainId == 0, "Invalid chainId");
         ISystemContext(SYSTEM_CONTEXT_CONTRACT).setChainId(_chainId);
         forceDeploy(_forceDeployments);

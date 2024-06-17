@@ -220,8 +220,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
         // We want the hashes of l2 system upgrade transactions to be unique.
         // This is why we require that the `nonce` field is unique to each upgrade.
+        (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(_l2ProtocolUpgradeTx.nonce));
         require(
-            _l2ProtocolUpgradeTx.nonce == _newMinorProtocolVersion,
+            minorVersion == _newMinorProtocolVersion,
             "The new protocol version should be included in the L2 system upgrade tx"
         );
 

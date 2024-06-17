@@ -307,25 +307,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
     }
 
-    function _transferAllowanceToNTV(bytes32 _assetInfo, uint256 _amount, address _prevMsgSender) internal {
-        // assetInfo might be padded token address, or it might be asset info (get token from NTV)
-        // do the transfer if allowance is bigger than amount
-        address asset = assetAddress[_assetInfo];
-        address l1TokenAddress = nativeTokenVault.tokenAddress(_assetInfo);
-        if (asset == address(0) && (uint256(_assetInfo) <= type(uint160).max)) {
-            l1TokenAddress = address(uint160(uint256(_assetInfo)));
-        } else if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
-            return;
-        }
-        IERC20 l1Token = IERC20(l1TokenAddress);
-
-        if (l1Token.allowance(_prevMsgSender, address(this)) >= _amount) {
-            // slither-disable-next-line arbitrary-send-erc20
-            l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
-            l1Token.safeIncreaseAllowance(address(nativeTokenVault), _amount);
-        }
-    }
-
     /// @notice Initiates a deposit transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
     function bridgehubDeposit(
         uint256 _chainId,
@@ -715,7 +696,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        bytes32 assetId = nativeTokenVault.getAssetId(_l1Asset);
+        bytes32 assetId = nativeTokenVault.getAssetId(_l1Token);
         bytes memory transferData = abi.encode(_amount, _depositSender);
         bridgeRecoverFailedTransfer({
             _chainId: _chainId,
@@ -772,7 +753,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
         bytes32 _assetId;
         bytes memory bridgeMintCalldata;
-xw
         {
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);

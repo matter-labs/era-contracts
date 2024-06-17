@@ -10,21 +10,16 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
 import {IAdmin} from "./chain-interfaces/IAdmin.sol";
-import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager, StateTransitionManagerInitializeData, ChainCreationParams} from "./IStateTransitionManager.sol";
-import {ISystemContext} from "./l2-deps/ISystemContext.sol";
 import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
-import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
-import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
+import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 /// @title State Transition Manager contract
 /// @author Matter Labs
@@ -306,7 +301,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// registration
-    
+
     /// @dev used to register already deployed hyperchain contracts
     /// @param _chainId the chain's id
     /// @param _hyperchain the chain's contract address
@@ -410,7 +405,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // TODO: Maybe `get` already ensured its existence.
         require(syncLayerAddress != address(0), "STM: sync layer not registered");
 
-        BRIDGE_HUB.registerSyncLayer(_newSyncLayerChainId, _isWhitelisted);
+        IBridgehub(BRIDGE_HUB).registerSyncLayer(_newSyncLayerChainId, _isWhitelisted);
 
         // TODO: emit event
     }
@@ -423,7 +418,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
         require(_newSyncLayerAdmin != address(0), "STM: admin zero");
         // todo check protocol version
-        return abi.encode(BRIDGE_HUB.baseToken(_chainId), _newSyncLayerAdmin, protocolVersion, _diamondCut);
+        return abi.encode(IBridgehub(BRIDGE_HUB).baseToken(_chainId), _newSyncLayerAdmin, protocolVersion, _diamondCut);
     }
 
     function bridgeMint(
@@ -439,7 +434,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         chainAddress = _deployNewChain({
             _chainId: _chainId,
             _baseToken: _baseToken,
-            _sharedBridge: address(BRIDGE_HUB.sharedBridge()),
+            _sharedBridge: address(IBridgehub(BRIDGE_HUB).sharedBridge()),
             _admin: _admin,
             _diamondCut: _diamondCut
         });

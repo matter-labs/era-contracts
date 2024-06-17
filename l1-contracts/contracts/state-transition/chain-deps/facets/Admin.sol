@@ -13,8 +13,8 @@ import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 import {IComplexUpgrader} from "../../l2-deps/IComplexUpgrader.sol";
 import {IGenesisUpgrade} from "../../l2-deps/IGenesisUpgrade.sol";
-import {PriorityOperation} from "../../libraries/PriorityQueue.sol";
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../common/L2ContractAddresses.sol";
+// import {PriorityOperation} from "../../libraries/PriorityQueue.sol";
+import {L2_FORCE_DEPLOYER_ADDR} from "../../../common/L2ContractAddresses.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 import {ProposedUpgrade} from "../../../upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "../../chain-interfaces/IVerifier.sol";
@@ -27,6 +27,8 @@ import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBas
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
+    using PriorityQueue for PriorityQueue.Queue;
+
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "AdminFacet";
 
@@ -146,8 +148,11 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         uint256 currentProtocolVersion = s.protocolVersion;
         uint256 chainId = s.chainId;
 
-        bytes memory genesisUpgradeCalldata = abi.encodeCall(IGenesisUpgrade.upgrade, (chainId )); //todo
-        bytes memory complexUpgraderCalldata = abi.encodeCall(IComplexUpgrader.upgrade, (GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata));
+        bytes memory genesisUpgradeCalldata = abi.encodeCall(IGenesisUpgrade.upgrade, (chainId)); //todo
+        bytes memory complexUpgraderCalldata = abi.encodeCall(
+            IComplexUpgrader.upgrade,
+            (GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata)
+        );
         uint256[] memory uintEmptyArray;
         bytes[] memory bytesEmptyArray;
 

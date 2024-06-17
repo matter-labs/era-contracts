@@ -659,19 +659,19 @@ contract ExperimentalBridgeTest is Test {
     //     mockChainContract.setBridgeHubAddress(address(bridgeHub));
     //     assertTrue(mockChainContract.getBridgeHubAddress() == address(bridgeHub));
 
-        // bytes32 baseTokenAssetIdLocation = bytes32(uint256(208));
-        // vm.store(
-        //     address(bridgeHub),
-        //     keccak256(abi.encode(l2TxnReqDirect.chainId, baseTokenAssetIdLocation)),
-        //     ETH_TOKEN_ASSET_ID
-        // );
-        // vm.mockCall(
-        //     address(mockSharedBridge),
-        //     abi.encodeWithSelector(IL1SharedBridge.bridgehubDepositBaseToken.selector),
-        //     abi.encode(true)
-        // );
+    // bytes32 baseTokenAssetIdLocation = bytes32(uint256(208));
+    // vm.store(
+    //     address(bridgeHub),
+    //     keccak256(abi.encode(l2TxnReqDirect.chainId, baseTokenAssetIdLocation)),
+    //     ETH_TOKEN_ASSET_ID
+    // );
+    // vm.mockCall(
+    //     address(mockSharedBridge),
+    //     abi.encodeWithSelector(IL1SharedBridge.bridgehubDepositBaseToken.selector),
+    //     abi.encode(true)
+    // );
 
-        // vm.txGasPrice(0.05 ether);
+    // vm.txGasPrice(0.05 ether);
 
     //     vm.prank(randomCaller);
     //     bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
@@ -738,23 +738,23 @@ contract ExperimentalBridgeTest is Test {
     //     testToken.mint(randomCaller, l2TxnReqDirect.mintValue);
     //     assertEq(testToken.balanceOf(randomCaller), l2TxnReqDirect.mintValue);
 
-        // vm.prank(randomCaller);
-        // testToken.transfer(address(this), l2TxnReqDirect.mintValue);
-        // assertEq(testToken.balanceOf(address(this)), l2TxnReqDirect.mintValue);
-        // testToken.approve(address(mockSharedBridge), l2TxnReqDirect.mintValue);
-        // bytes32 baseTokenAssetIdLocation = bytes32(uint256(208));
-        // vm.store(
-        //     address(bridgeHub),
-        //     keccak256(abi.encode(l2TxnReqDirect.chainId, baseTokenAssetIdLocation)),
-        //     tokenAssetId
-        // );
-        // //bytes32 resultantHash =
-        // vm.mockCall(
-        //     address(mockSharedBridge),
-        //     abi.encodeWithSelector(IL1SharedBridge.bridgehubDepositBaseToken.selector),
-        //     abi.encode(true)
-        // );
-        // resultantHash = bridgeHub.requestL2TransactionDirect(l2TxnReqDirect);
+    // vm.prank(randomCaller);
+    // testToken.transfer(address(this), l2TxnReqDirect.mintValue);
+    // assertEq(testToken.balanceOf(address(this)), l2TxnReqDirect.mintValue);
+    // testToken.approve(address(mockSharedBridge), l2TxnReqDirect.mintValue);
+    // bytes32 baseTokenAssetIdLocation = bytes32(uint256(208));
+    // vm.store(
+    //     address(bridgeHub),
+    //     keccak256(abi.encode(l2TxnReqDirect.chainId, baseTokenAssetIdLocation)),
+    //     tokenAssetId
+    // );
+    // //bytes32 resultantHash =
+    // vm.mockCall(
+    //     address(mockSharedBridge),
+    //     abi.encodeWithSelector(IL1SharedBridge.bridgehubDepositBaseToken.selector),
+    //     abi.encode(true)
+    // );
+    // resultantHash = bridgeHub.requestL2TransactionDirect(l2TxnReqDirect);
 
     //     assertEq(canonicalHash, resultantHash);
     // }
@@ -792,29 +792,29 @@ contract ExperimentalBridgeTest is Test {
     //     address randomCaller = makeAddr("RANDOM_CALLER");
     //     vm.deal(randomCaller, callerMsgValue);
 
-        // mockChainContract.setBridgeHubAddress(address(bridgeHub));
-        // {
-        //     bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+    // mockChainContract.setBridgeHubAddress(address(bridgeHub));
+    // {
+    //     bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
 
-        //     vm.mockCall(
-        //         address(mockChainContract),
-        //         abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
-        //         abi.encode(canonicalHash)
-        //     );
-        // }
-        // bytes32 baseTokenAssetIdLocation = bytes32(uint256(208));
-        // vm.store(
-        //     address(bridgeHub),
-        //     keccak256(abi.encode(l2TxnReq2BridgeOut.chainId, baseTokenAssetIdLocation)),
-        //     ETH_TOKEN_ASSET_ID
-        // );
-        // vm.mockCall(
-        //     address(mockSharedBridge),
-        //     abi.encodeWithSelector(IL1SharedBridge.bridgehubDepositBaseToken.selector),
-        //     abi.encode(true)
-        // );
-        // vm.prank(randomCaller);
-        // bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
+    //     vm.mockCall(
+    //         address(mockChainContract),
+    //         abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
+    //         abi.encode(canonicalHash)
+    //     );
+    // }
+    // bytes32 baseTokenAssetIdLocation = bytes32(uint256(208));
+    // vm.store(
+    //     address(bridgeHub),
+    //     keccak256(abi.encode(l2TxnReq2BridgeOut.chainId, baseTokenAssetIdLocation)),
+    //     ETH_TOKEN_ASSET_ID
+    // );
+    // vm.mockCall(
+    //     address(mockSharedBridge),
+    //     abi.encodeWithSelector(IL1SharedBridge.bridgehubDepositBaseToken.selector),
+    //     abi.encode(true)
+    // );
+    // vm.prank(randomCaller);
+    // bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
 
     //     assertTrue(true);
     // }

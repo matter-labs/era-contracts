@@ -7,7 +7,6 @@ import * as ethers from "ethers";
 import type { BigNumberish, Wallet } from "ethers";
 import { Interface } from "ethers/lib/utils";
 import * as zkethers from "zksync-ethers";
-import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/utils";
 import * as fs from "fs";
 
 import type { FacetCut } from "./diamondCut";
@@ -29,6 +28,7 @@ import {
   ADDRESS_ONE,
   EMPTY_STRING_KECCAK,
   isCurrentNetworkLocal,
+  ETH_ADDRESS_IN_CONTRACTS,
 } from "./utils";
 import { diamondCut, getCurrentFacetCutsForAdd, facetCut, Action } from "./diamondCut";
 import { CONTRACTS_GENESIS_PROTOCOL_VERSION } from "../test/unit_tests/utils";
