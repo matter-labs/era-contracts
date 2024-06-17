@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-// slither-disable unused-return
+// slither-disable-next-line unused-return
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
@@ -60,6 +60,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _owner Address which can change
     function initialize(address _owner) external reentrancyGuardInitializer initializer {
         require(_owner != address(0), "ShB owner 0");
+        // slither-disable-next-line unused-return
         sharedTree.setup(bytes32(0));
         _transferOwnership(_owner);
     }
@@ -68,7 +69,9 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
         chainIndex[_chainId] = chainCount;
         chainIndexToId[chainCount] = _chainId;
         chainCount++;
+        // slither-disable-next-line unused-return
         bytes32 initialHash = chainTree[_chainId].setup(keccak256("New Tree zero hash"));
+        // slither-disable-next-line unused-return
         sharedTree.pushNewLeaf(initialHash);
     }
 
@@ -83,9 +86,11 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
         bool _updateFullTree
     ) external onlyChain(_chainId) {
         bytes32 chainRoot;
+        // slither-disable-next-line unused-return
         (, chainRoot) = chainTree[_chainId].push(_chainBatchRoot);
 
         if (_updateFullTree) {
+            // slither-disable-next-line unused-return
             sharedTree.updateLeaf(chainIndex[_chainId], chainRoot);
         }
     }
@@ -95,7 +100,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
         for (uint256 i = 0; i < chainCount; i++) {
             newLeaves[i] = chainTree[chainIndexToId[i]].root();
         }
-
+        // slither-disable-next-line unused-return
         sharedTree.updateAllLeaves(newLeaves);
     }
 }
