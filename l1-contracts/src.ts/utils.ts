@@ -10,7 +10,7 @@ import { DiamondInitFactory } from "../typechain";
 import type { DiamondCut, FacetCut } from "./diamondCut";
 import { diamondCut } from "./diamondCut";
 import { SYSTEM_CONFIG, web3Url } from "../scripts/utils";
-import { Wallet as ZkWallet, ContractFactory as ZkContractFactory, Provider } from "zksync-ethers";
+import { Wallet as ZkWallet, Provider } from "zksync-ethers";
 
 export const testConfigPath = process.env.ZKSYNC_ENV
   ? path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant")

@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 // slither-disable-next-line unused-return
+// solhint-disable reason-string, gas-custom-errors
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
@@ -68,7 +69,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
     function addNewChain(uint256 _chainId) external onlyBridgehub {
         chainIndex[_chainId] = chainCount;
         chainIndexToId[chainCount] = _chainId;
-        chainCount++;
+        ++chainCount;
         // slither-disable-next-line unused-return
         bytes32 initialHash = chainTree[_chainId].setup(keccak256("New Tree zero hash"));
         // slither-disable-next-line unused-return
@@ -97,7 +98,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     function updateFullTree() external {
         bytes32[] memory newLeaves;
-        for (uint256 i = 0; i < chainCount; i++) {
+        for (uint256 i = 0; i < chainCount; ++i) {
             newLeaves[i] = chainTree[chainIndexToId[i]].root();
         }
         // slither-disable-next-line unused-return

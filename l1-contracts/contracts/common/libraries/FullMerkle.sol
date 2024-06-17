@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable reason-string, gas-custom-errors
+
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {Arrays} from "./openzeppelin/Arrays.sol";
 // import "forge-std/console.sol";
