@@ -4,6 +4,8 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_GAS_PER_TRANSACTION, HyperchainCommitment, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT, COMPLEX_UPGRADER_ADDR, GENESIS_UPGRADE_ADDR} from "../../../common/Config.sol";
@@ -19,6 +21,7 @@ import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 import {ProposedUpgrade} from "../../../upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "../../chain-interfaces/IVerifier.sol";
 import {IDefaultUpgrade} from "../../../upgrades/IDefaultUpgrade.sol";
+import {SemVer} from "../../../common/libraries/SemVer.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -156,6 +159,9 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         uint256[] memory uintEmptyArray;
         bytes[] memory bytesEmptyArray;
 
+        // slither-disable-next-line unused-return
+        (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(currentProtocolVersion));
+
         L2CanonicalTransaction memory l2ProtocolUpgradeTx = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
@@ -166,7 +172,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
             maxPriorityFeePerGas: uint256(0),
             paymaster: uint256(0),
             // Note, that the protocol version is used as "nonce" for system upgrade transactions
-            nonce: currentProtocolVersion,
+            nonce: uint256(minorVersion),
             value: 0,
             reserved: [uint256(0), 0, 0, 0],
             data: complexUpgraderCalldata,
