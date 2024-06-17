@@ -112,6 +112,10 @@ address constant NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS = address(2);
 /// @dev https://eips.ethereum.org/EIPS/eip-1352
 address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint16).max));
 
+address constant COMPLEX_UPGRADER_ADDR = address(0x800f);
+
+address constant GENESIS_UPGRADE_ADDR = address(0x8000);
+
 /// FIXME: move to a different file
 
 struct StoredBatchHashInfo {

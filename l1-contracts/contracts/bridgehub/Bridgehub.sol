@@ -68,7 +68,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @notice used to initialize the contract
-    function initialize(address _owner) external reentrancyGuardInitializer {
+    function initialize(address _owner) external reentrancyGuardInitializer initializer {
         _transferOwnership(_owner);
     }
 

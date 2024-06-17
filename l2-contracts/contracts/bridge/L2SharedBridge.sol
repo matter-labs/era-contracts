@@ -97,6 +97,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
             IL2StandardAsset(asset).bridgeMint(L1_CHAIN_ID, _assetInfo, _data);
         } else {
             IL2StandardAsset(standardDeployer).bridgeMint(L1_CHAIN_ID, _assetInfo, _data);
+            // Todo: registerAsset at L2StandardDeployer with NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS
         }
 
         emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetInfo, keccak256(_data));
