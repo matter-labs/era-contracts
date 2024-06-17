@@ -148,7 +148,10 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
     function setChainIdUpgrade(address _genesisUpgrade) external onlyStateTransitionManager {
-        uint256 currentProtocolVersion = s.protocolVersion;
+        uint256 cachedProtocolVersion = s.protocolVersion;
+        // slither-disable-next-line unused-return
+        (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(cachedProtocolVersion));
+
         uint256 chainId = s.chainId;
 
         bytes memory genesisUpgradeCalldata = abi.encodeCall(IGenesisUpgrade.upgrade, (chainId)); //todo
@@ -158,9 +161,6 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         );
         uint256[] memory uintEmptyArray;
         bytes[] memory bytesEmptyArray;
-
-        // slither-disable-next-line unused-return
-        (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(currentProtocolVersion));
 
         L2CanonicalTransaction memory l2ProtocolUpgradeTx = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
@@ -172,7 +172,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
             maxPriorityFeePerGas: uint256(0),
             paymaster: uint256(0),
             // Note, that the protocol version is used as "nonce" for system upgrade transactions
-            nonce: uint256(minorVersion),
+            nonce: minorVersion,
             value: 0,
             reserved: [uint256(0), 0, 0, 0],
             data: complexUpgraderCalldata,
@@ -196,7 +196,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
             upgradeTimestamp: 0,
-            newProtocolVersion: currentProtocolVersion
+            newProtocolVersion: cachedProtocolVersion
         });
 
         Diamond.FacetCut[] memory emptyArray;
@@ -207,7 +207,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         });
 
         Diamond.diamondCut(cutData);
-        emit SetChainIdUpgrade(address(this), l2ProtocolUpgradeTx, currentProtocolVersion);
+        emit SetChainIdUpgrade(address(this), l2ProtocolUpgradeTx, cachedProtocolVersion);
     }
 
     /*//////////////////////////////////////////////////////////////

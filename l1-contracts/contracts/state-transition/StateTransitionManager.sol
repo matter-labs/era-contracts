@@ -276,23 +276,27 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev setPriorityTxMaxGasLimit for the specified chain
-    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// @dev setTokenMultiplier for the specified chain
-    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setTokenMultiplier(_nominator, _denominator);
+    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).setTokenMultiplier(_nominator, _denominator);
     }
 
     /// @dev changeFeeParams for the specified chain
-    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).changeFeeParams(_newFeeParams);
+    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).changeFeeParams(_newFeeParams);
     }
 
     /// @dev setValidator for the specified chain
-    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwnerOrAdmin {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setValidator(_validator, _active);
+    function setValidator(uint256 _chainId, address _validator, bool _active) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).setValidator(_validator, _active);
     }
 
     /// @dev setPorterAvailability for the specified chain

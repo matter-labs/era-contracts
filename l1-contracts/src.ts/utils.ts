@@ -9,7 +9,8 @@ import * as path from "path";
 import { DiamondInitFactory } from "../typechain";
 import type { DiamondCut, FacetCut } from "./diamondCut";
 import { diamondCut } from "./diamondCut";
-import { SYSTEM_CONFIG } from "../scripts/utils";
+import { SYSTEM_CONFIG, web3Url } from "../scripts/utils";
+import { Wallet as ZkWallet, ContractFactory as ZkContractFactory, Provider } from "zksync-ethers";
 
 export const testConfigPath = process.env.ZKSYNC_ENV
   ? path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant")
@@ -184,6 +185,14 @@ export interface L2CanonicalTransaction {
   reservedDynamic: BytesLike;
 }
 
+export function ethersWalletToZkWallet(wallet: ethers.Wallet): ZkWallet {
+  return new ZkWallet(wallet.privateKey, new Provider(web3Url()));
+}
+
+export function isZKMode(): boolean {
+  return process.env.CONTRACTS_BASE_NETWORK_ZKSYNC === "true";
+}
+
 const LOCAL_NETWORKS = ["localhost", "hardhat", "localhostL2"];
 
 export function isCurrentNetworkLocal(): boolean {
@@ -286,6 +295,8 @@ export function compileInitialCutHash(
       baseToken: "0x0000000000000000000000000000000000004234",
       baseTokenBridge: "0x0000000000000000000000000000000000004234",
       storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
+      // The exact value is not important as it will be overriden by the STM
+      syncLayerState: 0,
       verifier,
       verifierParams,
       l2BootloaderBytecodeHash,
