@@ -354,12 +354,12 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
-        IBridgehub bridgehub = IBridgehub(s.bridgehub);
-        bridgehub.messageRoot().addChainBatchRoot(
-            s.chainId,
-            _storedBatch.l2LogsTreeRoot,
-            block.chainid != bridgehub.L1_CHAIN_ID()
-        );
+        // IBridgehub bridgehub = IBridgehub(s.bridgehub);
+        // bridgehub.messageRoot().addChainBatchRoot(
+        //     s.chainId,
+        //     _storedBatch.l2LogsTreeRoot,
+        //     block.chainid != bridgehub.L1_CHAIN_ID()
+        // );
     }
 
     /// @inheritdoc IExecutor

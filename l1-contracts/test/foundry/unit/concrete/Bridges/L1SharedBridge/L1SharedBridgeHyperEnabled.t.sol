@@ -123,7 +123,7 @@ contract L1SharedBridgeHyperEnabledTest is L1SharedBridgeTest {
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
-            _l1Asset: address(token),
+            _l1Token: address(token),
             _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
@@ -166,7 +166,7 @@ contract L1SharedBridgeHyperEnabledTest is L1SharedBridgeTest {
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
-            _l1Asset: ETH_TOKEN_ADDRESS,
+            _l1Token: ETH_TOKEN_ADDRESS,
             _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,

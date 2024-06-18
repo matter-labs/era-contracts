@@ -188,7 +188,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
 
         sharedBridge.claimFailedDepositLegacyErc20Bridge({
             _depositSender: alice,
-            _l1Asset: address(token),
+            _l1Token: address(token),
             _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
