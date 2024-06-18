@@ -9,6 +9,7 @@ import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, STATE_DIFF_ENTRY_SIZE, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER, COMPUTATIONAL_PRICE_FOR_PUBDATA} from "./Constants.sol";
 import {ReconstructionMismatch, PubdataField} from "./SystemContractErrors.sol";
+import {IL2DAValidator} from "../../l2-contracts/contracts/interfaces/IL2DAValidator.sol";
 
 /**
  * @author Matter Labs
@@ -193,6 +194,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     /// @dev Performs calculation of L2ToL1Logs merkle tree root, "sends" such root and keccak256(totalL2ToL1Pubdata)
     /// to L1 using low-level (VM) L2Log.
     function publishPubdataAndClearState(
+        address _l2DAValidator,
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
     ) external onlyCallFromBootloader {
         uint256 calldataPtr = 0;
@@ -331,7 +333,9 @@ contract L1Messenger is IL1Messenger, ISystemContract {
             );
         }
 
-        PUBDATA_CHUNK_PUBLISHER.chunkAndPublishPubdata(totalL2ToL1Pubdata);
+        uint8 blobsUsed = PUBDATA_CHUNK_PUBLISHER.chunkAndPublishPubdata(totalL2ToL1Pubdata);
+        IL2DAValidator(_l2DAValidator).produceDACommitment(totalL2ToL1Pubdata, stateDiffHash, blobsUsed);
+
 
         /// Native (VM) L2 to L1 log
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), l2ToL1LogsTreeRoot);
