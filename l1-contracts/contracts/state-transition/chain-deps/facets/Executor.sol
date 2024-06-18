@@ -139,12 +139,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             if (logKey == uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lm");
                 logOutput.l2LogsTreeRoot = logValue;
-            } else if (logKey == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY)) {
-                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
-                logOutput.pubdataHash = logValue;
-            } else if (logKey == uint256(SystemLogKey.STATE_DIFF_HASH_KEY)) {
-                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lb");
-                logOutput.stateDiffHash = logValue;
             } else if (logKey == uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)) {
                 require(logSender == L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, "sc");
                 logOutput.packedBatchAndL2BlockTimestamp = uint256(logValue);
@@ -160,7 +154,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             } else if (
                 logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)
             ) {
-                require(logSender == L2_BOOTLOADER_ADDRESS, "bk");
+                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "bk");
                 require(s.l2DAValidator == address(uint160(uint256(logValue))), "lo");
             } else if(logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY) ) {
                 require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "lp");

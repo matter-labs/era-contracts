@@ -327,26 +327,6 @@ object "Bootloader" {
                 ret := mul(COMPRESSED_BYTECODES_END_SLOT(), 32)
             }
 
-            function L2_DA_VALIDATOR_ADDR_SLOTS() -> ret {
-                ret := 1
-            }
-
-            function L2_DA_VALIDATOR_ADDR_BEGIN_SLOT() -> ret {
-                ret := COMPRESSED_BYTECODES_END_SLOT()
-            }
-
-            function L2_DA_VALIDATOR_ADDR_BEGIN_BYTE() -> ret {
-                ret := mul(L2_DA_VALIDATOR_ADDR_BEGIN_SLOT(), 32)
-            }
-
-            function L2_DA_VALIDATOR_ADDR_END_SLOT() -> ret {
-                ret := add(L2_DA_VALIDATOR_ADDR_BEGIN_SLOT(), L2_DA_VALIDATOR_ADDR_SLOTS())
-            }
-
-            function L2_DA_VALIDATOR_ADDR_END_BYTE() -> ret {
-                ret := mul(L2_DA_VALIDATOR_ADDR_END_SLOT(), 32)
-            }
-
             /// @dev Slots needed to store priority txs L1 data (`chainedPriorityTxsHash` and `numberOfLayer1Txs`).
             function PRIORITY_TXS_L1_DATA_RESERVED_SLOTS() -> ret {
                 ret := 2
@@ -354,7 +334,7 @@ object "Bootloader" {
 
             /// @dev Slot from which storing of the priority txs L1 data begins.
             function PRIORITY_TXS_L1_DATA_BEGIN_SLOT() -> ret {
-                ret := L2_DA_VALIDATOR_ADDR_END_SLOT()
+                ret := add(COMPRESSED_BYTECODES_BEGIN_SLOT(), COMPRESSED_BYTECODES_SLOTS())
             }
 
             /// @dev The byte from which storing of the priority txs L1 data begins.
@@ -2752,16 +2732,13 @@ object "Bootloader" {
                 debugLog("Publishing batch data to L1", 0)
                 // First slot (only last 4 bytes) -- selector
                 mstore(ptr, {{PUBLISH_PUBDATA_SELECTOR}})
-                // TODO: this code is wrong, provide the L2DataAvailabilityValidator address to the L1Messenger call properly
-                // Second slot -- l2DAValidator address
-                mstore(add(ptr, 32), L2_DATA_AVAILABILITY_VALIDATOR_ADDR())
-                // Third slot -- offset
-                mstore(add(ptr, 52), 32)
+                // Second slot -- offset
+                mstore(add(ptr, 32), 32)
                 setHook(VM_HOOK_PUBDATA_REQUESTED())
-                // Fourth slot -- length of pubdata
-                let len := mload(add(ptr, 84))
-                // 4 bytes for selector, 20 bytes for l2DAValidator address, 32 bytes for array offset and 32 bytes for array length
-                let fullLen := add(len, 88)
+                // Third slot -- length of pubdata
+                let len := mload(add(ptr, 64))
+                // 4 bytes for selector, 32 bytes for array offset and 32 bytes for array length
+                let fullLen := add(len, 68)
 
                 // ptr + 28 because the function selector only takes up the last 4 bytes in the first slot.
                 let success := call(
@@ -3979,11 +3956,7 @@ object "Bootloader" {
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function protocolUpgradeTxHashKey() -> ret {
-                ret := 7
-            }
-
-            function usedL2DAValidatorLogKey() -> ret {
-                ret := 9
+                ret := 13
             }
 
             ////////////////////////////////////////////////////////////////////////////
@@ -4193,7 +4166,6 @@ object "Bootloader" {
             // Sending system logs (to be processed on L1)
             sendToL1Native(true, chainedPriorityTxnHashLogKey(), mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
             sendToL1Native(true, numberOfLayer1TxsLogKey(), mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)))
-            sendToL1Native(true, usedL2DAValidatorLogKey(), mload(L2_DA_VALIDATOR_ADDR_BEGIN_BYTE()))
 
             l1MessengerPublishingCall()
         }

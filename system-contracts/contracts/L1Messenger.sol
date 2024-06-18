@@ -9,7 +9,8 @@ import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, STATE_DIFF_ENTRY_SIZE, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER, COMPUTATIONAL_PRICE_FOR_PUBDATA} from "./Constants.sol";
 import {ReconstructionMismatch, PubdataField} from "./SystemContractErrors.sol";
-import {IL2DAValidator} from "../../l2-contracts/contracts/interfaces/IL2DAValidator.sol";
+import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
+
 
 /**
  * @author Matter Labs
@@ -213,7 +214,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         bytes32[] memory l2ToL1LogsTreeArray = new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES);
         bytes32 reconstructedChainedLogsHash;
         for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
-            bytes32 hashedLog = EfficientCall.keccak(
+            bytes32 hashedLog = keccak256(
                 _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + L2_TO_L1_LOG_SERIALIZE_SIZE]
             );
             calldataPtr += L2_TO_L1_LOG_SERIALIZE_SIZE;
@@ -237,114 +238,19 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         }
         bytes32 l2ToL1LogsTreeRoot = l2ToL1LogsTreeArray[0];
 
-        /// Check messages
-        uint32 numberOfMessages = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-        calldataPtr += 4;
-        bytes32 reconstructedChainedMessagesHash;
-        for (uint256 i = 0; i < numberOfMessages; ++i) {
-            uint32 currentMessageLength = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-            calldataPtr += 4;
-            bytes32 hashedMessage = EfficientCall.keccak(
-                _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentMessageLength]
-            );
-            calldataPtr += currentMessageLength;
-            reconstructedChainedMessagesHash = keccak256(abi.encode(reconstructedChainedMessagesHash, hashedMessage));
-        }
-        if (reconstructedChainedMessagesHash != chainedMessagesHash) {
-            revert ReconstructionMismatch(PubdataField.MsgHash, chainedMessagesHash, reconstructedChainedMessagesHash);
-        }
-
-        /// Check bytecodes
-        uint32 numberOfBytecodes = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-        calldataPtr += 4;
-        bytes32 reconstructedChainedL1BytecodesRevealDataHash;
-        for (uint256 i = 0; i < numberOfBytecodes; ++i) {
-            uint32 currentBytecodeLength = uint32(
-                bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4])
-            );
-            calldataPtr += 4;
-            reconstructedChainedL1BytecodesRevealDataHash = keccak256(
-                abi.encode(
-                    reconstructedChainedL1BytecodesRevealDataHash,
-                    Utils.hashL2Bytecode(
-                        _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentBytecodeLength]
-                    )
-                )
-            );
-            calldataPtr += currentBytecodeLength;
-        }
-        if (reconstructedChainedL1BytecodesRevealDataHash != chainedL1BytecodesRevealDataHash) {
-            revert ReconstructionMismatch(
-                PubdataField.Bytecode,
-                chainedL1BytecodesRevealDataHash,
-                reconstructedChainedL1BytecodesRevealDataHash
-            );
-        }
-
-        /// Check State Diffs
-        /// encoding is as follows:
-        /// header (1 byte version, 3 bytes total len of compressed, 1 byte enumeration index size)
-        /// body (`compressedStateDiffSize` bytes, 4 bytes number of state diffs, `numberOfStateDiffs` * `STATE_DIFF_ENTRY_SIZE` bytes for the uncompressed state diffs)
-        /// encoded state diffs: [20bytes address][32bytes key][32bytes derived key][8bytes enum index][32bytes initial value][32bytes final value]
-        if (
-            uint256(uint8(bytes1(_totalL2ToL1PubdataAndStateDiffs[calldataPtr]))) !=
-            STATE_DIFF_COMPRESSION_VERSION_NUMBER
-        ) {
-            revert ReconstructionMismatch(
-                PubdataField.StateDiffCompressionVersion,
-                bytes32(STATE_DIFF_COMPRESSION_VERSION_NUMBER),
-                bytes32(uint256(uint8(bytes1(_totalL2ToL1PubdataAndStateDiffs[calldataPtr]))))
-            );
-        }
-        ++calldataPtr;
-
-        uint24 compressedStateDiffSize = uint24(bytes3(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 3]));
-        calldataPtr += 3;
-
-        uint8 enumerationIndexSize = uint8(bytes1(_totalL2ToL1PubdataAndStateDiffs[calldataPtr]));
-        ++calldataPtr;
-
-        bytes calldata compressedStateDiffs = _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr +
-            compressedStateDiffSize];
-        calldataPtr += compressedStateDiffSize;
-
-        bytes calldata totalL2ToL1Pubdata = _totalL2ToL1PubdataAndStateDiffs[:calldataPtr];
-
-        uint32 numberOfStateDiffs = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-        calldataPtr += 4;
-
-        bytes calldata stateDiffs = _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr +
-            (numberOfStateDiffs * STATE_DIFF_ENTRY_SIZE)];
-        calldataPtr += numberOfStateDiffs * STATE_DIFF_ENTRY_SIZE;
-
-        bytes32 stateDiffHash = COMPRESSOR_CONTRACT.verifyCompressedStateDiffs(
-            numberOfStateDiffs,
-            enumerationIndexSize,
-            stateDiffs,
-            compressedStateDiffs
+        // FIXME; this is inefficient and leads to copying the entire array of uncompressed state diffs
+        // Better to use efficent call
+        IL2DAValidator(_l2DAValidator).validatePubdata(
+            chainedLogsHash,
+            l2ToL1LogsTreeRoot,
+            chainedMessagesHash,
+            chainedL1BytecodesRevealDataHash,
+            _totalL2ToL1PubdataAndStateDiffs
         );
-
-        /// Check for calldata strict format
-        if (calldataPtr != _totalL2ToL1PubdataAndStateDiffs.length) {
-            revert ReconstructionMismatch(
-                PubdataField.ExtraData,
-                bytes32(calldataPtr),
-                bytes32(_totalL2ToL1PubdataAndStateDiffs.length)
-            );
-        }
-
-        uint8 blobsUsed = PUBDATA_CHUNK_PUBLISHER.chunkAndPublishPubdata(totalL2ToL1Pubdata);
-        IL2DAValidator(_l2DAValidator).produceDACommitment(totalL2ToL1Pubdata, stateDiffHash, blobsUsed);
-
-
+    
         /// Native (VM) L2 to L1 log
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), l2ToL1LogsTreeRoot);
-        SystemContractHelper.toL1(
-            true,
-            bytes32(uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY)),
-            EfficientCall.keccak(totalL2ToL1Pubdata)
-        );
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.STATE_DIFF_HASH_KEY)), stateDiffHash);
+        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)), bytes32(uint256(uint160(_l2DAValidator))));
 
         /// Clear logs state
         chainedLogsHash = bytes32(0);

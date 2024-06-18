@@ -9,7 +9,7 @@ import { IL1DAValidator, L1DAValidatorOutput } from "../chain-interfaces/IL1DAVa
 // TODO: maybe move it here
 import { PubdataSource, PUBDATA_COMMITMENT_SIZE } from "../chain-interfaces/IExecutor.sol";
 
-contract RollupL1DAValidator is IL1DAValidator {
+contract ValidiumL1DAValidator is IL1DAValidator {
     function checkDA(
         bytes32 l2DAValidatorOutputHash,
         bytes memory operatorDAInput,
