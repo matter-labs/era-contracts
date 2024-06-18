@@ -45,10 +45,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev used to accept the admin role
     address private pendingAdmin;
 
+    IMessageRoot public override messageRoot;
+
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
     mapping(uint256 _chainId => bytes32 _baseTokenAssetId) public baseTokenAssetId;
-
-    IMessageRoot public override messageRoot;
 
     ISTMDeploymentTracker public stmDeployer;
 
@@ -112,6 +112,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         emit NewPendingAdmin(currentPendingAdmin, address(0));
         emit NewAdmin(previousAdmin, currentPendingAdmin);
+    }
+
+    /// @notice To set stmDeploymetTracker, only Owner. Not done in initialize, as
+    /// the order of deployment is Bridgehub, Shared bridge, and then we call this
+    function setSTMDeployer(ISTMDeploymentTracker _stmDeployer) external onlyOwner {
+        stmDeployer = _stmDeployer;
     }
 
     /// @notice To set shared bridge, only Owner. Not done in initialize, as

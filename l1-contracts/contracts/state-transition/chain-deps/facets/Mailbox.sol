@@ -107,6 +107,16 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         return _proveL2LogInclusion(_l2BatchNumber, _l2MessageIndex, l2Log, _merkleProof);
     }
 
+    // /// @inheritdoc IMailbox
+    function proveL1ToL2TransactionStatusViaSyncLayer(
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof,
+        TxStatus _status
+    ) public view returns (bool) {}
+
     /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
     function _proveL2LogInclusion(
         uint256 _batchNumber,

@@ -99,26 +99,17 @@ describe("Synclayer", function () {
     // const ethIsBaseToken = baseTokenAddress == ADDRESS_ONE;
 
     const stmDeploymentTracker = migratingDeployer.stmDeploymentTracker(migratingDeployer.deployWallet);
-    await migratingDeployer.executeUpgrade(
-      bridgehub.address,
-      value,
-      bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
-        {
-          chainId,
-          mintValue: value,
-          l2Value: 0,
-          l2GasLimit: priorityTxMaxGasLimit,
-          l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-          refundRecipient: migratingDeployer.deployWallet.address,
-          secondBridgeAddress: stmDeploymentTracker.address,
-          secondBridgeValue: 0,
-          secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
-            ["bool", "address", "address"],
-            [false, stm.address, stm.address]
-          ),
-        },
-      ])
-    );
+    await (
+      await stmDeploymentTracker.registerSTMAssetOnL2SharedBridge(
+        chainId,
+        syncLayerDeployer.addresses.StateTransition.StateTransitionProxy,
+        value,
+        priorityTxMaxGasLimit,
+        SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+        syncLayerDeployer.deployWallet.address,
+        { value: value }
+      )
+    ).wait();
     // console.log("STM asset registered in L2SharedBridge on SL");
     await migratingDeployer.executeUpgrade(
       bridgehub.address,

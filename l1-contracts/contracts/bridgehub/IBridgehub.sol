@@ -187,6 +187,8 @@ interface IBridgehub is IL1AssetHandler {
 
     function stmDeployer() external view returns (ISTMDeploymentTracker);
 
+    function setSTMDeployer(ISTMDeploymentTracker _stmDeployer) external;
+
     function stmAssetInfoToAddress(bytes32 _assetInfo) external view returns (address);
 
     function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetAddress) external;

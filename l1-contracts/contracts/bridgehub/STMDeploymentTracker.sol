@@ -66,43 +66,49 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         // solhint-disable-next-line gas-custom-errors
 
         require(_prevMsgSender == owner(), "STMDT: not owner");
-        (bool _registerOnBridgehub, address _stmL1Address, address _stmL2Address) = abi.decode(
+        (bool _registerOnL2Bridgehub, address _stmL1Address, address _stmL2Address) = abi.decode(
             _data,
             (bool, address, address)
         );
 
-        if (_registerOnBridgehub) {
+        if (_registerOnL2Bridgehub) {
             request = _registerSTMAssetOnL2Bridgehub(_chainId, _stmL1Address, _stmL2Address);
-        } else {
-            request = _registerSTMAssetOnL2SharedBridge(_chainId, _stmL1Address);
         }
     }
 
-    function _registerSTMAssetOnL2SharedBridge(
+    // todo this has to be put in L1SharedBridge via TwoBridges. Hard, because we have to have multiple msg types
+    function registerSTMAssetOnL2SharedBridge(
         uint256 _chainId,
-        address _stmL1Address
-    ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
-        bytes memory l2TxCalldata = abi.encodeWithSelector(
-            IL1SharedBridge.setAssetHandlerAddressInitial.selector,
-            bytes32(uint256(uint160(_stmL1Address))),
-            BRIDGE_HUB.bridgehubCounterParts(_chainId)
+        address _stmL1Address,
+        uint256 _mintValue,
+        uint256 _l2TxGasLimit,
+        uint256 _l2TxGasPerPubdataByteLimit,
+        address _refundRecipient
+    ) public payable {
+        bytes32 assetId;
+        address bhCounterPart;
+        {
+            assetId = getAssetId(_stmL1Address);
+            bhCounterPart = BRIDGE_HUB.bridgehubCounterParts(_chainId);
+        }
+        SHARED_BRIDGE.setAssetHandlerAddressOnCounterPart{value: msg.value}(
+            _chainId,
+            _mintValue,
+            _l2TxGasLimit,
+            _l2TxGasPerPubdataByteLimit,
+            _refundRecipient,
+            assetId,
+            bhCounterPart
         );
-
-        request = L2TransactionRequestTwoBridgesInner({
-            magicValue: TWO_BRIDGES_MAGIC_VALUE,
-            l2Contract: SHARED_BRIDGE.l2BridgeAddress(_chainId),
-            l2Calldata: l2TxCalldata,
-            factoryDeps: new bytes[](0),
-            txDataHash: bytes32(0)
-        });
     }
-
+    // Todo this works for now, but it will not work in the future if we want to change STM DTs. Probably ok. 
     function _registerSTMAssetOnL2Bridgehub(
         uint256 _chainId,
         address _stmL1Address,
         address _stmL2Address
     ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes memory l2TxCalldata = abi.encodeWithSelector(
+            /// todo it should not be initial in setAssetHandlerAddressInitial
             IBridgehub.setAssetHandlerAddressInitial.selector,
             bytes32(uint256(uint160(_stmL1Address))),
             _stmL2Address
@@ -119,4 +125,8 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @dev we need to implement this for the bridgehub
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {}
+
+    function getAssetId(address _l1STM) public view override returns (bytes32) {
+        return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1STM)))));
+    }
 }

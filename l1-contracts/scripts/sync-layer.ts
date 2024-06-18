@@ -168,7 +168,7 @@ async function main() {
       );
       deployer.addresses.StateTransition.DiamondInit = getAddressFromEnv("SYNC_LAYER_DIAMOND_INIT_ADDR");
 
-      const receipt = await deployer.moveChainToSyncLayer(syncLayerChainId, gasPrice, false);
+      const receipt = await deployer.moveChainToSyncLayer(syncLayerChainId, gasPrice, true);
 
       const syncLayerAddress = await stm.getHyperchain(syncLayerChainId);
 
@@ -357,26 +357,17 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   }
   const stmDeploymentTracker = deployer.stmDeploymentTracker(deployer.deployWallet);
 
-  const receipt = await deployer.executeUpgrade(
-    l1Bridgehub.address,
-    value,
-    l1Bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
-      {
-        chainId,
-        mintValue: value,
-        l2Value: 0,
-        l2GasLimit: priorityTxMaxGasLimit,
-        l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-        refundRecipient: deployer.deployWallet.address,
-        secondBridgeAddress: stmDeploymentTracker.address,
-        secondBridgeValue: 0,
-        secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
-          ["bool", "address", "address"],
-          [false, l1STM.address, getAddressFromEnv("SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR")]
-        ),
-      },
-    ])
-  );
+  const receipt = await (
+    await stmDeploymentTracker.registerSTMAssetOnL2SharedBridge(
+      chainId,
+      l1STM.address,
+      value,
+      priorityTxMaxGasLimit,
+      SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+      deployer.deployWallet.address,
+      { value }
+    )
+  ).wait();
   const l2TxHash = zkUtils.getL2HashFromPriorityOp(receipt, syncLayerAddress);
   console.log("STM asset registered in L2SharedBridge on SL l2 tx hash: ", l2TxHash);
   const receipt2 = await deployer.executeUpgrade(
