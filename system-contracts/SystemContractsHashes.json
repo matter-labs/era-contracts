@@ -31,8 +31,8 @@
     "contractName": "ContractDeployer",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/ContractDeployer.sol/ContractDeployer.json",
     "sourceCodePath": "contracts-preprocessed/ContractDeployer.sol",
-    "bytecodeHash": "0x010004e5219e70c32d67ed1df0c46983a83a382e482abb5c4310ad554f55f738",
-    "sourceCodeHash": "0x28208c532ed8851077a9bb0a87636215840ce964397ab0767692f956a0fd11b3"
+    "bytecodeHash": "0x010004e5b06e78c8ffbdf6c578ce9d101d8d852e62e71f79ff8f845e7ada7fc9",
+    "sourceCodeHash": "0xdc95cb75554260ef8793c7899dbbc681165a441109458b3d058b03a0857d00e3"
   },
   {
     "contractName": "Create2Factory",
