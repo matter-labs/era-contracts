@@ -12,7 +12,13 @@ const verifierInterface = new Interface(hardhat.artifacts.readArtifactSync("Veri
 const bridgehubInterface = new Interface(hardhat.artifacts.readArtifactSync("Bridgehub").abi);
 const sharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
 
-const interfaces = [erc20BridgeInterface, zkSyncInterface, verifierInterface, bridgehubInterface, sharedBridgeInterface];
+const interfaces = [
+  erc20BridgeInterface,
+  zkSyncInterface,
+  verifierInterface,
+  bridgehubInterface,
+  sharedBridgeInterface,
+];
 
 function decodeTransaction(contractInterface, tx) {
   try {

@@ -10,6 +10,7 @@ import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
+import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
@@ -24,6 +25,7 @@ import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBas
 contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
+    using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "GettersFacet";
@@ -103,11 +105,17 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
+    function getPriorityTreeRoot() external view returns (bytes32) {
+        return s.priorityTree.getRoot();
+    }
+
+    /// @inheritdoc IGetters
     function getPriorityQueueSize() external view returns (uint256) {
         return s.priorityQueue.getSize();
     }
 
     /// @inheritdoc IGetters
+    // TODO: this will be unusable if we fully migrate to priority merkle tree
     function priorityQueueFrontOperation() external view returns (PriorityOperation memory) {
         return s.priorityQueue.front();
     }

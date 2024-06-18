@@ -51,6 +51,10 @@ library PriorityTree {
         _tree.startIndex = _startIndex;
     }
 
+    function getRoot(Tree storage _tree) internal view returns (bytes32) {
+        return _tree.tree.root();
+    }
+
     function processBatch(Tree storage _tree, PriorityOpsBatchInfo calldata _priorityOpsData) internal {
         bytes32 expectedRoot = Merkle.calculateRoot(
             _priorityOpsData.leftPath,
