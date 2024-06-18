@@ -385,11 +385,14 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             _hashStoredBatchInfo(_storedBatch) == s.storedBatchHashes[currentBatchNumber],
             "exe10" // executing batch should be committed
         );
+        require(_priorityOpsData.itemHashes.length == _storedBatch.numberOfLayer1Txs, "zxc");
 
         bytes32 priorityOperationsRollingHash = _rollingHash(_priorityOpsData.itemHashes);
         require(priorityOperationsRollingHash == _storedBatch.priorityOperationsHash, "x");
-        // TODO: pop the elements from the queue?
-        s.priorityTree.processBatch(_priorityOpsData);
+        // TODO: pop the elements from the queue if we can?
+        if (_priorityOpsData.itemHashes.length > 0) {
+            s.priorityTree.processBatch(_priorityOpsData);
+        }
 
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;

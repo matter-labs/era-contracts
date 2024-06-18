@@ -53,13 +53,13 @@ library Merkle {
     ) internal pure returns (bytes32) {
         uint256 pathLength = _startPath.length;
 
-        require(pathLength == _endPath.length, "");
-        require(pathLength > 0, "");
-        require(pathLength < 256, "");
+        require(pathLength == _endPath.length, "Merkle: path length mismatch");
+        require(pathLength > 0, "Merkle: empty paths");
+        require(pathLength < 256, "Merkle: path too long");
 
         uint256 levelLen = _itemHashes.length;
 
-        require(_startIndex + levelLen <= (1 << pathLength), "");
+        require(_startIndex + levelLen <= (1 << pathLength), "Merkle: index out of range");
 
         bytes32[] memory itemHashes = _itemHashes;
 
