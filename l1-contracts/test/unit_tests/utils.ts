@@ -475,7 +475,7 @@ export async function makeExecutedEqualCommitted(
     })
   ).wait();
 
-  await (await proxyExecutor.executeBatches(batchesToExecute)).wait();
+  await (await proxyExecutor.executeBatches(batchesToExecute, [])).wait();
 }
 
 export function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: string): StoredBatchInfo {
