@@ -340,7 +340,8 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
     function _rollingHash(bytes32[] calldata _hashes) internal pure returns (bytes32) {
         bytes32 hash = EMPTY_STRING_KECCAK;
-        for (uint256 i = 0; i < _hashes.length; i = i.uncheckedInc()) {
+        uint256 nHashes = _hashes.length;
+        for (uint256 i = 0; i < nHashes; i = i.uncheckedInc()) {
             hash = keccak256(abi.encode(hash, _hashes[i]));
         }
         return hash;
@@ -420,14 +421,14 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         PriorityOpsBatchInfo[] calldata _priorityOpsData
     ) internal {
         uint256 nBatches = _batchesData.length;
-        uint256 nPriorityOpsDatas = _priorityOpsData.length;
-        if (nPriorityOpsDatas != 0) {
-            require(nBatches == nPriorityOpsDatas, "");
+        uint256 nPriorityOpsData = _priorityOpsData.length;
+        if (nPriorityOpsData != 0) {
+            require(nBatches == nPriorityOpsData, "");
             require(s.priorityTree.startIndex <= s.priorityQueue.getFirstUnprocessedPriorityTx(), "");
         }
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
-            if (nPriorityOpsDatas != 0) {
+            if (nPriorityOpsData != 0) {
                 _executeOneBatch(_batchesData[i], _priorityOpsData[i], i);
             } else {
                 _executeOneBatch(_batchesData[i], i);
