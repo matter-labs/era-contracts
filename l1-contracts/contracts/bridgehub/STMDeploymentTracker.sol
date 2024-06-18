@@ -91,17 +91,17 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
             assetId = getAssetId(_stmL1Address);
             bhCounterPart = BRIDGE_HUB.bridgehubCounterParts(_chainId);
         }
-        SHARED_BRIDGE.setAssetHandlerAddressOnCounterPart{value: msg.value}(
-            _chainId,
-            _mintValue,
-            _l2TxGasLimit,
-            _l2TxGasPerPubdataByteLimit,
-            _refundRecipient,
-            assetId,
-            bhCounterPart
-        );
+        SHARED_BRIDGE.setAssetHandlerAddressOnCounterPart{value: msg.value}({
+            _chainId: _chainId,
+            _mintValue: _mintValue,
+            _l2TxGasLimit: _l2TxGasLimit,
+            _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByteLimit,
+            _refundRecipient: _refundRecipient,
+            _assetId: assetId,
+            _assetAddressOnCounterPart: bhCounterPart
+        });
     }
-    // Todo this works for now, but it will not work in the future if we want to change STM DTs. Probably ok. 
+    // Todo this works for now, but it will not work in the future if we want to change STM DTs. Probably ok.
     function _registerSTMAssetOnL2Bridgehub(
         uint256 _chainId,
         address _stmL1Address,
