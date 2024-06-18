@@ -126,10 +126,7 @@ contract DummyExecutor is IExecutor {
         );
     }
 
-    function executeBatches(
-        StoredBatchInfo[] calldata _batchesData,
-        PriorityOpsBatchInfo[] calldata
-    ) external {
+    function executeBatches(StoredBatchInfo[] calldata _batchesData, PriorityOpsBatchInfo[] calldata) external {
         executeBatches(_batchesData);
     }
 

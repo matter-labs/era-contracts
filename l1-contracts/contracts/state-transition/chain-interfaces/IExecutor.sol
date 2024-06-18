@@ -181,7 +181,10 @@ interface IExecutor is IZkSyncHyperchainBase {
     /// @param _batchesData Data of the batches to be executed.
     // function executeBatches(StoredBatchInfo[] calldata _batchesData) external;
 
-    function executeBatches(StoredBatchInfo[] calldata _batchesData, PriorityOpsBatchInfo[] calldata _priorityOpsData) external;
+    function executeBatches(
+        StoredBatchInfo[] calldata _batchesData,
+        PriorityOpsBatchInfo[] calldata _priorityOpsData
+    ) external;
 
     /// @notice same as `executeBatches` but with the chainId so ValidatorTimelock can sort the inputs.
     // function executeBatchesSharedBridge(uint256 _chainId, StoredBatchInfo[] calldata _batchesData) external;

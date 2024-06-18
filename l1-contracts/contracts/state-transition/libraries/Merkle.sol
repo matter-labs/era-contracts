@@ -68,7 +68,9 @@ library Merkle {
             uint256 nextLevelLen = levelLen / 2 + (parity | (levelLen % 2));
             for (uint256 i; i < nextLevelLen; i = i.uncheckedInc()) {
                 bytes32 lhs = (i == 0 && parity == 1) ? _startPath[level] : itemHashes[2 * i - parity];
-                bytes32 rhs = (i == nextLevelLen - 1 && (levelLen - parity) % 2 == 1) ? _endPath[level] : itemHashes[2 * i + 1 - parity];
+                bytes32 rhs = (i == nextLevelLen - 1 && (levelLen - parity) % 2 == 1)
+                    ? _endPath[level]
+                    : itemHashes[2 * i + 1 - parity];
                 itemHashes[i] = _efficientHash(lhs, rhs);
             }
             levelLen = nextLevelLen;

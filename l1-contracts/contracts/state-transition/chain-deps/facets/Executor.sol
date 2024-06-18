@@ -411,11 +411,14 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     function executeBatches(
         StoredBatchInfo[] calldata _batchesData,
         PriorityOpsBatchInfo[] calldata _priorityOpsData
-   ) external nonReentrant onlyValidator {
+    ) external nonReentrant onlyValidator {
         _executeBatches(_batchesData, _priorityOpsData);
     }
 
-    function _executeBatches(StoredBatchInfo[] calldata _batchesData, PriorityOpsBatchInfo[] calldata _priorityOpsData) internal {
+    function _executeBatches(
+        StoredBatchInfo[] calldata _batchesData,
+        PriorityOpsBatchInfo[] calldata _priorityOpsData
+    ) internal {
         uint256 nBatches = _batchesData.length;
         uint256 nPriorityOpsDatas = _priorityOpsData.length;
         if (nPriorityOpsDatas != 0) {

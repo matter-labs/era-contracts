@@ -49,10 +49,7 @@ library PriorityTree {
         _tree.startIndex = _startIndex;
     }
 
-    function processBatch(
-        Tree storage _tree,
-        PriorityOpsBatchInfo calldata _priorityOpsData
-    ) internal {
+    function processBatch(Tree storage _tree, PriorityOpsBatchInfo calldata _priorityOpsData) internal {
         bytes32 expectedRoot = Merkle.calculateRoot(
             _priorityOpsData.leftPath,
             _priorityOpsData.rightPath,
@@ -63,5 +60,3 @@ library PriorityTree {
         _tree.unprocessedIndex += _priorityOpsData.itemHashes.length;
     }
 }
-
-
