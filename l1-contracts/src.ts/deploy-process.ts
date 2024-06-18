@@ -31,13 +31,13 @@ export async function initialBridgehubDeployment(
   if (isCurrentNetworkLocal()) {
     if (!deployer.isZkMode()) {
       await deployer.deployCreate2Factory({ gasPrice, nonce });
-      nonce = nonce ? ++nonce : nonce;
+      nonce = (nonce || nonce == 0) ? ++nonce : nonce;
     } else {
       await deployer.updateCreate2FactoryZkMode();
     }
 
     await deployer.deployMulticall3(create2Salt, { gasPrice, nonce });
-    nonce = nonce ? ++nonce : nonce;
+    nonce = (nonce || nonce == 0) ? ++nonce : nonce;
   }
 
   if (onlyVerifier) {
