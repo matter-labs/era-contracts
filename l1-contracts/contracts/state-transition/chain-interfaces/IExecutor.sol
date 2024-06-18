@@ -7,14 +7,23 @@ import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
 /// @dev Enum used by L2 System Contracts to differentiate logs.
 enum SystemLogKey {
     L2_TO_L1_LOGS_TREE_ROOT_KEY,
+    TOTAL_L2_TO_L1_PUBDATA_KEY,
+    STATE_DIFF_HASH_KEY,
     PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
     PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,
     NUMBER_OF_LAYER_1_TXS_KEY,
-    USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+    BLOB_ONE_HASH_KEY, // TODO: remove
+    BLOB_TWO_HASH_KEY,
+    BLOB_THREE_HASH_KEY,
+    BLOB_FOUR_HASH_KEY,
+    BLOB_FIVE_HASH_KEY,
+    BLOB_SIX_HASH_KEY,
     L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+    USED_L2_DA_VALIDATOR_ADDRESS_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
+
 
 /// @dev Enum used to determine the source of pubdata. At first we will support calldata and blobs but this can be extended.
 enum PubdataSource {

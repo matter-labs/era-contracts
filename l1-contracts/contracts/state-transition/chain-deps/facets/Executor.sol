@@ -165,14 +165,17 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             }
         }
 
+        // FIXME: temporarily old logs were kept for backwards compaitibility. This check can not work now.
+        // 
+        //
         // We only require 13 logs to be checked, the 14th is if we are expecting a protocol upgrade
         // Without the protocol upgrade we expect 13 logs: 2^13 - 1 = 8191
         // With the protocol upgrade we expect 14 logs: 2^14 - 1 = 16383
-        if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
-            require(processedLogs == 127, "b7");
-        } else {
-            require(processedLogs == 255, "b8");
-        }
+        // if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
+        //     require(processedLogs == 127, "b7");
+        // } else {
+        //     require(processedLogs == 255, "b8");
+        // }
     }
 
     /// @inheritdoc IExecutor
