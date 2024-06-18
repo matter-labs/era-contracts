@@ -4,23 +4,23 @@ pragma solidity 0.8.20;
 
 // solhint-disable gas-custom-errors, reason-string
 
-import { IL2DAValidator } from "../interfaces/IL2DAValidator.sol";
+import {IL2DAValidator} from "../interfaces/IL2DAValidator.sol";
 import {StateDiffL2DAValidator} from "./StateDiffL2DAValidator.sol";
 import {PUBDATA_CHUNK_PUBLISHER} from "../L2ContractHelper.sol";
 
-import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
-import { ReconstructionMismatch, PubdataField} from "./DAErrors.sol";
+import {ReconstructionMismatch, PubdataField} from "./DAErrors.sol";
 
-/// Rollup DA validator. It will publish data that would allow to use either calldata or blobs. 
+/// Rollup DA validator. It will publish data that would allow to use either calldata or blobs.
 contract RollupL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
-    function validatePubdata (
+    function validatePubdata(
         // The rolling hash of the user L2->L1 logs.
         bytes32 chainedLogsHash,
-        // The root hash of the user L2->L1 logs. 
+        // The root hash of the user L2->L1 logs.
         bytes32 logsRootHash,
         // The chained hash of the L2->L1 messages
-        bytes32 chainedMessagesHash, 
+        bytes32 chainedMessagesHash,
         // The chained hash of uncompressed bytecodes sent to L1
         bytes32 chainedBytescodesHash,
         // Operator data, that is related to the DA itself
@@ -51,11 +51,13 @@ contract RollupL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
 
         bytes32[] memory blobLinearHashes = PUBDATA_CHUNK_PUBLISHER.chunkPubdataToBlobs(_totalPubdata);
 
-        outputHash = keccak256(abi.encodePacked(
-            stateDiffHash,
-            keccak256(_totalPubdata),
-            SafeCast.toUint8(blobLinearHashes.length),
-            blobLinearHashes
-        ));   
+        outputHash = keccak256(
+            abi.encodePacked(
+                stateDiffHash,
+                keccak256(_totalPubdata),
+                SafeCast.toUint8(blobLinearHashes.length),
+                blobLinearHashes
+            )
+        );
     }
 }

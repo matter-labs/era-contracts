@@ -4,11 +4,10 @@ pragma solidity 0.8.20;
 
 // solhint-disable gas-custom-errors, reason-string
 
-import { IL2DAValidator } from "../interfaces/IL2DAValidator.sol";
+import {IL2DAValidator} from "../interfaces/IL2DAValidator.sol";
 
-
-import { ReconstructionMismatch, PubdataField } from "./DAErrors.sol";
-import { COMPRESSOR_CONTRACT, L2ContractHelper} from "../L2ContractHelper.sol";
+import {ReconstructionMismatch, PubdataField} from "./DAErrors.sol";
+import {COMPRESSOR_CONTRACT, L2ContractHelper} from "../L2ContractHelper.sol";
 
 /// @dev The current version of state diff compression being used.
 uint256 constant STATE_DIFF_COMPRESSION_VERSION_NUMBER = 1;
@@ -19,7 +18,7 @@ uint256 constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
 uint256 constant STATE_DIFF_ENTRY_SIZE = 272;
 
 /// A library that could be used by any L2 DA validator to produce standard state-diff-based
-/// DA output. 
+/// DA output.
 abstract contract StateDiffL2DAValidator {
     /// @notice Validates, that the operator provided the correct preimages for los, messages, and bytecodes.
     /// @return uncompressedStateDiffHash the hash of the uncompressed state diffs
@@ -33,11 +32,11 @@ abstract contract StateDiffL2DAValidator {
         bytes32 chainedMessagesHash,
         bytes32 chainedBytescodesHash,
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
-    ) internal virtual returns (
-        bytes32 uncompressedStateDiffHash,
-        bytes calldata totalL2Pubdata,
-        bytes calldata leftoverSuffix
-    ) {
+    )
+        internal
+        virtual
+        returns (bytes32 uncompressedStateDiffHash, bytes calldata totalL2Pubdata, bytes calldata leftoverSuffix)
+    {
         uint256 calldataPtr = 0;
 
         /// Check logs
@@ -144,6 +143,6 @@ abstract contract StateDiffL2DAValidator {
 
         calldataPtr += numberOfStateDiffs * STATE_DIFF_ENTRY_SIZE;
 
-        leftoverSuffix = _totalL2ToL1PubdataAndStateDiffs[calldataPtr:]; 
+        leftoverSuffix = _totalL2ToL1PubdataAndStateDiffs[calldataPtr:];
     }
 }

@@ -151,12 +151,10 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             } else if (logKey == uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bk");
                 logOutput.numberOfLayer1Txs = uint256(logValue);
-            } else if (
-                logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)
-            ) {
+            } else if (logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "bk");
                 require(s.l2DAValidator == address(uint160(uint256(logValue))), "lo");
-            } else if(logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY) ) {
+            } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
                 require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "lp");
                 logOutput.l2DAValidatorOutputHash = logValue;
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {

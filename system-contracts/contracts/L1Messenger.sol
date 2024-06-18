@@ -11,7 +11,6 @@ import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMP
 import {ReconstructionMismatch, PubdataField} from "./SystemContractErrors.sol";
 import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
 
-
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
@@ -247,12 +246,19 @@ contract L1Messenger is IL1Messenger, ISystemContract {
             chainedL1BytecodesRevealDataHash,
             _totalL2ToL1PubdataAndStateDiffs
         );
-    
+
         /// Native (VM) L2 to L1 log
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), l2ToL1LogsTreeRoot);
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)), bytes32(uint256(uint160(_l2DAValidator))));
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)), l2DAValidatorOutputhash);
-
+        SystemContractHelper.toL1(
+            true,
+            bytes32(uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)),
+            bytes32(uint256(uint160(_l2DAValidator)))
+        );
+        SystemContractHelper.toL1(
+            true,
+            bytes32(uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)),
+            l2DAValidatorOutputhash
+        );
 
         /// Clear logs state
         chainedLogsHash = bytes32(0);

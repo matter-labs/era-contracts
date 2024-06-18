@@ -4,10 +4,10 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
-import { IL1DAValidator, L1DAValidatorOutput } from "../chain-interfaces/IL1DAValidator.sol";
+import {IL1DAValidator, L1DAValidatorOutput} from "../chain-interfaces/IL1DAValidator.sol";
 
 // TODO: maybe move it here
-import { PubdataSource, PUBDATA_COMMITMENT_SIZE } from "../chain-interfaces/IExecutor.sol";
+import {PubdataSource, PUBDATA_COMMITMENT_SIZE} from "../chain-interfaces/IExecutor.sol";
 
 contract ValidiumL1DAValidator is IL1DAValidator {
     function checkDA(
