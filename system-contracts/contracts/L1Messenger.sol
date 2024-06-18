@@ -240,7 +240,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
 
         // FIXME; this is inefficient and leads to copying the entire array of uncompressed state diffs
         // Better to use efficent call
-        IL2DAValidator(_l2DAValidator).validatePubdata(
+        bytes32 l2DAValidatorOutputhash = IL2DAValidator(_l2DAValidator).validatePubdata(
             chainedLogsHash,
             l2ToL1LogsTreeRoot,
             chainedMessagesHash,
@@ -251,6 +251,8 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         /// Native (VM) L2 to L1 log
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), l2ToL1LogsTreeRoot);
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)), bytes32(uint256(uint160(_l2DAValidator))));
+        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)), l2DAValidatorOutputhash);
+
 
         /// Clear logs state
         chainedLogsHash = bytes32(0);
