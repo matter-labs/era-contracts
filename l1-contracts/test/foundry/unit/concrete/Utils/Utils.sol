@@ -16,6 +16,7 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -475,6 +476,13 @@ library Utils {
         for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
             blobAuxOutputWords[i * 2] = _blobHashes[i];
             blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
+        }
+    }
+
+    function emptyData() internal pure returns (PriorityOpsBatchInfo[] calldata _empty) {
+        assembly {
+            _empty.offset := 0
+            _empty.length := 0
         }
     }
 
