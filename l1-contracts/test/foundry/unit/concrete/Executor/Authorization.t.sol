@@ -64,6 +64,6 @@ contract AuthorizationTest is ExecutorTest {
         vm.prank(randomSigner);
 
         vm.expectRevert(bytes.concat("Hyperchain: not validator"));
-        executor.executeBatches(storedBatchInfoArray);
+        executor.executeBatches(storedBatchInfoArray, Utils.emptyData());
     }
 }

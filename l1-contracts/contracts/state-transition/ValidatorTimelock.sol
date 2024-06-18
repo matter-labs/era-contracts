@@ -206,7 +206,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         StoredBatchInfo[] calldata _newBatchesData,
         PriorityOpsBatchInfo[] calldata _priorityOpsData
     ) external onlyValidator(_chainId) {
-        _executeBatchesInner(ERA_CHAIN_ID, _newBatchesData, _priorityOpsData);
+        _executeBatchesInner(_chainId, _newBatchesData, _priorityOpsData);
     }
 
     function _executeBatchesInner(
