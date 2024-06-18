@@ -24,7 +24,6 @@ enum SystemLogKey {
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
-
 /// @dev Enum used to determine the source of pubdata. At first we will support calldata and blobs but this can be extended.
 enum PubdataSource {
     Calldata,

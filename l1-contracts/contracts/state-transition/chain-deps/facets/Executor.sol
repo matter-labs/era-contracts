@@ -166,7 +166,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         }
 
         // FIXME: temporarily old logs were kept for backwards compaitibility. This check can not work now.
-        // 
+        //
         //
         // We only require 13 logs to be checked, the 14th is if we are expecting a protocol upgrade
         // Without the protocol upgrade we expect 13 logs: 2^13 - 1 = 8191
