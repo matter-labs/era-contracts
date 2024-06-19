@@ -187,7 +187,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
         bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData));
         assetHandlerAddress[assetId] = _assetHandlerAddress;
-        assetDeploymentTracker[assetId] = sender;
+        assetDeploymentTracker[assetId] = msg.sender;
         emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _additionalData, sender);
     }
 
