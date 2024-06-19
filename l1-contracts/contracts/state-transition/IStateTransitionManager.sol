@@ -39,8 +39,8 @@ interface IStateTransitionManager {
     /// @dev Emitted when a new Hyperchain is added
     event NewHyperchain(uint256 indexed _chainId, address indexed _hyperchainContract);
 
-    /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
-    event SetChainIdUpgrade(
+    /// @dev emitted when an chain registers and a GenesisUpgrade happens
+    event GenesisUpgrade(
         address indexed _hyperchain,
         L2CanonicalTransaction _l2Transaction,
         uint256 indexed _protocolVersion
@@ -87,7 +87,7 @@ interface IStateTransitionManager {
 
     function initialCutHash() external view returns (bytes32);
 
-    function genesisUpgrade() external view returns (address);
+    function l1GenesisUpgrade() external view returns (address);
 
     function upgradeCutHash(uint256 _protocolVersion) external view returns (bytes32);
 

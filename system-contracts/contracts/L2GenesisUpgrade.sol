@@ -9,7 +9,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
 /// @notice The contract that can be used for deterministic contract deployment.
-contract GenesisUpgrade {
+contract L2GenesisUpgrade {
     function genesisUpgrade(uint256 _chainId, ForceDeployment[] calldata _forceDeployments) external {
         // solhint-disable-next-line gas-custom-errors
         require(_chainId == 0, "Invalid chainId");
