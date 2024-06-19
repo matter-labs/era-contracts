@@ -155,7 +155,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "bk");
                 require(s.l2DAValidator == address(uint160(uint256(logValue))), "lo");
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
-                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "lp");
+                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lp2");
                 logOutput.l2DAValidatorOutputHash = logValue;
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bu");
@@ -459,7 +459,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
-    ) internal view returns (bytes32) {
+    ) internal returns (bytes32) {
         bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
         bytes32 metadataHash = keccak256(_batchMetaParameters());
         bytes32 auxiliaryOutputHash = keccak256(
@@ -523,8 +523,8 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     ) internal pure returns (bytes32[] memory blobAuxOutputWords) {
         // These invariants should be checked by the caller of this function, but we double check
         // just in case.
-        require(_blobCommitments.length == MAX_NUMBER_OF_BLOBS, "b10");
-        require(_blobHashes.length == MAX_NUMBER_OF_BLOBS, "b11");
+        require(_blobCommitments.length == TOTAL_BLOBS_IN_COMMITMENT, "b10");
+        require(_blobHashes.length == TOTAL_BLOBS_IN_COMMITMENT, "b11");
 
         // for each blob we have:
         // linear hash (hash of preimage from system logs) and
