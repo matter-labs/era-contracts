@@ -459,7 +459,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
-    ) internal returns (bytes32) {
+    ) internal view returns (bytes32) {
         bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
         bytes32 metadataHash = keccak256(_batchMetaParameters());
         bytes32 auxiliaryOutputHash = keccak256(
