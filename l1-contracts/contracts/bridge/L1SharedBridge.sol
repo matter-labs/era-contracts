@@ -337,7 +337,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
         require(BRIDGE_HUB.baseTokenAssetId(_chainId) != _assetId, "ShB: baseToken deposit not supported");
 
-        (, _assetId) = _getAssetProperties(_assetId); // Handles the non-legacy case
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
             _l2Value: _l2Value,
