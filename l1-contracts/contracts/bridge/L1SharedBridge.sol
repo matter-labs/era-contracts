@@ -671,12 +671,23 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) {
             // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
-
+            address l1Token;
             // this message is a token withdrawal
-            (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
-            transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
+
+            // Check that the message length is correct.
+            // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
+            // 76 (bytes).
+            require(_l2ToL1message.length == 76, "ShB wrong msg len 2");
+            (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+            (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+            (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+
+            assetId = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, l1Token));
+            transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
             //todo
+            (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
+            transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         } else {
             revert("ShB Incorrect message function selector");
         }

@@ -7,7 +7,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
@@ -199,7 +199,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     function test_finalizeWithdrawal_ErcOnEth() public {
         _setNativeTokenVaultChainBalance(chainId, address(token), amount);
         bytes memory message = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            IL1SharedBridge.finalizeWithdrawal.selector,
             tokenAssetId,
             abi.encode(amount, alice)
         );
@@ -244,7 +244,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         vm.prank(bridgehubAddress);
 
         bytes memory message = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            IL1SharedBridge.finalizeWithdrawal.selector,
             ETH_TOKEN_ASSET_ID,
             abi.encode(amount, alice)
         );
@@ -286,7 +286,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         vm.prank(bridgehubAddress);
 
         bytes memory message = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            IL1SharedBridge.finalizeWithdrawal.selector,
             tokenAssetId,
             abi.encode(amount, alice)
         );
@@ -325,7 +325,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
 
     function test_finalizeWithdrawal_NonBaseErcOnErc() public {
         bytes memory message = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            IL1SharedBridge.finalizeWithdrawal.selector,
             tokenAssetId,
             abi.encode(amount, alice)
         );
