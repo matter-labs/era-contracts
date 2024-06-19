@@ -24,6 +24,7 @@ contract RollupL1DAValidator is IL1DAValidator {
     /// `_pubdataCommitments` is a packed list of commitments of the following format:
     /// opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)
     function publishBlobs(bytes calldata _pubdataCommitments) external {
+        require(_pubdataCommitments.length > 0, "zln");
         require(_pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE == 0, "bd");
 
         uint256 versionedHashIndex = 0;
