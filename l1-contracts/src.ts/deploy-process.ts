@@ -40,7 +40,7 @@ export async function initialBridgehubDeployment(
   if (onlyVerifier) {
     await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
     return;
-  };
+  }
 
   await deployer.deployDefaultUpgrade(create2Salt, {
     gasPrice,

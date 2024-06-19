@@ -21,34 +21,33 @@ import * as hre from "hardhat";
 import { getAddressFromEnv } from "../../l1-contracts/src.ts/utils";
 
 async function deployContractOnL2ThroughL1(
-    deployer: Deployer, 
-    name: string,
-    chainId: string,
-    gasPrice: BigNumberish,
+  deployer: Deployer,
+  name: string,
+  chainId: string,
+  gasPrice: BigNumberish
 ): Promise<string> {
-    const bytecode = hre.artifacts.readArtifactSync(name).bytecode;
-    const address = computeL2Create2Address(
-        deployer.deployWallet,
-        bytecode,
-        // Empty constructor data
-        '0x',
-        ethers.constants.HashZero
-    );
+  const bytecode = hre.artifacts.readArtifactSync(name).bytecode;
+  const address = computeL2Create2Address(
+    deployer.deployWallet,
+    bytecode,
+    // Empty constructor data
+    "0x",
+    ethers.constants.HashZero
+  );
 
-    const tx = await create2DeployFromL1(
-        chainId,
-        deployer.deployWallet,
-        bytecode,
-        '0x',
-        ethers.constants.HashZero,
-        priorityTxMaxGasLimit,
-        gasPrice
-    );
+  const tx = await create2DeployFromL1(
+    chainId,
+    deployer.deployWallet,
+    bytecode,
+    "0x",
+    ethers.constants.HashZero,
+    priorityTxMaxGasLimit,
+    gasPrice
+  );
 
-    await tx.wait();
+  await tx.wait();
 
-    return address;
-    
+  return address;
 }
 
 export async function initializeChainGovernance(deployer: Deployer, chainId: string) {
@@ -111,33 +110,23 @@ async function main() {
       let l2DaValidatorAddress;
       let l1DaValidatorAddress;
       if (cmd.validiumMode) {
-        l2DaValidatorAddress = await deployContractOnL2ThroughL1(
-            deployer,
-            "ValidiumL2DAValidator",
-            chainId,
-            gasPrice
-        );
+        l2DaValidatorAddress = await deployContractOnL2ThroughL1(deployer, "ValidiumL2DAValidator", chainId, gasPrice);
         l1DaValidatorAddress = deployer.addresses.ValidiumL1DAValidator;
       } else {
-        l2DaValidatorAddress = await deployContractOnL2ThroughL1(
-            deployer,
-            "RollupL2DAValidator",
-            chainId,
-            gasPrice
-        );
+        l2DaValidatorAddress = await deployContractOnL2ThroughL1(deployer, "RollupL2DAValidator", chainId, gasPrice);
         l1DaValidatorAddress = deployer.addresses.RollupL1DAValidator;
       }
 
       console.log(`CONTRACTS_L1_DA_VALIDATOR_ADDR=${l1DaValidatorAddress}`);
       console.log(`CONTRACTS_L2_DA_VALIDATOR_ADDR=${l2DaValidatorAddress}`);
 
-      const adminFacetInterface = (new AdminFacetFactory()).interface;
+      const adminFacetInterface = new AdminFacetFactory().interface;
 
-      console.log('Setting the DA Validator pair on diamond proxy');
+      console.log("Setting the DA Validator pair on diamond proxy");
       await deployer.executeUpgrade(
         deployer.addresses.StateTransition.DiamondProxy,
         0,
-        adminFacetInterface.encodeFunctionData('setDAValidatorPair', [l1DaValidatorAddress, l2DaValidatorAddress])
+        adminFacetInterface.encodeFunctionData("setDAValidatorPair", [l1DaValidatorAddress, l2DaValidatorAddress])
       );
     });
 

@@ -901,16 +901,18 @@ export class Deployer {
     }
   }
 
-  public async deployDAValidators(
-    create2Salt: string, 
-    ethTxOptions: ethers.providers.TransactionRequest,
-  ) {
+  public async deployDAValidators(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
 
     const rollupDAValidatorAddress = await this.deployViaCreate2("RollupL1DAValidator", [], create2Salt, ethTxOptions);
     console.log(`CONTRACTS_L1_ROLLUP_DA_VALIDATOR=${rollupDAValidatorAddress}`);
 
-    const validiumDAValidatorAddress = await this.deployViaCreate2("ValidiumL1DAValidator", [], create2Salt, ethTxOptions);
+    const validiumDAValidatorAddress = await this.deployViaCreate2(
+      "ValidiumL1DAValidator",
+      [],
+      create2Salt,
+      ethTxOptions
+    );
     console.log(`CONTRACTS_L1_VALIDIUM_DA_VALIDATOR=${validiumDAValidatorAddress}`);
 
     this.addresses.RollupL1DAValidator = rollupDAValidatorAddress;
