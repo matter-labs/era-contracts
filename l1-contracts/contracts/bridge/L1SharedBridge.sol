@@ -224,6 +224,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
     /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
+    /// @param _chainId The chain ID of the hyperchain to which deposit.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @param _l1Token The L1 token address which is deposited.
+    /// @param _amount The total amount of tokens to be bridged.
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,
@@ -308,6 +312,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @notice Initiates a deposit transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
+    /// @param _chainId The chain ID of the hyperchain to which deposit.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @param _l2Value The L2 `msg.value` from the L1 -> L2 deposit transaction.
+    /// @param _data The calldata for the second bridge deposit.
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
@@ -410,6 +418,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
     /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
+    /// @param _chainId The chain ID of the hyperchain to which confirm the deposit.
+    /// @param _txDataHash The keccak256 hash of abi.encode(msgSender, l1Token, amount)
+    /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,
@@ -718,6 +729,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// of processing an L2 transaction where tokens would be minted.
     /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
     /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
     /// @param _l2Receiver The account address that should receive funds on L2
     /// @param _l1Token The L1 token address which is deposited
     /// @param _amount The total amount of tokens to be bridged
