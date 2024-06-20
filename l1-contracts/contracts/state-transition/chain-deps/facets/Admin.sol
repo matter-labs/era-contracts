@@ -4,12 +4,25 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_GAS_PER_TRANSACTION, HyperchainCommitment, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
+import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
+// import {IComplexUpgrader} from "../../l2-deps/IComplexUpgrader.sol";
+// import {IGenesisUpgrade} from "../../l2-deps/IGenesisUpgrade.sol";
+import {ISystemContext} from "../../l2-deps/ISystemContext.sol";
+// import {PriorityOperation} from "../../libraries/PriorityQueue.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../common/L2ContractAddresses.sol"; //, COMPLEX_UPGRADER_ADDR, GENESIS_UPGRADE_ADDR
+import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
+import {ProposedUpgrade} from "../../../upgrades/BaseZkSyncUpgrade.sol";
+import {VerifierParams} from "../../chain-interfaces/IVerifier.sol";
+import {IDefaultUpgrade} from "../../../upgrades/IDefaultUpgrade.sol";
+import {SemVer} from "../../../common/libraries/SemVer.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -18,6 +31,8 @@ import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBas
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
+    using PriorityQueue for PriorityQueue.Queue;
+
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "AdminFacet";
 
@@ -147,6 +162,72 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         emit ExecuteUpgrade(_diamondCut);
     }
 
+    /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
+    function setChainIdUpgrade(address _genesisUpgrade) external onlyStateTransitionManager {
+        uint256 cachedProtocolVersion = s.protocolVersion;
+        // slither-disable-next-line unused-return
+        (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(cachedProtocolVersion));
+
+        uint256 chainId = s.chainId;
+
+        // bytes memory genesisUpgradeCalldata = abi.encodeCall(IGenesisUpgrade.upgrade, (chainId)); //todo
+        // bytes memory complexUpgraderCalldata = abi.encodeCall(
+        //     IComplexUpgrader.upgrade,
+        //     (GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata)
+        // );
+        bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (chainId));
+
+        uint256[] memory uintEmptyArray;
+        bytes[] memory bytesEmptyArray;
+
+        L2CanonicalTransaction memory l2ProtocolUpgradeTx = L2CanonicalTransaction({
+            txType: SYSTEM_UPGRADE_L2_TX_TYPE,
+            from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
+            to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)), //COMPLEX_UPGRADER_ADDR
+            gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
+            gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            maxFeePerGas: uint256(0),
+            maxPriorityFeePerGas: uint256(0),
+            paymaster: uint256(0),
+            // Note, that the protocol version is used as "nonce" for system upgrade transactions
+            nonce: uint256(minorVersion),
+            value: 0,
+            reserved: [uint256(0), 0, 0, 0],
+            data: systemContextCalldata,
+            signature: new bytes(0),
+            factoryDeps: uintEmptyArray,
+            paymasterInput: new bytes(0),
+            reservedDynamic: new bytes(0)
+        });
+
+        ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
+            l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
+            factoryDeps: bytesEmptyArray,
+            bootloaderHash: bytes32(0),
+            defaultAccountHash: bytes32(0),
+            verifier: address(0),
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            }),
+            l1ContractsUpgradeCalldata: new bytes(0),
+            postUpgradeCalldata: new bytes(0),
+            upgradeTimestamp: 0,
+            newProtocolVersion: cachedProtocolVersion
+        });
+
+        Diamond.FacetCut[] memory emptyArray;
+        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
+            facetCuts: emptyArray,
+            initAddress: _genesisUpgrade,
+            initCalldata: abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
+        });
+
+        Diamond.diamondCut(cutData);
+        emit SetChainIdUpgrade(address(this), l2ProtocolUpgradeTx, cachedProtocolVersion);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             CONTRACT FREEZING
     //////////////////////////////////////////////////////////////*/
@@ -170,4 +251,167 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         emit Unfreeze();
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            CHAIN MIGRATION
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev we can move assets using these
+    function bridgeBurn(
+        address _syncLayer,
+        address _prevMsgSender,
+        bytes calldata
+    ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
+        // (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
+        require(s.syncLayer == address(0), "Af: already migrated");
+        require(_prevMsgSender == s.admin, "Af: not chainAdmin");
+        IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
+
+        // address chainBaseToken = hyperchain.getBaseToken();
+        uint256 currentProtocolVersion = s.protocolVersion;
+        uint256 protocolVersion = stm.protocolVersion();
+
+        require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
+        // FIXME: this will be removed once we support the migration of the priority queue also.
+        // require(s.priorityQueue.getSize() == 0, "Migration is only allowed with empty priority queue");
+
+        s.syncLayer = _syncLayer;
+        chainBridgeMintData = abi.encode(_prepareChainCommitment());
+    }
+
+    function bridgeMint(bytes calldata _data) external payable override {
+        HyperchainCommitment memory _commitment = abi.decode(_data, (HyperchainCommitment));
+
+        uint256 batchesExecuted = _commitment.totalBatchesExecuted;
+        uint256 batchesVerified = _commitment.totalBatchesVerified;
+        uint256 batchesCommitted = _commitment.totalBatchesCommitted;
+
+        s.totalBatchesCommitted = batchesCommitted;
+        s.totalBatchesVerified = batchesVerified;
+        s.totalBatchesExecuted = batchesExecuted;
+
+        // Some consistency checks just in case.
+        require(batchesExecuted <= batchesVerified, "Executed is not consistent with verified");
+        require(batchesVerified <= batchesCommitted, "Verified is not consistent with committed");
+
+        // In the worst case, we may need to revert all the committed batches that were not executed.
+        // This means that the stored batch hashes should be stored for [batchesExecuted; batchesCommitted] batches, i.e.
+        // there should be batchesCommitted - batchesExecuted + 1 hashes.
+        require(
+            _commitment.batchHashes.length == batchesCommitted - batchesExecuted + 1,
+            "Invalid number of batch hashes"
+        );
+
+        // Note that this part is done in O(N), i.e. it is the responsibility of the admin of the chain to ensure that the total number of
+        // outstanding committed batches is not too long.
+        uint256 length = _commitment.batchHashes.length;
+        for (uint256 i = 0; i < length; ++i) {
+            s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];
+        }
+
+        // Currently only zero length is allowed.
+        uint256 pqHead = _commitment.priorityQueueHead;
+        s.priorityQueue.head = pqHead;
+        s.priorityQueue.tail = pqHead + _commitment.priorityQueueTxs.length;
+
+        length = _commitment.priorityQueueTxs.length;
+        for (uint256 i = 0; i < length; ++i) {
+            s.priorityQueue.data[pqHead + i] = _commitment.priorityQueueTxs[i];
+        }
+
+        s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
+        s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
+
+        emit MigrationComplete();
+    }
+
+    function bridgeClaimFailedBurn(
+        uint256 _chainId,
+        bytes32 _assetInfo,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external payable override {}
+
+    // todo make internal. For now useful for testing
+    function _prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {
+        commitment.totalBatchesCommitted = s.totalBatchesCommitted;
+        commitment.totalBatchesVerified = s.totalBatchesVerified;
+        commitment.totalBatchesExecuted = s.totalBatchesExecuted;
+
+        uint256 pqHead = s.priorityQueue.head;
+        commitment.priorityQueueHead = pqHead;
+
+        uint256 pqLength = s.priorityQueue.tail - pqHead;
+        // FIXME: this will be removed once we support the migration of any priority queue size.
+        require(pqLength <= 50, "Migration is only allowed with empty priority queue 2");
+
+        PriorityOperation[] memory priorityQueueTxs = new PriorityOperation[](pqLength);
+
+        for (uint256 i = pqHead; i < s.priorityQueue.tail; ++i) {
+            priorityQueueTxs[i] = s.priorityQueue.data[i];
+        }
+        commitment.priorityQueueTxs = priorityQueueTxs;
+
+        commitment.l2SystemContractsUpgradeBatchNumber = s.l2SystemContractsUpgradeBatchNumber;
+        commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
+
+        // just in case
+        require(
+            commitment.totalBatchesExecuted <= commitment.totalBatchesVerified,
+            "Verified is not consistent with executed"
+        );
+        require(
+            commitment.totalBatchesVerified <= commitment.totalBatchesCommitted,
+            "Verified is not consistent with committed"
+        );
+
+        uint256 blocksToRemember = commitment.totalBatchesCommitted - commitment.totalBatchesExecuted + 1;
+
+        bytes32[] memory batchHashes = new bytes32[](blocksToRemember);
+
+        for (uint256 i = 0; i < blocksToRemember; ++i) {
+            unchecked {
+                batchHashes[i] = s.storedBatchHashes[commitment.totalBatchesExecuted + i];
+            }
+        }
+
+        commitment.batchHashes = batchHashes;
+    }
+
+    function readChainCommitment() external view returns (bytes memory commitment) {
+        return abi.encode(_prepareChainCommitment());
+    }
+
+    // function recoverFromFailedMigrationToSyncLayer(
+    //     uint256 _syncLayerChainId,
+    //     uint256 _l2BatchNumber,
+    //     uint256 _l2MessageIndex,
+    //     uint16 _l2TxNumberInBatch,
+    //     bytes32[] calldata _merkleProof
+    // ) external onlyAdmin {
+    //     require(s.syncLayerState == SyncLayerState.MigratedFromL1, "not migrated L1");
+
+    //     bytes32 migrationHash = s.syncLayerMigrationHash;
+    //     require(migrationHash != bytes32(0), "can not recover when there is no migration");
+
+    //     require(
+    //         IBridgehub(s.bridgehub).proveL1ToL2TransactionStatus(
+    //             _syncLayerChainId,
+    //             migrationHash,
+    //             _l2BatchNumber,
+    //             _l2MessageIndex,
+    //             _l2TxNumberInBatch,
+    //             _merkleProof,
+    //             TxStatus.Failure
+    //         ),
+    //         "Migration not failed"
+    //     );
+
+    //     s.syncLayerState = SyncLayerState.ActiveOnL1;
+    //     s.syncLayerChainId = 0;
+    //     s.syncLayerMigrationHash = bytes32(0);
+
+    //     // We do not need to perform any additional actions, since no changes related to the chain commitment can be performed
+    //     // while the chain is in the "migrated" state.
+    // }
 }

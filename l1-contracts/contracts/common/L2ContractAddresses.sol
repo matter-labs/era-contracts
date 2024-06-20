@@ -31,3 +31,7 @@ address constant L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR = address(0x800b);
 
 /// @dev The address of the pubdata chunk publisher contract
 address constant L2_PUBDATA_CHUNK_PUBLISHER_ADDR = address(0x8011);
+
+address constant COMPLEX_UPGRADER_ADDR = address(0x800f);
+
+address constant GENESIS_UPGRADE_ADDR = address(0x8000);

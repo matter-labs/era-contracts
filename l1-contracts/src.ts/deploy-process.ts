@@ -12,7 +12,7 @@ import type { FacetCut } from "./diamondCut";
 import type { Deployer } from "./deploy";
 import { getTokens } from "./deploy-token";
 
-import { ADDRESS_ONE } from "../src.ts/utils";
+import { ADDRESS_ONE, isCurrentNetworkLocal } from "../src.ts/utils";
 
 export const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000";
 export const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
@@ -25,16 +25,19 @@ export async function initialBridgehubDeployment(
   create2Salt?: string,
   nonce?: number
 ) {
-  nonce = nonce || (await deployer.deployWallet.getTransactionCount());
   create2Salt = create2Salt || ethers.utils.hexlify(ethers.utils.randomBytes(32));
 
   // Create2 factory already deployed on the public networks, only deploy it on local node
-  if (process.env.CHAIN_ETH_NETWORK === "localhost" || process.env.CHAIN_ETH_NETWORK === "hardhat") {
-    await deployer.deployCreate2Factory({ gasPrice, nonce });
-    nonce++;
+  if (isCurrentNetworkLocal()) {
+    if (!deployer.isZkMode()) {
+      await deployer.deployCreate2Factory({ gasPrice, nonce });
+      nonce = nonce || nonce == 0 ? ++nonce : nonce;
+    } else {
+      await deployer.updateCreate2FactoryZkMode();
+    }
 
     await deployer.deployMulticall3(create2Salt, { gasPrice, nonce });
-    nonce++;
+    nonce = nonce || nonce == 0 ? ++nonce : nonce;
   }
 
   if (onlyVerifier) {
@@ -44,30 +47,44 @@ export async function initialBridgehubDeployment(
 
   await deployer.deployDefaultUpgrade(create2Salt, {
     gasPrice,
-    nonce,
   });
-  nonce++;
+  nonce = nonce ? ++nonce : nonce;
 
   await deployer.deployGenesisUpgrade(create2Salt, {
     gasPrice,
-    nonce,
   });
-  nonce++;
+  nonce = nonce ? ++nonce : nonce;
 
   await deployer.deployValidatorTimelock(create2Salt, { gasPrice, nonce });
 
   await deployer.deployDAValidators(create2Salt, { gasPrice });
+  // Governance will be L1 governance, but we want to deploy it here for the init process.
   await deployer.deployGovernance(create2Salt, { gasPrice });
-  await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
+  await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
+
+  if (!deployer.isZkMode()) {
+    // proxy admin is already deployed when SL's L2SharedBridge is registered
+    await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
+  }
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
-  await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
+
+  if (deployer.isZkMode()) {
+    await deployer.updateBlobVersionedHashRetrieverZkMode();
+  } else {
+    await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
+  }
   await deployer.deployStateTransitionManagerContract(create2Salt, extraFacets, gasPrice);
   await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
 
-  await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
-  await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
-  await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });
-  await deployer.setParametersSharedBridge();
+  // L2 Shared Bridge already deployed via L1 forced tx
+  if (deployer.isZkMode()) {
+    await deployer.registerAddresses();
+  } else {
+    await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
+    await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
+    await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });
+    await deployer.setParametersSharedBridge();
+  }
 }
 
 export async function registerHyperchain(
@@ -86,8 +103,9 @@ export async function registerHyperchain(
     : ADDRESS_ONE;
 
   if (!(await deployer.bridgehubContract(deployer.deployWallet).tokenIsRegistered(baseTokenAddress))) {
-    await deployer.registerToken(baseTokenAddress, useGovernance);
+    await deployer.registerTokenBridgehub(baseTokenAddress, useGovernance);
   }
+  await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
   await deployer.registerHyperchain(
     baseTokenAddress,
     validiumMode,

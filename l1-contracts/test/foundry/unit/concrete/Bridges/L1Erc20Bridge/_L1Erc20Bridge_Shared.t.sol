@@ -2,15 +2,18 @@
 
 pragma solidity ^0.8.17;
 
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
+import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {FeeOnTransferToken} from "contracts/dev-contracts/FeeOnTransferToken.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {ReenterL1ERC20Bridge} from "contracts/dev-contracts/test/ReenterL1ERC20Bridge.sol";
 import {Utils} from "../../Utils/Utils.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
 
 contract L1Erc20BridgeTest is Test {
     L1ERC20Bridge internal bridge;
@@ -31,10 +34,15 @@ contract L1Erc20BridgeTest is Test {
         alice = makeAddr("alice");
 
         dummySharedBridge = new DummySharedBridge(dummyL2DepositTxHash);
-        bridge = new L1ERC20Bridge(IL1SharedBridge(address(dummySharedBridge)));
+        bridge = new L1ERC20Bridge(IL1SharedBridge(address(dummySharedBridge)), IL1NativeTokenVault(address(1)));
+        uint256 eraChainId = 1;
+        address weth = makeAddr("weth");
+        L1NativeTokenVault ntv = new L1NativeTokenVault(weth, IL1SharedBridge(address(dummySharedBridge)), eraChainId);
+
+        vm.store(address(bridge), bytes32(uint256(212)), bytes32(0));
 
         reenterL1ERC20Bridge = new ReenterL1ERC20Bridge();
-        bridgeReenterItself = new L1ERC20Bridge(IL1SharedBridge(address(reenterL1ERC20Bridge)));
+        bridgeReenterItself = new L1ERC20Bridge(IL1SharedBridge(address(reenterL1ERC20Bridge)), ntv);
         reenterL1ERC20Bridge.setBridge(bridgeReenterItself);
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);

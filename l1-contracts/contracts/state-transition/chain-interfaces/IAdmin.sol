@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IZkSyncHyperchainBase} from "../chain-interfaces/IZkSyncHyperchainBase.sol";
+import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
@@ -71,6 +72,8 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @param _l1DAValidator The address of the L1 DA validator
     /// @param _l2DAValidator The address of the L2 DA validator
     function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external;
+    
+    function setChainIdUpgrade(address _genesisUpgrade) external;
 
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
@@ -108,6 +111,9 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
 
+    /// TODO: maybe include some params
+    event MigrationComplete();
+
     /// @notice Emitted when the contract is frozen.
     event Freeze();
 
@@ -117,4 +123,31 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice New pair of DA validators set
     event NewL2DAValidator(address indexed oldL2DAValidator, address indexed newL2DAValidator);
     event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
+    /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
+    event SetChainIdUpgrade(
+        address indexed _hyperchain,
+        L2CanonicalTransaction _l2Transaction,
+        uint256 indexed _protocolVersion
+    );
+
+    event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
+
+    event BridgeMint(address indexed _account, uint256 _amount);
+
+    event BridgeBurn(address indexed _account, uint256 _amount);
+
+    function bridgeBurn(
+        address _syncLayer,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external payable returns (bytes memory _bridgeMintData);
+
+    function bridgeClaimFailedBurn(
+        uint256 _chainId,
+        bytes32 _assetInfo,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external payable;
+
+    function bridgeMint(bytes calldata _data) external payable;
 }

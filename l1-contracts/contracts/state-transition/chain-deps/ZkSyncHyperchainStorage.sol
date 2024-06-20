@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
+// import {IStateTransitionManager} from "../IStateTransitionManager.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type
@@ -157,4 +158,8 @@ struct ZkSyncHyperchainStorage {
     /// @dev The address of the contract on L2 that is responsible for the data availability verification.
     /// This contract sends `l2DAValidatorOutputHash` to L1 via L2->L1 system log and it will routed to the `l1DAValidator` contract.
     address l2DAValidator;
+    /// @dev the Asset Id of the baseToken
+    bytes32 baseTokenAssetId;
+    /// @dev address of the synclayer, only set on L1 if settling on it
+    address syncLayer;
 }

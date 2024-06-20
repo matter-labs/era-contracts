@@ -2,7 +2,6 @@ import * as hardhat from "hardhat";
 import type { BigNumberish, BytesLike } from "ethers";
 import { BigNumber, ethers } from "ethers";
 import type { Address } from "zksync-ethers/build/types";
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-ethers/build/utils";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
@@ -383,7 +382,7 @@ export async function depositERC20(
   l2RefundRecipient = ethers.constants.AddressZero
 ) {
   const gasPrice = await bridge.provider.getGasPrice();
-  const gasPerPubdata = REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT;
+  const gasPerPubdata = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
   const neededValue = await bridgehubContract.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
   const ethIsBaseToken = (await bridgehubContract.baseToken(chainId)) == ADDRESS_ONE;
 
@@ -392,7 +391,7 @@ export async function depositERC20(
     l1Token,
     amount,
     l2GasLimit,
-    REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     l2RefundRecipient,
     {
       value: ethIsBaseToken ? neededValue : 0,
@@ -407,7 +406,7 @@ export function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>)
     from: ethers.constants.AddressZero,
     to: ethers.constants.AddressZero,
     gasLimit: 5000000,
-    gasPerPubdataByteLimit: REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
+    gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     maxFeePerGas: 0,
     maxPriorityFeePerGas: 0,
     paymaster: 0,

@@ -6,6 +6,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -18,6 +19,7 @@ import {InitializeDataNewChain} from "contracts/state-transition/chain-interface
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
 import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract StateTransitionManagerTest is Test {
     StateTransitionManager internal stateTransitionManager;
@@ -37,11 +39,12 @@ contract StateTransitionManagerTest is Test {
     Diamond.FacetCut[] internal facetCuts;
 
     function setUp() public {
-        bridgehub = makeAddr("bridgehub");
+        DummyBridgehub dummyBridgehub = new DummyBridgehub();
+        bridgehub = address(dummyBridgehub);
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(bridgehub);
-        stateTransitionManager = new StateTransitionManager(bridgehub, type(uint256).max);
+        stateTransitionManager = new StateTransitionManager(address(IBridgehub(address(bridgehub))), type(uint256).max);
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new GenesisUpgrade();
 
