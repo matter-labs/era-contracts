@@ -16,7 +16,7 @@ object "Modexp" {
 
             /// @dev The gas cost of processing modexp circuit precompile.
             function MODEXP_GAS_COST() -> ret {
-                ret := 100000
+                ret := 13334
             }
 
             /// @dev The maximum amount of bytes for base.

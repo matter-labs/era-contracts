@@ -16,7 +16,7 @@ object "EcAdd" {
 
             /// @dev The gas cost of processing ecadd circuit precompile.
             function ECADD_GAS_COST() -> ret {
-                ret := 300
+                ret := 20
             }
 
             //////////////////////////////////////////////////////////////////

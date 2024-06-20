@@ -16,7 +16,7 @@ object "EcMul" {
 
             /// @dev The gas cost of processing ecmul circuit precompile.
             function ECMUL_GAS_COST() -> ret {
-                ret := 7000
+                ret := 3077
             }
 
             // ////////////////////////////////////////////////////////////////
