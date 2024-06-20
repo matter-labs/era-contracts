@@ -7,14 +7,14 @@ pragma solidity 0.8.24;
 import {IL1DAValidator, L1DAValidatorOutput} from "../chain-interfaces/IL1DAValidator.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "../../common/Config.sol";
 
+import { CalldataDA } from "./CalldataDA.sol";
+
 // TODO: maybe move it here
 import {BLOB_SIZE_BYTES, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE} from "../chain-interfaces/IExecutor.sol";
 
 uint256 constant BLOBS_SUPPORTED = 6;
 
-contract RollupL1DAValidator is IL1DAValidator {
-    mapping(address validator => bool isValidator) public validators;
-
+contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
     /// @dev The published blob commitments. Note, that the correctness of blob commitment with relation to the linear hash
     /// is *not* checked in this contract, but is expected to be checked at the veriifcation stage of the ZK contract.
     mapping(bytes32 blobCommitment => bool isPublished) public publishedBlobCommitments;
@@ -64,81 +64,6 @@ contract RollupL1DAValidator is IL1DAValidator {
         return keccak256(abi.encodePacked(blobVersionedHash, _commitment[:PUBDATA_COMMITMENT_COMMITMENT_OFFSET]));
     }
 
-    /// @notice Parses the input that the l2 Da validator has provided to the contract.
-    /// @param _l2DAValidatorOutputHash The hash of the output of the L2 DA validator.
-    /// @param _maxBlobsSupported The maximal number of blobs supported by the chain.
-    /// @param _operatorDAInput The DA input by the operator provided on L1.
-    function _processL2RollupDAValidatorOutputHash(
-        bytes32 _l2DAValidatorOutputHash,
-        uint256 _maxBlobsSupported,
-        bytes calldata _operatorDAInput
-    )
-        internal
-        pure
-        returns (
-            bytes32 stateDiffHash,
-            bytes32 fullPubdataHash,
-            bytes32[] memory blobsLinearHashes,
-            uint256 blobsProvided,
-            bytes calldata l1DaInput
-        )
-    {
-        // The preimage under the hash `l2DAValidatorOutputHash` is expected to be in the following format:
-        // - First 32 bytes are the hash of the uncompressed state diff.
-        // - Then, there is a 32-byte hash of the full pubdata.
-        // - Then, there is the 1-byte number of blobs published.
-        // - Then, there are linear hashes of the published blobs, 32 bytes each.
-
-        // Check that it accomodates enough pubdata for the state diff hash, hash of pubdata + the number of blobs.
-        require(_operatorDAInput.length >= 32 + 32 + 1, "too small");
-
-        stateDiffHash = bytes32(_operatorDAInput[:32]);
-        fullPubdataHash = bytes32(_operatorDAInput[32:64]);
-        blobsProvided = uint256(uint8(_operatorDAInput[64]));
-
-        require(blobsProvided <= _maxBlobsSupported, "invalid number of blobs");
-
-        // Note that the API of the contract requires that the returned blobs linear hashes have length of
-        // the `_maxBlobsSupported`
-        blobsLinearHashes = new bytes32[](_maxBlobsSupported);
-
-        require(_operatorDAInput.length >= 65 + 32 * blobsProvided, "invalid blobs hashes");
-
-        uint256 ptr = 65;
-
-        for (uint256 i = 0; i < blobsProvided; i++) {
-            // Take the 32 bytes of the blob linear hash
-            blobsLinearHashes[i] = bytes32(_operatorDAInput[ptr:ptr + 32]);
-            ptr += 32;
-        }
-
-        // Now, we need to double check that the provided input was indeed retutned by the L2 DA validator.
-        require(keccak256(_operatorDAInput[:ptr]) == _l2DAValidatorOutputHash, "invalid l2 DA output hash");
-
-        // The rest of the output were provided specifically by the operator
-        l1DaInput = _operatorDAInput[ptr:];
-    }
-
-    /// @notice Verify that the calldata DA was correctly provided.
-    /// todo: better doc comments
-    function _processCalldataDA(
-        uint256 _blobsProvided,
-        bytes32 _fullPubdataHash,
-        uint256 _maxBlobsSupported,
-        bytes calldata _pubdataInput
-    ) internal returns (bytes32[] memory blobCommitments) {
-        // We typically do not know whether we'll use calldata or blobs at the time when
-        // we start proving the batch. That's why the blob commitment for a single blob is still present in the case of calldata.
-
-        blobCommitments = new bytes32[](_maxBlobsSupported);
-
-        require(_blobsProvided == 1, "one one blob with calldata");
-
-        require(_pubdataInput.length - 32 <= BLOB_SIZE_BYTES, "cz");
-        require(_fullPubdataHash == keccak256(_pubdataInput[:_pubdataInput.length - 32]), "wp");
-        blobCommitments[0] = bytes32(_pubdataInput[_pubdataInput.length - 32:_pubdataInput.length]);
-    }
-
     /// todo: better doc comments
     function _processBlobDA(
         uint256 _blobsProvided,
@@ -185,6 +110,7 @@ contract RollupL1DAValidator is IL1DAValidator {
 
     /// @inheritdoc IL1DAValidator
     function checkDA(
+        uint256 _chainId,
         bytes32 _l2DAValidatorOutputHash,
         bytes calldata _operatorDAInput,
         uint256 _maxBlobsSupported
@@ -203,7 +129,7 @@ contract RollupL1DAValidator is IL1DAValidator {
         if (pubdataSource == uint8(PubdataSource.Blob)) {
             blobCommitments = _processBlobDA(blobsProvided, _maxBlobsSupported, l1DaInput[1:]);
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
-            blobCommitments = _processCalldataDA(blobsProvided, fullPubdataHash, _maxBlobsSupported, l1DaInput[1:]);
+            (blobCommitments, ) = _processCalldataDA(blobsProvided, fullPubdataHash, _maxBlobsSupported, l1DaInput[1:]);
         } else {
             revert("l1-da-validator/invalid-pubdata-source");
         }

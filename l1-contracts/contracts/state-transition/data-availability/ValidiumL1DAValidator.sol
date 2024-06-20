@@ -11,6 +11,7 @@ import {PubdataSource, PUBDATA_COMMITMENT_SIZE} from "../chain-interfaces/IExecu
 
 contract ValidiumL1DAValidator is IL1DAValidator {
     function checkDA(
+        uint256 _chainId,
         bytes32 l2DAValidatorOutputHash,
         bytes memory operatorDAInput,
         uint256 maxBlobsSupported
