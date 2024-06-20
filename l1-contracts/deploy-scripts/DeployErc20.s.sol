@@ -38,6 +38,15 @@ contract DeployErc20Script is Script {
         saveOutput();
     }
 
+    function getTokensAddresses() public view returns (address[] memory) {
+        uint256 tokensLength = config.tokens.length;
+        address[] memory addresses = new address[](tokensLength);
+        for (uint256 i = 0; i < tokensLength; ++i) {
+            addresses[i] = config.tokens[i].addr;
+        }
+        return addresses;
+    }
+
     function initializeConfig() internal {
         config.deployerAddress = msg.sender;
 
@@ -54,13 +63,11 @@ contract DeployErc20Script is Script {
         config.create2FactorySalt = vm.parseTomlBytes32(toml, "$.create2_factory_salt");
 
         // Grab config from custom config file
-        path = string.concat(root, "/script-config/config-deploy-erc20.toml");
+        path = string.concat(root, "/deploy-script-config-template/config-deploy-erc20.toml");
         toml = vm.readFile(path);
 
         string[] memory tokens = vm.parseTomlKeys(toml, "$.tokens");
-
-        uint256 tokensLength = tokens.length;
-        for (uint256 i = 0; i < tokensLength; ++i) {
+        for (uint256 i = 0; i < tokens.length; i++) {
             TokenDescription memory token;
             string memory key = string.concat("$.tokens.", tokens[i]);
             token.name = toml.readString(string.concat(key, ".name"));
@@ -106,7 +113,7 @@ contract DeployErc20Script is Script {
         bytes memory bytecode = abi.encodePacked(vm.getCode(implementation), args);
 
         address tokenAddress = deployViaCreate2(bytecode);
-
+        
         if (mint > 0) {
             vm.broadcast();
             (bool success, ) = tokenAddress.call(
