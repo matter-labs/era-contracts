@@ -156,7 +156,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev This sets the first post upgrade batch for era, used to check old withdrawals
-    /// @param  _eraLegacyBridgeLastDepositBatch The the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge
+    /// @param _eraLegacyBridgeLastDepositBatch The the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge
     /// @param _eraLegacyBridgeLastDepositTxNumber The tx number in the _eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge
     function setEraLegacyBridgeLastDepositTime(
         uint256 _eraLegacyBridgeLastDepositBatch,
@@ -168,7 +168,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         eraLegacyBridgeLastDepositTxNumber = _eraLegacyBridgeLastDepositTxNumber;
     }
 
-    /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process
+    /// @dev Transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process.
+    /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
+    /// @param _target The hyperchain or bridge contract address from where to transfer funds.
+    /// @param _targetChainId The chain ID of the corresponding hyperchain.
     function transferFundsFromLegacy(address _token, address _target, uint256 _targetChainId) external onlySelf {
         if (_token == ETH_TOKEN_ADDRESS) {
             uint256 balanceBefore = address(this).balance;
@@ -204,6 +207,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
     }
 
+    /// @dev Accepts ether only from the hyperchain associated with the specified chain ID.
+    /// @param _chainId The chain ID corresponding to the hyperchain allowed to send ether.
     function receiveEth(uint256 _chainId) external payable {
         require(BRIDGE_HUB.getHyperchain(_chainId) == msg.sender, "receiveEth not state transition");
     }
@@ -215,6 +220,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
     /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
+    /// @param _chainId The chain ID of the hyperchain to which deposit.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @param _l1Token The L1 token address which is deposited.
+    /// @param _amount The total amount of tokens to be bridged.
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         address _prevMsgSender,
@@ -250,6 +259,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @notice Initiates a deposit transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
+    /// @param _chainId The chain ID of the hyperchain to which deposit.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @param _l2Value The L2 `msg.value` from the L1 -> L2 deposit transaction.
+    /// @param _data The calldata for the second bridge deposit.
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
@@ -315,6 +328,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
     /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
+    /// @param _chainId The chain ID of the hyperchain to which confirm the deposit.
+    /// @param _txDataHash The keccak256 hash of abi.encode(msgSender, l1Token, amount)
+    /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,
@@ -665,6 +681,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// of processing an L2 transaction where tokens would be minted.
     /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
     /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
     /// @param _l2Receiver The account address that should receive funds on L2
     /// @param _l1Token The L1 token address which is deposited
     /// @param _amount The total amount of tokens to be bridged
