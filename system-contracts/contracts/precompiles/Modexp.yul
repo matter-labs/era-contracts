@@ -22,19 +22,19 @@ object "Modexp" {
             /// @dev The maximum amount of bytes for base.
             /// @dev This restriction comes from circuit precompile call limitations.
             function MAX_BASE_BYTES_SUPPORTED() -> ret{
-                ret := 256 // 2048 bits
+                ret := 32 // 256 bits
             }
 
             /// @dev The maximum amount of bytes for exponent.
             /// @dev This restriction comes from circuit precompile call limitations.
             function MAX_EXP_BYTES_SUPPORTED() -> ret{
-                ret := 8 // 64 bits
+                ret := 4 // 32 bits
             }
 
             /// @dev The maximum amount of bytes for modulus.
             /// @dev This restriction comes from circuit precompile call limitations.
             function MAX_MOD_BYTES_SUPPORTED() -> ret{
-                ret := 256 // 2048 bits
+                ret := 32 // 256 bits
             }
 
             //////////////////////////////////////////////////////////////////
