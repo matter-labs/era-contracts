@@ -18,7 +18,7 @@ library PriorityTree {
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
     struct Tree {
-        uint256 startIndex;
+        uint256 startIndex; // priority tree started accepting priority ops from this index
         uint256 unprocessedIndex; // relative to `startIndex`
         mapping(bytes32 => bool) historicalRoots;
         DynamicIncrementalMerkle.Bytes32PushTree tree;
@@ -46,8 +46,8 @@ library PriorityTree {
         _tree.historicalRoots[newRoot] = true;
     }
 
-    function setup(Tree storage _tree, bytes32 _zero, uint256 _startIndex) internal {
-        _tree.tree.setup(_zero);
+    function setup(Tree storage _tree, uint256 _startIndex) internal {
+        _tree.tree.setup(keccak256(""));
         _tree.startIndex = _startIndex;
     }
 
@@ -62,7 +62,7 @@ library PriorityTree {
             _tree.unprocessedIndex,
             _priorityOpsData.itemHashes
         );
-        require(_tree.historicalRoots[expectedRoot], "");
+        require(_tree.historicalRoots[expectedRoot], "PT: root mismatch");
         _tree.unprocessedIndex += _priorityOpsData.itemHashes.length;
     }
 }

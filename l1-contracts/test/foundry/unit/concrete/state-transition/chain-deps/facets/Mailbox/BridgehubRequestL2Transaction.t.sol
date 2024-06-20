@@ -8,6 +8,8 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransactionFiltererTrue.sol";
 import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
 
+import {console} from "forge-std/console.sol";
+
 contract BridgehubRequestL2TransactionTest is MailboxTest {
     function test_successWithoutFilterer() public {
         address bridgehub = makeAddr("bridgehub");
@@ -73,5 +75,27 @@ contract BridgehubRequestL2TransactionTest is MailboxTest {
             factoryDeps: factoryDeps,
             refundRecipient: sender
         });
+    }
+
+    function test_priorityTreeRootChange() public {
+        bytes32 oldRootHash = gettersFacet.getPriorityTreeRoot();
+        assertEq(oldRootHash, bytes32(0), "root hash should be 0");
+
+        address bridgehub = makeAddr("bridgehub");
+
+        utilsFacet.util_setBridgehub(bridgehub);
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
+        utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
+
+        BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
+
+        vm.deal(bridgehub, 100 ether);
+        vm.prank(address(bridgehub));
+        bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
+        assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
+
+        // TODO: check if the root hash is correct - calculate it manually
+        bytes32 newRootHash = gettersFacet.getPriorityTreeRoot();
+        assertNotEq(oldRootHash, newRootHash, "root hash should be different");
     }
 }
