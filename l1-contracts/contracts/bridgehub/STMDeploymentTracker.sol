@@ -56,11 +56,11 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     /// @dev The function is called by the Bridgehub contract during the `Bridgehub.requestL2TransactionTwoBridges`.
     /// @dev Since the L2 settlment layers `_chainId` might potentially have ERC20 tokens as native assets,
     /// there are two ways to perform the L1->L2 transaction:
-    /// - via the `Bridgehub.requestL2TransactionDirect`. However, this would require the STMDeploymentTracker to 
+    /// - via the `Bridgehub.requestL2TransactionDirect`. However, this would require the STMDeploymentTracker to
     /// hahndle the ERC20 balances to be used in the transaction.
     /// - via the `Bridgehub.requestL2TransactionTwoBridges`. This way it will be the sender that provides the funds
     /// for the L2 transaction.
-    /// The second approach is used due to its simplicity even though it gives the sender slightly more control over the call: 
+    /// The second approach is used due to its simplicity even though it gives the sender slightly more control over the call:
     /// `gasLimit`, etc.
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
@@ -75,10 +75,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         // solhint-disable-next-line gas-custom-errors
 
         require(_prevMsgSender == owner(), "STMDT: not owner");
-        (address _stmL1Address, address _stmL2Address) = abi.decode(
-            _data,
-            (address, address)
-        );
+        (address _stmL1Address, address _stmL2Address) = abi.decode(_data, (address, address));
 
         request = _registerSTMAssetOnL2Bridgehub(_chainId, _stmL1Address, _stmL2Address);
     }
@@ -132,7 +129,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @dev we need to implement this for the bridgehub
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {
-        // This function is typically used on bridges for e.g. 
+        // This function is typically used on bridges for e.g.
     }
 
     function getAssetId(address _l1STM) public view override returns (bytes32) {

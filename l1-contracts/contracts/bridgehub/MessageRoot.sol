@@ -21,7 +21,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
-import { MAX_NUMBER_OF_HYPERCHAINS } from "../common/Config.sol";
+import {MAX_NUMBER_OF_HYPERCHAINS} from "../common/Config.sol";
 
 // FIXME: explain why it can not collide with real root
 bytes32 constant EMPTY_LOG_ROOT = keccak256("New Tree zero hash");
@@ -89,10 +89,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @dev add a new chainBatchRoot to the chainTree
-    function addChainBatchRoot(
-        uint256 _chainId,
-        bytes32 _chainBatchRoot
-    ) external onlyChain(_chainId) {
+    function addChainBatchRoot(uint256 _chainId, bytes32 _chainBatchRoot) external onlyChain(_chainId) {
         bytes32 chainRoot;
         // slither-disable-next-line unused-return
         (, chainRoot) = chainTree[_chainId].push(_chainBatchRoot);
@@ -115,7 +112,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @return pubdata The pubdata to be relayed to the DA layer.
     function clearTreeAndProvidePubdata() external returns (bytes memory pubdata) {
         // FIXME: access control: only to be called by the l1 messenger.
-    
+
         uint256 cachedChainCount = chainCount;
 
         // We will send the updated roots for all chains.
@@ -126,7 +123,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
         // There are of course ways to optimize it further, but it will be done in the future.
         bytes memory pubdata = new bytes(cachedChainCount * 32);
 
-        for(uint256 i = 0; i < cachedChainCount; i++) {
+        for (uint256 i = 0; i < cachedChainCount; i++) {
             // It is the responsibility of each chain to provide the roots of its L2->L1 messages if it wants to see those.
             // However, for the security of the system as a whole, the chain roots need to be provided for all chains.
 

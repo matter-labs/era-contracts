@@ -154,7 +154,10 @@ interface IStateTransitionManager {
 
     event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
 
-    function forwardedBridgeBurn(uint256 _chainId, bytes calldata _data) external returns (bytes memory _bridgeMintData);
+    function forwardedBridgeBurn(
+        uint256 _chainId,
+        bytes calldata _data
+    ) external returns (bytes memory _bridgeMintData);
 
     function forwardedBridgeMint(uint256 _chainId, bytes calldata _data) external returns (address);
 
