@@ -32,6 +32,17 @@ contract MerkleTestTest is Test {
         assertEq(rootFromContract, root);
     }
 
+    function prepareRangeProof(uint256 start, uint256 end) public returns (bytes32[] memory, bytes32[] memory, bytes32[] memory) {
+        bytes32[] memory left = merkleTree.getProof(elements, start);
+        bytes32[] memory right = merkleTree.getProof(elements, end);
+        bytes32[] memory leafs = new bytes32[](end - start + 1);
+        for (uint256 i = start; i <= end; ++i) {
+            leafs[i - start] = elements[i];
+        }
+
+        return (left, right, leafs);
+    }
+
     function testFirstElement() public {
         testElements(0);
     }
@@ -62,5 +73,40 @@ contract MerkleTestTest is Test {
 
         vm.expectRevert(bytes("bt"));
         merkleTest.calculateRoot(proof, 0, leaf);
+    }
+
+    function testRangeProof() public {
+        (bytes32[] memory left, bytes32[] memory right, bytes32[] memory leafs) = prepareRangeProof(10, 13);
+        bytes32 rootFromContract = merkleTest.calculateRoot(left, right, 10, leafs);
+        assertEq(rootFromContract, root);
+    }
+
+    function testRangeProofIncorrect() public {
+        (bytes32[] memory left, bytes32[] memory right, bytes32[] memory leafs) = prepareRangeProof(10, 13);
+        bytes32 rootFromContract = merkleTest.calculateRoot(left, right, 9, leafs);
+        assertNotEq(rootFromContract, root);
+    }
+
+    function testRangeProofLengthMismatch_shouldRevert() public {
+        (, bytes32[] memory right, bytes32[] memory leafs) = prepareRangeProof(10, 13);
+        bytes32[] memory leftShortened = new bytes32[](right.length - 1);
+
+        vm.expectRevert(bytes("Merkle: path length mismatch"));
+        merkleTest.calculateRoot(leftShortened, right, 10, leafs);
+    }
+
+    function testRangeProofEmptyPaths_shouldRevert() public {
+        (,, bytes32[] memory leafs) = prepareRangeProof(10, 13);
+        bytes32[] memory left;
+        bytes32[] memory right;
+
+        vm.expectRevert(bytes("Merkle: empty paths"));
+        merkleTest.calculateRoot(left, right, 10, leafs);
+    }
+
+    function testRangeProofWrongIndex_shouldRevert() public {
+        (bytes32[] memory left, bytes32[] memory right, bytes32[] memory leafs) = prepareRangeProof(10, 13);
+        vm.expectRevert(bytes("Merkle: index/height mismatch"));
+        merkleTest.calculateRoot(left, right, 128, leafs);
     }
 }

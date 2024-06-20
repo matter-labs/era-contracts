@@ -59,7 +59,7 @@ library Merkle {
 
         uint256 levelLen = _itemHashes.length;
 
-        require(_startIndex + levelLen <= (1 << pathLength), "Merkle: index out of range");
+        require(_startIndex + levelLen <= (1 << pathLength), "Merkle: index/height mismatch");
 
         bytes32[] memory itemHashes = _itemHashes;
 

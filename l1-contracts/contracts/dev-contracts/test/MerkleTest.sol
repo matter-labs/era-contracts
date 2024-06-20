@@ -12,4 +12,13 @@ contract MerkleTest {
     ) external pure returns (bytes32) {
         return Merkle.calculateRoot(_path, _index, _itemHash);
     }
+
+    function calculateRoot(
+        bytes32[] calldata _startPath,
+        bytes32[] calldata _endPath,
+        uint256 _startIndex,
+        bytes32[] calldata _itemHashes
+    ) external pure returns (bytes32) {
+        return Merkle.calculateRoot(_startPath, _endPath, _startIndex, _itemHashes);
+    }
 }
