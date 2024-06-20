@@ -11,5 +11,5 @@ interface IMessageRoot {
 
     function chainMessageRoot(uint256 _chainId) external view returns (bytes32);
 
-    function addChainBatchRoot(uint256 _chainId, bytes32 _chainBatchRoot, bool _updateFullTree) external;
+    function addChainBatchRoot(uint256 _chainId, bytes32 _chainBatchRoot) external;
 }

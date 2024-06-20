@@ -242,7 +242,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev we can move assets using these
-    function bridgeBurn(
+    function forwardedBridgeBurn(
         address _syncLayer,
         address _prevMsgSender,
         bytes calldata
@@ -264,7 +264,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         chainBridgeMintData = abi.encode(_prepareChainCommitment());
     }
 
-    function bridgeMint(bytes calldata _data) external payable override {
+    function forwardedBridgeMint(bytes calldata _data) external payable override {
         HyperchainCommitment memory _commitment = abi.decode(_data, (HyperchainCommitment));
 
         uint256 batchesExecuted = _commitment.totalBatchesExecuted;
@@ -310,7 +310,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         emit MigrationComplete();
     }
 
-    function bridgeClaimFailedBurn(
+    function forwardedBridgeClaimFailedBurn(
         uint256 _chainId,
         bytes32 _assetInfo,
         address _prevMsgSender,

@@ -414,18 +414,23 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // TODO: emit event
     }
 
-    /// @dev we can move assets using these
-    function bridgeBurn(
+    /// @notice Called by the bridgehub during the migration of a chain to another settlement layer.
+    /// @param _chainId The chain id of the chain to be migrated.
+    /// @param _data The data needed to perform the migration.
+    function forwardedBridgeBurn(
         uint256 _chainId,
         bytes calldata _data
-    ) external view override onlyBridgehub returns (bytes memory stmBridgeMintData) {
+    ) external view override onlyBridgehub returns (bytes memory stmForwardedBridgeMintData) {
         (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
         require(_newSyncLayerAdmin != address(0), "STM: admin zero");
         // todo check protocol version
         return abi.encode(IBridgehub(BRIDGE_HUB).baseToken(_chainId), _newSyncLayerAdmin, protocolVersion, _diamondCut);
     }
 
-    function bridgeMint(
+    /// @notice Called by the bridgehub during the migration of a chain to the current settlement layer.
+    /// @param _chainId The chain id of the chain to be migrated.
+    /// @param _stmData The data returned from `forwardedBridgeBurn` for the chain.
+    function forwardedBridgeMint(
         uint256 _chainId,
         bytes calldata _stmData
     ) external override onlyBridgehub returns (address chainAddress) {

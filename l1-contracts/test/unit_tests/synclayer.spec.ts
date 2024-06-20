@@ -125,8 +125,8 @@ describe("Synclayer", function () {
           secondBridgeAddress: stmDeploymentTracker.address,
           secondBridgeValue: 0,
           secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
-            ["bool", "address", "address"],
-            [true, stm.address, stm.address]
+            ["address", "address"],
+            [stm.address, stm.address]
           ),
         },
       ])
