@@ -16,7 +16,8 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
 
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
-import {ETH_TOKEN_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -238,11 +239,7 @@ contract L1NativeTokenVault is
     function getAssetId(address _l1TokenAddress) public view override returns (bytes32) {
         return
             keccak256(
-                abi.encode(
-                    block.chainid,
-                    NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS,
-                    bytes32(uint256(uint160(_l1TokenAddress)))
-                )
+                abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, bytes32(uint256(uint160(_l1TokenAddress))))
             );
     }
 }

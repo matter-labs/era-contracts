@@ -6,12 +6,12 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/acces
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
+import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
-import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
+import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT, L2_ASSET_ROUTER, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
 import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../L2ContractErrors.sol";
@@ -21,8 +21,6 @@ import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFail
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
-    IL2SharedBridge public override l2Bridge;
-
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
     UpgradeableBeacon public l2TokenBeacon;
@@ -33,7 +31,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     mapping(bytes32 assetId => address tokenAddress) public override tokenAddress;
 
     modifier onlyBridge() {
-        if (msg.sender != address(l2Bridge)) {
+        if (msg.sender != address(L2_ASSET_ROUTER)) {
             revert InvalidCaller(msg.sender);
             // Only L2 bridge can call this method
         }
@@ -44,20 +42,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @dev Disable the initialization to prevent Parity hack.
     constructor() {
         _disableInitializers();
-    }
-
-    /// @dev Sets the Shared Bridge contract address. Should be called only once.
-    function setSharedBridge(IL2SharedBridge _sharedBridge) external onlyOwner {
-        if (address(l2Bridge) != address(0)) {
-            // "SD: shared bridge already set";
-            revert AddressMismatch(address(0), address(l2Bridge));
-        }
-        if (address(_sharedBridge) == address(0)) {
-            // "SD: shared bridge 0");
-            revert EmptyAddress();
-        }
-
-        l2Bridge = _sharedBridge;
     }
 
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
@@ -99,7 +83,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         address expectedToken = l2TokenAddress(originToken);
         if (token == address(0)) {
             bytes32 expectedAssetId = keccak256(
-                abi.encode(_chainId, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(originToken))))
+                abi.encode(_chainId, address(L2_NATIVE_TOKEN_VAULT), bytes32(uint256(uint160(originToken))))
             );
             if (_assetId != expectedAssetId) {
                 // Make sure that a NativeTokenVault sent the message

@@ -108,11 +108,4 @@ interface IAdmin is IZkSyncHyperchainBase {
 
     /// @notice Emitted when the contract is unfrozen.
     event Unfreeze();
-
-    /// @dev emitted when an chain registers and a GenesisUpgrade happens
-    event GenesisUpgrade(
-        address indexed _hyperchain,
-        L2CanonicalTransaction _l2Transaction,
-        uint256 indexed _protocolVersion
-    );
 }

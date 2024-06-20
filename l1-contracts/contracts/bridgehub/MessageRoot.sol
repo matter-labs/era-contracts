@@ -5,8 +5,8 @@ pragma solidity 0.8.24;
 // slither-disable-next-line unused-return
 // solhint-disable reason-string, gas-custom-errors
 
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+// import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+// import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/openzeppelin/IncrementalMerkle.sol"; // todo figure out how to import from OZ
 
 import {IBridgehub} from "./IBridgehub.sol";
@@ -21,7 +21,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
-contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+contract MessageRoot is IMessageRoot, ReentrancyGuard {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
@@ -53,17 +53,18 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(IBridgehub _bridgehub) reentrancyGuardInitializer {
-        _disableInitializers();
         BRIDGE_HUB = _bridgehub;
+        _initialize();
     }
 
-    /// @dev Initializes a contract for later use. Expected to be used in the proxy
-    /// @param _owner Address which can change
-    function initialize(address _owner) external reentrancyGuardInitializer initializer {
-        require(_owner != address(0), "ShB owner 0");
+    /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a system contract without a proxy.
+    function initialize() external reentrancyGuardInitializer {
+        _initialize();
+    }
+
+    function _initialize() internal {
         // slither-disable-next-line unused-return
         sharedTree.setup(bytes32(0));
-        _transferOwnership(_owner);
     }
 
     function addNewChain(uint256 _chainId) external onlyBridgehub {

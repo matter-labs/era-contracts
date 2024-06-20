@@ -8,20 +8,13 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_GAS_PER_TRANSACTION, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../../../common/Config.sol";
+import {MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
-// import {IComplexUpgrader} from "../../l2-deps/IComplexUpgrader.sol";
-// import {IL2GenesisUpgrade} from "../../l2-deps/IL2GenesisUpgrade.sol";
-import {ISystemContext} from "../../l2-deps/ISystemContext.sol";
 // import {PriorityOperation} from "../../libraries/PriorityQueue.sol";
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../common/L2ContractAddresses.sol"; //, COMPLEX_UPGRADER_ADDR, GENESIS_UPGRADE_ADDR
-import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
-import {ProposedUpgrade} from "../../../upgrades/BaseZkSyncUpgrade.sol";
-import {VerifierParams} from "../../chain-interfaces/IVerifier.sol";
-import {IDefaultUpgrade} from "../../../upgrades/IDefaultUpgrade.sol";
+import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -150,67 +143,33 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
     function genesisUpgrade(address _l1GenesisUpgrade) external onlyStateTransitionManager {
         uint256 cachedProtocolVersion = s.protocolVersion;
-        // slither-disable-next-line unused-return
-        (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(cachedProtocolVersion));
-
         uint256 chainId = s.chainId;
 
-        // bytes memory genesisUpgradeCalldata = abi.encodeCall(IGenesisUpgrade.upgrade, (chainId)); //todo
-        // bytes memory complexUpgraderCalldata = abi.encodeCall(
-        //     IComplexUpgrader.upgrade,
-        //     (GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata)
-        // );
-        bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (chainId));
-
-        uint256[] memory uintEmptyArray;
-        bytes[] memory bytesEmptyArray;
-
-        L2CanonicalTransaction memory l2ProtocolUpgradeTx = L2CanonicalTransaction({
-            txType: SYSTEM_UPGRADE_L2_TX_TYPE,
-            from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
-            to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)), //COMPLEX_UPGRADER_ADDR
-            gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
-            gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            maxFeePerGas: uint256(0),
-            maxPriorityFeePerGas: uint256(0),
-            paymaster: uint256(0),
-            // Note, that the protocol version is used as "nonce" for system upgrade transactions
-            nonce: uint256(minorVersion),
-            value: 0,
-            reserved: [uint256(0), 0, 0, 0],
-            data: systemContextCalldata,
-            signature: new bytes(0),
-            factoryDeps: uintEmptyArray,
-            paymasterInput: new bytes(0),
-            reservedDynamic: new bytes(0)
-        });
-
-        ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
-            factoryDeps: bytesEmptyArray,
-            bootloaderHash: bytes32(0),
-            defaultAccountHash: bytes32(0),
-            verifier: address(0),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: new bytes(0),
-            upgradeTimestamp: 0,
-            newProtocolVersion: cachedProtocolVersion
-        });
-
         Diamond.FacetCut[] memory emptyArray;
+        bytes32[] memory deploymentHashes = new bytes32[](0);
+        address[] memory deploymentAddresses = new address[](0);
+        bool[] memory deploymentBool = new bool[](0);
+        // bytes32[] memory _byteCodeHashes = new bytes32[](0);
+        uint256[] memory _factoryDeps = new uint256[](0);
+
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
             facetCuts: emptyArray,
             initAddress: _l1GenesisUpgrade,
-            initCalldata: abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
+            initCalldata: abi.encodeCall(
+                IL1GenesisUpgrade.genesisUpgrade,
+                (
+                    _l1GenesisUpgrade,
+                    chainId,
+                    cachedProtocolVersion,
+                    deploymentAddresses,
+                    deploymentBool,
+                    deploymentHashes,
+                    _factoryDeps
+                )
+            ) // todo fill out empty values
         });
 
         Diamond.diamondCut(cutData);
-        emit GenesisUpgrade(address(this), l2ProtocolUpgradeTx, cachedProtocolVersion);
     }
 
     /*//////////////////////////////////////////////////////////////
