@@ -6,13 +6,14 @@
   "dependencies": {
     "@matterlabs/hardhat-zksync-deploy": "^0.6.5",
     "@matterlabs/hardhat-zksync-solc": "^1.1.4",
+    "@matterlabs/hardhat-zksync-verify": "^1.4.3",
     "commander": "^9.4.1",
     "eslint": "^8.51.0",
     "eslint-plugin-import": "^2.29.0",
     "eslint-plugin-prettier": "^5.0.1",
     "ethers": "^5.7.0",
     "fast-glob": "^3.3.2",
-    "hardhat": "^2.18.3",
+    "hardhat": "=2.22.2",
     "preprocess": "^3.2.0",
     "zksync-ethers": "https://github.com/zksync-sdk/zksync-ethers#ethers-v5-feat/bridgehub"
   },
@@ -63,6 +64,7 @@
     "deploy-preimages": "ts-node scripts/deploy-preimages.ts",
     "preprocess:bootloader": "rm -rf ./bootloader/build && yarn ts-node scripts/preprocess-bootloader.ts",
     "preprocess:system-contracts": "rm -rf ./contracts-preprocessed && ts-node scripts/preprocess-system-contracts.ts",
+    "verify-on-explorer": "hardhat run scripts/verify-on-explorer.ts",
     "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode",
     "test-node": "hardhat node-zksync --tag v0.0.1-vm1.5.0",
     "test:bootloader": "cd bootloader/test_infra && cargo run"
