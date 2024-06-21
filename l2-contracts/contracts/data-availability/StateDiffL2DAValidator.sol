@@ -27,10 +27,9 @@ abstract contract StateDiffL2DAValidator {
     /// On Era or other "vanilla" rollups it is empty, but it can be used for providing additional data by the operator,
     /// e.g. DA comittee signatures, etc.
     function _produceStateDiffPubdata(
-        bytes32 chainedLogsHash,
-        bytes32 logsRootHash,
-        bytes32 chainedMessagesHash,
-        bytes32 chainedBytescodesHash,
+        bytes32 _chainedLogsHash,
+        bytes32 _chainedMessagesHash,
+        bytes32 _chainedBytescodesHash,
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
     )
         internal
@@ -51,8 +50,8 @@ abstract contract StateDiffL2DAValidator {
             calldataPtr += L2_TO_L1_LOG_SERIALIZE_SIZE;
             reconstructedChainedLogsHash = keccak256(abi.encode(reconstructedChainedLogsHash, hashedLog));
         }
-        if (reconstructedChainedLogsHash != chainedLogsHash) {
-            revert ReconstructionMismatch(PubdataField.LogsHash, chainedLogsHash, reconstructedChainedLogsHash);
+        if (reconstructedChainedLogsHash != _chainedLogsHash) {
+            revert ReconstructionMismatch(PubdataField.LogsHash, _chainedLogsHash, reconstructedChainedLogsHash);
         }
 
         /// Check messages
@@ -68,8 +67,8 @@ abstract contract StateDiffL2DAValidator {
             calldataPtr += currentMessageLength;
             reconstructedChainedMessagesHash = keccak256(abi.encode(reconstructedChainedMessagesHash, hashedMessage));
         }
-        if (reconstructedChainedMessagesHash != chainedMessagesHash) {
-            revert ReconstructionMismatch(PubdataField.MsgHash, chainedMessagesHash, reconstructedChainedMessagesHash);
+        if (reconstructedChainedMessagesHash != _chainedMessagesHash) {
+            revert ReconstructionMismatch(PubdataField.MsgHash, _chainedMessagesHash, reconstructedChainedMessagesHash);
         }
 
         /// Check bytecodes
@@ -91,10 +90,10 @@ abstract contract StateDiffL2DAValidator {
             );
             calldataPtr += currentBytecodeLength;
         }
-        if (reconstructedChainedL1BytecodesRevealDataHash != chainedBytescodesHash) {
+        if (reconstructedChainedL1BytecodesRevealDataHash != _chainedBytescodesHash) {
             revert ReconstructionMismatch(
                 PubdataField.Bytecode,
-                chainedBytescodesHash,
+                _chainedBytescodesHash,
                 reconstructedChainedL1BytecodesRevealDataHash
             );
         }

@@ -4,11 +4,8 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
-import {IL1DAValidator, L1DAValidatorOutput} from "../chain-interfaces/IL1DAValidator.sol";
-import {POINT_EVALUATION_PRECOMPILE_ADDR} from "../../common/Config.sol";
-
 // TODO: maybe move it here
-import {BLOB_SIZE_BYTES, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE} from "../chain-interfaces/IExecutor.sol";
+import {BLOB_SIZE_BYTES} from "../chain-interfaces/IExecutor.sol";
 
 uint256 constant BLOBS_SUPPORTED = 6;
 
@@ -87,6 +84,7 @@ abstract contract CalldataDA {
 
         _pubdata = _pubdataInput[:_pubdataInput.length - 32];
 
+        // FIXME: allow larger lengths for SyncLayer-based chains.
         require(_pubdata.length <= BLOB_SIZE_BYTES, "cz");
         require(_fullPubdataHash == keccak256(_pubdata), "wp");
         blobCommitments[0] = bytes32(_pubdataInput[_pubdataInput.length - 32:_pubdataInput.length]);

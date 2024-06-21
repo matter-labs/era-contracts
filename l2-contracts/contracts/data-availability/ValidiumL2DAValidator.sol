@@ -14,15 +14,15 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 contract ValidiumL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
     function validatePubdata(
         // The rolling hash of the user L2->L1 logs.
-        bytes32 chainedLogsHash,
+        bytes32,
         // The root hash of the user L2->L1 logs.
-        bytes32 logsRootHash,
+        bytes32,
         // The chained hash of the L2->L1 messages
-        bytes32 chainedMessagesHash,
+        bytes32,
         // The chained hash of uncompressed bytecodes sent to L1
-        bytes32 chainedBytescodesHash,
+        bytes32,
         // Operator data, that is related to the DA itself
-        bytes calldata _totalL2ToL1PubdataAndStateDiffs
+        bytes calldata
     ) external returns (bytes32 outputHash) {
         // Since we do not need to publish anything to L1, we can just return 0.
         // Note, that Rollup validator sends the hash of uncompressed state diffs, since the

@@ -10,7 +10,7 @@ import {POINT_EVALUATION_PRECOMPILE_ADDR} from "../../common/Config.sol";
 import {CalldataDA} from "./CalldataDA.sol";
 
 // TODO: maybe move it here
-import {BLOB_SIZE_BYTES, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE} from "../chain-interfaces/IExecutor.sol";
+import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE} from "../chain-interfaces/IExecutor.sol";
 
 uint256 constant BLOBS_SUPPORTED = 6;
 
@@ -81,7 +81,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         uint256 versionedHashIndex = 0;
 
         // we iterate over the `_operatorDAInput`, while advacning the pointer by `BLOB_DA_INPUT_SIZE` each time
-        for (uint256 i = 0; i < _blobsProvided; i++) {
+        for (uint256 i = 0; i < _blobsProvided; ++i) {
             bytes calldata commitmentData = _operatorDAInput[:PUBDATA_COMMITMENT_SIZE];
             bytes32 prepublishedCommitment = bytes32(
                 _operatorDAInput[PUBDATA_COMMITMENT_SIZE:PUBDATA_COMMITMENT_SIZE + 32]
@@ -110,7 +110,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
 
     /// @inheritdoc IL1DAValidator
     function checkDA(
-        uint256 _chainId,
+        uint256, // _chainId
         bytes32 _l2DAValidatorOutputHash,
         bytes calldata _operatorDAInput,
         uint256 _maxBlobsSupported
@@ -170,7 +170,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         require(result == BLS_MODULUS, "precompile unexpected output");
     }
 
-    function _getBlobVersionedHash(uint256 _index) internal view virtual returns (bytes32 versionedHash) {
+    function _getBlobVersionedHash(uint256) internal view virtual returns (bytes32 versionedHash) {
         // FIXME: enable blobs
         revert("Blobs not supported on this codebase yet");
         // assembly {

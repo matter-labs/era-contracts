@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.20;
 
+import { MalformedBytecode, BytecodeError } from "./L2ContractErrors.sol";
+
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
@@ -157,11 +159,19 @@ library L2ContractHelper {
     /// - Bytecode words length is not odd
     function hashL2Bytecode(bytes calldata _bytecode) internal pure returns (bytes32 hashedBytecode) {
         // Note that the length of the bytecode must be provided in 32-byte words.
-        require(_bytecode.length % 32 == 0, "pq");
+        if (_bytecode.length % 32 != 0) {
+            revert MalformedBytecode(BytecodeError.Length);
+        }
 
         uint256 bytecodeLenInWords = _bytecode.length / 32;
-        require(bytecodeLenInWords < 2 ** 16, "pp"); // bytecode length must be less than 2^16 words
-        require(bytecodeLenInWords % 2 == 1, "ps"); // bytecode length in words must be odd
+        // bytecode length must be less than 2^16 words
+        if (lengthInWords >= 2 ** 16) {
+            revert MalformedBytecode(BytecodeError.NumberOfWords);
+        }
+        // bytecode length in words must be odd
+        if (lengthInWords % 2 == 0) {
+            revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
+        }
         hashedBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
         // Setting the version of the hash
         hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));

@@ -37,7 +37,6 @@ import {
   DIAMOND_CUT_DATA_ABI_STRING,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   compileInitialCutHash,
-  PubdataSource,
 } from "./utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
