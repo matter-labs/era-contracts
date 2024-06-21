@@ -9,7 +9,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
-import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
+import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
@@ -99,9 +99,10 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
 
         // solhint-disable-next-line func-named-parameters
         bytes memory message = abi.encodePacked(
-            IL1SharedBridge.finalizeWithdrawal.selector,
-            tokenAssetId,
-            abi.encode(amount, alice)
+            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            alice,
+            address(token),
+            amount
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,

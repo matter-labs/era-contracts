@@ -195,7 +195,7 @@ contract L1NativeTokenVault is
             assembly {
                 callSuccess := call(gas(), _l1Receiver, amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "NTV: withdraw failed");
+            require(callSuccess, "NTV: withdrawal failed, no funds or cannot transfer to receiver");
         } else {
             // Withdraw funds
             IERC20(l1Token).safeTransfer(_l1Receiver, amount);
@@ -221,7 +221,7 @@ contract L1NativeTokenVault is
             assembly {
                 callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "NTV: claimFailedDeposit failed");
+            require(callSuccess, "NTV: claimFailedDeposit failed, no funds or cannot transfer to receiver");
         } else {
             IERC20(l1Token).safeTransfer(_depositSender, _amount);
             // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.

@@ -116,7 +116,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
             msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY),
-            "L1SharedBridge: msg.value not equal to amount bridgehub or era chain"
+            "L1SharedBridge: msg.sender not equal to bridgehub or era chain"
         );
         _;
     }
@@ -172,8 +172,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
     function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external onlyOwner {
-        require(address(nativeTokenVault) == address(0), "ShB: legacy bridge already set");
-        require(address(_nativeTokenVault) != address(0), "ShB: legacy bridge 0");
+        require(address(nativeTokenVault) == address(0), "ShB: native token vault already set");
+        require(address(_nativeTokenVault) != address(0), "ShB: native token vault 0");
         nativeTokenVault = _nativeTokenVault;
     }
 
@@ -260,7 +260,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             : _assetId;
         l1AssetHandler = assetHandlerAddress[_assetId];
         // Check if no asset handler is set
-        if (l1AssetHandler == address(0) && uint256(_assetId) <= type(uint160).max) {
+        if (l1AssetHandler == address(0)) {
+            require(uint256(_assetId) <= type(uint160).max, "ShB: only address can be registered");
             l1AssetHandler = address(nativeTokenVault);
             nativeTokenVault.registerToken(address(uint160(uint256(_assetId))));
         }

@@ -8,11 +8,49 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 contract L1SharedBridgeTestBase is L1SharedBridgeTest {
+    using stdStorage for StdStorage;
+
+    function test_bridgehubPause() public {
+        vm.prank(owner);
+        sharedBridge.pause();
+        assertEq(sharedBridge.paused(), true, "Shared Bridge Not Paused");
+    }
+
+    function test_bridgehubUnpause() public {
+        vm.prank(owner);
+        sharedBridge.pause();
+        assertEq(sharedBridge.paused(), true, "Shared Bridge Not Paused");
+        vm.prank(owner);
+        sharedBridge.unpause();
+        assertEq(sharedBridge.paused(), false, "Shared Bridge Remains Paused");
+    }
+
+    function test_setAssetHandlerAddressOnCounterPart() public payable {
+        uint256 l2TxGasLimit = 100000;
+        uint256 l2TxGasPerPubdataByte = 100;
+        uint256 mintValue = 1;
+        address refundRecipient = address(0);
+
+        vm.deal(owner, amount);
+        vm.prank(owner);
+        sharedBridge.setAssetHandlerAddressOnCounterPart{value: 1}(
+            eraChainId,
+            mintValue,
+            l2TxGasLimit,
+            l2TxGasPerPubdataByte,
+            refundRecipient,
+            tokenAssetId,
+            address(token)
+        );
+    }
+
     function test_bridgehubDepositBaseToken_Eth() public {
         vm.prank(bridgehubAddress);
         // solhint-disable-next-line func-named-parameters
@@ -21,7 +59,32 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, ETH_TOKEN_ASSET_ID, alice, amount);
     }
 
+    function test_bridgehubDepositBaseToken_Eth_Token_NotRegistered() public {
+        stdstore
+            .target(address(sharedBridge))
+            .sig("assetHandlerAddress(bytes32)")
+            .with_key(ETH_TOKEN_ASSET_ID)
+            .checked_write(address(0));
+        vm.prank(bridgehubAddress);
+        sharedBridge.bridgehubDepositBaseToken{value: amount}(
+            chainId,
+            bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))),
+            alice,
+            amount
+        );
+    }
+
     function test_bridgehubDepositBaseToken_Erc() public {
+        vm.prank(bridgehubAddress);
+        // solhint-disable-next-line func-named-parameters
+        vm.expectEmit(true, true, true, true, address(sharedBridge));
+        emit BridgehubDepositBaseTokenInitiated(chainId, alice, tokenAssetId, amount);
+        sharedBridge.bridgehubDepositBaseToken(chainId, tokenAssetId, alice, amount);
+    }
+
+    function test_bridgehubDepositBaseToken_Erc_NoApproval() public {
+        vm.prank(alice);
+        token.approve(address(nativeTokenVault), 0);
         vm.prank(bridgehubAddress);
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
@@ -53,6 +116,31 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, amount, bob));
     }
 
+    function test_bridgehubDeposit_Eth_NewEncoding() public {
+        _setBaseTokenAssetId(tokenAssetId);
+
+        bytes memory transferData = abi.encode(amount, bob);
+        bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ASSET_ID, transferData));
+        bytes memory mintCalldata = abi.encode(
+            amount,
+            alice,
+            bob,
+            nativeTokenVault.getERC20Getters(address(ETH_TOKEN_ADDRESS)),
+            address(ETH_TOKEN_ADDRESS)
+        );
+        // solhint-disable-next-line func-named-parameters
+        vm.expectEmit(true, true, true, true, address(sharedBridge));
+        vm.prank(bridgehubAddress);
+        emit BridgehubDepositInitiated({
+            chainId: chainId,
+            txDataHash: txDataHash,
+            from: alice,
+            assetId: ETH_TOKEN_ASSET_ID,
+            bridgeMintCalldata: mintCalldata
+        });
+        sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ASSET_ID, transferData));
+    }
+
     function test_bridgehubDeposit_Erc() public {
         vm.prank(bridgehubAddress);
         // solhint-disable-next-line func-named-parameters
@@ -65,6 +153,17 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             assetId: tokenAssetId,
             bridgeMintCalldata: abi.encode(amount, bob)
         });
+        sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(address(token), amount, bob));
+    }
+
+    function test_bridgehubDeposit_Erc_CustomAssetHandler() public {
+        // ToDo: remove the mock call and register custom asset handler?
+        vm.mockCall(
+            address(nativeTokenVault),
+            abi.encodeWithSelector(IL1NativeTokenVault.tokenAddress.selector, tokenAssetId),
+            abi.encode(address(0))
+        );
+        vm.prank(bridgehubAddress);
         sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(address(token), amount, bob));
     }
 
@@ -153,6 +252,49 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             _depositSender: alice,
             _l1Asset: ETH_TOKEN_ADDRESS,
             _amount: amount,
+            _l2TxHash: txHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _merkleProof: merkleProof
+        });
+    }
+
+    function test_bridgeRecoverFailedTransfer_Eth() public {
+        bytes memory transferData = abi.encode(amount, alice);
+        bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
+        _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
+        require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
+
+        vm.mockCall(
+            bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(
+                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                chainId,
+                txHash,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2TxNumberInBatch,
+                merkleProof,
+                TxStatus.Failure
+            ),
+            abi.encode(true)
+        );
+
+        // solhint-disable-next-line func-named-parameters
+        vm.expectEmit(true, true, true, false, address(sharedBridge));
+        emit ClaimedFailedDepositSharedBridge({
+            chainId: chainId,
+            to: alice,
+            assetId: ETH_TOKEN_ASSET_ID,
+            assetDataHash: bytes32(0)
+        });
+        sharedBridge.bridgeRecoverFailedTransfer({
+            _chainId: chainId,
+            _depositSender: alice,
+            _assetId: ETH_TOKEN_ASSET_ID,
+            _assetData: transferData,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,

@@ -64,6 +64,7 @@ contract L1SharedBridgeTest is Test {
 
     L1SharedBridge sharedBridgeImpl;
     L1SharedBridge sharedBridge;
+    L1NativeTokenVault nativeTokenVaultImpl;
     L1NativeTokenVault nativeTokenVault;
     address bridgehubAddress;
     address l1ERC20BridgeAddress;
@@ -80,9 +81,11 @@ contract L1SharedBridgeTest is Test {
     address bob;
     uint256 chainId;
     uint256 amount = 100;
+    uint256 mintValue = 1;
     bytes32 txHash;
 
     uint256 eraChainId;
+    uint256 randomChainId;
     address eraDiamondProxy;
     address eraErc20BridgeAddress;
 
@@ -118,6 +121,7 @@ contract L1SharedBridgeTest is Test {
 
         chainId = 1;
         eraChainId = 9;
+        randomChainId = 999;
         eraDiamondProxy = makeAddr("eraDiamondProxy");
         eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
 
@@ -134,11 +138,17 @@ contract L1SharedBridgeTest is Test {
             abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner, 1, 1, 1, 0)
         );
         sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
-        nativeTokenVault = new L1NativeTokenVault({
+        nativeTokenVaultImpl = new L1NativeTokenVault({
             _l1WethAddress: l1WethAddress,
             _l1SharedBridge: IL1SharedBridge(address(sharedBridge)),
             _eraChainId: eraChainId
         });
+        TransparentUpgradeableProxy nativeTokenVaultProxy = new TransparentUpgradeableProxy(
+            address(nativeTokenVaultImpl),
+            admin,
+            abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner)
+        );
+        nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
         vm.prank(owner);
         sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
         tokenAssetId = nativeTokenVault.getAssetId(address(token));
@@ -174,6 +184,11 @@ contract L1SharedBridgeTest is Test {
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector, chainId),
             abi.encode(ETH_TOKEN_ASSET_ID)
+        );
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.requestL2TransactionDirect.selector),
+            abi.encode(txHash)
         );
         // vm.mockCall(
         //     address(bridgehubAddress),
