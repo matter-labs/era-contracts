@@ -6,7 +6,6 @@ import {Test} from "forge-std/Test.sol";
 import {PriorityTreeTest, PriorityOpsBatchInfo} from "contracts/dev-contracts/test/PriorityTreeTest.sol";
 // import {MerkleTreeNoSort} from "../Merkle/MerkleTreeNoSort.sol";
 
-
 contract PriorityTreeSharedTest is Test {
     PriorityTreeTest internal priorityTree;
     // MerkleTreeNoSort internal merkleTree;
