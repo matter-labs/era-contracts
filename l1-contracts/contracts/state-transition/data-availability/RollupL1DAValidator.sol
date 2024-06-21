@@ -7,7 +7,7 @@ pragma solidity 0.8.24;
 import {IL1DAValidator, L1DAValidatorOutput} from "../chain-interfaces/IL1DAValidator.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "../../common/Config.sol";
 
-import { CalldataDA } from "./CalldataDA.sol";
+import {CalldataDA} from "./CalldataDA.sol";
 
 // TODO: maybe move it here
 import {BLOB_SIZE_BYTES, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE} from "../chain-interfaces/IExecutor.sol";

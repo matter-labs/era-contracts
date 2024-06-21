@@ -121,7 +121,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @notice Sets the DA validator pair with the given addresses.
-    /// @dev It does not check for these addresses to be non-zero, since when migrating to a new settlement 
+    /// @dev It does not check for these addresses to be non-zero, since when migrating to a new settlement
     /// layer, we set them to zero.
     function _setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) internal {
         address oldL1DAValidator = s.l1DAValidator;
