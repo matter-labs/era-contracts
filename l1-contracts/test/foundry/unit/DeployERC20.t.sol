@@ -114,7 +114,7 @@ contract TokenDeployTest is Test {
     }
 
     function test_checkTestnetERC20Mint() public {
-        bool mintResult = testnetToken.mint(0x36615Cf349d7F6344891B1e7CA7C72883F5dc049, 5);
+        bool mintResult = testnetToken.mint(vm.addr(1), 5);
         assertTrue(mintResult);
     }
 }
