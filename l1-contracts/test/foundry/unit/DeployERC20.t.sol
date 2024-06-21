@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {DeployErc20Script} from "../../../deploy-scripts/DeployErc20.s.sol";
 import {TestnetERC20Token} from "../../../contracts/dev-contracts/TestnetERC20Token.sol";
+import {DeployL1Script} from "../../../deploy-scripts/DeployL1.s.sol";
 
 contract TokenDeployTest is Test {
     using stdToml for string;
@@ -47,6 +48,9 @@ contract TokenDeployTest is Test {
     TestnetERC20Token testnetToken;
 
     function setUp() public {
+        DeployL1Script l1Script = new DeployL1Script();
+        l1Script.run();
+
         deployScript = new DeployErc20Script();
         deployScript.run();
         addresses = deployScript.getTokensAddresses();
