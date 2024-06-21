@@ -4,15 +4,12 @@ pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {PriorityTreeTest, PriorityOpsBatchInfo} from "contracts/dev-contracts/test/PriorityTreeTest.sol";
-// import {MerkleTreeNoSort} from "../Merkle/MerkleTreeNoSort.sol";
 
 contract PriorityTreeSharedTest is Test {
     PriorityTreeTest internal priorityTree;
-    // MerkleTreeNoSort internal merkleTree;
 
     constructor() {
         priorityTree = new PriorityTreeTest();
-        // merkleTree = new MerkleTreeNoSort();
     }
 
     // Pushes 'count' entries into the priority tree.

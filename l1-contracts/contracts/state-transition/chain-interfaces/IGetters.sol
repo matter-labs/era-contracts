@@ -61,7 +61,8 @@ interface IGetters is IZkSyncHyperchainBase {
     /// @return The number of priority operations currently in the queue
     function getPriorityQueueSize() external view returns (uint256);
 
-    /// @return The first unprocessed priority operation from the queue
+    /// @notice This function is deprecated and will return an empty priority operation.
+    /// @return Empty priority operation
     function priorityQueueFrontOperation() external view returns (PriorityOperation memory);
 
     /// @return Whether the address has a validator access

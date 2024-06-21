@@ -56,13 +56,15 @@ library PriorityTree {
     }
 
     function processBatch(Tree storage _tree, PriorityOpsBatchInfo calldata _priorityOpsData) internal {
-        bytes32 expectedRoot = Merkle.calculateRoot(
-            _priorityOpsData.leftPath,
-            _priorityOpsData.rightPath,
-            _tree.unprocessedIndex,
-            _priorityOpsData.itemHashes
-        );
-        require(_tree.historicalRoots[expectedRoot], "PT: root mismatch");
-        _tree.unprocessedIndex += _priorityOpsData.itemHashes.length;
+        if (_priorityOpsData.itemHashes.length > 0) {
+            bytes32 expectedRoot = Merkle.calculateRoot(
+                _priorityOpsData.leftPath,
+                _priorityOpsData.rightPath,
+                _tree.unprocessedIndex,
+                _priorityOpsData.itemHashes
+            );
+            require(_tree.historicalRoots[expectedRoot], "PT: root mismatch");
+            _tree.unprocessedIndex += _priorityOpsData.itemHashes.length;
+        }
     }
 }

@@ -96,12 +96,20 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getTotalPriorityTxs() external view returns (uint256) {
-        return s.priorityQueue.getTotalPriorityTxs();
+        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
+            return s.priorityTree.getTotalPriorityTxs();
+        } else {
+            return s.priorityQueue.getTotalPriorityTxs();
+        }
     }
 
     /// @inheritdoc IGetters
     function getFirstUnprocessedPriorityTx() external view returns (uint256) {
-        return s.priorityQueue.getFirstUnprocessedPriorityTx();
+        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
+            return s.priorityTree.getFirstUnprocessedPriorityTx();
+        } else {
+            return s.priorityQueue.getFirstUnprocessedPriorityTx();
+        }
     }
 
     /// @inheritdoc IGetters
@@ -111,14 +119,15 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getPriorityQueueSize() external view returns (uint256) {
-        return s.priorityQueue.getSize();
+        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
+            return s.priorityTree.getSize();
+        } else {
+            return s.priorityQueue.getSize();
+        }
     }
 
     /// @inheritdoc IGetters
-    // TODO: this will be unusable if we fully migrate to priority merkle tree
-    function priorityQueueFrontOperation() external view returns (PriorityOperation memory) {
-        return s.priorityQueue.front();
-    }
+    function priorityQueueFrontOperation() external view returns (PriorityOperation memory op) {}
 
     /// @inheritdoc IGetters
     function isValidator(address _address) external view returns (bool) {
