@@ -91,6 +91,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
             assetId = getAssetId(_stmL1Address);
             bhCounterPart = BRIDGE_HUB.bridgehubCounterParts(_chainId);
         }
+        // slither-disable-next-line usused-return
         SHARED_BRIDGE.setAssetHandlerAddressOnCounterPart{value: msg.value}({
             _chainId: _chainId,
             _mintValue: _mintValue,
