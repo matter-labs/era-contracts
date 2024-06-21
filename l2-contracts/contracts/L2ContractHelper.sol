@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import { MalformedBytecode, BytecodeError } from "./L2ContractErrors.sol";
+import {MalformedBytecode, BytecodeError} from "./L2ContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -165,11 +165,11 @@ library L2ContractHelper {
 
         uint256 bytecodeLenInWords = _bytecode.length / 32;
         // bytecode length must be less than 2^16 words
-        if (lengthInWords >= 2 ** 16) {
+        if (bytecodeLenInWords >= 2 ** 16) {
             revert MalformedBytecode(BytecodeError.NumberOfWords);
         }
         // bytecode length in words must be odd
-        if (lengthInWords % 2 == 0) {
+        if (bytecodeLenInWords % 2 == 0) {
             revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
         }
         hashedBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;

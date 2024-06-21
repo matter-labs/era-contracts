@@ -54,7 +54,7 @@ abstract contract CalldataDA {
 
         uint256 ptr = 65;
 
-        for (uint256 i = 0; i < blobsProvided; i++) {
+        for (uint256 i = 0; i < blobsProvided; ++i) {
             // Take the 32 bytes of the blob linear hash
             blobsLinearHashes[i] = bytes32(_operatorDAInput[ptr:ptr + 32]);
             ptr += 32;

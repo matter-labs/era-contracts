@@ -2,12 +2,7 @@ import { Command } from "commander";
 import type { BigNumberish } from "ethers";
 import { ethers, Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import {
-  computeL2Create2Address,
-  create2DeployFromL1,
-  provider,
-  priorityTxMaxGasLimit,
-} from "./utils";
+import { computeL2Create2Address, create2DeployFromL1, provider, priorityTxMaxGasLimit } from "./utils";
 
 import { ethTestConfig } from "./deploy-utils";
 

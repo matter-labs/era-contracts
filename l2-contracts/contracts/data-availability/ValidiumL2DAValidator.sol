@@ -5,13 +5,9 @@ pragma solidity 0.8.20;
 // solhint-disable gas-custom-errors, reason-string
 
 import {IL2DAValidator} from "../interfaces/IL2DAValidator.sol";
-import {StateDiffL2DAValidator} from "./StateDiffL2DAValidator.sol";
-import {PUBDATA_CHUNK_PUBLISHER} from "../L2ContractHelper.sol";
-
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /// Rollup DA validator. It will publish data that would allow to use either calldata or blobs.
-contract ValidiumL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
+contract ValidiumL2DAValidator is IL2DAValidator {
     function validatePubdata(
         // The rolling hash of the user L2->L1 logs.
         bytes32,
