@@ -55,8 +55,6 @@ export async function initialBridgehubDeployment(
   });
   nonce = nonce ? ++nonce : nonce;
 
-  await deployer.deployValidatorTimelock(create2Salt, { gasPrice, nonce });
-
   await deployer.deployDAValidators(create2Salt, { gasPrice });
   // Governance will be L1 governance, but we want to deploy it here for the init process.
   await deployer.deployGovernance(create2Salt, { gasPrice });
