@@ -5,6 +5,9 @@ pragma solidity 0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {WETH9} from "contracts/dev-contracts/WETH9.sol";
+
 
 import {Utils} from "./Utils.sol";
 
