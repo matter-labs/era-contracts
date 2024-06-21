@@ -12,6 +12,8 @@ import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfac
 
 contract ExecutingTest is ExecutorTest {
     function setUp() public {
+        // TODO: tests with `priorityTree.startIndex` 0-2 to actually use `priorityTree`
+        executor.setPriorityTreeStartIndex(100);
         vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
         currentTimestamp = block.timestamp;
 

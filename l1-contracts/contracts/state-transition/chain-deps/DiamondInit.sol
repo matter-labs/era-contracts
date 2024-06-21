@@ -54,7 +54,6 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
         s.priorityTxMaxGasLimit = _initializeData.priorityTxMaxGasLimit;
         s.feeParams = _initializeData.feeParams;
         s.blobVersionedHashRetriever = _initializeData.blobVersionedHashRetriever;
-        // TODO - how to do this during the upgrade?
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
 
         s.baseTokenAssetId = IBridgehub(_initializeData.bridgehub).baseTokenAssetId(_initializeData.chainId);

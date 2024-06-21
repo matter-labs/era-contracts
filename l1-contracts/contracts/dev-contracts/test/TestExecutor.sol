@@ -11,4 +11,8 @@ contract TestExecutor is ExecutorFacet {
         require(success, "vc");
         versionedHash = abi.decode(data, (bytes32));
     }
+
+    function setPriorityTreeStartIndex(uint256 _startIndex) external {
+        s.priorityTree.startIndex = _startIndex;
+    }
 }

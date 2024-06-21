@@ -61,11 +61,12 @@ contract ExecutorTest is Test {
     }
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](4);
+        bytes4[] memory selectors = new bytes4[](5);
         selectors[0] = executor.commitBatches.selector;
         selectors[1] = executor.proveBatches.selector;
         selectors[2] = executor.executeBatches.selector;
         selectors[3] = executor.revertBatches.selector;
+        selectors[4] = executor.setPriorityTreeStartIndex.selector;
         return selectors;
     }
 
