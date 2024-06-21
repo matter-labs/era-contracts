@@ -8,8 +8,6 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransactionFiltererTrue.sol";
 import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
 
-import {console} from "forge-std/console.sol";
-
 contract BridgehubRequestL2TransactionTest is MailboxTest {
     function test_successWithoutFilterer() public {
         address bridgehub = makeAddr("bridgehub");

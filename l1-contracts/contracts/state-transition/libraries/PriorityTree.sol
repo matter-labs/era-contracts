@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 // solhint-disable gas-custom-errors
 
 import {DynamicIncrementalMerkle} from "../../common/libraries/openzeppelin/IncrementalMerkle.sol";
-import {Merkle} from "./Merkle.sol";
+import {Merkle} from "../../common/libraries/Merkle.sol";
 
 struct PriorityOpsBatchInfo {
     bytes32[] leftPath;
