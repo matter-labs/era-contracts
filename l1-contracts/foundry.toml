@@ -14,7 +14,11 @@ fs_permissions = [
     { access = "read", path = "../l2-contracts/artifacts-zk/" },
     { access = "read", path = "./script-config" },
     { access = "read-write", path = "./script-out" },
-    { access = "read", path = "./out" }
+    { access = "read", path = "./out" },
+    { access = "read", path = "./deploy-script-config-template/config-deploy-erc20.toml" },
+    { access = "read", path = "./deploy-script-config-template/config-deploy-l1.toml" },
+    { access = "read-write", path = "./script-out/output-deploy-l1.toml"},
+    { access = "read-write", path = "./script-out/output-deploy-erc20.toml"}
 ]
 cache_path = 'cache-forge'
 test = 'test/foundry'
