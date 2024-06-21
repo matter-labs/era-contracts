@@ -179,16 +179,13 @@ interface IExecutor is IZkSyncHyperchainBase {
     /// - Processing all pending operations (commpleting priority requests).
     /// - Finalizing this batch (i.e. allowing to withdraw funds from the system)
     /// @param _batchesData Data of the batches to be executed.
-    // function executeBatches(StoredBatchInfo[] calldata _batchesData) external;
-
+    /// @param _priorityOpsData Merkle proofs of the priority operations for each batch.
     function executeBatches(
         StoredBatchInfo[] calldata _batchesData,
         PriorityOpsBatchInfo[] calldata _priorityOpsData
     ) external;
 
     /// @notice same as `executeBatches` but with the chainId so ValidatorTimelock can sort the inputs.
-    // function executeBatchesSharedBridge(uint256 _chainId, StoredBatchInfo[] calldata _batchesData) external;
-
     function executeBatchesSharedBridge(
         uint256 _chainId,
         StoredBatchInfo[] calldata _batchesData,

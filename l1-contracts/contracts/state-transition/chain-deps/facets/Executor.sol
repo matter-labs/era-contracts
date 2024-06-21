@@ -363,6 +363,12 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         bytes32 priorityOperationsHash = _collectOperationsFromPriorityQueue(_storedBatch.numberOfLayer1Txs);
         require(priorityOperationsHash == _storedBatch.priorityOperationsHash, "x"); // priority operations hash does not match to expected
 
+        uint256 firstUnprocessed = s.priorityQueue.getFirstUnprocessedPriorityTx();
+        uint256 treeStartIndex = s.priorityTree.startIndex;
+        if (firstUnprocessed > treeStartIndex) {
+            s.priorityTree.unprocessedIndex = firstUnprocessed - treeStartIndex;
+        }
+
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
         // IBridgehub bridgehub = IBridgehub(s.bridgehub);
@@ -373,7 +379,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // );
     }
 
-    // TODO: once we use this method, the normal priorityQueue becomes unusable since we didn't pop the elements
     function _executeOneBatch(
         StoredBatchInfo memory _storedBatch,
         PriorityOpsBatchInfo calldata _priorityOpsData,
@@ -387,29 +392,13 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         );
         require(_priorityOpsData.itemHashes.length == _storedBatch.numberOfLayer1Txs, "zxc");
 
-        bytes32 priorityOperationsRollingHash = _rollingHash(_priorityOpsData.itemHashes);
-        require(priorityOperationsRollingHash == _storedBatch.priorityOperationsHash, "x");
-        // TODO: pop the elements from the queue if we can?
-        if (_priorityOpsData.itemHashes.length > 0) {
-            s.priorityTree.processBatch(_priorityOpsData);
-        }
+        bytes32 priorityOperationsHash = _rollingHash(_priorityOpsData.itemHashes);
+        require(priorityOperationsHash == _storedBatch.priorityOperationsHash, "x");
+        s.priorityTree.processBatch(_priorityOpsData);
 
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
     }
-
-    /// @inheritdoc IExecutor
-    // function executeBatchesSharedBridge(
-    //     uint256,
-    //     StoredBatchInfo[] calldata _batchesData
-    // ) external nonReentrant onlyValidator {
-    //     _executeBatches(_batchesData, emptyPriorityOpsData());
-    // }
-
-    /// @inheritdoc IExecutor
-    // function executeBatches(StoredBatchInfo[] calldata _batchesData) external nonReentrant onlyValidator {
-    //     _executeBatches(_batchesData, emptyPriorityOpsData());
-    // }
 
     function executeBatchesSharedBridge(
         uint256,
@@ -431,15 +420,11 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         PriorityOpsBatchInfo[] calldata _priorityOpsData
     ) internal {
         uint256 nBatches = _batchesData.length;
-        uint256 nPriorityOpsData = _priorityOpsData.length;
-        if (nPriorityOpsData != 0) {
-            require(nBatches == nPriorityOpsData, "");
-            require(s.priorityTree.startIndex <= s.priorityQueue.getFirstUnprocessedPriorityTx(), "");
-        }
+        uint256 dataIndex = 0;
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
-            if (nPriorityOpsData != 0) {
-                _executeOneBatch(_batchesData[i], _priorityOpsData[i], i);
+            if (s.priorityTree.startIndex <= s.priorityQueue.getFirstUnprocessedPriorityTx()) {
+                _executeOneBatch(_batchesData[i], _priorityOpsData[dataIndex++], i);
             } else {
                 _executeOneBatch(_batchesData[i], i);
             }

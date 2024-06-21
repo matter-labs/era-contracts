@@ -393,15 +393,18 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) internal {
-        s.priorityQueue.pushBack(
-            PriorityOperation({
-                canonicalTxHash: _canonicalTxHash,
-                // FIXME: safe downcast
-                expirationTimestamp: _expirationTimestamp,
-                layer2Tip: uint192(0) // TODO: Restore after fee modeling will be stable. (SMA-1230)
-            })
-        );
-        s.priorityTree.push(canonicalTxHash);
+        if (s.priorityTree.startIndex > s.priorityQueue.getFirstUnprocessedPriorityTx()) {
+            s.priorityQueue.pushBack(
+                PriorityOperation({
+                    canonicalTxHash: _canonicalTxHash,
+                    // FIXME: safe downcast
+                    expirationTimestamp: _expirationTimestamp,
+                    layer2Tip: uint192(0) // TODO: Restore after fee modeling will be stable. (SMA-1230)
+                })
+            );
+        }
+        // TODO: do we have to push keccak256(abi.encode(canonicalTxHash, expirationTimestamp, layer2Tip)) instead?
+        s.priorityTree.push(_canonicalTxHash);
 
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters
