@@ -113,7 +113,7 @@ contract DeployErc20Script is Script {
         bytes memory bytecode = abi.encodePacked(vm.getCode(implementation), args);
 
         address tokenAddress = deployViaCreate2(bytecode);
-        
+
         if (mint > 0) {
             vm.broadcast();
             (bool success, ) = tokenAddress.call(

@@ -57,7 +57,9 @@ contract InitialDeploymentTest is Test {
         string memory toml = vm.readFile(path);
         string memory key = "$.deployed_addresses.state_transition";
         addr.stateTransitionProxy = toml.readAddress(string.concat(key, ".state_transition_proxy_addr"));
-        addr.stateTransitionImplementation = toml.readAddress(string.concat(key, ".state_transition_implementation_addr"));
+        addr.stateTransitionImplementation = toml.readAddress(
+            string.concat(key, ".state_transition_implementation_addr")
+        );
         addr.verifier = toml.readAddress(string.concat(key, ".verifier_addr"));
         addr.adminFacet = toml.readAddress(string.concat(key, ".admin_facet_addr"));
         addr.mailboxFacet = toml.readAddress(string.concat(key, ".mailbox_facet_addr"));
@@ -76,9 +78,9 @@ contract InitialDeploymentTest is Test {
     }
 
     function test_checkStateTransitionHyperChainAddress() public {
-         address stateTransitionAddress1 = diamondProxy;
-         address stateTransitionAddress2 = addr.diamondProxy;
-         assertEq(stateTransitionAddress1, stateTransitionAddress2);
+        address stateTransitionAddress1 = diamondProxy;
+        address stateTransitionAddress2 = addr.diamondProxy;
+        assertEq(stateTransitionAddress1, stateTransitionAddress2);
     }
 
     function test_checkBridgeHubHyperchainAddress() public {
@@ -87,4 +89,3 @@ contract InitialDeploymentTest is Test {
         assertEq(stateTransitionAddress1, stateTransitionAddress3);
     }
 }
-

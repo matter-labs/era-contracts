@@ -47,7 +47,6 @@ contract TokenDeployTest is Test {
     TestnetERC20Token testnetToken;
 
     function setUp() public {
-
         deployScript = new DeployErc20Script();
         deployScript.run();
         addresses = deployScript.getTokensAddresses();
@@ -66,7 +65,7 @@ contract TokenDeployTest is Test {
             token.name = toml.readString(string.concat(key, ".name"));
             token.symbol = toml.readString(string.concat(key, ".symbol"));
 
-            configOutput.tokens.push(token);    
+            configOutput.tokens.push(token);
         }
 
         path = string.concat(root, "/deploy-script-config-template/config-deploy-erc20.toml");
@@ -83,7 +82,11 @@ contract TokenDeployTest is Test {
             configInput.tokens.push(token);
         }
 
-        testnetToken = new TestnetERC20Token(configInput.tokens[0].name, configInput.tokens[0].symbol, uint8(configInput.tokens[0].decimals));
+        testnetToken = new TestnetERC20Token(
+            configInput.tokens[0].name,
+            configInput.tokens[0].symbol,
+            uint8(configInput.tokens[0].decimals)
+        );
     }
 
     function test_checkTokenAddresses() public {
@@ -106,7 +109,7 @@ contract TokenDeployTest is Test {
         assertEq(token01Symbol, token01SymbolCheck);
 
         uint8 token01Decimals = testnetToken.decimals();
-        uint8 token01DecimalsCheck = configOutput.tokens[0].decimals;
+        uint8 token01DecimalsCheck = uint8(configOutput.tokens[0].decimals);
         assertEq(token01Decimals, token01DecimalsCheck);
     }
 
