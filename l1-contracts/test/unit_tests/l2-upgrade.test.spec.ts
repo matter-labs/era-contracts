@@ -880,15 +880,14 @@ async function buildCommitBatchInfo(
   info: CommitBatchInfoWithTimestamp
 ): Promise<CommitBatchInfo> {
   const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
-  const [
-    fullPubdataCommitment,
-    l1DAOutputHash,
-  ] = buildL2DARollupPubdataCommitment(
-    ethers.constants.HashZero,
-    "0x"
+  const [fullPubdataCommitment, l1DAOutputHash] = buildL2DARollupPubdataCommitment(ethers.constants.HashZero, "0x");
+
+  const systemLogs = createSystemLogs(
+    info.priorityOperationsHash,
+    info.numberOfLayer1Txs,
+    prevInfo.batchHash,
+    l1DAOutputHash
   );
-  
-  const systemLogs = createSystemLogs(info.priorityOperationsHash, info.numberOfLayer1Txs, prevInfo.batchHash, l1DAOutputHash);
   systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
     true,
     L2_SYSTEM_CONTEXT_ADDRESS,
@@ -916,13 +915,7 @@ async function buildCommitBatchInfoWithCustomLogs(
   systemLogs: string[]
 ): Promise<CommitBatchInfo> {
   const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
-  const [
-    fullPubdataCommitment,
-    l1DAOutputHash,
-  ] = buildL2DARollupPubdataCommitment(
-    ethers.constants.HashZero,
-    "0x"
-  );
+  const [fullPubdataCommitment, l1DAOutputHash] = buildL2DARollupPubdataCommitment(ethers.constants.HashZero, "0x");
 
   systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
     true,

@@ -127,12 +127,15 @@ export async function registerHyperchainWithBridgeRegistration(
   await registerTestDAValidators(deployer);
 }
 
-async function registerTestDAValidators(
-  deployer: Deployer,
-) {
+async function registerTestDAValidators(deployer: Deployer) {
   const contract = await deployer.stateTransitionContract(deployer.deployWallet);
   // The L2 DA validator must not be zero, but it can be any other value. It is not relevant for the tests.
-  await (await contract.setDAValidatorPair(deployer.addresses.RollupL1DAValidator, process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR)).wait();
+  await (
+    await contract.setDAValidatorPair(
+      deployer.addresses.RollupL1DAValidator,
+      process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR
+    )
+  ).wait();
 }
 
 // This is used to deploy the diamond and bridge such that they can be upgraded using UpgradeHyperchain.sol

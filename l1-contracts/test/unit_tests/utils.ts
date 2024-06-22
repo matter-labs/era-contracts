@@ -13,7 +13,6 @@ import type { FeeParams, L2CanonicalTransaction } from "../../src.ts/utils";
 import { ADDRESS_ONE, PubdataPricingMode, EMPTY_STRING_KECCAK } from "../../src.ts/utils";
 import { packSemver } from "../../scripts/utils";
 import { keccak256 } from "ethers/lib/utils";
-import { L1_MESSENGER_ADDRESS } from "zksync-ethers/build/utils";
 
 export const CONTRACTS_GENESIS_PROTOCOL_VERSION = packSemver(0, 21, 0).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -256,7 +255,7 @@ export function createSystemLogs(
       true,
       L2_TO_L1_MESSENGER,
       SYSTEM_LOG_KEYS.L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
-      l2DaValidatorOutputHash ? ethers.utils.hexlify(l2DaValidatorOutputHash) : ethers.constants.HashZero 
+      l2DaValidatorOutputHash ? ethers.utils.hexlify(l2DaValidatorOutputHash) : ethers.constants.HashZero
     ),
     constructL2Log(
       true,
@@ -272,7 +271,7 @@ export function createSystemLogsWithUpgrade(
   numberOfLayer1Txs?: BigNumberish,
   upgradeTxHash?: string,
   previousBatchHash?: string,
-  l2DaValidatorOutputHash?: BytesLike,
+  l2DaValidatorOutputHash?: BytesLike
 ) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
@@ -461,28 +460,25 @@ export type CommitBatchInfoWithTimestamp = Partial<CommitBatchInfo> & {
 function padStringWithZeroes(str: string, lenBytes: number): string {
   const strLen = lenBytes * 2;
   if (str.length > strLen) {
-    throw new Error('String is too long');
+    throw new Error("String is too long");
   }
   const paddingLength = strLen - str.length;
-  return str + '0'.repeat(paddingLength);
+  return str + "0".repeat(paddingLength);
 }
 
 // Returns a pair of strings:
 // - the expected pubdata commitemnt
 // - the required rollup l2 da hash output
-export function buildL2DARollupPubdataCommitment(
-  stateDiffHash: string,
-  fullPubdata: string,
-): [string, string] {
+export function buildL2DARollupPubdataCommitment(stateDiffHash: string, fullPubdata: string): [string, string] {
   const BLOB_SIZE_BYTES = 126_976;
   const fullPubdataHash = ethers.utils.keccak256(fullPubdata);
   if (ethers.utils.arrayify(fullPubdata).length > BLOB_SIZE_BYTES) {
-    throw new Error('Too much pubdata');
+    throw new Error("Too much pubdata");
   }
   const blobsProvided = 1;
 
   const blobLinearHash = keccak256(padStringWithZeroes(fullPubdata, BLOB_SIZE_BYTES));
-  
+
   const l1DAOutput = ethers.utils.hexConcat([
     stateDiffHash,
     fullPubdataHash,
@@ -495,7 +491,7 @@ export function buildL2DARollupPubdataCommitment(
   // Then, there is the full pubdata.
   // Then, there are 32 bytes for blob commitment. They must have at least one non-zero byte,
   // so it will be the last one.
-  const fullPubdataCommitment = `${l1DAOutput}00${fullPubdata.slice(2)}${'0'.repeat(62)}01`;
+  const fullPubdataCommitment = `${l1DAOutput}00${fullPubdata.slice(2)}${"0".repeat(62)}01`;
 
   return [fullPubdataCommitment, l1DAOutputHash];
 }
@@ -507,13 +503,7 @@ export async function buildCommitBatchInfoWithUpgrade(
 ): Promise<CommitBatchInfo> {
   const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
 
-  const [
-    fullPubdataCommitment,
-    l1DAOutputHash,
-  ] = buildL2DARollupPubdataCommitment(
-    ethers.constants.HashZero,
-    "0x"
-  );
+  const [fullPubdataCommitment, l1DAOutputHash] = buildL2DARollupPubdataCommitment(ethers.constants.HashZero, "0x");
 
   const systemLogs = createSystemLogsWithUpgrade(
     info.priorityOperationsHash,
