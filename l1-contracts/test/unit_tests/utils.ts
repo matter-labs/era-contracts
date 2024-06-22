@@ -12,6 +12,8 @@ import type { ExecutorFacet } from "../../typechain";
 import type { FeeParams, L2CanonicalTransaction } from "../../src.ts/utils";
 import { ADDRESS_ONE, PubdataPricingMode, EMPTY_STRING_KECCAK } from "../../src.ts/utils";
 import { packSemver } from "../../scripts/utils";
+import { keccak256 } from "ethers/lib/utils";
+import { L1_MESSENGER_ADDRESS } from "zksync-ethers/build/utils";
 
 export const CONTRACTS_GENESIS_PROTOCOL_VERSION = packSemver(0, 21, 0).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -49,6 +51,8 @@ export enum SYSTEM_LOG_KEYS {
   BLOB_FOUR_HASH_KEY,
   BLOB_FIVE_HASH_KEY,
   BLOB_SIX_HASH_KEY,
+  L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+  USED_L2_DA_VALIDATOR_ADDRESS_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
 }
 
@@ -195,7 +199,8 @@ export function constructL2Log(isService: boolean, sender: string, key: number |
 export function createSystemLogs(
   chainedPriorityTxHashKey?: BytesLike,
   numberOfLayer1Txs?: BigNumberish,
-  previousBatchHash?: BytesLike
+  previousBatchHash?: BytesLike,
+  l2DaValidatorOutputHash?: BytesLike
 ) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
@@ -225,6 +230,7 @@ export function createSystemLogs(
       SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
       numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
     ),
+    // FIXME: these logs are not used anymore, but they needed for some of the tests' functionality to work.
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
@@ -246,6 +252,18 @@ export function createSystemLogs(
       ethers.constants.HashZero
     ),
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_SIX_HASH_KEY, ethers.constants.HashZero),
+    constructL2Log(
+      true,
+      L2_TO_L1_MESSENGER,
+      SYSTEM_LOG_KEYS.L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+      l2DaValidatorOutputHash ? ethers.utils.hexlify(l2DaValidatorOutputHash) : ethers.constants.HashZero 
+    ),
+    constructL2Log(
+      true,
+      L2_TO_L1_MESSENGER,
+      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+      process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR || ethers.constants.AddressZero
+    ),
   ];
 }
 
@@ -253,7 +271,8 @@ export function createSystemLogsWithUpgrade(
   chainedPriorityTxHashKey?: BytesLike,
   numberOfLayer1Txs?: BigNumberish,
   upgradeTxHash?: string,
-  previousBatchHash?: string
+  previousBatchHash?: string,
+  l2DaValidatorOutputHash?: BytesLike,
 ) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
@@ -283,6 +302,7 @@ export function createSystemLogsWithUpgrade(
       SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
       numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
     ),
+    // FIXME: these logs are not used anymore, but they needed for some of the tests' functionality to work.
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
@@ -304,6 +324,18 @@ export function createSystemLogsWithUpgrade(
       ethers.constants.HashZero
     ),
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_SIX_HASH_KEY, ethers.constants.HashZero),
+    constructL2Log(
+      true,
+      L2_TO_L1_MESSENGER,
+      SYSTEM_LOG_KEYS.L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+      ethers.utils.hexlify(l2DaValidatorOutputHash) || ethers.constants.HashZero
+    ),
+    constructL2Log(
+      true,
+      L2_TO_L1_MESSENGER,
+      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+      process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR || ethers.constants.AddressZero
+    ),
     constructL2Log(
       true,
       L2_BOOTLOADER_ADDRESS,
@@ -368,7 +400,7 @@ export interface CommitBatchInfo {
   bootloaderHeapInitialContentsHash: BytesLike;
   eventsQueueStateHash: BytesLike;
   systemLogs: BytesLike;
-  pubdataCommitments: BytesLike;
+  operatorDAInput: BytesLike;
 }
 
 export async function depositERC20(
@@ -426,17 +458,69 @@ export type CommitBatchInfoWithTimestamp = Partial<CommitBatchInfo> & {
   batchNumber: BigNumberish;
 };
 
+function padStringWithZeroes(str: string, lenBytes: number): string {
+  const strLen = lenBytes * 2;
+  if (str.length > strLen) {
+    throw new Error('String is too long');
+  }
+  const paddingLength = strLen - str.length;
+  return str + '0'.repeat(paddingLength);
+}
+
+// Returns a pair of strings:
+// - the expected pubdata commitemnt
+// - the required rollup l2 da hash output
+export function buildL2DARollupPubdataCommitment(
+  stateDiffHash: string,
+  fullPubdata: string,
+): [string, string] {
+  const BLOB_SIZE_BYTES = 126_976;
+  const fullPubdataHash = ethers.utils.keccak256(fullPubdata);
+  if (ethers.utils.arrayify(fullPubdata).length > BLOB_SIZE_BYTES) {
+    throw new Error('Too much pubdata');
+  }
+  const blobsProvided = 1;
+
+  const blobLinearHash = keccak256(padStringWithZeroes(fullPubdata, BLOB_SIZE_BYTES));
+  
+  const l1DAOutput = ethers.utils.hexConcat([
+    stateDiffHash,
+    fullPubdataHash,
+    ethers.utils.hexlify(blobsProvided),
+    blobLinearHash,
+  ]);
+  const l1DAOutputHash = ethers.utils.keccak256(l1DAOutput);
+
+  // After the header the 00 byte is for "calldata" mode.
+  // Then, there is the full pubdata.
+  // Then, there are 32 bytes for blob commitment. They must have at least one non-zero byte,
+  // so it will be the last one.
+  const fullPubdataCommitment = `${l1DAOutput}00${fullPubdata.slice(2)}${'0'.repeat(62)}01`;
+
+  return [fullPubdataCommitment, l1DAOutputHash];
+}
+
 export async function buildCommitBatchInfoWithUpgrade(
   prevInfo: StoredBatchInfo,
   info: CommitBatchInfoWithTimestamp,
   upgradeTxHash: string
 ): Promise<CommitBatchInfo> {
   const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
+
+  const [
+    fullPubdataCommitment,
+    l1DAOutputHash,
+  ] = buildL2DARollupPubdataCommitment(
+    ethers.constants.HashZero,
+    "0x"
+  );
+
   const systemLogs = createSystemLogsWithUpgrade(
     info.priorityOperationsHash,
     info.numberOfLayer1Txs,
     upgradeTxHash,
-    ethers.utils.hexlify(prevInfo.batchHash)
+    ethers.utils.hexlify(prevInfo.batchHash),
+    l1DAOutputHash
   );
   systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
     true,
@@ -452,7 +536,7 @@ export async function buildCommitBatchInfoWithUpgrade(
     numberOfLayer1Txs: 0,
     priorityOperationsHash: EMPTY_STRING_KECCAK,
     systemLogs: ethers.utils.hexConcat(systemLogs),
-    pubdataCommitments: `0x${"0".repeat(130)}`,
+    operatorDAInput: fullPubdataCommitment,
     bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
     eventsQueueStateHash: ethers.utils.randomBytes(32),
     ...info,
