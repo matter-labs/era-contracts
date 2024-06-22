@@ -238,7 +238,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         bytes32 l2ToL1LogsTreeRoot = l2ToL1LogsTreeArray[0];
 
         // FIXME; this is inefficient and leads to copying the entire array of uncompressed state diffs
-        // Better to use efficent call
+        // Better to use efficient call
         bytes32 l2DAValidatorOutputhash = IL2DAValidator(_l2DAValidator).validatePubdata({
             _chainedLogsHash: chainedLogsHash,
             _logsRootHash: l2ToL1LogsTreeRoot,

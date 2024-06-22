@@ -37,7 +37,7 @@ abstract contract CalldataDA {
         // - Then, there is the 1-byte number of blobs published.
         // - Then, there are linear hashes of the published blobs, 32 bytes each.
 
-        // Check that it accomodates enough pubdata for the state diff hash, hash of pubdata + the number of blobs.
+        // Check that it accommodates enough pubdata for the state diff hash, hash of pubdata + the number of blobs.
         require(_operatorDAInput.length >= 32 + 32 + 1, "too small");
 
         stateDiffHash = bytes32(_operatorDAInput[:32]);

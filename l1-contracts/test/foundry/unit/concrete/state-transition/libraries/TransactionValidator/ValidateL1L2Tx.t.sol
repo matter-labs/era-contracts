@@ -12,7 +12,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         validateL1ToL2Transaction(testTx, 500000, 100000);
     }
 
-    function test_RevertWhen_GasLimitDoesntCoverOverhead() public {
+    function test_RevertWhen_GasLimitdoesn'tCoverOverhead() public {
         L2CanonicalTransaction memory testTx = createTestTransaction();
         // The limit is so low, that it doesn't even cover the overhead
         testTx.gasLimit = 0;

@@ -23,7 +23,7 @@ abstract contract StateDiffL2DAValidator {
     /// @return totalL2Pubdata total pubdata that should be sent to L1.
     /// @return leftoverSuffix the suffix left after pubdata and uncompressed state diffs.
     /// On Era or other "vanilla" rollups it is empty, but it can be used for providing additional data by the operator,
-    /// e.g. DA comittee signatures, etc.
+    /// e.g. DA committee signatures, etc.
     function _produceStateDiffPubdata(
         bytes32 _chainedLogsHash,
         bytes32 _chainedMessagesHash,

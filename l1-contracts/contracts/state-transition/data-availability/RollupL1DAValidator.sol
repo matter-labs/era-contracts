@@ -39,7 +39,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         }
     }
 
-    /// @notice Generated the blob commitemnt to be used in the cryptographic prooof by calling the point evaluation precompile.
+    /// @notice Generated the blob commitemnt to be used in the cryptographic proof by calling the point evaluation precompile.
     /// @param _index The index of the blob in this transaction.
     /// @param _commitment The packed: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
     /// @return The commitment to be used in the cryptographic proof.

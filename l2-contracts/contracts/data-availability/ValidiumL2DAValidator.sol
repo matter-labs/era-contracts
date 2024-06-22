@@ -22,7 +22,7 @@ contract ValidiumL2DAValidator is IL2DAValidator {
     ) external returns (bytes32 outputHash) {
         // Since we do not need to publish anything to L1, we can just return 0.
         // Note, that Rollup validator sends the hash of uncompressed state diffs, since the
-        // correctness of the publish pubdata depends on it. However Validium doesnt sent anythng,
+        // correctness of the publish pubdata depends on it. However Validium doesn't sent anything,
         // so we don't need to publish even that.
         outputHash = bytes32(0);
     }
