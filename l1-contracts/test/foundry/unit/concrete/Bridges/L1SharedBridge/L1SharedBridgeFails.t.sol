@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
-
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -14,9 +14,149 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 
 /// We are testing all the specified revert and require cases.
 contract L1SharedBridgeFailTest is L1SharedBridgeTest {
+    using stdStorage for StdStorage;
+
+    function test_setL1Erc20Bridge_alreadySet(address anotherBridge) public {
+        address bridge = makeAddr("bridge");
+        L1SharedBridge sharedBridge = new L1SharedBridge({
+            _l1WethAddress: l1WethAddress,
+            _bridgehub: IBridgehub(bridgehubAddress),
+            _eraChainId: eraChainId,
+            _eraDiamondProxy: eraDiamondProxy
+        });
+
+        vm.prank(sharedBridge.owner());
+        sharedBridge.transferOwnership(owner);
+        vm.prank(owner);
+        sharedBridge.acceptOwnership();
+
+        vm.startPrank(owner);
+        vm.expectRevert("ShB: legacy bridge 0");
+        sharedBridge.setL1Erc20Bridge(address(0));
+
+        sharedBridge.setL1Erc20Bridge(bridge);
+
+        vm.expectRevert("ShB: legacy bridge already set");
+        sharedBridge.setL1Erc20Bridge(anotherBridge);
+        vm.stopPrank();
+    }
+
+    function test_bridgehubDepositBaseToken_callerNotBridgeHubOrEra(address caller, uint256 chainId) public {
+        vm.assume(caller != bridgehubAddress);
+        vm.assume(chainId != chainId || caller != eraDiamondProxy);
+
+        vm.deal(caller, amount);
+        vm.expectRevert("L1SharedBridge: not bridgehub or era chain");
+        vm.prank(caller);
+        sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, alice, ETH_TOKEN_ADDRESS, amount);
+    }
+
+    function test_receiveEth_notSTM(uint256 amount, address caller) public {
+        address stmAddress = makeAddr("stm");
+
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, eraChainId),
+            abi.encode(stmAddress)
+        );
+
+        vm.assume(caller != stmAddress);
+        vm.deal(caller, amount);
+        vm.prank(caller);
+        vm.expectRevert("receiveEth not state transition");
+        sharedBridge.receiveEth{value: amount}(eraChainId);
+    }
+
+    function test_setEraPostDiamondUpgradeFirstBatch_wrongValue(uint256 eraPostUpgradeFirstBatch) public {
+        eraPostUpgradeFirstBatch = bound(eraPostUpgradeFirstBatch, 1, type(uint256).max);
+
+        vm.prank(owner);
+        sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
+
+        vm.prank(owner);
+        vm.expectRevert("ShB: eFPUB already set");
+        sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
+    }
+
+    function setEraPostLegacyBridgeUpgradeFirstBatch_wrongValue(uint256 eraPostLegacyBridgeUpgradeFirstBatch) public {
+        eraPostUpgradeFirstBatch = bound(eraPostLegacyBridgeUpgradeFirstBatch, 1, type(uint256).max);
+
+        vm.prank(owner);
+        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostLegacyBridgeUpgradeFirstBatch);
+
+        vm.prank(owner);
+        vm.expectRevert("ShB: eFPUB already set");
+        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostLegacyBridgeUpgradeFirstBatch);
+    }
+
+    function test_setEraLegacyBridgeLastDepositTime_batchAlreadySet(
+        uint256 eraLegacyBridgeLastDepositBatch,
+        uint256 eraLegacyBridgeLastDepositTxNumber
+    ) public {
+        vm.startPrank(owner);
+        sharedBridge.setEraLegacyBridgeLastDepositTime(0, 0);
+
+        eraLegacyBridgeLastDepositBatch = bound(eraLegacyBridgeLastDepositTxNumber, 1, type(uint256).max);
+        eraLegacyBridgeLastDepositTxNumber = 0;
+
+        vm.startPrank(owner);
+        sharedBridge.setEraLegacyBridgeLastDepositTime(
+            eraLegacyBridgeLastDepositBatch,
+            eraLegacyBridgeLastDepositTxNumber
+        );
+
+        vm.expectRevert("ShB: eLOBDB already set");
+        sharedBridge.setEraLegacyBridgeLastDepositTime(
+            eraLegacyBridgeLastDepositBatch,
+            eraLegacyBridgeLastDepositTxNumber
+        );
+
+        vm.stopPrank();
+    }
+
+    function test_setEraLegacyBridgeLastDepositTime_txnSet(
+        uint256 eraLegacyBridgeLastDepositBatch,
+        uint256 eraLegacyBridgeLastDepositTxNumber
+    ) public {
+        L1SharedBridge sharedBridgeImpl = new L1SharedBridge({
+            _l1WethAddress: l1WethAddress,
+            _bridgehub: IBridgehub(bridgehubAddress),
+            _eraChainId: eraChainId,
+            _eraDiamondProxy: eraDiamondProxy
+        });
+        TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
+            address(sharedBridgeImpl),
+            admin,
+            abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner)
+        );
+
+        L1SharedBridge sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
+
+        vm.startPrank(owner);
+        sharedBridge.setEraLegacyBridgeLastDepositTime(0, 0);
+
+        eraLegacyBridgeLastDepositBatch = 0;
+        eraLegacyBridgeLastDepositTxNumber = bound(eraLegacyBridgeLastDepositTxNumber, 1, type(uint256).max);
+
+        vm.startPrank(owner);
+        sharedBridge.setEraLegacyBridgeLastDepositTime(
+            eraLegacyBridgeLastDepositBatch,
+            eraLegacyBridgeLastDepositTxNumber
+        );
+
+        vm.expectRevert("ShB: eLOBDTN already set");
+        sharedBridge.setEraLegacyBridgeLastDepositTime(
+            eraLegacyBridgeLastDepositBatch,
+            eraLegacyBridgeLastDepositTxNumber
+        );
+
+        vm.stopPrank();
+    }
+
     function test_initialize_wrongOwner() public {
         vm.expectRevert("ShB owner 0");
         new TransparentUpgradeableProxy(
@@ -25,6 +165,11 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(L1SharedBridge.initialize.selector, address(0), eraPostUpgradeFirstBatch)
         );
+    }
+
+    function test_bridgehubDepositBaseToken_paused() public testPause {
+        vm.prank(bridgehubAddress);
+        sharedBridge.bridgehubDepositBaseToken(chainId, alice, address(token), amount);
     }
 
     function test_bridgehubDepositBaseToken_EthwrongMsgValue() public {
@@ -70,6 +215,12 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         vm.expectRevert("ShB l2 bridge not deployed");
         // solhint-disable-next-line func-named-parameters
         sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, 0, bob));
+    }
+
+    function test_bridgehubDeposit_paused() public testPause {
+        vm.prank(bridgehubAddress);
+        // solhint-disable-next-line func-named-parameters
+        sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(l1WethAddress, amount, bob));
     }
 
     function test_bridgehubDeposit_Erc_weth() public {
@@ -152,12 +303,39 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, 0, bob));
     }
 
+    function test_bridgehubConfirmL2Transaction_paused() public testPause {
+        vm.prank(bridgehubAddress);
+        sharedBridge.bridgehubConfirmL2Transaction(chainId, bytes32(0), bytes32(0));
+    }
+
+    function test_bridgehubConfirmL2Transaction_invalidCaller(address caller) public {
+        vm.assume(caller != bridgehubAddress);
+        vm.expectRevert("ShB not BH");
+        vm.prank(caller);
+        sharedBridge.bridgehubConfirmL2Transaction(chainId, bytes32(0), bytes32(0));
+    }
+
     function test_bridgehubConfirmL2Transaction_depositAlreadyHappened() public {
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         vm.prank(bridgehubAddress);
         vm.expectRevert("ShB tx hap");
         sharedBridge.bridgehubConfirmL2Transaction(chainId, txDataHash, txHash);
+    }
+
+    function test_claimFialedDeposit_paused() public testPause {
+        vm.prank(bridgehubAddress);
+        sharedBridge.claimFailedDeposit({
+            _chainId: chainId,
+            _depositSender: alice,
+            _l1Token: ETH_TOKEN_ADDRESS,
+            _amount: amount,
+            _l2TxHash: txHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_claimFailedDeposit_proofInvalid() public {
@@ -208,6 +386,39 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             _depositSender: alice,
             _l1Token: ETH_TOKEN_ADDRESS,
             _amount: 0,
+            _l2TxHash: txHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _merkleProof: merkleProof
+        });
+    }
+
+    function test_claimFailedDeposit_lastDepositTimeNotSet() public {
+        vm.deal(address(sharedBridge), amount);
+
+        vm.mockCall(
+            bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(
+                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                eraChainId,
+                txHash,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2TxNumberInBatch,
+                merkleProof,
+                TxStatus.Failure
+            ),
+            abi.encode(true)
+        );
+
+        vm.expectRevert("ShB: last deposit time not set for Era");
+        sharedBridge.claimFailedDeposit({
+            _chainId: eraChainId,
+            _depositSender: alice,
+            _l1Token: ETH_TOKEN_ADDRESS,
+            _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -286,7 +497,25 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         });
     }
 
+    function test_finalizeWithdrawal_paused() public {
+        vm.prank(owner);
+        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
+        vm.prank(owner);
+        sharedBridge.pause();
+        vm.expectRevert("Pausable: paused");
+        sharedBridge.finalizeWithdrawal({
+            _chainId: eraChainId,
+            _l2BatchNumber: 0,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: new bytes(0),
+            _merkleProof: merkleProof
+        });
+    }
+
     function test_finalizeWithdrawal_EthOnEth_LegacyTxFinalizedInERC20Bridge() public {
+        vm.prank(owner);
+        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
         vm.deal(address(sharedBridge), amount);
         uint256 legacyBatchNumber = 0;
 
@@ -315,6 +544,8 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     }
 
     function test_finalizeWithdrawal_EthOnEth_LegacyTxFinalizedInSharedBridge() public {
+        vm.prank(owner);
+        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
         vm.deal(address(sharedBridge), amount);
         uint256 legacyBatchNumber = 0;
 
@@ -358,7 +589,58 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         });
     }
 
+    function test_finalizeWithdrawal_EthOnEth_UFBNotSet() public {
+        vm.deal(address(sharedBridge), amount);
+        uint256 legacyBatchNumber = 0;
+
+        vm.mockCall(
+            l1ERC20BridgeAddress,
+            abi.encodeWithSelector(IL1ERC20Bridge.isWithdrawalFinalized.selector),
+            abi.encode(false)
+        );
+
+        vm.mockCall(
+            eraDiamondProxy,
+            abi.encodeWithSelector(IGetters.isEthWithdrawalFinalized.selector),
+            abi.encode(true)
+        );
+
+        bytes memory message = abi.encodePacked(
+            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            alice,
+            address(token),
+            amount
+        );
+
+        vm.expectRevert("ShB: LegacyUFB not set for Era");
+        sharedBridge.finalizeWithdrawal({
+            _chainId: eraChainId,
+            _l2BatchNumber: legacyBatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
+
+        vm.prank(owner);
+        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
+
+        vm.expectRevert("ShB: diamondUFB not set for Era");
+        sharedBridge.finalizeWithdrawal({
+            _chainId: eraChainId,
+            _l2BatchNumber: legacyBatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
+    }
+
     function test_finalizeWithdrawal_EthOnEth_LegacyTxFinalizedInDiamondProxy() public {
+        vm.prank(owner);
+        sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
+        vm.prank(owner);
+        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
         vm.deal(address(sharedBridge), amount);
         uint256 legacyBatchNumber = 0;
 
@@ -499,6 +781,10 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     }
 
     function test_parseL2WithdrawalMessage_WrongMsgLength2() public {
+        vm.prank(owner);
+        sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
+        vm.prank(owner);
+        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
         vm.deal(address(sharedBridge), amount);
 
         vm.mockCall(
@@ -523,6 +809,10 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     }
 
     function test_parseL2WithdrawalMessage_WrongSelector() public {
+        vm.prank(owner);
+        sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
+        vm.prank(owner);
+        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
         vm.deal(address(sharedBridge), amount);
 
         vm.mockCall(
@@ -542,6 +832,66 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             _l2TxNumberInBatch: l2TxNumberInBatch,
             _message: message,
             _merkleProof: merkleProof
+        });
+    }
+
+    function test_finalizeWithdrawalLegacyErc20Bridge_badCaller(address caller) public {
+        vm.assume(caller != l1ERC20BridgeAddress);
+
+        vm.expectRevert("ShB not legacy bridge");
+        vm.prank(caller);
+        sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
+            _l2BatchNumber: 0,
+            _l2MessageIndex: 0,
+            _l2TxNumberInBatch: 0,
+            _message: new bytes(0),
+            _merkleProof: new bytes32[](0)
+        });
+    }
+
+    function test_claimFailedDepositLegacyErc20Bridge_badCaller(address caller) public {
+        vm.assume(caller != l1ERC20BridgeAddress);
+
+        vm.expectRevert("ShB not legacy bridge");
+        vm.prank(caller);
+        sharedBridge.claimFailedDepositLegacyErc20Bridge({
+            _depositSender: address(0),
+            _l1Token: address(0),
+            _amount: 0,
+            _l2TxHash: bytes32(0),
+            _l2BatchNumber: 0,
+            _l2MessageIndex: 0,
+            _l2TxNumberInBatch: 0,
+            _merkleProof: new bytes32[](0)
+        });
+    }
+
+    function test_depositLegacyERC20Bridge_paused() public testPause {
+        vm.prank(l1ERC20BridgeAddress);
+        sharedBridge.depositLegacyErc20Bridge({
+            _prevMsgSender: alice,
+            _l2Receiver: bob,
+            _l1Token: address(token),
+            _amount: amount,
+            _l2TxGasLimit: 100,
+            _l2TxGasPerPubdataByte: 100000,
+            _refundRecipient: address(0)
+        });
+    }
+
+    function test_depositLegacyERC20Bridge_badCaller(address caller) public {
+        vm.assume(caller != l1ERC20BridgeAddress);
+
+        vm.expectRevert("ShB not legacy bridge");
+        vm.prank(caller);
+        sharedBridge.depositLegacyErc20Bridge({
+            _prevMsgSender: alice,
+            _l2Receiver: bob,
+            _l1Token: address(token),
+            _amount: amount,
+            _l2TxGasLimit: 100,
+            _l2TxGasPerPubdataByte: 100000,
+            _refundRecipient: address(0)
         });
     }
 

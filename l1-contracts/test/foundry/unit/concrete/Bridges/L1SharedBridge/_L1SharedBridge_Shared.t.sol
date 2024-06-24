@@ -7,6 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
+import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
@@ -61,6 +62,7 @@ contract L1SharedBridgeTest is Test {
     L1SharedBridge sharedBridgeImpl;
     L1SharedBridge sharedBridge;
     address bridgehubAddress;
+    L1ERC20Bridge l1Erc20Bridge;
     address l1ERC20BridgeAddress;
     address l1WethAddress;
     address l2SharedBridge;
@@ -85,17 +87,24 @@ contract L1SharedBridgeTest is Test {
     uint16 l2TxNumberInBatch;
     bytes32[] merkleProof;
 
+    modifier testPause() {
+        vm.prank(owner);
+        sharedBridge.pause();
+        assertTrue(sharedBridge.paused());
+        vm.expectRevert("Pausable: paused");
+        _;
+    }
+
     uint256 isWithdrawalFinalizedStorageLocation = uint256(8 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1 + 50);
 
     function setUp() public {
         owner = makeAddr("owner");
         admin = makeAddr("admin");
-        // zkSync = makeAddr("zkSync");
         bridgehubAddress = makeAddr("bridgehub");
         alice = makeAddr("alice");
-        // bob = makeAddr("bob");
+        bob = makeAddr("bob");
         l1WethAddress = makeAddr("weth");
-        l1ERC20BridgeAddress = makeAddr("l1ERC20Bridge");
+
         l2SharedBridge = makeAddr("l2SharedBridge");
 
         txHash = bytes32(uint256(uint160(makeAddr("txHash"))));
@@ -123,16 +132,15 @@ contract L1SharedBridgeTest is Test {
             abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner)
         );
         sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
+
+        l1Erc20Bridge = new L1ERC20Bridge(sharedBridge);
+        l1ERC20BridgeAddress = address(l1Erc20Bridge);
+
         vm.prank(owner);
         sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
         vm.prank(owner);
-        sharedBridge.setEraPostDiamondUpgradeFirstBatch(eraPostUpgradeFirstBatch);
-        vm.prank(owner);
-        sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(eraPostUpgradeFirstBatch);
-        vm.prank(owner);
-        sharedBridge.setEraLegacyBridgeLastDepositTime(1, 0);
-        vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
+        assertEq(sharedBridge.l2BridgeAddress(chainId), l2SharedBridge);
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(eraChainId, l2SharedBridge);
     }
