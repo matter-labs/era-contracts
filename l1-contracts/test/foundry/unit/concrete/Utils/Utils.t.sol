@@ -118,47 +118,6 @@ contract UtilsTest is Test {
             ),
             "log[6] should be correct"
         );
-
-        assertEq(
-            logs[7],
-            Utils.constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_ONE_HASH_KEY), bytes32(0)),
-            "log[7] should be correct"
-        );
-
-        assertEq(
-            logs[8],
-            Utils.constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_TWO_HASH_KEY), bytes32(0)),
-            "log[8] should be correct"
-        );
-
-        assertEq(
-            logs[9],
-            Utils.constructL2Log(
-                true,
-                PUBDATA_PUBLISHER_ADDRESS,
-                uint256(SystemLogKey.BLOB_THREE_HASH_KEY),
-                bytes32(0)
-            ),
-            "log[9] should be correct"
-        );
-
-        assertEq(
-            logs[10],
-            Utils.constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_FOUR_HASH_KEY), bytes32(0)),
-            "log[8] should be correct"
-        );
-
-        assertEq(
-            logs[11],
-            Utils.constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_FIVE_HASH_KEY), bytes32(0)),
-            "log[11] should be correct"
-        );
-
-        assertEq(
-            logs[12],
-            Utils.constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_SIX_HASH_KEY), bytes32(0)),
-            "log[12] should be correct"
-        );
     }
 
     // add this to be excluded from coverage report

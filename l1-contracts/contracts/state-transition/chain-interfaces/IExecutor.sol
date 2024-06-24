@@ -18,12 +18,6 @@ enum SystemLogKey {
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
-/// @dev Enum used to determine the source of pubdata. At first we will support calldata and blobs but this can be extended.
-enum PubdataSource {
-    Calldata,
-    Blob
-}
-
 struct LogProcessingOutput {
     uint256 numberOfLayer1Txs;
     bytes32 chainedPriorityTxsHash;
@@ -35,11 +29,6 @@ struct LogProcessingOutput {
     bytes32 l2DAValidatorOutputHash;
 }
 
-/// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
-/// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
-/// @dev Our circuits will prove that a EIP-4844 blob and our internal blob are the same.
-uint256 constant BLOB_SIZE_BYTES = 126_976;
-
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
 uint256 constant L2_LOG_ADDRESS_OFFSET = 4;
 
@@ -48,23 +37,6 @@ uint256 constant L2_LOG_KEY_OFFSET = 24;
 
 /// @dev Offset used to pull Value From Log. Equal to 4 (bytes for isService) + 20 (bytes for address) + 32 (bytes for key)
 uint256 constant L2_LOG_VALUE_OFFSET = 56;
-
-/// @dev BLS Modulus value defined in EIP-4844 and the magic value returned from a successful call to the
-/// point evaluation precompile
-uint256 constant BLS_MODULUS = 52435875175126190479447740508185965837690552500527637822603658699938581184513;
-
-/// @dev Packed pubdata commitments.
-/// @dev Format: list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
-uint256 constant PUBDATA_COMMITMENT_SIZE = 144;
-
-/// @dev Offset in pubdata commitment of blobs for claimed value
-uint256 constant PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET = 16;
-
-/// @dev Offset in pubdata commitment of blobs for kzg commitment
-uint256 constant PUBDATA_COMMITMENT_COMMITMENT_OFFSET = 48;
-
-/// @dev For each blob we expect that the commitment is provided as well as the marker whether a blob with such commitment has been published before.
-uint256 constant BLOB_DA_INPUT_SIZE = PUBDATA_COMMITMENT_SIZE + 32;
 
 /// @dev Max number of blobs currently supported
 uint256 constant MAX_NUMBER_OF_BLOBS = 6;

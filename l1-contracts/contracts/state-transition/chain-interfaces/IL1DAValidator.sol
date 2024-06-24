@@ -4,6 +4,12 @@ pragma solidity 0.8.24;
 
 import {IERC165} from "openzeppelin-contracts-v4/contracts/interfaces/IERC165.sol";
 
+/// @dev Enum used to determine the source of pubdata. At first we will support calldata and blobs but this can be extended.
+enum PubdataSource {
+    Calldata,
+    Blob
+}
+
 struct L1DAValidatorOutput {
     /// @dev The hash of the uncompressed state diff.
     bytes32 stateDiffHash;
@@ -16,7 +22,6 @@ struct L1DAValidatorOutput {
     bytes32[] blobsOpeningCommitments;
 }
 
-// TODO: require EIP165 support as this will allow changes for future compatibility.
 interface IL1DAValidator is IERC165 {
     /// @notice The function that checks the data availability for the given batch input.
     /// @param l2DAValidatorOutputHash The hash of that was returned by the l2DAValidator.
