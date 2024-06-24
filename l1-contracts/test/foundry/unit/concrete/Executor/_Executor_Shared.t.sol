@@ -11,7 +11,7 @@ import {IStateTransitionManager} from "contracts/state-transition/IStateTransiti
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {TestExecutor} from "contracts/dev-contracts/test/TestExecutor.sol";
+import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -27,7 +27,7 @@ contract ExecutorTest is Test {
     address internal randomSigner;
     address internal blobVersionedHashRetriever;
     AdminFacet internal admin;
-    TestExecutor internal executor;
+    ExecutorFacet internal executor;
     GettersFacet internal getters;
     MailboxFacet internal mailbox;
     bytes32 internal newCommittedBlockBatchHash;
@@ -129,7 +129,7 @@ contract ExecutorTest is Test {
 
         eraChainId = 9;
 
-        executor = new TestExecutor();
+        executor = new ExecutorFacet();
         admin = new AdminFacet();
         getters = new GettersFacet();
         mailbox = new MailboxFacet(eraChainId);
@@ -218,7 +218,7 @@ contract ExecutorTest is Test {
         uint256 chainId = block.chainid;
         DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
 
-        executor = TestExecutor(address(diamondProxy));
+        executor = ExecutorFacet(address(diamondProxy));
         getters = GettersFacet(address(diamondProxy));
         mailbox = MailboxFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));

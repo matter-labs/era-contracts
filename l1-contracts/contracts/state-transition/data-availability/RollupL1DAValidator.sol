@@ -39,7 +39,7 @@ contract RollupL1DAValidator is IL1DAValidator {
         }
     }
 
-    /// @notice Generated the blob commitemnt to be used in the cryptographic prooof by calling the point evaluation precompile.
+    /// @notice Generated the blob commitemnt to be used in the cryptographic proof by calling the point evaluation precompile.
     /// @param _index The index of the blob in this transaction.
     /// @param _commitment The packed: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
     /// @return The commitment to be used in the cryptographic proof.
@@ -120,7 +120,11 @@ contract RollupL1DAValidator is IL1DAValidator {
     }
 
     /// @notice Verify that the calldata DA was correctly provided.
-    /// todo: better doc comments
+    /// @param _blobsProvided The number of blobs provided.
+    /// @param _fullPubdataHash Hash of the pubdata preimage.
+    /// @param _maxBlobsSupported Maximum number of blobs supported.
+    /// @param _pubdataInput Full pubdata + an additional 32 bytes containing the blob commitment for the pubdata.
+    /// @dev We supply the blob commitment as part of the pubdata because even with calldata the prover will check these values. 
     function _processCalldataDA(
         uint256 _blobsProvided,
         bytes32 _fullPubdataHash,
@@ -139,7 +143,10 @@ contract RollupL1DAValidator is IL1DAValidator {
         blobCommitments[0] = bytes32(_pubdataInput[_pubdataInput.length - 32:_pubdataInput.length]);
     }
 
-    /// todo: better doc comments
+    /// @notice Verify that the blob DA was correctly provided.
+    /// @param _blobsProvided The number of blobs provided.
+    /// @param _maxBlobsSupported Maximum number of blobs supported.
+    /// @param _operatorDAInput Input used to verify that the blobs contain the data we expect.
     function _processBlobDA(
         uint256 _blobsProvided,
         uint256 _maxBlobsSupported,
