@@ -128,7 +128,7 @@ contract L1NativeTokenVault is
         );
         uint256 sharedBridgeChainBalance = L1_SHARED_BRIDGE.chainBalance(_targetChainId, _token);
         chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + sharedBridgeChainBalance;
-        chainBalanceMigrated[_targetChainId][_token] == true;
+        chainBalanceMigrated[_targetChainId][_token] = true;
     }
 
     /// @dev Transfer tokens from shared bridge as part of migration process.

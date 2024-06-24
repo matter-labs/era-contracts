@@ -513,7 +513,6 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     }
 
     function test_safeTransferFundsFromSharedBridge_Erc() public {
-        uint256 maxGas = 30_000_000;
         uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, address(token));
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, false, true, address(token));
@@ -525,7 +524,6 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     }
 
     function test_safeTransferFundsFromSharedBridge_Eth() public {
-        uint256 maxGas = 30_000_000;
         uint256 startEthBalanceNtv = address(nativeTokenVault).balance;
         uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ADDRESS);
         nativeTokenVault.safeTransferFundsFromSharedBridge{gas: maxGas}(ETH_TOKEN_ADDRESS, maxGas);

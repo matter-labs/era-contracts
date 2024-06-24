@@ -51,6 +51,16 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         );
     }
 
+    function test_transferEthToNTV_wrongCaller() public {
+        vm.expectRevert("ShB: not NTV");
+        sharedBridge.transferEthToNTV();
+    }
+
+    function test_transferTokenToNTV_wrongCaller() public {
+        vm.expectRevert("ShB: not NTV");
+        sharedBridge.transferTokenToNTV(address(token));
+    }
+
     function test_registerToken_noCode() public {
         vm.expectRevert("NTV: empty token");
         nativeTokenVault.registerToken(address(0));
@@ -116,6 +126,37 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             tokenAssetId,
             address(token)
         );
+    }
+
+    function test_transferFundsToSharedBridge_Eth_0_AmountTransferred() public {
+        uint256 gas = 1_000_000;
+        vm.deal(address(sharedBridge), 0);
+        vm.prank(address(nativeTokenVault));
+        vm.expectRevert("NTV: 0 eth transferred");
+        nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
+    }
+
+    function test_transferFundsToSharedBridge_Erc_0_AmountTransferred() public {
+        vm.prank(address(sharedBridge));
+        token.transfer(address(1), amount);
+        vm.prank(address(nativeTokenVault));
+        vm.expectRevert("NTV: 0 amount to transfer");
+        nativeTokenVault.transferFundsFromSharedBridge(address(token));
+    }
+
+    function test_transferFundsToSharedBridge_Erc_WrongAmountTransferred() public {
+        vm.mockCall(address(token), abi.encodeWithSelector(IERC20.balanceOf.selector), abi.encode(10));
+        vm.prank(address(nativeTokenVault));
+        vm.expectRevert("NTV: wrong amount transferred");
+        nativeTokenVault.transferFundsFromSharedBridge(address(token));
+    }
+
+    function test_safeTransferFundsFromSharedBridge_ShouldNotBeCalledTwice() public {
+        nativeTokenVault.safeTransferBalancesFromSharedBridge{gas: maxGas}(ETH_TOKEN_ADDRESS, chainId, maxGas);
+        assertEq(nativeTokenVault.chainBalanceMigrated(chainId, ETH_TOKEN_ADDRESS), true);
+        vm.prank(address(nativeTokenVault));
+        vm.expectRevert("NTV: chain balance for the token already migrated");
+        nativeTokenVault.transferBalancesFromSharedBridge{gas: maxGas}(ETH_TOKEN_ADDRESS, chainId);
     }
 
     function test_bridgehubDepositBaseToken_Eth_Token_notRegisteredTokenID() public {
