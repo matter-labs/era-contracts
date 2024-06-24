@@ -54,6 +54,13 @@ contract ValidatorTimelockTest is Test {
         validator.addValidator(eraChainId, dan);
     }
 
+    function test_SuccessfulConstruction() public {
+        ValidatorTimelock validator = new ValidatorTimelock(owner, executionDelay, eraChainId);
+
+        assertEq(validator.owner(), owner);
+        assertEq(validator.executionDelay(), executionDelay);
+    }
+
     function test_addValidator() public {
         assert(validator.validators(chainId, bob) == false);
 

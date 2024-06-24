@@ -154,4 +154,7 @@ contract L1SharedBridgeTest is Test {
             .with_key(_token)
             .checked_write(_value);
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }

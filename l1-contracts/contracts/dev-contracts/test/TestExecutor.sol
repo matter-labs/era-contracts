@@ -5,6 +5,9 @@ import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.s
 pragma solidity 0.8.24;
 
 contract TestExecutor is ExecutorFacet {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     /// @dev Since we want to test the blob functionality we want mock the calls to the blobhash opcode.
     function _getBlobVersionedHash(uint256 _index) internal view virtual override returns (bytes32 versionedHash) {
         (bool success, bytes memory data) = s.blobVersionedHashRetriever.staticcall(abi.encode(_index));

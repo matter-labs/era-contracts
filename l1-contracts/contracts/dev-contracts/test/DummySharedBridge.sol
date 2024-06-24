@@ -8,6 +8,9 @@ import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.so
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 
 contract DummySharedBridge {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,
         address indexed from,

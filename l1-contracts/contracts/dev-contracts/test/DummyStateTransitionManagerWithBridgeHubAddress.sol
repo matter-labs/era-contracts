@@ -10,6 +10,8 @@ import {StateTransitionManager} from "../../state-transition/StateTransitionMana
 /// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
 contract DummyStateTransitionManagerWBH is StateTransitionManager {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 
     /// @notice Constructor
     constructor(address bridgeHub) StateTransitionManager(bridgeHub, type(uint256).max) {}

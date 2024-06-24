@@ -39,8 +39,8 @@ contract L1Erc20BridgeTest is Test {
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
         feeOnTransferToken = new FeeOnTransferToken("FeeOnTransferToken", "FOT", 18);
-        token.mint(alice, type(uint256).max);
-        feeOnTransferToken.mint(alice, type(uint256).max);
+        token.mint(alice, 10 ether);
+        feeOnTransferToken.mint(alice, 10 ether);
     }
 
     // add this to be excluded from coverage report
