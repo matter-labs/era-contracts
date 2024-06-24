@@ -10,7 +10,7 @@ import {IL2GenesisUpgrade} from "./interfaces/IL2GenesisUpgrade.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
 /// @notice The contract that can be used for deterministic contract deployment.
-contract L2GenesisUpgrade is IL2GenesisUpgrade{
+contract L2GenesisUpgrade is IL2GenesisUpgrade {
     function genesisUpgrade(uint256 _chainId, bytes calldata _forceDeploymentsData) external payable {
         // solhint-disable-next-line gas-custom-errors
         require(_chainId != 0, "Invalid chainId");

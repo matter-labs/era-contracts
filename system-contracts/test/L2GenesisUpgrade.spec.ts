@@ -19,11 +19,22 @@ describe("L2GenesisUpgrade tests", function () {
   });
 
   describe("upgrade", function () {
-
-
     it("successfully upgraded", async () => {
       // const force_deployer = await ethers.getImpersonatedSigner(TEST_FORCE_DEPLOYER_ADDRESS);
-        const forceDeployments = ethers.utils.defaultAbiCoder.encode(["tuple(bytes32 bytecodeHash, address newAddress, bool callConstructor, uint256 value, bytes input)[]"], [[{bytecodeHash: "0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70", newAddress: "0x0000000000000000000000000000000000020002" , callConstrucor: true, value: 0, input: "0x" }]]);
+      const forceDeployments = ethers.utils.defaultAbiCoder.encode(
+        ["tuple(bytes32 bytecodeHash, address newAddress, bool callConstructor, uint256 value, bytes input)[]"],
+        [
+          [
+            {
+              bytecodeHash: "0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70",
+              newAddress: "0x0000000000000000000000000000000000020002",
+              callConstrucor: true,
+              value: 0,
+              input: "0x",
+            },
+          ],
+        ]
+      );
 
       await expect(l2GenesisUpgrade.genesisUpgrade(chainId, forceDeployments))
         .to.emit(l2GenesisUpgrade, "UpgradeComplete")

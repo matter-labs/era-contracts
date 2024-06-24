@@ -53,14 +53,7 @@ export async function publishL2NativeTokenVaultDependencyBytecodesOnL2(
   }
 }
 
-
-
-
-export async function deploySharedBridgeOnL2ThroughL1(
-  deployer: Deployer,
-  chainId: string,
-  gasPrice: BigNumberish
-) {
+export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
   await publishL2NativeTokenVaultDependencyBytecodesOnL2(deployer, chainId, gasPrice);
 }
 

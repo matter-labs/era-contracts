@@ -171,7 +171,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             genesisBatchHash: _chainCreationParams.genesisBatchHash,
             genesisIndexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
             genesisBatchCommitment: _chainCreationParams.genesisBatchCommitment,
-            newInitialCutHash: newInitialCutHash, 
+            newInitialCutHash: newInitialCutHash,
             forceDeploymentHash: forceDeploymentHash
         });
     }
@@ -375,7 +375,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @param _baseToken the base token address used to pay for gas fees
     /// @param _sharedBridge the shared bridge address, used as base token bridge
     /// @param _admin the chain's admin address
-    /// @param _initData the diamond cut data, force deployments and factoryDeps encoded 
+    /// @param _initData the diamond cut data, force deployments and factoryDeps encoded
     /// that initializes the chains Diamond Proxy
     function createNewChain(
         uint256 _chainId,
@@ -385,18 +385,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
     ) external onlyBridgehub {
-        (bytes memory _diamondCut,
-        bytes memory _forceDeploymentData
-        ) = abi.decode(_initData, (bytes, bytes));
+        (bytes memory _diamondCut, bytes memory _forceDeploymentData) = abi.decode(_initData, (bytes, bytes));
         // TODO: only allow on L1.
         // solhint-disable-next-line func-named-parameters
-        address hyperchainAddress = _deployNewChain(
-            _chainId,
-            _baseToken,
-            _sharedBridge,
-            _admin,
-            _diamondCut
-        );
+        address hyperchainAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut);
 
         {
             // check input
