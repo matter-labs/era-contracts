@@ -69,6 +69,76 @@ contract InitializeTest is DiamondInitTest {
         new DiamondProxy(block.chainid, diamondCutData);
     }
 
+    function test_revertWhen_bridgehubAddressIsZero() public {
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
+        initializeData.bridgehub = address(0);
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(new DiamondInit()),
+            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+        });
+
+        vm.expectRevert(bytes.concat("DiamondInit: b0"));
+        new DiamondProxy(block.chainid, diamondCutData);
+    }
+
+    function test_revertWhen_stateTransitionManagerAddressIsZero() public {
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
+        initializeData.stateTransitionManager = address(0);
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(new DiamondInit()),
+            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+        });
+
+        vm.expectRevert(bytes.concat("DiamondInit: stm0"));
+        new DiamondProxy(block.chainid, diamondCutData);
+    }
+
+    function test_revertWhen_baseTokenAddressIsZero() public {
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
+        initializeData.baseToken = address(0);
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(new DiamondInit()),
+            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+        });
+
+        vm.expectRevert(bytes.concat("DiamondInit: bt0"));
+        new DiamondProxy(block.chainid, diamondCutData);
+    }
+
+    function test_revertWhen_baseTokenBridgeAddressIsZero() public {
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
+        initializeData.baseTokenBridge = address(0);
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(new DiamondInit()),
+            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+        });
+
+        vm.expectRevert(bytes.concat("DiamondInit: btb0"));
+        new DiamondProxy(block.chainid, diamondCutData);
+    }
+
+    function test_revertWhen_blobVersionedHashRetrieverAddressIsZero() public {
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
+        initializeData.blobVersionedHashRetriever = address(0);
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(new DiamondInit()),
+            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+        });
+
+        vm.expectRevert(bytes.concat("DiamondInit: bvhr0"));
+        new DiamondProxy(block.chainid, diamondCutData);
+    }
+
     function test_valuesCorrectWhenSuccessfulInit() public {
         InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 

@@ -12,4 +12,8 @@ contract AddressAliasHelperTest {
     function undoL1ToL2Alias(address _l2Address) external pure returns (address) {
         return AddressAliasHelper.undoL1ToL2Alias(_l2Address);
     }
+
+    function actualRefundRecipient(address _recipient, address _prevMessageSender) external view returns (address) {
+        return AddressAliasHelper.actualRefundRecipient(_recipient, _prevMessageSender);
+    }
 }
