@@ -155,13 +155,19 @@ export class Deployer {
   }
 
   public async genesisForceDeploymentsData() {
-    const bridgehubZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "Bridgehub");
-    const messageRootZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "MessageRoot");
-    const assetRouterZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2AssetRouter");
-    const nativeTokenVaultZKBytecode = readBytecode(
-      "../l2-contracts/artifacts-zk/contracts/bridge",
-      "L2NativeTokenVault"
-    );
+    let bridgehubZKBytecode = ethers.constants.HashZero;
+    let messageRootZKBytecode = ethers.constants.HashZero; 
+    let assetRouterZKBytecode = ethers.constants.HashZero;
+    let nativeTokenVaultZKBytecode = ethers.constants.HashZero; 
+    if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
+      bridgehubZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "Bridgehub");
+      messageRootZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "MessageRoot");
+      assetRouterZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2AssetRouter");
+      nativeTokenVaultZKBytecode = readBytecode(
+        "../l2-contracts/artifacts-zk/contracts/bridge",
+        "L2NativeTokenVault"
+      );
+    }
 
     const bridgehubDeployment = {
       bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(bridgehubZKBytecode)),
