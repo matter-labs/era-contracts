@@ -174,7 +174,9 @@ interface IL1SharedBridge {
         bytes32[] calldata _merkleProof
     ) external;
 
-    function transferEthToNTV(uint256 _chainId) external;
+    function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
 
-    function transferTokenToNTV(uint256 _chainId, address _token) external;
+    function transferEthToNTV() external;
+
+    function transferTokenToNTV(address _token) external;
 }

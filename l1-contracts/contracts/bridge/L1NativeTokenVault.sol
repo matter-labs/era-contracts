@@ -49,6 +49,10 @@ contract L1NativeTokenVault is
     /// NOTE: this function may be removed in the future, don't rely on it!
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 
+    /// @dev Maps token balances for each chain to verify that chain balance was migrated from shared bridge.
+    /// This serves only for migration purposes.
+    mapping(uint256 chainId => mapping(address l1Token => bool migrated)) public chainBalanceMigrated;
+
     /// @dev A mapping assetId => tokenAddress
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
@@ -96,38 +100,54 @@ contract L1NativeTokenVault is
         require(address(L1_SHARED_BRIDGE) == msg.sender, "NTV: ETH only accepted from Shared Bridge");
     }
 
-    /// @dev Transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process.
+    /// @dev Transfer tokens from shared bridge as part of migration process.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
-    /// @param _targetChainId The chain ID of the corresponding hyperchain.
-    function transferFundsFromSharedBridge(address _token, uint256 _targetChainId) external onlySelf {
+    function transferFundsFromSharedBridge(address _token) external onlySelf {
         if (_token == ETH_TOKEN_ADDRESS) {
             uint256 balanceBefore = address(this).balance;
-            L1_SHARED_BRIDGE.transferEthToNTV(_targetChainId);
+            L1_SHARED_BRIDGE.transferEthToNTV();
             uint256 balanceAfter = address(this).balance;
             require(balanceAfter > balanceBefore, "NTV: 0 eth transferred");
-            chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] =
-                chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] +
-                balanceAfter -
-                balanceBefore;
         } else {
             uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
-            uint256 sharedBridgeChainBalance = chainBalance[_targetChainId][_token];
+            uint256 sharedBridgeChainBalance = IERC20(_token).balanceOf(address(L1_SHARED_BRIDGE));
             require(sharedBridgeChainBalance > 0, "NTV: 0 amount to transfer");
-            L1_SHARED_BRIDGE.transferTokenToNTV(_targetChainId, _token);
+            L1_SHARED_BRIDGE.transferTokenToNTV(_token);
             uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
             require(balanceAfter - balanceBefore >= sharedBridgeChainBalance, "NTV: wrong amount transferred");
-            chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + sharedBridgeChainBalance;
         }
     }
 
-    /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process.
-    /// @dev Unlike `transferFundsFromLegacy` is provides a concrete limit on the gas used for the transfer and even if it will fail, it will not revert the whole transaction.
-    function safeTransferFundsFromSharedBridge(
+    /// @dev Set chain token balance as part of migration process.
+    /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
+    /// @param _targetChainId The chain ID of the corresponding hyperchain.
+    function transferBalancesFromSharedBridge(address _token, uint256 _targetChainId) external onlySelf {
+        require(
+            chainBalanceMigrated[_targetChainId][_token] == false,
+            "NTV: chain balance for the token already migrated"
+        );
+        uint256 sharedBridgeChainBalance = L1_SHARED_BRIDGE.chainBalance(_targetChainId, _token);
+        chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + sharedBridgeChainBalance;
+        chainBalanceMigrated[_targetChainId][_token] == true;
+    }
+
+    /// @dev Transfer tokens from shared bridge as part of migration process.
+    /// @dev Unlike `transferFundsFromSharedBridge` is provides a concrete limit on the gas used for the transfer and even if it will fail, it will not revert the whole transaction.
+    function safeTransferFundsFromSharedBridge(address _token, uint256 _gasPerToken) external {
+        try this.transferFundsFromSharedBridge{gas: _gasPerToken}(_token) {} catch {
+            // A reasonable amount of gas will be provided to transfer the token.
+            // If the transfer fails, we don't want to revert the whole transaction.
+        }
+    }
+
+    /// @dev Set chain token balance as part of migration process.
+    /// @dev Unlike `transferBalancesFromSharedBridge` is provides a concrete limit on the gas used for the transfer and even if it will fail, it will not revert the whole transaction.
+    function safeTransferBalancesFromSharedBridge(
         address _token,
         uint256 _targetChainId,
         uint256 _gasPerToken
     ) external {
-        try this.transferFundsFromSharedBridge{gas: _gasPerToken}(_token, _targetChainId) {} catch {
+        try this.transferBalancesFromSharedBridge{gas: _gasPerToken}(_token, _targetChainId) {} catch {
             // A reasonable amount of gas will be provided to transfer the token.
             // If the transfer fails, we don't want to revert the whole transaction.
         }
