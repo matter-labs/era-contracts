@@ -119,7 +119,8 @@ interface IBridgehub {
         address _baseToken,
         uint256 _salt,
         address _admin,
-        bytes calldata _initData
+        bytes calldata _initData,
+        bytes[] calldata _factoryDeps
     ) external returns (uint256 chainId);
 
     function addStateTransitionManager(address _stateTransitionManager) external;

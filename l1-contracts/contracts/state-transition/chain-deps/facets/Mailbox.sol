@@ -303,7 +303,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             reserved: [request.mintValue, uint256(uint160(request.refundRecipient)), 0, 0],
             data: request.l2Calldata,
             signature: new bytes(0),
-            factoryDeps: _hashFactoryDeps(request.factoryDeps),
+            factoryDeps: L2ContractHelper.hashFactoryDeps(request.factoryDeps),
             paymasterInput: new bytes(0),
             reservedDynamic: new bytes(0)
         });
@@ -343,19 +343,5 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             transaction,
             _priorityOpParams.request.factoryDeps
         );
-    }
-
-    /// @notice Hashes the L2 bytecodes and returns them in the format in which they are processed by the bootloader
-    function _hashFactoryDeps(bytes[] memory _factoryDeps) internal pure returns (uint256[] memory hashedFactoryDeps) {
-        uint256 factoryDepsLen = _factoryDeps.length;
-        hashedFactoryDeps = new uint256[](factoryDepsLen);
-        for (uint256 i = 0; i < factoryDepsLen; i = i.uncheckedInc()) {
-            bytes32 hashedBytecode = L2ContractHelper.hashL2Bytecode(_factoryDeps[i]);
-
-            // Store the resulting hash sequentially in bytes.
-            assembly {
-                mstore(add(hashedFactoryDeps, mul(add(i, 1), 32)), hashedBytecode)
-            }
-        }
     }
 }

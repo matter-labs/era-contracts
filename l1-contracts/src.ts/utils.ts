@@ -22,12 +22,17 @@ export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.jso
 export const SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 export const ADDRESS_ONE = "0x0000000000000000000000000000000000000001";
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
+export const L2_BRIDGEHUB_ADDRESS = "0x0000000000000000000000000000000000010002"; 
+export const L2_ASSET_ROUTER_ADDRESS = "0x0000000000000000000000000000000000010003"; 
+export const L2_NATIVE_TOKEN_VAULT_ADDRESS = "0x0000000000000000000000000000000000010004"; 
+export const L2_MESSAGE_ROOT_ADDRESS = "0x0000000000000000000000000000000000010005";
 export const EMPTY_STRING_KECCAK = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
 
 const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
 export const DIAMOND_CUT_DATA_ABI_STRING =
   "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)";
+export const FORCE_DEPLOYMENT_ABI_STRING = "tuple(bytes32 bytecodeHash, address newAddress, bool callConstructor, uint256 value, bytes input)[]";
 
 export function applyL1ToL2Alias(address: string): string {
   return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));

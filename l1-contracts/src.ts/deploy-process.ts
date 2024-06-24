@@ -61,14 +61,14 @@ export async function initialBridgehubDeployment(
   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
 
-  await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
-  await deployer.deployStateTransitionManagerContract(create2Salt, extraFacets, gasPrice);
-  await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
-
   await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
   await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
   await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });
   await deployer.setParametersSharedBridge();
+
+  await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
+  await deployer.deployStateTransitionManagerContract(create2Salt, extraFacets, gasPrice);
+  await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
 }
 
 export async function registerHyperchain(

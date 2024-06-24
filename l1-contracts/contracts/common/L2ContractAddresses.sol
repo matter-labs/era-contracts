@@ -39,7 +39,7 @@ address constant L2_COMPLEX_UPGRADER_ADDR = address(0x800f);
 address constant L2_GENESIS_UPGRADE_ADDR = address(0x10001);
 
 /// @dev Todo
-address constant L2_BRIDGEHUB_ADDR = address(0x10001);
+address constant L2_BRIDGEHUB_ADDR = address(0x10002);
 
 /// @dev An l2 system contract address, used in the assetId calculation for native assets.
 /// This is needed for automatic bridging, i.e. without deploying the AssetHandler contract,

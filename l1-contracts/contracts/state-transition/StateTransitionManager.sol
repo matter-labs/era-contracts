@@ -64,6 +64,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The address to accept the admin role
     address private pendingAdmin;
 
+    /// @dev The initial force deployment hash
+    bytes32 public initialForceDeploymentHash;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(address _bridgehub, uint256 _maxNumberOfHyperchains) reentrancyGuardInitializer {
@@ -160,13 +163,16 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         storedBatchZero = keccak256(abi.encode(batchZero));
         bytes32 newInitialCutHash = keccak256(abi.encode(_chainCreationParams.diamondCut));
         initialCutHash = newInitialCutHash;
+        bytes32 forceDeploymentHash = keccak256(abi.encode(_chainCreationParams.forceDeploymentsData));
+        initialForceDeploymentHash = forceDeploymentHash;
 
         emit NewChainCreationParams({
             genesisUpgrade: _chainCreationParams.genesisUpgrade,
             genesisBatchHash: _chainCreationParams.genesisBatchHash,
             genesisIndexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
             genesisBatchCommitment: _chainCreationParams.genesisBatchCommitment,
-            newInitialCutHash: newInitialCutHash
+            newInitialCutHash: newInitialCutHash, 
+            forceDeploymentHash: forceDeploymentHash
         });
     }
 
@@ -327,10 +333,11 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // check not registered
         Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));
 
-        // check input
-        bytes32 cutHashInput = keccak256(_diamondCut);
-        require(cutHashInput == initialCutHash, "STM: initial cutHash mismatch");
-
+        {
+            // check input
+            bytes32 cutHashInput = keccak256(_diamondCut);
+            require(cutHashInput == initialCutHash, "STM: initial cutHash mismatch");
+        }
         bytes memory mandatoryInitData;
         {
             // solhint-disable-next-line func-named-parameters
@@ -368,14 +375,19 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @param _baseToken the base token address used to pay for gas fees
     /// @param _sharedBridge the shared bridge address, used as base token bridge
     /// @param _admin the chain's admin address
-    /// @param _diamondCut the diamond cut data that initializes the chains Diamond Proxy
+    /// @param _initData the diamond cut data, force deployments and factoryDeps encoded 
+    /// that initializes the chains Diamond Proxy
     function createNewChain(
         uint256 _chainId,
         address _baseToken,
         address _sharedBridge,
         address _admin,
-        bytes calldata _diamondCut
+        bytes calldata _initData,
+        bytes[] calldata _factoryDeps
     ) external onlyBridgehub {
+        (bytes memory _diamondCut,
+        bytes memory _forceDeploymentData
+        ) = abi.decode(_initData, (bytes, bytes));
         // TODO: only allow on L1.
         // solhint-disable-next-line func-named-parameters
         address hyperchainAddress = _deployNewChain(
@@ -384,11 +396,15 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             _sharedBridge,
             _admin,
             _diamondCut
-            // SyncLayerState.ActiveOnL1
         );
 
-        // set chainId in VM
-        IAdmin(hyperchainAddress).genesisUpgrade(l1GenesisUpgrade);
+        {
+            // check input
+            bytes32 forceDeploymentHash = keccak256(abi.encode(_forceDeploymentData));
+            require(forceDeploymentHash == initialForceDeploymentHash, "STM: initial force deployment mismatch");
+        }
+        // genesis upgrade, deploys some contracts, sets chainId
+        IAdmin(hyperchainAddress).genesisUpgrade(l1GenesisUpgrade, _forceDeploymentData, _factoryDeps);
     }
 
     function getProtocolVersion(uint256 _chainId) public view returns (uint256) {

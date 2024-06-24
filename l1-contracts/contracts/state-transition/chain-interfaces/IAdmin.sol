@@ -65,7 +65,7 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @dev Both the admin and the STM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
 
-    function genesisUpgrade(address _genesisUpgrade) external;
+    function genesisUpgrade(address _l1GenesisUpgrade, bytes calldata _forceDeploymentData, bytes[] calldata _factoryDeps) external;
 
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);

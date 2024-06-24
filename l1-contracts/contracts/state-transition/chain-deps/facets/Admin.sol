@@ -141,17 +141,11 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
-    function genesisUpgrade(address _l1GenesisUpgrade) external onlyStateTransitionManager {
+    function genesisUpgrade(address _l1GenesisUpgrade, bytes calldata _forceDeploymentData, bytes[] calldata _factoryDeps) external onlyStateTransitionManager {
         uint256 cachedProtocolVersion = s.protocolVersion;
         uint256 chainId = s.chainId;
 
         Diamond.FacetCut[] memory emptyArray;
-        bytes32[] memory deploymentHashes = new bytes32[](0);
-        address[] memory deploymentAddresses = new address[](0);
-        bool[] memory deploymentBool = new bool[](0);
-        // bytes32[] memory _byteCodeHashes = new bytes32[](0);
-        uint256[] memory _factoryDeps = new uint256[](0);
-
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
             facetCuts: emptyArray,
             initAddress: _l1GenesisUpgrade,
@@ -161,12 +155,10 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
                     _l1GenesisUpgrade,
                     chainId,
                     cachedProtocolVersion,
-                    deploymentAddresses,
-                    deploymentBool,
-                    deploymentHashes,
+                    _forceDeploymentData,
                     _factoryDeps
                 )
-            ) // todo fill out empty values
+            ) 
         });
 
         Diamond.diamondCut(cutData);

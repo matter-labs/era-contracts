@@ -135,7 +135,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // solhint-disable-next-line no-unused-vars
         uint256 _salt,
         address _admin,
-        bytes calldata _initData
+        bytes calldata _initData,
+        bytes[] calldata _factoryDeps
     ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256) {
         require(_chainId != 0, "Bridgehub: chainId cannot be 0");
         require(_chainId <= type(uint48).max, "Bridgehub: chainId too large");
@@ -159,7 +160,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _baseToken: _baseToken,
             _sharedBridge: address(sharedBridge),
             _admin: _admin,
-            _diamondCut: _initData
+            _initData: _initData,
+            _factoryDeps: _factoryDeps
         });
 
         emit NewChain(_chainId, _stateTransitionManager, _admin);

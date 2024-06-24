@@ -137,7 +137,8 @@ contract StateTransitionManagerTest is Test {
             _baseToken: baseToken,
             _sharedBridge: sharedBridge,
             _admin: newChainAdmin,
-            _diamondCut: abi.encode(_diamondCut)
+            _initData: abi.encode(_diamondCut), // todo encode initdata
+            _factoryDeps: new bytes[](0)
         });
     }
 

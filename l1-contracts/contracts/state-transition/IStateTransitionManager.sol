@@ -33,6 +33,7 @@ struct ChainCreationParams {
     uint64 genesisIndexRepeatedStorageChanges;
     bytes32 genesisBatchCommitment;
     Diamond.DiamondCutData diamondCut;
+    bytes forceDeploymentsData;
 }
 
 interface IStateTransitionManager {
@@ -62,7 +63,8 @@ interface IStateTransitionManager {
         bytes32 genesisBatchHash,
         uint64 genesisIndexRepeatedStorageChanges,
         bytes32 genesisBatchCommitment,
-        bytes32 newInitialCutHash
+        bytes32 newInitialCutHash,
+        bytes32 forceDeploymentHash
     );
 
     /// @notice new UpgradeCutHash
@@ -110,7 +112,8 @@ interface IStateTransitionManager {
         address _baseToken,
         address _sharedBridge,
         address _admin,
-        bytes calldata _diamondCut
+        bytes calldata _initData,
+        bytes[] calldata _factoryDeps
     ) external;
 
     function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external;

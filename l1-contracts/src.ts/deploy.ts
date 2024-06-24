@@ -1,10 +1,12 @@
 import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 
+
 import type { BigNumberish, providers, Signer, Wallet, Contract } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
-import type { Wallet as ZkWallet } from "zksync-ethers";
+import { Wallet as ZkWallet, Provider as ZkProvider } from "zksync-ethers";
+import { Deployer as ZkDeployer } from "@matterlabs/hardhat-zksync-deploy";
 
 import type { DeployedAddresses } from "./deploy-utils";
 import { deployedAddressesFromEnv, deployBytecodeViaCreate2, deployViaCreate2 } from "./deploy-utils";
@@ -14,6 +16,8 @@ import {
   readSystemContractsBytecode,
   unpackStringSemVer,
   SYSTEM_CONFIG,
+  web3Provider,
+  web3Url
 } from "../scripts/utils";
 import { getTokens } from "./deploy-token";
 import {
@@ -24,8 +28,14 @@ import {
   PubdataPricingMode,
   hashL2Bytecode,
   DIAMOND_CUT_DATA_ABI_STRING,
+  FORCE_DEPLOYMENT_ABI_STRING,
+  L2_BRIDGEHUB_ADDRESS,
+  L2_MESSAGE_ROOT_ADDRESS,
+  L2_NATIVE_TOKEN_VAULT_ADDRESS,
+  L2_ASSET_ROUTER_ADDRESS,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   compileInitialCutHash,
+  readBytecode,
 } from "./utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
@@ -47,6 +57,9 @@ import { IL1SharedBridgeFactory } from "../typechain/IL1SharedBridgeFactory";
 import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
 
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
+
+const provider = web3Provider();
+
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -142,6 +155,22 @@ export class Deployer {
     return diamondCut;
   }
 
+  public async genesisForceDeploymentsData() {
+    const bridgehubZKBytecode = readBytecode('./artifacts-zk/contracts/bridgehub', "Bridgehub");
+    const messageRootZKBytecode = readBytecode('./artifacts-zk/contracts/bridgehub', "MessageRoot");
+    const assetRouterZKBytecode = readBytecode('../l2-contracts/artifacts-zk/contracts/bridge', "L2AssetRouter");
+    const nativeTokenVaultZKBytecode = readBytecode('../l2-contracts/artifacts-zk/contracts/bridge', "L2NativeTokenVault");
+
+    const bridgehubDeployment = {bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(bridgehubZKBytecode)), newAddress: L2_BRIDGEHUB_ADDRESS , callConstrucor: true, value: 0, input: "0x" }
+    const messageRootDeployment = {bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(messageRootZKBytecode)), newAddress: L2_MESSAGE_ROOT_ADDRESS , callConstrucor: true, value: 0, input: ethers.utils.defaultAbiCoder.encode(["address"], [L2_BRIDGEHUB_ADDRESS])}
+    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
+    const assetRouterDeployment = {bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(assetRouterZKBytecode)), newAddress: L2_ASSET_ROUTER_ADDRESS , callConstrucor: true, value: 0, input: ethers.utils.defaultAbiCoder.encode(["uint256", "uint256", "address"], [eraChainId, this.chainId, this.addresses.Bridges.SharedBridgeProxy])}
+    const ntvDeployment = {bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(nativeTokenVaultZKBytecode)), newAddress: L2_NATIVE_TOKEN_VAULT_ADDRESS , callConstrucor: true, value: 0, input: "0x"}
+
+    const forceDeployments = [bridgehubDeployment, messageRootDeployment, assetRouterDeployment, ntvDeployment]
+    return ethers.utils.defaultAbiCoder.encode([FORCE_DEPLOYMENT_ABI_STRING], [forceDeployments]);
+  }
+
   public async deployCreate2Factory(ethTxOptions?: ethers.providers.TransactionRequest) {
     if (this.verbose) {
       console.log("Deploying Create2 factory");
@@ -156,7 +185,7 @@ export class Deployer {
 
     if (this.verbose) {
       console.log(`CONTRACTS_CREATE2_FACTORY_ADDR=${create2Factory.address}`);
-      console.log(`Create2 factory deployed, gasUsed: ${rec.gasUsed.toString()}`);
+      console.log(`Create2 factory deployed, gasUsed: ${rec.gasUsed.toString()}, ${rec.transactionHash}`);
     }
 
     this.addresses.Create2Factory = create2Factory.address;
@@ -321,13 +350,14 @@ export class Deployer {
     const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
 
     const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
-
+    const forceDeploymentsData = await this.genesisForceDeploymentsData();
     const chainCreationParams = {
       genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
       genesisBatchHash,
       genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
       genesisBatchCommitment,
       diamondCut,
+      forceDeploymentsData
     };
 
     const initCalldata = stateTransitionManager.encodeFunctionData("initialize", [
@@ -817,7 +847,9 @@ export class Deployer {
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets, compareDiamondCutHash);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
-
+    const forceDeploymentsData = await this.genesisForceDeploymentsData();
+    const initData = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes"], [initialDiamondCut, forceDeploymentsData]);
+    // note the factory deps are provided at genesis
     const receipt = await this.executeDirectOrGovernance(
       useGovernance,
       bridgehub,
@@ -828,7 +860,8 @@ export class Deployer {
         baseTokenAddress,
         Date.now(),
         admin,
-        initialDiamondCut,
+        initData,
+        []
       ],
       0,
       {
@@ -836,7 +869,6 @@ export class Deployer {
         ...txOptions,
       }
     );
-
     const chainId = receipt.logs.find((log) => log.topics[0] == bridgehub.interface.getEventTopic("NewChain"))
       .topics[1];
 

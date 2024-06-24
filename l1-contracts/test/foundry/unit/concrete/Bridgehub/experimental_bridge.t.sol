@@ -369,7 +369,8 @@ contract ExperimentalBridgeTest is Test {
                 _baseToken: address(testToken),
                 _salt: uint256(123),
                 _admin: admin,
-                _initData: bytes("")
+                _initData: bytes(""),
+                _factoryDeps: new bytes[](0)
             });
         }
 
@@ -408,7 +409,8 @@ contract ExperimentalBridgeTest is Test {
             _baseToken: address(testToken),
             _salt: uint256(chainId * 2),
             _admin: admin,
-            _initData: _newChainInitData
+            _initData: _newChainInitData,
+            _factoryDeps: new bytes[](0)
         });
 
         vm.stopPrank();
