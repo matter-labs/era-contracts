@@ -124,10 +124,7 @@ describe("Synclayer", function () {
           refundRecipient: migratingDeployer.deployWallet.address,
           secondBridgeAddress: stmDeploymentTracker.address,
           secondBridgeValue: 0,
-          secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
-            ["bool", "address", "address"],
-            [true, stm.address, stm.address]
-          ),
+          secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(["address", "address"], [stm.address, stm.address]),
         },
       ])
     );

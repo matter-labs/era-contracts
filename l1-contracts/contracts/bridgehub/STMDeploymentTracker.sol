@@ -52,7 +52,16 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         BRIDGE_HUB.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_stmAddress))), _stmAddress);
     }
 
-    /// @dev registerSTMAssetOnL2SharedBridge, use via requestL2TransactionTwoBridges
+    /// @notice The function responsible for registering the L2 counterpart of an STM asset on the L2 Bridgehub.
+    /// @dev The function is called by the Bridgehub contract during the `Bridgehub.requestL2TransactionTwoBridges`.
+    /// @dev Since the L2 settlment layers `_chainId` might potentially have ERC20 tokens as native assets,
+    /// there are two ways to perform the L1->L2 transaction:
+    /// - via the `Bridgehub.requestL2TransactionDirect`. However, this would require the STMDeploymentTracker to
+    /// hahndle the ERC20 balances to be used in the transaction.
+    /// - via the `Bridgehub.requestL2TransactionTwoBridges`. This way it will be the sender that provides the funds
+    /// for the L2 transaction.
+    /// The second approach is used due to its simplicity even though it gives the sender slightly more control over the call:
+    /// `gasLimit`, etc.
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
         uint256 _chainId,
@@ -66,14 +75,9 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         // solhint-disable-next-line gas-custom-errors
 
         require(_prevMsgSender == owner(), "STMDT: not owner");
-        (bool _registerOnL2Bridgehub, address _stmL1Address, address _stmL2Address) = abi.decode(
-            _data,
-            (bool, address, address)
-        );
+        (address _stmL1Address, address _stmL2Address) = abi.decode(_data, (address, address));
 
-        if (_registerOnL2Bridgehub) {
-            request = _registerSTMAssetOnL2Bridgehub(_chainId, _stmL1Address, _stmL2Address);
-        }
+        request = _registerSTMAssetOnL2Bridgehub(_chainId, _stmL1Address, _stmL2Address);
     }
 
     // todo this has to be put in L1SharedBridge via TwoBridges. Hard, because we have to have multiple msg types
@@ -125,7 +129,9 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     }
 
     /// @dev we need to implement this for the bridgehub
-    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {}
+    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {
+        // This function is typically used on bridges for e.g.
+    }
 
     function getAssetId(address _l1STM) public view override returns (bytes32) {
         return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1STM)))));
