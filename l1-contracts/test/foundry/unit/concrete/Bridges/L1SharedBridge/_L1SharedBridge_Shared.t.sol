@@ -202,6 +202,8 @@ contract L1SharedBridgeTest is Test {
         _setNativeTokenVaultChainBalance(chainId, address(token), 1000 * amount);
         _setNativeTokenVaultChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
         // console.log("chainBalance %s, %s", address(token), nativeTokenVault.chainBalance(chainId, address(token)));
+        _setSharedBridgeChainBalance(chainId, address(token), amount);
+        _setSharedBridgeChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
 
         vm.deal(bridgehubAddress, amount);
         vm.deal(address(sharedBridge), amount);
@@ -242,6 +244,15 @@ contract L1SharedBridgeTest is Test {
         stdstore
             .target(address(nativeTokenVault))
             .sig(nativeTokenVault.chainBalance.selector)
+            .with_key(_chainId)
+            .with_key(_token)
+            .checked_write(_value);
+    }
+
+    function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
+        stdstore
+            .target(address(sharedBridge))
+            .sig(sharedBridge.chainBalance.selector)
             .with_key(_chainId)
             .with_key(_token)
             .checked_write(_value);

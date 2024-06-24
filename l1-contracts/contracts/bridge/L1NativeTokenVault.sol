@@ -64,6 +64,12 @@ contract L1NativeTokenVault is
         _;
     }
 
+    /// @notice Checks that the message sender is the shared bridge itself.
+    modifier onlySelf() {
+        require(msg.sender == address(this), "NTV only");
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
@@ -83,6 +89,48 @@ contract L1NativeTokenVault is
     function initialize(address _owner) external reentrancyGuardInitializer initializer {
         require(_owner != address(0), "NTV owner 0");
         _transferOwnership(_owner);
+    }
+
+    /// @dev Accepts ether only from the Shared Bridge.
+    receive() external payable {
+        require(address(L1_SHARED_BRIDGE) == msg.sender, "NTV: ETH only accepted from Shared Bridge");
+    }
+
+    /// @dev Transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process.
+    /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
+    /// @param _targetChainId The chain ID of the corresponding hyperchain.
+    function transferFundsFromSharedBridge(address _token, uint256 _targetChainId) external onlySelf {
+        if (_token == ETH_TOKEN_ADDRESS) {
+            uint256 balanceBefore = address(this).balance;
+            L1_SHARED_BRIDGE.transferEthToNTV(_targetChainId);
+            uint256 balanceAfter = address(this).balance;
+            require(balanceAfter > balanceBefore, "NTV: 0 eth transferred");
+            chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] =
+                chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] +
+                balanceAfter -
+                balanceBefore;
+        } else {
+            uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
+            uint256 sharedBridgeChainBalance = chainBalance[_targetChainId][_token];
+            require(sharedBridgeChainBalance > 0, "NTV: 0 amount to transfer");
+            L1_SHARED_BRIDGE.transferTokenToNTV(_targetChainId, _token);
+            uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
+            require(balanceAfter - balanceBefore >= sharedBridgeChainBalance, "NTV: wrong amount transferred");
+            chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + sharedBridgeChainBalance;
+        }
+    }
+
+    /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process.
+    /// @dev Unlike `transferFundsFromLegacy` is provides a concrete limit on the gas used for the transfer and even if it will fail, it will not revert the whole transaction.
+    function safeTransferFundsFromSharedBridge(
+        address _token,
+        uint256 _targetChainId,
+        uint256 _gasPerToken
+    ) external {
+        try this.transferFundsFromSharedBridge{gas: _gasPerToken}(_token, _targetChainId) {} catch {
+            // A reasonable amount of gas will be provided to transfer the token.
+            // If the transfer fails, we don't want to revert the whole transaction.
+        }
     }
 
     /// @dev We want to be able to bridge native tokens automatically, this means registering them on the fly

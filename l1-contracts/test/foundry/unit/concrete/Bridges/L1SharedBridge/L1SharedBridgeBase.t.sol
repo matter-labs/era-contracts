@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -508,5 +510,24 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             _message: message,
             _merkleProof: merkleProof
         });
+    }
+
+    function test_safeTransferFundsFromSharedBridge_Erc() public {
+        uint256 maxGas = 30_000_000;
+        // solhint-disable-next-line func-named-parameters
+        vm.expectEmit(true, true, false, true, address(token));
+        emit IERC20.Transfer(address(sharedBridge), address(nativeTokenVault), amount);
+        nativeTokenVault.safeTransferFundsFromSharedBridge{gas: maxGas}(address(token), chainId, maxGas);
+    }
+
+    function test_safeTransferFundsFromSharedBridge_Eth() public {
+        uint256 maxGas = 30_000_000;
+        uint256 startBalanceShb = sharedBridge.chainBalance(chainId, ETH_TOKEN_ADDRESS);
+        uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ADDRESS);
+        nativeTokenVault.safeTransferFundsFromSharedBridge{gas: maxGas}(ETH_TOKEN_ADDRESS, chainId, maxGas);
+        uint256 endBalanceShb = sharedBridge.chainBalance(chainId, ETH_TOKEN_ADDRESS);
+        uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ADDRESS);
+        assertEq(endBalanceNtv - startBalanceNtv, amount);
+        assertEq(startBalanceShb - endBalanceShb, amount);
     }
 }

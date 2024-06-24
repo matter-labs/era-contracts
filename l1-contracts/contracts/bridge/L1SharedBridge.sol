@@ -87,6 +87,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => bool enabled) public hyperbridgingEnabled;
 
+    /// @dev Maps token balances for each chain to prevent unauthorized spending across hyperchains.
+    /// This serves as a security measure until hyperbridging is implemented.
+    /// NOTE: this function may be removed in the future, don't rely on it!
+    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
+
     /// @dev A mapping assetId => assetHandlerAddress
     /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset
     /// @dev P.S. this liquidity was locked directly in SharedBridge before
@@ -161,6 +166,27 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             eraLegacyBridgeLastDepositBatch = _eraLegacyBridgeLastDepositBatch;
             eraLegacyBridgeLastDepositTxNumber = _eraLegacyBridgeLastDepositTxNumber;
         }
+    }
+
+    /// @dev transfer token to shared bridge as part of upgrade
+    function transferEthToNTV(uint256 _chainId) external {
+        require(msg.sender == address(nativeTokenVault), "ShB: not NTV");
+        uint256 amount = chainBalance[_chainId][ETH_TOKEN_ADDRESS];
+        bool callSuccess;
+        address ntvAddress = address(nativeTokenVault);
+        // Low-level assembly call, to avoid any memory copying (save gas)
+        assembly {
+            callSuccess := call(gas(), ntvAddress, amount, 0, 0, 0, 0)
+        }
+        chainBalance[_chainId][ETH_TOKEN_ADDRESS] = chainBalance[_chainId][ETH_TOKEN_ADDRESS] - amount;
+    }
+
+    /// @dev transfer token to shared bridge as part of upgrade
+    function transferTokenToNTV(uint256 _chainId, address _token) external {
+        require(msg.sender == address(nativeTokenVault), "ShB: not NTV");
+        uint256 amount = chainBalance[_chainId][_token];
+        IERC20(_token).safeTransfer(address(nativeTokenVault), amount);
+        chainBalance[_chainId][_token] = chainBalance[_chainId][_token] - amount;
     }
 
     /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
