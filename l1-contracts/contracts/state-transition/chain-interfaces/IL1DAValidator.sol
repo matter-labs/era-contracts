@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {IERC165} from "openzeppelin-contracts-v4/contracts/interfaces/IERC165.sol";
+import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 
 /// @dev Enum used to determine the source of pubdata. At first we will support calldata and blobs but this can be extended.
 enum PubdataSource {
