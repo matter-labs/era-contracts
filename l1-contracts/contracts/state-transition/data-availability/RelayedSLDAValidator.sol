@@ -4,13 +4,10 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
-import {IL1DAValidator, L1DAValidatorOutput} from "../chain-interfaces/IL1DAValidator.sol";
+import {IL1DAValidator, L1DAValidatorOutput, PubdataSource} from "../chain-interfaces/IL1DAValidator.sol";
 import {IL1Messenger} from "../../common/interfaces/IL1Messenger.sol";
 
 import {CalldataDA} from "./CalldataDA.sol";
-
-// TODO: maybe move it here
-import {PubdataSource} from "../chain-interfaces/IExecutor.sol";
 
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 
@@ -79,5 +76,9 @@ contract RelayedSLDAValidator is IL1DAValidator, CalldataDA {
                 "bh"
             );
         }
+    }
+
+    function supportsInterface(bytes4 interfaceId) override external view returns (bool) {
+        return interfaceId == type(IL1DAValidator).interfaceId;
     }
 }

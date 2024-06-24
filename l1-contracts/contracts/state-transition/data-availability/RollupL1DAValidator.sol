@@ -22,11 +22,6 @@ uint256 constant BLOB_DA_INPUT_SIZE = PUBDATA_COMMITMENT_SIZE + 32;
 /// point evaluation precompile
 uint256 constant BLS_MODULUS = 52435875175126190479447740508185965837690552500527637822603658699938581184513;
 
-/// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
-/// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
-/// @dev Our circuits will prove that a EIP-4844 blob and our internal blob are the same.
-uint256 constant BLOB_SIZE_BYTES = 126_976;
-
 /// @dev Offset in pubdata commitment of blobs for claimed value
 uint256 constant PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET = 16;
 
