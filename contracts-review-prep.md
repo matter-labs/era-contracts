@@ -46,33 +46,12 @@ We need to either:
   for Markdown's syntax, type some text into the left window and
   watch the results in the right.
 
-### redundant call \_getAssetProperties
-
-> (, \_assetId) = \_getAssetProperties(\_assetId); // Handles the non-legacy case
-
-Most likely a redundant call:
-
-- for the new assets not needed
-- for legacy tokens the handleLegacyData already provided the correct data.
-
-This one could be used in theory if the data has new format, but still uses the address instead of normal id. However, not sure we should support such cases, so it will be removed and tests updated.
-
 ### not allowing legacy withdrawals
 
 > require(!\_isEraLegacyEthWithdrawal(\_chainId, \_l2BatchNumber), "ShB: legacy eth withdrawal");
 
 No method to finalize an old withdrawal.
 We will manually finalize all legacy withdrawals before the upgrade, i.e. withdrawals that happened before the previous Bridgehub upgrade.
-
-### empty branch when matching function signatures
-
-> (assetId, offset) = UnsafeBytes.readBytes32(\_l2ToL1message, offset);
-
-        transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
-    } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
-        //todo
-
-Currently, the support of old selector with ERC20 is completed, but the new format with chainId in the `finalizeWithdraw` selector hasn't been implemented in the `_parseL2WithdrawalMessage` function.
 
 ### Custom Errors not implemented
 
@@ -82,5 +61,5 @@ Custom errors will be introduced for all contracts.
 
 ## Migration plan
 
-- Bulkheads will need o be migrated
-- Tokens will have to be transferred
+- Bulkheads will need to be migrated (methods added)
+- Tokens will have to be transferred (methods added)
