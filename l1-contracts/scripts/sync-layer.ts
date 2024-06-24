@@ -390,8 +390,8 @@ async function registerSLContractsOnL1(deployer: Deployer) {
         secondBridgeAddress: stmDeploymentTracker.address,
         secondBridgeValue: 0,
         secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
-          ["bool", "address", "address"],
-          [true, l1STM.address, getAddressFromEnv("SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR")]
+          ["address", "address"],
+          [l1STM.address, getAddressFromEnv("SYNC_LAYER_STATE_TRANSITION_PROXY_ADDR")]
         ),
       },
     ])

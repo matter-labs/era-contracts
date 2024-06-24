@@ -134,20 +134,18 @@ interface IAdmin is IZkSyncHyperchainBase {
 
     event BridgeMint(address indexed _account, uint256 _amount);
 
-    event BridgeBurn(address indexed _account, uint256 _amount);
-
-    function bridgeBurn(
+    function forwardedBridgeBurn(
         address _syncLayer,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);
 
-    function bridgeClaimFailedBurn(
+    function forwardedBridgeClaimFailedBurn(
         uint256 _chainId,
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable;
 
-    function bridgeMint(bytes calldata _data) external payable;
+    function forwardedBridgeMint(bytes calldata _data) external payable;
 }

@@ -457,11 +457,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(settlementLayer[_chainId] == block.chainid, "BH: not current SL");
         settlementLayer[_chainId] = _settlementChainId;
 
-        bytes memory stmMintData = IStateTransitionManager(stateTransitionManager[_chainId]).bridgeBurn(
+        bytes memory stmMintData = IStateTransitionManager(stateTransitionManager[_chainId]).forwardedBridgeBurn(
             _chainId,
             _stmData
         );
-        bytes memory chainMintData = IZkSyncHyperchain(getHyperchain(_chainId)).bridgeBurn(
+        bytes memory chainMintData = IZkSyncHyperchain(getHyperchain(_chainId)).forwardedBridgeBurn(
             getHyperchain(_settlementChainId),
             _prevMsgSender,
             _chainData
@@ -487,10 +487,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         stateTransitionManager[_chainId] = stm;
         address hyperchain = getHyperchain(_chainId);
         if (hyperchain == address(0)) {
-            hyperchain = IStateTransitionManager(stm).bridgeMint(_chainId, _stmData);
+            hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(_chainId, _stmData);
         }
 
-        IZkSyncHyperchain(hyperchain).bridgeMint(_chainMintData);
+        IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData);
         return address(0);
     }
 
