@@ -6,6 +6,8 @@ import {Diamond} from "./libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 
+// import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+
 /// @notice Struct that holds all data needed for initializing STM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
 /// @param owner The address who can manage non-critical updates in the contract
@@ -147,4 +149,22 @@ interface IStateTransitionManager {
     ) external;
 
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32);
+
+    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
+
+    event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
+
+    function forwardedBridgeBurn(
+        uint256 _chainId,
+        bytes calldata _data
+    ) external returns (bytes memory _bridgeMintData);
+
+    function forwardedBridgeMint(uint256 _chainId, bytes calldata _data) external returns (address);
+
+    function bridgeClaimFailedBurn(
+        uint256 _chainId,
+        bytes32 _assetInfo,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external;
 }

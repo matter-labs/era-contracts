@@ -5,13 +5,13 @@ pragma solidity 0.8.24;
 // solhint-disable gas-custom-errors, reason-string
 
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR} from "../../../common/Config.sol";
+// import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "../../../common/L2ContractAddresses.sol";
-import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 
@@ -43,6 +43,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
         L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA(
+            s.chainId,
             logOutput.l2DAValidatorOutputHash,
             _newBatch.operatorDAInput,
             TOTAL_BLOBS_IN_COMMITMENT
@@ -167,15 +168,15 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         // FIXME: temporarily old logs were kept for backwards compaitibility. This check can not work now.
         //
-        //
         // We only require 13 logs to be checked, the 14th is if we are expecting a protocol upgrade
         // Without the protocol upgrade we expect 13 logs: 2^13 - 1 = 8191
         // With the protocol upgrade we expect 14 logs: 2^14 - 1 = 16383
-        // if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
-        //     require(processedLogs == 127, "b7");
-        // } else {
-        //     require(processedLogs == 255, "b8");
-        // }
+        if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
+            // require(processedLogs == 127, "b7");
+        } else {
+            // FIXME: do restore this code to the one that was before
+            require(_checkBit(processedLogs, uint8(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)), "b8");
+        }
     }
 
     /// @inheritdoc IExecutor
@@ -316,6 +317,12 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
+        // IBridgehub bridgehub = IBridgehub(s.bridgehub);
+        // bridgehub.messageRoot().addChainBatchRoot(
+        //     s.chainId,
+        //     _storedBatch.l2LogsTreeRoot,
+        //     block.chainid != bridgehub.L1_CHAIN_ID()
+        // );
     }
 
     /// @inheritdoc IExecutor

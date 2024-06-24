@@ -1,16 +1,8 @@
 import { Command } from "commander";
 import type { BigNumberish } from "ethers";
 import { ethers, Wallet } from "ethers";
-import { formatUnits, Interface, parseUnits, defaultAbiCoder } from "ethers/lib/utils";
-import {
-  computeL2Create2Address,
-  create2DeployFromL1,
-  provider,
-  priorityTxMaxGasLimit,
-  hashL2Bytecode,
-  applyL1ToL2Alias,
-  publishBytecodeFromL1,
-} from "./utils";
+import { formatUnits, parseUnits } from "ethers/lib/utils";
+import { computeL2Create2Address, create2DeployFromL1, provider, priorityTxMaxGasLimit } from "./utils";
 
 import { ethTestConfig } from "./deploy-utils";
 
@@ -18,7 +10,6 @@ import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import { AdminFacetFactory } from "../../l1-contracts/typechain";
 import * as hre from "hardhat";
-import { getAddressFromEnv } from "../../l1-contracts/src.ts/utils";
 
 async function deployContractOnL2ThroughL1(
   deployer: Deployer,

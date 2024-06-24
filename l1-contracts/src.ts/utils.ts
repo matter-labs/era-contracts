@@ -9,7 +9,8 @@ import * as path from "path";
 import { DiamondInitFactory } from "../typechain";
 import type { DiamondCut, FacetCut } from "./diamondCut";
 import { diamondCut } from "./diamondCut";
-import { SYSTEM_CONFIG } from "../scripts/utils";
+import { SYSTEM_CONFIG, web3Url } from "../scripts/utils";
+import { Wallet as ZkWallet, Provider } from "zksync-ethers";
 
 export const testConfigPath = process.env.ZKSYNC_ENV
   ? path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant")
@@ -21,13 +22,18 @@ export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.jso
 
 export const SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 export const ADDRESS_ONE = "0x0000000000000000000000000000000000000001";
+export const ETH_ADDRESS_IN_CONTRACTS = ADDRESS_ONE;
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 export const EMPTY_STRING_KECCAK = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
 
+export const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
+
 const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
 export const DIAMOND_CUT_DATA_ABI_STRING =
   "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)";
+export const HYPERCHAIN_COMMITMENT_ABI_STRING =
+  "tuple(uint256 totalBatchesExecuted, uint256 totalBatchesVerified, uint256 totalBatchesCommitted, uint256 priorityQueueHead, tuple(bytes32 canonicalTxHash,  uint64 expirationTimestamp,  uint192 layer2Tip)[] priorityQueueTxs, bytes32 l2SystemContractsUpgradeTxHash, uint256 l2SystemContractsUpgradeBatchNumber, bytes32[] batchHashes)";
 
 export function applyL1ToL2Alias(address: string): string {
   return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
@@ -177,6 +183,20 @@ export interface L2CanonicalTransaction {
   // Reserved dynamic type for the future use-case. Using it should be avoided,
   // But it is still here, just in case we want to enable some additional functionality.
   reservedDynamic: BytesLike;
+}
+
+export function ethersWalletToZkWallet(wallet: ethers.Wallet): ZkWallet {
+  return new ZkWallet(wallet.privateKey, new Provider(web3Url()));
+}
+
+export function isZKMode(): boolean {
+  return process.env.CONTRACTS_BASE_NETWORK_ZKSYNC === "true";
+}
+
+const LOCAL_NETWORKS = ["localhost", "hardhat", "localhostL2"];
+
+export function isCurrentNetworkLocal(): boolean {
+  return LOCAL_NETWORKS.includes(process.env.CHAIN_ETH_NETWORK);
 }
 
 // Checks that the initial cut hash params are valid.

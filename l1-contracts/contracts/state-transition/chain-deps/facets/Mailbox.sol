@@ -7,8 +7,11 @@ pragma solidity 0.8.24;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
+import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
-import {Merkle} from "../../libraries/Merkle.sol";
+import {Merkle} from "../../../common/libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
@@ -17,13 +20,18 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, ETH_TOKEN_ADDRESS, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+
+import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 import {IL1SharedBridge} from "../../../bridge/interfaces/IL1SharedBridge.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
+
+// import {SyncLayerState} from "../ZkSyncHyperchainStorage.sol";
 
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -40,15 +48,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
     constructor(uint256 _eraChainId) {
         ERA_CHAIN_ID = _eraChainId;
-    }
-
-    /// @inheritdoc IMailbox
-    function transferEthToSharedBridge() external onlyBaseTokenBridge {
-        require(s.chainId == ERA_CHAIN_ID, "Mailbox: transferEthToSharedBridge only available for Era on mailbox");
-
-        uint256 amount = address(this).balance;
-        address baseTokenBridgeAddress = s.baseTokenBridge;
-        IL1SharedBridge(baseTokenBridgeAddress).receiveEth{value: amount}(ERA_CHAIN_ID);
     }
 
     /// @notice when requesting transactions through the bridgehub
@@ -107,6 +106,16 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         });
         return _proveL2LogInclusion(_l2BatchNumber, _l2MessageIndex, l2Log, _merkleProof);
     }
+
+    // /// @inheritdoc IMailbox
+    function proveL1ToL2TransactionStatusViaSyncLayer(
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof,
+        TxStatus _status
+    ) public view returns (bool) {}
 
     /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
     function _proveL2LogInclusion(
@@ -185,55 +194,71 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         return Math.max(l2GasPrice, minL2GasPriceBaseToken);
     }
 
-    /// @inheritdoc IMailbox
-    function finalizeEthWithdrawal(
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external nonReentrant {
-        require(s.chainId == ERA_CHAIN_ID, "Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
-        IL1SharedBridge(s.baseTokenBridge).finalizeWithdrawal({
-            _chainId: ERA_CHAIN_ID,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _message: _message,
-            _merkleProof: _merkleProof
+    /// @dev On L1 we have to forward to SyncLayer mailbox
+    function requestL2TransactionToSyncLayerMailbox(
+        uint256 _chainId,
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external returns (bytes32 canonicalTxHash) {
+        require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId), "Mailbox SL: not SL");
+        require(
+            IStateTransitionManager(s.stateTransitionManager).getHyperchain(_chainId) == msg.sender,
+            "Mailbox SL: not hyperchain"
+        );
+
+        BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest({
+            _chainId: _chainId,
+            _transaction: _transaction,
+            _factoryDeps: _factoryDeps,
+            _canonicalTxHash: _canonicalTxHash,
+            _expirationTimestamp: _expirationTimestamp
         });
+        canonicalTxHash = _requestL2TransactionToSyncLayerFree(wrappedRequest);
     }
 
-    ///  @inheritdoc IMailbox
-    function requestL2Transaction(
-        address _contractL2,
-        uint256 _l2Value,
-        bytes calldata _calldata,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit,
+    /// @dev On SL the chain's mailbox
+    function bridgehubRequestL2TransactionOnSyncLayer(
+        L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
-        address _refundRecipient
-    ) external payable returns (bytes32 canonicalTxHash) {
-        require(s.chainId == ERA_CHAIN_ID, "Mailbox: legacy interface only available for Era");
-        canonicalTxHash = _requestL2TransactionSender(
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external {
+        _writePriorityOp(_transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp);
+    }
+
+    function _wrapRequest(
+        uint256 _chainId,
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint256 _expirationTimestamp
+    ) internal view returns (BridgehubL2TransactionRequest memory) {
+        // solhint-disable-next-line func-named-parameters
+        bytes memory data = abi.encodeWithSelector(
+            IBridgehub(s.bridgehub).forwardTransactionOnSyncLayer.selector,
+            _chainId,
+            _transaction,
+            _factoryDeps,
+            _canonicalTxHash,
+            _expirationTimestamp
+        );
+        return
             BridgehubL2TransactionRequest({
-                sender: msg.sender,
-                contractL2: _contractL2,
-                mintValue: msg.value,
-                l2Value: _l2Value,
-                l2GasLimit: _l2GasLimit,
-                l2Calldata: _calldata,
-                l2GasPerPubdataByteLimit: _l2GasPerPubdataByteLimit,
-                factoryDeps: _factoryDeps,
-                refundRecipient: _refundRecipient
-            })
-        );
-        IL1SharedBridge(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
-            s.chainId,
-            msg.sender,
-            ETH_TOKEN_ADDRESS,
-            msg.value
-        );
+                sender: s.bridgehub,
+                contractL2: IBridgehub(s.bridgehub).bridgehubCounterParts(s.chainId),
+                mintValue: 0,
+                l2Value: 0,
+                // Very large amount
+                l2GasLimit: 72_000_000,
+                l2Calldata: data,
+                // TODO: use constant for that
+                l2GasPerPubdataByteLimit: 800,
+                factoryDeps: new bytes[](0),
+                // Tx is free, no so refund recipient needed
+                refundRecipient: address(0)
+            });
     }
 
     function _requestL2TransactionSender(
@@ -281,7 +306,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         request.refundRecipient = AddressAliasHelper.actualRefundRecipient(request.refundRecipient, request.sender);
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
-        // solhint-disable avoid-tx-origin
         // slither-disable-next-line tx-origin
         if (request.sender != tx.origin) {
             request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
@@ -290,7 +314,35 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         // populate missing fields
         _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
 
-        canonicalTxHash = _writePriorityOp(_params);
+        L2CanonicalTransaction memory transaction;
+        (transaction, canonicalTxHash) = _validateTx(_params);
+
+        _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
+        if (s.syncLayer != address(0)) {
+            canonicalTxHash = IMailbox(s.syncLayer).requestL2TransactionToSyncLayerMailbox({
+                _chainId: s.chainId,
+                _transaction: transaction,
+                _factoryDeps: _params.request.factoryDeps,
+                _canonicalTxHash: canonicalTxHash,
+                _expirationTimestamp: _params.expirationTimestamp
+            });
+            return canonicalTxHash;
+        }
+    }
+
+    function _requestL2TransactionToSyncLayerFree(
+        BridgehubL2TransactionRequest memory _request
+    ) internal nonReentrant returns (bytes32 canonicalTxHash) {
+        WritePriorityOpParams memory params = WritePriorityOpParams({
+            request: _request,
+            txId: s.priorityQueue.getTotalPriorityTxs(),
+            l2GasPrice: 0,
+            expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
+        });
+
+        L2CanonicalTransaction memory transaction;
+        (transaction, canonicalTxHash) = _validateTx(params);
+        _writePriorityOp(transaction, params.request.factoryDeps, canonicalTxHash, params.expirationTimestamp);
     }
 
     function _serializeL2Transaction(
@@ -318,40 +370,39 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         });
     }
 
-    /// @notice Stores a transaction record in storage & send event about that
-    function _writePriorityOp(
+    function _validateTx(
         WritePriorityOpParams memory _priorityOpParams
-    ) internal returns (bytes32 canonicalTxHash) {
-        L2CanonicalTransaction memory transaction = _serializeL2Transaction(_priorityOpParams);
-
+    ) internal returns (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) {
+        transaction = _serializeL2Transaction(_priorityOpParams);
         bytes memory transactionEncoding = abi.encode(transaction);
-
         TransactionValidator.validateL1ToL2Transaction(
             transaction,
             transactionEncoding,
             s.priorityTxMaxGasLimit,
             s.feeParams.priorityTxMaxPubdata
         );
-
         canonicalTxHash = keccak256(transactionEncoding);
+    }
 
+    /// @notice Stores a transaction record in storage & send event about that
+    function _writePriorityOp(
+        L2CanonicalTransaction memory _transaction,
+        bytes[] memory _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) internal {
         s.priorityQueue.pushBack(
             PriorityOperation({
-                canonicalTxHash: canonicalTxHash,
-                expirationTimestamp: _priorityOpParams.expirationTimestamp,
+                canonicalTxHash: _canonicalTxHash,
+                // FIXME: safe downcast
+                expirationTimestamp: _expirationTimestamp,
                 layer2Tip: uint192(0) // TODO: Restore after fee modeling will be stable. (SMA-1230)
             })
         );
 
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters
-        emit NewPriorityRequest(
-            _priorityOpParams.txId,
-            canonicalTxHash,
-            _priorityOpParams.expirationTimestamp,
-            transaction,
-            _priorityOpParams.request.factoryDeps
-        );
+        emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, _expirationTimestamp, _transaction, _factoryDeps);
     }
 
     /// @notice Hashes the L2 bytecodes and returns them in the format in which they are processed by the bootloader
@@ -366,5 +417,59 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
                 mstore(add(hashedFactoryDeps, mul(add(i, 1), 32)), hashedBytecode)
             }
         }
+    }
+
+    ///////////////////////////////////////////////////////
+    //////// Legacy Era functions
+
+    /// @inheritdoc IMailbox
+    function finalizeEthWithdrawal(
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external nonReentrant {
+        require(s.chainId == ERA_CHAIN_ID, "Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
+        IL1SharedBridge(s.baseTokenBridge).finalizeWithdrawal({
+            _chainId: ERA_CHAIN_ID,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
+        });
+    }
+
+    ///  @inheritdoc IMailbox
+    function requestL2Transaction(
+        address _contractL2,
+        uint256 _l2Value,
+        bytes calldata _calldata,
+        uint256 _l2GasLimit,
+        uint256 _l2GasPerPubdataByteLimit,
+        bytes[] calldata _factoryDeps,
+        address _refundRecipient
+    ) external payable returns (bytes32 canonicalTxHash) {
+        require(s.chainId == ERA_CHAIN_ID, "Mailbox: legacy interface only available for Era");
+        canonicalTxHash = _requestL2TransactionSender(
+            BridgehubL2TransactionRequest({
+                sender: msg.sender,
+                contractL2: _contractL2,
+                mintValue: msg.value,
+                l2Value: _l2Value,
+                l2GasLimit: _l2GasLimit,
+                l2Calldata: _calldata,
+                l2GasPerPubdataByteLimit: _l2GasPerPubdataByteLimit,
+                factoryDeps: _factoryDeps,
+                refundRecipient: _refundRecipient
+            })
+        );
+        IL1SharedBridge(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
+            s.chainId,
+            s.baseTokenAssetId,
+            msg.sender,
+            msg.value
+        );
     }
 }

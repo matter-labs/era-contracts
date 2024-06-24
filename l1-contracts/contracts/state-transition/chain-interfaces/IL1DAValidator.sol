@@ -24,6 +24,7 @@ struct L1DAValidatorOutput {
 
 interface IL1DAValidator is IERC165 {
     /// @notice The function that checks the data availability for the given batch input.
+    /// @param chainId The chain id of the chain that is being committed.
     /// @param l2DAValidatorOutputHash The hash of that was returned by the l2DAValidator.
     /// @param operatorDAInput The DA input by the operator provided on L1.
     /// @param maxBlobsSupported The maximal number of blobs supported by the chain.
@@ -32,6 +33,7 @@ interface IL1DAValidator is IERC165 {
     /// in the `L1DAValidatorOutput` struct will have to have this length as it is required
     /// to be static by the circuits.
     function checkDA(
+        uint256 chainId,
         bytes32 l2DAValidatorOutputHash,
         bytes calldata operatorDAInput,
         uint256 maxBlobsSupported

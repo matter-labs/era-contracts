@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
+import type { BytesLike } from "ethers/lib/utils";
 import { Interface } from "ethers/lib/utils";
 
 import type { Bridgehub, L1SharedBridge, GettersFacet, MockExecutorFacet } from "../../typechain";
@@ -46,6 +47,7 @@ describe("Legacy Era tests", function () {
   let bridgehub: Bridgehub;
   let chainId = "9"; // Hardhat config ERA_CHAIN_ID
   const functionSignature = "0x11a2ccc1";
+  let l2ToL1message: BytesLike;
 
   let mailbox: IMailbox;
   let getter: GettersFacet;
@@ -121,6 +123,17 @@ describe("Legacy Era tests", function () {
       deployer.addresses.StateTransition.DiamondProxy,
       mockExecutorContract.signer
     );
+
+    const txExecute = await proxyAsMockExecutor.setExecutedBatches(1);
+    await txExecute.wait();
+
+    const l1Receiver = await randomSigner.getAddress();
+    l2ToL1message = ethers.utils.hexConcat([
+      functionSignature,
+      "0x".concat(l1Receiver.slice(2).padStart(64, "0")),
+      "0x".concat(ethers.utils.parseUnits("800", 18).toHexString().slice(2).padStart(64, "0")),
+      "0x".concat(erc20TestToken.address.slice(2).padStart(64, "0")),
+    ]);
   });
 
   it("Check should initialize through governance", async () => {
@@ -160,7 +173,7 @@ describe("Legacy Era tests", function () {
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
     const revertReason = await getCallRevertReason(
-      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, "0x", [ethers.constants.HashZero])
+      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(1, 0, 0, "0x", [ethers.constants.HashZero])
     );
     expect(revertReason).equal("ShB wrong msg len");
   });
@@ -169,19 +182,12 @@ describe("Legacy Era tests", function () {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge
         .connect(randomSigner)
-        .finalizeWithdrawal(0, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
+        .finalizeWithdrawal(1, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
     );
     expect(revertReason).equal("ShB Incorrect message function selector");
   });
 
   it("Should revert on finalizing a withdrawal with wrong batch number", async () => {
-    const l1Receiver = await randomSigner.getAddress();
-    const l2ToL1message = ethers.utils.hexConcat([
-      functionSignature,
-      l1Receiver,
-      erc20TestToken.address,
-      ethers.constants.HashZero,
-    ]);
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(10, 0, 0, l2ToL1message, [])
     );
@@ -189,31 +195,17 @@ describe("Legacy Era tests", function () {
   });
 
   it("Should revert on finalizing a withdrawal with wrong length of proof", async () => {
-    const l1Receiver = await randomSigner.getAddress();
-    const l2ToL1message = ethers.utils.hexConcat([
-      functionSignature,
-      l1Receiver,
-      erc20TestToken.address,
-      ethers.constants.HashZero,
-    ]);
     const revertReason = await getCallRevertReason(
-      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, l2ToL1message, [])
+      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(1, 0, 0, l2ToL1message, [])
     );
     expect(revertReason).equal("xc");
   });
 
   it("Should revert on finalizing a withdrawal with wrong proof", async () => {
-    const l1Receiver = await randomSigner.getAddress();
-    const l2ToL1message = ethers.utils.hexConcat([
-      functionSignature,
-      l1Receiver,
-      erc20TestToken.address,
-      ethers.constants.HashZero,
-    ]);
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge
         .connect(randomSigner)
-        .finalizeWithdrawal(0, 0, 0, l2ToL1message, Array(9).fill(ethers.constants.HashZero))
+        .finalizeWithdrawal(1, 0, 0, l2ToL1message, Array(9).fill(ethers.constants.HashZero))
     );
     expect(revertReason).equal("ShB withd w proof");
   });
@@ -306,7 +298,6 @@ describe("Legacy Era tests", function () {
 
     it("Successful withdrawal", async () => {
       const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
-
       await mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF);
       const balanceAfter = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
       expect(balanceAfter.sub(balanceBefore)).equal(AMOUNT);

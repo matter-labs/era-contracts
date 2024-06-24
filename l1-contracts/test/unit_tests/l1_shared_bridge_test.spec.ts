@@ -1,12 +1,13 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
-import { Interface } from "ethers/lib/utils";
 import * as hardhat from "hardhat";
-import type { L1SharedBridge, Bridgehub, WETH9 } from "../../typechain";
-import { L1SharedBridgeFactory, BridgehubFactory, WETH9Factory, TestnetERC20TokenFactory } from "../../typechain";
+import type { L1SharedBridge, Bridgehub, L1NativeTokenVault } from "../../typechain";
+import { L1SharedBridgeFactory, BridgehubFactory, TestnetERC20TokenFactory } from "../../typechain";
+import { L1NativeTokenVaultFactory } from "../../typechain/L1NativeTokenVaultFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
-import { ADDRESS_ONE, ethTestConfig } from "../../src.ts/utils";
+import { Action, facetCut } from "../../src.ts/diamondCut";
+import { ethTestConfig } from "../../src.ts/utils";
 import type { Deployer } from "../../src.ts/deploy";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
@@ -18,9 +19,8 @@ describe("Shared Bridge tests", () => {
   let deployWallet: Wallet;
   let deployer: Deployer;
   let bridgehub: Bridgehub;
+  let l1NativeTokenVault: L1NativeTokenVault;
   let l1SharedBridge: L1SharedBridge;
-  let l1SharedBridgeInterface: Interface;
-  let l1Weth: WETH9;
   let erc20TestToken: ethers.Contract;
   const functionSignature = "0x6c0960f9";
   const ERC20functionSignature = "0x11a2ccc1";
@@ -46,39 +46,40 @@ describe("Shared Bridge tests", () => {
 
     await owner.sendTransaction(tx);
 
+    const mockExecutorFactory = await hardhat.ethers.getContractFactory("MockExecutorFacet");
+    const mockExecutorContract = await mockExecutorFactory.deploy();
+    const extraFacet = facetCut(mockExecutorContract.address, mockExecutorContract.interface, Action.Add, true);
+
     // note we can use initialTestnetDeploymentProcess so we don't go into deployment details here
-    deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, []);
+    deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [extraFacet]);
 
     chainId = deployer.chainId;
     // prepare the bridge
 
     l1SharedBridge = L1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
-    l1SharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
+    l1NativeTokenVault = L1NativeTokenVaultFactory.connect(
+      deployer.addresses.Bridges.NativeTokenVaultProxy,
+      deployWallet
+    );
 
     const tokens = getTokens();
-    const l1WethTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
-    l1Weth = WETH9Factory.connect(l1WethTokenAddress, owner);
 
     const tokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
     erc20TestToken = TestnetERC20TokenFactory.connect(tokenAddress, owner);
 
     await erc20TestToken.mint(await randomSigner.getAddress(), ethers.utils.parseUnits("10000", 18));
-    await erc20TestToken.connect(randomSigner).approve(l1SharedBridge.address, ethers.utils.parseUnits("10000", 18));
-  });
+    await erc20TestToken
+      .connect(randomSigner)
+      .approve(l1NativeTokenVault.address, ethers.utils.parseUnits("10000", 18));
 
-  it("Check should initialize through governance", async () => {
-    const upgradeCall = l1SharedBridgeInterface.encodeFunctionData("initializeChainGovernance(uint256,address)", [
-      chainId,
-      ADDRESS_ONE,
-    ]);
-    const txHash = await deployer.executeUpgrade(l1SharedBridge.address, 0, upgradeCall);
-
-    expect(txHash).not.equal(ethers.constants.HashZero);
+    await l1NativeTokenVault.registerToken(erc20TestToken.address);
   });
 
   it("Should not allow depositing zero erc20 amount", async () => {
     const mintValue = ethers.utils.parseEther("0.01");
+    await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, mintValue.mul(10))).wait();
+
     const revertReason = await getCallRevertReason(
       bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
         {
@@ -91,8 +92,11 @@ describe("Shared Bridge tests", () => {
           secondBridgeAddress: l1SharedBridge.address,
           secondBridgeValue: 0,
           secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
-            ["address", "uint256", "address"],
-            [erc20TestToken.address, 0, await randomSigner.getAddress()]
+            ["bytes32", "bytes"],
+            [
+              await l1NativeTokenVault.getAssetId(erc20TestToken.address),
+              new ethers.utils.AbiCoder().encode(["uint256", "address"], [0, await randomSigner.getAddress()]),
+            ]
           ),
         },
         { value: mintValue }
@@ -104,9 +108,51 @@ describe("Shared Bridge tests", () => {
   it("Should deposit successfully", async () => {
     const amount = ethers.utils.parseEther("1");
     const mintValue = ethers.utils.parseEther("2");
-    await l1Weth.connect(randomSigner).deposit({ value: amount });
-    await (await l1Weth.connect(randomSigner).approve(l1SharedBridge.address, amount)).wait();
-    bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
+
+    await erc20TestToken.connect(randomSigner).mint(await randomSigner.getAddress(), amount.mul(10));
+
+    const balanceBefore = await erc20TestToken.balanceOf(await randomSigner.getAddress());
+    const balanceNTVBefore = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
+
+    const assetId = await l1NativeTokenVault.getAssetId(erc20TestToken.address);
+    await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, amount.mul(10))).wait();
+    await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
+      {
+        chainId,
+        mintValue,
+        l2Value: amount,
+        l2GasLimit: 1000000,
+        l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+        refundRecipient: ethers.constants.AddressZero,
+        secondBridgeAddress: l1SharedBridge.address,
+        secondBridgeValue: 0,
+        secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
+          ["bytes32", "bytes"],
+          [
+            assetId,
+            new ethers.utils.AbiCoder().encode(["uint256", "address"], [amount, await randomSigner.getAddress()]),
+          ]
+        ),
+      },
+      { value: mintValue }
+    );
+    const balanceAfter = await erc20TestToken.balanceOf(await randomSigner.getAddress());
+    expect(balanceAfter).equal(balanceBefore.sub(amount));
+    const balanceNTVAfter = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
+    expect(balanceNTVAfter).equal(balanceNTVBefore.add(amount));
+  });
+
+  it("Should deposit successfully legacy encoding", async () => {
+    const amount = ethers.utils.parseEther("1");
+    const mintValue = ethers.utils.parseEther("2");
+
+    await erc20TestToken.connect(randomSigner).mint(await randomSigner.getAddress(), amount.mul(10));
+
+    const balanceBefore = await erc20TestToken.balanceOf(await randomSigner.getAddress());
+    const balanceNTVBefore = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
+
+    await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, amount.mul(10))).wait();
+    await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
       {
         chainId,
         mintValue,
@@ -118,11 +164,15 @@ describe("Shared Bridge tests", () => {
         secondBridgeValue: 0,
         secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
           ["address", "uint256", "address"],
-          [l1Weth.address, amount, await randomSigner.getAddress()]
+          [erc20TestToken.address, amount, await randomSigner.getAddress()]
         ),
       },
       { value: mintValue }
     );
+    const balanceAfter = await erc20TestToken.balanceOf(await randomSigner.getAddress());
+    expect(balanceAfter).equal(balanceBefore.sub(amount));
+    const balanceNTVAfter = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
+    expect(balanceNTVAfter).equal(balanceNTVBefore.add(amount));
   });
 
   it("Should revert on finalizing a withdrawal with short message length", async () => {
@@ -141,11 +191,11 @@ describe("Shared Bridge tests", () => {
           0,
           0,
           0,
-          ethers.utils.hexConcat([ERC20functionSignature, l1SharedBridge.address, ethers.utils.randomBytes(72 + 4)]),
+          ethers.utils.hexConcat([ERC20functionSignature, l1SharedBridge.address, ethers.utils.randomBytes(72)]),
           [ethers.constants.HashZero]
         )
     );
-    expect(revertReason).equal("ShB wrong msg len 2");
+    expect(revertReason).equal("ShB withd w proof");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {
@@ -153,30 +203,6 @@ describe("Shared Bridge tests", () => {
       l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
     );
     expect(revertReason).equal("ShB Incorrect message function selector");
-  });
-
-  it("Should deposit erc20 token successfully", async () => {
-    const amount = ethers.utils.parseEther("0.001");
-    const mintValue = ethers.utils.parseEther("0.002");
-    await l1Weth.connect(randomSigner).deposit({ value: amount });
-    await (await l1Weth.connect(randomSigner).approve(l1SharedBridge.address, amount)).wait();
-    bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
-      {
-        chainId,
-        mintValue,
-        l2Value: amount,
-        l2GasLimit: 1000000,
-        l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-        refundRecipient: ethers.constants.AddressZero,
-        secondBridgeAddress: l1SharedBridge.address,
-        secondBridgeValue: 0,
-        secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
-          ["address", "uint256", "address"],
-          [l1Weth.address, amount, await randomSigner.getAddress()]
-        ),
-      },
-      { value: mintValue }
-    );
   });
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {

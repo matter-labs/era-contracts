@@ -137,8 +137,12 @@ describe("Custom base token chain and bridge tests", () => {
       secondBridgeAddress: l1SharedBridge.address,
       secondBridgeValue: 0,
       secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
-        ["address", "uint256", "address"],
-        [altTokenAddress, altTokenAmount, await randomSigner.getAddress()]
+        ["bytes32", "bytes", "address"],
+        [
+          ethers.utils.hexZeroPad(altTokenAddress, 32),
+          new ethers.utils.AbiCoder().encode(["uint256"], [altTokenAmount]),
+          await randomSigner.getAddress(),
+        ]
       ),
     });
   });

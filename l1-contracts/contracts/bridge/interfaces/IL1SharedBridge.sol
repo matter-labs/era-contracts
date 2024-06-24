@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
+import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
@@ -15,7 +16,7 @@ interface IL1SharedBridge {
         bytes32 indexed l2DepositTxHash,
         address indexed from,
         address to,
-        address l1Token,
+        address l1Asset,
         uint256 amount
     );
 
@@ -23,17 +24,18 @@ interface IL1SharedBridge {
         uint256 indexed chainId,
         bytes32 indexed txDataHash,
         address indexed from,
-        address to,
-        address l1Token,
-        uint256 amount
+        bytes32 assetId,
+        bytes bridgeMintCalldata
     );
 
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,
         address indexed from,
-        address l1Token,
+        bytes32 assetId,
         uint256 amount
     );
+
+    event BridgehubMintData(bytes bridgeMintData);
 
     event BridgehubDepositFinalized(
         uint256 indexed chainId,
@@ -44,16 +46,25 @@ interface IL1SharedBridge {
     event WithdrawalFinalizedSharedBridge(
         uint256 indexed chainId,
         address indexed to,
-        address indexed l1Token,
+        bytes32 indexed assetId,
         uint256 amount
     );
 
     event ClaimedFailedDepositSharedBridge(
         uint256 indexed chainId,
         address indexed to,
-        address indexed l1Token,
-        uint256 amount
+        bytes32 indexed assetId,
+        bytes32 assetDataHash
     );
+
+    event AssetHandlerRegisteredInitial(
+        bytes32 indexed assetId,
+        address indexed assetHandlerAddress,
+        bytes32 indexed additionalData,
+        address sender
+    );
+
+    event AssetHandlerRegistered(bytes32 indexed assetId, address indexed assetHandlerAddress);
 
     function isWithdrawalFinalized(
         uint256 _chainId,
@@ -111,15 +122,6 @@ interface IL1SharedBridge {
         bytes32[] calldata _merkleProof
     ) external;
 
-    function setEraPostDiamondUpgradeFirstBatch(uint256 _eraPostDiamondUpgradeFirstBatch) external;
-
-    function setEraPostLegacyBridgeUpgradeFirstBatch(uint256 _eraPostLegacyBridgeUpgradeFirstBatch) external;
-
-    function setEraLegacyBridgeLastDepositTime(
-        uint256 _eraLegacyBridgeLastDepositBatch,
-        uint256 _eraLegacyBridgeLastDepositTxNumber
-    ) external;
-
     function L1_WETH_TOKEN() external view returns (address);
 
     function BRIDGE_HUB() external view returns (IBridgehub);
@@ -143,12 +145,44 @@ interface IL1SharedBridge {
 
     function bridgehubDepositBaseToken(
         uint256 _chainId,
+        bytes32 _assetId,
         address _prevMsgSender,
-        address _l1Token,
         uint256 _amount
     ) external payable;
 
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 
-    function receiveEth(uint256 _chainId) external payable;
+    function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external;
+
+    function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
+
+    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external;
+
+    function setAssetHandlerAddressOnCounterPart(
+        uint256 _chainId,
+        uint256 _mintValue,
+        uint256 _l2TxGasLimit,
+        uint256 _l2TxGasPerPubdataByte,
+        address _refundRecipient,
+        bytes32 _assetId,
+        address _assetAddressOnCounterPart
+    ) external payable returns (bytes32 l2TxHash);
+
+    function assetHandlerAddress(bytes32 _assetId) external view returns (address);
+
+    function nativeTokenVault() external view returns (IL1NativeTokenVault);
+
+    function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external;
+
+    function bridgeRecoverFailedTransfer(
+        uint256 _chainId,
+        address _depositSender,
+        bytes32 _assetId,
+        bytes calldata _tokenData,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external;
 }

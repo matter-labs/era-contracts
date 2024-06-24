@@ -2,12 +2,12 @@
 
 pragma solidity 0.8.20;
 
-import {IL1Messenger, L2ToL1Log, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE, STATE_DIFF_COMPRESSION_VERSION_NUMBER} from "./interfaces/IL1Messenger.sol";
+import {IL1Messenger, L2ToL1Log, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE} from "./interfaces/IL1Messenger.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, STATE_DIFF_ENTRY_SIZE, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER, COMPUTATIONAL_PRICE_FOR_PUBDATA} from "./Constants.sol";
+import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, COMPUTATIONAL_PRICE_FOR_PUBDATA} from "./Constants.sol";
 import {ReconstructionMismatch, PubdataField} from "./SystemContractErrors.sol";
 import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
 
@@ -238,14 +238,14 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         bytes32 l2ToL1LogsTreeRoot = l2ToL1LogsTreeArray[0];
 
         // FIXME; this is inefficient and leads to copying the entire array of uncompressed state diffs
-        // Better to use efficent call
-        bytes32 l2DAValidatorOutputhash = IL2DAValidator(_l2DAValidator).validatePubdata(
-            chainedLogsHash,
-            l2ToL1LogsTreeRoot,
-            chainedMessagesHash,
-            chainedL1BytecodesRevealDataHash,
-            _totalL2ToL1PubdataAndStateDiffs
-        );
+        // Better to use efficient call
+        bytes32 l2DAValidatorOutputhash = IL2DAValidator(_l2DAValidator).validatePubdata({
+            _chainedLogsHash: chainedLogsHash,
+            _logsRootHash: l2ToL1LogsTreeRoot,
+            _chainedMessagesHash: chainedMessagesHash,
+            _chainedBytescodesHash: chainedL1BytecodesRevealDataHash,
+            _operatorInput: _totalL2ToL1PubdataAndStateDiffs
+        });
 
         /// Native (VM) L2 to L1 log
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), l2ToL1LogsTreeRoot);
