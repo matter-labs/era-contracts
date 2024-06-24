@@ -10,7 +10,7 @@ import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_GAS_PER_TRANSACTION, HyperchainCommitment, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
-import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
+import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 // import {IComplexUpgrader} from "../../l2-deps/IComplexUpgrader.sol";
@@ -31,7 +31,7 @@ import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBas
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
-    using PriorityQueue for PriorityQueue.Queue;
+    using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "AdminFacet";
@@ -294,15 +294,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
             s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];
         }
 
-        // Currently only zero length is allowed.
-        uint256 pqHead = _commitment.priorityQueueHead;
-        s.priorityQueue.head = pqHead;
-        s.priorityQueue.tail = pqHead + _commitment.priorityQueueTxs.length;
-
-        length = _commitment.priorityQueueTxs.length;
-        for (uint256 i = 0; i < length; ++i) {
-            s.priorityQueue.data[pqHead + i] = _commitment.priorityQueueTxs[i];
-        }
+        s.priorityTree.initFromCommitment(_commitment.priorityTree);
 
         s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
         s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
@@ -319,26 +311,14 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
     // todo make internal. For now useful for testing
     function _prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {
+        require(s.priorityTree.unprocessedIndex > 0, "PQ not ready");
+
         commitment.totalBatchesCommitted = s.totalBatchesCommitted;
         commitment.totalBatchesVerified = s.totalBatchesVerified;
         commitment.totalBatchesExecuted = s.totalBatchesExecuted;
-
-        uint256 pqHead = s.priorityQueue.head;
-        commitment.priorityQueueHead = pqHead;
-
-        uint256 pqLength = s.priorityQueue.tail - pqHead;
-        // FIXME: this will be removed once we support the migration of any priority queue size.
-        require(pqLength <= 50, "Migration is only allowed with empty priority queue 2");
-
-        PriorityOperation[] memory priorityQueueTxs = new PriorityOperation[](pqLength);
-
-        for (uint256 i = pqHead; i < s.priorityQueue.tail; ++i) {
-            priorityQueueTxs[i] = s.priorityQueue.data[i];
-        }
-        commitment.priorityQueueTxs = priorityQueueTxs;
-
         commitment.l2SystemContractsUpgradeBatchNumber = s.l2SystemContractsUpgradeBatchNumber;
         commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
+        commitment.priorityTree = s.priorityTree.getCommitment();
 
         // just in case
         require(

@@ -5,7 +5,9 @@ pragma solidity ^0.8.0;
 // solhint-disable gas-custom-errors
 
 import {DynamicIncrementalMerkle} from "../../common/libraries/openzeppelin/IncrementalMerkle.sol";
+import {Hashes} from "../../common/libraries/openzeppelin/Hashes.sol";
 import {Merkle} from "../../common/libraries/Merkle.sol";
+import {PriorityTreeCommitment} from "../../common/Config.sol";
 
 struct PriorityOpsBatchInfo {
     bytes32[] leftPath;
@@ -66,5 +68,30 @@ library PriorityTree {
             require(_tree.historicalRoots[expectedRoot], "PT: root mismatch");
             _tree.unprocessedIndex += _priorityOpsData.itemHashes.length;
         }
+    }
+
+    function initFromCommitment(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal {
+        uint256 height = _commitment.sides.length;
+        _tree.startIndex = _commitment.startIndex;
+        _tree.unprocessedIndex = _commitment.unprocessedIndex;
+        _tree.tree._nextLeafIndex = _commitment.nextLeafIndex;
+        _tree.tree._sides = _commitment.sides;
+        _tree.tree._height = height;
+        _tree.tree._fnHash = Hashes.Keccak256;
+        bytes32 zero = keccak256("");
+        for (uint256 i; i < height; ++i) {
+            _tree.tree._zeros.push(zero);
+            zero = Hashes.Keccak256(zero, zero);
+        }
+        if (height > 0) {
+            _tree.historicalRoots[_tree.tree.root()] = true;
+        }
+    }
+
+    function getCommitment(Tree storage _tree) internal view returns (PriorityTreeCommitment memory commitment) {
+        commitment.nextLeafIndex = _tree.tree._nextLeafIndex;
+        commitment.startIndex = _tree.startIndex;
+        commitment.unprocessedIndex = _tree.unprocessedIndex;
+        commitment.sides = _tree.tree._sides;
     }
 }
