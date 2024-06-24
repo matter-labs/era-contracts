@@ -1,3 +1,0 @@
-ds-test/=../lib/forge-std/lib/ds-test/src/
-murky/=../lib/murky/src/
-foundry-test/=test/foundry/
