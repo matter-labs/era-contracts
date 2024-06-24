@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
-import {PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
+import {PubdataPricingMode, FeeParams} from "../chain-deps/ZkSyncHyperchainStorage.sol";
 import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
 
 /// @title The interface of the Getters Contract that implements functions for getting contract state from outside the blockchain.
@@ -117,6 +117,9 @@ interface IGetters is IZkSyncHyperchainBase {
 
     /// @return the baseTokenGasPriceMultiplierDenominator, used to compare the baseTokenPrice to ether for L1->L2 transactions
     function baseTokenGasPriceMultiplierDenominator() external view returns (uint128);
+
+    /// @return The L2 fee parameters
+    function getFeeParams() external view returns (FeeParams memory);
 
     /*//////////////////////////////////////////////////////////////
                             DIAMOND LOUPE
