@@ -5,7 +5,6 @@ pragma solidity 0.8.20;
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";

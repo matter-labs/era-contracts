@@ -1,24 +1,14 @@
 import { Command } from "commander";
 import type { BigNumberish } from "ethers";
-import { ethers, Wallet } from "ethers";
-import { formatUnits, Interface, parseUnits, defaultAbiCoder } from "ethers/lib/utils";
-import {
-  computeL2Create2Address,
-  create2DeployFromL1,
-  provider,
-  priorityTxMaxGasLimit,
-  hashL2Bytecode,
-  applyL1ToL2Alias,
-  publishBytecodeFromL1,
-  requestL2TransactionDirect,
-} from "./utils";
+import { Wallet } from "ethers";
+import { formatUnits, parseUnits } from "ethers/lib/utils";
+import { provider, publishBytecodeFromL1 } from "./utils";
 
 import { ethTestConfig } from "./deploy-utils";
 
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import * as hre from "hardhat";
-import { L2NativeTokenVaultFactory } from "../typechain/L2NativeTokenVaultFactory";
 
 export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2SharedBridge").abi;
 export const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;

@@ -29,7 +29,7 @@ function getZksolcUrl(): string {
 
 // These are L2/ETH networks defined by environment in `dev.env` of zksync-era default development environment
 // const DEFAULT_L2_NETWORK = "http://127.0.0.1:3050";
-const DEFAULT_ETH_NETWORK = "http://127.0.0.1:8545";
+// const DEFAULT_ETH_NETWORK = "http://127.0.0.1:8545";
 
 const zkSyncBaseNetworkEnv =
   process.env.CONTRACTS_BASE_NETWORK_ZKSYNC === "true"

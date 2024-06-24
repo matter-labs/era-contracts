@@ -4,18 +4,15 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
-import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
+// import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 // import {PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {SemVer} from "../../../common/libraries/SemVer.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -24,7 +21,7 @@ import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBas
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
-    using PriorityQueue for PriorityQueue.Queue;
+    // using PriorityQueue for PriorityQueue.Queue;
 
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "AdminFacet";

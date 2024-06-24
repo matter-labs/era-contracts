@@ -5,8 +5,8 @@ import type { BigNumberish, providers, Signer, Wallet, Contract } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
 import type { Wallet as ZkWallet } from "zksync-ethers";
-import { Provider as ZkProvider } from "zksync-ethers";
-import { Deployer as ZkDeployer } from "@matterlabs/hardhat-zksync-deploy";
+// import { Provider as ZkProvider } from "zksync-ethers";
+// import { Deployer as ZkDeployer } from "@matterlabs/hardhat-zksync-deploy";
 
 import type { DeployedAddresses } from "./deploy-utils";
 import { deployedAddressesFromEnv, deployBytecodeViaCreate2, deployViaCreate2 } from "./deploy-utils";
@@ -16,8 +16,8 @@ import {
   readSystemContractsBytecode,
   unpackStringSemVer,
   SYSTEM_CONFIG,
-  web3Provider,
-  web3Url,
+  // web3Provider,
+  // web3Url,
 } from "../scripts/utils";
 import { getTokens } from "./deploy-token";
 import {
@@ -58,7 +58,7 @@ import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFact
 
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
 
-const provider = web3Provider();
+// const provider = web3Provider();
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -166,14 +166,14 @@ export class Deployer {
     const bridgehubDeployment = {
       bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(bridgehubZKBytecode)),
       newAddress: L2_BRIDGEHUB_ADDRESS,
-      callConstrucor: true,
+      callConstructor: true,
       value: 0,
       input: "0x",
     };
     const messageRootDeployment = {
       bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(messageRootZKBytecode)),
       newAddress: L2_MESSAGE_ROOT_ADDRESS,
-      callConstrucor: true,
+      callConstructor: true,
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(["address"], [L2_BRIDGEHUB_ADDRESS]),
     };
@@ -181,7 +181,7 @@ export class Deployer {
     const assetRouterDeployment = {
       bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(assetRouterZKBytecode)),
       newAddress: L2_ASSET_ROUTER_ADDRESS,
-      callConstrucor: true,
+      callConstructor: true,
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(
         ["uint256", "uint256", "address"],
@@ -191,7 +191,7 @@ export class Deployer {
     const ntvDeployment = {
       bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(nativeTokenVaultZKBytecode)),
       newAddress: L2_NATIVE_TOKEN_VAULT_ADDRESS,
-      callConstrucor: true,
+      callConstructor: true,
       value: 0,
       input: "0x",
     };

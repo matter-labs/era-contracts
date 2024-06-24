@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import "./bridge/interfaces/IL2AssetRouter.sol";
-import "./bridge/interfaces/IL2NativeTokenVault.sol";
+import {IL2AssetRouter} from "./bridge/interfaces/IL2AssetRouter.sol";
+import {IL2NativeTokenVault} from "./bridge/interfaces/IL2NativeTokenVault.sol";
 
 /**
  * @author Matter Labs

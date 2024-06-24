@@ -19,7 +19,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/acces
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+// import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 /// @title State Transition Manager contract
 /// @author Matter Labs
