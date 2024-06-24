@@ -52,19 +52,17 @@ library Merkle {
         bytes32[] calldata _itemHashes
     ) internal pure returns (bytes32) {
         uint256 pathLength = _startPath.length;
-
         require(pathLength == _endPath.length, "Merkle: path length mismatch");
         require(pathLength > 0, "Merkle: empty paths");
         require(pathLength < 256, "Merkle: path too long");
-
         uint256 levelLen = _itemHashes.length;
-
         require(_startIndex + levelLen <= (1 << pathLength), "Merkle: index/height mismatch");
-
         bytes32[] memory itemHashes = _itemHashes;
 
         for (uint256 level; level < pathLength; level = level.uncheckedInc()) {
             uint256 parity = _startIndex % 2;
+            // We get an extra element on the next level if on the current level elements either
+            // start on an odd index (`parity == 1`) or end on an even index (`levelLen % 2 == 1`)
             uint256 nextLevelLen = levelLen / 2 + (parity | (levelLen % 2));
             for (uint256 i; i < nextLevelLen; i = i.uncheckedInc()) {
                 bytes32 lhs = (i == 0 && parity == 1) ? _startPath[level] : itemHashes[2 * i - parity];

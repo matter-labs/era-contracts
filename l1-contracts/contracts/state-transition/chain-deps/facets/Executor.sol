@@ -348,20 +348,27 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         return hash;
     }
 
-    /// @dev Executes one batch
-    /// @dev 1. Processes all pending operations (Complete priority requests)
-    /// @dev 2. Finalizes batch on Ethereum
-    /// @dev _executedBatchIdx is an index in the array of the batches that we want to execute together
-    function _executeOneBatch(StoredBatchInfo memory _storedBatch, uint256 _executedBatchIdx) internal {
+    function _checkBatchData(
+        StoredBatchInfo memory _storedBatch,
+        uint256 _executedBatchIdx,
+        bytes32 _priorityOperationsHash
+    ) internal view {
         uint256 currentBatchNumber = _storedBatch.batchNumber;
         require(currentBatchNumber == s.totalBatchesExecuted + _executedBatchIdx + 1, "k"); // Execute batches in order
         require(
             _hashStoredBatchInfo(_storedBatch) == s.storedBatchHashes[currentBatchNumber],
             "exe10" // executing batch should be committed
         );
+        require(_priorityOperationsHash == _storedBatch.priorityOperationsHash, "x"); // priority operations hash does not match with expected
+    }
 
+    /// @dev Executes one batch
+    /// @dev 1. Processes all pending operations (Complete priority requests)
+    /// @dev 2. Finalizes batch on Ethereum
+    /// @dev _executedBatchIdx is an index in the array of the batches that we want to execute together
+    function _executeOneBatch(StoredBatchInfo memory _storedBatch, uint256 _executedBatchIdx) internal {
         bytes32 priorityOperationsHash = _collectOperationsFromPriorityQueue(_storedBatch.numberOfLayer1Txs);
-        require(priorityOperationsHash == _storedBatch.priorityOperationsHash, "x"); // priority operations hash does not match to expected
+        _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash);
 
         uint256 firstUnprocessed = s.priorityQueue.getFirstUnprocessedPriorityTx();
         uint256 treeStartIndex = s.priorityTree.startIndex;
@@ -370,7 +377,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         }
 
         // Save root hash of L2 -> L1 logs tree
-        s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
+        s.l2LogsRootHashes[_storedBatch.batchNumber] = _storedBatch.l2LogsTreeRoot;
         // IBridgehub bridgehub = IBridgehub(s.bridgehub);
         // bridgehub.messageRoot().addChainBatchRoot(
         //     s.chainId,
@@ -384,20 +391,13 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         PriorityOpsBatchInfo calldata _priorityOpsData,
         uint256 _executedBatchIdx
     ) internal {
-        uint256 currentBatchNumber = _storedBatch.batchNumber;
-        require(currentBatchNumber == s.totalBatchesExecuted + _executedBatchIdx + 1, "k"); // Execute batches in order
-        require(
-            _hashStoredBatchInfo(_storedBatch) == s.storedBatchHashes[currentBatchNumber],
-            "exe10" // executing batch should be committed
-        );
         require(_priorityOpsData.itemHashes.length == _storedBatch.numberOfLayer1Txs, "zxc");
-
         bytes32 priorityOperationsHash = _rollingHash(_priorityOpsData.itemHashes);
-        require(priorityOperationsHash == _storedBatch.priorityOperationsHash, "x");
+        _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash);
         s.priorityTree.processBatch(_priorityOpsData);
 
         // Save root hash of L2 -> L1 logs tree
-        s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
+        s.l2LogsRootHashes[_storedBatch.batchNumber] = _storedBatch.l2LogsTreeRoot;
     }
 
     function executeBatchesSharedBridge(
@@ -424,6 +424,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
             if (s.priorityTree.startIndex <= s.priorityQueue.getFirstUnprocessedPriorityTx()) {
+                // solhint-disable-next-line gas-increment-by-one
                 _executeOneBatch(_batchesData[i], _priorityOpsData[dataIndex++], i);
             } else {
                 _executeOneBatch(_batchesData[i], i);
