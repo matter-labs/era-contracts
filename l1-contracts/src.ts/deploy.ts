@@ -4,7 +4,8 @@ import "@nomiclabs/hardhat-ethers";
 import type { BigNumberish, providers, Signer, Wallet, Contract } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
-import { Wallet as ZkWallet, Provider as ZkProvider } from "zksync-ethers";
+import type { Wallet as ZkWallet } from "zksync-ethers";
+import { Provider as ZkProvider } from "zksync-ethers";
 import { Deployer as ZkDeployer } from "@matterlabs/hardhat-zksync-deploy";
 
 import type { DeployedAddresses } from "./deploy-utils";
