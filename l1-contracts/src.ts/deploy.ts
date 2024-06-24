@@ -156,17 +156,14 @@ export class Deployer {
 
   public async genesisForceDeploymentsData() {
     let bridgehubZKBytecode = ethers.constants.HashZero;
-    let messageRootZKBytecode = ethers.constants.HashZero; 
+    let messageRootZKBytecode = ethers.constants.HashZero;
     let assetRouterZKBytecode = ethers.constants.HashZero;
-    let nativeTokenVaultZKBytecode = ethers.constants.HashZero; 
+    let nativeTokenVaultZKBytecode = ethers.constants.HashZero;
     if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
       bridgehubZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "Bridgehub");
       messageRootZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "MessageRoot");
       assetRouterZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2AssetRouter");
-      nativeTokenVaultZKBytecode = readBytecode(
-        "../l2-contracts/artifacts-zk/contracts/bridge",
-        "L2NativeTokenVault"
-      );
+      nativeTokenVaultZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2NativeTokenVault");
     }
 
     const bridgehubDeployment = {
