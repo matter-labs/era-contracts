@@ -184,7 +184,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     function transferTokenToNTV(address _token) external {
         require(msg.sender == address(nativeTokenVault), "ShB: not NTV");
         uint256 amount = IERC20(_token).balanceOf(address(this));
-        IERC20(_token).safeTransfer(address(nativeTokenVault), amount);
+        IERC20(_token).safeTransferFrom(address(this), address(nativeTokenVault), amount);
     }
 
     /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
