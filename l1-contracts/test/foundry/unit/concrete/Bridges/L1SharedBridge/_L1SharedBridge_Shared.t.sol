@@ -65,6 +65,7 @@ contract L1SharedBridgeTest is Test {
 
     L1SharedBridge sharedBridgeImpl;
     L1SharedBridge sharedBridge;
+    L1NativeTokenVault nativeTokenVaultImpl;
     L1NativeTokenVault nativeTokenVault;
     address bridgehubAddress;
     address l1ERC20BridgeAddress;
@@ -81,9 +82,13 @@ contract L1SharedBridgeTest is Test {
     address bob;
     uint256 chainId;
     uint256 amount = 100;
+    uint256 mintValue = 1;
     bytes32 txHash;
+    uint256 gas = 1_000_000;
+    uint256 maxGas = 30_000_000;
 
     uint256 eraChainId;
+    uint256 randomChainId;
     address eraDiamondProxy;
     address eraErc20BridgeAddress;
 
@@ -119,6 +124,7 @@ contract L1SharedBridgeTest is Test {
 
         chainId = 1;
         eraChainId = 9;
+        randomChainId = 999;
         eraDiamondProxy = makeAddr("eraDiamondProxy");
         eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
 
@@ -135,11 +141,17 @@ contract L1SharedBridgeTest is Test {
             abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner, 1, 1, 1, 0)
         );
         sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
-        nativeTokenVault = new L1NativeTokenVault({
+        nativeTokenVaultImpl = new L1NativeTokenVault({
             _l1WethAddress: l1WethAddress,
             _l1SharedBridge: IL1SharedBridge(address(sharedBridge)),
             _eraChainId: eraChainId
         });
+        TransparentUpgradeableProxy nativeTokenVaultProxy = new TransparentUpgradeableProxy(
+            address(nativeTokenVaultImpl),
+            admin,
+            abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner)
+        );
+        nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
         vm.prank(owner);
         sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
         tokenAssetId = nativeTokenVault.getAssetId(address(token));
@@ -176,6 +188,11 @@ contract L1SharedBridgeTest is Test {
             abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector, chainId),
             abi.encode(ETH_TOKEN_ASSET_ID)
         );
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.requestL2TransactionDirect.selector),
+            abi.encode(txHash)
+        );
         // vm.mockCall(
         //     address(bridgehubAddress),
         //     abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector, address(token)),
@@ -188,6 +205,8 @@ contract L1SharedBridgeTest is Test {
         _setNativeTokenVaultChainBalance(chainId, address(token), 1000 * amount);
         _setNativeTokenVaultChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
         // console.log("chainBalance %s, %s", address(token), nativeTokenVault.chainBalance(chainId, address(token)));
+        _setSharedBridgeChainBalance(chainId, address(token), amount);
+        _setSharedBridgeChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
 
         vm.deal(bridgehubAddress, amount);
         vm.deal(address(sharedBridge), amount);
@@ -228,6 +247,15 @@ contract L1SharedBridgeTest is Test {
         stdstore
             .target(address(nativeTokenVault))
             .sig(nativeTokenVault.chainBalance.selector)
+            .with_key(_chainId)
+            .with_key(_token)
+            .checked_write(_value);
+    }
+
+    function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
+        stdstore
+            .target(address(sharedBridge))
+            .sig(sharedBridge.chainBalance.selector)
             .with_key(_chainId)
             .with_key(_token)
             .checked_write(_value);

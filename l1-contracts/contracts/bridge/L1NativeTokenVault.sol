@@ -50,6 +50,10 @@ contract L1NativeTokenVault is
     /// NOTE: this function may be removed in the future, don't rely on it!
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 
+    /// @dev Maps token balances for each chain to verify that chain balance was migrated from shared bridge.
+    /// This serves only for migration purposes.
+    mapping(uint256 chainId => mapping(address l1Token => bool migrated)) public chainBalanceMigrated;
+
     /// @dev A mapping assetId => tokenAddress
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
@@ -62,6 +66,12 @@ contract L1NativeTokenVault is
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyOwnerOrBridge() {
         require((msg.sender == address(L1_SHARED_BRIDGE) || (msg.sender == owner())), "NTV not ShB or o");
+        _;
+    }
+
+    /// @notice Checks that the message sender is the shared bridge itself.
+    modifier onlySelf() {
+        require(msg.sender == address(this), "NTV only");
         _;
     }
 
@@ -84,6 +94,64 @@ contract L1NativeTokenVault is
     function initialize(address _owner) external reentrancyGuardInitializer initializer {
         require(_owner != address(0), "NTV owner 0");
         _transferOwnership(_owner);
+    }
+
+    /// @dev Accepts ether only from the Shared Bridge.
+    receive() external payable {
+        require(address(L1_SHARED_BRIDGE) == msg.sender, "NTV: ETH only accepted from Shared Bridge");
+    }
+
+    /// @dev Transfer tokens from shared bridge as part of migration process.
+    /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
+    function transferFundsFromSharedBridge(address _token) external onlySelf {
+        if (_token == ETH_TOKEN_ADDRESS) {
+            uint256 balanceBefore = address(this).balance;
+            L1_SHARED_BRIDGE.transferEthToNTV();
+            uint256 balanceAfter = address(this).balance;
+            require(balanceAfter > balanceBefore, "NTV: 0 eth transferred");
+        } else {
+            uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
+            uint256 sharedBridgeChainBalance = IERC20(_token).balanceOf(address(L1_SHARED_BRIDGE));
+            require(sharedBridgeChainBalance > 0, "NTV: 0 amount to transfer");
+            L1_SHARED_BRIDGE.transferTokenToNTV(_token);
+            uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
+            require(balanceAfter - balanceBefore >= sharedBridgeChainBalance, "NTV: wrong amount transferred");
+        }
+    }
+
+    /// @dev Set chain token balance as part of migration process.
+    /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
+    /// @param _targetChainId The chain ID of the corresponding hyperchain.
+    function transferBalancesFromSharedBridge(address _token, uint256 _targetChainId) external onlySelf {
+        require(
+            chainBalanceMigrated[_targetChainId][_token] == false,
+            "NTV: chain balance for the token already migrated"
+        );
+        uint256 sharedBridgeChainBalance = L1_SHARED_BRIDGE.chainBalance(_targetChainId, _token);
+        chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + sharedBridgeChainBalance;
+        chainBalanceMigrated[_targetChainId][_token] = true;
+    }
+
+    /// @dev Transfer tokens from shared bridge as part of migration process.
+    /// @dev Unlike `transferFundsFromSharedBridge` is provides a concrete limit on the gas used for the transfer and even if it will fail, it will not revert the whole transaction.
+    function safeTransferFundsFromSharedBridge(address _token, uint256 _gasPerToken) external {
+        try this.transferFundsFromSharedBridge{gas: _gasPerToken}(_token) {} catch {
+            // A reasonable amount of gas will be provided to transfer the token.
+            // If the transfer fails, we don't want to revert the whole transaction.
+        }
+    }
+
+    /// @dev Set chain token balance as part of migration process.
+    /// @dev Unlike `transferBalancesFromSharedBridge` is provides a concrete limit on the gas used for the transfer and even if it will fail, it will not revert the whole transaction.
+    function safeTransferBalancesFromSharedBridge(
+        address _token,
+        uint256 _targetChainId,
+        uint256 _gasPerToken
+    ) external {
+        try this.transferBalancesFromSharedBridge{gas: _gasPerToken}(_token, _targetChainId) {} catch {
+            // A reasonable amount of gas will be provided to transfer the token.
+            // If the transfer fails, we don't want to revert the whole transaction.
+        }
     }
 
     /// @dev We want to be able to bridge native tokens automatically, this means registering them on the fly
@@ -196,7 +264,7 @@ contract L1NativeTokenVault is
             assembly {
                 callSuccess := call(gas(), _l1Receiver, amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "NTV: withdraw failed");
+            require(callSuccess, "NTV: withdrawal failed, no funds or cannot transfer to receiver");
         } else {
             // Withdraw funds
             IERC20(l1Token).safeTransfer(_l1Receiver, amount);
@@ -222,7 +290,7 @@ contract L1NativeTokenVault is
             assembly {
                 callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "NTV: claimFailedDeposit failed");
+            require(callSuccess, "NTV: claimFailedDeposit failed, no funds or cannot transfer to receiver");
         } else {
             IERC20(l1Token).safeTransfer(_depositSender, _amount);
             // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.

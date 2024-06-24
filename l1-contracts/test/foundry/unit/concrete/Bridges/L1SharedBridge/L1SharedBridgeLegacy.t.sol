@@ -100,8 +100,9 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         // solhint-disable-next-line func-named-parameters
         bytes memory message = abi.encodePacked(
             IL1ERC20Bridge.finalizeWithdrawal.selector,
-            tokenAssetId,
-            abi.encode(amount, alice)
+            alice,
+            address(token),
+            amount
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,

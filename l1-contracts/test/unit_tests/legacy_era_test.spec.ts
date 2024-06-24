@@ -130,9 +130,9 @@ describe("Legacy Era tests", function () {
     const l1Receiver = await randomSigner.getAddress();
     l2ToL1message = ethers.utils.hexConcat([
       functionSignature,
-      "0x".concat(l1Receiver.slice(2).padStart(64, "0")),
-      "0x".concat(ethers.utils.parseUnits("800", 18).toHexString().slice(2).padStart(64, "0")),
-      "0x".concat(erc20TestToken.address.slice(2).padStart(64, "0")),
+      l1Receiver,
+      erc20TestToken.address,
+      ethers.constants.HashZero,
     ]);
   });
 
