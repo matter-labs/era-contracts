@@ -526,7 +526,7 @@ for { } true { } {
         offset, sp := popStackItem(sp)
 
         checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
-        let expansionGas := expandMemory(offset) // TODO: add +32 here
+        let expansionGas := expandMemory(add(offset, 32))
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
         checkOverflow(offset,MEM_OFFSET_INNER(), evmGasLeft)
@@ -542,7 +542,7 @@ for { } true { } {
         value, sp := popStackItem(sp)
 
         checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
-        let expansionGas := expandMemory(offset) // TODO: add +32 here
+        let expansionGas := expandMemory(add(offset, 32))
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
         checkOverflow(offset,MEM_OFFSET_INNER(), evmGasLeft)
@@ -557,7 +557,7 @@ for { } true { } {
         value, sp := popStackItem(sp)
 
         checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
-        let expansionGas := expandMemory(offset) // TODO: add +1 here
+        let expansionGas := expandMemory(add(offset, 1))
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
         checkOverflow(offset,MEM_OFFSET_INNER(), evmGasLeft)
