@@ -123,7 +123,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
         // There are of course ways to optimize it further, but it will be done in the future.
         bytes memory pubdata = new bytes(cachedChainCount * 32);
 
-        for (uint256 i = 0; i < cachedChainCount; i++) {
+        for (uint256 i = 0; i < cachedChainCount; ++i) {
             // It is the responsibility of each chain to provide the roots of its L2->L1 messages if it wants to see those.
             // However, for the security of the system as a whole, the chain roots need to be provided for all chains.
 
