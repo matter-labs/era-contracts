@@ -21,12 +21,12 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
-import { Messaging } from "../common/libraries/Messaging.sol";
+import {Messaging} from "../common/libraries/Messaging.sol";
 
 import {MAX_NUMBER_OF_HYPERCHAINS} from "../common/Config.sol";
 
-// Chain tree consists of batch commitments as their leaves. And these are always hashes, so 
-// none of them is equal to 0. That's why we can use `bytes32(0)` as the value for an empty leaf. 
+// Chain tree consists of batch commitments as their leaves. And these are always hashes, so
+// none of them is equal to 0. That's why we can use `bytes32(0)` as the value for an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(0);
 
 // Shared tree consists of chain roots as their leaves. And these are always hashes, so
@@ -85,7 +85,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     function addNewChain(uint256 _chainId) external onlyBridgehub {
-        // The chain itself can not be the part of the message root. 
+        // The chain itself can not be the part of the message root.
         // The message root will only aggregate chains that settle on it.
         require(_chainId != block.chainid);
         require(!chainRegistered[_chainId], "MR: chain exists");
@@ -110,7 +110,11 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @dev add a new chainBatchRoot to the chainTree
-    function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external onlyChain(_chainId) {
+    function addChainBatchRoot(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        bytes32 _chainBatchRoot
+    ) external onlyChain(_chainId) {
         require(chainRegistered[_chainId], "MR: not registered");
         bytes32 chainRoot;
         // slither-disable-next-line unused-return
@@ -135,8 +139,8 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
     function _unsafeResetChainRoot(uint256 _index, bool _updateTree) internal {
         uint256 chainId = chainIndexToId[_index];
         bytes32 initialRoot = chainTree[chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
-        
-        if(_updateTree) {
+
+        if (_updateTree) {
             sharedTree.updateLeaf(_index, Messaging.chainIdLeafHash(initialRoot, chainId));
         }
     }

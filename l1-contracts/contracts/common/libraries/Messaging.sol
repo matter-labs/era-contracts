@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.24;
 
-
 library Messaging {
     bytes32 constant BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf");
     function batchLeafHash(bytes32 batchRoot, uint256 batchNumber) internal pure returns (bytes32) {
@@ -14,4 +13,3 @@ library Messaging {
         return keccak256(abi.encodePacked(CHAIN_ID_LEAF_PADDING, chainIdRoot, chainId));
     }
 }
-

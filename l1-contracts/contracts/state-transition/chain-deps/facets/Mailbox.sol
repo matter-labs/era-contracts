@@ -15,7 +15,7 @@ import {Merkle} from "../../../common/libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
-import { Messaging } from "../../../common/libraries/Messaging.sol";
+import {Messaging} from "../../../common/libraries/Messaging.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
@@ -118,30 +118,32 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         TxStatus _status
     ) public view returns (bool) {}
 
-    function _parseProofMetadata(bytes32 _proofMetadata) internal view returns (
-        uint256 logLeafProofLen, 
-        uint256 batchLeafProofLen
-    ) {
+    function _parseProofMetadata(
+        bytes32 _proofMetadata
+    ) internal view returns (uint256 logLeafProofLen, uint256 batchLeafProofLen) {
         bytes1 metadataVersion = bytes1(_proofMetadata[0]);
         require(metadataVersion == 0x01, "Mailbox: unsupported proof metadata version");
-        
+
         logLeafProofLen = uint256(uint8(_proofMetadata[1]));
         batchLeafProofLen = uint256(uint8(_proofMetadata[2]));
     }
 
-    function extractSlice(bytes32[] calldata _proof, uint256 l, uint256 r) internal pure returns (bytes32[] memory slice) {
+    function extractSlice(
+        bytes32[] calldata _proof,
+        uint256 l,
+        uint256 r
+    ) internal pure returns (bytes32[] memory slice) {
         slice = new bytes32[](r - l);
         for (uint256 i = l; i < r; i = i.uncheckedInc()) {
             slice[i - l] = _proof[i];
         }
     }
 
-
     function proveL2LeafInclusion(
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
-        bytes32[] calldata _proof 
+        bytes32[] calldata _proof
     ) external view returns (bool) {
         return _proveL2LeafInclusion(_batchNumber, _leafProofMask, _leaf, _proof);
     }
@@ -151,9 +153,8 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
-        bytes32[] calldata _proof 
+        bytes32[] calldata _proof
     ) internal view returns (bool) {
-
         // FIXME: maybe support legacy interface
 
         uint256 ptr = 0;
@@ -162,7 +163,11 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             (uint256 logLeafProofLen, uint256 batchLeafProofLen) = _parseProofMetadata(_proof[ptr]);
             ++ptr;
 
-            bytes32 batchSettlementRoot = Merkle.calculateRootMemory(extractSlice(_proof, ptr, ptr + logLeafProofLen), _leafProofMask, _leaf);
+            bytes32 batchSettlementRoot = Merkle.calculateRootMemory(
+                extractSlice(_proof, ptr, ptr + logLeafProofLen),
+                _leafProofMask,
+                _leaf
+            );
             ptr += logLeafProofLen;
 
             // Note that this logic works only for chains that do not migrate away from the synclayer back to L1.
@@ -181,7 +186,11 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             uint256 batchLeafProofMask = uint256(bytes32(_proof[ptr]));
             ++ptr;
 
-            bytes32 chainIdRoot = Merkle.calculateRootMemory(extractSlice(_proof, ptr, ptr + batchLeafProofLen), batchLeafProofMask, batchLeafHash);
+            bytes32 chainIdRoot = Merkle.calculateRootMemory(
+                extractSlice(_proof, ptr, ptr + batchLeafProofLen),
+                batchLeafProofMask,
+                batchLeafHash
+            );
             ptr += batchLeafProofLen;
 
             chainIdLeaf = Messaging.chainIdLeafHash(chainIdRoot, s.chainId);
@@ -206,7 +215,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             extractSlice(_proof, ptr, _proof.length)
         );
     }
-    
 
     /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
     function _proveL2LogInclusion(
@@ -230,7 +238,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         // equal to the length of other nodes preimages (which are `2 * 32`)
 
         // We can use `index` as a mask, since the `localMessageRoot` is on the left part of the tree.
-    
+
         return _proveL2LeafInclusion(_batchNumber, _index, hashedLog, _proof);
     }
 

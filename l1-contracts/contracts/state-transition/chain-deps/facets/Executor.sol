@@ -319,7 +319,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
 
-
         // Once the batch is executed, we include its message to the message root.
         IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
         messageRootContract.addChainBatchRoot(s.chainId, currentBatchNumber, _storedBatch.l2LogsTreeRoot);

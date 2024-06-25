@@ -77,7 +77,7 @@ interface IBridgehub is IL1AssetHandler {
 
     function sharedBridge() external view returns (IL1SharedBridge);
 
-        function messageRoot() external view returns (IMessageRoot);
+    function messageRoot() external view returns (IMessageRoot);
 
     function getHyperchain(uint256 _chainId) external view returns (address);
 

@@ -38,7 +38,6 @@ library Merkle {
         return currentHash;
     }
 
-
     /// @dev Calculate Merkle root by the provided Merkle proof.
     /// NOTE: When using this function, check that the _path length is equal to the tree height to prevent shorter/longer paths attack
     /// @param _path Merkle path from the leaf to the root
