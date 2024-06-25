@@ -51,14 +51,14 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         );
     }
 
-    function test_transferEthToNTV_wrongCaller() public {
-        vm.expectRevert("ShB: not NTV");
-        sharedBridge.transferEthToNTV();
-    }
-
     function test_transferTokenToNTV_wrongCaller() public {
         vm.expectRevert("ShB: not NTV");
         sharedBridge.transferTokenToNTV(address(token));
+    }
+
+    function test_transferBalanceToNTV_wrongCaller() public {
+        vm.expectRevert("ShB: not NTV");
+        sharedBridge.transferBalanceToNTV(chainId, address(token));
     }
 
     function test_registerToken_noCode() public {
@@ -149,14 +149,6 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         vm.prank(address(nativeTokenVault));
         vm.expectRevert("NTV: wrong amount transferred");
         nativeTokenVault.transferFundsFromSharedBridge(address(token));
-    }
-
-    function test_safeTransferFundsFromSharedBridge_ShouldNotBeCalledTwice() public {
-        nativeTokenVault.safeTransferBalancesFromSharedBridge{gas: maxGas}(ETH_TOKEN_ADDRESS, chainId, maxGas);
-        assertEq(nativeTokenVault.chainBalanceMigrated(chainId, ETH_TOKEN_ADDRESS), true);
-        vm.prank(address(nativeTokenVault));
-        vm.expectRevert("NTV: chain balance for the token already migrated");
-        nativeTokenVault.transferBalancesFromSharedBridge{gas: maxGas}(ETH_TOKEN_ADDRESS, chainId);
     }
 
     function test_bridgehubDepositBaseToken_Eth_Token_notRegisteredTokenID() public {

@@ -176,7 +176,7 @@ interface IL1SharedBridge {
 
     function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
 
-    function transferEthToNTV() external;
-
     function transferTokenToNTV(address _token) external;
+
+    function transferBalanceToNTV(uint256 _chainId, address _token) external;
 }

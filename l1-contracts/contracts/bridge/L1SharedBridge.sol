@@ -169,21 +169,25 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev transfer token to shared bridge as part of upgrade
-    function transferEthToNTV() external {
-        address ntvAddress = address(nativeTokenVault);
-        require(msg.sender == ntvAddress, "ShB: not NTV");
-        uint256 amount = address(this).balance;
-        bool callSuccess;
-        // Low-level assembly call, to avoid any memory copying (save gas)
-        assembly {
-            callSuccess := call(gas(), ntvAddress, amount, 0, 0, 0, 0)
+    function transferTokenToNTV(address _token) external {
+        require(msg.sender == address(nativeTokenVault), "ShB: not NTV");
+        if (ETH_TOKEN_ADDRESS == _token) {
+            address ntvAddress = address(nativeTokenVault);
+            uint256 amount = address(this).balance;
+            bool callSuccess;
+            // Low-level assembly call, to avoid any memory copying (save gas)
+            assembly {
+                callSuccess := call(gas(), ntvAddress, amount, 0, 0, 0, 0)
+            }
+        } else {
+            IERC20(_token).safeTransfer(address(nativeTokenVault), IERC20(_token).balanceOf(address(this)));
         }
     }
 
-    /// @dev transfer token to shared bridge as part of upgrade
-    function transferTokenToNTV(address _token) external {
+    /// @dev transfer balance to native token vault as part of upgrade
+    function transferBalanceToNTV(uint256 _chainId, address _token) external {
         require(msg.sender == address(nativeTokenVault), "ShB: not NTV");
-        IERC20(_token).safeTransfer(address(nativeTokenVault), IERC20(_token).balanceOf(address(this)));
+        chainBalance[_chainId][_token] = 0;
     }
 
     /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
