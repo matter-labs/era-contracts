@@ -45,6 +45,12 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     mapping(uint256 chainIndex => uint256 chainId) public chainIndexToId;
 
+    // There are two ways to distinguish chains:
+    // - Either by reserving the index 0 as a special value which denotes an unregistede chain
+    // - Use a separate mapping
+    // The second approach is used due to explicitness.
+    mapping(uint256 chainId => bool isRegistered) public chainRegistered;
+
     FullMerkle.FullTree public sharedTree;
 
     /// @dev the incremental merkle tree storing the chain message roots
@@ -82,12 +88,14 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
         // The chain itself can not be the part of the message root. 
         // The message root will only aggregate chains that settle on it.
         require(_chainId != block.chainid);
-        require(chainIndex[_chainId] == 0, "MR: chain exists");
+        require(!chainRegistered[_chainId], "MR: chain exists");
+        chainRegistered[_chainId] = true;
 
         // We firstly increment `chainCount` and then apply it to ensure that `0` is reserved for chains that are not present.
-        uint256 cachedChainCount = ++chainCount;
+        uint256 cachedChainCount = chainCount;
         require(cachedChainCount < MAX_NUMBER_OF_HYPERCHAINS, "MR: too many chains");
 
+        ++chainCount;
         chainIndex[_chainId] = cachedChainCount;
         chainIndexToId[cachedChainCount] = _chainId;
 
@@ -103,6 +111,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @dev add a new chainBatchRoot to the chainTree
     function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external onlyChain(_chainId) {
+        require(chainRegistered[_chainId], "MR: not registered");
         bytes32 chainRoot;
         // slither-disable-next-line unused-return
         (, chainRoot) = chainTree[_chainId].push(Messaging.batchLeafHash(_chainBatchRoot, _batchNumber));
