@@ -56,6 +56,7 @@ library Merkle {
         require(pathLength > 0, "Merkle: empty paths");
         require(pathLength < 256, "Merkle: path too long");
         uint256 levelLen = _itemHashes.length;
+        require(levelLen > 0, "Merkle: nothing to prove");
         require(_startIndex + levelLen <= (1 << pathLength), "Merkle: index/height mismatch");
         bytes32[] memory itemHashes = _itemHashes;
 

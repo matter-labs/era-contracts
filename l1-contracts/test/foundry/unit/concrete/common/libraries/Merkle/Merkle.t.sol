@@ -112,4 +112,18 @@ contract MerkleTestTest is Test {
         vm.expectRevert(bytes("Merkle: index/height mismatch"));
         merkleTest.calculateRoot(left, right, 128, leaves);
     }
+
+    function testRangeProofSingleLeaf() public {
+        (bytes32[] memory left, bytes32[] memory right, bytes32[] memory leaves) = prepareRangeProof(10, 10);
+        bytes32 rootFromContract = merkleTest.calculateRoot(left, right, 10, leaves);
+        assertEq(rootFromContract, root);
+    }
+
+    function testRangeProofEmpty_shouldRevert() public {
+        bytes32[] memory left = merkleTree.getProof(elements, 10);
+        bytes32[] memory right = merkleTree.getProof(elements, 10);
+        bytes32[] memory leaves;
+        vm.expectRevert(bytes("Merkle: nothing to prove"));
+        merkleTest.calculateRoot(left, right, 10, leaves);
+    }
 }
