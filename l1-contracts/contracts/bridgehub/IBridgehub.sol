@@ -156,11 +156,7 @@ interface IBridgehub is IL1AssetHandler {
 
     event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
 
-    function registerCounterpart(uint256 _chainId, address _counterPart) external;
-
     function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
-
-    function bridgehubCounterParts(uint256 _chainId) external view returns (address);
 
     function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
 

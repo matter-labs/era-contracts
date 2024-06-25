@@ -202,7 +202,7 @@ export class Deployer {
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(
         ["uint256", "uint256", "address"],
-        [eraChainId, this.chainId, this.addresses.Bridges.SharedBridgeProxy]
+        [eraChainId, getNumberFromEnv("ETH_CLIENT_CHAIN_ID"), this.addresses.Bridges.SharedBridgeProxy]
       ),
     };
     const ntvDeployment = {
@@ -216,7 +216,7 @@ export class Deployer {
     const forceDeployments = [bridgehubDeployment, messageRootDeployment, assetRouterDeployment, ntvDeployment];
     return ethers.utils.defaultAbiCoder.encode([FORCE_DEPLOYMENT_ABI_STRING], [forceDeployments]);
   }
-  
+
   public async updateCreate2FactoryZkMode() {
     if (!this.isZkMode()) {
       throw new Error("`updateCreate2FactoryZkMode` should be only called in Zk mode");
@@ -424,7 +424,7 @@ export class Deployer {
   public async deployMessageRootProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const messageRoot = new Interface(hardhat.artifacts.readArtifactSync("MessageRoot").abi);
 
-    const initCalldata = messageRoot.encodeFunctionData("initialize", [this.addresses.Governance]);
+    const initCalldata = messageRoot.encodeFunctionData("initialize");
 
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
@@ -873,22 +873,10 @@ export class Deployer {
     if (this.verbose) {
       console.log("STM DT registered in Bridgehub");
     }
-
-    const stmDeploymentTracker = this.stmDeploymentTracker(this.deployWallet);
-    const data1 = stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL1", [
-      this.addresses.StateTransition.StateTransitionProxy,
-    ]);
-    const receipt = await this.executeUpgrade(this.addresses.Bridgehub.STMDeploymentTrackerProxy, 0, data1);
-    if (this.verbose) {
-      console.log("STM asset registered in L1 Shared Bridge via STM Deployment Tracker", receipt.gasUsed.toString());
-      console.log(
-        `CONTRACTS_STM_ASSET_INFO=${await bridgehub.stmAssetInfo(this.addresses.StateTransition.StateTransitionProxy)}`
-      );
-    }
   }
 
   public async sharedBridgeSetEraPostUpgradeFirstBatch() {
-    const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
+    const sharedBridge = L1AssetRouterFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
     const storageSwitch = getNumberFromEnv("CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH");
     const tx = await sharedBridge.setEraPostUpgradeFirstBatch(storageSwitch);
     const receipt = await tx.wait();
@@ -1012,10 +1000,22 @@ export class Deployer {
         this.addresses.StateTransition.StateTransitionProxy,
       ]);
 
-      const receipt = await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData);
+      const receipt1 = await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData);
 
       if (this.verbose) {
-        console.log(`StateTransition System registered, gas used: ${receipt.gasUsed.toString()}`);
+        console.log(`StateTransition System registered, gas used: ${receipt1.gasUsed.toString()}`);
+      }
+
+      const stmDeploymentTracker = this.stmDeploymentTracker(this.deployWallet);
+      const data1 = stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL1", [
+        this.addresses.StateTransition.StateTransitionProxy,
+      ]);
+      const receipt2 = await this.executeUpgrade(this.addresses.Bridgehub.STMDeploymentTrackerProxy, 0, data1);
+      if (this.verbose) {
+        console.log("STM asset registered in L1 Shared Bridge via STM Deployment Tracker", receipt2.gasUsed.toString());
+        console.log(
+          `CONTRACTS_STM_ASSET_INFO=${await bridgehub.stmAssetInfo(this.addresses.StateTransition.StateTransitionProxy)}`
+        );
       }
     }
   }
@@ -1326,7 +1326,9 @@ export class Deployer {
 
     // This address only makes sense on the L1, but we deploy it anyway to keep the script simple
     const rollupDAValidatorAddress = await this.deployViaCreate2("RollupL1DAValidator", [], create2Salt, ethTxOptions);
-    console.log(`CONTRACTS_L1_ROLLUP_DA_VALIDATOR=${rollupDAValidatorAddress}`);
+    if (this.verbose) {
+      console.log(`CONTRACTS_L1_ROLLUP_DA_VALIDATOR=${rollupDAValidatorAddress}`);
+    }
 
     const validiumDAValidatorAddress = await this.deployViaCreate2(
       "ValidiumL1DAValidator",
@@ -1334,12 +1336,14 @@ export class Deployer {
       create2Salt,
       ethTxOptions
     );
-    console.log(`CONTRACTS_L1_VALIDIUM_DA_VALIDATOR=${validiumDAValidatorAddress}`);
-
+    if (this.verbose) {
+      console.log(`CONTRACTS_L1_VALIDIUM_DA_VALIDATOR=${validiumDAValidatorAddress}`);
+    }
     // This address only makes sense on the Sync Layer, but we deploy it anyway to keep the script simple
     const relayedSLDAValidator = await this.deployViaCreate2("RelayedSLDAValidator", [], create2Salt, ethTxOptions);
-    console.log(`CONTRACTS_L1_RELAYED_SL_DA_VALIDATOR=${relayedSLDAValidator}`);
-
+    if (this.verbose) {
+      console.log(`CONTRACTS_L1_RELAYED_SL_DA_VALIDATOR=${relayedSLDAValidator}`);
+    }
     this.addresses.RollupL1DAValidator = rollupDAValidatorAddress;
     this.addresses.ValidiumL1DAValidator = validiumDAValidatorAddress;
     this.addresses.RelayedSLDAValidator = relayedSLDAValidator;

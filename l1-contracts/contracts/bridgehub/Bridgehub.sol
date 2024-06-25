@@ -16,6 +16,9 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
+import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
+import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -129,7 +132,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         ISTMDeploymentTracker _stmDeployer,
         IMessageRoot _messageRoot
     ) external onlyOwner {
-        sharedBridge = IL1SharedBridge(_sharedBridge);
+        sharedBridge = IL1AssetRouter(_sharedBridge);
         stmDeployer = _stmDeployer;
         messageRoot = _messageRoot;
         _messageRoot.addNewChain(block.chainid);

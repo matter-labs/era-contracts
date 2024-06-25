@@ -18,7 +18,7 @@ import {MAX_NUMBER_OF_HYPERCHAINS} from "../common/Config.sol";
 // FIXME: explain why it can not collide with real root
 bytes32 constant EMPTY_LOG_ROOT = keccak256("New Tree zero hash");
 
-contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+contract MessageRoot is IMessageRoot, ReentrancyGuard {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
@@ -116,7 +116,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
         // There are of course ways to optimize it further, but it will be done in the future.
         pubdata = new bytes(cachedChainCount * 32);
 
-        for (uint256 i = 0; i < cachedChainCount; i++) {
+        for (uint256 i = 0; i < cachedChainCount; ++i) {
             // It is the responsibility of each chain to provide the roots of its L2->L1 messages if it wants to see those.
             // However, for the security of the system as a whole, the chain roots need to be provided for all chains.
 

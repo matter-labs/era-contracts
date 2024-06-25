@@ -66,7 +66,7 @@ export async function initialBridgehubDeployment(
   }
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
 
-  // L2 Shared Bridge already deployed 
+  // L2 Asset Router Bridge already deployed
   if (deployer.isZkMode()) {
     await deployer.registerAddresses();
   } else {

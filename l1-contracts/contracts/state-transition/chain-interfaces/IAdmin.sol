@@ -70,7 +70,7 @@ interface IAdmin is IZkSyncHyperchainBase {
         bytes calldata _forceDeploymentData,
         bytes[] calldata _factoryDeps
     ) external;
-    
+
     /// @notice Set the L1 DA validator address as well as the L2 DA validator address.
     /// @dev While in principle it is possible that updating only one of the addresses is needed,
     /// usually these should work in pair and L1 validator typically expects a specific input from the L2 Validator.
@@ -78,8 +78,6 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @param _l1DAValidator The address of the L1 DA validator
     /// @param _l2DAValidator The address of the L2 DA validator
     function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external;
-
-    function setChainIdUpgrade(address _genesisUpgrade) external;
 
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
