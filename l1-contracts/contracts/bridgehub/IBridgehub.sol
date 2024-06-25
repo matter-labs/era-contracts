@@ -77,6 +77,8 @@ interface IBridgehub is IL1AssetHandler {
 
     function sharedBridge() external view returns (IL1SharedBridge);
 
+        function messageRoot() external view returns (IMessageRoot);
+
     function getHyperchain(uint256 _chainId) external view returns (address);
 
     /// Mailbox forwarder
@@ -194,6 +196,4 @@ interface IBridgehub is IL1AssetHandler {
     function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetAddress) external;
 
     function L1_CHAIN_ID() external view returns (uint256);
-
-    function messageRoot() external view returns (IMessageRoot);
 }

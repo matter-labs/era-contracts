@@ -3,6 +3,8 @@
 pragma solidity 0.8.20;
 
 import {IL1Messenger, L2ToL1Log, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE} from "./interfaces/IL1Messenger.sol";
+import {IMessageRoot} from "./interfaces/IMessageRoot.sol";
+
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
@@ -41,6 +43,14 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     /// according to the current block execution invariant.
     /// @dev Will be reset at the end of the block to zero value.
     bytes32 internal chainedL1BytecodesRevealDataHash;
+
+    /// FIXME: remove this in production
+    address public messageRootAddress;
+
+    // FIXME This is just a hack before messageRoot is available in kernel space.
+    function setMessageRoot(address _messageRootAddress) public {
+        messageRootAddress = _messageRootAddress;
+    }
 
     /// The gas cost of processing one keccak256 round.
     uint256 internal constant KECCAK_ROUND_GAS_COST = 40;
@@ -235,20 +245,28 @@ contract L1Messenger is IL1Messenger, ISystemContract {
                 );
             }
         }
-        bytes32 l2ToL1LogsTreeRoot = l2ToL1LogsTreeArray[0];
+        bytes32 localLogsRootHash = l2ToL1LogsTreeArray[0];
+
+        // FIXME: in prod it can never be 0.
+        bytes32 aggregatedRootHash = messageRootAddress == address(0) ? bytes32(0) : bytes32(IMessageRoot(messageRootAddress).getAggregatedRoot());
+
+        // FIXME: make it used for pubdata.
+        bytes memory _p = IMessageRoot(messageRootAddress).clearTreeAndProvidePubdata();
 
         // FIXME; this is inefficient and leads to copying the entire array of uncompressed state diffs
         // Better to use efficient call
         bytes32 l2DAValidatorOutputhash = IL2DAValidator(_l2DAValidator).validatePubdata({
             _chainedLogsHash: chainedLogsHash,
-            _logsRootHash: l2ToL1LogsTreeRoot,
+            _logsRootHash: localLogsRootHash,
             _chainedMessagesHash: chainedMessagesHash,
             _chainedBytescodesHash: chainedL1BytecodesRevealDataHash,
             _operatorInput: _totalL2ToL1PubdataAndStateDiffs
         });
 
+        bytes32 fullRootHash = keccak256(bytes.concat(localLogsRootHash, aggregatedRootHash));
+
         /// Native (VM) L2 to L1 log
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), l2ToL1LogsTreeRoot);
+        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), fullRootHash);
         SystemContractHelper.toL1(
             true,
             bytes32(uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)),

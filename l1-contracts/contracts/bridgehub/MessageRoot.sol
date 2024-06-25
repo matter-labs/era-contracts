@@ -21,10 +21,17 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
+import { Messaging } from "../common/libraries/Messaging.sol";
+
 import {MAX_NUMBER_OF_HYPERCHAINS} from "../common/Config.sol";
 
-// FIXME: explain why it can not collide with real root
-bytes32 constant EMPTY_LOG_ROOT = keccak256("New Tree zero hash");
+// Chain tree consists of batch commitments as their leaves. And these are always hashes, so 
+// none of them is equal to 0. That's why we can use `bytes32(0)` as the value for an empty leaf. 
+bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(0);
+
+// Shared tree consists of chain roots as their leaves. And these are always hashes, so
+// none of them is equal to 0. That's why we can use `bytes32(0)` as the value for an empty leaf.
+bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(0);
 
 contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     using FullMerkle for FullMerkle.FullTree;
@@ -67,47 +74,66 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
     function initialize(address _owner) external reentrancyGuardInitializer initializer {
         require(_owner != address(0), "ShB owner 0");
         // slither-disable-next-line unused-return
-        sharedTree.setup(bytes32(0));
+        sharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
         _transferOwnership(_owner);
     }
 
     function addNewChain(uint256 _chainId) external onlyBridgehub {
-        uint256 cachedChainCount = chainCount;
+        // The chain itself can not be the part of the message root. 
+        // The message root will only aggregate chains that settle on it.
+        require(_chainId != block.chainid);
+        require(chainIndex[_chainId] == 0, "MR: chain exists");
+
+        // We firstly increment `chainCount` and then apply it to ensure that `0` is reserved for chains that are not present.
+        uint256 cachedChainCount = ++chainCount;
         require(cachedChainCount < MAX_NUMBER_OF_HYPERCHAINS, "MR: too many chains");
 
         chainIndex[_chainId] = cachedChainCount;
         chainIndexToId[cachedChainCount] = _chainId;
-        ++chainCount;
+
         // slither-disable-next-line unused-return
-        bytes32 initialHash = chainTree[_chainId].setup(EMPTY_LOG_ROOT);
+        bytes32 initialHash = chainTree[_chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
         // slither-disable-next-line unused-return
-        sharedTree.pushNewLeaf(initialHash);
+        sharedTree.pushNewLeaf(Messaging.chainIdLeafHash(initialHash, _chainId));
     }
 
-    function chainMessageRoot(uint256 _chainId) external view override returns (bytes32) {
-        return chainTree[_chainId].root();
+    function getAggregatedRoot() external view returns (bytes32) {
+        return sharedTree.root();
     }
 
     /// @dev add a new chainBatchRoot to the chainTree
-    function addChainBatchRoot(uint256 _chainId, bytes32 _chainBatchRoot) external onlyChain(_chainId) {
+    function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external onlyChain(_chainId) {
         bytes32 chainRoot;
         // slither-disable-next-line unused-return
-        (, chainRoot) = chainTree[_chainId].push(_chainBatchRoot);
+        (, chainRoot) = chainTree[_chainId].push(Messaging.batchLeafHash(_chainBatchRoot, _batchNumber));
 
         // slither-disable-next-line unused-return
-        sharedTree.updateLeaf(chainIndex[_chainId], chainRoot);
+        sharedTree.updateLeaf(chainIndex[_chainId], Messaging.chainIdLeafHash(chainRoot, _chainId));
     }
 
     function updateFullTree() public {
         uint256 cachedChainCount = chainCount;
         bytes32[] memory newLeaves = new bytes32[](cachedChainCount);
         for (uint256 i = 0; i < cachedChainCount; ++i) {
-            newLeaves[i] = chainTree[chainIndexToId[i]].root();
+            newLeaves[i] = Messaging.chainIdLeafHash(chainTree[chainIndexToId[i]].root(), chainIndexToId[i]);
         }
         // slither-disable-next-line unused-return
         sharedTree.updateAllLeaves(newLeaves);
     }
 
+    // It is expected that the root is present
+    // `_updateTree` should be false only if the caller ensures that it is followed by updating the entire tree.
+    function _unsafeResetChainRoot(uint256 _index, bool _updateTree) internal {
+        uint256 chainId = chainIndexToId[_index];
+        bytes32 initialRoot = chainTree[chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
+        
+        if(_updateTree) {
+            sharedTree.updateLeaf(_index, Messaging.chainIdLeafHash(initialRoot, chainId));
+        }
+    }
+
+    /// IMPORTANT FIXME!!!: split into two: provide pubdata and clear state. The "provide pubdata" part should be used by SL.
+    /// NO DA is provided here ATM !!!
     /// @notice To be called by the bootloader by the L1Messenger at the end of the batch to produce the final root and send it to the underlying layer.
     /// @return pubdata The pubdata to be relayed to the DA layer.
     function clearTreeAndProvidePubdata() external returns (bytes memory pubdata) {
@@ -137,7 +163,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
             // Note that it *does not* delete any storage slots, so in terms of pubdata savings, it is useless.
             // However, the chains paid for these changes anyway, so it is considered acceptable.
             // In the future, further optimizations will be available.
-            chainTree[chainIndexToId[i]].setup(EMPTY_LOG_ROOT);
+            _unsafeResetChainRoot(i, false);
         }
 
         updateFullTree();
