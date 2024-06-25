@@ -121,7 +121,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
         // - The alternative is to send pairs of (chainId, root), which is less efficient if at least half of the chains are active.
         //
         // There are of course ways to optimize it further, but it will be done in the future.
-        bytes memory pubdata = new bytes(cachedChainCount * 32);
+        pubdata = new bytes(cachedChainCount * 32);
 
         for (uint256 i = 0; i < cachedChainCount; i++) {
             // It is the responsibility of each chain to provide the roots of its L2->L1 messages if it wants to see those.
@@ -137,6 +137,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
             // Note that it *does not* delete any storage slots, so in terms of pubdata savings, it is useless.
             // However, the chains paid for these changes anyway, so it is considered acceptable.
             // In the future, further optimizations will be available.
+            // slither-disable-next-line usused-return
             chainTree[chainIndexToId[i]].setup(EMPTY_LOG_ROOT);
         }
 
