@@ -23,7 +23,7 @@ contract createNewChainTest is StateTransitionManagerTest {
             _baseToken: baseToken,
             _sharedBridge: sharedBridge,
             _admin: admin,
-            _initData: abi.encode(initialDiamondCutData), // todo encode force deployments
+            _initData: abi.encode(abi.encode(initialDiamondCutData), bytes("")),
             _factoryDeps: new bytes[](0)
         });
     }

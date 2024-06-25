@@ -62,17 +62,11 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
+    /// @param _l1SharedBridge The address of the L1 Bridge contract.
+    /// @param _l1Bridge The address of the legacy L1 Bridge contract.
     constructor(uint256 _eraChainId, uint256 _l1ChainId, address _l1SharedBridge, address _l1Bridge) {
         ERA_CHAIN_ID = _eraChainId;
         L1_CHAIN_ID = _l1ChainId;
-        _initialize(_l1SharedBridge, _l1Bridge);
-        _disableInitializers();
-    }
-
-    /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
-    /// @param _l1SharedBridge The address of the L1 Bridge contract.
-    /// @param _l1Bridge The address of the legacy L1 Bridge contract.
-    function _initialize(address _l1SharedBridge, address _l1Bridge) internal reinitializer(3) {
         if (_l1SharedBridge == address(0)) {
             revert EmptyAddress();
         }
@@ -86,6 +80,7 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
                 l1Bridge = _l1Bridge;
             }
         }
+        _disableInitializers();
     }
 
     /// @notice Finalize the deposit and mint funds

@@ -369,7 +369,7 @@ contract ExperimentalBridgeTest is Test {
                 _baseToken: address(testToken),
                 _salt: uint256(123),
                 _admin: admin,
-                _initData: bytes(""),
+                _initData: abi.encode(bytes(""), bytes("")),
                 _factoryDeps: new bytes[](0)
             });
         }
@@ -921,12 +921,13 @@ contract ExperimentalBridgeTest is Test {
             genesisUpgrade: address(0x01),
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: uint64(0x01),
-            genesisBatchCommitment: bytes32(uint256(0x01))
+            genesisBatchCommitment: bytes32(uint256(0x01)),
+            forceDeploymentsData: bytes("")
         });
 
         mockSTM.setChainCreationParams(params);
 
-        return abi.encode(diamondCutData);
+        return abi.encode(abi.encode(diamondCutData), bytes(""));
     }
 
     function _setUpHyperchainForChainId(uint256 mockChainId) internal returns (uint256 mockChainIdInRange) {
