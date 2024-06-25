@@ -136,6 +136,9 @@ export interface DeployedAddresses {
   Governance: string;
   BlobVersionedHashRetriever: string;
   ValidatorTimeLock: string;
+  RollupL1DAValidator: string;
+  ValidiumL1DAValidator: string;
+  RelayedSLDAValidator: string;
   Create2Factory: string;
 }
 
@@ -175,6 +178,9 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       NativeTokenVaultImplementation: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_IMPL_ADDR"),
       NativeTokenVaultProxy: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_PROXY_ADDR"),
     },
+    RollupL1DAValidator: getAddressFromEnv("CONTRACTS_L1_ROLLUP_DA_VALIDATOR"),
+    ValidiumL1DAValidator: getAddressFromEnv("CONTRACTS_L1_VALIDIUM_DA_VALIDATOR"),
+    RelayedSLDAValidator: getAddressFromEnv("CONTRACTS_L1_RELAYED_SL_DA_VALIDATOR"),
     BaseToken: getAddressFromEnv("CONTRACTS_BASE_TOKEN_ADDR"),
     TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),
     L2ProxyAdmin: getAddressFromEnv("CONTRACTS_L2_PROXY_ADMIN_ADDR"),

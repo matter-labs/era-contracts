@@ -304,6 +304,12 @@ async function main() {
       console.log("The default ones token multiplier");
       await (await hyperchain.setTokenMultiplier(1, 1)).wait();
 
+      console.log("Setting SL DA validators");
+      // This logic should be distinctive between Validium and Rollup
+      const l1DaValidator = getAddressFromEnv("SYNC_LAYER_L1_RELAYED_SL_DA_VALIDATOR");
+      const l2DaValidator = getAddressFromEnv("CONTRACTS_L2_DA_VALIDATOR_ADDR");
+      await (await hyperchain.setDAValidatorPair(l1DaValidator, l2DaValidator)).wait();
+
       console.log("Success!");
     });
 
