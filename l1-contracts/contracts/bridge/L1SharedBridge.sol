@@ -174,10 +174,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         if (ETH_TOKEN_ADDRESS == _token) {
             address ntvAddress = address(nativeTokenVault);
             uint256 amount = address(this).balance;
-            bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
             assembly {
-                callSuccess := call(gas(), ntvAddress, amount, 0, 0, 0, 0)
+                pop(call(gas(), ntvAddress, amount, 0, 0, 0, 0))
             }
         } else {
             IERC20(_token).safeTransfer(address(nativeTokenVault), IERC20(_token).balanceOf(address(this)));
