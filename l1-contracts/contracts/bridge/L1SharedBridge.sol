@@ -87,6 +87,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => bool enabled) public hyperbridgingEnabled;
 
+    /// @dev Maps token balances for each chain to prevent unauthorized spending across hyperchains.
+    /// This serves as a security measure until hyperbridging is implemented.
+    /// NOTE: this function may be removed in the future, don't rely on it!
+    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
+
     /// @dev A mapping assetId => assetHandlerAddress
     /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset
     /// @dev P.S. this liquidity was locked directly in SharedBridge before
@@ -116,7 +121,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
             msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY),
-            "L1SharedBridge: msg.value not equal to amount bridgehub or era chain"
+            "L1SharedBridge: msg.sender not equal to bridgehub or era chain"
         );
         _;
     }
@@ -163,6 +168,24 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
     }
 
+    /// @dev transfer token to shared bridge as part of upgrade
+    function transferEthToNTV() external {
+        address ntvAddress = address(nativeTokenVault);
+        require(msg.sender == ntvAddress, "ShB: not NTV");
+        uint256 amount = address(this).balance;
+        bool callSuccess;
+        // Low-level assembly call, to avoid any memory copying (save gas)
+        assembly {
+            callSuccess := call(gas(), ntvAddress, amount, 0, 0, 0, 0)
+        }
+    }
+
+    /// @dev transfer token to shared bridge as part of upgrade
+    function transferTokenToNTV(address _token) external {
+        require(msg.sender == address(nativeTokenVault), "ShB: not NTV");
+        IERC20(_token).safeTransfer(address(nativeTokenVault), IERC20(_token).balanceOf(address(this)));
+    }
+
     /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
     function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
         require(address(legacyBridge) == address(0), "ShB: legacy bridge already set");
@@ -172,8 +195,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
     function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external onlyOwner {
-        require(address(nativeTokenVault) == address(0), "ShB: legacy bridge already set");
-        require(address(_nativeTokenVault) != address(0), "ShB: legacy bridge 0");
+        require(address(nativeTokenVault) == address(0), "ShB: native token vault already set");
+        require(address(_nativeTokenVault) != address(0), "ShB: native token vault 0");
         nativeTokenVault = _nativeTokenVault;
     }
 
@@ -187,7 +210,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
         bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData));
         assetHandlerAddress[assetId] = _assetHandlerAddress;
-        assetDeploymentTracker[assetId] = sender;
+        assetDeploymentTracker[assetId] = msg.sender;
         emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _additionalData, sender);
     }
 
@@ -224,6 +247,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
     /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
+    /// @param _chainId The chain ID of the hyperchain to which deposit.
+    /// @param _assetId The deposited asset ID.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @param _amount The total amount of tokens to be bridged.
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,
@@ -256,7 +283,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             : _assetId;
         l1AssetHandler = assetHandlerAddress[_assetId];
         // Check if no asset handler is set
-        if (l1AssetHandler == address(0) && uint256(_assetId) <= type(uint160).max) {
+        if (l1AssetHandler == address(0)) {
+            require(uint256(_assetId) <= type(uint160).max, "ShB: only address can be registered");
             l1AssetHandler = address(nativeTokenVault);
             nativeTokenVault.registerToken(address(uint160(uint256(_assetId))));
         }
@@ -308,6 +336,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @notice Initiates a deposit transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
+    /// @param _chainId The chain ID of the hyperchain to which deposit.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @param _l2Value The L2 `msg.value` from the L1 -> L2 deposit transaction.
+    /// @param _data The calldata for the second bridge deposit.
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
@@ -337,7 +369,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
         require(BRIDGE_HUB.baseTokenAssetId(_chainId) != _assetId, "ShB: baseToken deposit not supported");
 
-        (, _assetId) = _getAssetProperties(_assetId); // Handles the non-legacy case
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
             _l2Value: _l2Value,
@@ -411,6 +442,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
     /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
+    /// @param _chainId The chain ID of the hyperchain to which confirm the deposit.
+    /// @param _txDataHash The keccak256 hash of abi.encode(msgSender, l1Token, amount)
+    /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,
@@ -661,12 +695,23 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) {
             // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
-
+            address l1Token;
             // this message is a token withdrawal
-            (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
-            transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
+
+            // Check that the message length is correct.
+            // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
+            // 76 (bytes).
+            require(_l2ToL1message.length == 76, "ShB wrong msg len 2");
+            (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+            (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+            (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+
+            assetId = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, l1Token));
+            transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
             //todo
+            (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
+            transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         } else {
             revert("ShB Incorrect message function selector");
         }
@@ -719,6 +764,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// of processing an L2 transaction where tokens would be minted.
     /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
     /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
     /// @param _l2Receiver The account address that should receive funds on L2
     /// @param _l1Token The L1 token address which is deposited
     /// @param _amount The total amount of tokens to be bridged

@@ -195,7 +195,7 @@ describe("Shared Bridge tests", () => {
           [ethers.constants.HashZero]
         )
     );
-    expect(revertReason).equal("ShB withd w proof");
+    expect(revertReason).equal("ShB wrong msg len 2");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {
