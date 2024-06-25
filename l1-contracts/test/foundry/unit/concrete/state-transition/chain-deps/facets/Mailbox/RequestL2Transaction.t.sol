@@ -9,14 +9,20 @@ import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransac
 import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
+import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 
-contract MailboxequestL2TransactionTest is MailboxTest {
+contract MailboxRequestL2TransactionTest is MailboxTest {
     address tempAddress;
     bytes[] tempBytesArr;
     bytes tempBytes;
+    DummySharedBridge l1SharedBridge;
+    address baseTokenBridgeAddress;
 
     function setUp() public virtual {
         setupDiamondProxy();
+
+        l1SharedBridge = new DummySharedBridge(keccak256("dummyDepositHash"));
+        baseTokenBridgeAddress = address(l1SharedBridge);
 
         tempAddress = makeAddr("temp");
         tempBytesArr = new bytes[](0);
@@ -24,8 +30,10 @@ contract MailboxequestL2TransactionTest is MailboxTest {
         utilsFacet.util_setChainId(eraChainId);
     }
 
-    function test_RevertWhen_NotEra() public {
-        utilsFacet.util_setChainId(eraChainId + 1);
+    function test_RevertWhen_NotEra(uint256 randomChainId) public {
+        vm.assume(eraChainId != randomChainId);
+
+        utilsFacet.util_setChainId(randomChainId);
 
         vm.expectRevert("Mailbox: legacy interface only available for Era");
         mailboxFacet.requestL2Transaction({
@@ -87,44 +95,59 @@ contract MailboxequestL2TransactionTest is MailboxTest {
         });
     }
 
-    function test_success_requestL2Transaction() public {
-        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
-        utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
-
+    function _requestL2Transaction(
+        uint256 amount,
+        uint256 baseCost,
+        uint256 l2GasLimit
+    ) internal returns (bytes32 canonicalTxHash, uint256 mintValue) {
         bytes[] memory factoryDeps = new bytes[](1);
         factoryDeps[0] = "11111111111111111111111111111111";
 
-        uint256 baseCost = mailboxFacet.l2TransactionBaseCost(10000000, 1000000, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
-        uint256 l2Value = 1 ether;
-        uint256 mintValue = baseCost + l2Value;
-
-        address baseTokenBridge = makeAddr("baseTokenBridge");
-        utilsFacet.util_setBaseTokenBridge(baseTokenBridge);
-
-        vm.mockCall(
-            baseTokenBridge,
-            abi.encodeWithSelector(
-                IL1SharedBridge.bridgehubDepositBaseToken.selector,
-                eraChainId,
-                sender,
-                ETH_TOKEN_ADDRESS,
-                mintValue
-            ),
-            ""
-        );
+        mintValue = baseCost + amount;
 
         vm.deal(sender, mintValue);
         vm.prank(sender);
-        bytes32 canonicalTxHash = mailboxFacet.requestL2Transaction{value: mintValue}({
+        canonicalTxHash = mailboxFacet.requestL2Transaction{value: mintValue}({
             _contractL2: tempAddress,
-            _l2Value: l2Value,
+            _l2Value: amount,
             _calldata: tempBytes,
-            _l2GasLimit: 1000000,
+            _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             _factoryDeps: factoryDeps,
             _refundRecipient: tempAddress
         });
+    }
 
+    function test_RevertWhen_bridgePaused(uint256 randomValue) public {
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
+        utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
+        utilsFacet.util_setBaseTokenBridge(baseTokenBridgeAddress);
+
+        uint256 l2GasLimit = 1000000;
+        uint256 baseCost = mailboxFacet.l2TransactionBaseCost(10000000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+        randomValue = bound(randomValue, 0, type(uint256).max - baseCost);
+
+        l1SharedBridge.pause();
+
+        vm.expectRevert("Pausable: paused");
+        _requestL2Transaction(randomValue, baseCost, l2GasLimit);
+    }
+
+    function test_success_requestL2Transaction(uint256 randomValue) public {
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
+        utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
+        utilsFacet.util_setBaseTokenBridge(baseTokenBridgeAddress);
+
+        uint256 l2GasLimit = 1000000;
+        uint256 baseCost = mailboxFacet.l2TransactionBaseCost(10000000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+        randomValue = bound(randomValue, 0, type(uint256).max - baseCost);
+
+        bytes32 canonicalTxHash;
+        uint256 mintValue;
+
+        (canonicalTxHash, mintValue) = _requestL2Transaction(randomValue, baseCost, l2GasLimit);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
+        assertEq(baseTokenBridgeAddress.balance, mintValue);
+        assertEq(l1SharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), mintValue);
     }
 }

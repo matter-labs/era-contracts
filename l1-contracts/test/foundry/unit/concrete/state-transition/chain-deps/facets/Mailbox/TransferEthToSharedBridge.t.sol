@@ -16,7 +16,7 @@ contract MailboxTransferEthToSharedBridge is MailboxTest {
 
         l1SharedBridge = new DummySharedBridge(keccak256("dummyDepositHash"));
         baseTokenBridgeAddress = address(l1SharedBridge);
-        vm.deal(diamondProxy, 1 ether);
+   
         utilsFacet.util_setChainId(eraChainId);
         utilsFacet.util_setBaseTokenBridge(baseTokenBridgeAddress);
     }
@@ -27,11 +27,13 @@ contract MailboxTransferEthToSharedBridge is MailboxTest {
         vm.stopPrank();
     }
 
-    function test_success_transfer() public useBaseTokenBridge {
+    function test_success_transfer(uint256 randomAmount) public useBaseTokenBridge {
+        vm.deal(diamondProxy, randomAmount);
+
         assertEq(address(l1SharedBridge).balance, 0);
-        assertEq(address(diamondProxy).balance, 1 ether);
+        assertEq(address(diamondProxy).balance, randomAmount);
         mailboxFacet.transferEthToSharedBridge();
-        assertEq(address(l1SharedBridge).balance, 1 ether);
+        assertEq(address(l1SharedBridge).balance, randomAmount);
         assertEq(address(diamondProxy).balance, 0);
     }
 
@@ -41,8 +43,9 @@ contract MailboxTransferEthToSharedBridge is MailboxTest {
         mailboxFacet.transferEthToSharedBridge();
     }
 
-    function test_RevertWhen_hyperchainIsNotEra() public useBaseTokenBridge {
-        utilsFacet.util_setChainId(eraChainId + 1);
+    function test_RevertWhen_hyperchainIsNotEra(uint256 randomChainId) public useBaseTokenBridge {
+        vm.assume(eraChainId != randomChainId);
+        utilsFacet.util_setChainId(randomChainId);
 
         vm.expectRevert("Mailbox: transferEthToSharedBridge only available for Era on mailbox");
         mailboxFacet.transferEthToSharedBridge();
