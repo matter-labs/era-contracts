@@ -150,4 +150,7 @@ interface IGetters is IZkSyncHyperchainBase {
 
     /// @return isFreezable Whether the facet can be frozen by the admin or always accessible
     function isFacetFreezable(address _facet) external view returns (bool isFreezable);
+
+    /// TODO
+    function getSyncLayer() external view returns (address);
 }

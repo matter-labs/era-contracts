@@ -719,7 +719,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2
     /// @param _depositSender The address of the deposit initiator
-    /// @param _l1Asset The address of the deposited L1 ERC20 token
+    /// @param _l1Token The address of the deposited L1 ERC20 token
     /// @param _amount The amount of the deposit that failed.
     /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization
     /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed
@@ -729,7 +729,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     function claimFailedDeposit(
         uint256 _chainId,
         address _depositSender,
-        address _l1Asset,
+        address _l1Token,
         uint256 _amount,
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,
@@ -737,7 +737,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        bytes32 assetId = nativeTokenVault.getAssetId(_l1Asset);
+        bytes32 assetId = nativeTokenVault.getAssetId(_l1Token);
         bytes memory transferData = abi.encode(_amount, _depositSender);
         bridgeRecoverFailedTransfer({
             _chainId: _chainId,
@@ -794,7 +794,6 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
 
         bytes32 _assetId;
         bytes memory bridgeMintCalldata;
-
         {
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
@@ -878,7 +877,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     /// method in `L1ERC20Bridge`.
     ///
     /// @param _depositSender The address of the deposit initiator
-    /// @param _l1Asset The address of the deposited L1 ERC20 token
+    /// @param _l1Token The address of the deposited L1 ERC20 token
     /// @param _amount The amount of the deposit that failed.
     /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization
     /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed
@@ -887,7 +886,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization
     function claimFailedDepositLegacyErc20Bridge(
         address _depositSender,
-        address _l1Asset,
+        address _l1Token,
         uint256 _amount,
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,
@@ -899,7 +898,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         bridgeRecoverFailedTransfer({
             _chainId: ERA_CHAIN_ID,
             _depositSender: _depositSender,
-            _assetId: nativeTokenVault.getAssetId(_l1Asset),
+            _assetId: nativeTokenVault.getAssetId(_l1Token),
             _assetData: transferData,
             _l2TxHash: _l2TxHash,
             _l2BatchNumber: _l2BatchNumber,

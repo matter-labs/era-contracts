@@ -397,7 +397,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
-            _l1Asset: ETH_TOKEN_ADDRESS,
+            _l1Token: ETH_TOKEN_ADDRESS,
             _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
@@ -431,7 +431,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
-            _l1Asset: ETH_TOKEN_ADDRESS,
+            _l1Token: ETH_TOKEN_ADDRESS,
             _amount: 0,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
@@ -464,7 +464,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
-            _l1Asset: ETH_TOKEN_ADDRESS,
+            _l1Token: ETH_TOKEN_ADDRESS,
             _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
@@ -501,7 +501,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
-            _l1Asset: ETH_TOKEN_ADDRESS,
+            _l1Token: ETH_TOKEN_ADDRESS,
             _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,

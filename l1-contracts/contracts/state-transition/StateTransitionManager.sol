@@ -282,23 +282,27 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev setPriorityTxMaxGasLimit for the specified chain
-    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// @dev setTokenMultiplier for the specified chain
-    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setTokenMultiplier(_nominator, _denominator);
+    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).setTokenMultiplier(_nominator, _denominator);
     }
 
     /// @dev changeFeeParams for the specified chain
-    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).changeFeeParams(_newFeeParams);
+    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).changeFeeParams(_newFeeParams);
     }
 
     /// @dev setValidator for the specified chain
-    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwnerOrAdmin {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setValidator(_validator, _active);
+    function setValidator(uint256 _chainId, address _validator, bool _active) external {
+        // FIXME
+        // IZkSyncHyperchain(hyperchainMap.get(_chainId)).setValidator(_validator, _active);
     }
 
     /// @dev setPorterAvailability for the specified chain
@@ -401,6 +405,64 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     function getProtocolVersion(uint256 _chainId) public view returns (uint256) {
         return IZkSyncHyperchain(hyperchainMap.get(_chainId)).getProtocolVersion();
+    }
+
+    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external onlyOwner {
+        require(_newSyncLayerChainId != 0, "Bad chain id");
+
+        // Currently, we require that the sync layer is deployed by the same STM.
+        address syncLayerAddress = hyperchainMap.get(_newSyncLayerChainId);
+
+        // TODO: Maybe `get` already ensured its existence.
+        require(syncLayerAddress != address(0), "STM: sync layer not registered");
+
+        IBridgehub(BRIDGE_HUB).registerSyncLayer(_newSyncLayerChainId, _isWhitelisted);
+
+        // TODO: emit event
+    }
+
+    /// @notice Called by the bridgehub during the migration of a chain to another settlement layer.
+    /// @param _chainId The chain id of the chain to be migrated.
+    /// @param _data The data needed to perform the migration.
+    function forwardedBridgeBurn(
+        uint256 _chainId,
+        bytes calldata _data
+    ) external view override onlyBridgehub returns (bytes memory stmForwardedBridgeMintData) {
+        (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
+        require(_newSyncLayerAdmin != address(0), "STM: admin zero");
+        // todo check protocol version
+        return abi.encode(IBridgehub(BRIDGE_HUB).baseToken(_chainId), _newSyncLayerAdmin, protocolVersion, _diamondCut);
+    }
+
+    /// @notice Called by the bridgehub during the migration of a chain to the current settlement layer.
+    /// @param _chainId The chain id of the chain to be migrated.
+    /// @param _stmData The data returned from `forwardedBridgeBurn` for the chain.
+    function forwardedBridgeMint(
+        uint256 _chainId,
+        bytes calldata _stmData
+    ) external override onlyBridgehub returns (address chainAddress) {
+        (address _baseToken, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
+            _stmData,
+            (address, address, uint256, bytes)
+        );
+        require(_protocolVersion == protocolVersion, "STM, outdated pv");
+        // todo porotocl version check
+        chainAddress = _deployNewChain({
+            _chainId: _chainId,
+            _baseToken: _baseToken,
+            _sharedBridge: address(IBridgehub(BRIDGE_HUB).sharedBridge()),
+            _admin: _admin,
+            _diamondCut: _diamondCut
+        });
+    }
+
+    function bridgeClaimFailedBurn(
+        uint256 _chainId,
+        bytes32 _assetInfo,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external {
+        // todo
     }
 
     /// @dev This internal function is used to register a new hyperchain in the system.

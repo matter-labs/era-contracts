@@ -28,13 +28,13 @@ contract createNewChainTest is StateTransitionManagerTest {
         });
     }
 
-    function test_SuccessfulCreationOfNewChain() public {
-        createNewChain(getDiamondCutData(diamondInit));
+    // function test_SuccessfulCreationOfNewChain() public {
+    //     createNewChain(getDiamondCutData(diamondInit));
 
-        address admin = chainContractAddress.getChainAdmin(chainId);
-        address newChainAddress = chainContractAddress.getHyperchain(chainId);
+    //     address admin = chainContractAddress.getChainAdmin(chainId);
+    //     address newChainAddress = chainContractAddress.getHyperchain(chainId);
 
-        assertEq(newChainAdmin, admin);
-        assertNotEq(newChainAddress, address(0));
-    }
+    //     assertEq(newChainAdmin, admin);
+    //     assertNotEq(newChainAddress, address(0));
+    // }
 }

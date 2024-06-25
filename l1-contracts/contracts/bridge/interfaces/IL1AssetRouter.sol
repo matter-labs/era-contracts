@@ -35,6 +35,8 @@ interface IL1AssetRouter {
         uint256 amount
     );
 
+    event BridgehubMintData(bytes bridgeMintData);
+
     event BridgehubDepositFinalized(
         uint256 indexed chainId,
         bytes32 indexed txDataHash,
@@ -151,6 +153,16 @@ interface IL1AssetRouter {
     function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
 
     function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external;
+
+    function setAssetHandlerAddressOnCounterPart(
+        uint256 _chainId,
+        uint256 _mintValue,
+        uint256 _l2TxGasLimit,
+        uint256 _l2TxGasPerPubdataByte,
+        address _refundRecipient,
+        bytes32 _assetId,
+        address _assetAddressOnCounterPart
+    ) external payable returns (bytes32 l2TxHash);
 
     function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 
