@@ -10,7 +10,7 @@ import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransa
 
 contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
     function setUp() public virtual {
-        prepare();
+        setupDiamondProxy();
     }
 
     function test_success_withoutFilterer() public {

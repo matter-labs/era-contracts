@@ -9,7 +9,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 
 contract MailboxBaseTests is MailboxTest {
     function setUp() public virtual {
-        prepare();
+        setupDiamondProxy();
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(1);
     }

@@ -13,7 +13,7 @@ contract MailboxFinalizeWithdrawal is MailboxTest {
     bytes message;
 
     function setUp() public virtual {
-        prepare();
+        setupDiamondProxy();
 
         proof = new bytes32[](0);
         message = "message";

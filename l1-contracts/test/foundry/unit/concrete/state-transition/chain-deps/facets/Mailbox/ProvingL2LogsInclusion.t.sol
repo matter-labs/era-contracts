@@ -24,7 +24,7 @@ contract MailboxL2LogsProve is MailboxTest {
     uint8 shardId;
 
     function setUp() public virtual {
-        prepare();
+        setupDiamondProxy();
 
         data = abi.encodePacked("test data");
         merkleTree = new MerkleTreeNoSort();
