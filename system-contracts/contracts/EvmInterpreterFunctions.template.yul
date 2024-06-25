@@ -1204,7 +1204,7 @@ function genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, 
 
     let gasForTheCall := capGas(evmGasLeftOld,INF_PASS_GAS())
 
-    if lt(balance(addr),value) {
+    if lt(selfbalance(),value) {
         revertWithGas(evmGasLeftOld)
     }
 

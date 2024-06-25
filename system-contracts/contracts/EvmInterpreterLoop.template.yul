@@ -698,6 +698,10 @@ for { } true { } {
     case 0x5D { // OP_TSTORE
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
+        if isStatic {
+            revertWithGas(evmGasLeft)
+        }
+
         let key, value
         key, sp := popStackItem(sp)
         value, sp := popStackItem(sp)

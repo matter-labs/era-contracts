@@ -1278,7 +1278,7 @@ object "EVMInterpreter" {
         
             let gasForTheCall := capGas(evmGasLeftOld,INF_PASS_GAS())
         
-            if lt(balance(addr),value) {
+            if lt(selfbalance(),value) {
                 revertWithGas(evmGasLeftOld)
             }
         
@@ -2182,6 +2182,10 @@ object "EVMInterpreter" {
                 }
                 case 0x5D { // OP_TSTORE
                     evmGasLeft := chargeGas(evmGasLeft, 100)
+            
+                    if isStatic {
+                        revertWithGas(evmGasLeft)
+                    }
             
                     let key, value
                     key, sp := popStackItem(sp)
@@ -4012,7 +4016,7 @@ object "EVMInterpreter" {
             
                 let gasForTheCall := capGas(evmGasLeftOld,INF_PASS_GAS())
             
-                if lt(balance(addr),value) {
+                if lt(selfbalance(),value) {
                     revertWithGas(evmGasLeftOld)
                 }
             
@@ -4927,6 +4931,10 @@ object "EVMInterpreter" {
                 }
                 case 0x5D { // OP_TSTORE
                     evmGasLeft := chargeGas(evmGasLeft, 100)
+            
+                    if isStatic {
+                        revertWithGas(evmGasLeft)
+                    }
             
                     let key, value
                     key, sp := popStackItem(sp)
