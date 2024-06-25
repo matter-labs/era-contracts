@@ -15,6 +15,8 @@ struct PriorityOpsBatchInfo {
     bytes32[] itemHashes;
 }
 
+bytes32 constant ZERO_LEAF_HASH = keccak256("");
+
 library PriorityTree {
     using PriorityTree for Tree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
@@ -49,7 +51,7 @@ library PriorityTree {
     }
 
     function setup(Tree storage _tree, uint256 _startIndex) internal {
-        _tree.tree.setup(keccak256(""));
+        _tree.tree.setup(ZERO_LEAF_HASH);
         _tree.startIndex = _startIndex;
     }
 
@@ -71,21 +73,18 @@ library PriorityTree {
     }
 
     function initFromCommitment(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal {
-        uint256 height = _commitment.sides.length;
+        uint256 height = _commitment.sides.length; // Height, including the root node.
+        require(height > 0, "PT: invalid commitment");
         _tree.startIndex = _commitment.startIndex;
         _tree.unprocessedIndex = _commitment.unprocessedIndex;
         _tree.tree._nextLeafIndex = _commitment.nextLeafIndex;
         _tree.tree._sides = _commitment.sides;
-        _tree.tree._height = height;
-        _tree.tree._fnHash = Hashes.Keccak256;
-        bytes32 zero = keccak256("");
+        bytes32 zero = ZERO_LEAF_HASH;
         for (uint256 i; i < height; ++i) {
             _tree.tree._zeros.push(zero);
             zero = Hashes.Keccak256(zero, zero);
         }
-        if (height > 0) {
-            _tree.historicalRoots[_tree.tree.root()] = true;
-        }
+        _tree.historicalRoots[_tree.tree.root()] = true;
     }
 
     function getCommitment(Tree storage _tree) internal view returns (PriorityTreeCommitment memory commitment) {

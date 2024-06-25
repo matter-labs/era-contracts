@@ -23,7 +23,7 @@ contract IncrementalMerkleTest {
     }
 
     function height() external view returns (uint256) {
-        return tree._height;
+        return tree.height();
     }
 
     function index() external view returns (uint256) {
