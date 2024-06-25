@@ -38,6 +38,9 @@ contract DummySharedBridge {
         amountReturnInFinalizeWithdrawal = _amount;
     }
 
+    function receiveEth(uint256 _chainId) external payable {}
+
+
     function depositLegacyErc20Bridge(
         address, //_msgSender,
         address, //_l2Receiver,

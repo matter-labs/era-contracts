@@ -16,7 +16,7 @@ contract MailboxequestL2TransactionTest is MailboxTest {
     bytes tempBytes;
 
     function setUp() public virtual {
-        prepare();
+        setupDiamondProxy();
 
         tempAddress = makeAddr("temp");
         tempBytesArr = new bytes[](0);
