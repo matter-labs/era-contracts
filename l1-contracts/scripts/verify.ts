@@ -180,7 +180,7 @@ async function main() {
     eraDiamondProxy,
   ]);
   promises.push(promise12);
-  const initCalldata4 = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi).encodeFunctionData(
+  const initCalldata4 = new Interface(hardhat.artifacts.readArtifactSync("L1AssetRouter").abi).encodeFunctionData(
     "initialize",
     [deployWalletAddress]
   );

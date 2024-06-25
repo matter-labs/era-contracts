@@ -7,8 +7,8 @@ import type { TestnetERC20Token } from "../../typechain";
 import { TestnetERC20TokenFactory } from "../../typechain";
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
-import type { IL1SharedBridge } from "../../typechain/IL1SharedBridge";
-import { IL1SharedBridgeFactory } from "../../typechain/IL1SharedBridgeFactory";
+import type { IL1AssetRouter } from "../../typechain/IL1AssetRouter";
+import { IL1AssetRouterFactory } from "../../typechain/IL1AssetRouterFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
@@ -22,7 +22,7 @@ describe("Custom base token chain and bridge tests", () => {
   let randomSigner: ethers.Signer;
   let deployWallet: Wallet;
   let deployer: Deployer;
-  let l1SharedBridge: IL1SharedBridge;
+  let l1SharedBridge: IL1AssetRouter;
   let bridgehub: IBridgehub;
   let baseToken: TestnetERC20Token;
   let baseTokenAddress: string;
@@ -61,25 +61,13 @@ describe("Custom base token chain and bridge tests", () => {
     altToken = TestnetERC20TokenFactory.connect(altTokenAddress, owner);
 
     // prepare the bridge
-    l1SharedBridge = IL1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
+    l1SharedBridge = IL1AssetRouterFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
   });
 
   it("Should have correct base token", async () => {
     // we should still be able to deploy the erc20 bridge
     const baseTokenAddressInBridgehub = await bridgehub.baseToken(chainId);
     expect(baseTokenAddress).equal(baseTokenAddressInBridgehub);
-  });
-
-  it("Check should initialize through governance", async () => {
-    const l1SharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
-    const upgradeCall = l1SharedBridgeInterface.encodeFunctionData("initializeChainGovernance(uint256,address)", [
-      chainId,
-      ADDRESS_ONE,
-    ]);
-
-    const txHash = await deployer.executeUpgrade(l1SharedBridge.address, 0, upgradeCall);
-
-    expect(txHash).not.equal(ethers.constants.HashZero);
   });
 
   it("Should not allow direct legacy deposits", async () => {

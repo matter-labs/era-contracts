@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
+import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 
 struct L2TransactionRequestDirect {
@@ -64,7 +64,7 @@ interface IBridgehub {
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
-    function sharedBridge() external view returns (IL1SharedBridge);
+    function sharedBridge() external view returns (IL1AssetRouter);
 
     function getHyperchain(uint256 _chainId) external view returns (address);
 

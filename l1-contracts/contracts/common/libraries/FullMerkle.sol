@@ -74,12 +74,12 @@ library FullMerkle {
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < self._height; i = i.uncheckedInc()) {
             if (_index % 2 == 0) {
-                currentHash =  Hashes.Keccak256(
+                currentHash = Hashes.Keccak256(
                     currentHash,
                     maxNodeNumber == _index ? self._zeros[i] : self._nodes[i][_index + 1]
                 );
             } else {
-                currentHash =  Hashes.Keccak256(self._nodes[i][_index - 1], currentHash);
+                currentHash = Hashes.Keccak256(self._nodes[i][_index - 1], currentHash);
             }
             _index /= 2;
             maxNodeNumber /= 2;
@@ -108,11 +108,10 @@ library FullMerkle {
         for (uint256 i; i < length; i = i.uncheckedAdd(2)) {
             self._nodes[_height][i] = _newNodes[i];
             self._nodes[_height][i + 1] = _newNodes[i + 1];
-            _newRow[i / 2] =  Hashes.Keccak256(_newNodes[i], _newNodes[i + 1]);
+            _newRow[i / 2] = Hashes.Keccak256(_newNodes[i], _newNodes[i + 1]);
         }
         return updateAllNodesAtHeight(self, _height + 1, _newRow);
     }
-
 
     function root(FullTree storage self) internal view returns (bytes32) {
         return self._nodes[self._height][0];

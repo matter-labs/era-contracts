@@ -13,7 +13,7 @@ import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "c
 import {DummyStateTransitionManagerWBH} from "contracts/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
 import {DummyHyperchain} from "contracts/dev-contracts/test/DummyHyperchain.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
-import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
+import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 
 import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
@@ -49,7 +49,7 @@ contract ExperimentalBridgeTest is Test {
         mockChainContract = new DummyHyperchain(address(bridgeHub), eraChainId);
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
-        ntv = new L1NativeTokenVault(weth, IL1SharedBridge(address(mockSharedBridge)), eraChainId);
+        ntv = new L1NativeTokenVault(weth, IL1AssetRouter(address(mockSharedBridge)), eraChainId);
         mockSharedBridge.setNativeTokenVault(ntv);
         mockSecondSharedBridge.setNativeTokenVault(ntv);
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
@@ -301,7 +301,7 @@ contract ExperimentalBridgeTest is Test {
 
     function test_setSharedBridge(address randomAddress) public {
         assertTrue(
-            bridgeHub.sharedBridge() == IL1SharedBridge(address(0)),
+            bridgeHub.sharedBridge() == IL1AssetRouter(address(0)),
             "This random address is not registered as sharedBridge"
         );
 
@@ -309,7 +309,7 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub.setSharedBridge(randomAddress);
 
         assertTrue(
-            bridgeHub.sharedBridge() == IL1SharedBridge(randomAddress),
+            bridgeHub.sharedBridge() == IL1AssetRouter(randomAddress),
             "after call from the bridgeowner, this randomAddress should be the registered sharedBridge"
         );
     }
@@ -322,7 +322,7 @@ contract ExperimentalBridgeTest is Test {
         }
 
         assertTrue(
-            bridgeHub.sharedBridge() == IL1SharedBridge(address(0)),
+            bridgeHub.sharedBridge() == IL1AssetRouter(address(0)),
             "This random address is not registered as sharedBridge"
         );
 
@@ -330,7 +330,7 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub.setSharedBridge(randomAddress);
 
         assertTrue(
-            bridgeHub.sharedBridge() == IL1SharedBridge(randomAddress),
+            bridgeHub.sharedBridge() == IL1AssetRouter(randomAddress),
             "after call from the bridgeowner, this randomAddress should be the registered sharedBridge"
         );
     }
@@ -669,7 +669,7 @@ contract ExperimentalBridgeTest is Test {
         );
         vm.mockCall(
             address(mockSharedBridge),
-            abi.encodeWithSelector(IL1SharedBridge.bridgehubDepositBaseToken.selector),
+            abi.encodeWithSelector(IL1AssetRouter.bridgehubDepositBaseToken.selector),
             abi.encode(true)
         );
 
@@ -753,7 +753,7 @@ contract ExperimentalBridgeTest is Test {
         //bytes32 resultantHash =
         vm.mockCall(
             address(mockSharedBridge),
-            abi.encodeWithSelector(IL1SharedBridge.bridgehubDepositBaseToken.selector),
+            abi.encodeWithSelector(IL1AssetRouter.bridgehubDepositBaseToken.selector),
             abi.encode(true)
         );
         resultantHash = bridgeHub.requestL2TransactionDirect(l2TxnReqDirect);
@@ -812,7 +812,7 @@ contract ExperimentalBridgeTest is Test {
         );
         vm.mockCall(
             address(mockSharedBridge),
-            abi.encodeWithSelector(IL1SharedBridge.bridgehubDepositBaseToken.selector),
+            abi.encodeWithSelector(IL1AssetRouter.bridgehubDepositBaseToken.selector),
             abi.encode(true)
         );
         vm.prank(randomCaller);
