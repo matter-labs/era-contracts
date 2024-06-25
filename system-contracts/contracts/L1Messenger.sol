@@ -248,11 +248,14 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         bytes32 localLogsRootHash = l2ToL1LogsTreeArray[0];
 
         // FIXME: in prod it can never be 0.
-        bytes32 aggregatedRootHash = messageRootAddress == address(0) ? bytes32(0) : bytes32(IMessageRoot(messageRootAddress).getAggregatedRoot());
-
-        // FIXME: make it used for pubdata.
-        bytes memory _p = IMessageRoot(messageRootAddress).clearTreeAndProvidePubdata();
-
+        bytes32 aggregatedRootHash;
+        
+        if (messageRootAddress != address(0))  {
+            aggregatedRootHash = IMessageRoot(messageRootAddress).getAggregatedRoot();
+            // FIXME: make it used for pubdata.
+            bytes memory _p = IMessageRoot(messageRootAddress).clearTreeAndProvidePubdata();
+        }
+        
         // FIXME; this is inefficient and leads to copying the entire array of uncompressed state diffs
         // Better to use efficient call
         bytes32 l2DAValidatorOutputhash = IL2DAValidator(_l2DAValidator).validatePubdata({
