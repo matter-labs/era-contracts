@@ -5,19 +5,11 @@ pragma solidity 0.8.24;
 // slither-disable-next-line unused-return
 // solhint-disable reason-string, gas-custom-errors
 
-// import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-// import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/openzeppelin/IncrementalMerkle.sol"; // todo figure out how to import from OZ
 
 import {IBridgehub} from "./IBridgehub.sol";
-// import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-// import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-// import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-// import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
-// import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-// import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
