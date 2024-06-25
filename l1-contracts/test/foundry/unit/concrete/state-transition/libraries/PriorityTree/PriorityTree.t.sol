@@ -4,6 +4,8 @@ pragma solidity 0.8.24;
 
 import {PriorityTreeSharedTest, PriorityOpsBatchInfo} from "./_PriorityTree_Shared.t.sol";
 
+bytes32 constant ZERO_LEAF_HASH = keccak256("");
+
 contract PriorityTreeTest is PriorityTreeSharedTest {
     function test_gets() public {
         assertEq(0, priorityTree.getSize());
@@ -13,18 +15,84 @@ contract PriorityTreeTest is PriorityTreeSharedTest {
     }
 
     function test_push() public {
-        priorityTree.push(keccak256(abi.encode(1)));
-        priorityTree.push(keccak256(abi.encode(2)));
+        bytes32 leaf1 = keccak256(abi.encode(1));
+        bytes32 leaf2 = keccak256(abi.encode(2));
+
+        priorityTree.push(leaf1);
+
+        assertEq(1, priorityTree.getSize());
+        assertEq(0, priorityTree.getFirstUnprocessedPriorityTx());
+        assertEq(1, priorityTree.getTotalPriorityTxs());
+        assertEq(leaf1, priorityTree.getRoot());
+
+        priorityTree.push(leaf2);
 
         assertEq(2, priorityTree.getSize());
         assertEq(0, priorityTree.getFirstUnprocessedPriorityTx());
         assertEq(2, priorityTree.getTotalPriorityTxs());
 
-        bytes32 expectedRoot = keccak256(abi.encode(keccak256(abi.encode(1)), keccak256(abi.encode(2))));
+        bytes32 expectedRoot = keccak256(abi.encode(leaf1, leaf2));
         assertEq(expectedRoot, priorityTree.getRoot());
     }
 
+    function test_processEmptyBatch() public {
+        pushMockEntries(3);
+
+        assertEq(0, priorityTree.getFirstUnprocessedPriorityTx());
+        priorityTree.processBatch(PriorityOpsBatchInfo({
+            leftPath: new bytes32[](0),
+            rightPath: new bytes32[](0),
+            itemHashes: new bytes32[](0)
+        }));
+
+        assertEq(0, priorityTree.getFirstUnprocessedPriorityTx());
+    }
+
+    function test_processBatch() public {
+        bytes32[] memory leaves = pushMockEntries(3);
+        assertEq(0, priorityTree.getFirstUnprocessedPriorityTx());
+
+        // two batches are: 1 tx, 2 tx.
+
+        bytes32[] memory leftPath = new bytes32[](2);
+        bytes32[] memory rightPath = new bytes32[](2);
+        rightPath[0] = leaves[1];
+        rightPath[1] = keccak256(abi.encode(leaves[2], ZERO_LEAF_HASH));
+        bytes32[] memory batch1 = new bytes32[](1);
+        batch1[0] = leaves[0];
+
+        priorityTree.processBatch(PriorityOpsBatchInfo({
+            leftPath: leftPath,
+            rightPath: rightPath,
+            itemHashes: batch1
+        }));
+
+        assertEq(1, priorityTree.getFirstUnprocessedPriorityTx());
+
+        leftPath[0] = leaves[0];
+        rightPath[0] = ZERO_LEAF_HASH;
+        rightPath[1] = bytes32(0);
+        bytes32[] memory batch2 = new bytes32[](2);
+        batch2[0] = leaves[1];
+        batch2[1] = leaves[2];
+
+        priorityTree.processBatch(PriorityOpsBatchInfo({
+            leftPath: leftPath,
+            rightPath: rightPath,
+            itemHashes: batch2
+        }));
+
+        assertEq(3, priorityTree.getFirstUnprocessedPriorityTx());
+    }
+
     function test_processBatch_shouldRevert() public {
-        // TODO
+        bytes32[] memory itemHashes = pushMockEntries(3);
+
+        vm.expectRevert("PT: root mismatch");
+        priorityTree.processBatch(PriorityOpsBatchInfo({
+            leftPath: new bytes32[](2),
+            rightPath: new bytes32[](2),
+            itemHashes: itemHashes
+        }));
     }
 }

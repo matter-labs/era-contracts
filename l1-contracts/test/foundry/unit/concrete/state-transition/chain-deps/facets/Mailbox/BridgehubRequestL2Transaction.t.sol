@@ -92,8 +92,7 @@ contract BridgehubRequestL2TransactionTest is MailboxTest {
         bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
 
-        // TODO: check if the root hash is correct - calculate it manually
         bytes32 newRootHash = gettersFacet.getPriorityTreeRoot();
-        assertNotEq(oldRootHash, newRootHash, "root hash should be different");
+        assertEq(canonicalTxHash, newRootHash, "root hash should have changed");
     }
 }

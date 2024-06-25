@@ -31,7 +31,7 @@ contract PriorityTreeTest {
         return PriorityTree.getRoot(priorityTree);
     }
 
-    function processBatch(PriorityOpsBatchInfo calldata _priorityOpsData) internal {
+    function processBatch(PriorityOpsBatchInfo calldata _priorityOpsData) external {
         PriorityTree.processBatch(priorityTree, _priorityOpsData);
     }
 }
