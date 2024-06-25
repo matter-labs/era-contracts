@@ -2172,6 +2172,23 @@ object "EVMInterpreter" {
                 case 0x5B { // OP_JUMPDEST
                     evmGasLeft := chargeGas(evmGasLeft, 1)
                 }
+                case 0x5C { // OP_TLOAD
+                    evmGasLeft := chargeGas(evmGasLeft, 100)
+            
+                    let key
+                    key, sp := popStackItem(sp)
+            
+                    sp := pushStackItem(sp, tload(key))
+                }
+                case 0x5D { // OP_TSTORE
+                    evmGasLeft := chargeGas(evmGasLeft, 100)
+            
+                    let key, value
+                    key, sp := popStackItem(sp)
+                    value, sp := popStackItem(sp)
+            
+                    tstore(key, value)
+                }
                 case 0x5E { // OP_MCOPY
                     let destOffset, offset, size
                     destOffset, sp := popStackItem(sp)
@@ -4899,6 +4916,23 @@ object "EVMInterpreter" {
                 }
                 case 0x5B { // OP_JUMPDEST
                     evmGasLeft := chargeGas(evmGasLeft, 1)
+                }
+                case 0x5C { // OP_TLOAD
+                    evmGasLeft := chargeGas(evmGasLeft, 100)
+            
+                    let key
+                    key, sp := popStackItem(sp)
+            
+                    sp := pushStackItem(sp, tload(key))
+                }
+                case 0x5D { // OP_TSTORE
+                    evmGasLeft := chargeGas(evmGasLeft, 100)
+            
+                    let key, value
+                    key, sp := popStackItem(sp)
+                    value, sp := popStackItem(sp)
+            
+                    tstore(key, value)
                 }
                 case 0x5E { // OP_MCOPY
                     let destOffset, offset, size
