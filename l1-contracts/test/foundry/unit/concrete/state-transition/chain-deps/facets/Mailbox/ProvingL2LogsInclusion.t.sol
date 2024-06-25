@@ -60,7 +60,7 @@ contract MailboxL2LogsProve is MailboxTest {
         });
     }
 
-    function test_success_proveL2MessageInclussion() public {
+    function test_success_proveL2MessageInclusion() public {
         uint256 firstLogIndex = _addHashedLogToMerkleTree({
             _shardId: 0,
             _isService: true,
