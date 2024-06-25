@@ -54,7 +54,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @notice The function responsible for registering the L2 counterpart of an STM asset on the L2 Bridgehub.
     /// @dev The function is called by the Bridgehub contract during the `Bridgehub.requestL2TransactionTwoBridges`.
-    /// @dev Since the L2 settlment layers `_chainId` might potentially have ERC20 tokens as native assets,
+    /// @dev Since the L2 settlement layers `_chainId` might potentially have ERC20 tokens as native assets,
     /// there are two ways to perform the L1->L2 transaction:
     /// - via the `Bridgehub.requestL2TransactionDirect`. However, this would require the STMDeploymentTracker to
     /// hahndle the ERC20 balances to be used in the transaction.
