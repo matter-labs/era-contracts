@@ -417,6 +417,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
 
     /// @dev The request data that is passed to the bridgehub
     function _requestToBridge(
+        // solhint-disable-next-line no-unused-vars
         uint256 _chainId,
         address _prevMsgSender,
         bytes32 _assetId,

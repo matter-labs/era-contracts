@@ -4,9 +4,8 @@ import * as hardhat from "hardhat";
 import type { BytesLike } from "ethers/lib/utils";
 import { Interface } from "ethers/lib/utils";
 
-import type { Bridgehub, L1AssetRouter, GettersFacet, MockExecutorFacet } from "../../typechain";
+import type { Bridgehub, GettersFacet, MockExecutorFacet } from "../../typechain";
 import {
-  L1AssetRouterFactory,
   BridgehubFactory,
   TestnetERC20TokenFactory,
   MailboxFacetFactory,
@@ -17,7 +16,7 @@ import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
 import type { IMailbox } from "../../typechain/IMailbox";
 
-import { ADDRESS_ONE, ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/utils";
 import { Action, facetCut } from "../../src.ts/diamondCut";
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
@@ -42,7 +41,7 @@ describe("Legacy Era tests", function () {
   let deployer: Deployer;
   let l1ERC20BridgeAddress: string;
   let l1ERC20Bridge: IL1ERC20Bridge;
-  let sharedBridgeProxy: L1AssetRouter;
+  // let sharedBridgeProxy: L1AssetRouter;
   let erc20TestToken: ethers.Contract;
   let bridgehub: Bridgehub;
   let chainId = "9"; // Hardhat config ERA_CHAIN_ID
@@ -87,7 +86,7 @@ describe("Legacy Era tests", function () {
     l1ERC20BridgeAddress = deployer.addresses.Bridges.ERC20BridgeProxy;
 
     l1ERC20Bridge = IL1ERC20BridgeFactory.connect(l1ERC20BridgeAddress, deployWallet);
-    sharedBridgeProxy = L1AssetRouterFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
+    // sharedBridgeProxy = L1AssetRouterFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
 
     const tokens = getTokens();
     const tokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;

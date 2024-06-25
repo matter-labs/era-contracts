@@ -1,7 +1,6 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { ethers, Wallet } from "ethers";
-import { Interface } from "ethers/lib/utils";
 
 import type { TestnetERC20Token } from "../../typechain";
 import { TestnetERC20TokenFactory } from "../../typechain";
@@ -12,7 +11,7 @@ import { IL1AssetRouterFactory } from "../../typechain/IL1AssetRouterFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
-import { ADDRESS_ONE, ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/utils";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
 import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
