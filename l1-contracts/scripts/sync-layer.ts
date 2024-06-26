@@ -80,14 +80,6 @@ async function main() {
 
       await initialBridgehubDeployment(deployer, [], gasPrice, true, create2Salt);
       await initialBridgehubDeployment(deployer, [], gasPrice, false, create2Salt);
-      const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
-      const l1ChainId = getNumberFromEnv("ETH_CLIENT_CHAIN_ID");
-      const l1BridgehubAddress = getAddressFromEnv("CONTRACTS_BRIDGEHUB_PROXY_ADDR");
-      await deployer.executeUpgrade(
-        bridgehub.address,
-        0,
-        bridgehub.interface.encodeFunctionData("registerCounterpart", [l1ChainId, l1BridgehubAddress])
-      );
     });
 
   program
@@ -339,12 +331,12 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   );
 
   console.log("Registering Bridgehub counter part on the SyncLayer");
-  await deployer.executeUpgrade(
-    l1Bridgehub.address, // kl todo fix. The BH has the counterpart, the BH needs to be deployed on L2, and the STM needs to be registered in the L2 BH.
-    0,
-    l1Bridgehub.interface.encodeFunctionData("registerCounterpart", [chainId, bridgehubOnSyncLayer])
-  );
-  console.log("SyncLayer registration completed in L1 Bridgehub");
+  // await deployer.executeUpgrade(
+  //   l1Bridgehub.address, // kl todo fix. The BH has the counterpart, the BH needs to be deployed on L2, and the STM needs to be registered in the L2 BH.
+  //   0,
+  //   l1Bridgehub.interface.encodeFunctionData("registerCounterpart", [chainId, bridgehubOnSyncLayer])
+  // );
+  // console.log("SyncLayer registration completed in L1 Bridgehub");
 
   const gasPrice = (await deployer.deployWallet.provider.getGasPrice()).mul(GAS_MULTIPLIER);
   const value = (

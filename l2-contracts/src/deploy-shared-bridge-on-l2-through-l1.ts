@@ -46,7 +46,7 @@ export async function publishL2NativeTokenVaultDependencyBytecodesOnL2(
   }
 }
 
-async function setL2TokenBeacon(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
+async function setL2TokenBeacon(deployer: Deployer, chainId: string) {
   if (deployer.verbose) {
     console.log("Setting L2 token beacon");
   }
@@ -67,7 +67,7 @@ async function setL2TokenBeacon(deployer: Deployer, chainId: string, gasPrice: B
 
 export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
   await publishL2NativeTokenVaultDependencyBytecodesOnL2(deployer, chainId, gasPrice);
-  await setL2TokenBeacon(deployer, chainId, gasPrice);
+  await setL2TokenBeacon(deployer, chainId);
   if (deployer.verbose) {
     console.log(`CONTRACTS_L2_NATIVE_TOKEN_VAULT_IMPL_ADDR=${L2_NATIVE_TOKEN_VAULT_ADDRESS}`);
     console.log(`CONTRACTS_L2_NATIVE_TOKEN_VAULT_PROXY_ADDR=${L2_NATIVE_TOKEN_VAULT_ADDRESS}`);
