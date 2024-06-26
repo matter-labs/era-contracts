@@ -59,7 +59,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     }
 
     /// @dev we don't call this in the constructor, as we need to provide factory deps
-    function setL2TokenBeacon() external onlyOwner {
+    function setL2TokenBeacon() external {
         if (address(l2TokenBeacon) != address(0)) {
             revert AddressMismatch(address(l2TokenBeacon), address(0));
         }

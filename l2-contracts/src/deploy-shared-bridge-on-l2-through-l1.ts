@@ -46,28 +46,27 @@ export async function publishL2NativeTokenVaultDependencyBytecodesOnL2(
   }
 }
 
-async function setL2TokenBeacon(deployer: Deployer, chainId: string) {
+async function setL2TokenBeacon(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
   if (deployer.verbose) {
     console.log("Setting L2 token beacon");
   }
   const l2NTV = L2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, deployer.deployWallet);
 
-  const tx2 = await requestL2TransactionDirect(
+  const receipt = await deployer.executeUpgradeOnL2(
     chainId,
-    deployer.deployWallet,
-    deployer.addresses.Bridges.L2NativeTokenVaultProxy,
+    L2_NATIVE_TOKEN_VAULT_ADDRESS,
+    gasPrice,
     l2NTV.interface.encodeFunctionData("setL2TokenBeacon"),
     priorityTxMaxGasLimit
   );
-  await tx2.wait();
   if (deployer.verbose) {
-    console.log("Transferred L2NativeTokenVault ownership to ");
+    console.log("Set L2Token Beacon, upgrade hash", receipt.transactionHash);
   }
 }
 
 export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
   await publishL2NativeTokenVaultDependencyBytecodesOnL2(deployer, chainId, gasPrice);
-  await setL2TokenBeacon(deployer, chainId);
+  await setL2TokenBeacon(deployer, chainId, gasPrice);
   if (deployer.verbose) {
     console.log(`CONTRACTS_L2_NATIVE_TOKEN_VAULT_IMPL_ADDR=${L2_NATIVE_TOKEN_VAULT_ADDRESS}`);
     console.log(`CONTRACTS_L2_NATIVE_TOKEN_VAULT_PROXY_ADDR=${L2_NATIVE_TOKEN_VAULT_ADDRESS}`);

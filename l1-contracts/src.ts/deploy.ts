@@ -218,7 +218,7 @@ export class Deployer {
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(
         ["bytes32", "address", "bool"],
-        [l2TokenProxyBytecodeHash, this.deployWallet.address, false]
+        [l2TokenProxyBytecodeHash, this.addresses.Governance, false]
       ),
     };
 
