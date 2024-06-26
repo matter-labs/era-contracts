@@ -205,7 +205,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             chainId: chainId,
             to: alice,
             assetId: tokenAssetId,
-            assetDataHash: bytes32(0)
+            assetData: abi.encode(bytes32(0))
         });
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
@@ -247,7 +247,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             chainId: chainId,
             to: alice,
             assetId: ETH_TOKEN_ASSET_ID,
-            assetDataHash: bytes32(0)
+            assetData: abi.encode(bytes32(0))
         });
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
@@ -290,7 +290,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             chainId: chainId,
             to: alice,
             assetId: ETH_TOKEN_ASSET_ID,
-            assetDataHash: bytes32(0)
+            assetData: abi.encode(bytes32(0))
         });
         sharedBridge.bridgeRecoverFailedTransfer({
             _chainId: chainId,

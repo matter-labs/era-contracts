@@ -118,7 +118,7 @@ contract L1SharedBridgeHyperEnabledTest is L1SharedBridgeTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit ClaimedFailedDepositSharedBridge(chainId, alice, tokenAssetId, bytes32(0));
+        emit ClaimedFailedDepositSharedBridge(chainId, alice, tokenAssetId, abi.encode(bytes32(0)));
         vm.prank(bridgehubAddress);
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
@@ -161,7 +161,7 @@ contract L1SharedBridgeHyperEnabledTest is L1SharedBridgeTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit ClaimedFailedDepositSharedBridge(chainId, alice, ETH_TOKEN_ASSET_ID, bytes32(0));
+        emit ClaimedFailedDepositSharedBridge(chainId, alice, ETH_TOKEN_ASSET_ID, abi.encode(bytes32(0)));
         vm.prank(bridgehubAddress);
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,

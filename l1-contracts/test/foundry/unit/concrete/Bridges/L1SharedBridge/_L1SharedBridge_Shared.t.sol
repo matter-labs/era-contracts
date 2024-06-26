@@ -50,7 +50,7 @@ contract L1SharedBridgeTest is Test {
         uint256 indexed chainId,
         address indexed to,
         bytes32 indexed assetId,
-        bytes32 assetDataHash
+        bytes assetData
     );
 
     event LegacyDepositInitiated(
