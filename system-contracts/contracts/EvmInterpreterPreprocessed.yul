@@ -1949,6 +1949,7 @@ object "EVMInterpreter" {
             
                     let addr
                     addr, sp := popStackItem(sp)
+                    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
                     if iszero(warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500) 
@@ -4696,6 +4697,7 @@ object "EVMInterpreter" {
             
                     let addr
                     addr, sp := popStackItem(sp)
+                    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
                     if iszero(warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500) 
