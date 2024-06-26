@@ -21,6 +21,7 @@ pragma solidity 0.8.20;
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2SharedBridge {// is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
-    // todo 
+contract L2SharedBridge {
+    // is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
+    // todo
 }
