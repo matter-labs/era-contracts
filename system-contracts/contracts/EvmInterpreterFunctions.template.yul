@@ -1052,6 +1052,8 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
     retOffset, sp := popStackItem(sp)
     retSize, sp := popStackItem(sp)
 
+    // addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+
     checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER(), evmGasLeft)
     checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER(), evmGasLeft)
 
