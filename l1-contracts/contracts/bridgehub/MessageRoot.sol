@@ -25,15 +25,18 @@ import {Messaging} from "../common/libraries/Messaging.sol";
 
 import {MAX_NUMBER_OF_HYPERCHAINS} from "../common/Config.sol";
 
-// Chain tree consists of batch commitments as their leaves. And these are always hashes, so
-// none of them is equal to 0. That's why we can use `bytes32(0)` as the value for an empty leaf.
-bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(0);
+// Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
+bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
 
-// Shared tree consists of chain roots as their leaves. And these are always hashes, so
-// none of them is equal to 0. That's why we can use `bytes32(0)` as the value for an empty leaf.
-bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(0);
+// Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
+bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
 
 contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+
+    event AddedChain(uint256 indexed chainId, uint256 indexed chainIndex);
+
+    event AppendedChainBatchRoot(uint256 indexed chainId, uint256 indexed batchNumber, bytes32 batchRoot);
+
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
@@ -85,10 +88,29 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     function addNewChain(uint256 _chainId) external onlyBridgehub {
+        require(!chainRegistered[_chainId], "MR: chain exists");
+        _addNewChain(_chainId);
+    }
+
+    function addNewChainIfNeeded(uint256 _chainId) external onlyBridgehub {
+        if(!chainRegistered[_chainId]) {
+            _addNewChain(_chainId);
+        }
+    }
+
+    function getAggregatedRoot() external view returns (bytes32) {
+        return sharedTree.root();
+    }
+
+    function getChainRoot(uint256 _chainId) external view returns (bytes32) {
+        return chainTree[_chainId].root();
+    }
+
+    function _addNewChain(uint256 _chainId) internal {
         // The chain itself can not be the part of the message root.
         // The message root will only aggregate chains that settle on it.
         require(_chainId != block.chainid);
-        require(!chainRegistered[_chainId], "MR: chain exists");
+
         chainRegistered[_chainId] = true;
 
         // We firstly increment `chainCount` and then apply it to ensure that `0` is reserved for chains that are not present.
@@ -103,11 +125,11 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32 initialHash = chainTree[_chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
         // slither-disable-next-line unused-return
         sharedTree.pushNewLeaf(Messaging.chainIdLeafHash(initialHash, _chainId));
+
+        emit AddedChain(_chainId, cachedChainCount);
     }
 
-    function getAggregatedRoot() external view returns (bytes32) {
-        return sharedTree.root();
-    }
+    event Preimage(bytes32 one, bytes32 two);
 
     /// @dev add a new chainBatchRoot to the chainTree
     function addChainBatchRoot(
@@ -122,6 +144,10 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
 
         // slither-disable-next-line unused-return
         sharedTree.updateLeaf(chainIndex[_chainId], Messaging.chainIdLeafHash(chainRoot, _chainId));
+
+        emit Preimage(chainRoot, Messaging.chainIdLeafHash(chainRoot, _chainId));
+
+        emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
     }
 
     function updateFullTree() public {
@@ -152,33 +178,33 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
     function clearTreeAndProvidePubdata() external returns (bytes memory pubdata) {
         // FIXME: access control: only to be called by the l1 messenger.
 
-        uint256 cachedChainCount = chainCount;
+        // uint256 cachedChainCount = chainCount;
 
-        // We will send the updated roots for all chains.
-        // While it will mean that we'll pay even for unchanged roots:
-        // - It is the simplest approach
-        // - The alternative is to send pairs of (chainId, root), which is less efficient if at least half of the chains are active.
-        //
-        // There are of course ways to optimize it further, but it will be done in the future.
-        bytes memory pubdata = new bytes(cachedChainCount * 32);
+        // // We will send the updated roots for all chains.
+        // // While it will mean that we'll pay even for unchanged roots:
+        // // - It is the simplest approach
+        // // - The alternative is to send pairs of (chainId, root), which is less efficient if at least half of the chains are active.
+        // //
+        // // There are of course ways to optimize it further, but it will be done in the future.
+        // bytes memory pubdata = new bytes(cachedChainCount * 32);
 
-        for (uint256 i = 0; i < cachedChainCount; i++) {
-            // It is the responsibility of each chain to provide the roots of its L2->L1 messages if it wants to see those.
-            // However, for the security of the system as a whole, the chain roots need to be provided for all chains.
+        // for (uint256 i = 0; i < cachedChainCount; i++) {
+        //     // It is the responsibility of each chain to provide the roots of its L2->L1 messages if it wants to see those.
+        //     // However, for the security of the system as a whole, the chain roots need to be provided for all chains.
 
-            bytes32 chainRoot = chainTree[chainIndexToId[i]].root();
+        //     bytes32 chainRoot = chainTree[chainIndexToId[i]].root();
 
-            assembly {
-                mstore(add(pubdata, add(32, mul(i, 32))), chainRoot)
-            }
+        //     assembly {
+        //         mstore(add(pubdata, add(32, mul(i, 32))), chainRoot)
+        //     }
 
-            // Clearing up the state.
-            // Note that it *does not* delete any storage slots, so in terms of pubdata savings, it is useless.
-            // However, the chains paid for these changes anyway, so it is considered acceptable.
-            // In the future, further optimizations will be available.
-            _unsafeResetChainRoot(i, false);
-        }
+        //     // Clearing up the state.
+        //     // Note that it *does not* delete any storage slots, so in terms of pubdata savings, it is useless.
+        //     // However, the chains paid for these changes anyway, so it is considered acceptable.
+        //     // In the future, further optimizations will be available.
+        //     _unsafeResetChainRoot(i, false);
+        // }
 
-        updateFullTree();
+        // updateFullTree();
     }
 }
