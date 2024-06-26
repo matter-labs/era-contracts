@@ -120,6 +120,28 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         emit NewTransactionFilterer(oldTransactionFilterer, _transactionFilterer);
     }
 
+    /// @notice Sets the DA validator pair with the given addresses.
+    /// @dev It does not check for these addresses to be non-zero, since when migrating to a new settlement
+    /// layer, we set them to zero.
+    function _setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) internal {
+        address oldL1DAValidator = s.l1DAValidator;
+        address oldL2DAValidator = s.l2DAValidator;
+
+        s.l1DAValidator = _l1DAValidator;
+        s.l2DAValidator = _l2DAValidator;
+
+        emit NewL1DAValidator(oldL1DAValidator, _l1DAValidator);
+        emit NewL2DAValidator(oldL2DAValidator, _l2DAValidator);
+    }
+
+    /// @inheritdoc IAdmin
+    function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external onlyAdmin {
+        require(_l1DAValidator != address(0), "AdminFacet: L1DAValidator address is zero");
+        require(_l2DAValidator != address(0), "AdminFacet: L2DAValidator address is zero");
+
+        _setDAValidatorPair(_l1DAValidator, _l2DAValidator);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             UPGRADE EXECUTION
     //////////////////////////////////////////////////////////////*/
@@ -298,6 +320,8 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
         s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
+
+        _setDAValidatorPair(address(0), address(0));
 
         emit MigrationComplete();
     }

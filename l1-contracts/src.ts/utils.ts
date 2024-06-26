@@ -307,3 +307,8 @@ export function compileInitialCutHash(
 
   return diamondCut(facetCuts, diamondInit, "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2));
 }
+
+export enum PubdataSource {
+  Rollup,
+  Validium,
+}

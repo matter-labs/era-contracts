@@ -78,7 +78,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         AccountInfo memory currentInfo = accountInfo[msg.sender];
 
         if (
-            _nonceOrdering != AccountNonceOrdering.Arbitrary &&
+            _nonceOrdering != AccountNonceOrdering.Arbitrary ||
             currentInfo.nonceOrdering != AccountNonceOrdering.Sequential
         ) {
             revert InvalidNonceOrderingChange();

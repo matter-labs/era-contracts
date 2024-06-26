@@ -6,6 +6,7 @@ import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.s
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
+import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IL2AssetHandler} from "./interfaces/IL2AssetHandler.sol";
@@ -143,7 +144,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         // note we use the IL1ERC20Bridge.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
         // and we use this interface so that when the switch happened the old messages could be processed
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _assetId, _bridgeMintData);
+        return abi.encodePacked(IL1SharedBridge.finalizeWithdrawal.selector, _assetId, _bridgeMintData);
     }
 
     /// @dev Used to set the assedAddress for a given assetId.

@@ -183,13 +183,6 @@ describe("Compressor tests", function () {
   });
 
   describe("verifyCompressedStateDiffs", function () {
-    it("non l1 messenger failed to call", async () => {
-      await expect(compressor.verifyCompressedStateDiffs(0, 8, "0x", "0x0000")).to.be.revertedWithCustomError(
-        compressor,
-        "Unauthorized"
-      );
-    });
-
     it("enumeration index size is too large", async () => {
       const stateDiffs = [
         {

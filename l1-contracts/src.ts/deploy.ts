@@ -1259,6 +1259,30 @@ export class Deployer {
     }
   }
 
+  public async deployDAValidators(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+
+    // This address only makes sense on the L1, but we deploy it anyway to keep the script simple
+    const rollupDAValidatorAddress = await this.deployViaCreate2("RollupL1DAValidator", [], create2Salt, ethTxOptions);
+    console.log(`CONTRACTS_L1_ROLLUP_DA_VALIDATOR=${rollupDAValidatorAddress}`);
+
+    const validiumDAValidatorAddress = await this.deployViaCreate2(
+      "ValidiumL1DAValidator",
+      [],
+      create2Salt,
+      ethTxOptions
+    );
+    console.log(`CONTRACTS_L1_VALIDIUM_DA_VALIDATOR=${validiumDAValidatorAddress}`);
+
+    // This address only makes sense on the Sync Layer, but we deploy it anyway to keep the script simple
+    const relayedSLDAValidator = await this.deployViaCreate2("RelayedSLDAValidator", [], create2Salt, ethTxOptions);
+    console.log(`CONTRACTS_L1_RELAYED_SL_DA_VALIDATOR=${relayedSLDAValidator}`);
+
+    this.addresses.RollupL1DAValidator = rollupDAValidatorAddress;
+    this.addresses.ValidiumL1DAValidator = validiumDAValidatorAddress;
+    this.addresses.RelayedSLDAValidator = relayedSLDAValidator;
+  }
+
   public async updateBlobVersionedHashRetrieverZkMode() {
     if (!this.isZkMode()) {
       throw new Error("`updateBlobVersionedHashRetrieverZk` should be only called when deploying on zkSync network");
