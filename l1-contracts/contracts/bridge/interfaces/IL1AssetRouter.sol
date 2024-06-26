@@ -10,7 +10,7 @@ import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL1SharedBridge {
+interface IL1AssetRouter {
     event LegacyDepositInitiated(
         uint256 indexed chainId,
         bytes32 indexed l2DepositTxHash,
@@ -128,8 +128,6 @@ interface IL1SharedBridge {
 
     function legacyBridge() external view returns (IL1ERC20Bridge);
 
-    function l2BridgeAddress(uint256 _chainId) external view returns (address);
-
     function depositHappened(uint256 _chainId, bytes32 _l2TxHash) external view returns (bytes32);
 
     /// data is abi encoded :
@@ -151,8 +149,6 @@ interface IL1SharedBridge {
     ) external payable;
 
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
-
-    function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external;
 
     function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
 
