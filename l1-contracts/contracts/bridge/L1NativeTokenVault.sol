@@ -33,10 +33,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     /// @dev Era's chainID
     uint256 public immutable ERA_CHAIN_ID;
 
-    /// @dev Indicates whether the hyperbridging is enabled for a given chain.
-    // slither-disable-next-line uninitialized-state
-    mapping(uint256 chainId => bool enabled) public hyperbridgingEnabled;
-
     /// @dev Maps token balances for each chain to prevent unauthorized spending across hyperchains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
@@ -67,8 +63,12 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy
+    /// @param _owner Address which can change pause / unpause the NTV
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    function initialize() external initializer {}
+    function initialize(address _owner) external initializer {
+        require(_owner != address(0), "NTV owner 0");
+        _transferOwnership(_owner);
+    }
 
     /// @dev Accepts ether only from the Shared Bridge.
     receive() external payable {
@@ -171,9 +171,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         }
         require(amount != 0, "6T"); // empty deposit amount
 
-        if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
-            chainBalance[_chainId][l1Token] += amount;
-        }
+        chainBalance[_chainId][l1Token] += amount;
 
         // solhint-disable-next-line func-named-parameters
         _bridgeMintData = abi.encode(amount, _prevMsgSender, _l2Receiver, getERC20Getters(l1Token), l1Token); // to do add l2Receiver in here
@@ -220,41 +218,43 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
-    ) external payable override onlyBridge whenNotPaused returns (address _l1Receiver) {
+    ) external payable override onlyBridge whenNotPaused returns (address l1Receiver) {
         // here we are minting the tokens after the bridgeBurn has happened on an L2, so we can assume the l1Token is not zero
         address l1Token = tokenAddress[_assetId];
         uint256 amount;
-        (amount, _l1Receiver) = abi.decode(_data, (uint256, address));
-        if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
-            // Check that the chain has sufficient balance
-            require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
-            chainBalance[_chainId][l1Token] -= amount;
-        }
+        (amount, l1Receiver) = abi.decode(_data, (uint256, address));
+        // Check that the chain has sufficient balance
+        require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
+        chainBalance[_chainId][l1Token] -= amount;
+
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
             assembly {
-                callSuccess := call(gas(), _l1Receiver, amount, 0, 0, 0, 0)
+                callSuccess := call(gas(), l1Receiver, amount, 0, 0, 0, 0)
             }
             require(callSuccess, "NTV: withdrawal failed, no funds or cannot transfer to receiver");
         } else {
             // Withdraw funds
-            IERC20(l1Token).safeTransfer(_l1Receiver, amount);
+            IERC20(l1Token).safeTransfer(l1Receiver, amount);
         }
         // solhint-disable-next-line func-named-parameters
-        emit BridgeMint(_chainId, _assetId, _l1Receiver, amount);
+        emit BridgeMint(_chainId, _assetId, l1Receiver, amount);
     }
 
     ///  @inheritdoc IL1AssetHandler
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
-        address,
         bytes calldata _data
     ) external payable override onlyBridge whenNotPaused {
         (uint256 _amount, address _depositSender) = abi.decode(_data, (uint256, address));
         address l1Token = tokenAddress[_assetId];
         require(_amount > 0, "y1");
+
+        // check that the chain has sufficient balance
+        require(chainBalance[_chainId][l1Token] >= _amount, "NTV n funds");
+        chainBalance[_chainId][l1Token] -= _amount;
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
@@ -268,22 +268,23 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
             // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.
             // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
         }
-
-        if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
-            // check that the chain has sufficient balance
-            require(chainBalance[_chainId][l1Token] >= _amount, "NTV n funds");
-            chainBalance[_chainId][l1Token] -= _amount;
-        }
     }
 
     function getAssetId(address _l1TokenAddress) public view override returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    block.chainid,
-                    NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS,
-                    bytes32(uint256(uint160(_l1TokenAddress)))
-                )
-            );
+        return keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _l1TokenAddress));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            PAUSE
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
+    function unpause() external onlyOwner {
+        _unpause();
     }
 }

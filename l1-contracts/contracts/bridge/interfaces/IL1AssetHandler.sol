@@ -46,11 +46,6 @@ interface IL1AssetHandler {
 
     /// @param _chainId the chainId that the message will be sent to
     /// @param _assetId the assetId of the asset being bridged
-    /// @param _prevMsgSender the original caller of the Bridgehub/// @param _data the actual data specified for the function
-    function bridgeRecoverFailedTransfer(
-        uint256 _chainId,
-        bytes32 _assetId,
-        address _prevMsgSender,
-        bytes calldata _data
-    ) external payable;
+    /// @param _data the actual data specified for the function
+    function bridgeRecoverFailedTransfer(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable;
 }

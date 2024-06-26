@@ -7,6 +7,7 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -359,41 +360,41 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         returns (L2TransactionRequestTwoBridgesInner memory request)
     {
         require(l2BridgeAddress[_chainId] != address(0), "ShB l2 bridge not deployed");
-        bytes32 _assetId;
-        bytes memory _transferData;
+        bytes32 assetId;
+        bytes memory transferData;
         bool legacyDeposit = false;
         try this.handleLegacyData(_data, _prevMsgSender) returns (
-            bytes32 _assetIdDecoded,
-            bytes memory _transferDataDecoded
+            bytes32 assetIdDecoded,
+            bytes memory transferDataDecoded
         ) {
-            (_assetId, _transferData) = (_assetIdDecoded, _transferDataDecoded);
+            (assetId, transferData) = (assetIdDecoded, transferDataDecoded);
             legacyDeposit = true;
         } catch {
-            (_assetId, _transferData) = abi.decode(_data, (bytes32, bytes));
+            (assetId, transferData) = abi.decode(_data, (bytes32, bytes));
         }
 
-        require(BRIDGE_HUB.baseTokenAssetId(_chainId) != _assetId, "ShB: baseToken deposit not supported");
+        require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, "ShB: baseToken deposit not supported");
 
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
             _l2Value: _l2Value,
-            _assetId: _assetId,
+            _assetId: assetId,
             _prevMsgSender: _prevMsgSender,
-            _transferData: _transferData
+            _transferData: transferData
         });
         bytes32 txDataHash;
 
         if (legacyDeposit) {
-            (uint256 _depositAmount, ) = abi.decode(_transferData, (uint256, address));
-            txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(_assetId), _depositAmount));
+            (uint256 _depositAmount, ) = abi.decode(transferData, (uint256, address));
+            txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(assetId), _depositAmount));
         } else {
-            txDataHash = keccak256(abi.encode(_prevMsgSender, _assetId, _transferData));
+            txDataHash = keccak256(abi.encode(_prevMsgSender, assetId, transferData));
         }
 
         request = _requestToBridge({
             _chainId: _chainId,
             _prevMsgSender: _prevMsgSender,
-            _assetId: _assetId,
+            _assetId: assetId,
             _bridgeMintCalldata: bridgeMintCalldata,
             _txDataHash: txDataHash
         });
@@ -402,7 +403,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             chainId: _chainId,
             txDataHash: txDataHash,
             from: _prevMsgSender,
-            assetId: _assetId,
+            assetId: assetId,
             bridgeMintCalldata: bridgeMintCalldata
         });
     }
@@ -527,14 +528,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
         delete depositHappened[_chainId][_l2TxHash];
 
-        IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(
-            _chainId,
-            _assetId,
-            _depositSender,
-            _assetData
-        );
+        IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(_chainId, _assetId, _assetData);
 
-        emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetId, keccak256(_assetData));
+        emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetId, _assetData);
     }
 
     /// @dev Determines if an eth withdrawal was initiated on zkSync Era before the upgrade to the Shared Bridge.
@@ -722,6 +718,21 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
     }
 
+    /// @dev Receives and parses (name, symbol, decimals) from the token contract
+    function getERC20Getters(address _token) public view returns (bytes memory) {
+        if (_token == ETH_TOKEN_ADDRESS) {
+            bytes memory name = bytes("Ether");
+            bytes memory symbol = bytes("ETH");
+            bytes memory decimals = abi.encode(uint8(18));
+            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
+        }
+
+        (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
+        (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
+        (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
+        return abi.encode(data1, data2, data3);
+    }
+
     /*//////////////////////////////////////////////////////////////
             SHARED BRIDGE TOKEN BRIDGING LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -810,13 +821,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
 
             // solhint-disable-next-line func-named-parameters
-            bridgeMintCalldata = abi.encode(
-                _amount,
-                _prevMsgSender,
-                _l2Receiver,
-                nativeTokenVault.getERC20Getters(_l1Token),
-                _l1Token
-            );
+            bridgeMintCalldata = abi.encode(_amount, _prevMsgSender, _l2Receiver, getERC20Getters(_l1Token), _l1Token);
         }
 
         {

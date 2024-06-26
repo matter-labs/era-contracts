@@ -52,7 +52,7 @@ interface IL1SharedBridge {
         uint256 indexed chainId,
         address indexed to,
         bytes32 indexed assetId,
-        bytes32 assetDataHash
+        bytes assetData
     );
 
     event AssetHandlerRegisteredInitial(
