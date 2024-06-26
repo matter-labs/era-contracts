@@ -139,9 +139,9 @@ function popStackItem(sp) -> a, newSp {
     newSp := sub(sp, 0x20)
 }
 
-function pushStackItem(sp, item) -> newSp {
+function pushStackItem(sp, item, evmGasLeft) -> newSp {
     if or(gt(sp, BYTECODE_OFFSET()), eq(sp, BYTECODE_OFFSET())) {
-        revert(0, 0)
+        revertWithGas(evmGasLeft)
     }
 
     newSp := add(sp, 0x20)
@@ -913,7 +913,7 @@ function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
 
     extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
     extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
-    sp := pushStackItem(sp, success)
+    sp := pushStackItem(sp, success, evmGasLeft)
 }
 function capGas(evmGasLeft,oldGasToPass) -> gasToPass {
     let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
@@ -1036,7 +1036,7 @@ function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
 
     extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
     extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
-    sp := pushStackItem(sp,success) 
+    sp := pushStackItem(sp,success, evmGasLeft) 
 }
 
 function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost {
@@ -1097,7 +1097,7 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
 
     extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
     extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
-    sp := pushStackItem(sp, success)
+    sp := pushStackItem(sp, success, evmGasLeft)
 }
 
 function getMessageCallGas (
@@ -1217,10 +1217,10 @@ function genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, 
 
     offset := add(MEM_OFFSET_INNER(), offset)
 
-    sp := pushStackItem(sp, mload(sub(offset, 0x80)))
-    sp := pushStackItem(sp, mload(sub(offset, 0x60)))
-    sp := pushStackItem(sp, mload(sub(offset, 0x40)))
-    sp := pushStackItem(sp, mload(sub(offset, 0x20)))
+    sp := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeft)
+    sp := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeft)
+    sp := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeft)
+    sp := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeft)
 
     // Selector
     mstore(sub(offset, 0x80), 0x5b16a23c)
@@ -1343,8 +1343,8 @@ function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
     result, evmGasLeft := genericCreate(addr, offset, size, sp, value, evmGasLeft)
 
     switch result
-        case 0 { sp := pushStackItem(sp, 0) }
-        default { sp := pushStackItem(sp, addr) }
+        case 0 { sp := pushStackItem(sp, 0, evmGasLeft) }
+        default { sp := pushStackItem(sp, addr, evmGasLeft) }
 }
 
 function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp, result, addr{
