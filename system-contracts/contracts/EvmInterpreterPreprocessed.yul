@@ -331,14 +331,20 @@ object "EVMInterpreter" {
         
             let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
         
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
+            switch iszero(success)
+            case 1 {
+                // The code oracle call can only fail in the case where the contract
+                // we are querying is the current one executing and it has not yet been
+                // deployed, i.e., if someone calls codesize (or extcodesize(address()))
+                // inside the constructor. In that case, code length is zero.
+                codeLen := 0
+            }
+            default {
+                // The first word is the true length of the bytecode
+                returndatacopy(0, 0, 32)
+                codeLen := mload(0)
             }
         
-            // The first word is the true length of the bytecode
-            returndatacopy(0, 0, 32)
-            codeLen := mload(0)
         }
         
         function getDeployedBytecode() {
@@ -1902,6 +1908,7 @@ object "EVMInterpreter" {
                     let addr
                     addr, sp := popStackItem(sp)
             
+                    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
                     if iszero(warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
@@ -1909,6 +1916,8 @@ object "EVMInterpreter" {
                     // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
                     // if a contract is created it works, but if the address is a zkSync's contract
                     // what happens?
+                    // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)
+            
                     switch _isEVM(addr) 
                         case 0  { sp := pushStackItem(sp, extcodesize(addr), evmGasLeft) }
                         default { sp := pushStackItem(sp, _fetchDeployedCodeLen(addr), evmGasLeft) }
@@ -3070,14 +3079,20 @@ object "EVMInterpreter" {
             
                 let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
             
-                if iszero(success) {
-                    // This error should never happen
-                    revert(0, 0)
+                switch iszero(success)
+                case 1 {
+                    // The code oracle call can only fail in the case where the contract
+                    // we are querying is the current one executing and it has not yet been
+                    // deployed, i.e., if someone calls codesize (or extcodesize(address()))
+                    // inside the constructor. In that case, code length is zero.
+                    codeLen := 0
+                }
+                default {
+                    // The first word is the true length of the bytecode
+                    returndatacopy(0, 0, 32)
+                    codeLen := mload(0)
                 }
             
-                // The first word is the true length of the bytecode
-                returndatacopy(0, 0, 32)
-                codeLen := mload(0)
             }
             
             function getDeployedBytecode() {
@@ -4652,6 +4667,7 @@ object "EVMInterpreter" {
                     let addr
                     addr, sp := popStackItem(sp)
             
+                    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
                     if iszero(warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
@@ -4659,6 +4675,8 @@ object "EVMInterpreter" {
                     // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
                     // if a contract is created it works, but if the address is a zkSync's contract
                     // what happens?
+                    // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)
+            
                     switch _isEVM(addr) 
                         case 0  { sp := pushStackItem(sp, extcodesize(addr), evmGasLeft) }
                         default { sp := pushStackItem(sp, _fetchDeployedCodeLen(addr), evmGasLeft) }

@@ -415,6 +415,7 @@ for { } true { } {
         let addr
         addr, sp := popStackItem(sp)
 
+        addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
         if iszero(warmAddress(addr)) {
             evmGasLeft := chargeGas(evmGasLeft, 2500)
         }
@@ -422,6 +423,8 @@ for { } true { } {
         // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
         // if a contract is created it works, but if the address is a zkSync's contract
         // what happens?
+        // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)
+
         switch _isEVM(addr) 
             case 0  { sp := pushStackItem(sp, extcodesize(addr), evmGasLeft) }
             default { sp := pushStackItem(sp, _fetchDeployedCodeLen(addr), evmGasLeft) }
