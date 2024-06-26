@@ -42,7 +42,7 @@ library FullMerkle {
         // solhint-disable-next-line gas-increment-by-one
         uint256 index = self._leafNumber++;
 
-        if ((index == 1 << self._height)) {
+        if (index == 1 << self._height) {
             uint256 newHeight = self._height.uncheckedInc();
             self._height = newHeight;
             bytes32 topZero = self._zeros[newHeight - 1];
@@ -104,12 +104,20 @@ library FullMerkle {
             self._nodes[_height][0] = _newNodes[0];
             return _newNodes[0];
         }
-        bytes32[] memory _newRow;
+
+        uint256 newRowLength = (_newNodes.length + 1) / 2;
+        bytes32[] memory _newRow = new bytes32[](newRowLength);
+
         uint256 length = _newNodes.length;
         for (uint256 i; i < length; i = i.uncheckedAdd(2)) {
             self._nodes[_height][i] = _newNodes[i];
-            self._nodes[_height][i + 1] = _newNodes[i + 1];
-            _newRow[i / 2] = _efficientHash(_newNodes[i], _newNodes[i + 1]);
+            if (i + 1 < length) {
+                self._nodes[_height][i + 1] = _newNodes[i + 1];
+                _newRow[i / 2] = _efficientHash(_newNodes[i], _newNodes[i + 1]);
+            } else {
+                // Handle odd number of nodes by hashing the last node with zero
+                _newRow[i / 2] = _efficientHash(_newNodes[i], self._zeros[_height]);
+            }
         }
         return updateAllNodesAtHeight(self, _height + 1, _newRow);
     }
