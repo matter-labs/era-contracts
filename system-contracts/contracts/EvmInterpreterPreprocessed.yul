@@ -869,7 +869,7 @@ object "EVMInterpreter" {
             if lt(sub(_gas,shl(30,1)), requiredGas) {
                 // This cheks if enough zkevm gas was provided, we are substracting 2^30 since that's the stipend, 
                 // and we need to make sure that the gas provided over that is enough for security reasons
-                // revert(0, 0)
+                revert(0, 0)
             }
             evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
         }
@@ -1790,6 +1790,7 @@ object "EVMInterpreter" {
                     let addr
             
                     addr, sp := popStackItem(sp)
+                    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
                     if iszero(warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
@@ -2071,7 +2072,6 @@ object "EVMInterpreter" {
                     
                 }
                 case 0x55 { // OP_SSTORE
-                
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
                     if isStatic {
@@ -3605,7 +3605,7 @@ object "EVMInterpreter" {
                 if lt(sub(_gas,shl(30,1)), requiredGas) {
                     // This cheks if enough zkevm gas was provided, we are substracting 2^30 since that's the stipend, 
                     // and we need to make sure that the gas provided over that is enough for security reasons
-                    // revert(0, 0)
+                    revert(0, 0)
                 }
                 evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
             }
@@ -4537,6 +4537,7 @@ object "EVMInterpreter" {
                     let addr
             
                     addr, sp := popStackItem(sp)
+                    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
                     if iszero(warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
@@ -4818,7 +4819,6 @@ object "EVMInterpreter" {
                     
                 }
                 case 0x55 { // OP_SSTORE
-                
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
                     if isStatic {

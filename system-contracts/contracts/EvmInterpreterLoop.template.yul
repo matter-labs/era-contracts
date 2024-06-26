@@ -305,6 +305,7 @@ for { } true { } {
         let addr
 
         addr, sp := popStackItem(sp)
+        addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
         if iszero(warmAddress(addr)) {
             evmGasLeft := chargeGas(evmGasLeft, 2500)
@@ -586,7 +587,6 @@ for { } true { } {
         
     }
     case 0x55 { // OP_SSTORE
-    
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
         if isStatic {

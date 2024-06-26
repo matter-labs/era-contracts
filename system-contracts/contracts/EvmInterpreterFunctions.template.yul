@@ -795,7 +795,7 @@ function getEVMGas() -> evmGas {
     if lt(sub(_gas,shl(30,1)), requiredGas) {
         // This cheks if enough zkevm gas was provided, we are substracting 2^30 since that's the stipend, 
         // and we need to make sure that the gas provided over that is enough for security reasons
-        // revert(0, 0)
+        revert(0, 0)
     }
     evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
 }
