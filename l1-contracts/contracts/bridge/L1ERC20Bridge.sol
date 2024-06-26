@@ -16,7 +16,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to hyperchains
+/// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to ZK chains
 /// @dev It is a legacy bridge from zkSync Era, that was deprecated in favour of shared bridge.
 /// It is needed for backward compatibility with already integrated projects.
 contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {

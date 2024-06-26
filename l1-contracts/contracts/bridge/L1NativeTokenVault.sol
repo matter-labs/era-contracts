@@ -19,7 +19,7 @@ import {ETH_TOKEN_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/C
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the hyperchains.
+/// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the ZK chains.
 /// @dev Designed for use with a proxy for upgradability.
 contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
@@ -33,7 +33,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     /// @dev Era's chainID
     uint256 public immutable ERA_CHAIN_ID;
 
-    /// @dev Maps token balances for each chain to prevent unauthorized spending across hyperchains.
+    /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
@@ -95,7 +95,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
 
     /// @dev Set chain token balance as part of migration process.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
-    /// @param _targetChainId The chain ID of the corresponding hyperchain.
+    /// @param _targetChainId The chain ID of the corresponding ZK chain.
     function transferBalancesFromSharedBridge(address _token, uint256 _targetChainId) external onlySelf {
         uint256 sharedBridgeChainBalance = L1_SHARED_BRIDGE.chainBalance(_targetChainId, _token);
         chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + sharedBridgeChainBalance;
