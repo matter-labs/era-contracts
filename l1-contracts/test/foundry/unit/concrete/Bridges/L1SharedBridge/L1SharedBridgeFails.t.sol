@@ -118,6 +118,13 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     //     nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
     // }
 
+    // function test_transferFundsToSharedBridge_Eth_CallFailed() public {
+    //     vm.mockCall(address(nativeTokenVault), "0x", abi.encode(""));
+    //     vm.prank(address(nativeTokenVault));
+    //     vm.expectRevert("ShB: eth transfer failed");
+    //     nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
+    // }
+
     function test_transferFundsToSharedBridge_Eth_0_AmountTransferred() public {
         vm.deal(address(sharedBridge), 0);
         vm.prank(address(nativeTokenVault));
