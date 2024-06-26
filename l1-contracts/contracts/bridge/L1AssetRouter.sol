@@ -355,8 +355,8 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         whenNotPaused
         returns (L2TransactionRequestTwoBridgesInner memory request)
     {
-        bytes32 _assetId;
-        bytes memory _transferData;
+        bytes32 assetId;
+        bytes memory transferData;
         bool legacyDeposit = false;
         try this.handleLegacyData(_data, _prevMsgSender) returns (
             bytes32 assetIdDecoded,
