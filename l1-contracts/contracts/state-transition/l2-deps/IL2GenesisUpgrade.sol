@@ -16,5 +16,5 @@ struct ForceDeployment {
 }
 
 interface IL2GenesisUpgrade {
-    function upgrade(uint256 _chainId, ForceDeployment[] calldata _forceDeployments) external payable;
+    function genesisUpgrade(uint256 _chainId, bytes calldata _forceDeploymentsData) external payable;
 }

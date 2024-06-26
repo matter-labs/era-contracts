@@ -5,8 +5,10 @@ import type { Contract } from "ethers";
 import { parseEther } from "ethers/lib/utils";
 
 import * as fs from "fs";
+import { isZKMode } from "./utils";
 
 import { deployContractWithArgs as deployContractWithArgsEVM } from "./deploy-utils";
+import { deployContractWithArgs as deployContractWithArgsZK } from "./deploy-utils-zk";
 
 const DEFAULT_ERC20 = "TestnetERC20Token";
 
@@ -30,10 +32,14 @@ export async function deployContracts(tokens: TokenDescription[], wallet: Wallet
 
     const args = token.implementation !== "WETH9" ? [token.name, token.symbol, token.decimals] : [];
 
-    token.contract = await deployContractWithArgsEVM(wallet, token.implementation, args, {
-      gasLimit: 5000000,
-      nonce: nonce++,
-    });
+    if (isZKMode()) {
+      token.contract = await deployContractWithArgsZK(wallet, token.implementation, args, { nonce: nonce++ });
+    } else {
+      token.contract = await deployContractWithArgsEVM(wallet, token.implementation, args, {
+        gasLimit: 5000000,
+        nonce: nonce++,
+      });
+    }
   }
 
   await Promise.all(tokens.map(async (token) => token.contract.deployTransaction.wait()));

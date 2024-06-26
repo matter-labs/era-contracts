@@ -91,7 +91,7 @@ contract DummySharedBridge {
         uint256 _amount
     ) external payable {
         if (_l1Token == address(1)) {
-            require(msg.value == _amount, "L1SharedBridge: msg.value not equal to amount");
+            require(msg.value == _amount, "L1AssetRouter: msg.value not equal to amount");
         } else {
             // The Bridgehub also checks this, but we want to be sure
             require(msg.value == 0, "ShB m.v > 0 b d.it");

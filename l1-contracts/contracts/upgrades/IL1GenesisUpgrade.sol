@@ -10,17 +10,16 @@ interface IL1GenesisUpgrade {
     event GenesisUpgrade(
         address indexed _hyperchain,
         L2CanonicalTransaction _l2Transaction,
-        uint256 indexed _protocolVersion
+        uint256 indexed _protocolVersion,
+        bytes[] _factoryDeps
     );
 
     function genesisUpgrade(
         address _l1GenesisUpgrade,
         uint256 _chainId,
         uint256 _protocolVersion,
-        address[] calldata _addresses,
-        bool[] calldata _bools,
-        bytes32[] calldata _byteCodeHashes,
-        uint256[] calldata _factoryDeps
+        bytes calldata _forceDeployments,
+        bytes[] calldata _factoryDeps
     ) external returns (bytes32);
 
     function upgradeInner(ProposedUpgrade calldata _proposedUpgrade) external returns (bytes32);

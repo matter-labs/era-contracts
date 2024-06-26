@@ -3,16 +3,16 @@ pragma solidity 0.8.24;
 
 import "forge-std/console.sol";
 
-import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
+import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
-contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
+contract L1AssetRouterLegacyTest is L1AssetRouterTest {
     function test_depositLegacyERC20Bridge() public {
         uint256 l2TxGasLimit = 100000;
         uint256 l2TxGasPerPubdataByte = 100;
@@ -100,12 +100,13 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         // solhint-disable-next-line func-named-parameters
         bytes memory message = abi.encodePacked(
             IL1ERC20Bridge.finalizeWithdrawal.selector,
-            tokenAssetId,
-            abi.encode(amount, alice)
+            alice,
+            address(token),
+            amount
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: l2SharedBridge,
+            sender: L2_ASSET_ROUTER_ADDR,
             data: message
         });
 
@@ -188,7 +189,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
 
         sharedBridge.claimFailedDepositLegacyErc20Bridge({
             _depositSender: alice,
-            _l1Asset: address(token),
+            _l1Token: address(token),
             _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,

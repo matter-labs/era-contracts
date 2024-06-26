@@ -27,7 +27,8 @@ contract SetChainCreationParamsTest is StateTransitionManagerTest {
             genesisBatchHash: genesisBatchHash,
             genesisIndexRepeatedStorageChanges: genesisIndexRepeatedStorageChanges,
             genesisBatchCommitment: genesisBatchCommitment,
-            diamondCut: newDiamondCutData
+            diamondCut: newDiamondCutData,
+            forceDeploymentsData: bytes("")
         });
 
         chainContractAddress.setChainCreationParams(newChainCreationParams);

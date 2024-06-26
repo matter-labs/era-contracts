@@ -99,6 +99,10 @@ export interface DeployedAddresses {
   Bridgehub: {
     BridgehubProxy: string;
     BridgehubImplementation: string;
+    STMDeploymentTrackerImplementation: string;
+    STMDeploymentTrackerProxy: string;
+    MessageRootImplementation: string;
+    MessageRootProxy: string;
   };
   StateTransition: {
     StateTransitionProxy: string;
@@ -132,6 +136,9 @@ export interface DeployedAddresses {
   Governance: string;
   BlobVersionedHashRetriever: string;
   ValidatorTimeLock: string;
+  RollupL1DAValidator: string;
+  ValidiumL1DAValidator: string;
+  RelayedSLDAValidator: string;
   Create2Factory: string;
 }
 
@@ -140,6 +147,10 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     Bridgehub: {
       BridgehubProxy: getAddressFromEnv("CONTRACTS_BRIDGEHUB_PROXY_ADDR"),
       BridgehubImplementation: getAddressFromEnv("CONTRACTS_BRIDGEHUB_IMPL_ADDR"),
+      STMDeploymentTrackerImplementation: getAddressFromEnv("CONTRACTS_STM_DEPLOYMENT_TRACKER_IMPL_ADDR"),
+      STMDeploymentTrackerProxy: getAddressFromEnv("CONTRACTS_STM_DEPLOYMENT_TRACKER_PROXY_ADDR"),
+      MessageRootImplementation: getAddressFromEnv("CONTRACTS_MESSAGE_ROOT_IMPL_ADDR"),
+      MessageRootProxy: getAddressFromEnv("CONTRACTS_MESSAGE_ROOT_PROXY_ADDR"),
     },
     StateTransition: {
       StateTransitionProxy: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_PROXY_ADDR"),
@@ -167,6 +178,9 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       NativeTokenVaultImplementation: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_IMPL_ADDR"),
       NativeTokenVaultProxy: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_PROXY_ADDR"),
     },
+    RollupL1DAValidator: getAddressFromEnv("CONTRACTS_L1_ROLLUP_DA_VALIDATOR"),
+    ValidiumL1DAValidator: getAddressFromEnv("CONTRACTS_L1_VALIDIUM_DA_VALIDATOR"),
+    RelayedSLDAValidator: getAddressFromEnv("CONTRACTS_L1_RELAYED_SL_DA_VALIDATOR"),
     BaseToken: getAddressFromEnv("CONTRACTS_BASE_TOKEN_ADDR"),
     TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),
     L2ProxyAdmin: getAddressFromEnv("CONTRACTS_L2_PROXY_ADMIN_ADDR"),

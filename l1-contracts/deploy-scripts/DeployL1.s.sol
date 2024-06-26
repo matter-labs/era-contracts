@@ -15,7 +15,7 @@ import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
+// import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -29,7 +29,7 @@ import {IStateTransitionManager} from "contracts/state-transition/IStateTransiti
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
+import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
@@ -510,7 +510,7 @@ contract DeployL1Script is Script {
 
     function deploySharedBridgeImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
-            type(L1SharedBridge).creationCode,
+            type(L1AssetRouter).creationCode,
             // solhint-disable-next-line func-named-parameters
             abi.encode(
                 config.tokens.tokenWethAddress,
@@ -525,7 +525,7 @@ contract DeployL1Script is Script {
     }
 
     function deploySharedBridgeProxy() internal {
-        bytes memory initCalldata = abi.encodeCall(L1SharedBridge.initialize, (config.deployerAddress, 1, 1, 1, 0));
+        bytes memory initCalldata = abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress, 1, 1, 1, 0));
         bytes memory bytecode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(addresses.bridges.sharedBridgeImplementation, addresses.transparentProxyAdmin, initCalldata)
@@ -566,7 +566,7 @@ contract DeployL1Script is Script {
     }
 
     function updateSharedBridge() internal {
-        L1SharedBridge sharedBridge = L1SharedBridge(addresses.bridges.sharedBridgeProxy);
+        L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
         vm.broadcast();
         sharedBridge.setL1Erc20Bridge(addresses.bridges.erc20BridgeProxy);
         console.log("SharedBridge updated with ERC20Bridge address");
@@ -581,7 +581,7 @@ contract DeployL1Script is Script {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         bridgehub.transferOwnership(addresses.governance);
 
-        L1SharedBridge sharedBridge = L1SharedBridge(addresses.bridges.sharedBridgeProxy);
+        L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses.governance);
 
         vm.stopBroadcast();

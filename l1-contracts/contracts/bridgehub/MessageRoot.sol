@@ -5,21 +5,18 @@ pragma solidity 0.8.24;
 // slither-disable-next-line unused-return
 // solhint-disable reason-string, gas-custom-errors
 
-// import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-// import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/openzeppelin/IncrementalMerkle.sol"; // todo figure out how to import from OZ
 
 import {IBridgehub} from "./IBridgehub.sol";
-// import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-// import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-// import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-// import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
-// import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-// import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
+
+import {MAX_NUMBER_OF_HYPERCHAINS} from "../common/Config.sol";
+
+// FIXME: explain why it can not collide with real root
+bytes32 constant EMPTY_LOG_ROOT = keccak256("New Tree zero hash");
 
 contract MessageRoot is IMessageRoot, ReentrancyGuard {
     using FullMerkle for FullMerkle.FullTree;
@@ -68,11 +65,14 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     }
 
     function addNewChain(uint256 _chainId) external onlyBridgehub {
-        chainIndex[_chainId] = chainCount;
-        chainIndexToId[chainCount] = _chainId;
+        uint256 cachedChainCount = chainCount;
+        require(cachedChainCount < MAX_NUMBER_OF_HYPERCHAINS, "MR: too many chains");
+
+        chainIndex[_chainId] = cachedChainCount;
+        chainIndexToId[cachedChainCount] = _chainId;
         ++chainCount;
         // slither-disable-next-line unused-return
-        bytes32 initialHash = chainTree[_chainId].setup(keccak256("New Tree zero hash"));
+        bytes32 initialHash = chainTree[_chainId].setup(EMPTY_LOG_ROOT);
         // slither-disable-next-line unused-return
         sharedTree.pushNewLeaf(initialHash);
     }
@@ -82,27 +82,58 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     }
 
     /// @dev add a new chainBatchRoot to the chainTree
-    function addChainBatchRoot(
-        uint256 _chainId,
-        bytes32 _chainBatchRoot,
-        bool _updateFullTree
-    ) external onlyChain(_chainId) {
+    function addChainBatchRoot(uint256 _chainId, bytes32 _chainBatchRoot) external onlyChain(_chainId) {
         bytes32 chainRoot;
         // slither-disable-next-line unused-return
         (, chainRoot) = chainTree[_chainId].push(_chainBatchRoot);
 
-        if (_updateFullTree) {
-            // slither-disable-next-line unused-return
-            sharedTree.updateLeaf(chainIndex[_chainId], chainRoot);
-        }
+        // slither-disable-next-line unused-return
+        sharedTree.updateLeaf(chainIndex[_chainId], chainRoot);
     }
 
-    function updateFullTree() external {
-        bytes32[] memory newLeaves;
-        for (uint256 i = 0; i < chainCount; ++i) {
+    function updateFullTree() public {
+        uint256 cachedChainCount = chainCount;
+        bytes32[] memory newLeaves = new bytes32[](cachedChainCount);
+        for (uint256 i = 0; i < cachedChainCount; ++i) {
             newLeaves[i] = chainTree[chainIndexToId[i]].root();
         }
         // slither-disable-next-line unused-return
         sharedTree.updateAllLeaves(newLeaves);
+    }
+
+    /// @notice To be called by the bootloader by the L1Messenger at the end of the batch to produce the final root and send it to the underlying layer.
+    /// @return pubdata The pubdata to be relayed to the DA layer.
+    function clearTreeAndProvidePubdata() external returns (bytes memory pubdata) {
+        // FIXME: access control: only to be called by the l1 messenger.
+
+        uint256 cachedChainCount = chainCount;
+
+        // We will send the updated roots for all chains.
+        // While it will mean that we'll pay even for unchanged roots:
+        // - It is the simplest approach
+        // - The alternative is to send pairs of (chainId, root), which is less efficient if at least half of the chains are active.
+        //
+        // There are of course ways to optimize it further, but it will be done in the future.
+        pubdata = new bytes(cachedChainCount * 32);
+
+        for (uint256 i = 0; i < cachedChainCount; ++i) {
+            // It is the responsibility of each chain to provide the roots of its L2->L1 messages if it wants to see those.
+            // However, for the security of the system as a whole, the chain roots need to be provided for all chains.
+
+            bytes32 chainRoot = chainTree[chainIndexToId[i]].root();
+
+            assembly {
+                mstore(add(pubdata, add(32, mul(i, 32))), chainRoot)
+            }
+
+            // Clearing up the state.
+            // Note that it *does not* delete any storage slots, so in terms of pubdata savings, it is useless.
+            // However, the chains paid for these changes anyway, so it is considered acceptable.
+            // In the future, further optimizations will be available.
+            // slither-disable-next-line usused-return
+            chainTree[chainIndexToId[i]].setup(EMPTY_LOG_ROOT);
+        }
+
+        updateFullTree();
     }
 }

@@ -1,8 +1,8 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
-import type { L1SharedBridge, Bridgehub, L1NativeTokenVault } from "../../typechain";
-import { L1SharedBridgeFactory, BridgehubFactory, TestnetERC20TokenFactory } from "../../typechain";
+import type { L1AssetRouter, Bridgehub, L1NativeTokenVault } from "../../typechain";
+import { L1AssetRouterFactory, BridgehubFactory, TestnetERC20TokenFactory } from "../../typechain";
 import { L1NativeTokenVaultFactory } from "../../typechain/L1NativeTokenVaultFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
@@ -20,7 +20,7 @@ describe("Shared Bridge tests", () => {
   let deployer: Deployer;
   let bridgehub: Bridgehub;
   let l1NativeTokenVault: L1NativeTokenVault;
-  let l1SharedBridge: L1SharedBridge;
+  let l1SharedBridge: L1AssetRouter;
   let erc20TestToken: ethers.Contract;
   const functionSignature = "0x6c0960f9";
   const ERC20functionSignature = "0x11a2ccc1";
@@ -56,7 +56,7 @@ describe("Shared Bridge tests", () => {
     chainId = deployer.chainId;
     // prepare the bridge
 
-    l1SharedBridge = L1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
+    l1SharedBridge = L1AssetRouterFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
     l1NativeTokenVault = L1NativeTokenVaultFactory.connect(
       deployer.addresses.Bridges.NativeTokenVaultProxy,
@@ -195,7 +195,7 @@ describe("Shared Bridge tests", () => {
           [ethers.constants.HashZero]
         )
     );
-    expect(revertReason).equal("ShB withd w proof");
+    expect(revertReason).equal("ShB wrong msg len 2");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {

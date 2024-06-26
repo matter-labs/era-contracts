@@ -10,7 +10,7 @@ import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL1SharedBridge {
+interface IL1AssetRouter {
     event LegacyDepositInitiated(
         uint256 indexed chainId,
         bytes32 indexed l2DepositTxHash,
@@ -34,6 +34,8 @@ interface IL1SharedBridge {
         bytes32 assetId,
         uint256 amount
     );
+
+    event BridgehubMintData(bytes bridgeMintData);
 
     event BridgehubDepositFinalized(
         uint256 indexed chainId,
@@ -126,8 +128,6 @@ interface IL1SharedBridge {
 
     function legacyBridge() external view returns (IL1ERC20Bridge);
 
-    function l2BridgeAddress(uint256 _chainId) external view returns (address);
-
     function depositHappened(uint256 _chainId, bytes32 _l2TxHash) external view returns (bytes32);
 
     /// data is abi encoded :
@@ -150,11 +150,19 @@ interface IL1SharedBridge {
 
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 
-    function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external;
-
     function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
 
     function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external;
+
+    function setAssetHandlerAddressOnCounterPart(
+        uint256 _chainId,
+        uint256 _mintValue,
+        uint256 _l2TxGasLimit,
+        uint256 _l2TxGasPerPubdataByte,
+        address _refundRecipient,
+        bytes32 _assetId,
+        address _assetAddressOnCounterPart
+    ) external payable returns (bytes32 l2TxHash);
 
     function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 
@@ -173,4 +181,10 @@ interface IL1SharedBridge {
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external;
+
+    function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
+
+    function transferEthToNTV() external;
+
+    function transferTokenToNTV(address _token) external;
 }

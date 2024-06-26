@@ -56,6 +56,13 @@
     "sourceCodeHash": "0xc88a4210dda96bc21fc852860fb74a4efeb0cc4101ffe6d928551cab46d15263"
   },
   {
+    "contractName": "GenesisUpgrade",
+    "bytecodePath": "artifacts-zk/contracts-preprocessed/GenesisUpgrade.sol/GenesisUpgrade.json",
+    "sourceCodePath": "contracts-preprocessed/GenesisUpgrade.sol",
+    "bytecodeHash": "0x010000894c70c95faa2197e866a6bf9a8154c6e154a878c6bb8b64d554dfed1b",
+    "sourceCodeHash": "0xa437698a10cba654424f7cc37d042955ff61dd46fcc07525a844bb9421bed85a"
+  },
+  {
     "contractName": "ImmutableSimulator",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/ImmutableSimulator.sol/ImmutableSimulator.json",
     "sourceCodePath": "contracts-preprocessed/ImmutableSimulator.sol",

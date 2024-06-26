@@ -8,7 +8,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/acces
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
-import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
+import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
@@ -16,13 +16,24 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
+import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
+import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @dev The Bridgehub contract serves as the primary entry point for L1<->L2 communication,
+/// facilitating interactions between end user and bridges.
+/// It also manages state transition managers, base tokens, and chain registrations.
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice the asset id of Eth
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
+    /// @dev The chain id of L1, this contract will be deployed on multiple layers.
+    uint256 public immutable L1_CHAIN_ID;
+
     /// @notice all the ether is held by the weth bridge
-    IL1SharedBridge public sharedBridge;
+    IL1AssetRouter public sharedBridge;
 
     /// @notice we store registered stateTransitionManagers
     mapping(address _stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
@@ -41,11 +52,26 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev used to accept the admin role
     address private pendingAdmin;
 
+    IMessageRoot public override messageRoot;
+
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
     mapping(uint256 _chainId => bytes32 _baseTokenAssetId) public baseTokenAssetId;
 
+    ISTMDeploymentTracker public stmDeployer;
+
+    /// @dev asset info used to identify chains in the Shared Bridge
+    mapping(bytes32 stmAssetInfo => address stmAddress) public stmAssetInfoToAddress;
+
+    /// @dev used to indicate the currently active settlement layer for a given chainId
+    mapping(uint256 chainId => uint256 activeSettlementLayerChainId) public settlementLayer;
+
+    /// @dev Sync layer chain is expected to have .. as the base token.
+    mapping(uint256 chainId => bool isWhitelistedSyncLayer) public whitelistedSettlementLayers;
+
     /// @notice to avoid parity hack
-    constructor() reentrancyGuardInitializer {
+    constructor(uint256 _l1ChainId) reentrancyGuardInitializer {
+        _disableInitializers();
+        L1_CHAIN_ID = _l1ChainId;
         ETH_TOKEN_ASSET_ID = keccak256(
             abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
         );
@@ -61,6 +87,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
         _;
     }
+
+    modifier onlyChainSTM(uint256 _chainId) {
+        require(msg.sender == stateTransitionManager[_chainId], "BH: not chain STM");
+        _;
+    }
+
+    //// Initialization and registration
 
     /// @inheritdoc IBridgehub
     /// @dev Please note, if the owner wants to enforce the admin change it must execute both `setPendingAdmin` and
@@ -86,11 +119,23 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         emit NewAdmin(previousAdmin, currentPendingAdmin);
     }
 
-    ///// Getters
+    /// @notice To set stmDeploymetTracker, only Owner. Not done in initialize, as
+    /// the order of deployment is Bridgehub, Shared bridge, and then we call this
+    function setSTMDeployer(ISTMDeploymentTracker _stmDeployer) external onlyOwner {
+        stmDeployer = _stmDeployer;
+    }
 
-    /// @notice return the state transition chain contract for a chainId
-    function getHyperchain(uint256 _chainId) public view returns (address) {
-        return IStateTransitionManager(stateTransitionManager[_chainId]).getHyperchain(_chainId);
+    /// @notice To set shared bridge, only Owner. Not done in initialize, as
+    /// the order of deployment is Bridgehub, Shared bridge, and then we call this
+    function setAddresses(
+        address _sharedBridge,
+        ISTMDeploymentTracker _stmDeployer,
+        IMessageRoot _messageRoot
+    ) external onlyOwner {
+        sharedBridge = IL1AssetRouter(_sharedBridge);
+        stmDeployer = _stmDeployer;
+        messageRoot = _messageRoot;
+        _messageRoot.addNewChain(block.chainid);
     }
 
     //// Registry
@@ -123,8 +168,48 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
     function setSharedBridge(address _sharedBridge) external onlyOwner {
-        sharedBridge = IL1SharedBridge(_sharedBridge);
+        sharedBridge = IL1AssetRouter(_sharedBridge);
     }
+
+    function registerSyncLayer(
+        uint256 _newSyncLayerChainId,
+        bool _isWhitelisted
+    ) external onlyChainSTM(_newSyncLayerChainId) {
+        whitelistedSettlementLayers[_newSyncLayerChainId] = _isWhitelisted;
+
+        // TODO: emit event
+    }
+
+    /// @dev Used to set the assedAddress for a given assetInfo.
+    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetAddress) external {
+        address sender = L1_CHAIN_ID == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender); // Todo: this might be dangerous. We should decide based on the tx type.
+        bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData)); /// todo make other asse
+        stmAssetInfoToAddress[assetInfo] = _assetAddress;
+        emit AssetRegistered(assetInfo, _assetAddress, _additionalData, msg.sender);
+    }
+
+    ///// Getters
+
+    /// @notice return the state transition chain contract for a chainId
+    function getHyperchain(uint256 _chainId) public view returns (address) {
+        return IStateTransitionManager(stateTransitionManager[_chainId]).getHyperchain(_chainId);
+    }
+
+    function stmAssetInfoFromChainId(uint256 _chainId) public view override returns (bytes32) {
+        return stmAssetInfo(stateTransitionManager[_chainId]);
+    }
+
+    function stmAssetInfo(address _stmAddress) public view override returns (bytes32) {
+        return keccak256(abi.encode(L1_CHAIN_ID, address(stmDeployer), bytes32(uint256(uint160(_stmAddress)))));
+    }
+
+    /// FIXME: this method should not be present in the prod code.
+    // function registerCounterpart(uint256 chainid, address _counterpart) external onlyOwner {
+    //     trustedCounterparts[chainid] = _counterpart;
+    //     isTrustedCounterpart[_counterpart] = true;
+    // }
+
+    /// New chain
 
     /// @notice register new chain
     /// @notice for Eth the baseToken address is 1
@@ -135,40 +220,49 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // solhint-disable-next-line no-unused-vars
         uint256 _salt,
         address _admin,
-        bytes calldata _initData
+        bytes calldata _initData,
+        bytes[] calldata _factoryDeps
     ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256) {
-        require(_chainId != 0, "Bridgehub: chainId cannot be 0");
-        require(_chainId <= type(uint48).max, "Bridgehub: chainId too large");
+        require(_chainId != 0, "BH: chainId cannot be 0");
+        require(_chainId <= type(uint48).max, "BH: chainId too large");
 
-        require(
-            stateTransitionManagerIsRegistered[_stateTransitionManager],
-            "Bridgehub: state transition not registered"
-        );
-        require(tokenIsRegistered[_baseToken], "Bridgehub: token not registered");
-        require(address(sharedBridge) != address(0), "Bridgehub: weth bridge not set");
+        require(stateTransitionManagerIsRegistered[_stateTransitionManager], "BH: state transition not registered");
+        require(tokenIsRegistered[_baseToken], "BH: token not registered");
+        require(address(sharedBridge) != address(0), "BH: weth bridge not set");
 
-        require(stateTransitionManager[_chainId] == address(0), "Bridgehub: chainId already registered");
+        require(stateTransitionManager[_chainId] == address(0), "BH: chainId already registered");
 
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
         /// For now all base tokens have to use the NTV.
         baseTokenAssetId[_chainId] = sharedBridge.nativeTokenVault().getAssetId(_baseToken);
+        settlementLayer[_chainId] = block.chainid;
 
         IStateTransitionManager(_stateTransitionManager).createNewChain({
             _chainId: _chainId,
             _baseToken: _baseToken,
             _sharedBridge: address(sharedBridge),
             _admin: _admin,
-            _diamondCut: _initData
+            _initData: _initData,
+            _factoryDeps: _factoryDeps
         });
+        messageRoot.addNewChain(_chainId);
 
         emit NewChain(_chainId, _stateTransitionManager, _admin);
         return _chainId;
     }
 
-    //// Mailbox forwarder
+    /*//////////////////////////////////////////////////////////////
+                        Mailbox forwarder
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice forwards function call to Mailbox based on ChainId
+    /// @param _chainId The chain ID of the hyperchain where to prove L2 message inclusion.
+    /// @param _batchNumber The executed L2 batch number in which the message appeared
+    /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _message Information about the sent message: sender address, the message itself, tx index in the L2 batch where the message was sent
+    /// @param _proof Merkle proof for inclusion of L2 log that was sent with the message
+    /// @return Whether the proof is valid
     function proveL2MessageInclusion(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -181,6 +275,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
+    /// @param _chainId The chain ID of the hyperchain where to prove L2 log inclusion.
+    /// @param _batchNumber The executed L2 batch number in which the log appeared
+    /// @param _index The position of the l2log in the L2 logs Merkle tree
+    /// @param _log Information about the sent log
+    /// @param _proof Merkle proof for inclusion of the L2 log
+    /// @return Whether the proof is correct and L2 log is included in batch
     function proveL2LogInclusion(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -193,6 +293,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
+    /// @param _chainId The chain ID of the hyperchain where to prove L1->L2 tx status.
+    /// @param _l2TxHash The L2 canonical transaction hash
+    /// @param _l2BatchNumber The L2 batch number where the transaction was processed
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
+    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction
+    /// @param _status The execution status of the L1 -> L2 transaction (true - success & 0 - fail)
+    /// @return Whether the proof is correct and the transaction was actually executed with provided status
+    /// NOTE: It may return `false` for incorrect proof, but it doesn't mean that the L1 -> L2 transaction has an opposite status!
     function proveL1ToL2TransactionStatus(
         uint256 _chainId,
         bytes32 _l2TxHash,
@@ -303,7 +412,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address hyperchain = getHyperchain(_request.chainId);
 
         // slither-disable-next-line arbitrary-send-eth
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1SharedBridge(_request.secondBridgeAddress)
+        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1AssetRouter(_request.secondBridgeAddress)
             .bridgehubDeposit{value: _request.secondBridgeValue}(
             _request.chainId,
             msg.sender,
@@ -333,12 +442,92 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             })
         );
 
-        IL1SharedBridge(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
+        IL1AssetRouter(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
             _request.chainId,
             outputRequest.txDataHash,
             canonicalTxHash
         );
     }
+
+    function forwardTransactionOnSyncLayer(
+        uint256 _chainId,
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external override {
+        require(L1_CHAIN_ID != block.chainid, "BH: not in sync layer mode");
+        address hyperchain = getHyperchain(_chainId);
+        IZkSyncHyperchain(hyperchain).bridgehubRequestL2TransactionOnSyncLayer(
+            _transaction,
+            _factoryDeps,
+            _canonicalTxHash,
+            _expirationTimestamp
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        Chain migration
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev we can move assets using these
+    function bridgeBurn(
+        uint256 _settlementChainId,
+        uint256,
+        bytes32 _assetId,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external payable override returns (bytes memory bridgehubMintData) {
+        require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
+
+        (uint256 _chainId, bytes memory _stmData, bytes memory _chainData) = abi.decode(_data, (uint256, bytes, bytes));
+        require(_assetId == stmAssetInfoFromChainId(_chainId), "BH: assetInfo 1");
+        require(settlementLayer[_chainId] == block.chainid, "BH: not current SL");
+        settlementLayer[_chainId] = _settlementChainId;
+
+        bytes memory stmMintData = IStateTransitionManager(stateTransitionManager[_chainId]).forwardedBridgeBurn(
+            _chainId,
+            _stmData
+        );
+        bytes memory chainMintData = IZkSyncHyperchain(getHyperchain(_chainId)).forwardedBridgeBurn(
+            getHyperchain(_settlementChainId),
+            _prevMsgSender,
+            _chainData
+        );
+        bridgehubMintData = abi.encode(_chainId, stmMintData, chainMintData);
+        // TODO: double check that get only returns when chain id is there.
+    }
+
+    function bridgeMint(
+        uint256,
+        bytes32 _assetId,
+        bytes calldata _bridgehubMintData
+    ) external payable override returns (address l1Receiver) {
+        (uint256 _chainId, bytes memory _stmData, bytes memory _chainMintData) = abi.decode(
+            _bridgehubMintData,
+            (uint256, bytes, bytes)
+        );
+        address stm = stmAssetInfoToAddress[_assetId];
+        require(stm != address(0), "BH: assetInfo 2");
+        require(settlementLayer[_chainId] != block.chainid, "BH: already current SL");
+
+        settlementLayer[_chainId] = block.chainid;
+        stateTransitionManager[_chainId] = stm;
+        address hyperchain = getHyperchain(_chainId);
+        if (hyperchain == address(0)) {
+            hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(_chainId, _stmData);
+        }
+
+        IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData);
+        return address(0);
+    }
+
+    function bridgeRecoverFailedTransfer(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external payable override {}
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {IL2AssetRouter} from "./IL2AssetRouter.sol";
+// import {IL2AssetRouter} from "./IL2AssetRouter.sol";
 import {IL2AssetHandler} from "./IL2AssetHandler.sol";
 
 /// @author Matter Labs
