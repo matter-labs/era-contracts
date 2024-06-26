@@ -26,13 +26,16 @@ import {Messaging} from "../common/libraries/Messaging.sol";
 import {MAX_NUMBER_OF_HYPERCHAINS} from "../common/Config.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
-bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
+bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
+    0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
+);
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
-bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21);
+bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
+    0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
+);
 
 contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
-
     event AddedChain(uint256 indexed chainId, uint256 indexed chainIndex);
 
     event AppendedChainBatchRoot(uint256 indexed chainId, uint256 indexed batchNumber, bytes32 batchRoot);
@@ -93,7 +96,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     function addNewChainIfNeeded(uint256 _chainId) external onlyBridgehub {
-        if(!chainRegistered[_chainId]) {
+        if (!chainRegistered[_chainId]) {
             _addNewChain(_chainId);
         }
     }
@@ -177,9 +180,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @return pubdata The pubdata to be relayed to the DA layer.
     function clearTreeAndProvidePubdata() external returns (bytes memory pubdata) {
         // FIXME: access control: only to be called by the l1 messenger.
-
         // uint256 cachedChainCount = chainCount;
-
         // // We will send the updated roots for all chains.
         // // While it will mean that we'll pay even for unchanged roots:
         // // - It is the simplest approach
@@ -187,24 +188,19 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
         // //
         // // There are of course ways to optimize it further, but it will be done in the future.
         // bytes memory pubdata = new bytes(cachedChainCount * 32);
-
         // for (uint256 i = 0; i < cachedChainCount; i++) {
         //     // It is the responsibility of each chain to provide the roots of its L2->L1 messages if it wants to see those.
         //     // However, for the security of the system as a whole, the chain roots need to be provided for all chains.
-
         //     bytes32 chainRoot = chainTree[chainIndexToId[i]].root();
-
         //     assembly {
         //         mstore(add(pubdata, add(32, mul(i, 32))), chainRoot)
         //     }
-
         //     // Clearing up the state.
         //     // Note that it *does not* delete any storage slots, so in terms of pubdata savings, it is useless.
         //     // However, the chains paid for these changes anyway, so it is considered acceptable.
         //     // In the future, further optimizations will be available.
         //     _unsafeResetChainRoot(i, false);
         // }
-
         // updateFullTree();
     }
 }
