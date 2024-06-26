@@ -69,11 +69,11 @@ interface IL1ERC20Bridge {
 
     function l2NativeTokenVault() external view returns (address);
 
+    function l2Bridge() external view returns (address);
+
     function depositAmount(
         address _account,
         address _l1Token,
         bytes32 _depositL2TxHash
     ) external returns (uint256 amount);
-
-    function transferTokenToSharedBridge(address _token) external;
 }

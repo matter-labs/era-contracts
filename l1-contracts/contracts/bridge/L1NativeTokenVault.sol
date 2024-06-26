@@ -12,7 +12,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
 
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
@@ -22,13 +21,7 @@ import {ETH_TOKEN_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/C
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the hyperchains.
 /// @dev Designed for use with a proxy for upgradability.
-contract L1NativeTokenVault is
-    IL1NativeTokenVault,
-    IL1AssetHandler,
-    ReentrancyGuard,
-    Ownable2StepUpgradeable,
-    PausableUpgradeable
-{
+contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token on L1.
@@ -58,12 +51,6 @@ contract L1NativeTokenVault is
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyOwnerOrBridge() {
-        require((msg.sender == address(L1_SHARED_BRIDGE) || (msg.sender == owner())), "NTV not ShB or o");
-        _;
-    }
-
     /// @notice Checks that the message sender is the shared bridge itself.
     modifier onlySelf() {
         require(msg.sender == address(this), "NTV only");
@@ -72,11 +59,7 @@ contract L1NativeTokenVault is
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(
-        address _l1WethAddress,
-        IL1SharedBridge _l1SharedBridge,
-        uint256 _eraChainId
-    ) reentrancyGuardInitializer {
+    constructor(address _l1WethAddress, IL1SharedBridge _l1SharedBridge, uint256 _eraChainId) {
         _disableInitializers();
         L1_WETH_TOKEN = _l1WethAddress;
         ERA_CHAIN_ID = _eraChainId;
@@ -84,12 +67,8 @@ contract L1NativeTokenVault is
     }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy
-    /// @param _owner Address which can change L2 token implementation and upgrade the bridge
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    function initialize(address _owner) external reentrancyGuardInitializer initializer {
-        require(_owner != address(0), "NTV owner 0");
-        _transferOwnership(_owner);
-    }
+    function initialize() external initializer {}
 
     /// @dev Accepts ether only from the Shared Bridge.
     receive() external payable {

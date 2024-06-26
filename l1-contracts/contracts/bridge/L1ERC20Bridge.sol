@@ -25,7 +25,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @dev The shared bridge that is now used for all bridging, replacing the legacy contract.
     IL1SharedBridge public immutable override SHARED_BRIDGE;
 
-    /// @dev The native token vault, which handles the token transfers. We should deposit to it
+    /// @dev The native token vault, which holds deposited tokens.
     IL1NativeTokenVault public immutable override NATIVE_TOKEN_VAULT;
 
     /// @dev A mapping L2 batch number => message number => flag.
@@ -69,13 +69,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
     function initialize() external reentrancyGuardInitializer {}
-
-    /// @dev transfer token to shared bridge as part of upgrade
-    function transferTokenToSharedBridge(address _token) external {
-        require(msg.sender == address(SHARED_BRIDGE), "Not shared bridge");
-        uint256 amount = IERC20(_token).balanceOf(address(this));
-        IERC20(_token).safeTransfer(address(SHARED_BRIDGE), amount);
-    }
 
     /*//////////////////////////////////////////////////////////////
                             ERA LEGACY GETTERS
@@ -247,5 +240,10 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             _merkleProof: _merkleProof
         });
         emit WithdrawalFinalized(l1Receiver, l1Token, amount);
+    }
+
+    /// @notice View-only function for backward compatibility
+    function l2Bridge() external view returns (address) {
+        return l2NativeTokenVault;
     }
 }

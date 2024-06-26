@@ -4,7 +4,7 @@
 
 ### Reason for changes
 
-The goal was to be build a foundation to be able to support bridging of tokens with custom logic on receiving chain (not wrapped), as well as custom bridging logic (assets, which accrue value over time, like LRTs).
+The goal was to be build a foundation to be able to support token bridging with custom logic on receiving chain (not wrapped), as well as custom bridging logic (assets, which accrue value over time, like LRTs).
 For clarity, we only developed a framework, the exact logic for custom tokens and custom bridging will follow.
 
 ### Major changes
@@ -20,7 +20,7 @@ In order to achieve it, we separated the liquidity managing logic from the Share
 
 ### storage layout
 
-L2SharedBridge will be a system contract, L2NativeTokenVault will replace it ( the storage layout is still not yet backwards compatible)
+L2SharedBridge will be a system contract, L2NativeTokenVault will replace it (the storage layout is still not yet backwards compatible)
 
 ### bridgehubDeposit API change
 
