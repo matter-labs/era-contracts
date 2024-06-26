@@ -298,7 +298,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         BridgehubL2TransactionRequest memory request = _params.request;
 
         require(request.factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
-        _params.txId = s.priorityQueue.getTotalPriorityTxs();
+        _params.txId = _nextPriorityTxId();
 
         // Checking that the user provided enough ether to pay for the transaction.
         _params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, request.l2GasPerPubdataByteLimit);
@@ -332,12 +332,20 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         }
     }
 
+    function _nextPriorityTxId() internal view returns (uint256) {
+        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
+            return s.priorityTree.getTotalPriorityTxs();
+        } else {
+            return s.priorityQueue.getTotalPriorityTxs();
+        }
+    }
+
     function _requestL2TransactionToSyncLayerFree(
         BridgehubL2TransactionRequest memory _request
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         WritePriorityOpParams memory params = WritePriorityOpParams({
             request: _request,
-            txId: s.priorityQueue.getTotalPriorityTxs(),
+            txId: _nextPriorityTxId(),
             l2GasPrice: 0,
             expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
         });
