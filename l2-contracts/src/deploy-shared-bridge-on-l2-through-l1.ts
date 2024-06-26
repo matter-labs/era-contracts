@@ -2,7 +2,7 @@ import { Command } from "commander";
 import type { BigNumberish } from "ethers";
 import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { provider, publishBytecodeFromL1, requestL2TransactionDirect, priorityTxMaxGasLimit } from "./utils";
+import { provider, publishBytecodeFromL1, priorityTxMaxGasLimit } from "./utils";
 
 import { ethTestConfig } from "./deploy-utils";
 

@@ -401,7 +401,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
     upgradeData,
     priorityTxMaxGasLimit
   );
-  console.log(`StateTransition System registered, gas used: ${receipt1.gasUsed.toString()}`);
+  console.log(`StateTransition System registered, txHash: ${receipt4.transactionHash}`);
 }
 
 // TODO: maybe move it to SDK
