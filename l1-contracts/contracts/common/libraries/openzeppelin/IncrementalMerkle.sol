@@ -51,10 +51,7 @@ library DynamicIncrementalMerkle {
      * IMPORTANT: The zero value should be carefully chosen since it will be stored in the tree representing
      * empty leaves. It should be a value that is not expected to be part of the tree.
      */
-    function setup(
-        Bytes32PushTree storage self,
-        bytes32 zero
-    ) internal returns (bytes32 initialRoot) {
+    function setup(Bytes32PushTree storage self, bytes32 zero) internal returns (bytes32 initialRoot) {
         self._nextLeafIndex = 0;
         self._zeros.push(zero);
         self._sides.push(bytes32(0));
@@ -125,5 +122,4 @@ library DynamicIncrementalMerkle {
     function height(Bytes32PushTree storage self) internal view returns (uint256) {
         return self._sides.length - 1;
     }
-
 }

@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {PriorityTreeSharedTest, PriorityOpsBatchInfo} from "./_PriorityTree_Shared.t.sol";
+import {PriorityTreeCommitment} from "contracts/common/Config.sol";
 
 bytes32 constant ZERO_LEAF_HASH = keccak256("");
 
@@ -39,11 +40,13 @@ contract PriorityTreeTest is PriorityTreeSharedTest {
         pushMockEntries(3);
 
         assertEq(0, priorityTree.getFirstUnprocessedPriorityTx());
-        priorityTree.processBatch(PriorityOpsBatchInfo({
-            leftPath: new bytes32[](0),
-            rightPath: new bytes32[](0),
-            itemHashes: new bytes32[](0)
-        }));
+        priorityTree.processBatch(
+            PriorityOpsBatchInfo({
+                leftPath: new bytes32[](0),
+                rightPath: new bytes32[](0),
+                itemHashes: new bytes32[](0)
+            })
+        );
 
         assertEq(0, priorityTree.getFirstUnprocessedPriorityTx());
     }
@@ -52,7 +55,7 @@ contract PriorityTreeTest is PriorityTreeSharedTest {
         bytes32[] memory leaves = pushMockEntries(3);
         assertEq(0, priorityTree.getFirstUnprocessedPriorityTx());
 
-        // two batches are: 1 tx, 2 tx.
+        // 2 batches with: 1 tx, 2 txs.
 
         bytes32[] memory leftPath = new bytes32[](2);
         bytes32[] memory rightPath = new bytes32[](2);
@@ -61,11 +64,7 @@ contract PriorityTreeTest is PriorityTreeSharedTest {
         bytes32[] memory batch1 = new bytes32[](1);
         batch1[0] = leaves[0];
 
-        priorityTree.processBatch(PriorityOpsBatchInfo({
-            leftPath: leftPath,
-            rightPath: rightPath,
-            itemHashes: batch1
-        }));
+        priorityTree.processBatch(PriorityOpsBatchInfo({leftPath: leftPath, rightPath: rightPath, itemHashes: batch1}));
 
         assertEq(1, priorityTree.getFirstUnprocessedPriorityTx());
 
@@ -76,11 +75,7 @@ contract PriorityTreeTest is PriorityTreeSharedTest {
         batch2[0] = leaves[1];
         batch2[1] = leaves[2];
 
-        priorityTree.processBatch(PriorityOpsBatchInfo({
-            leftPath: leftPath,
-            rightPath: rightPath,
-            itemHashes: batch2
-        }));
+        priorityTree.processBatch(PriorityOpsBatchInfo({leftPath: leftPath, rightPath: rightPath, itemHashes: batch2}));
 
         assertEq(3, priorityTree.getFirstUnprocessedPriorityTx());
     }
@@ -89,10 +84,21 @@ contract PriorityTreeTest is PriorityTreeSharedTest {
         bytes32[] memory itemHashes = pushMockEntries(3);
 
         vm.expectRevert("PT: root mismatch");
-        priorityTree.processBatch(PriorityOpsBatchInfo({
-            leftPath: new bytes32[](2),
-            rightPath: new bytes32[](2),
-            itemHashes: itemHashes
-        }));
+        priorityTree.processBatch(
+            PriorityOpsBatchInfo({leftPath: new bytes32[](2), rightPath: new bytes32[](2), itemHashes: itemHashes})
+        );
+    }
+
+    function test_commitDecommit() public {
+        pushMockEntries(3);
+        bytes32 root = priorityTree.getRoot();
+
+        PriorityTreeCommitment memory commitment = priorityTree.getCommitment();
+        priorityTree.initFromCommitment(commitment);
+
+        assertEq(0, priorityTree.getFirstUnprocessedPriorityTx());
+        assertEq(3, priorityTree.getTotalPriorityTxs());
+        assertEq(root, priorityTree.getRoot());
+        assertEq(ZERO_LEAF_HASH, priorityTree.getZero());
     }
 }

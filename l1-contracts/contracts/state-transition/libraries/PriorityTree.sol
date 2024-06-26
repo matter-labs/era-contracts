@@ -80,8 +80,9 @@ library PriorityTree {
         _tree.tree._nextLeafIndex = _commitment.nextLeafIndex;
         _tree.tree._sides = _commitment.sides;
         bytes32 zero = ZERO_LEAF_HASH;
+        _tree.tree._zeros = new bytes32[](height);
         for (uint256 i; i < height; ++i) {
-            _tree.tree._zeros.push(zero);
+            _tree.tree._zeros[i] = zero;
             zero = Hashes.Keccak256(zero, zero);
         }
         _tree.historicalRoots[_tree.tree.root()] = true;
