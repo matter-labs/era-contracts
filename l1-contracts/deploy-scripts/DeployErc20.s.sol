@@ -136,7 +136,7 @@ contract DeployErc20Script is Script {
             vm.serializeString(token.symbol, "symbol", token.symbol);
             vm.serializeUint(token.symbol, "decimals", token.decimals);
             vm.serializeString(token.symbol, "implementation", token.implementation);
-            vm.serializeUint(token.symbol, "mint", token.mint);
+            vm.serializeUintToHex(token.symbol, "mint", token.mint);
             string memory tokenInfo = vm.serializeAddress(token.symbol, "address", token.addr);
 
             tokens = vm.serializeString("tokens", token.symbol, tokenInfo);
