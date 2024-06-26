@@ -205,7 +205,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
             chainId: chainId,
             to: alice,
             assetId: tokenAssetId,
-            assetDataHash: bytes32(0)
+            assetData: abi.encode(bytes32(0))
         });
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
@@ -247,7 +247,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
             chainId: chainId,
             to: alice,
             assetId: ETH_TOKEN_ASSET_ID,
-            assetDataHash: bytes32(0)
+            assetData: abi.encode(bytes32(0))
         });
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
@@ -290,7 +290,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
             chainId: chainId,
             to: alice,
             assetId: ETH_TOKEN_ASSET_ID,
-            assetDataHash: bytes32(0)
+            assetData: abi.encode(bytes32(0))
         });
         sharedBridge.bridgeRecoverFailedTransfer({
             _chainId: chainId,
@@ -517,8 +517,8 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, false, true, address(token));
         emit IERC20.Transfer(address(sharedBridge), address(nativeTokenVault), amount);
-        nativeTokenVault.safeTransferFundsFromSharedBridge{gas: maxGas}(address(token), maxGas);
-        nativeTokenVault.safeTransferBalancesFromSharedBridge{gas: maxGas}(address(token), chainId, maxGas);
+        nativeTokenVault.transferFundsFromSharedBridge(address(token));
+        nativeTokenVault.transferBalancesFromSharedBridge(address(token), chainId);
         uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, address(token));
         assertEq(endBalanceNtv - startBalanceNtv, amount);
     }
@@ -526,8 +526,8 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     function test_safeTransferFundsFromSharedBridge_Eth() public {
         uint256 startEthBalanceNtv = address(nativeTokenVault).balance;
         uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ADDRESS);
-        nativeTokenVault.safeTransferFundsFromSharedBridge{gas: maxGas}(ETH_TOKEN_ADDRESS, maxGas);
-        nativeTokenVault.safeTransferBalancesFromSharedBridge{gas: maxGas}(ETH_TOKEN_ADDRESS, chainId, maxGas);
+        nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
+        nativeTokenVault.transferBalancesFromSharedBridge(ETH_TOKEN_ADDRESS, chainId);
         uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ADDRESS);
         uint256 endEthBalanceNtv = address(nativeTokenVault).balance;
         assertEq(endBalanceNtv - startBalanceNtv, amount);

@@ -51,7 +51,7 @@ contract L1AssetRouterTest is Test {
         uint256 indexed chainId,
         address indexed to,
         bytes32 indexed assetId,
-        bytes32 assetDataHash
+        bytes assetData
     );
 
     event LegacyDepositInitiated(
@@ -85,7 +85,6 @@ contract L1AssetRouterTest is Test {
     uint256 mintValue = 1;
     bytes32 txHash;
     uint256 gas = 1_000_000;
-    uint256 maxGas = 30_000_000;
 
     uint256 eraChainId;
     uint256 randomChainId;

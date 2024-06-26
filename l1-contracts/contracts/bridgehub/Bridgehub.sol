@@ -526,7 +526,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
-        address _prevMsgSender,
         bytes calldata _data
     ) external payable override {}
 
