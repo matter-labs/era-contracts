@@ -41,26 +41,6 @@ async function deployContractOnL2ThroughL1(
   return address;
 }
 
-export async function initializeChainGovernance(deployer: Deployer, chainId: string) {
-  const l1SharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
-
-  if (deployer.verbose) {
-    console.log("Initializing chain governance");
-  }
-  await deployer.executeUpgrade(
-    l1SharedBridge.address,
-    0,
-    l1SharedBridge.interface.encodeFunctionData("initializeChainGovernance", [
-      chainId,
-      deployer.addresses.Bridges.L2SharedBridgeProxy,
-    ])
-  );
-
-  if (deployer.verbose) {
-    console.log("L2 shared bridge address registered on L1 via governance");
-  }
-}
-
 async function main() {
   const program = new Command();
 

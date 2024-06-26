@@ -2,13 +2,16 @@ import { Command } from "commander";
 import type { BigNumberish } from "ethers";
 import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { provider, publishBytecodeFromL1 } from "./utils";
+import { provider, publishBytecodeFromL1, requestL2TransactionDirect, priorityTxMaxGasLimit } from "./utils";
 
 import { ethTestConfig } from "./deploy-utils";
 
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import * as hre from "hardhat";
+import { L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS } from "../../l1-contracts/src.ts/utils";
+
+import { L2NativeTokenVaultFactory } from "../typechain";
 
 export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2SharedBridge").abi;
 export const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
@@ -43,8 +46,34 @@ export async function publishL2NativeTokenVaultDependencyBytecodesOnL2(
   }
 }
 
+async function setL2TokenBeacon(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
+  if (deployer.verbose) {
+    console.log("Setting L2 token beacon");
+  }
+  const l2NTV = L2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, deployer.deployWallet);
+
+  const tx2 = await requestL2TransactionDirect(
+    chainId,
+    deployer.deployWallet,
+    deployer.addresses.Bridges.L2NativeTokenVaultProxy,
+    l2NTV.interface.encodeFunctionData("setL2TokenBeacon"),
+    priorityTxMaxGasLimit
+  );
+  await tx2.wait();
+  if (deployer.verbose) {
+    console.log("Transferred L2NativeTokenVault ownership to ");
+  }
+}
+
 export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
   await publishL2NativeTokenVaultDependencyBytecodesOnL2(deployer, chainId, gasPrice);
+  await setL2TokenBeacon(deployer, chainId, gasPrice);
+  if (deployer.verbose) {
+    console.log(`CONTRACTS_L2_NATIVE_TOKEN_VAULT_IMPL_ADDR=${L2_NATIVE_TOKEN_VAULT_ADDRESS}`);
+    console.log(`CONTRACTS_L2_NATIVE_TOKEN_VAULT_PROXY_ADDR=${L2_NATIVE_TOKEN_VAULT_ADDRESS}`);
+    console.log(`CONTRACTS_L2_SHARED_BRIDGE_IMPL_ADDR=${L2_ASSET_ROUTER_ADDRESS}`);
+    console.log(`CONTRACTS_L2_SHARED_BRIDGE_ADDR=${L2_ASSET_ROUTER_ADDRESS}`);
+  }
 }
 
 async function main() {

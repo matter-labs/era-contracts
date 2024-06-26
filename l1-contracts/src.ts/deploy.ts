@@ -173,11 +173,17 @@ export class Deployer {
     let messageRootZKBytecode = ethers.constants.HashZero;
     let assetRouterZKBytecode = ethers.constants.HashZero;
     let nativeTokenVaultZKBytecode = ethers.constants.HashZero;
+    let l2TokenProxyBytecodeHash = ethers.constants.HashZero;
     if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
       bridgehubZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "Bridgehub");
       messageRootZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "MessageRoot");
       assetRouterZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2AssetRouter");
       nativeTokenVaultZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2NativeTokenVault");
+      const l2TokenProxyBytecode = readBytecode(
+        "../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon",
+        "BeaconProxy"
+      );
+      l2TokenProxyBytecodeHash = ethers.utils.hexlify(hashL2Bytecode(l2TokenProxyBytecode));
     }
 
     const bridgehubDeployment = {
@@ -185,7 +191,7 @@ export class Deployer {
       newAddress: L2_BRIDGEHUB_ADDRESS,
       callConstructor: true,
       value: 0,
-      input: "0x",
+      input: ethers.utils.defaultAbiCoder.encode(["uint256"], [getNumberFromEnv("ETH_CLIENT_CHAIN_ID")]),
     };
     const messageRootDeployment = {
       bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(messageRootZKBytecode)),
@@ -201,8 +207,8 @@ export class Deployer {
       callConstructor: true,
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(
-        ["uint256", "uint256", "address"],
-        [eraChainId, getNumberFromEnv("ETH_CLIENT_CHAIN_ID"), this.addresses.Bridges.SharedBridgeProxy]
+        ["uint256", "uint256", "address", "address"],
+        [eraChainId, getNumberFromEnv("ETH_CLIENT_CHAIN_ID"), this.addresses.Bridges.SharedBridgeProxy, ADDRESS_ONE]
       ),
     };
     const ntvDeployment = {
@@ -210,10 +216,13 @@ export class Deployer {
       newAddress: L2_NATIVE_TOKEN_VAULT_ADDRESS,
       callConstructor: true,
       value: 0,
-      input: "0x",
+      input: ethers.utils.defaultAbiCoder.encode(
+        ["bytes32", "address", "bool"],
+        [l2TokenProxyBytecodeHash, this.deployWallet.address, false]
+      ),
     };
 
-    const forceDeployments = [bridgehubDeployment, messageRootDeployment, assetRouterDeployment, ntvDeployment];
+    const forceDeployments = [bridgehubDeployment, assetRouterDeployment, ntvDeployment, messageRootDeployment];
     return ethers.utils.defaultAbiCoder.encode([FORCE_DEPLOYMENT_ABI_STRING], [forceDeployments]);
   }
 
