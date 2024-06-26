@@ -111,7 +111,6 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         );
     }
 
-
     // function test_transferFundsToSharedBridge_Eth_CallFailed() public {
     //     vm.mockCall(address(nativeTokenVault), "0x", abi.encode(""));
     //     vm.prank(address(nativeTokenVault));
