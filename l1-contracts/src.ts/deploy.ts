@@ -45,6 +45,8 @@ import {
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   compileInitialCutHash,
   readBytecode,
+  applyL1ToL2Alias,
+  // priorityTxMaxGasLimit,
 } from "./utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
@@ -81,6 +83,7 @@ export interface DeployerConfig {
   bootloaderBytecodeHash?: string;
   defaultAccountBytecodeHash?: string;
   deployedLogPrefix?: string;
+  l1Deployer?: Deployer;
 }
 
 export interface Operation {
@@ -191,7 +194,10 @@ export class Deployer {
       newAddress: L2_BRIDGEHUB_ADDRESS,
       callConstructor: true,
       value: 0,
-      input: ethers.utils.defaultAbiCoder.encode(["uint256"], [getNumberFromEnv("ETH_CLIENT_CHAIN_ID")]),
+      input: ethers.utils.defaultAbiCoder.encode(
+        ["uint256", "address"],
+        [getNumberFromEnv("ETH_CLIENT_CHAIN_ID"), applyL1ToL2Alias(this.addresses.Governance)]
+      ),
     };
     const messageRootDeployment = {
       bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(messageRootZKBytecode)),
@@ -387,7 +393,12 @@ export class Deployer {
 
   public async deployBridgehubImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const l1ChainId = this.isZkMode() ? getNumberFromEnv("ETH_CLIENT_CHAIN_ID") : await this.deployWallet.getChainId();
-    const contractAddress = await this.deployViaCreate2("Bridgehub", [l1ChainId], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2(
+      "Bridgehub",
+      [l1ChainId, this.addresses.Governance],
+      create2Salt,
+      ethTxOptions
+    );
 
     if (this.verbose) {
       console.log(`CONTRACTS_BRIDGEHUB_IMPL_ADDR=${contractAddress}`);
@@ -904,7 +915,7 @@ export class Deployer {
       console.log("ETH token registered in Bridgehub");
     }
 
-    const upgradeData2 = await bridgehub.interface.encodeFunctionData("setAddresses", [
+    const upgradeData2 = bridgehub.interface.encodeFunctionData("setAddresses", [
       this.addresses.Bridges.SharedBridgeProxy,
       this.addresses.Bridgehub.STMDeploymentTrackerProxy,
       this.addresses.Bridgehub.MessageRootProxy,
@@ -1009,10 +1020,12 @@ export class Deployer {
         this.addresses.StateTransition.StateTransitionProxy,
       ]);
 
-      const receipt1 = await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData);
-
-      if (this.verbose) {
-        console.log(`StateTransition System registered, gas used: ${receipt1.gasUsed.toString()}`);
+      let receipt1;
+      if (!this.isZkMode()) {
+        receipt1 = await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData);
+        if (this.verbose) {
+          console.log(`StateTransition System registered, gas used: ${receipt1.gasUsed.toString()}`);
+        }
       }
 
       const stmDeploymentTracker = this.stmDeploymentTracker(this.deployWallet);

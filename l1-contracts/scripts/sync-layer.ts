@@ -324,13 +324,13 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   const syncLayerAddress = await l1STM.getHyperchain(chainId);
   // this script only works when owner is the deployer
   console.log("Registering SyncLayer chain id on the STM");
-  await deployer.executeUpgrade(
+  const receipt1 = await deployer.executeUpgrade(
     l1STM.address,
     0,
     l1Bridgehub.interface.encodeFunctionData("registerSyncLayer", [chainId, true])
   );
 
-  console.log("Registering Bridgehub counter part on the SyncLayer");
+  console.log("Registering Bridgehub counter part on the SyncLayer", receipt1.transactionHash);
   // await deployer.executeUpgrade(
   //   l1Bridgehub.address, // kl todo fix. The BH has the counterpart, the BH needs to be deployed on L2, and the STM needs to be registered in the L2 BH.
   //   0,
@@ -355,7 +355,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   }
   const stmDeploymentTracker = deployer.stmDeploymentTracker(deployer.deployWallet);
 
-  const receipt = await (
+  const receipt2 = await (
     await stmDeploymentTracker.registerSTMAssetOnL2SharedBridge(
       chainId,
       l1STM.address,
@@ -366,9 +366,9 @@ async function registerSLContractsOnL1(deployer: Deployer) {
       { value }
     )
   ).wait();
-  const l2TxHash = zkUtils.getL2HashFromPriorityOp(receipt, syncLayerAddress);
+  const l2TxHash = zkUtils.getL2HashFromPriorityOp(receipt2, syncLayerAddress);
   console.log("STM asset registered in L2SharedBridge on SL l2 tx hash: ", l2TxHash);
-  const receipt2 = await deployer.executeUpgrade(
+  const receipt3 = await deployer.executeUpgrade(
     l1Bridgehub.address,
     value,
     l1Bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
@@ -388,8 +388,20 @@ async function registerSLContractsOnL1(deployer: Deployer) {
       },
     ])
   );
-  const l2TxHash2 = zkUtils.getL2HashFromPriorityOp(receipt2, syncLayerAddress);
+  const l2TxHash2 = zkUtils.getL2HashFromPriorityOp(receipt3, syncLayerAddress);
   console.log("STM asset registered in L2 Bridgehub on SL", l2TxHash2);
+
+  const upgradeData = l1Bridgehub.interface.encodeFunctionData("addStateTransitionManager", [
+    deployer.addresses.StateTransition.StateTransitionProxy,
+  ]);
+  const receipt4 = await deployer.executeUpgradeOnL2(
+    chainId,
+    getAddressFromEnv("SYNC_LAYER_BRIDGEHUB_PROXY_ADDR"),
+    gasPrice,
+    upgradeData,
+    priorityTxMaxGasLimit
+  );
+  console.log(`StateTransition System registered, gas used: ${receipt1.gasUsed.toString()}`);
 }
 
 // TODO: maybe move it to SDK

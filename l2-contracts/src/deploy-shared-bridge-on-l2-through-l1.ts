@@ -9,9 +9,16 @@ import { ethTestConfig } from "./deploy-utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import * as hre from "hardhat";
-import { L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS } from "../../l1-contracts/src.ts/utils";
+import {
+  ADDRESS_ONE,
+  L2_ASSET_ROUTER_ADDRESS,
+  L2_BRIDGEHUB_ADDRESS,
+  L2_MESSAGE_ROOT_ADDRESS,
+  L2_NATIVE_TOKEN_VAULT_ADDRESS,
+} from "../../l1-contracts/src.ts/utils";
 
 import { L2NativeTokenVaultFactory } from "../typechain";
+import { BridgehubFactory } from "../../l1-contracts/typechain";
 
 export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2SharedBridge").abi;
 export const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
@@ -61,6 +68,21 @@ async function setL2TokenBeacon(deployer: Deployer, chainId: string, gasPrice: B
   );
   if (deployer.verbose) {
     console.log("Set L2Token Beacon, upgrade hash", receipt.transactionHash);
+  }
+  const bridgehub = BridgehubFactory.connect(L2_BRIDGEHUB_ADDRESS, deployer.deployWallet);
+  const receipt2 = await deployer.executeUpgradeOnL2(
+    chainId,
+    L2_BRIDGEHUB_ADDRESS,
+    gasPrice,
+    bridgehub.interface.encodeFunctionData("setAddresses", [
+      L2_ASSET_ROUTER_ADDRESS,
+      ADDRESS_ONE,
+      L2_MESSAGE_ROOT_ADDRESS,
+    ]),
+    priorityTxMaxGasLimit
+  );
+  if (deployer.verbose) {
+    console.log("Set addresses in BH, upgrade hash", receipt2.transactionHash);
   }
 }
 
