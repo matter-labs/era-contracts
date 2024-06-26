@@ -77,7 +77,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
 
     /// @dev Transfer tokens from shared bridge as part of migration process.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
-    function transferFundsFromSharedBridge(address _token) external onlySelf {
+    function transferFundsFromSharedBridge(address _token) external {
         if (_token == ETH_TOKEN_ADDRESS) {
             uint256 balanceBefore = address(this).balance;
             L1_SHARED_BRIDGE.transferTokenToNTV(_token);
@@ -96,34 +96,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     /// @dev Set chain token balance as part of migration process.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     /// @param _targetChainId The chain ID of the corresponding ZK chain.
-    function transferBalancesFromSharedBridge(address _token, uint256 _targetChainId) external onlySelf {
+    function transferBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
         uint256 sharedBridgeChainBalance = L1_SHARED_BRIDGE.chainBalance(_targetChainId, _token);
         chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + sharedBridgeChainBalance;
         L1_SHARED_BRIDGE.transferBalanceToNTV(_targetChainId, _token);
-    }
-
-    /// @dev Transfer tokens from shared bridge as part of migration process.
-    /// @dev This method does not required access control, as the assets can only be transferred to NTV.
-    /// @dev Unlike `transferFundsFromSharedBridge` is provides a concrete limit on the gas used for the transfer and even if it will fail, it will not revert the whole transaction.
-    function safeTransferFundsFromSharedBridge(address _token, uint256 _gasPerToken) external {
-        try this.transferFundsFromSharedBridge{gas: _gasPerToken}(_token) {} catch {
-            // A reasonable amount of gas will be provided to transfer the token.
-            // If the transfer fails, we don't want to revert the whole transaction.
-        }
-    }
-
-    /// @dev Set chain token balance as part of migration process.
-    /// @dev This method does not required access control, as the balances can only be transferred to NTV.
-    /// @dev Unlike `transferBalancesFromSharedBridge` is provides a concrete limit on the gas used for the transfer and even if it will fail, it will not revert the whole transaction.
-    function safeTransferBalancesFromSharedBridge(
-        address _token,
-        uint256 _targetChainId,
-        uint256 _gasPerToken
-    ) external {
-        try this.transferBalancesFromSharedBridge{gas: _gasPerToken}(_token, _targetChainId) {} catch {
-            // A reasonable amount of gas will be provided to transfer the token.
-            // If the transfer fails, we don't want to revert the whole transaction.
-        }
     }
 
     /// @dev We want to be able to bridge native tokens automatically, this means registering them on the fly

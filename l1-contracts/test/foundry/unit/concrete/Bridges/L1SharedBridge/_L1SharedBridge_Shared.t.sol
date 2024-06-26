@@ -84,7 +84,6 @@ contract L1SharedBridgeTest is Test {
     uint256 mintValue = 1;
     bytes32 txHash;
     uint256 gas = 1_000_000;
-    uint256 maxGas = 30_000_000;
 
     uint256 eraChainId;
     uint256 randomChainId;
