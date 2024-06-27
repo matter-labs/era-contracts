@@ -330,7 +330,7 @@ contract CommittingTest is ExecutorTest {
 
         IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-        correctNewCommitBatchInfo.pubdataCommitments = abi.encodePacked(
+        correctNewCommitBatchInfo.operatorDAInput = abi.encodePacked(
             "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
             bytes32(uint256(0xbeef))
         );
@@ -404,7 +404,7 @@ contract CommittingTest is ExecutorTest {
 
         IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].pubdataCommitments = pubdataCommitment;
+        correctCommitBatchInfoArray[0].operatorDAInput = pubdataCommitment;
 
         vm.prank(validator);
 
@@ -477,7 +477,7 @@ contract CommittingTest is ExecutorTest {
 
         IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].pubdataCommitments = pubdataCommitment;
+        correctCommitBatchInfoArray[0].operatorDAInput = pubdataCommitment;
 
         vm.prank(validator);
 
@@ -526,7 +526,7 @@ contract CommittingTest is ExecutorTest {
 
         IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].pubdataCommitments = pubdataCommitment;
+        correctCommitBatchInfoArray[0].operatorDAInput = pubdataCommitment;
 
         vm.prank(validator);
 
@@ -551,7 +551,7 @@ contract CommittingTest is ExecutorTest {
 
         IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].pubdataCommitments = pubdataCommitment;
+        correctCommitBatchInfoArray[0].operatorDAInput = pubdataCommitment;
 
         vm.prank(validator);
 
@@ -576,7 +576,7 @@ contract CommittingTest is ExecutorTest {
 
         IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].pubdataCommitments = pubdataCommitment;
+        correctCommitBatchInfoArray[0].operatorDAInput = pubdataCommitment;
 
         vm.prank(validator);
 
@@ -620,7 +620,7 @@ contract CommittingTest is ExecutorTest {
 
         IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].pubdataCommitments = pubdataCommitment;
+        correctCommitBatchInfoArray[0].operatorDAInput = pubdataCommitment;
 
         vm.prank(validator);
 
@@ -657,7 +657,7 @@ contract CommittingTest is ExecutorTest {
 
         IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].pubdataCommitments = pubdataCommitment;
+        correctCommitBatchInfoArray[0].operatorDAInput = pubdataCommitment;
 
         vm.prank(validator);
 
@@ -702,7 +702,7 @@ contract CommittingTest is ExecutorTest {
 
         IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].pubdataCommitments = pubdataCommitment;
+        correctCommitBatchInfoArray[0].operatorDAInput = pubdataCommitment;
 
         vm.prank(validator);
 
@@ -765,7 +765,7 @@ contract CommittingTest is ExecutorTest {
 
         IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].pubdataCommitments = pubdataCommitment;
+        correctCommitBatchInfoArray[0].operatorDAInput = pubdataCommitment;
 
         vm.prank(validator);
 
@@ -815,7 +815,7 @@ contract CommittingTest is ExecutorTest {
 
         IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].pubdataCommitments = pubdataCommitment;
+        correctCommitBatchInfoArray[0].operatorDAInput = pubdataCommitment;
 
         vm.prank(validator);
 
