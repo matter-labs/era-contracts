@@ -6,7 +6,6 @@ import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 
-
 contract MailboxTransferEthToSharedBridge is MailboxTest {
     address baseTokenBridgeAddress;
     DummySharedBridge l1SharedBridge;
@@ -16,7 +15,7 @@ contract MailboxTransferEthToSharedBridge is MailboxTest {
 
         l1SharedBridge = new DummySharedBridge(keccak256("dummyDepositHash"));
         baseTokenBridgeAddress = address(l1SharedBridge);
-   
+
         utilsFacet.util_setChainId(eraChainId);
         utilsFacet.util_setBaseTokenBridge(baseTokenBridgeAddress);
     }

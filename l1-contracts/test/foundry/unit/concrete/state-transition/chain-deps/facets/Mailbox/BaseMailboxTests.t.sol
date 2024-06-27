@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {DummyHyperchain} from "contracts/dev-contracts/test/DummyHyperchain.sol";
 
 contract MailboxBaseTests is MailboxTest {
     function setUp() public virtual {
@@ -15,8 +15,8 @@ contract MailboxBaseTests is MailboxTest {
     }
 
     function test_mailboxConstructor() public {
-        MailboxFacet m = new MailboxFacet(eraChainId);
-        assertEq(m.ERA_CHAIN_ID(), eraChainId);
+        DummyHyperchain h = new DummyHyperchain(address(0), eraChainId);
+        assertEq(h.getEraChainId(), eraChainId);
     }
 
     function test_RevertWhen_badDenominatorInL2TransactionBaseCost() public {
