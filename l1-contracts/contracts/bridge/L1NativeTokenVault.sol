@@ -12,46 +12,32 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
 
-import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
-import {ETH_TOKEN_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
+import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
+import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the hyperchains.
+/// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the ZK chains.
 /// @dev Designed for use with a proxy for upgradability.
-contract L1NativeTokenVault is
-    IL1NativeTokenVault,
-    IL1AssetHandler,
-    ReentrancyGuard,
-    Ownable2StepUpgradeable,
-    PausableUpgradeable
-{
+contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token on L1.
     address public immutable override L1_WETH_TOKEN;
 
     /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
-    IL1SharedBridge public immutable override L1_SHARED_BRIDGE;
+    IL1AssetRouter public immutable override L1_SHARED_BRIDGE;
 
     /// @dev Era's chainID
     uint256 public immutable ERA_CHAIN_ID;
 
-    /// @dev Indicates whether the hyperbridging is enabled for a given chain.
-    // slither-disable-next-line uninitialized-state
-    mapping(uint256 chainId => bool enabled) public hyperbridgingEnabled;
-
-    /// @dev Maps token balances for each chain to prevent unauthorized spending across hyperchains.
+    /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
-
-    /// @dev Maps token balances for each chain to verify that chain balance was migrated from shared bridge.
-    /// This serves only for migration purposes.
-    mapping(uint256 chainId => mapping(address l1Token => bool migrated)) public chainBalanceMigrated;
 
     /// @dev A mapping assetId => tokenAddress
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
@@ -59,12 +45,6 @@ contract L1NativeTokenVault is
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridge() {
         require(msg.sender == address(L1_SHARED_BRIDGE), "NTV not ShB");
-        _;
-    }
-
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyOwnerOrBridge() {
-        require((msg.sender == address(L1_SHARED_BRIDGE) || (msg.sender == owner())), "NTV not ShB or o");
         _;
     }
 
@@ -76,11 +56,7 @@ contract L1NativeTokenVault is
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(
-        address _l1WethAddress,
-        IL1SharedBridge _l1SharedBridge,
-        uint256 _eraChainId
-    ) reentrancyGuardInitializer {
+    constructor(address _l1WethAddress, IL1AssetRouter _l1SharedBridge, uint256 _eraChainId) {
         _disableInitializers();
         L1_WETH_TOKEN = _l1WethAddress;
         ERA_CHAIN_ID = _eraChainId;
@@ -88,9 +64,9 @@ contract L1NativeTokenVault is
     }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy
-    /// @param _owner Address which can change L2 token implementation and upgrade the bridge
+    /// @param _owner Address which can change pause / unpause the NTV
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    function initialize(address _owner) external reentrancyGuardInitializer initializer {
+    function initialize(address _owner) external initializer {
         require(_owner != address(0), "NTV owner 0");
         _transferOwnership(_owner);
     }
@@ -102,10 +78,10 @@ contract L1NativeTokenVault is
 
     /// @dev Transfer tokens from shared bridge as part of migration process.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
-    function transferFundsFromSharedBridge(address _token) external onlySelf {
+    function transferFundsFromSharedBridge(address _token) external {
         if (_token == ETH_TOKEN_ADDRESS) {
             uint256 balanceBefore = address(this).balance;
-            L1_SHARED_BRIDGE.transferEthToNTV();
+            L1_SHARED_BRIDGE.transferTokenToNTV(_token);
             uint256 balanceAfter = address(this).balance;
             require(balanceAfter > balanceBefore, "NTV: 0 eth transferred");
         } else {
@@ -120,37 +96,11 @@ contract L1NativeTokenVault is
 
     /// @dev Set chain token balance as part of migration process.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
-    /// @param _targetChainId The chain ID of the corresponding hyperchain.
-    function transferBalancesFromSharedBridge(address _token, uint256 _targetChainId) external onlySelf {
-        require(
-            chainBalanceMigrated[_targetChainId][_token] == false,
-            "NTV: chain balance for the token already migrated"
-        );
+    /// @param _targetChainId The chain ID of the corresponding ZK chain.
+    function transferBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
         uint256 sharedBridgeChainBalance = L1_SHARED_BRIDGE.chainBalance(_targetChainId, _token);
         chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + sharedBridgeChainBalance;
-        chainBalanceMigrated[_targetChainId][_token] = true;
-    }
-
-    /// @dev Transfer tokens from shared bridge as part of migration process.
-    /// @dev Unlike `transferFundsFromSharedBridge` is provides a concrete limit on the gas used for the transfer and even if it will fail, it will not revert the whole transaction.
-    function safeTransferFundsFromSharedBridge(address _token, uint256 _gasPerToken) external {
-        try this.transferFundsFromSharedBridge{gas: _gasPerToken}(_token) {} catch {
-            // A reasonable amount of gas will be provided to transfer the token.
-            // If the transfer fails, we don't want to revert the whole transaction.
-        }
-    }
-
-    /// @dev Set chain token balance as part of migration process.
-    /// @dev Unlike `transferBalancesFromSharedBridge` is provides a concrete limit on the gas used for the transfer and even if it will fail, it will not revert the whole transaction.
-    function safeTransferBalancesFromSharedBridge(
-        address _token,
-        uint256 _targetChainId,
-        uint256 _gasPerToken
-    ) external {
-        try this.transferBalancesFromSharedBridge{gas: _gasPerToken}(_token, _targetChainId) {} catch {
-            // A reasonable amount of gas will be provided to transfer the token.
-            // If the transfer fails, we don't want to revert the whole transaction.
-        }
+        L1_SHARED_BRIDGE.transferBalanceToNTV(_targetChainId, _token);
     }
 
     /// @dev We want to be able to bridge native tokens automatically, this means registering them on the fly
@@ -198,9 +148,7 @@ contract L1NativeTokenVault is
         }
         require(amount != 0, "6T"); // empty deposit amount
 
-        if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
-            chainBalance[_chainId][l1Token] += amount;
-        }
+        chainBalance[_chainId][l1Token] += amount;
 
         // solhint-disable-next-line func-named-parameters
         _bridgeMintData = abi.encode(amount, _prevMsgSender, _l2Receiver, getERC20Getters(l1Token), l1Token); // to do add l2Receiver in here
@@ -247,41 +195,43 @@ contract L1NativeTokenVault is
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
-    ) external payable override onlyBridge whenNotPaused returns (address _l1Receiver) {
+    ) external payable override onlyBridge whenNotPaused returns (address l1Receiver) {
         // here we are minting the tokens after the bridgeBurn has happened on an L2, so we can assume the l1Token is not zero
         address l1Token = tokenAddress[_assetId];
         uint256 amount;
-        (amount, _l1Receiver) = abi.decode(_data, (uint256, address));
-        if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
-            // Check that the chain has sufficient balance
-            require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
-            chainBalance[_chainId][l1Token] -= amount;
-        }
+        (amount, l1Receiver) = abi.decode(_data, (uint256, address));
+        // Check that the chain has sufficient balance
+        require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
+        chainBalance[_chainId][l1Token] -= amount;
+
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
             assembly {
-                callSuccess := call(gas(), _l1Receiver, amount, 0, 0, 0, 0)
+                callSuccess := call(gas(), l1Receiver, amount, 0, 0, 0, 0)
             }
             require(callSuccess, "NTV: withdrawal failed, no funds or cannot transfer to receiver");
         } else {
             // Withdraw funds
-            IERC20(l1Token).safeTransfer(_l1Receiver, amount);
+            IERC20(l1Token).safeTransfer(l1Receiver, amount);
         }
         // solhint-disable-next-line func-named-parameters
-        emit BridgeMint(_chainId, _assetId, _l1Receiver, amount);
+        emit BridgeMint(_chainId, _assetId, l1Receiver, amount);
     }
 
     ///  @inheritdoc IL1AssetHandler
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
-        address,
         bytes calldata _data
     ) external payable override onlyBridge whenNotPaused {
         (uint256 _amount, address _depositSender) = abi.decode(_data, (uint256, address));
         address l1Token = tokenAddress[_assetId];
         require(_amount > 0, "y1");
+
+        // check that the chain has sufficient balance
+        require(chainBalance[_chainId][l1Token] >= _amount, "NTV n funds");
+        chainBalance[_chainId][l1Token] -= _amount;
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
@@ -295,22 +245,23 @@ contract L1NativeTokenVault is
             // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.
             // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
         }
-
-        if (!L1_SHARED_BRIDGE.hyperbridgingEnabled(_chainId)) {
-            // check that the chain has sufficient balance
-            require(chainBalance[_chainId][l1Token] >= _amount, "NTV n funds");
-            chainBalance[_chainId][l1Token] -= _amount;
-        }
     }
 
     function getAssetId(address _l1TokenAddress) public view override returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    block.chainid,
-                    NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS,
-                    bytes32(uint256(uint160(_l1TokenAddress)))
-                )
-            );
+        return keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, _l1TokenAddress));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            PAUSE
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
+    function unpause() external onlyOwner {
+        _unpause();
     }
 }

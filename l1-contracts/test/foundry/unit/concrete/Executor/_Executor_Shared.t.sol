@@ -21,7 +21,7 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
+import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 
 contract ExecutorTest is Test {
     address internal owner;
@@ -258,7 +258,7 @@ contract ExecutorTest is Test {
 
         vm.mockCall(
             address(sharedBridge),
-            abi.encodeWithSelector(IL1SharedBridge.bridgehubDepositBaseToken.selector),
+            abi.encodeWithSelector(IL1AssetRouter.bridgehubDepositBaseToken.selector),
             abi.encode(true)
         );
     }

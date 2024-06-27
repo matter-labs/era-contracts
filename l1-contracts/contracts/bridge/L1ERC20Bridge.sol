@@ -8,7 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
-import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
+import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
@@ -16,16 +16,16 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to hyperchains
+/// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to ZK chains
 /// @dev It is a legacy bridge from zkSync Era, that was deprecated in favour of shared bridge.
 /// It is needed for backward compatibility with already integrated projects.
 contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @dev The shared bridge that is now used for all bridging, replacing the legacy contract.
-    IL1SharedBridge public immutable override SHARED_BRIDGE;
+    IL1AssetRouter public immutable override SHARED_BRIDGE;
 
-    /// @dev The native token vault, which handles the token transfers. We should deposit to it
+    /// @dev The native token vault, which holds deposited tokens.
     IL1NativeTokenVault public immutable override NATIVE_TOKEN_VAULT;
 
     /// @dev A mapping L2 batch number => message number => flag.
@@ -62,20 +62,13 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IL1SharedBridge _sharedBridge, IL1NativeTokenVault _nativeTokenVault) reentrancyGuardInitializer {
+    constructor(IL1AssetRouter _sharedBridge, IL1NativeTokenVault _nativeTokenVault) reentrancyGuardInitializer {
         SHARED_BRIDGE = _sharedBridge;
         NATIVE_TOKEN_VAULT = _nativeTokenVault;
     }
 
     /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
     function initialize() external reentrancyGuardInitializer {}
-
-    /// @dev transfer token to shared bridge as part of upgrade
-    function transferTokenToSharedBridge(address _token) external {
-        require(msg.sender == address(SHARED_BRIDGE), "Not shared bridge");
-        uint256 amount = IERC20(_token).balanceOf(address(this));
-        IERC20(_token).safeTransfer(address(SHARED_BRIDGE), amount);
-    }
 
     /*//////////////////////////////////////////////////////////////
                             ERA LEGACY GETTERS
@@ -247,5 +240,10 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             _merkleProof: _merkleProof
         });
         emit WithdrawalFinalized(l1Receiver, l1Token, amount);
+    }
+
+    /// @notice View-only function for backward compatibility
+    function l2Bridge() external view returns (address) {
+        return l2NativeTokenVault;
     }
 }

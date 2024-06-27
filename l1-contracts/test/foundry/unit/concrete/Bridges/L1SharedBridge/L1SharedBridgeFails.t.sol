@@ -3,12 +3,12 @@ pragma solidity 0.8.24;
 
 import "forge-std/console.sol";
 
-import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
+import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
+import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
@@ -16,12 +16,13 @@ import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
+import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 /// We are testing all the specified revert and require cases.
-contract L1SharedBridgeFailTest is L1SharedBridgeTest {
+contract L1AssetRouterFailTest is L1AssetRouterTest {
     using stdStorage for StdStorage;
 
     function test_initialize_WrongOwner() public {
@@ -31,7 +32,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             admin,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                L1SharedBridge.initialize.selector,
+                L1AssetRouter.initialize.selector,
                 address(0),
                 eraPostUpgradeFirstBatch,
                 eraPostUpgradeFirstBatch,
@@ -51,14 +52,14 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         );
     }
 
-    function test_transferEthToNTV_wrongCaller() public {
-        vm.expectRevert("ShB: not NTV");
-        sharedBridge.transferEthToNTV();
-    }
-
     function test_transferTokenToNTV_wrongCaller() public {
         vm.expectRevert("ShB: not NTV");
         sharedBridge.transferTokenToNTV(address(token));
+    }
+
+    function test_transferBalanceToNTV_wrongCaller() public {
+        vm.expectRevert("ShB: not NTV");
+        sharedBridge.transferBalanceToNTV(chainId, address(token));
     }
 
     function test_registerToken_noCode() public {
@@ -110,26 +111,21 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         );
     }
 
-    function test_setAssetHandlerAddressOnCounterPart_chainNotAddedToSharedBridge() public {
-        uint256 l2TxGasLimit = 100000;
-        uint256 l2TxGasPerPubdataByte = 100;
-        address refundRecipient = address(0);
+    // function test_transferFundsToSharedBridge_Eth_CallFailed() public {
+    //     vm.mockCall(address(nativeTokenVault), "0x", abi.encode(""));
+    //     vm.prank(address(nativeTokenVault));
+    //     vm.expectRevert("ShB: eth transfer failed");
+    //     nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
+    // }
 
-        vm.prank(owner);
-        vm.expectRevert("ShB: chain governance not initialized");
-        sharedBridge.setAssetHandlerAddressOnCounterPart(
-            randomChainId,
-            mintValue,
-            l2TxGasLimit,
-            l2TxGasPerPubdataByte,
-            refundRecipient,
-            tokenAssetId,
-            address(token)
-        );
-    }
+    // function test_transferFundsToSharedBridge_Eth_CallFailed() public {
+    //     vm.mockCall(address(nativeTokenVault), "0x", abi.encode(""));
+    //     vm.prank(address(nativeTokenVault));
+    //     vm.expectRevert("ShB: eth transfer failed");
+    //     nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
+    // }
 
     function test_transferFundsToSharedBridge_Eth_0_AmountTransferred() public {
-        uint256 gas = 1_000_000;
         vm.deal(address(sharedBridge), 0);
         vm.prank(address(nativeTokenVault));
         vm.expectRevert("NTV: 0 eth transferred");
@@ -151,14 +147,6 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         nativeTokenVault.transferFundsFromSharedBridge(address(token));
     }
 
-    function test_safeTransferFundsFromSharedBridge_ShouldNotBeCalledTwice() public {
-        nativeTokenVault.safeTransferBalancesFromSharedBridge{gas: maxGas}(ETH_TOKEN_ADDRESS, chainId, maxGas);
-        assertEq(nativeTokenVault.chainBalanceMigrated(chainId, ETH_TOKEN_ADDRESS), true);
-        vm.prank(address(nativeTokenVault));
-        vm.expectRevert("NTV: chain balance for the token already migrated");
-        nativeTokenVault.transferBalancesFromSharedBridge{gas: maxGas}(ETH_TOKEN_ADDRESS, chainId);
-    }
-
     function test_bridgehubDepositBaseToken_Eth_Token_notRegisteredTokenID() public {
         // ToDo: Shall we do it properly instead of mocking?
         stdstore
@@ -172,7 +160,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     }
 
     function test_bridgehubDepositBaseToken_Eth_Token_incorrectSender() public {
-        vm.expectRevert("L1SharedBridge: msg.sender not equal to bridgehub or era chain");
+        vm.expectRevert("L1AssetRouter: msg.sender not equal to bridgehub or era chain");
         sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, ETH_TOKEN_ASSET_ID, alice, amount);
     }
 
@@ -195,17 +183,6 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         vm.expectRevert(message);
         vm.prank(bridgehubAddress);
         sharedBridge.bridgehubDepositBaseToken(chainId, tokenAssetId, alice, amount);
-    }
-
-    function test_bridgehubDeposit_Eth_l2BridgeNotDeployed() public {
-        vm.prank(owner);
-        sharedBridge.initializeChainGovernance(chainId, address(0));
-        _setBaseTokenAssetId(tokenAssetId);
-        vm.prank(bridgehubAddress);
-
-        vm.expectRevert("ShB l2 bridge not deployed");
-        // solhint-disable-next-line func-named-parameters
-        sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, 0, bob));
     }
 
     function test_bridgehubDeposit_Erc_weth() public {
@@ -809,27 +786,6 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             _l2TxNumberInBatch: l2TxNumberInBatch,
             _message: message,
             _merkleProof: merkleProof
-        });
-    }
-
-    function test_depositLegacyERC20Bridge_l2BridgeNotDeployed() public {
-        uint256 l2TxGasLimit = 100000;
-        uint256 l2TxGasPerPubdataByte = 100;
-        address refundRecipient = address(0);
-
-        vm.prank(owner);
-        sharedBridge.initializeChainGovernance(eraChainId, address(0));
-
-        vm.expectRevert("ShB b. n dep");
-        vm.prank(l1ERC20BridgeAddress);
-        sharedBridge.depositLegacyErc20Bridge({
-            _prevMsgSender: alice,
-            _l2Receiver: bob,
-            _l1Token: address(token),
-            _amount: amount,
-            _l2TxGasLimit: l2TxGasLimit,
-            _l2TxGasPerPubdataByte: l2TxGasPerPubdataByte,
-            _refundRecipient: refundRecipient
         });
     }
 

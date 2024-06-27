@@ -3,20 +3,20 @@ pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
+import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
-import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
+import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
-contract L1SharedBridgeTestBase is L1SharedBridgeTest {
+contract L1AssetRouterTestBase is L1AssetRouterTest {
     using stdStorage for StdStorage;
 
     function test_bridgehubPause() public {
@@ -205,7 +205,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             chainId: chainId,
             to: alice,
             assetId: tokenAssetId,
-            assetDataHash: bytes32(0)
+            assetData: abi.encode(bytes32(0))
         });
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
@@ -247,7 +247,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             chainId: chainId,
             to: alice,
             assetId: ETH_TOKEN_ASSET_ID,
-            assetDataHash: bytes32(0)
+            assetData: abi.encode(bytes32(0))
         });
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
@@ -290,7 +290,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             chainId: chainId,
             to: alice,
             assetId: ETH_TOKEN_ASSET_ID,
-            assetDataHash: bytes32(0)
+            assetData: abi.encode(bytes32(0))
         });
         sharedBridge.bridgeRecoverFailedTransfer({
             _chainId: chainId,
@@ -343,13 +343,13 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     function test_finalizeWithdrawal_ErcOnEth() public {
         _setNativeTokenVaultChainBalance(chainId, address(token), amount);
         bytes memory message = abi.encodePacked(
-            IL1SharedBridge.finalizeWithdrawal.selector,
+            IL1AssetRouter.finalizeWithdrawal.selector,
             tokenAssetId,
             abi.encode(amount, alice)
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: l2SharedBridge,
+            sender: L2_ASSET_ROUTER_ADDR,
             data: message
         });
 
@@ -388,13 +388,13 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         vm.prank(bridgehubAddress);
 
         bytes memory message = abi.encodePacked(
-            IL1SharedBridge.finalizeWithdrawal.selector,
+            IL1AssetRouter.finalizeWithdrawal.selector,
             ETH_TOKEN_ASSET_ID,
             abi.encode(amount, alice)
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: l2SharedBridge,
+            sender: L2_ASSET_ROUTER_ADDR,
             data: message
         });
 
@@ -430,7 +430,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         vm.prank(bridgehubAddress);
 
         bytes memory message = abi.encodePacked(
-            IL1SharedBridge.finalizeWithdrawal.selector,
+            IL1AssetRouter.finalizeWithdrawal.selector,
             tokenAssetId,
             abi.encode(amount, alice)
         );
@@ -469,7 +469,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
 
     function test_finalizeWithdrawal_NonBaseErcOnErc() public {
         bytes memory message = abi.encodePacked(
-            IL1SharedBridge.finalizeWithdrawal.selector,
+            IL1AssetRouter.finalizeWithdrawal.selector,
             tokenAssetId,
             abi.encode(amount, alice)
         );
@@ -481,7 +481,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         //alt base token
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
-            sender: l2SharedBridge,
+            sender: L2_ASSET_ROUTER_ADDR,
             data: message
         });
 
@@ -517,8 +517,8 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, false, true, address(token));
         emit IERC20.Transfer(address(sharedBridge), address(nativeTokenVault), amount);
-        nativeTokenVault.safeTransferFundsFromSharedBridge{gas: maxGas}(address(token), maxGas);
-        nativeTokenVault.safeTransferBalancesFromSharedBridge{gas: maxGas}(address(token), chainId, maxGas);
+        nativeTokenVault.transferFundsFromSharedBridge(address(token));
+        nativeTokenVault.transferBalancesFromSharedBridge(address(token), chainId);
         uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, address(token));
         assertEq(endBalanceNtv - startBalanceNtv, amount);
     }
@@ -526,8 +526,8 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     function test_safeTransferFundsFromSharedBridge_Eth() public {
         uint256 startEthBalanceNtv = address(nativeTokenVault).balance;
         uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ADDRESS);
-        nativeTokenVault.safeTransferFundsFromSharedBridge{gas: maxGas}(ETH_TOKEN_ADDRESS, maxGas);
-        nativeTokenVault.safeTransferBalancesFromSharedBridge{gas: maxGas}(ETH_TOKEN_ADDRESS, chainId, maxGas);
+        nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
+        nativeTokenVault.transferBalancesFromSharedBridge(ETH_TOKEN_ADDRESS, chainId);
         uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ADDRESS);
         uint256 endEthBalanceNtv = address(nativeTokenVault).balance;
         assertEq(endBalanceNtv - startBalanceNtv, amount);

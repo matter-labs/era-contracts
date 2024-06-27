@@ -2,22 +2,13 @@
 
 pragma solidity 0.8.24;
 
-// slither-disable-next-line unused-return
 // solhint-disable reason-string, gas-custom-errors
 
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/openzeppelin/IncrementalMerkle.sol"; // todo figure out how to import from OZ
 
 import {IBridgehub} from "./IBridgehub.sol";
-// import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-// import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-// import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-// import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
-// import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-// import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
@@ -26,7 +17,7 @@ import {MAX_NUMBER_OF_HYPERCHAINS} from "../common/Config.sol";
 // FIXME: explain why it can not collide with real root
 bytes32 constant EMPTY_LOG_ROOT = keccak256("New Tree zero hash");
 
-contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+contract MessageRoot is IMessageRoot, ReentrancyGuard {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
@@ -58,17 +49,18 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(IBridgehub _bridgehub) reentrancyGuardInitializer {
-        _disableInitializers();
         BRIDGE_HUB = _bridgehub;
+        _initialize();
     }
 
-    /// @dev Initializes a contract for later use. Expected to be used in the proxy
-    /// @param _owner Address which can change
-    function initialize(address _owner) external reentrancyGuardInitializer initializer {
-        require(_owner != address(0), "ShB owner 0");
+    /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a system contract without a proxy.
+    function initialize() external reentrancyGuardInitializer {
+        _initialize();
+    }
+
+    function _initialize() internal {
         // slither-disable-next-line unused-return
         sharedTree.setup(bytes32(0));
-        _transferOwnership(_owner);
     }
 
     function addNewChain(uint256 _chainId) external onlyBridgehub {
@@ -137,7 +129,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard, Ownable2StepUpgradeable, 
             // Note that it *does not* delete any storage slots, so in terms of pubdata savings, it is useless.
             // However, the chains paid for these changes anyway, so it is considered acceptable.
             // In the future, further optimizations will be available.
-            // slither-disable-next-line usused-return
+            // slither-disable-next-line unused-return
             chainTree[chainIndexToId[i]].setup(EMPTY_LOG_ROOT);
         }
 

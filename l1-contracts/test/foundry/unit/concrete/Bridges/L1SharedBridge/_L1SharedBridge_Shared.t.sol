@@ -7,15 +7,16 @@ import "forge-std/console.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
-import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
+import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
+import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
-import {ETH_TOKEN_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
-contract L1SharedBridgeTest is Test {
+contract L1AssetRouterTest is Test {
     using stdStorage for StdStorage;
 
     event BridgehubDepositBaseTokenInitiated(
@@ -50,7 +51,7 @@ contract L1SharedBridgeTest is Test {
         uint256 indexed chainId,
         address indexed to,
         bytes32 indexed assetId,
-        bytes32 assetDataHash
+        bytes assetData
     );
 
     event LegacyDepositInitiated(
@@ -62,8 +63,8 @@ contract L1SharedBridgeTest is Test {
         uint256 amount
     );
 
-    L1SharedBridge sharedBridgeImpl;
-    L1SharedBridge sharedBridge;
+    L1AssetRouter sharedBridgeImpl;
+    L1AssetRouter sharedBridge;
     L1NativeTokenVault nativeTokenVaultImpl;
     L1NativeTokenVault nativeTokenVault;
     address bridgehubAddress;
@@ -84,7 +85,6 @@ contract L1SharedBridgeTest is Test {
     uint256 mintValue = 1;
     bytes32 txHash;
     uint256 gas = 1_000_000;
-    uint256 maxGas = 30_000_000;
 
     uint256 eraChainId;
     uint256 randomChainId;
@@ -100,7 +100,7 @@ contract L1SharedBridgeTest is Test {
     uint256 isWithdrawalFinalizedStorageLocation = uint256(8 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1 + 50);
     bytes32 ETH_TOKEN_ASSET_ID =
         keccak256(
-            abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
+            abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
         );
 
     function setUp() public {
@@ -128,7 +128,7 @@ contract L1SharedBridgeTest is Test {
         eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
-        sharedBridgeImpl = new L1SharedBridge({
+        sharedBridgeImpl = new L1AssetRouter({
             _l1WethAddress: l1WethAddress,
             _bridgehub: IBridgehub(bridgehubAddress),
             _eraChainId: eraChainId,
@@ -137,12 +137,12 @@ contract L1SharedBridgeTest is Test {
         TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
             address(sharedBridgeImpl),
             admin,
-            abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner, 1, 1, 1, 0)
+            abi.encodeWithSelector(L1AssetRouter.initialize.selector, owner, 1, 1, 1, 0)
         );
-        sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
+        sharedBridge = L1AssetRouter(payable(sharedBridgeProxy));
         nativeTokenVaultImpl = new L1NativeTokenVault({
             _l1WethAddress: l1WethAddress,
-            _l1SharedBridge: IL1SharedBridge(address(sharedBridge)),
+            _l1SharedBridge: IL1AssetRouter(address(sharedBridge)),
             _eraChainId: eraChainId
         });
         TransparentUpgradeableProxy nativeTokenVaultProxy = new TransparentUpgradeableProxy(
@@ -173,10 +173,6 @@ contract L1SharedBridgeTest is Test {
         vm.store(address(sharedBridge), bytes32(isWithdrawalFinalizedStorageLocation + 2), bytes32(uint256(1)));
         vm.store(address(sharedBridge), bytes32(isWithdrawalFinalizedStorageLocation + 3), bytes32(0));
 
-        vm.prank(owner);
-        sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
-        vm.prank(owner);
-        sharedBridge.initializeChainGovernance(eraChainId, l2SharedBridge);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
