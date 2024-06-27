@@ -1091,11 +1091,12 @@ export class Deployer {
 
     // console.log("bridgehubData", bridgehubData)
     // console.log("this.addresses.ChainAssetInfo", this.addresses.ChainAssetInfo)
-    const sharedBridgeData = ethers.utils.defaultAbiCoder.encode(
+    let sharedBridgeData = ethers.utils.defaultAbiCoder.encode(
       ["bytes32", "bytes"],
 
       [await bridgehub.stmAssetInfoFromChainId(this.chainId), bridgehubData]
     );
+    sharedBridgeData = "0x01" + sharedBridgeData.slice(2);
     const receipt = await this.executeDirectOrGovernance(
       useGovernance,
       bridgehub,
