@@ -208,12 +208,13 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             syncLayerBatchRootMask = uint256(syncLayerPackedBatchInfo & ((1 << 128) - 1));
         }
 
-        IMailbox(s.syncLayer).proveL2LeafInclusion(
-            syncLayerBatchNumber,
-            syncLayerBatchRootMask,
-            chainIdLeaf,
-            extractSlice(_proof, ptr, _proof.length)
-        );
+        return
+            IMailbox(s.syncLayer).proveL2LeafInclusion(
+                syncLayerBatchNumber,
+                syncLayerBatchRootMask,
+                chainIdLeaf,
+                extractSlice(_proof, ptr, _proof.length)
+            );
     }
 
     /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
@@ -223,7 +224,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         L2Log memory _log,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        require(_batchNumber <= s.totalBatchesExecuted, "xx");
+        // require(_batchNumber <= s.totalBatchesExecuted, "xx");
 
         bytes32 hashedLog = keccak256(
             // solhint-disable-next-line func-named-parameters
