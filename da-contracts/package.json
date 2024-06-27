@@ -57,7 +57,7 @@
     "build-l1": "harhdat compile",
     "clean": "hardhat clean",
     "clean:foundry": "forge clean",
-    "verify": "hardhat run --network env scripts/verify.ts",
+    "verify": "hardhat run --network env scripts/verify.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3",
