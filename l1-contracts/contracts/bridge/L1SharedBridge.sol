@@ -284,13 +284,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         address _prevMsgSender,
         uint256 _amount
     ) external payable virtual onlyBridgehubOrEra(_chainId) whenNotPaused {
-        (address l1AssetHandler, bytes32 assetId) = _getAssetProperties(_assetId);
-        _transferAllowanceToNTV(assetId, _amount, _prevMsgSender);
+        address l1AssetHandler = _getAssetHandler(_assetId);
+        _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
         // slither-disable-next-line unused-return
         IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
             _mintValue: _amount,
-            _assetId: assetId,
+            _assetId: _assetId,
             _prevMsgSender: _prevMsgSender,
             _data: abi.encode(_amount, address(0))
         });
@@ -299,17 +299,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _assetId, _amount);
     }
 
-    /// @notice Returns the address of asset handler and parsed assetId, if padded token address was passed.
-    /// @dev For backwards compatibility we pad the l1Token to become a bytes32 assetId.
-    /// @dev If asset handler is not set for the asset, we also register the asset.
-    /// @param _assetId The encoding of asset ID or padded address of the token.
+    /// @notice Returns the address of asset handler.
+    /// @dev If asset handler is not set for the asset, the asset is registered.
+    /// @param _assetId The encoding of asset ID.
     /// @return l1AssetHandler The address of asset handler for provided asset ID.
-    /// @return assetId The asset ID.
-    function _getAssetProperties(bytes32 _assetId) internal returns (address l1AssetHandler, bytes32 assetId) {
-        // Check if the passed ID is the address and assume NTV for the case
-        assetId = uint256(_assetId) <= type(uint160).max
-            ? keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetId))
-            : _assetId;
+    function _getAssetHandler(bytes32 _assetId) internal returns (address l1AssetHandler) {
         l1AssetHandler = assetHandlerAddress[_assetId];
         // Check if no asset handler is set
         if (l1AssetHandler == address(0)) {
