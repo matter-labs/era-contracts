@@ -71,7 +71,6 @@ import { ISTMDeploymentTrackerFactory } from "../typechain/ISTMDeploymentTracker
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
 
 import { RollupL1DAValidatorFactory } from "../../da-contracts/typechain/RollupL1DAValidatorFactory";
-import { RelayedSLDAValidatorFactory } from "../../da-contracts/typechain/RelayedSLDAValidatorFactory";
 import { ValidiumL1DAValidatorFactory } from "../../da-contracts/typechain/ValidiumL1DAValidatorFactory";
 
 // const provider = web3Provider();
@@ -281,6 +280,10 @@ export class Deployer {
     bytecode?: ethers.utils.BytesLike
   ) {
     if (this.isZkMode()) {
+      if (bytecode != null) {
+        return ADDRESS_ONE;
+        // note providing bytecode is only for da-contracts on L1, we can skip it here
+      }
       const result = await deployViaCreate2Zk(
         this.deployWallet as ZkWallet,
         contractName,
@@ -312,8 +315,6 @@ export class Deployer {
     let factory;
     if (contractName == "RollupL1DAValidator") {
       factory = new RollupL1DAValidatorFactory(this.deployWallet);
-    } else if (contractName == "RelayedSLDAValidator") {
-      factory = new RelayedSLDAValidatorFactory(this.deployWallet);
     } else if (contractName == "ValidiumL1DAValidator") {
       factory = new ValidiumL1DAValidatorFactory(this.deployWallet);
     }
@@ -1391,15 +1392,7 @@ export class Deployer {
       console.log(`CONTRACTS_L1_VALIDIUM_DA_VALIDATOR=${validiumDAValidatorAddress}`);
     }
     // This address only makes sense on the Sync Layer, but we deploy it anyway to keep the script simple
-    const relayedSLValidatorBytecode = await this.loadFromDAFolder("RelayedSLDAValidator");
-    const relayedSLDAValidator = await this.deployViaCreate2(
-      "RelayedSLDAValidator",
-      [],
-      create2Salt,
-      ethTxOptions,
-      undefined,
-      relayedSLValidatorBytecode
-    );
+    const relayedSLDAValidator = await this.deployViaCreate2("RelayedSLDAValidator", [], create2Salt, ethTxOptions);
     if (this.verbose) {
       console.log(`CONTRACTS_L1_RELAYED_SL_DA_VALIDATOR=${relayedSLDAValidator}`);
     }
