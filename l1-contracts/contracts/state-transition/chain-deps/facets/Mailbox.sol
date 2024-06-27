@@ -130,12 +130,12 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
     function extractSlice(
         bytes32[] calldata _proof,
-        uint256 l,
-        uint256 r
+        uint256 _left,
+        uint256 _right
     ) internal pure returns (bytes32[] memory slice) {
-        slice = new bytes32[](r - l);
-        for (uint256 i = l; i < r; i = i.uncheckedInc()) {
-            slice[i - l] = _proof[i];
+        slice = new bytes32[](_right - _left);
+        for (uint256 i = _left; i < _right; i = i.uncheckedInc()) {
+            slice[i - _left] = _proof[i];
         }
     }
 
