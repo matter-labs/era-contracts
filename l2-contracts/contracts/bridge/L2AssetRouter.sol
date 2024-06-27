@@ -148,9 +148,7 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
         bytes calldata _data
     ) external override {
         // onlyBridge {
-        bytes32 assetId = keccak256(
-            abi.encode(L1_CHAIN_ID, address(L2_NATIVE_TOKEN_VAULT), bytes32(uint256(uint160(_l1Token))))
-        );
+        bytes32 assetId = keccak256(abi.encode(L1_CHAIN_ID, address(L2_NATIVE_TOKEN_VAULT), _l1Token));
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encode(_l1Sender, _amount, _l2Receiver, _data, _l1Token);
         finalizeDeposit(assetId, data);
@@ -158,11 +156,7 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
         bytes32 assetId = keccak256(
-            abi.encode(
-                L1_CHAIN_ID,
-                address(L2_NATIVE_TOKEN_VAULT),
-                bytes32(uint256(uint160(getL1TokenAddress(_l2Token))))
-            )
+            abi.encode(L1_CHAIN_ID, address(L2_NATIVE_TOKEN_VAULT), getL1TokenAddress(_l2Token))
         );
         bytes memory data = abi.encode(_amount, _l1Receiver);
         withdraw(assetId, data);
