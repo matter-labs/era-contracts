@@ -221,7 +221,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @notice Used to set the asset handler address for a given asset ID.
     /// @dev No access control on the caller, as msg.sender is encoded in the assetId.
-    /// @param _assetData In most cases this paramater is bytes32 encoded token address. However, it can include extra infromation used by custom asset handlers.
+    /// @param _assetData In most cases this parameter is bytes32 encoded token address. However, it can include extra information used by custom asset handlers.
     /// @param _assetHandlerAddress The address of the asset handler, which will hold the token of interest.
     function setAssetHandlerAddressInitial(bytes32 _assetData, address _assetHandlerAddress) external {
         address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
@@ -397,7 +397,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
         require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, "ShB: baseToken deposit not supported");
 
-        bytes memory bridgeMintCalldata = _burn({
+        bytes memory l2BridgeMintCalldata = _burn({
             _chainId: _chainId,
             _l2Value: _l2Value,
             _assetId: assetId,
@@ -417,7 +417,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _chainId: _chainId,
             _prevMsgSender: _prevMsgSender,
             _assetId: assetId,
-            _bridgeMintCalldata: bridgeMintCalldata,
+            _l2BridgeMintCalldata: l2BridgeMintCalldata,
             _txDataHash: txDataHash
         });
 
@@ -426,7 +426,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             txDataHash: txDataHash,
             from: _prevMsgSender,
             assetId: assetId,
-            bridgeMintCalldata: bridgeMintCalldata
+            l2BridgeMintCalldata: l2BridgeMintCalldata
         });
     }
 
@@ -436,16 +436,16 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _assetId The deposited asset ID.
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
     /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
-    /// @return bridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
+    /// @return l2BridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
     function _burn(
         uint256 _chainId,
         uint256 _l2Value,
         bytes32 _assetId,
         address _prevMsgSender,
         bytes memory _transferData
-    ) internal returns (bytes memory bridgeMintCalldata) {
+    ) internal returns (bytes memory l2BridgeMintCalldata) {
         address l1AssetHandler = assetHandlerAddress[_assetId];
-        bridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
+        l2BridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
             _mintValue: _l2Value,
             _assetId: _assetId,
@@ -458,18 +458,18 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _chainId The chain ID of the ZK chain to which deposit.
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
     /// @param _assetId The deposited asset ID.
-    /// @param _bridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
+    /// @param _l2BridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
     /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
     /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
     function _requestToBridge(
         uint256 _chainId,
         address _prevMsgSender,
         bytes32 _assetId,
-        bytes memory _bridgeMintCalldata,
+        bytes memory _l2BridgeMintCalldata,
         bytes32 _txDataHash
     ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
         // Request the finalization of the deposit on the L2 side
-        bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _assetId, _bridgeMintCalldata);
+        bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _assetId, _l2BridgeMintCalldata);
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
@@ -873,18 +873,24 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(_l1Token != L1_WETH_TOKEN, "ShB: WETH deposit not supported 2");
 
         bytes32 _assetId;
-        bytes memory bridgeMintCalldata;
+        bytes memory l2BridgeMintCalldata;
 
         {
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
 
             // solhint-disable-next-line func-named-parameters
-            bridgeMintCalldata = abi.encode(_amount, _prevMsgSender, _l2Receiver, getERC20Getters(_l1Token), _l1Token);
+            l2BridgeMintCalldata = abi.encode(
+                _amount,
+                _prevMsgSender,
+                _l2Receiver,
+                getERC20Getters(_l1Token),
+                _l1Token
+            );
         }
 
         {
-            bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _assetId, bridgeMintCalldata);
+            bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _assetId, l2BridgeMintCalldata);
 
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
             // Otherwise, the refund will be sent to the specified address.
