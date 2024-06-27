@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 // solhint-disable gas-custom-errors, reason-string
 
 // TODO: maybe move it here
-import {BLOB_SIZE_BYTES} from "../chain-interfaces/IExecutor.sol";
+import {BLOB_SIZE_BYTES} from "./DAUtils.sol";
 
 uint256 constant BLOBS_SUPPORTED = 6;
 

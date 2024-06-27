@@ -41,11 +41,6 @@ struct LogProcessingOutput {
     bytes32 l2DAValidatorOutputHash;
 }
 
-/// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
-/// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
-/// @dev Our circuits will prove that a EIP-4844 blob and our internal blob are the same.
-uint256 constant BLOB_SIZE_BYTES = 126_976;
-
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
 uint256 constant L2_LOG_ADDRESS_OFFSET = 4;
 

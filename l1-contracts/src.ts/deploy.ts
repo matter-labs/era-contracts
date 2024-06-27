@@ -70,6 +70,10 @@ import { ISTMDeploymentTrackerFactory } from "../typechain/ISTMDeploymentTracker
 
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
 
+import { RollupL1DAValidatorFactory } from "../../da-contracts/typechain/RollupL1DAValidatorFactory";
+import { RelayedSLDAValidatorFactory } from "../../da-contracts/typechain/RelayedSLDAValidatorFactory";
+import { ValidiumL1DAValidatorFactory } from "../../da-contracts/typechain/ValidiumL1DAValidatorFactory";
+
 // const provider = web3Provider();
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
@@ -273,7 +277,8 @@ export class Deployer {
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    libraries?: any
+    libraries?: any,
+    bytecode?: ethers.utils.BytesLike
   ) {
     if (this.isZkMode()) {
       const result = await deployViaCreate2Zk(
@@ -297,9 +302,22 @@ export class Deployer {
       ethTxOptions,
       this.addresses.Create2Factory,
       this.verbose,
-      libraries
+      libraries,
+      bytecode
     );
     return result[0];
+  }
+
+  public async loadFromDAFolder(contractName: string) {
+    let factory;
+    if (contractName == "RollupL1DAValidator") {
+      factory = new RollupL1DAValidatorFactory(this.deployWallet);
+    } else if (contractName == "RelayedSLDAValidator") {
+      factory = new RelayedSLDAValidatorFactory(this.deployWallet);
+    } else if (contractName == "ValidiumL1DAValidator") {
+      factory = new ValidiumL1DAValidatorFactory(this.deployWallet);
+    }
+    return factory.getDeployTransaction().data;
   }
 
   private async deployBytecodeViaCreate2(
@@ -1347,22 +1365,41 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
 
     // This address only makes sense on the L1, but we deploy it anyway to keep the script simple
-    const rollupDAValidatorAddress = await this.deployViaCreate2("RollupL1DAValidator", [], create2Salt, ethTxOptions);
+    const rollupValidatorBytecode = await this.loadFromDAFolder("RollupL1DAValidator");
+    const rollupDAValidatorAddress = await this.deployViaCreate2(
+      "RollupL1DAValidator",
+      [],
+      create2Salt,
+      ethTxOptions,
+      undefined,
+      rollupValidatorBytecode
+    );
     if (this.verbose) {
       console.log(`CONTRACTS_L1_ROLLUP_DA_VALIDATOR=${rollupDAValidatorAddress}`);
     }
-
+    const validiumValidatorBytecode = await this.loadFromDAFolder("ValidiumL1DAValidator");
     const validiumDAValidatorAddress = await this.deployViaCreate2(
       "ValidiumL1DAValidator",
       [],
       create2Salt,
-      ethTxOptions
+      ethTxOptions,
+      undefined,
+      validiumValidatorBytecode
     );
+
     if (this.verbose) {
       console.log(`CONTRACTS_L1_VALIDIUM_DA_VALIDATOR=${validiumDAValidatorAddress}`);
     }
     // This address only makes sense on the Sync Layer, but we deploy it anyway to keep the script simple
-    const relayedSLDAValidator = await this.deployViaCreate2("RelayedSLDAValidator", [], create2Salt, ethTxOptions);
+    const relayedSLValidatorBytecode = await this.loadFromDAFolder("RelayedSLDAValidator");
+    const relayedSLDAValidator = await this.deployViaCreate2(
+      "RelayedSLDAValidator",
+      [],
+      create2Salt,
+      ethTxOptions,
+      undefined,
+      relayedSLValidatorBytecode
+    );
     if (this.verbose) {
       console.log(`CONTRACTS_L1_RELAYED_SL_DA_VALIDATOR=${relayedSLDAValidator}`);
     }
