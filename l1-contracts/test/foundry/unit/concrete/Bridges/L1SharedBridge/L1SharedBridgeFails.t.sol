@@ -57,9 +57,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         sharedBridge.transferTokenToNTV(address(token));
     }
 
-    function test_transferBalanceToNTV_wrongCaller() public {
+    function test_clearChainBalance_wrongCaller() public {
         vm.expectRevert("ShB: not NTV");
-        sharedBridge.transferBalanceToNTV(chainId, address(token));
+        sharedBridge.clearChainBalance(chainId, address(token));
     }
 
     function test_registerToken_noCode() public {
@@ -305,7 +305,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             _chainId: chainId,
             _depositSender: alice,
             _assetId: ETH_TOKEN_ASSET_ID,
-            _assetData: transferData,
+            _transferData: transferData,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -343,7 +343,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             _chainId: eraChainId,
             _depositSender: alice,
             _assetId: ETH_TOKEN_ASSET_ID,
-            _assetData: transferData,
+            _transferData: transferData,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -382,7 +382,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             _chainId: eraChainId,
             _depositSender: alice,
             _assetId: ETH_TOKEN_ASSET_ID,
-            _assetData: transferData,
+            _transferData: transferData,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,

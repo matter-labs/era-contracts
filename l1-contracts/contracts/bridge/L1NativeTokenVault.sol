@@ -48,7 +48,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         _;
     }
 
-    /// @notice Checks that the message sender is the shared bridge itself.
+    /// @notice Checks that the message sender is the native token vault itself.
     modifier onlySelf() {
         require(msg.sender == address(this), "NTV only");
         _;
@@ -63,8 +63,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         L1_SHARED_BRIDGE = _l1SharedBridge;
     }
 
-    /// @dev Initializes a contract for later use. Expected to be used in the proxy
-    /// @param _owner Address which can change pause / unpause the NTV
+    /// @dev Initializes a contract for later use. Expected to be used in the proxy.
+    /// @param _owner Address which can change pause / unpause the NTV.
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
     function initialize(address _owner) external initializer {
         require(_owner != address(0), "NTV owner 0");
@@ -76,7 +76,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         require(address(L1_SHARED_BRIDGE) == msg.sender, "NTV: ETH only accepted from Shared Bridge");
     }
 
-    /// @dev Transfer tokens from shared bridge as part of migration process.
+    /// @notice Transfers tokens from shared bridge as part of the migration process.
+    /// @dev Both ETH and ERC20 tokens can be transferred. Exhausts balance of shared bridge after the first call.
+    /// @dev Calling second time for the same token will revert.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     function transferFundsFromSharedBridge(address _token) external {
         if (_token == ETH_TOKEN_ADDRESS) {
@@ -94,16 +96,18 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         }
     }
 
-    /// @dev Set chain token balance as part of migration process.
+    /// @notice Updates chain token balance within NTV to account for tokens transferred from the shared bridge (part of the migration process).
+    /// @dev Clears chain balance on the shared bridge after the first call. Subsequent calls will not affect the state.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     /// @param _targetChainId The chain ID of the corresponding ZK chain.
     function transferBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
         uint256 sharedBridgeChainBalance = L1_SHARED_BRIDGE.chainBalance(_targetChainId, _token);
         chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + sharedBridgeChainBalance;
-        L1_SHARED_BRIDGE.transferBalanceToNTV(_targetChainId, _token);
+        L1_SHARED_BRIDGE.clearChainBalance(_targetChainId, _token);
     }
 
-    /// @dev We want to be able to bridge native tokens automatically, this means registering them on the fly
+    /// @notice Registers tokens within the NTV.
+    /// @dev The goal was to allow bridging L1 native tokens automatically, by registering them on the fly.
     /// @notice Allows the bridge to register a token address for the vault.
     /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
     function registerToken(address _l1Token) external {
@@ -116,7 +120,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
 
     /// @inheritdoc IL1AssetHandler
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
-    /// @dev here _data is the _depositAmount and the _l2Receiver
+    /// @dev In case of native token vault _data is the tuple of _depositAmount and _l2Receiver.
     function bridgeBurn(
         uint256 _chainId,
         uint256,
@@ -151,12 +155,15 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         chainBalance[_chainId][l1Token] += amount;
 
         // solhint-disable-next-line func-named-parameters
-        _bridgeMintData = abi.encode(amount, _prevMsgSender, _l2Receiver, getERC20Getters(l1Token), l1Token); // to do add l2Receiver in here
+        _bridgeMintData = abi.encode(amount, _prevMsgSender, _l2Receiver, getERC20Getters(l1Token), l1Token);
         // solhint-disable-next-line func-named-parameters
         emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _l2Receiver, amount);
     }
 
-    /// @dev Transfers tokens from the depositor address to the smart contract address.
+    /// @notice Transfers tokens from the depositor address to the smart contract address.
+    /// @param _from The address of the depositor.
+    /// @param _token The ERC20 token to be transferred.
+    /// @param _amount The amount to be transferred.
     /// @return The difference between the contract balance before and after the transferring of funds.
     function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));
@@ -175,7 +182,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         return balanceAfter - balanceBefore;
     }
 
-    /// @dev Receives and parses (name, symbol, decimals) from the token contract
+    /// @notice Receives and parses (name, symbol, decimals) from the token contract.
+    /// @param _token The address of token of interest.
+    /// @return Returns encoded name, symbol, and decimals for specific token.
     function getERC20Getters(address _token) public view returns (bytes memory) {
         if (_token == ETH_TOKEN_ADDRESS) {
             bytes memory name = bytes("Ether");
@@ -247,6 +256,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         }
     }
 
+    /// @notice Returns the parsed assetId.
+    /// @param _l1TokenAddress The address of the token to be parsed.
+    /// @return The asset ID.
     function getAssetId(address _l1TokenAddress) public view override returns (bytes32) {
         return keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, _l1TokenAddress));
     }

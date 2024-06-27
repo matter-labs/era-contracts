@@ -91,13 +91,16 @@ describe("Shared Bridge tests", () => {
           refundRecipient: ethers.constants.AddressZero,
           secondBridgeAddress: l1SharedBridge.address,
           secondBridgeValue: 0,
-          secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
-            ["bytes32", "bytes"],
-            [
-              await l1NativeTokenVault.getAssetId(erc20TestToken.address),
-              new ethers.utils.AbiCoder().encode(["uint256", "address"], [0, await randomSigner.getAddress()]),
-            ]
-          ),
+          secondBridgeCalldata: ethers.utils.concat([
+            ethers.utils.hexlify(1),
+            new ethers.utils.AbiCoder().encode(
+              ["bytes32", "bytes"],
+              [
+                await l1NativeTokenVault.getAssetId(erc20TestToken.address),
+                new ethers.utils.AbiCoder().encode(["uint256", "address"], [0, await randomSigner.getAddress()]),
+              ]
+            ),
+          ]),
         },
         { value: mintValue }
       )
@@ -126,13 +129,16 @@ describe("Shared Bridge tests", () => {
         refundRecipient: ethers.constants.AddressZero,
         secondBridgeAddress: l1SharedBridge.address,
         secondBridgeValue: 0,
-        secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
-          ["bytes32", "bytes"],
-          [
-            assetId,
-            new ethers.utils.AbiCoder().encode(["uint256", "address"], [amount, await randomSigner.getAddress()]),
-          ]
-        ),
+        secondBridgeCalldata: ethers.utils.concat([
+          ethers.utils.hexlify(1),
+          new ethers.utils.AbiCoder().encode(
+            ["bytes32", "bytes"],
+            [
+              assetId,
+              new ethers.utils.AbiCoder().encode(["uint256", "address"], [amount, await randomSigner.getAddress()]),
+            ]
+          ),
+        ]),
       },
       { value: mintValue }
     );

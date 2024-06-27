@@ -43,8 +43,8 @@ contract ExperimentalBridgeTest is Test {
     function setUp() public {
         eraChainId = 9;
         uint256 l1ChainId = 1;
-        bridgeHub = new Bridgehub(l1ChainId);
         bridgeOwner = makeAddr("BRIDGE_OWNER");
+        bridgeHub = new Bridgehub(l1ChainId, bridgeOwner);
         address weth = makeAddr("WETH");
         mockSTM = new DummyStateTransitionManagerWBH(address(bridgeHub));
         mockChainContract = new DummyHyperchain(address(bridgeHub), eraChainId);

@@ -15,15 +15,18 @@ export async function deployViaCreate2(
   create2FactoryAddress: string,
   verbose: boolean = true,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  libraries?: any
+  libraries?: any,
+  bytecode?: ethers.utils.BytesLike
 ): Promise<[string, string]> {
   // [address, txHash]
 
-  const contractFactory = await hardhat.ethers.getContractFactory(contractName, {
-    signer: deployWallet,
-    libraries,
-  });
-  const bytecode = contractFactory.getDeployTransaction(...args, ethTxOptions).data;
+  if (!bytecode) {
+    const contractFactory = await hardhat.ethers.getContractFactory(contractName, {
+      signer: deployWallet,
+      libraries,
+    });
+    bytecode = contractFactory.getDeployTransaction(...args, ethTxOptions).data;
+  }
 
   return await deployBytecodeViaCreate2(
     deployWallet,

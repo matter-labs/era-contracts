@@ -163,7 +163,7 @@ library Utils {
                 bootloaderHeapInitialContentsHash: randomBytes32("bootloaderHeapInitialContentsHash"),
                 eventsQueueStateHash: randomBytes32("eventsQueueStateHash"),
                 systemLogs: abi.encode(randomBytes32("systemLogs")),
-                pubdataCommitments: abi.encodePacked(uint256(0))
+                operatorDAInput: abi.encodePacked(uint256(0))
             });
     }
 
