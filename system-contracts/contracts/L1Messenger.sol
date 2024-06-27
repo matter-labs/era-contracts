@@ -9,7 +9,7 @@ import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, COMPUTATIONAL_PRICE_FOR_PUBDATA} from "./Constants.sol";
+import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, COMPUTATIONAL_PRICE_FOR_PUBDATA, L2_MESSAGE_ROOT} from "./Constants.sol";
 import {ReconstructionMismatch, PubdataField} from "./SystemContractErrors.sol";
 import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
 
@@ -44,13 +44,13 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     /// @dev Will be reset at the end of the block to zero value.
     bytes32 internal chainedL1BytecodesRevealDataHash;
 
-    /// FIXME: remove this in production
-    address public messageRootAddress;
+    // /// FIXME: remove this in production
+    // address public messageRootAddress;
 
-    // FIXME This is just a hack before messageRoot is available in kernel space.
-    function setMessageRoot(address _messageRootAddress) public {
-        messageRootAddress = _messageRootAddress;
-    }
+    // // FIXME This is just a hack before messageRoot is available in kernel space.
+    // function setMessageRoot(address _messageRootAddress) public {
+    //     messageRootAddress = _messageRootAddress;
+    // }
 
     /// The gas cost of processing one keccak256 round.
     uint256 internal constant KECCAK_ROUND_GAS_COST = 40;
@@ -247,14 +247,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         }
         bytes32 localLogsRootHash = l2ToL1LogsTreeArray[0];
 
-        // FIXME: in prod it can never be 0.
-        bytes32 aggregatedRootHash;
-
-        if (messageRootAddress != address(0)) {
-            aggregatedRootHash = IMessageRoot(messageRootAddress).getAggregatedRoot();
-            // FIXME: make it used for pubdata.
-            bytes memory _p = IMessageRoot(messageRootAddress).clearTreeAndProvidePubdata();
-        }
+        bytes32 aggregatedRootHash = L2_MESSAGE_ROOT.getAggregatedRoot();
 
         // FIXME; this is inefficient and leads to copying the entire array of uncompressed state diffs
         // Better to use efficient call
