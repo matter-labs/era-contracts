@@ -285,11 +285,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
-    /// @dev setTokenMultiplier for the specified chain
-    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setTokenMultiplier(_nominator, _denominator);
+    /// @dev adjustFee for the specified chain
+    function adjustFee(uint256 _chainId, uint128 _nominator, uint128 _denominator, uint64 _minimalL2GasPrice) external onlyOwner {
+        IZkSyncHyperchain(hyperchainMap.get(_chainId)).adjustFee(_nominator, _denominator, _minimalL2GasPrice);
     }
-
     /// @dev changeFeeParams for the specified chain
     function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).changeFeeParams(_newFeeParams);

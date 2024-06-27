@@ -36,8 +36,8 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @param _newFeeParams The new fee params
     function changeFeeParams(FeeParams calldata _newFeeParams) external;
 
-    /// @notice Change the token multiplier for L1->L2 transactions
-    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external;
+    /// @notice Adjust the fee for L1 -> L2 transactions
+    function adjustFee(uint128 _nominator, uint128 _denominator, uint64 _minimalL2GasPrice) external;
 
     /// @notice Change the pubdata pricing mode before the first batch is processed
     /// @param _pricingMode The new pubdata pricing mode
@@ -89,12 +89,14 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice The transaction filterer has been updated
     event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
 
-    /// @notice BaseToken multiplier for L1->L2 transactions changed
-    event NewBaseTokenMultiplier(
+    /// @notice Fee adjustment for L1->L2 transactions changed
+    event NewFeeAdjustment(
         uint128 oldNominator,
         uint128 oldDenominator,
+        uint64 oldMinimalL2GasPrice,
         uint128 newNominator,
-        uint128 newDenominator
+        uint128 newDenominator,
+        uint64 newMinimalL2GasPrice
     );
 
     /// @notice Emitted when an upgrade is executed.
