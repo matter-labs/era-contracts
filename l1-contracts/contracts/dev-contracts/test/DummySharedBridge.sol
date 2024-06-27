@@ -6,14 +6,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract DummySharedBridge is PausableUpgradeable {
-    using SafeERC20 for IERC20;
-
+contract DummySharedBridge {
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,
         address indexed from,
@@ -25,7 +19,7 @@ contract DummySharedBridge is PausableUpgradeable {
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across hyperchains.
     /// This serves as a security measure until hyperbridging is implemented.
-    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
+    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) internal chainBalance;
 
     /// @dev Indicates whether the hyperbridging is enabled for a given chain.
     mapping(uint256 chainId => bool enabled) internal hyperbridgingEnabled;
@@ -43,8 +37,6 @@ contract DummySharedBridge is PausableUpgradeable {
         l1TokenReturnInFinalizeWithdrawal = _l1Token;
         amountReturnInFinalizeWithdrawal = _amount;
     }
-
-    function receiveEth(uint256 _chainId) external payable {}
 
     function depositLegacyErc20Bridge(
         address, //_msgSender,
@@ -83,51 +75,12 @@ contract DummySharedBridge is PausableUpgradeable {
 
     event Debugger(uint256);
 
-    function pause() external {
-        _pause();
-    }
-
-    function unpause() external {
-        _unpause();
-    }
-
-    // This function expects abi encoded data
-    function _parseL2WithdrawalMessage(
-        bytes memory _l2ToL1message
-    ) internal view returns (address l1Receiver, address l1Token, uint256 amount) {
-        (l1Receiver, l1Token, amount) = abi.decode(_l2ToL1message, (address, address, uint256));
-    }
-
-    // simple function to just transfer the funds
-    function finalizeWithdrawal(
-        uint256 _chainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external {
-        (address l1Receiver, address l1Token, uint256 amount) = _parseL2WithdrawalMessage(_message);
-
-        if (l1Token == address(1)) {
-            bool callSuccess;
-            // Low-level assembly call, to avoid any memory copying (save gas)
-            assembly {
-                callSuccess := call(gas(), l1Receiver, amount, 0, 0, 0, 0)
-            }
-            require(callSuccess, "ShB: withdraw failed");
-        } else {
-            // Withdraw funds
-            IERC20(l1Token).safeTransfer(l1Receiver, amount);
-        }
-    }
-
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         address _prevMsgSender,
         address _l1Token,
         uint256 _amount
-    ) external payable whenNotPaused {
+    ) external payable {
         if (_l1Token == address(1)) {
             require(msg.value == _amount, "L1SharedBridge: msg.value not equal to amount");
         } else {
