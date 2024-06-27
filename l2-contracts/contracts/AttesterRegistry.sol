@@ -143,7 +143,7 @@ contract AttesterRegistry {
         }
     }
 
-    // Finds the index offset of am attester in the `attesterIndexes` array.
+    // Finds the index offset of an attester in the `attesterIndexes` array.
     function idxOffset(uint256 idx) internal view returns (uint256) {
         for (uint256 i = 0; i < attesterIndexes.length; i++) {
             if (attesterIndexes[i] == idx) {
