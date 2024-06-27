@@ -184,7 +184,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit ClaimedFailedDepositSharedBridge(eraChainId, alice, (tokenAssetId), bytes32(0));
+        emit ClaimedFailedDepositSharedBridge(eraChainId, alice, (tokenAssetId), abi.encode(bytes32(0)));
         vm.prank(l1ERC20BridgeAddress);
 
         sharedBridge.claimFailedDepositLegacyErc20Bridge({

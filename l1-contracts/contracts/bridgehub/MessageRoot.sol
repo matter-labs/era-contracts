@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// slither-disable-next-line unused-return
 // solhint-disable reason-string, gas-custom-errors
 
 import {DynamicIncrementalMerkle} from "../common/libraries/openzeppelin/IncrementalMerkle.sol"; // todo figure out how to import from OZ
@@ -130,7 +129,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
             // Note that it *does not* delete any storage slots, so in terms of pubdata savings, it is useless.
             // However, the chains paid for these changes anyway, so it is considered acceptable.
             // In the future, further optimizations will be available.
-            // slither-disable-next-line usused-return
+            // slither-disable-next-line unused-return
             chainTree[chainIndexToId[i]].setup(EMPTY_LOG_ROOT);
         }
 

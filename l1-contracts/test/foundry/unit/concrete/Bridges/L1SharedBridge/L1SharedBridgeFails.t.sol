@@ -16,6 +16,7 @@ import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
+import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
@@ -51,14 +52,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         );
     }
 
-    function test_transferEthToNTV_wrongCaller() public {
-        vm.expectRevert("ShB: not NTV");
-        sharedBridge.transferEthToNTV();
-    }
-
     function test_transferTokenToNTV_wrongCaller() public {
         vm.expectRevert("ShB: not NTV");
         sharedBridge.transferTokenToNTV(address(token));
+    }
+
+    function test_transferBalanceToNTV_wrongCaller() public {
+        vm.expectRevert("ShB: not NTV");
+        sharedBridge.transferBalanceToNTV(chainId, address(token));
     }
 
     function test_registerToken_noCode() public {
@@ -110,8 +111,21 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         );
     }
 
+    // function test_transferFundsToSharedBridge_Eth_CallFailed() public {
+    //     vm.mockCall(address(nativeTokenVault), "0x", abi.encode(""));
+    //     vm.prank(address(nativeTokenVault));
+    //     vm.expectRevert("ShB: eth transfer failed");
+    //     nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
+    // }
+
+    // function test_transferFundsToSharedBridge_Eth_CallFailed() public {
+    //     vm.mockCall(address(nativeTokenVault), "0x", abi.encode(""));
+    //     vm.prank(address(nativeTokenVault));
+    //     vm.expectRevert("ShB: eth transfer failed");
+    //     nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
+    // }
+
     function test_transferFundsToSharedBridge_Eth_0_AmountTransferred() public {
-        uint256 gas = 1_000_000;
         vm.deal(address(sharedBridge), 0);
         vm.prank(address(nativeTokenVault));
         vm.expectRevert("NTV: 0 eth transferred");
@@ -131,14 +145,6 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.prank(address(nativeTokenVault));
         vm.expectRevert("NTV: wrong amount transferred");
         nativeTokenVault.transferFundsFromSharedBridge(address(token));
-    }
-
-    function test_safeTransferFundsFromSharedBridge_ShouldNotBeCalledTwice() public {
-        nativeTokenVault.safeTransferBalancesFromSharedBridge{gas: maxGas}(ETH_TOKEN_ADDRESS, chainId, maxGas);
-        assertEq(nativeTokenVault.chainBalanceMigrated(chainId, ETH_TOKEN_ADDRESS), true);
-        vm.prank(address(nativeTokenVault));
-        vm.expectRevert("NTV: chain balance for the token already migrated");
-        nativeTokenVault.transferBalancesFromSharedBridge{gas: maxGas}(ETH_TOKEN_ADDRESS, chainId);
     }
 
     function test_bridgehubDepositBaseToken_Eth_Token_notRegisteredTokenID() public {

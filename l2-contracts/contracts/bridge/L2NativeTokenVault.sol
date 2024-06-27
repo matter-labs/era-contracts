@@ -39,19 +39,11 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
-    constructor() {
-        _disableInitializers();
-    }
-
-    /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
     /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed
-    function initialize(
-        bytes32 _l2TokenProxyBytecodeHash,
-        address _aliasedOwner,
-        bool _contractsDeployedAlready
-    ) external reinitializer(2) {
+    constructor(bytes32 _l2TokenProxyBytecodeHash, address _aliasedOwner, bool _contractsDeployedAlready) {
+        _disableInitializers();
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
             revert EmptyBytes32();
         }
@@ -60,19 +52,20 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         }
 
         if (!_contractsDeployedAlready) {
-            address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
-            l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
             l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
-            l2TokenBeacon.transferOwnership(_aliasedOwner);
         }
 
         _transferOwnership(_aliasedOwner);
     }
 
-    function setL2TokenBeacon(address _l2TokenBeacon, bytes32 _l2TokenProxyBytecodeHash) external onlyOwner {
-        l2TokenBeacon = UpgradeableBeacon(_l2TokenBeacon);
-        l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
-        emit L2TokenBeaconUpdated(_l2TokenBeacon, _l2TokenProxyBytecodeHash);
+    /// @dev we don't call this in the constructor, as we need to provide factory deps
+    function setL2TokenBeacon() external {
+        if (address(l2TokenBeacon) != address(0)) {
+            revert AddressMismatch(address(l2TokenBeacon), address(0));
+        }
+        address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
+        l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
+        l2TokenBeacon.transferOwnership(owner());
     }
 
     function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable override {

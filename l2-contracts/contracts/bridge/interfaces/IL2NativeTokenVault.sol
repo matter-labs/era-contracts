@@ -27,5 +27,5 @@ interface IL2NativeTokenVault is IL2AssetHandler {
 
     function l2TokenAddress(address _l1Token) external view returns (address);
 
-    function setL2TokenBeacon(address _l2TokenBeacon, bytes32 _l2TokenProxyBytecodeHash) external;
+    function setL2TokenBeacon() external;
 }

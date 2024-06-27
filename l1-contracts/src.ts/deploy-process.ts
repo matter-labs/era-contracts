@@ -12,7 +12,7 @@ import type { FacetCut } from "./diamondCut";
 import type { Deployer } from "./deploy";
 import { getTokens } from "./deploy-token";
 
-import { ADDRESS_ONE, isCurrentNetworkLocal } from "../src.ts/utils";
+import { ADDRESS_ONE, L2_BRIDGEHUB_ADDRESS, L2_MESSAGE_ROOT_ADDRESS, isCurrentNetworkLocal } from "../src.ts/utils";
 
 export const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000";
 export const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
@@ -63,13 +63,19 @@ export async function initialBridgehubDeployment(
   if (!deployer.isZkMode()) {
     // proxy admin is already deployed when SL's L2SharedBridge is registered
     await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
+    await deployer.deployBridgehubContract(create2Salt, gasPrice);
+  } else {
+    deployer.addresses.Bridgehub.BridgehubProxy = L2_BRIDGEHUB_ADDRESS;
+    deployer.addresses.Bridgehub.MessageRootProxy = L2_MESSAGE_ROOT_ADDRESS;
+
+    console.log(`CONTRACTS_BRIDGEHUB_IMPL_ADDR=${L2_BRIDGEHUB_ADDRESS}`);
+    console.log(`CONTRACTS_BRIDGEHUB_PROXY_ADDR=${L2_BRIDGEHUB_ADDRESS}`);
+    console.log(`CONTRACTS_MESSAGE_ROOT_IMPL_ADDR=${L2_MESSAGE_ROOT_ADDRESS}`);
+    console.log(`CONTRACTS_MESSAGE_ROOT_PROXY_ADDR=${L2_MESSAGE_ROOT_ADDRESS}`);
   }
-  await deployer.deployBridgehubContract(create2Salt, gasPrice);
 
   // L2 Asset Router Bridge already deployed
-  if (deployer.isZkMode()) {
-    await deployer.registerAddresses();
-  } else {
+  if (!deployer.isZkMode()) {
     await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
     await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
     await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });

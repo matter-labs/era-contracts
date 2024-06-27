@@ -69,12 +69,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     mapping(uint256 chainId => bool isWhitelistedSyncLayer) public whitelistedSettlementLayers;
 
     /// @notice to avoid parity hack
-    constructor(uint256 _l1ChainId) reentrancyGuardInitializer {
+    constructor(uint256 _l1ChainId, address _owner) reentrancyGuardInitializer {
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
         ETH_TOKEN_ASSET_ID = keccak256(
             abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
         );
+        _transferOwnership(_owner);
     }
 
     /// @notice used to initialize the contract
@@ -525,7 +526,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
-        address _prevMsgSender,
         bytes calldata _data
     ) external payable override {}
 

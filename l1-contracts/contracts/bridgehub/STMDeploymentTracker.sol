@@ -94,7 +94,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         {
             assetId = getAssetId(_stmL1Address);
         }
-        // slither-disable-next-line usused-return
+        // slither-disable-next-line unused-return
         SHARED_BRIDGE.setAssetHandlerAddressOnCounterPart{value: msg.value}({
             _chainId: _chainId,
             _mintValue: _mintValue,
