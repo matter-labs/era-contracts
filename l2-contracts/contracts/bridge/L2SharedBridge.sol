@@ -5,7 +5,6 @@ pragma solidity 0.8.20;
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
@@ -166,9 +165,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         bytes calldata _data
     ) external override {
         // onlyBridge {
-        bytes32 assetId = keccak256(
-            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
-        );
+        bytes32 assetId = keccak256(abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _l1Token));
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encode(_l1Sender, _amount, _l2Receiver, _data, _l1Token);
         finalizeDeposit(assetId, data);
@@ -176,11 +173,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
         bytes32 assetId = keccak256(
-            abi.encode(
-                L1_CHAIN_ID,
-                NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS,
-                bytes32(uint256(uint160(getL1TokenAddress(_l2Token))))
-            )
+            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, getL1TokenAddress(_l2Token))
         );
         bytes memory data = abi.encode(_amount, _l1Receiver);
         withdraw(assetId, data);

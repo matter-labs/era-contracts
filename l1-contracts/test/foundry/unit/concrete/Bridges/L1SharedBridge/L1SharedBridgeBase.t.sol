@@ -122,7 +122,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         _setBaseTokenAssetId(tokenAssetId);
 
         bytes memory transferData = abi.encode(amount, bob);
-        bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ASSET_ID, transferData));
+        bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(alice, ETH_TOKEN_ASSET_ID, transferData)));
         bytes memory mintCalldata = abi.encode(
             amount,
             alice,
@@ -140,7 +140,12 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             assetId: ETH_TOKEN_ASSET_ID,
             bridgeMintCalldata: mintCalldata
         });
-        sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ASSET_ID, transferData));
+        sharedBridge.bridgehubDeposit{value: amount}(
+            chainId,
+            alice,
+            0,
+            bytes.concat(bytes1(0x01), abi.encode(ETH_TOKEN_ASSET_ID, transferData))
+        );
     }
 
     function test_bridgehubDeposit_Erc() public {
