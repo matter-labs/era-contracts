@@ -66,6 +66,13 @@ contract ConsensusAuthority {
         attesterRegistry.activate(node.attesterIdx);
     }
 
+    // Removes a node.
+    function remove(address owningPubKey) external onlyOwner {
+        RegistryIndexes memory node = nodes[owningPubKey];
+        validatorRegistry.remove(node.validatorIdx);
+        attesterRegistry.remove(node.attesterIdx);
+    }
+
     // Changes node's validator weight.
     function changeValidatorWeight(address owningPubKey, uint256 weight) external onlyOwner {
         uint256 idx = nodes[owningPubKey].validatorIdx;
