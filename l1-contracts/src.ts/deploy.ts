@@ -807,7 +807,7 @@ export class Deployer {
     const diamondProxy = this.stateTransitionContract(this.deployWallet);
     // if we are using governance, the deployer will not be the admin, so we can't call the diamond proxy directly
     if (admin == this.deployWallet.address) {
-      const tx4 = await diamondProxy.setTokenMultiplier(1, 1);
+      const tx4 = await diamondProxy.adjustFee(1, 1, 25000000);
       const receipt4 = await tx4.wait();
       if (this.verbose) {
         console.log(`BaseTokenMultiplier set, gas used: ${receipt4.gasUsed.toString()}`);

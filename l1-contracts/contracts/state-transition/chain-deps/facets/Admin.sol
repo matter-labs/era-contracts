@@ -81,15 +81,17 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrStateTransitionManager {
+    function adjustFee(uint128 _nominator, uint128 _denominator, uint64 _minimalL2GasPrice) external onlyAdminOrStateTransitionManager {
         require(_denominator != 0, "AF: denominator 0");
         uint128 oldNominator = s.baseTokenGasPriceMultiplierNominator;
         uint128 oldDenominator = s.baseTokenGasPriceMultiplierDenominator;
+        uint64 oldMinimalL2GasPrice = s.feeParams.minimalL2GasPrice;
 
         s.baseTokenGasPriceMultiplierNominator = _nominator;
         s.baseTokenGasPriceMultiplierDenominator = _denominator;
+        s.feeParams.minimalL2GasPrice = _minimalL2GasPrice;
 
-        emit NewBaseTokenMultiplier(oldNominator, oldDenominator, _nominator, _denominator);
+        emit NewFeeAdjustment(oldNominator, oldDenominator, oldMinimalL2GasPrice, _nominator, _denominator, _minimalL2GasPrice);
     }
 
     /// @inheritdoc IAdmin

@@ -6,7 +6,7 @@ pragma solidity 0.8.24;
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
+import {PubdataPricingMode, FeeParams} from "../ZkSyncHyperchainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
@@ -202,6 +202,11 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     /// @inheritdoc IGetters
     function getPubdataPricingMode() external view returns (PubdataPricingMode) {
         return s.feeParams.pubdataPricingMode;
+    }
+
+    /// @inheritdoc IGetters
+    function getFeeParams() external view returns (FeeParams memory) {
+        return s.feeParams;
     }
 
     /*//////////////////////////////////////////////////////////////
