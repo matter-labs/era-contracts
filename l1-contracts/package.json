@@ -57,7 +57,7 @@
     "build-l1": "harhdat compile",
     "clean": "hardhat clean",
     "clean:foundry": "forge clean",
-    "test": "hardhat test test/unit_tests/*.spec.ts --network hardhat",
+    "test": "yarn workspace da-contracts build && hardhat test test/unit_tests/*.spec.ts --network hardhat",
     "test:foundry": "forge test",
     "test:fork": "TEST_CONTRACTS_FORK=1 yarn run hardhat test test/unit_tests/*.fork.ts --network hardhat",
     "coverage:foundry": "forge coverage",
