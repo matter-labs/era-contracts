@@ -5,8 +5,9 @@ pragma solidity 0.8.24;
 // solhint-disable reason-string, gas-custom-errors
 
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
+// This importing issue should not be pushed to main, we only need this while we did not import OZ-v5 and v4 in parallel. Once we merge that it will be removed
 import {Arrays} from "./openzeppelin/Arrays.sol";
-// import "forge-std/console.sol";
+import {Hashes} from "./openzeppelin/Hashes.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -46,10 +47,8 @@ library FullMerkle {
             uint256 newHeight = self._height.uncheckedInc();
             self._height = newHeight;
             bytes32 topZero = self._zeros[newHeight - 1];
-            bytes32 newZero = _efficientHash(topZero, topZero);
+            bytes32 newZero = Hashes.Keccak256(topZero, topZero);
             self._zeros.push(newZero);
-            // uint256 length = self._zeros.length;
-            // console.log("newZero", uint256(newZero), length);
             self._nodes.push([newZero]);
         }
         if (index != 0) {
@@ -75,12 +74,12 @@ library FullMerkle {
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < self._height; i = i.uncheckedInc()) {
             if (_index % 2 == 0) {
-                currentHash = _efficientHash(
+                currentHash = Hashes.Keccak256(
                     currentHash,
                     maxNodeNumber == _index ? self._zeros[i] : self._nodes[i][_index + 1]
                 );
             } else {
-                currentHash = _efficientHash(self._nodes[i][_index - 1], currentHash);
+                currentHash = Hashes.Keccak256(self._nodes[i][_index - 1], currentHash);
             }
             _index /= 2;
             maxNodeNumber /= 2;
@@ -109,18 +108,9 @@ library FullMerkle {
         for (uint256 i; i < length; i = i.uncheckedAdd(2)) {
             self._nodes[_height][i] = _newNodes[i];
             self._nodes[_height][i + 1] = _newNodes[i + 1];
-            _newRow[i / 2] = _efficientHash(_newNodes[i], _newNodes[i + 1]);
+            _newRow[i / 2] = Hashes.Keccak256(_newNodes[i], _newNodes[i + 1]);
         }
         return updateAllNodesAtHeight(self, _height + 1, _newRow);
-    }
-
-    /// @dev Keccak hash of the concatenation of two 32-byte words
-    function _efficientHash(bytes32 _lhs, bytes32 _rhs) private pure returns (bytes32 result) {
-        assembly {
-            mstore(0x00, _lhs)
-            mstore(0x20, _rhs)
-            result := keccak256(0x00, 0x40)
-        }
     }
 
     function root(FullTree storage self) internal view returns (bytes32) {

@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 /// @author Matter Labs
-interface IL2SharedBridge {
+interface IL2AssetRouter {
     event FinalizeDepositSharedBridge(uint256 chainId, bytes32 indexed assetId, bytes32 assetDataHash);
 
     event WithdrawalInitiatedSharedBridge(

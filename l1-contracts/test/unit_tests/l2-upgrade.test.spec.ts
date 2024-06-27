@@ -122,7 +122,7 @@ describe("L2 upgrade test", function () {
 
     await (await dummyAdminFacet.dummySetValidator(await deployWallet.getAddress())).wait();
 
-    // do initial setChainIdUpgrade
+    // do initial GenesisUpgrade
     const upgradeTxHash = await proxyGetters.getL2SystemContractsUpgradeTxHash();
     batch1InfoChainIdUpgrade = await buildCommitBatchInfoWithUpgrade(
       genesisStoredBatchInfo(),

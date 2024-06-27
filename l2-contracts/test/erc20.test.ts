@@ -45,7 +45,7 @@ describe("ERC20Bridge", function () {
   let erc20Bridge: L2SharedBridge;
   let erc20NativeTokenVault: L2NativeTokenVault;
   let erc20Token: L2StandardERC20;
-  let contractsDeployedAlready: boolean = false;
+  const contractsDeployedAlready: boolean = false;
 
   before("Deploy token and bridge", async function () {
     const deployer = new Deployer(hre, deployerWallet);
@@ -57,7 +57,13 @@ describe("ERC20Bridge", function () {
     ]);
     await deployer.deploy(await deployer.loadArtifact("BeaconProxy"), [l2Erc20TokenBeacon.address, "0x"]);
     const beaconProxyBytecodeHash = hashBytecode((await deployer.loadArtifact("BeaconProxy")).bytecode);
-    const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [testChainId, 1]);
+    const erc20BridgeContract = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [
+      testChainId,
+      1,
+      unapplyL1ToL2Alias(l1BridgeWallet.address),
+      unapplyL1ToL2Alias(l1BridgeWallet.address),
+    ]);
+    erc20Bridge = L2SharedBridgeFactory.connect(erc20BridgeContract.address, deployerWallet);
     const erc20NativeTokenVaultImpl = await deployer.deploy(await deployer.loadArtifact("L2NativeTokenVault"));
     const assetHandlerInitializeData = erc20NativeTokenVaultImpl.interface.encodeFunctionData("initialize", [
       beaconProxyBytecodeHash,
@@ -70,24 +76,7 @@ describe("ERC20Bridge", function () {
       [erc20NativeTokenVaultImpl.address, proxyAdminWallet.address, assetHandlerInitializeData]
     );
 
-    contractsDeployedAlready = true;
-
-    const bridgeInitializeData = erc20BridgeImpl.interface.encodeFunctionData("initialize", [
-      unapplyL1ToL2Alias(l1BridgeWallet.address),
-      // ethers.constants.AddressZero,
-      unapplyL1ToL2Alias(governorWallet.address), // note on real deployment this will be the governor
-      erc20NativeTokenVaultProxy.address,
-    ]);
-
-    const erc20BridgeProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
-      erc20BridgeImpl.address,
-      proxyAdminWallet.address,
-      bridgeInitializeData,
-    ]);
-
-    erc20Bridge = L2SharedBridgeFactory.connect(erc20BridgeProxy.address, deployerWallet);
     erc20NativeTokenVault = L2NativeTokenVaultFactory.connect(erc20NativeTokenVaultProxy.address, governorWallet);
-    await erc20NativeTokenVault.setSharedBridge(erc20BridgeProxy.address);
 
     /// note in real deployment we have to transfer ownership of standard deployer here
   });

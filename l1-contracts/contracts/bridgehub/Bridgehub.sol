@@ -8,16 +8,23 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/acces
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
-import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
-import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
+import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
-import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
+import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
+import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
+import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @dev The Bridgehub contract serves as the primary entry point for L1<->L2 communication,
+/// facilitating interactions between end user and bridges.
+/// It also manages state transition managers, base tokens, and chain registrations.
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice the asset id of Eth
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
@@ -26,7 +33,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     uint256 public immutable L1_CHAIN_ID;
 
     /// @notice all the ether is held by the weth bridge
-    IL1SharedBridge public sharedBridge;
+    IL1AssetRouter public sharedBridge;
 
     /// @notice we store registered stateTransitionManagers
     mapping(address _stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
@@ -64,20 +71,19 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev Sync layer chain is expected to have .. as the base token.
     mapping(uint256 chainId => bool isWhitelistedSyncLayer) public whitelistedSettlementLayers;
 
-    /// @dev the address of the bridghub on other chains
-    mapping(uint256 chainId => address bridgehubCounterPart) public bridgehubCounterParts;
-
     /// @notice to avoid parity hack
-    constructor(uint256 _l1ChainId) reentrancyGuardInitializer {
+    constructor(uint256 _l1ChainId, address _owner) reentrancyGuardInitializer {
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
         ETH_TOKEN_ASSET_ID = keccak256(
-            abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
+            abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
         );
+        _transferOwnership(_owner);
     }
 
     /// @notice used to initialize the contract
-    function initialize(address _owner) external reentrancyGuardInitializer initializer {
+    /// @notice this contract is also deployed on L2 as a system contract there the owner and the related functions will not be used
+    function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
     }
 
@@ -130,7 +136,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         ISTMDeploymentTracker _stmDeployer,
         IMessageRoot _messageRoot
     ) external onlyOwner {
-        sharedBridge = IL1SharedBridge(_sharedBridge);
+        sharedBridge = IL1AssetRouter(_sharedBridge);
         stmDeployer = _stmDeployer;
         messageRoot = _messageRoot;
     }
@@ -162,10 +168,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         tokenIsRegistered[_token] = true;
     }
 
-    function registerCounterpart(uint256 _chainId, address _counterPart) external onlyOwner {
-        require(_counterPart != address(0), "BH: counter part zero");
-
-        bridgehubCounterParts[_chainId] = _counterPart;
+    /// @notice To set shared bridge, only Owner. Not done in initialize, as
+    /// the order of deployment is Bridgehub, Shared bridge, and then we call this
+    function setSharedBridge(address _sharedBridge) external onlyOwner {
+        sharedBridge = IL1AssetRouter(_sharedBridge);
     }
 
     function registerSyncLayer(
@@ -217,7 +223,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // solhint-disable-next-line no-unused-vars
         uint256 _salt,
         address _admin,
-        bytes calldata _initData
+        bytes calldata _initData,
+        bytes[] calldata _factoryDeps
     ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256) {
         require(_chainId != 0, "BH: chainId cannot be 0");
         require(_chainId <= type(uint48).max, "BH: chainId too large");
@@ -239,7 +246,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _baseToken: _baseToken,
             _sharedBridge: address(sharedBridge),
             _admin: _admin,
-            _diamondCut: _initData
+            _initData: _initData,
+            _factoryDeps: _factoryDeps
         });
         messageRoot.addNewChain(_chainId);
 
@@ -252,6 +260,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     //////////////////////////////////////////////////////////////*/
 
     /// @notice forwards function call to Mailbox based on ChainId
+    /// @param _chainId The chain ID of the hyperchain where to prove L2 message inclusion.
+    /// @param _batchNumber The executed L2 batch number in which the message appeared
+    /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _message Information about the sent message: sender address, the message itself, tx index in the L2 batch where the message was sent
+    /// @param _proof Merkle proof for inclusion of L2 log that was sent with the message
+    /// @return Whether the proof is valid
     function proveL2MessageInclusion(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -264,6 +278,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
+    /// @param _chainId The chain ID of the hyperchain where to prove L2 log inclusion.
+    /// @param _batchNumber The executed L2 batch number in which the log appeared
+    /// @param _index The position of the l2log in the L2 logs Merkle tree
+    /// @param _log Information about the sent log
+    /// @param _proof Merkle proof for inclusion of the L2 log
+    /// @return Whether the proof is correct and L2 log is included in batch
     function proveL2LogInclusion(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -276,6 +296,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
+    /// @param _chainId The chain ID of the hyperchain where to prove L1->L2 tx status.
+    /// @param _l2TxHash The L2 canonical transaction hash
+    /// @param _l2BatchNumber The L2 batch number where the transaction was processed
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
+    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction
+    /// @param _status The execution status of the L1 -> L2 transaction (true - success & 0 - fail)
+    /// @return Whether the proof is correct and the transaction was actually executed with provided status
+    /// NOTE: It may return `false` for incorrect proof, but it doesn't mean that the L1 -> L2 transaction has an opposite status!
     function proveL1ToL2TransactionStatus(
         uint256 _chainId,
         bytes32 _l2TxHash,
@@ -386,7 +415,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address hyperchain = getHyperchain(_request.chainId);
 
         // slither-disable-next-line arbitrary-send-eth
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1SharedBridge(_request.secondBridgeAddress)
+        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1AssetRouter(_request.secondBridgeAddress)
             .bridgehubDeposit{value: _request.secondBridgeValue}(
             _request.chainId,
             msg.sender,
@@ -416,7 +445,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             })
         );
 
-        IL1SharedBridge(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
+        IL1AssetRouter(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
             _request.chainId,
             outputRequest.txDataHash,
             canonicalTxHash
@@ -501,7 +530,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
-        address _prevMsgSender,
         bytes calldata _data
     ) external payable override {}
 
