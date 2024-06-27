@@ -25,7 +25,7 @@ interface IL1SharedBridge {
         bytes32 indexed txDataHash,
         address indexed from,
         bytes32 assetId,
-        bytes bridgeMintCalldata
+        bytes l2BridgeMintCalldata
     );
 
     event BridgehubDepositBaseTokenInitiated(
