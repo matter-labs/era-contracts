@@ -4,13 +4,12 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
-import {IL1DAValidator, L1DAValidatorOutput} from "../chain-interfaces/IL1DAValidator.sol";
-import {POINT_EVALUATION_PRECOMPILE_ADDR} from "../../common/Config.sol";
+import {IL1DAValidator, L1DAValidatorOutput} from "./IL1DAValidator.sol";
 
 import {CalldataDA} from "./CalldataDA.sol";
 
 // TODO: maybe move it here
-import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE} from "../chain-interfaces/IExecutor.sol";
+import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE, POINT_EVALUATION_PRECOMPILE_ADDR} from "./DAUtils.sol";
 
 uint256 constant BLOBS_SUPPORTED = 6;
 
@@ -170,11 +169,9 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         require(result == BLS_MODULUS, "precompile unexpected output");
     }
 
-    function _getBlobVersionedHash(uint256) internal view virtual returns (bytes32 versionedHash) {
-        // FIXME: enable blobs
-        revert("Blobs not supported on this codebase yet");
-        // assembly {
-        //     versionedHash := blobhash(_index)
-        // }
+    function _getBlobVersionedHash(uint256 _index) internal view virtual returns (bytes32 versionedHash) {
+        assembly {
+            versionedHash := blobhash(_index)
+        }
     }
 }
