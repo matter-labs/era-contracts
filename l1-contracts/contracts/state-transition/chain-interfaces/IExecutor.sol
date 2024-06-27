@@ -13,12 +13,14 @@ enum SystemLogKey {
     PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,
     NUMBER_OF_LAYER_1_TXS_KEY,
-    BLOB_ONE_HASH_KEY,
+    BLOB_ONE_HASH_KEY, // TODO: remove
     BLOB_TWO_HASH_KEY,
     BLOB_THREE_HASH_KEY,
     BLOB_FOUR_HASH_KEY,
     BLOB_FIVE_HASH_KEY,
     BLOB_SIX_HASH_KEY,
+    L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+    USED_L2_DA_VALIDATOR_ADDRESS_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
@@ -36,7 +38,7 @@ struct LogProcessingOutput {
     bytes32 stateDiffHash;
     bytes32 l2LogsTreeRoot;
     uint256 packedBatchAndL2BlockTimestamp;
-    bytes32[] blobHashes;
+    bytes32 l2DAValidatorOutputHash;
 }
 
 /// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
@@ -66,6 +68,9 @@ uint256 constant PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET = 16;
 
 /// @dev Offset in pubdata commitment of blobs for kzg commitment
 uint256 constant PUBDATA_COMMITMENT_COMMITMENT_OFFSET = 48;
+
+/// @dev For each blob we expect that the commitment is provided as well as the marker whether a blob with such commitment has been published before.
+uint256 constant BLOB_DA_INPUT_SIZE = PUBDATA_COMMITMENT_SIZE + 32;
 
 /// @dev Max number of blobs currently supported
 uint256 constant MAX_NUMBER_OF_BLOBS = 6;
@@ -110,7 +115,7 @@ interface IExecutor is IZkSyncHyperchainBase {
     /// @param bootloaderHeapInitialContentsHash Hash of the initial contents of the bootloader heap. In practice it serves as the commitment to the transactions in the batch.
     /// @param eventsQueueStateHash Hash of the events queue state. In practice it serves as the commitment to the events in the batch.
     /// @param systemLogs concatenation of all L2 -> L1 system logs in the batch
-    /// @param pubdataCommitments Packed pubdata commitments/data.
+    /// @param operatorDAInput Packed pubdata commitments/data.
     /// @dev pubdataCommitments format: This will always start with a 1 byte pubdataSource flag. Current allowed values are 0 (calldata) or 1 (blobs)
     ///                             kzg: list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes) = 144 bytes
     ///                             calldata: pubdataCommitments.length - 1 - 32 bytes of pubdata
@@ -128,7 +133,7 @@ interface IExecutor is IZkSyncHyperchainBase {
         bytes32 bootloaderHeapInitialContentsHash;
         bytes32 eventsQueueStateHash;
         bytes systemLogs;
-        bytes pubdataCommitments;
+        bytes operatorDAInput;
     }
 
     /// @notice Recursive proof input data (individual commitments are constructed onchain)

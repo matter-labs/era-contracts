@@ -115,6 +115,8 @@ export interface DeployedAddresses {
   Governance: string;
   BlobVersionedHashRetriever: string;
   ValidatorTimeLock: string;
+  RollupL1DAValidator: string;
+  ValidiumL1DAValidator: string;
   Create2Factory: string;
 }
 
@@ -146,6 +148,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       L2SharedBridgeImplementation: getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_IMPL_ADDR"),
       L2SharedBridgeProxy: getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR"),
     },
+    RollupL1DAValidator: getAddressFromEnv("CONTRACTS_L1_ROLLUP_DA_VALIDATOR"),
+    ValidiumL1DAValidator: getAddressFromEnv("CONTRACTS_L1_VALIDIUM_DA_VALIDATOR"),
     BaseToken: getAddressFromEnv("CONTRACTS_BASE_TOKEN_ADDR"),
     TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),
     Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
