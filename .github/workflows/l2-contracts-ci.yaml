@@ -94,6 +94,6 @@ jobs:
 
       - name: Copy typechain
         run: yarn sc copy:typechain
-        
+
       - name: Run tests
         run: yarn l2 test
