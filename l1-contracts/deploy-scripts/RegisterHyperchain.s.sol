@@ -63,7 +63,7 @@ contract RegisterHyperchainScript is Script {
     function initializeConfig() internal {
         // Grab config from output of l1 deployment
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/register-hyperchain.toml");
+        string memory path = string.concat(root, "/deploy-script-config-template/register-hyperchain.toml");
         string memory toml = vm.readFile(path);
 
         config.deployerAddress = msg.sender;
