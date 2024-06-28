@@ -61,7 +61,7 @@
     "compile-yul": "ts-node scripts/compile-yul.ts",
     "compile-zasm": "ts-node scripts/compile-zasm.ts",
     "deploy-preimages": "ts-node scripts/deploy-preimages.ts",
-    "copy:typechain": "cp ./typechain/ContractDeployerFactory.ts ../l2-contracts/typechain/",
+    "copy:typechain": "mkdir -p ../l2-contracts/typechain && cp ./typechain/ContractDeployerFactory.ts ../l2-contracts/typechain/",
     "preprocess:bootloader": "rm -rf ./bootloader/build && yarn ts-node scripts/preprocess-bootloader.ts",
     "preprocess:system-contracts": "ts-node scripts/preprocess-system-contracts.ts",
     "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode",
