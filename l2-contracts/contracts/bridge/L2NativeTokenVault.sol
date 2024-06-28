@@ -58,6 +58,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         _transferOwnership(_aliasedOwner);
     }
 
+    /// @notice Sets L2 token beacon used by wrapped ERC20 tokens deployed by NTV.
     /// @dev we don't call this in the constructor, as we need to provide factory deps
     function setL2TokenBeacon() external {
         if (address(l2TokenBeacon) != address(0)) {
@@ -68,10 +69,14 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         l2TokenBeacon.transferOwnership(owner());
     }
 
-    function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable override {
+    /// @notice Mints the wrapped asset during shared bridge deposit finalization.
+    /// @param _chainId The chainId that the message is from.
+    /// @param _assetId The assetId of the asset being bridged.
+    /// @param _transferData The abi.encoded transfer data.
+    function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) external payable override {
         address token = tokenAddress[_assetId];
         (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken) = abi
-            .decode(_data, (address, uint256, address, bytes, address));
+            .decode(_transferData, (address, uint256, address, bytes, address));
         address expectedToken = l2TokenAddress(originToken);
         if (token == address(0)) {
             bytes32 expectedAssetId = keccak256(
@@ -95,14 +100,22 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         emit BridgeMint(_chainId, _assetId, _l1Sender, _l2Receiver, _amount);
     }
 
+    /// @notice Burns wrapped tokens and returns the calldata for L2 -> L1 message.
+    /// @dev In case of native token vault _transferData is the tuple of _depositAmount and _l2Receiver.
+    /// @param _chainId The chainId that the message will be sent to.
+    /// @param _mintValue The L1 base token value bridged.
+    /// @param _assetId The L2 assetId of the asset being bridged.
+    /// @param _prevMsgSender The original caller of the shared bridge.
+    /// @param _transferData The abi.encoded transfer data.
+    /// @return l1BridgeMintData The calldata used by l1 asset handler to unlock tokens for recipient.
     function bridgeBurn(
         uint256 _chainId,
         uint256 _mintValue,
         bytes32 _assetId,
         address _prevMsgSender,
-        bytes calldata _data
-    ) external payable override onlyBridge returns (bytes memory _bridgeMintData) {
-        (uint256 _amount, address _l1Receiver) = abi.decode(_data, (uint256, address));
+        bytes calldata _transferData
+    ) external payable override onlyBridge returns (bytes memory l1BridgeMintData) {
+        (uint256 _amount, address _l1Receiver) = abi.decode(_transferData, (uint256, address));
         if (_amount == 0) {
             // "Amount cannot be zero");
             revert AmountMustBeGreaterThanZero();
@@ -115,22 +128,27 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         emit WithdrawalInitiated(_prevMsgSender, _l1Receiver, l2Token, _amount);
         // solhint-disable-next-line func-named-parameters
         emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _l1Receiver, _mintValue, _amount);
-        _bridgeMintData = _data;
+        l1BridgeMintData = _transferData;
     }
 
-    /// @dev Deploy and initialize the L2 token for the L1 counterpart
-    function _deployL2Token(address _l1Token, bytes memory _data) internal returns (address) {
+    /// @notice Deploys and initializes the L2 token for the L1 counterpart.
+    /// @param _l1Token The address of token on L1.
+    /// @param _erc20Data The ERC20 metadata of the token deployed.
+    /// @return The address of the beacon proxy (L2 wrapped / bridged token).
+    function _deployL2Token(address _l1Token, bytes memory _erc20Data) internal returns (address) {
         bytes32 salt = _getCreate2Salt(_l1Token);
 
         BeaconProxy l2Token = _deployBeaconProxy(salt);
-        L2StandardERC20(address(l2Token)).bridgeInitialize(_l1Token, _data);
+        L2StandardERC20(address(l2Token)).bridgeInitialize(_l1Token, _erc20Data);
 
         return address(l2Token);
     }
 
-    /// @dev Deploy the beacon proxy for the L2 token, while using ContractDeployer system contract.
+    /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
     /// @dev This function uses raw call to ContractDeployer to make sure that exactly `l2TokenProxyBytecodeHash` is used
     /// for the code of the proxy.
+    /// @param salt The salt used for beacon proxy deployment of L2 wrapped token.
+    /// @return proxy The beacon proxy, i.e. L2 wrapped / bridged token.
     function _deployBeaconProxy(bytes32 salt) internal returns (BeaconProxy proxy) {
         (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
             uint32(gasleft()),
@@ -149,12 +167,16 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         proxy = BeaconProxy(abi.decode(returndata, (address)));
     }
 
-    /// @dev Convert the L1 token address to the create2 salt of deployed L2 token
+    /// @notice Converts the L1 token address to the create2 salt of deployed L2 token.
+    /// @param _l1Token The address of token on L1.
+    /// @return salt The salt used to compute address of wrapped token on L2 and for beacon proxy deployment.
     function _getCreate2Salt(address _l1Token) internal pure returns (bytes32 salt) {
         salt = bytes32(uint256(uint160(_l1Token)));
     }
 
-    /// @return Address of an L2 token counterpart
+    /// @notice Calculates L2 wrapped token address corresponding to L1 token counterpart.
+    /// @param _l1Token The address of token on L1.
+    /// @return The address of token on L2.
     function l2TokenAddress(address _l1Token) public view override returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_l1Token);
