@@ -42,13 +42,14 @@ contract ConsensusAuthority {
     // Adds a new node to the registries.
     function add(
         address owningPubKey,
-        uint256 weight,
+        uint256 validatorWeight,
         bytes calldata validatorPubKey,
         bytes calldata validatorPoP,
-        bytes calldata attesterPubKey
+        uint256 attesterWeight,
+    bytes calldata attesterPubKey
     ) external onlyOwner {
-        uint256 validatorIdx = validatorRegistry.add(weight, validatorPubKey, validatorPoP);
-        uint256 attesterIdx = attesterRegistry.add(weight, attesterPubKey);
+        uint256 validatorIdx = validatorRegistry.add(validatorWeight, validatorPubKey, validatorPoP);
+        uint256 attesterIdx = attesterRegistry.add(attesterWeight, attesterPubKey);
         nodes[owningPubKey] = RegistryIndexes(validatorIdx, attesterIdx);
     }
 
