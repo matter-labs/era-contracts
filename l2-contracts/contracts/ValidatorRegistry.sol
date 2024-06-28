@@ -3,15 +3,13 @@
 pragma solidity 0.8.20;
 
 contract ValidatorRegistry {
-    // Owner of the contract (the Authority contract).
+    // Owner of the contract (the ConsensusAuthority contract).
     address public owner;
 
-    // A map of indexes => validators (used for efficient lookups).
-    mapping(uint256 => Validator) public validators;
-    // Array to keep track of validator indexes (used for iterations).
-    uint256[] public validatorIndexes;
-    // The last unique value used as a validator index (used for supporting arbitrary removals).
-    uint256 public validatorSequence;
+    // A map of node owners => validators (used for validator lookups).
+    mapping(address => Validator) public validators;
+    // Array to keep track of validator node owners (used for iterating validators).
+    address[] public nodeOwners;
 
     // The current committee list. Weight and public key are stored explicitly
     // since they might change after committee selection.
@@ -45,7 +43,7 @@ contract ValidatorRegistry {
     }
 
     struct CommitteeValidator {
-        uint256 idx;
+        address nodeOwner;
         uint256 weight;
         bytes pubKey;
     }
@@ -62,72 +60,69 @@ contract ValidatorRegistry {
     // Adds a new validator to the registry. Fails if a validator with the
     // same public key already exists. Has to verify the PoP.
     function add(
+        address nodeOwner,
         uint256 weight,
         bytes calldata pubKey,
         bytes calldata pop
-    ) public onlyOwner returns (uint256) {
-        // Check if validator with the same public key already exists.
-        for (uint256 i = 0; i < validatorIndexes.length; i++) {
-            uint256 idx = validatorIndexes[i];
-            require(!compareBytes(validators[idx].pubKey, pubKey), "pubKey already exists");
+    ) public onlyOwner {
+        // Check if a validator with the same node owner or public key already exists.
+        for (uint256 i = 0; i < nodeOwners.length; i++) {
+            require(nodeOwners[i] != nodeOwner, "nodeOwner already exists");
+            require(!compareBytes(validators[nodeOwners[i]].pubKey, pubKey), "pubKey already exists");
         }
 
         verifyPoP(pubKey, pop);
 
-        validatorSequence++;
-        uint256 idx = validatorSequence;
-        validators[idx] = Validator(weight, pubKey, pop, false, 0);
-        validatorIndexes.push(idx);
-        return idx;
+        validators[nodeOwner] = Validator(weight, pubKey, pop, false, 0);
+        nodeOwners.push(nodeOwner);
     }
 
     // Removes a validator. Should fail if the validator is still active or
     // the inactivity delay has not passed.
-    function remove(uint256 idx) public onlyOwner {
-        verifyExists(idx);
-        require(validators[idx].isInactive, "Validator is still active");
-        require(epoch >= validators[idx].inactiveSince + INACTIVITY_DELAY,
+    function remove(address nodeOwner) public onlyOwner {
+        verifyExists(nodeOwner);
+        require(validators[nodeOwner].isInactive, "Validator is still active");
+        require(epoch >= validators[nodeOwner].inactiveSince + INACTIVITY_DELAY,
             "Validator's inactivity delay has not passed"
         );
 
         // Remove from mapping.
-        delete validators[idx];
+        delete validators[nodeOwner];
 
         // Remove from array by swapping the last element (gas-efficient, not preserving order).
-        uint256 offset = idxOffset(idx);
-        validatorIndexes[offset] = validatorIndexes[validatorIndexes.length - 1];
-        validatorIndexes.pop();
+        nodeOwners[nodeOwnerIndex(nodeOwner)] = nodeOwners[nodeOwners.length - 1];
+        nodeOwners.pop();
     }
 
     // Inactivates a validator.
-    function inactivate(uint256 idx) public onlyOwner {
-        verifyExists(idx);
-        validators[idx].isInactive = true;
-        validators[idx].inactiveSince = epoch;
+    function inactivate(address nodeOwner) public onlyOwner {
+        verifyExists(nodeOwner);
+        validators[nodeOwner].isInactive = true;
+        validators[nodeOwner].inactiveSince = epoch;
     }
 
     // Activates a validator.
-    function activate(uint256 idx) public onlyOwner {
-        verifyExists(idx);
-        validators[idx].isInactive = false;
+    function activate(address nodeOwner) public onlyOwner {
+        verifyExists(nodeOwner);
+        validators[nodeOwner].isInactive = false;
     }
 
     // Changes the weight.
-    function changeWeight(uint256 idx, uint256 weight) public onlyOwner {
-        verifyExists(idx);
-        validators[idx].weight = weight;
+    function changeWeight(address nodeOwner, uint256 weight) public onlyOwner {
+        verifyExists(nodeOwner);
+        validators[nodeOwner].weight = weight;
     }
 
     // Changes the public key and PoP.
     function changePublicKey(
-        uint256 idx,
+        address nodeOwner,
         bytes calldata pubKey,
         bytes calldata pop
     ) public onlyOwner {
-        verifyExists(idx);
+        verifyExists(nodeOwner);
         verifyPoP(pubKey, pop);
-        validators[idx].pubKey = pubKey;
-        validators[idx].pop = pop;
+        validators[nodeOwner].pubKey = pubKey;
+        validators[nodeOwner].pop = pop;
     }
 
     // Creates a new committee list which will become the next committee list.
@@ -142,28 +137,27 @@ contract ValidatorRegistry {
 
         // Populate `nextCommittee` based on active validators
         delete nextCommittee;
-        for (uint256 i = 0; i < validatorIndexes.length; i++) {
-            uint256 idx = validatorIndexes[i];
-            Validator memory validator = validators[idx];
+        for (uint256 i = 0; i < nodeOwners.length; i++) {
+            Validator memory validator = validators[nodeOwners[i]];
             if (!validator.isInactive) {
-                nextCommittee.push(CommitteeValidator(idx, validator.weight, validator.pubKey));
+                nextCommittee.push(CommitteeValidator(nodeOwners[i], validator.weight, validator.pubKey));
             }
         }
     }
 
-    // Finds the index offset of a validator in the `validatorIndexes` array.
-    function idxOffset(uint256 idx) private view returns (uint256) {
-        for (uint256 i = 0; i < validatorIndexes.length; i++) {
-            if (validatorIndexes[i] == idx) {
+    // Finds the index of a node owner in the `nodeOwners` array.
+    function nodeOwnerIndex(address nodeOwner) private view returns (uint256) {
+        for (uint256 i = 0; i < nodeOwners.length; i++) {
+            if (nodeOwners[i] == nodeOwner) {
                 return i;
             }
         }
-        revert("Validator idx not found");
+        revert("nodeOwner not found");
     }
 
     // Verifies that a validator exists.
-    function verifyExists(uint256 idx) private view {
-        require(validators[idx].pubKey.length != 0, "Validator doesn't exist");
+    function verifyExists(address nodeOwner) private view {
+        require(validators[nodeOwner].pubKey.length != 0, "Validator doesn't exist");
     }
 
     function compareBytes(bytes storage a, bytes calldata b) private pure returns (bool) {

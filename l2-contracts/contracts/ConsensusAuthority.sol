@@ -13,23 +13,13 @@ contract ConsensusAuthority {
     // The attester registry instance.
     AttesterRegistry public attesterRegistry;
 
-    // A map of owningPubKey (a cold key L2 address) => indexes on registries.
-    mapping(address => RegistryIndexes) public nodes;
-
-    struct RegistryIndexes {
-        // Index in the validator registry.
-        uint256 validatorIdx;
-        // Index in the attester registry.
-        uint256 attesterIdx;
-    }
-
     modifier onlyOwner() {
         require(msg.sender == owner, "Unauthorized: onlyOwner");
         _;
     }
 
-    modifier onlyOwnerOrNodeOwner(address owningPubKey) {
-        require(msg.sender == owner || msg.sender == owningPubKey, "Unauthorized: onlyOwnerOrNodeOwner");
+    modifier onlyOwnerOrNodeOwner(address nodeOwner) {
+        require(msg.sender == owner || msg.sender == nodeOwner, "Unauthorized: onlyOwnerOrNodeOwner");
         _;
     }
 
@@ -41,60 +31,52 @@ contract ConsensusAuthority {
 
     // Adds a new node to the registries.
     function add(
-        address owningPubKey,
+        address nodeOwner,
         uint256 validatorWeight,
         bytes calldata validatorPubKey,
         bytes calldata validatorPoP,
         uint256 attesterWeight,
     bytes calldata attesterPubKey
     ) external onlyOwner {
-        uint256 validatorIdx = validatorRegistry.add(validatorWeight, validatorPubKey, validatorPoP);
-        uint256 attesterIdx = attesterRegistry.add(attesterWeight, attesterPubKey);
-        nodes[owningPubKey] = RegistryIndexes(validatorIdx, attesterIdx);
+        validatorRegistry.add(nodeOwner, validatorWeight, validatorPubKey, validatorPoP);
+        attesterRegistry.add(nodeOwner, attesterWeight, attesterPubKey);
     }
 
     // Inactivates a node.
-    function inactivate(address owningPubKey) external onlyOwnerOrNodeOwner(owningPubKey) {
-        RegistryIndexes memory node = nodes[owningPubKey];
-        validatorRegistry.inactivate(node.validatorIdx);
-        attesterRegistry.inactivate(node.attesterIdx);
+    function inactivate(address nodeOwner) external onlyOwnerOrNodeOwner(nodeOwner) {
+        validatorRegistry.inactivate(nodeOwner);
+        attesterRegistry.inactivate(nodeOwner);
     }
 
     // Activates a node.
-    function activate(address owningPubKey) external onlyOwner {
-        RegistryIndexes memory node = nodes[owningPubKey];
-        validatorRegistry.activate(node.validatorIdx);
-        attesterRegistry.activate(node.attesterIdx);
+    function activate(address nodeOwner) external onlyOwner {
+        validatorRegistry.activate(nodeOwner);
+        attesterRegistry.activate(nodeOwner);
     }
 
     // Removes a node.
-    function remove(address owningPubKey) external onlyOwner {
-        RegistryIndexes memory node = nodes[owningPubKey];
-        validatorRegistry.remove(node.validatorIdx);
-        attesterRegistry.remove(node.attesterIdx);
+    function remove(address nodeOwner) external onlyOwner {
+        validatorRegistry.remove(nodeOwner);
+        attesterRegistry.remove(nodeOwner);
     }
 
     // Changes node's validator weight.
-    function changeValidatorWeight(address owningPubKey, uint256 weight) external onlyOwner {
-        uint256 idx = nodes[owningPubKey].validatorIdx;
-        validatorRegistry.changeWeight(idx, weight);
+    function changeValidatorWeight(address nodeOwner, uint256 weight) external onlyOwner {
+        validatorRegistry.changeWeight(nodeOwner, weight);
     }
 
     // Changes node's attester weight.
-    function changeAttesterWeight(address owningPubKey, uint256 weight) external onlyOwner {
-        uint256 idx = nodes[owningPubKey].attesterIdx;
-        attesterRegistry.changeWeight(idx, weight);
+    function changeAttesterWeight(address nodeOwner, uint256 weight) external onlyOwner {
+        attesterRegistry.changeWeight(nodeOwner, weight);
     }
 
     // Changes node's validator public key and PoP.
-    function changeValidatorPubKey(address owningPubKey, bytes calldata pubKey, bytes calldata pop) external onlyOwnerOrNodeOwner(owningPubKey) {
-        uint256 idx = nodes[owningPubKey].validatorIdx;
-        validatorRegistry.changePublicKey(idx, pubKey, pop);
+    function changeValidatorPubKey(address nodeOwner, bytes calldata pubKey, bytes calldata pop) external onlyOwnerOrNodeOwner(nodeOwner) {
+        validatorRegistry.changePublicKey(nodeOwner, pubKey, pop);
     }
 
     // Changes node's attester public key.
-    function changeAttesterPubKey(address owningPubKey, bytes calldata pubKey) external onlyOwnerOrNodeOwner(owningPubKey) {
-        uint256 idx = nodes[owningPubKey].attesterIdx;
-        attesterRegistry.changePublicKey(idx, pubKey);
+    function changeAttesterPubKey(address nodeOwner, bytes calldata pubKey) external onlyOwnerOrNodeOwner(nodeOwner) {
+        attesterRegistry.changePublicKey(nodeOwner, pubKey);
     }
 }

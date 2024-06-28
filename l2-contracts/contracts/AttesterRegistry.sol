@@ -3,15 +3,13 @@
 pragma solidity 0.8.20;
 
 contract AttesterRegistry {
-    // Owner of the contract (the Authority contract).
+    // Owner of the contract (the ConsensusAuthority contract).
     address public owner;
 
-    // A map of indexes => attesters (used for efficient lookups).
-    mapping(uint256 => Attester) public attesters;
-    // Array to keep track of attester indexes (used for iterations).
-    uint256[] public attesterIndexes;
-    // The last unique value used as an attester index (used for supporting arbitrary removals).
-    uint256 public attesterSequence;
+    // A map of node owners => attesters (used for attester lookups).
+    mapping(address => Attester) public attesters;
+    // Array to keep track of attester node owners (used for iterating attesters).
+    address[] public nodeOwners;
 
     // The current committee list. Weight and public key are stored explicitly
     // since they might change after committee selection.
@@ -43,7 +41,7 @@ contract AttesterRegistry {
     }
 
     struct CommitteeAttester {
-        uint256 idx;
+        address nodeOwner;
         uint256 weight;
         bytes pubKey;
     }
@@ -60,66 +58,60 @@ contract AttesterRegistry {
     // Adds a new attester to the registry. Fails if an attester with the
     // same public key already exists.
     function add(
+        address nodeOwner,
         uint256 weight,
         bytes calldata pubKey
-    ) external onlyOwner returns (uint256) {
-        // Check if validator with the same public key already exists.
-        for (uint256 i = 0; i < attesterIndexes.length; i++) {
-            uint256 idx = attesterIndexes[i];
-            require(!compareBytes(attesters[idx].pubKey, pubKey), "pubKey already exists");
+    ) external onlyOwner {
+        // Check if an attester with the same node owner or public key already exists.
+        for (uint256 i = 0; i < nodeOwners.length; i++) {
+            require(nodeOwners[i] != nodeOwner, "nodeOwner already exists");
+            require(!compareBytes(attesters[nodeOwners[i]].pubKey, pubKey), "pubKey already exists");
         }
 
-        attesterSequence++;
-        uint256 idx = attesterSequence;
-        attesters[idx] = Attester(weight, pubKey, false, 0);
-        attesterIndexes.push(idx);
-        return idx;
+        attesters[nodeOwner] = Attester(weight, pubKey, false, 0);
+        nodeOwners.push(nodeOwner);
     }
 
     // Removes an attester. Should fail if the validator is still active or
     // the inactivity delay has not passed.
-    function remove(uint256 idx) external onlyOwner {
-        verifyExists(idx);
-        require(attesters[idx].isInactive, "Attester is still active");
-        require(epoch >= attesters[idx].inactiveSince + INACTIVITY_DELAY,
+    function remove(address nodeOwner) external onlyOwner {
+        verifyExists(nodeOwner);
+        require(attesters[nodeOwner].isInactive, "Attester is still active");
+        require(epoch >= attesters[nodeOwner].inactiveSince + INACTIVITY_DELAY,
             "Attester's inactivity delay has not passed"
         );
 
         // Remove from mapping.
-        delete attesters[idx];
+        delete attesters[nodeOwner];
 
         // Remove from array by swapping the last element (gas-efficient, not preserving order).
-        uint256 offset = idxOffset(idx);
-        attesterIndexes[offset] = attesterIndexes[attesterIndexes.length - 1];
-        attesterIndexes.pop();
+        nodeOwners[nodeOwnerIndex(nodeOwner)] = nodeOwners[nodeOwners.length - 1];
+        nodeOwners.pop();
     }
 
     // Inactivates an attester.
-    function inactivate(uint256 idx) external onlyOwner {
-        verifyExists(idx);
-        attesters[idx].isInactive = true;
-        attesters[idx].inactiveSince = epoch;
+    function inactivate(address nodeOwner) external onlyOwner {
+        verifyExists(nodeOwner);
+        attesters[nodeOwner].isInactive = true;
+        attesters[nodeOwner].inactiveSince = epoch;
     }
 
     // Activates an attester.
-    function activate(uint256 idx) external onlyOwner {
-        verifyExists(idx);
-        attesters[idx].isInactive = false;
+    function activate(address nodeOwner) external onlyOwner {
+        verifyExists(nodeOwner);
+        attesters[nodeOwner].isInactive = false;
     }
 
     // Changes the weight.
-    function changeWeight(uint256 idx, uint256 weight) external onlyOwner {
-        verifyExists(idx);
-        attesters[idx].weight = weight;
+    function changeWeight(address nodeOwner, uint256 weight) external onlyOwner {
+        verifyExists(nodeOwner);
+        attesters[nodeOwner].weight = weight;
     }
 
     // Changes the public key.
-    function changePublicKey(
-        uint256 idx,
-        bytes calldata pubKey
-    ) external onlyOwner {
-        verifyExists(idx);
-        attesters[idx].pubKey = pubKey;
+    function changePublicKey(address nodeOwner, bytes calldata pubKey) external onlyOwner {
+        verifyExists(nodeOwner);
+        attesters[nodeOwner].pubKey = pubKey;
     }
 
     // Creates a new committee list which will become the next committee list.
@@ -134,28 +126,26 @@ contract AttesterRegistry {
 
         // Populate `nextCommittee` based on active attesters.
         delete nextCommittee;
-        for (uint256 i = 0; i < attesterIndexes.length; i++) {
-            uint256 idx = attesterIndexes[i];
-            Attester memory attester = attesters[idx];
+        for (uint256 i = 0; i < nodeOwners.length; i++) {
+            Attester memory attester = attesters[nodeOwners[i]];
             if (!attester.isInactive) {
-                nextCommittee.push(CommitteeAttester(idx, attester.weight, attester.pubKey));
+                nextCommittee.push(CommitteeAttester(nodeOwners[i], attester.weight, attester.pubKey));
             }
         }
     }
 
-    // Finds the index offset of an attester in the `attesterIndexes` array.
-    function idxOffset(uint256 idx) internal view returns (uint256) {
-        for (uint256 i = 0; i < attesterIndexes.length; i++) {
-            if (attesterIndexes[i] == idx) {
+    // Finds the index of a node owner in the `nodeOwners` array.
+    function nodeOwnerIndex(address nodeOwner) private view returns (uint256) {
+        for (uint256 i = 0; i < nodeOwners.length; i++) {
+            if (nodeOwners[i] == nodeOwner) {
                 return i;
             }
         }
-        revert("Attester index not found");
+        revert("nodeOwner not found");
     }
-
     // Verifies that an attester exists.
-    function verifyExists(uint256 idx) internal view {
-        require(attesters[idx].pubKey.length != 0, "Attester doesn't exist");
+    function verifyExists(address nodeOwner) private view {
+        require(attesters[nodeOwner].pubKey.length != 0, "Attester doesn't exist");
     }
 
     function compareBytes(bytes storage a, bytes calldata b) private pure returns (bool) {
