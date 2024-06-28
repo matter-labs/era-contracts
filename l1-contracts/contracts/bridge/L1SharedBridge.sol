@@ -219,7 +219,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
     }
 
-    /// @notice Used to set the asset handler address for a given asset ID.
+    /// @notice Sets the asset handler address for a given asset ID.
     /// @dev No access control on the caller, as msg.sender is encoded in the assetId.
     /// @param _assetData In most cases this parameter is bytes32 encoded token address. However, it can include extra information used by custom asset handlers.
     /// @param _assetHandlerAddress The address of the asset handler, which will hold the token of interest.
