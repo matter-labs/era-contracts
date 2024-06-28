@@ -24,8 +24,8 @@ describe("Shared Bridge tests", () => {
   let erc20TestToken: ethers.Contract;
   const functionSignature = "0x6c0960f9";
   const ERC20functionSignature = "0x11a2ccc1";
-  let dummyProof = Array(9).fill(ethers.constants.HashZero);
-  dummyProof[0]= DUMMY_MERKLE_PROOF_START;
+  const dummyProof = Array(9).fill(ethers.constants.HashZero);
+  dummyProof[0] = DUMMY_MERKLE_PROOF_START;
 
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
@@ -266,9 +266,7 @@ describe("Shared Bridge tests", () => {
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
-      l1SharedBridge
-        .connect(randomSigner)
-        .finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, dummyProof)
+      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, dummyProof)
     );
     expect(revertReason).equal("ShB withd w proof");
   });
