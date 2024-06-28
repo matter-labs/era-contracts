@@ -25,7 +25,7 @@ describe("WETH token & WETH bridge", function () {
   before("Deploy token and bridge", async function () {
     const deployer = new Deployer(hre, wallet);
     const wethTokenImpl = await deployer.deploy(await deployer.loadArtifact("L2WrappedBaseToken"));
-    const wethBridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [testChainId]);
+    const wethBridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [testChainId, 1]);
     const randomAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
 
     const wethTokenProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [

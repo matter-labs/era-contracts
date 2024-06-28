@@ -62,6 +62,8 @@ interface IBridgehub {
 
     function baseToken(uint256 _chainId) external view returns (address);
 
+    function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
+
     function sharedBridge() external view returns (IL1SharedBridge);
 
     function getHyperchain(uint256 _chainId) external view returns (address);

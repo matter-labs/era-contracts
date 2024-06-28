@@ -329,7 +329,7 @@ describe("Mailbox tests", function () {
       for (const [refundRecipient, externallyOwned] of refundRecipients) {
         const result = await sendTransaction(refundRecipient);
 
-        const [, event2] = (await result.transaction.wait()).logs;
+        const [, , event2] = (await result.transaction.wait()).logs;
         const parsedEvent = mailbox.interface.parseLog(event2);
         expect(parsedEvent.name).to.equal("NewPriorityRequest");
 

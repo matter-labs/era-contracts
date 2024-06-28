@@ -83,6 +83,18 @@ export async function deployBytecodeViaCreate2(
   return [expectedAddress, tx.hash];
 }
 
+export async function deployContractWithArgs(
+  wallet: ethers.Wallet,
+  contractName: string,
+  // eslint-disable-next-line
+  args: any[],
+  ethTxOptions: ethers.providers.TransactionRequest
+) {
+  const factory = await hardhat.ethers.getContractFactory(contractName, wallet);
+
+  return await factory.deploy(...args, ethTxOptions);
+}
+
 export interface DeployedAddresses {
   Bridgehub: {
     BridgehubProxy: string;
@@ -109,9 +121,14 @@ export interface DeployedAddresses {
     SharedBridgeProxy: string;
     L2SharedBridgeProxy: string;
     L2SharedBridgeImplementation: string;
+    L2NativeTokenVaultImplementation: string;
+    L2NativeTokenVaultProxy: string;
+    NativeTokenVaultImplementation: string;
+    NativeTokenVaultProxy: string;
   };
   BaseToken: string;
   TransparentProxyAdmin: string;
+  L2ProxyAdmin: string;
   Governance: string;
   BlobVersionedHashRetriever: string;
   ValidatorTimeLock: string;
@@ -143,11 +160,16 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       ERC20BridgeProxy: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR"),
       SharedBridgeImplementation: getAddressFromEnv("CONTRACTS_L1_SHARED_BRIDGE_IMPL_ADDR"),
       SharedBridgeProxy: getAddressFromEnv("CONTRACTS_L1_SHARED_BRIDGE_PROXY_ADDR"),
+      L2NativeTokenVaultImplementation: getAddressFromEnv("CONTRACTS_L2_NATIVE_TOKEN_VAULT_IMPL_ADDR"),
+      L2NativeTokenVaultProxy: getAddressFromEnv("CONTRACTS_L2_NATIVE_TOKEN_VAULT_PROXY_ADDR"),
       L2SharedBridgeImplementation: getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_IMPL_ADDR"),
       L2SharedBridgeProxy: getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR"),
+      NativeTokenVaultImplementation: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_IMPL_ADDR"),
+      NativeTokenVaultProxy: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_PROXY_ADDR"),
     },
     BaseToken: getAddressFromEnv("CONTRACTS_BASE_TOKEN_ADDR"),
     TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),
+    L2ProxyAdmin: getAddressFromEnv("CONTRACTS_L2_PROXY_ADMIN_ADDR"),
     Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
     BlobVersionedHashRetriever: getAddressFromEnv("CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR"),
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),

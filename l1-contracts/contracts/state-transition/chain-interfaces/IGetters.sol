@@ -30,6 +30,9 @@ interface IGetters is IZkSyncHyperchainBase {
     /// @return The address of the state transition
     function getStateTransitionManager() external view returns (address);
 
+    /// @return The chain ID
+    function getChainId() external view returns (uint256);
+
     /// @return The address of the base token
     function getBaseToken() external view returns (address);
 

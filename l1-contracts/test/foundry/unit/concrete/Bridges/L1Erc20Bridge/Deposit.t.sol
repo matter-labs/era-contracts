@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.24;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
 
 contract DepositTest is L1Erc20BridgeTest {
@@ -82,6 +83,11 @@ contract DepositTest is L1Erc20BridgeTest {
 
     function test_RevertWhen_depositTransferAmountIsDifferent() public {
         uint256 amount = 2;
+        vm.mockCall(
+            address(feeOnTransferToken),
+            abi.encodeWithSelector(IERC20.balanceOf.selector),
+            abi.encode(amount + 1)
+        );
         vm.prank(alice);
         feeOnTransferToken.approve(address(bridge), amount);
         vm.expectRevert(bytes("3T"));
@@ -97,6 +103,11 @@ contract DepositTest is L1Erc20BridgeTest {
 
     function test_RevertWhen_legacyDepositTransferAmountIsDifferent() public {
         uint256 amount = 4;
+        vm.mockCall(
+            address(feeOnTransferToken),
+            abi.encodeWithSelector(IERC20.balanceOf.selector),
+            abi.encode(amount + 1)
+        );
         vm.prank(alice);
         feeOnTransferToken.approve(address(bridge), amount);
         vm.expectRevert(bytes("3T"));

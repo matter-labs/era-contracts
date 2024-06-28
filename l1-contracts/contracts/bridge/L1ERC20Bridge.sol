@@ -9,13 +9,14 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
+import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to hyperchains
+/// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to ZK chains
 /// @dev It is a legacy bridge from zkSync Era, that was deprecated in favour of shared bridge.
 /// It is needed for backward compatibility with already integrated projects.
 contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
@@ -23,6 +24,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev The shared bridge that is now used for all bridging, replacing the legacy contract.
     IL1SharedBridge public immutable override SHARED_BRIDGE;
+
+    /// @dev The native token vault, which holds deposited tokens.
+    IL1NativeTokenVault public immutable override NATIVE_TOKEN_VAULT;
 
     /// @dev A mapping L2 batch number => message number => flag.
     /// @dev Used to indicate that L2 -> L1 message was already processed for zkSync Era withdrawals.
@@ -35,9 +39,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     mapping(address account => mapping(address l1Token => mapping(bytes32 depositL2TxHash => uint256 amount)))
         public depositAmount;
 
-    /// @dev The address that is used as a L2 bridge counterpart in zkSync Era.
+    /// @dev The address that is used as a L2 native token vault in zkSync Era.
     // slither-disable-next-line uninitialized-state
-    address public l2Bridge;
+    address public l2NativeTokenVault;
 
     /// @dev The address that is used as a beacon for L2 tokens in zkSync Era.
     // slither-disable-next-line uninitialized-state
@@ -58,19 +62,13 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IL1SharedBridge _sharedBridge) reentrancyGuardInitializer {
+    constructor(IL1SharedBridge _sharedBridge, IL1NativeTokenVault _nativeTokenVault) reentrancyGuardInitializer {
         SHARED_BRIDGE = _sharedBridge;
+        NATIVE_TOKEN_VAULT = _nativeTokenVault;
     }
 
     /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
     function initialize() external reentrancyGuardInitializer {}
-
-    /// @dev transfer token to shared bridge as part of upgrade
-    function transferTokenToSharedBridge(address _token) external {
-        require(msg.sender == address(SHARED_BRIDGE), "Not shared bridge");
-        uint256 amount = IERC20(_token).balanceOf(address(this));
-        IERC20(_token).safeTransfer(address(SHARED_BRIDGE), amount);
-    }
 
     /*//////////////////////////////////////////////////////////////
                             ERA LEGACY GETTERS
@@ -81,7 +79,13 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         bytes32 constructorInputHash = keccak256(abi.encode(l2TokenBeacon, ""));
         bytes32 salt = bytes32(uint256(uint160(_l1Token)));
 
-        return L2ContractHelper.computeCreate2Address(l2Bridge, salt, l2TokenProxyBytecodeHash, constructorInputHash);
+        return
+            L2ContractHelper.computeCreate2Address(
+                l2NativeTokenVault,
+                salt,
+                l2TokenProxyBytecodeHash,
+                constructorInputHash
+            );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -151,7 +155,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         address _refundRecipient
     ) public payable nonReentrant returns (bytes32 l2TxHash) {
         require(_amount != 0, "0T"); // empty deposit
-        uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
+        uint256 amount = _depositFundsToNTV(msg.sender, IERC20(_l1Token), _amount);
         require(amount == _amount, "3T"); // The token has non-standard transfer logic
 
         l2TxHash = SHARED_BRIDGE.depositLegacyErc20Bridge{value: msg.value}({
@@ -168,12 +172,12 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, _amount);
     }
 
-    /// @dev Transfers tokens from the depositor address to the shared bridge address.
+    /// @dev Transfers tokens from the depositor address to the native token vault address.
     /// @return The difference between the contract balance before and after the transferring of funds.
-    function _depositFundsToSharedBridge(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
-        uint256 balanceBefore = _token.balanceOf(address(SHARED_BRIDGE));
-        _token.safeTransferFrom(_from, address(SHARED_BRIDGE), _amount);
-        uint256 balanceAfter = _token.balanceOf(address(SHARED_BRIDGE));
+    function _depositFundsToNTV(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
+        uint256 balanceBefore = _token.balanceOf(address(NATIVE_TOKEN_VAULT));
+        _token.safeTransferFrom(_from, address(NATIVE_TOKEN_VAULT), _amount);
+        uint256 balanceAfter = _token.balanceOf(address(NATIVE_TOKEN_VAULT));
 
         return balanceAfter - balanceBefore;
     }
@@ -236,5 +240,10 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             _merkleProof: _merkleProof
         });
         emit WithdrawalFinalized(l1Receiver, l1Token, amount);
+    }
+
+    /// @notice View-only function for backward compatibility
+    function l2Bridge() external view returns (address) {
+        return l2NativeTokenVault;
     }
 }

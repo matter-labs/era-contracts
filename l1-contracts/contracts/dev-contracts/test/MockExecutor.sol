@@ -12,4 +12,10 @@ contract MockExecutorFacet is ZkSyncHyperchainBase {
         s.totalBatchesExecuted = _batchNumber;
         s.l2LogsRootHashes[_batchNumber] = _l2LogsTreeRoot;
     }
+
+    function setExecutedBatches(uint256 _batchNumber) external {
+        s.totalBatchesExecuted = _batchNumber;
+        s.totalBatchesCommitted = _batchNumber;
+        s.totalBatchesVerified = _batchNumber;
+    }
 }

@@ -9,6 +9,7 @@ error UnsupportedPaymasterFlow();
 error EmptyAddress();
 error EmptyBytes32();
 error AddressMismatch(address expected, address supplied);
+error AssetIdMismatch(bytes32 expected, bytes32 supplied);
 error AmountMustBeGreaterThanZero();
 error DeployFailed();
 error Unauthorized();

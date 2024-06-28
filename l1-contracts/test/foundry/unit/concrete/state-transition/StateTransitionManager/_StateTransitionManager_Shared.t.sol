@@ -18,6 +18,7 @@ import {InitializeDataNewChain} from "contracts/state-transition/chain-interface
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
 import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract StateTransitionManagerTest is Test {
     StateTransitionManager internal stateTransitionManager;
@@ -37,7 +38,8 @@ contract StateTransitionManagerTest is Test {
     Diamond.FacetCut[] internal facetCuts;
 
     function setUp() public {
-        bridgehub = makeAddr("bridgehub");
+        DummyBridgehub dummyBridgehub = new DummyBridgehub();
+        bridgehub = address(dummyBridgehub);
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(bridgehub);
