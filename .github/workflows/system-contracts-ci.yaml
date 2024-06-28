@@ -23,9 +23,6 @@ jobs:
       - name: Build artifacts
         run: yarn sc build
 
-      - name: Copy typechain
-        run: yarn sc copy:typechain
-
       - name: Create cache
         uses: actions/cache/save@v3
         with:
