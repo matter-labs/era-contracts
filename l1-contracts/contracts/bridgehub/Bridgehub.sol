@@ -52,7 +52,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev used to accept the admin role
     address private pendingAdmin;
 
-    // FIXME: `messageRoot` DOES NOT contain messages that come from the current layer.
+    // FIXME: `messageRoot` DOES NOT contain messages that come from the current layer and go to the settlement layer.
     // it may make sense to store the final root somewhere for interop purposes.
     // THough maybe it can be postponed.
     IMessageRoot public override messageRoot;

@@ -11,7 +11,7 @@ import { ethTestConfig } from "../../src.ts/utils";
 import type { Deployer } from "../../src.ts/deploy";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
-import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
+import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DUMMY_MERKLE_PROOF_START } from "./utils";
 
 describe("Shared Bridge tests", () => {
   let owner: ethers.Signer;
@@ -24,6 +24,8 @@ describe("Shared Bridge tests", () => {
   let erc20TestToken: ethers.Contract;
   const functionSignature = "0x6c0960f9";
   const ERC20functionSignature = "0x11a2ccc1";
+  let dummyProof = Array(9).fill(ethers.constants.HashZero);
+  dummyProof[0]= DUMMY_MERKLE_PROOF_START;
 
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
@@ -236,7 +238,7 @@ describe("Shared Bridge tests", () => {
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 10, 0, 0, l2ToL1message, [])
+      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 10, 0, 0, l2ToL1message, dummyProof)
     );
     expect(revertReason).equal("xx");
   });
@@ -250,7 +252,7 @@ describe("Shared Bridge tests", () => {
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, [])
+      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, dummyProof)
     );
     expect(revertReason).equal("xc");
   });
@@ -266,7 +268,7 @@ describe("Shared Bridge tests", () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge
         .connect(randomSigner)
-        .finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, Array(9).fill(ethers.constants.HashZero))
+        .finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, dummyProof)
     );
     expect(revertReason).equal("ShB withd w proof");
   });

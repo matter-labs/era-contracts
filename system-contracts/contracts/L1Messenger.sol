@@ -43,14 +43,6 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     /// @dev Will be reset at the end of the block to zero value.
     bytes32 internal chainedL1BytecodesRevealDataHash;
 
-    // /// FIXME: remove this in production
-    // address public messageRootAddress;
-
-    // // FIXME This is just a hack before messageRoot is available in kernel space.
-    // function setMessageRoot(address _messageRootAddress) public {
-    //     messageRootAddress = _messageRootAddress;
-    // }
-
     /// The gas cost of processing one keccak256 round.
     uint256 internal constant KECCAK_ROUND_GAS_COST = 40;
 
