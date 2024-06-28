@@ -198,10 +198,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         _executeBatchesInner(_chainId, _newBatchesData);
     }
 
-    function _executeBatchesInner(
-        uint256 _chainId,
-        StoredBatchInfo[] calldata _newBatchesData
-    ) internal {
+    function _executeBatchesInner(uint256 _chainId, StoredBatchInfo[] calldata _newBatchesData) internal {
         uint256 delay = executionDelay; // uint32
         unchecked {
             // solhint-disable-next-line gas-length-in-loops

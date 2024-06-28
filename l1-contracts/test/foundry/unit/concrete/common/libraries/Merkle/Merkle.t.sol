@@ -7,12 +7,14 @@ import {MerkleTreeNoSort} from "./MerkleTreeNoSort.sol";
 
 contract MerkleTestTest is Test {
     MerkleTreeNoSort merkleTree;
+    MerkleTreeNoSort smallMerkleTree;
     MerkleTest merkleTest;
     bytes32[] elements;
     bytes32 root;
 
     function setUp() public {
         merkleTree = new MerkleTreeNoSort();
+        smallMerkleTree = new MerkleTreeNoSort();
         merkleTest = new MerkleTest();
 
         for (uint256 i = 0; i < 65; i++) {
@@ -125,5 +127,14 @@ contract MerkleTestTest is Test {
         bytes32[] memory leaves;
         vm.expectRevert(bytes("Merkle: nothing to prove"));
         merkleTest.calculateRoot(left, right, 10, leaves);
+    }
+
+    function testRangeProofSingleElementTree() public {
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = elements[10];
+        bytes32[] memory left = new bytes32[](0);
+        bytes32[] memory right = new bytes32[](0);
+        bytes32 rootFromContract = merkleTest.calculateRoot(left, right, 0, leaves);
+        assertEq(rootFromContract, leaves[0]);
     }
 }
