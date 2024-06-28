@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.0;
 
-import {Hashes} from "./Hashes.sol";
-import {Arrays} from "./Arrays.sol";
+import {Merkle} from "./Merkle.sol";
+import {Arrays} from "@openzeppelin/contracts/utils/Arrays.sol";
 
 /**
  * @dev Library for managing https://wikipedia.org/wiki/Merkle_Tree[Merkle Tree] data structures.
@@ -18,7 +18,8 @@ import {Arrays} from "./Arrays.sol";
  * * Zero value: The value that represents an empty leaf. Used to avoid regular zero values to be part of the tree.
  * * Hashing function: A cryptographic hash function used to produce internal nodes.
  *
- * _Available since v5.1._
+ * This is a fork of OpenZeppelin's [`MerkleTree`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/9af280dc4b45ee5bda96ba47ff829b407eaab67e/contracts/utils/structs/MerkleTree.sol)
+ * library, with the changes to support dynamic tree growth (doubling the size when full).
  */
 library DynamicIncrementalMerkle {
     /**
@@ -76,7 +77,7 @@ library DynamicIncrementalMerkle {
         // Check if tree is full.
         if (index == 1 << levels) {
             bytes32 zero = self._zeros[levels];
-            bytes32 newZero = Hashes.Keccak256(zero, zero);
+            bytes32 newZero = Merkle.efficientHash(zero, zero);
             self._zeros.push(newZero);
             self._sides.push(bytes32(0));
             ++levels;
@@ -98,7 +99,7 @@ library DynamicIncrementalMerkle {
 
             // Compute the current node hash by using the hash function
             // with either its sibling (side) or the zero value for that level.
-            currentLevelHash = Hashes.Keccak256(
+            currentLevelHash = Merkle.efficientHash(
                 isLeft ? currentLevelHash : Arrays.unsafeAccess(self._sides, i).value,
                 isLeft ? Arrays.unsafeAccess(self._zeros, i).value : currentLevelHash
             );

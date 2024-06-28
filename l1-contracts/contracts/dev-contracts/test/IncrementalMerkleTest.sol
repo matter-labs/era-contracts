@@ -2,8 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {DynamicIncrementalMerkle} from "../../common/libraries/openzeppelin/IncrementalMerkle.sol";
-import {Arrays} from "../../common/libraries/openzeppelin/Arrays.sol";
+import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 
 contract IncrementalMerkleTest {
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
@@ -31,10 +30,10 @@ contract IncrementalMerkleTest {
     }
 
     function side(uint256 _index) external view returns (bytes32) {
-        return Arrays.unsafeAccess(tree._sides, _index).value;
+        return tree._sides[_index];
     }
 
     function zeros(uint256 _index) external view returns (bytes32) {
-        return Arrays.unsafeAccess(tree._zeros, _index).value;
+        return tree._zeros[_index];
     }
 }

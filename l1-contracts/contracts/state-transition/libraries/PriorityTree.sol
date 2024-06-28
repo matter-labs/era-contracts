@@ -4,8 +4,7 @@ pragma solidity ^0.8.24;
 
 // solhint-disable gas-custom-errors
 
-import {DynamicIncrementalMerkle} from "../../common/libraries/openzeppelin/IncrementalMerkle.sol";
-import {Hashes} from "../../common/libraries/openzeppelin/Hashes.sol";
+import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 import {Merkle} from "../../common/libraries/Merkle.sol";
 import {PriorityTreeCommitment} from "../../common/Config.sol";
 
@@ -83,7 +82,7 @@ library PriorityTree {
         _tree.tree._zeros = new bytes32[](height);
         for (uint256 i; i < height; ++i) {
             _tree.tree._zeros[i] = zero;
-            zero = Hashes.Keccak256(zero, zero);
+            zero = Merkle.efficientHash(zero, zero);
         }
         _tree.historicalRoots[_tree.tree.root()] = true;
     }
