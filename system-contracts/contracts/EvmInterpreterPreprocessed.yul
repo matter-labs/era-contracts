@@ -1847,8 +1847,14 @@ object "EVMInterpreter" {
                     checkMultipleOverflow(offset,size,MEM_OFFSET_INNER(), evmGasLeft)
                     checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER(), evmGasLeft)
             
-                    checkMemOverflow(add(add(offset, size), MEM_OFFSET_INNER()), evmGasLeft)
-                    checkMemOverflow(add(add(destOffset, size), MEM_OFFSET_INNER()), evmGasLeft)
+                    if or(gt(add(add(offset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM()), gt(add(add(destOffset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM())) {
+                        for { let i := 0 } lt(i, size) { i := add(i, 1) } {
+                            mstore8(
+                                add(add(destOffset, MEM_OFFSET_INNER()), i),
+                                0
+                            )
+                        }
+                    }
             
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                     // minimum_word_size = (size + 31) / 32
@@ -4606,8 +4612,14 @@ object "EVMInterpreter" {
                     checkMultipleOverflow(offset,size,MEM_OFFSET_INNER(), evmGasLeft)
                     checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER(), evmGasLeft)
             
-                    checkMemOverflow(add(add(offset, size), MEM_OFFSET_INNER()), evmGasLeft)
-                    checkMemOverflow(add(add(destOffset, size), MEM_OFFSET_INNER()), evmGasLeft)
+                    if or(gt(add(add(offset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM()), gt(add(add(destOffset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM())) {
+                        for { let i := 0 } lt(i, size) { i := add(i, 1) } {
+                            mstore8(
+                                add(add(destOffset, MEM_OFFSET_INNER()), i),
+                                0
+                            )
+                        }
+                    }
             
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                     // minimum_word_size = (size + 31) / 32
