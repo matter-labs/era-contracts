@@ -56,7 +56,7 @@ library Merkle {
         require(pathLength < 256, "Merkle: path too long");
         uint256 levelLen = _itemHashes.length;
         // Edge case: we want to be able to prove an element in a single-node tree.
-        require(pathLength > 0 || _startIndex == 0 && levelLen == 1, "Merkle: empty paths");
+        require(pathLength > 0 || (_startIndex == 0 && levelLen == 1), "Merkle: empty paths");
         require(levelLen > 0, "Merkle: nothing to prove");
         require(_startIndex + levelLen <= (1 << pathLength), "Merkle: index/height mismatch");
         bytes32[] memory itemHashes = _itemHashes;
