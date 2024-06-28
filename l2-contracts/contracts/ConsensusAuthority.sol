@@ -79,7 +79,7 @@ contract ConsensusAuthority {
         validatorRegistry.changeWeight(idx, weight);
     }
 
-    // Changes node's ayyester weight.
+    // Changes node's attester weight.
     function changeAttesterWeight(address owningPubKey, uint256 weight) external onlyOwner {
         uint256 idx = nodes[owningPubKey].attesterIdx;
         attesterRegistry.changeWeight(idx, weight);
