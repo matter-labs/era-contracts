@@ -85,13 +85,15 @@ library DynamicIncrementalMerkle {
         // Rebuild branch from leaf to root
         uint256 currentIndex = index;
         bytes32 currentLevelHash = leaf;
+        bool updatedSides = false;
         for (uint32 i = 0; i < levels; ++i) {
             // Reaching the parent node, is currentLevelHash the left child?
             bool isLeft = currentIndex % 2 == 0;
 
             // If so, next time we will come from the right, so we need to save it
-            if (isLeft) {
+            if (isLeft && !updatedSides) {
                 Arrays.unsafeAccess(self._sides, i).value = currentLevelHash;
+                updatedSides = true;
             }
 
             // Compute the current node hash by using the hash function
