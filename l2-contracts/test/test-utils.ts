@@ -3,7 +3,7 @@ import * as hre from "hardhat";
 import * as zksync from "zksync-ethers";
 import type { BytesLike } from "ethers";
 
-import { ContractDeployerFactory } from "../../system-contracts/typechain";
+import { ContractDeployerFactory } from "../typechain/ContractDeployerFactory";
 
 const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
