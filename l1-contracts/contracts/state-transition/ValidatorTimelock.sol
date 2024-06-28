@@ -183,9 +183,9 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// make a call to the hyperchain diamond contract with the same calldata.
     function executeBatches(
         StoredBatchInfo[] calldata _batchesData,
-        PriorityOpsBatchInfo[] calldata _priorityOpsData
+        PriorityOpsBatchInfo[] calldata
     ) external onlyValidator(ERA_CHAIN_ID) {
-        _executeBatchesInner(ERA_CHAIN_ID, _batchesData, _priorityOpsData);
+        _executeBatchesInner(ERA_CHAIN_ID, _batchesData);
     }
 
     /// @dev Check that batches were committed at least X time ago and
@@ -193,15 +193,14 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     function executeBatchesSharedBridge(
         uint256 _chainId,
         StoredBatchInfo[] calldata _newBatchesData,
-        PriorityOpsBatchInfo[] calldata _priorityOpsData
+        PriorityOpsBatchInfo[] calldata
     ) external onlyValidator(_chainId) {
-        _executeBatchesInner(_chainId, _newBatchesData, _priorityOpsData);
+        _executeBatchesInner(_chainId, _newBatchesData);
     }
 
     function _executeBatchesInner(
         uint256 _chainId,
-        StoredBatchInfo[] calldata _newBatchesData,
-        PriorityOpsBatchInfo[] calldata
+        StoredBatchInfo[] calldata _newBatchesData
     ) internal {
         uint256 delay = executionDelay; // uint32
         unchecked {

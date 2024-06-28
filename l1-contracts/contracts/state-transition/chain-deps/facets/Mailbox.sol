@@ -405,13 +405,11 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             s.priorityQueue.pushBack(
                 PriorityOperation({
                     canonicalTxHash: _canonicalTxHash,
-                    // FIXME: safe downcast
                     expirationTimestamp: _expirationTimestamp,
                     layer2Tip: uint192(0) // TODO: Restore after fee modeling will be stable. (SMA-1230)
                 })
             );
         }
-        // TODO: do we have to push keccak256(abi.encode(canonicalTxHash, expirationTimestamp, layer2Tip)) instead?
         s.priorityTree.push(_canonicalTxHash);
 
         // Data that is needed for the operator to simulate priority queue offchain

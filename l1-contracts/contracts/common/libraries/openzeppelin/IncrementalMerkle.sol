@@ -115,7 +115,7 @@ library DynamicIncrementalMerkle {
      * @dev Tree's root.
      */
     function root(Bytes32PushTree storage self) internal view returns (bytes32) {
-        return self._sides[self._sides.length - 1];
+        return Arrays.unsafeAccess(self._sides, self._sides.length - 1).value;
     }
 
     /**

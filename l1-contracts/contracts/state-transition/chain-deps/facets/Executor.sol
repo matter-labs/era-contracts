@@ -311,6 +311,8 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         return hash;
     }
 
+    /// @dev Checks that the data of the batch is correct and can be executed
+    /// @dev Verifies that batch number, batch hash and priority operations hash are correct
     function _checkBatchData(
         StoredBatchInfo memory _storedBatch,
         uint256 _executedBatchIdx,
