@@ -26,9 +26,6 @@ jobs:
       - name: Build L2 artifacts
         run: yarn l2 build
 
-      - name: Build System Contracts artifacts
-        run: yarn sc build
-
       - name: Create cache
         uses: actions/cache/save@v3
         with:
@@ -96,7 +93,7 @@ jobs:
         uses: dutterbutter/era-test-node-action@v0.1.3
 
       - name: Copy typechain from System Contracts
-        run: yarn sc copy:typechain
+        run: yarn sc build && yarn sc copy:typechain
 
       - name: Run tests
         run: yarn l2 test
