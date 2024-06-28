@@ -960,7 +960,7 @@ function _performCall(addr,gasToPass,value,argsOffset,argsSize,retOffset,retSize
 
     if and(is_evm, iszero(isStatic)) {
         _pushEVMFrame(gasToPassNew, isStatic)
-        success := call(gasToPassNew, addr, value, argsOffset, argsSize, 0, 0)
+        success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
         frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
         _popEVMFrame()
     }
@@ -1091,7 +1091,7 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
     _pushEVMFrame(gasToPass, isStatic)
     let success := delegatecall(
         // We can not just pass all gas here to prevert overflow of zkEVM gas counter
-        gasToPass,
+        EVM_GAS_STIPEND(),
         addr,
         add(MEM_OFFSET_INNER(), argsOffset),
         argsSize,
@@ -1153,7 +1153,7 @@ function _performStaticCall(
         _pushEVMFrame(_calleeGas, true)
         // TODO Check the following comment from zkSync .sol.
         // We can not just pass all gas here to prevert overflow of zkEVM gas counter
-        success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, 0, 0)
+        success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
 
         _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
         _popEVMFrame()
