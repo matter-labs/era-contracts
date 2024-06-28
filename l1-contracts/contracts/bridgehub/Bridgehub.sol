@@ -36,15 +36,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     IL1AssetRouter public sharedBridge;
 
     /// @notice we store registered stateTransitionManagers
-    mapping(address _stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
+    mapping(address stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
     /// @notice we store registered tokens (for arbitrary base token)
-    mapping(address _token => bool) public tokenIsRegistered;
+    mapping(address token => bool) public tokenIsRegistered;
 
     /// @notice chainID => StateTransitionManager contract address, storing StateTransitionManager
-    mapping(uint256 _chainId => address) public stateTransitionManager;
+    mapping(uint256 chainId => address) public stateTransitionManager;
 
     /// @notice chainID => baseToken contract address, storing baseToken
-    mapping(uint256 _chainId => address) public baseToken;
+    mapping(uint256 chainId => address) public baseToken;
 
     /// @dev used to manage non critical updates
     address public admin;
@@ -58,7 +58,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     IMessageRoot public override messageRoot;
 
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
-    mapping(uint256 _chainId => bytes32 _baseTokenAssetId) public baseTokenAssetId;
+    mapping(uint256 chainId => bytes32 baseTokenAssetId) public baseTokenAssetId;
 
     ISTMDeploymentTracker public stmDeployer;
 
@@ -75,9 +75,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     constructor(uint256 _l1ChainId, address _owner) reentrancyGuardInitializer {
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
-        ETH_TOKEN_ASSET_ID = keccak256(
-            abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
-        );
+        ETH_TOKEN_ASSET_ID = keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, ETH_TOKEN_ADDRESS));
         _transferOwnership(_owner);
     }
 
@@ -344,6 +342,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+        // Note: If the hyperchain with corresponding `chainId` is not yet created,
+        // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
         {
             bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
             if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
@@ -406,7 +406,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             // slither-disable-next-line arbitrary-send-eth
             sharedBridge.bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
-                baseTokenAssetId[_request.chainId],
+                tokenAssetId,
                 msg.sender,
                 _request.mintValue
             );

@@ -25,7 +25,7 @@ interface IL1AssetRouter {
         bytes32 indexed txDataHash,
         address indexed from,
         bytes32 assetId,
-        bytes bridgeMintCalldata
+        bytes l2BridgeMintCalldata
     );
 
     event BridgehubDepositBaseTokenInitiated(
@@ -186,5 +186,5 @@ interface IL1AssetRouter {
 
     function transferTokenToNTV(address _token) external;
 
-    function transferBalanceToNTV(uint256 _chainId, address _token) external;
+    function clearChainBalance(uint256 _chainId, address _token) external;
 }

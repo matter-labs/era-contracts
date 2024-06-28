@@ -16,12 +16,14 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
+import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
+import {L1DAValidatorOutput} from "da-contracts/IL1DAValidator.sol";
 
 contract ExecutorTest is Test {
     address internal owner;
@@ -38,6 +40,7 @@ contract ExecutorTest is Test {
     IExecutor.CommitBatchInfo internal newCommitBatchInfo;
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
     DummyEraBaseTokenBridge internal sharedBridge;
+    RollupL1DAValidator internal rollupL1DAValidator;
 
     uint256 eraChainId;
 
@@ -45,7 +48,7 @@ contract ExecutorTest is Test {
     IExecutor.ProofInput internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](11);
+        bytes4[] memory selectors = new bytes4[](12);
         selectors[0] = admin.setPendingAdmin.selector;
         selectors[1] = admin.acceptAdmin.selector;
         selectors[2] = admin.setValidator.selector;
@@ -57,6 +60,7 @@ contract ExecutorTest is Test {
         selectors[8] = admin.executeUpgrade.selector;
         selectors[9] = admin.freezeDiamond.selector;
         selectors[10] = admin.unfreezeDiamond.selector;
+        selectors[11] = admin.setDAValidatorPair.selector;
         return selectors;
     }
 
@@ -135,6 +139,7 @@ contract ExecutorTest is Test {
         eraChainId = 9;
 
         executor = new TestExecutor();
+        rollupL1DAValidator = new RollupL1DAValidator();
         admin = new AdminFacet();
         getters = new GettersFacet();
         mailbox = new MailboxFacet(eraChainId);
@@ -231,6 +236,19 @@ contract ExecutorTest is Test {
         // Initiate the token multiplier to enable L1 -> L2 transactions.
         vm.prank(address(stateTransitionManager));
         admin.setTokenMultiplier(1, 1);
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(address(rollupL1DAValidator), address(rollupL1DAValidator));
+        L1DAValidatorOutput memory l1DAValidatorOutput = L1DAValidatorOutput({
+            stateDiffHash: Utils.randomBytes32("stateDiffHash"),
+            blobsLinearHashes: new bytes32[](TOTAL_BLOBS_IN_COMMITMENT),
+            blobsOpeningCommitments: new bytes32[](TOTAL_BLOBS_IN_COMMITMENT)
+        });
+        // todo we should not mock this.
+        vm.mockCall(
+            address(rollupL1DAValidator),
+            abi.encodeWithSelector(rollupL1DAValidator.checkDA.selector),
+            abi.encode(l1DAValidatorOutput)
+        );
 
         uint256[] memory recursiveAggregationInput;
         uint256[] memory serializedProof;
@@ -252,7 +270,7 @@ contract ExecutorTest is Test {
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
             systemLogs: l2Logs,
-            pubdataCommitments: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+            operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
 
         vm.mockCall(
