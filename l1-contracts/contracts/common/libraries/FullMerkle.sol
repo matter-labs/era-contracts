@@ -5,8 +5,6 @@ pragma solidity 0.8.24;
 // solhint-disable reason-string, gas-custom-errors
 
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
-// This importing issue should not be pushed to main, we only need this while we did not import OZ-v5 and v4 in parallel. Once we merge that it will be removed
-import {Arrays} from "@openzeppelin/contracts/utils/Arrays.sol";
 import {Merkle} from "./Merkle.sol";
 
 /// @author Matter Labs
