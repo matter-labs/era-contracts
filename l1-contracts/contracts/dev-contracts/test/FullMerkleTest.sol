@@ -25,6 +25,10 @@ contract FullMerkleTest {
         tree.updateAllLeaves(_items);
     }
 
+    function updateAllNodesAtHeight(uint256 _height, bytes32[] memory _items) external {
+        tree.updateAllNodesAtHeight(_height, _items);
+    }
+
     function root() external view returns (bytes32) {
         return tree.root();
     }
