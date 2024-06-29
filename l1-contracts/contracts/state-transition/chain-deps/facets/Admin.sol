@@ -9,6 +9,7 @@ import {Diamond} from "../../libraries/Diamond.sol";
 import {MAX_GAS_PER_TRANSACTION, HyperchainCommitment} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
+import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
@@ -21,6 +22,7 @@ import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBas
 /// @custom:security-contact security@matterlabs.dev
 contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     using PriorityTree for PriorityTree.Tree;
+    using PriorityQueue for PriorityQueue.Queue;
 
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "AdminFacet";
@@ -280,7 +282,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
     // todo make internal. For now useful for testing
     function _prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {
-        require(s.priorityTree.unprocessedIndex > 0, "PQ not ready");
+        require(s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex, "PQ not ready");
 
         commitment.totalBatchesCommitted = s.totalBatchesCommitted;
         commitment.totalBatchesVerified = s.totalBatchesVerified;
