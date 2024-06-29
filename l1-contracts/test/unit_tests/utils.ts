@@ -548,7 +548,8 @@ export async function makeExecutedEqualCommitted(
     })
   ).wait();
 
-  await (await proxyExecutor.executeBatches(batchesToExecute)).wait();
+  const dummyMerkleProofs = batchesToExecute.map(() => ({ leftPath: [], rightPath: [], itemHashes: [] }));
+  await (await proxyExecutor.executeBatches(batchesToExecute, dummyMerkleProofs)).wait();
 }
 
 export function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: string): StoredBatchInfo {

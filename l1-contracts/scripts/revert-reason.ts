@@ -7,10 +7,18 @@ import { Interface } from "ethers/lib/utils";
 import { web3Url } from "./utils";
 
 const erc20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
-const zkSyncInterface = new Interface(hardhat.artifacts.readArtifactSync("IZkSync").abi);
+const zkSyncInterface = new Interface(hardhat.artifacts.readArtifactSync("IZkSyncHyperchain").abi);
 const verifierInterface = new Interface(hardhat.artifacts.readArtifactSync("Verifier").abi);
+const bridgehubInterface = new Interface(hardhat.artifacts.readArtifactSync("Bridgehub").abi);
+const sharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
 
-const interfaces = [erc20BridgeInterface, zkSyncInterface, verifierInterface];
+const interfaces = [
+  erc20BridgeInterface,
+  zkSyncInterface,
+  verifierInterface,
+  bridgehubInterface,
+  sharedBridgeInterface,
+];
 
 function decodeTransaction(contractInterface, tx) {
   try {
