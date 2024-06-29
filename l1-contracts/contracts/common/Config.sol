@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-import {PriorityOperation} from "../state-transition/libraries/PriorityQueue.sol";
-
 /// @dev `keccak256("")`
 bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
@@ -120,6 +118,13 @@ struct StoredBatchHashInfo {
     bytes32 hash;
 }
 
+struct PriorityTreeCommitment {
+    uint256 nextLeafIndex;
+    uint256 startIndex;
+    uint256 unprocessedIndex;
+    bytes32[] sides;
+}
+
 // Info that allows to restore a chain.
 struct HyperchainCommitment {
     /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch
@@ -130,13 +135,11 @@ struct HyperchainCommitment {
     /// @notice Total number of committed batches i.e. batches[totalBatchesCommitted] points at the latest committed
     /// batch
     uint256 totalBatchesCommitted;
-    /// @notice total number of priority txs ever executed
-    uint256 priorityQueueHead;
-    PriorityOperation[] priorityQueueTxs;
     /// @notice
     bytes32 l2SystemContractsUpgradeTxHash;
     /// @notice
     uint256 l2SystemContractsUpgradeBatchNumber;
     bytes32[] batchHashes;
-    /// TODO: add priority queue here.
+    /// @notice Commitment to the priority merkle tree
+    PriorityTreeCommitment priorityTree;
 }

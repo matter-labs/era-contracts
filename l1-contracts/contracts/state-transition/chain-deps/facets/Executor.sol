@@ -13,6 +13,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
+import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -24,6 +25,7 @@ import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBas
 contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
+    using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "ExecutorFacet";
@@ -300,23 +302,47 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         }
     }
 
-    /// @dev Executes one batch
-    /// @dev 1. Processes all pending operations (Complete priority requests)
-    /// @dev 2. Finalizes batch on Ethereum
-    /// @dev _executedBatchIdx is an index in the array of the batches that we want to execute together
-    function _executeOneBatch(StoredBatchInfo memory _storedBatch, uint256 _executedBatchIdx) internal {
+    function _rollingHash(bytes32[] calldata _hashes) internal pure returns (bytes32) {
+        bytes32 hash = EMPTY_STRING_KECCAK;
+        uint256 nHashes = _hashes.length;
+        for (uint256 i = 0; i < nHashes; i = i.uncheckedInc()) {
+            hash = keccak256(abi.encode(hash, _hashes[i]));
+        }
+        return hash;
+    }
+
+    /// @dev Checks that the data of the batch is correct and can be executed
+    /// @dev Verifies that batch number, batch hash and priority operations hash are correct
+    function _checkBatchData(
+        StoredBatchInfo memory _storedBatch,
+        uint256 _executedBatchIdx,
+        bytes32 _priorityOperationsHash
+    ) internal view {
         uint256 currentBatchNumber = _storedBatch.batchNumber;
         require(currentBatchNumber == s.totalBatchesExecuted + _executedBatchIdx + 1, "k"); // Execute batches in order
         require(
             _hashStoredBatchInfo(_storedBatch) == s.storedBatchHashes[currentBatchNumber],
             "exe10" // executing batch should be committed
         );
+        require(_priorityOperationsHash == _storedBatch.priorityOperationsHash, "x"); // priority operations hash does not match with expected
+    }
 
+    /// @dev Executes one batch
+    /// @dev 1. Processes all pending operations (Complete priority requests)
+    /// @dev 2. Finalizes batch on Ethereum
+    /// @dev _executedBatchIdx is an index in the array of the batches that we want to execute together
+    function _executeOneBatch(StoredBatchInfo memory _storedBatch, uint256 _executedBatchIdx) internal {
         bytes32 priorityOperationsHash = _collectOperationsFromPriorityQueue(_storedBatch.numberOfLayer1Txs);
-        require(priorityOperationsHash == _storedBatch.priorityOperationsHash, "x"); // priority operations hash does not match to expected
+        _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash);
+
+        uint256 firstUnprocessed = s.priorityQueue.getFirstUnprocessedPriorityTx();
+        uint256 treeStartIndex = s.priorityTree.startIndex;
+        if (firstUnprocessed > treeStartIndex) {
+            s.priorityTree.unprocessedIndex = firstUnprocessed - treeStartIndex;
+        }
 
         // Save root hash of L2 -> L1 logs tree
-        s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
+        s.l2LogsRootHashes[_storedBatch.batchNumber] = _storedBatch.l2LogsTreeRoot;
         // IBridgehub bridgehub = IBridgehub(s.bridgehub);
         // bridgehub.messageRoot().addChainBatchRoot(
         //     s.chainId,
@@ -325,23 +351,49 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // );
     }
 
-    /// @inheritdoc IExecutor
+    function _executeOneBatch(
+        StoredBatchInfo memory _storedBatch,
+        PriorityOpsBatchInfo calldata _priorityOpsData,
+        uint256 _executedBatchIdx
+    ) internal {
+        require(_priorityOpsData.itemHashes.length == _storedBatch.numberOfLayer1Txs, "zxc");
+        bytes32 priorityOperationsHash = _rollingHash(_priorityOpsData.itemHashes);
+        _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash);
+        s.priorityTree.processBatch(_priorityOpsData);
+
+        // Save root hash of L2 -> L1 logs tree
+        s.l2LogsRootHashes[_storedBatch.batchNumber] = _storedBatch.l2LogsTreeRoot;
+    }
+
     function executeBatchesSharedBridge(
         uint256,
-        StoredBatchInfo[] calldata _batchesData
+        StoredBatchInfo[] calldata _batchesData,
+        PriorityOpsBatchInfo[] calldata _priorityOpsData
     ) external nonReentrant onlyValidator {
-        _executeBatches(_batchesData);
+        _executeBatches(_batchesData, _priorityOpsData);
     }
 
-    /// @inheritdoc IExecutor
-    function executeBatches(StoredBatchInfo[] calldata _batchesData) external nonReentrant onlyValidator {
-        _executeBatches(_batchesData);
+    function executeBatches(
+        StoredBatchInfo[] calldata _batchesData,
+        PriorityOpsBatchInfo[] calldata _priorityOpsData
+    ) external nonReentrant onlyValidator {
+        _executeBatches(_batchesData, _priorityOpsData);
     }
 
-    function _executeBatches(StoredBatchInfo[] calldata _batchesData) internal {
+    function _executeBatches(
+        StoredBatchInfo[] calldata _batchesData,
+        PriorityOpsBatchInfo[] calldata _priorityOpsData
+    ) internal {
         uint256 nBatches = _batchesData.length;
+        uint256 dataIndex = 0;
+
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
-            _executeOneBatch(_batchesData[i], i);
+            if (s.priorityTree.startIndex <= s.priorityQueue.getFirstUnprocessedPriorityTx()) {
+                // solhint-disable-next-line gas-increment-by-one
+                _executeOneBatch(_batchesData[i], _priorityOpsData[dataIndex++], i);
+            } else {
+                _executeOneBatch(_batchesData[i], i);
+            }
             emit BlockExecution(_batchesData[i].batchNumber, _batchesData[i].batchHash, _batchesData[i].commitment);
         }
 

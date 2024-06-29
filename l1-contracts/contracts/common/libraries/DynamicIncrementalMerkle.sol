@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.0;
 
-import {Hashes} from "./Hashes.sol";
-import {Arrays} from "./Arrays.sol";
+import {Merkle} from "./Merkle.sol";
+import {Arrays} from "@openzeppelin/contracts/utils/Arrays.sol";
 
 /**
  * @dev Library for managing https://wikipedia.org/wiki/Merkle_Tree[Merkle Tree] data structures.
@@ -18,16 +18,14 @@ import {Arrays} from "./Arrays.sol";
  * * Zero value: The value that represents an empty leaf. Used to avoid regular zero values to be part of the tree.
  * * Hashing function: A cryptographic hash function used to produce internal nodes.
  *
- * _Available since v5.1._
+ * This is a fork of OpenZeppelin's [`MerkleTree`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/9af280dc4b45ee5bda96ba47ff829b407eaab67e/contracts/utils/structs/MerkleTree.sol)
+ * library, with the changes to support dynamic tree growth (doubling the size when full).
  */
 library DynamicIncrementalMerkle {
     /**
      * @dev A complete `bytes32` Merkle tree.
      *
      * The `sides` and `zero` arrays are set to have a length equal to the depth of the tree during setup.
-     *
-     * The hashing function used during initialization to compute the `zeros` values (value of a node at a given depth
-     * for which the subtree is full of zero leaves). This function is kept in the structure for handling insertions.
      *
      * Struct members have an underscore prefix indicating that they are "private" and should not be read or written to
      * directly. Use the functions provided below instead. Modifying the struct manually may violate assumptions and
@@ -41,10 +39,8 @@ library DynamicIncrementalMerkle {
      */
     struct Bytes32PushTree {
         uint256 _nextLeafIndex;
-        uint256 _height;
         bytes32[] _sides;
         bytes32[] _zeros;
-        function(bytes32, bytes32) view returns (bytes32) _fnHash;
     }
 
     /**
@@ -57,30 +53,10 @@ library DynamicIncrementalMerkle {
      * empty leaves. It should be a value that is not expected to be part of the tree.
      */
     function setup(Bytes32PushTree storage self, bytes32 zero) internal returns (bytes32 initialRoot) {
-        return setup(self, zero, Hashes.Keccak256);
-    }
-
-    /**
-     * @dev Same as {setup}, but allows to specify a custom hashing function.
-     *
-     * IMPORTANT: Providing a custom hashing function is a security-sensitive operation since it may
-     * compromise the soundness of the tree. Consider using functions from {Hashes}.
-     */
-    function setup(
-        Bytes32PushTree storage self,
-        bytes32 zero,
-        function(bytes32, bytes32) view returns (bytes32) fnHash
-    ) internal returns (bytes32 initialRoot) {
-        // Store depth in the dynamic array
-
-        Arrays.unsafeAccess(self._zeros, 0).value = zero;
-
-        // Set the first root
         self._nextLeafIndex = 0;
-        self._fnHash = fnHash;
-        self._height = 0;
-
-        return zero;
+        self._zeros.push(zero);
+        self._sides.push(bytes32(0));
+        return bytes32(0);
     }
 
     /**
@@ -92,38 +68,38 @@ library DynamicIncrementalMerkle {
      */
     function push(Bytes32PushTree storage self, bytes32 leaf) internal returns (uint256 index, bytes32 newRoot) {
         // Cache read
-        uint256 levels = self._zeros.length;
-        function(bytes32, bytes32) view returns (bytes32) fnHash = self._fnHash;
+        uint256 levels = self._zeros.length - 1;
 
         // Get leaf index
         // solhint-disable-next-line gas-increment-by-one
         index = self._nextLeafIndex++;
 
+        // Check if tree is full.
         if (index == 1 << levels) {
-            // Tree is full, reset index add new level
-            bytes32 currentMaxZero = Arrays.unsafeAccess(self._zeros, levels).value;
-            ++self._height;
+            bytes32 zero = self._zeros[levels];
+            bytes32 newZero = Merkle.efficientHash(zero, zero);
+            self._zeros.push(newZero);
+            self._sides.push(bytes32(0));
             ++levels;
-            Arrays.unsafeAccess(self._zeros, levels).value = fnHash(currentMaxZero, currentMaxZero);
-            Arrays.unsafeSetLength(self._sides, levels);
-            Arrays.unsafeSetLength(self._zeros, levels);
         }
 
         // Rebuild branch from leaf to root
         uint256 currentIndex = index;
         bytes32 currentLevelHash = leaf;
+        bool updatedSides = false;
         for (uint32 i = 0; i < levels; ++i) {
             // Reaching the parent node, is currentLevelHash the left child?
             bool isLeft = currentIndex % 2 == 0;
 
             // If so, next time we will come from the right, so we need to save it
-            if (isLeft) {
+            if (isLeft && !updatedSides) {
                 Arrays.unsafeAccess(self._sides, i).value = currentLevelHash;
+                updatedSides = true;
             }
 
             // Compute the current node hash by using the hash function
-            // with either the its sibling (side) or the zero value for that level.
-            currentLevelHash = fnHash(
+            // with either its sibling (side) or the zero value for that level.
+            currentLevelHash = Merkle.efficientHash(
                 isLeft ? currentLevelHash : Arrays.unsafeAccess(self._sides, i).value,
                 isLeft ? Arrays.unsafeAccess(self._zeros, i).value : currentLevelHash
             );
@@ -131,6 +107,7 @@ library DynamicIncrementalMerkle {
             // Update node index
             currentIndex >>= 1;
         }
+
         Arrays.unsafeAccess(self._sides, levels).value = currentLevelHash;
         return (index, currentLevelHash);
     }
@@ -138,8 +115,14 @@ library DynamicIncrementalMerkle {
     /**
      * @dev Tree's root.
      */
-
     function root(Bytes32PushTree storage self) internal view returns (bytes32) {
-        return Arrays.unsafeAccess(self._sides, self._height).value;
+        return Arrays.unsafeAccess(self._sides, self._sides.length - 1).value;
+    }
+
+    /**
+     * @dev Tree's height (does not include the root node).
+     */
+    function height(Bytes32PushTree storage self) internal view returns (uint256) {
+        return self._sides.length - 1;
     }
 }

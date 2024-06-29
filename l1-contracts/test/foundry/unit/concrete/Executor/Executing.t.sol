@@ -12,6 +12,8 @@ import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfac
 
 contract ExecutingTest is ExecutorTest {
     function setUp() public {
+        // This currently only uses the legacy priority queue, not the priority tree.
+        executor.setPriorityTreeStartIndex(100);
         vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
         currentTimestamp = block.timestamp;
 
@@ -63,7 +65,7 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("k"));
-        executor.executeBatches(storedBatchInfoArray);
+        executor.executeBatches(storedBatchInfoArray, Utils.emptyData());
     }
 
     function test_RevertWhen_ExecutingBlockWithWrongData() public {
@@ -75,7 +77,7 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("exe10"));
-        executor.executeBatches(storedBatchInfoArray);
+        executor.executeBatches(storedBatchInfoArray, Utils.emptyData());
     }
 
     function test_RevertWhen_ExecutingRevertedBlockWithoutCommittingAndProvingAgain() public {
@@ -87,7 +89,7 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("n"));
-        executor.executeBatches(storedBatchInfoArray);
+        executor.executeBatches(storedBatchInfoArray, Utils.emptyData());
     }
 
     function test_RevertWhen_ExecutingUnavailablePriorityOperationHash() public {
@@ -144,7 +146,7 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("s"));
-        executor.executeBatches(correctNewStoredBatchInfoArray);
+        executor.executeBatches(correctNewStoredBatchInfoArray, Utils.emptyData());
     }
 
     function test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash() public {
@@ -221,7 +223,7 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("x"));
-        executor.executeBatches(correctNewStoredBatchInfoArray);
+        executor.executeBatches(correctNewStoredBatchInfoArray, Utils.emptyData());
     }
 
     function test_RevertWhen_CommittingBlockWithWrongPreviousBatchHash() public {
@@ -255,7 +257,7 @@ contract ExecutingTest is ExecutorTest {
         storedBatchInfoArray[0] = newStoredBatchInfo;
 
         vm.prank(validator);
-        executor.executeBatches(storedBatchInfoArray);
+        executor.executeBatches(storedBatchInfoArray, Utils.emptyData());
 
         uint256 totalBlocksExecuted = getters.getTotalBlocksExecuted();
         assertEq(totalBlocksExecuted, 1);
