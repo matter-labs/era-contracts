@@ -202,12 +202,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return keccak256(abi.encode(L1_CHAIN_ID, address(stmDeployer), bytes32(uint256(uint160(_stmAddress)))));
     }
 
-    /// FIXME: this method should not be present in the prod code.
-    // function registerCounterpart(uint256 chainid, address _counterpart) external onlyOwner {
-    //     trustedCounterparts[chainid] = _counterpart;
-    //     isTrustedCounterpart[_counterpart] = true;
-    // }
-
     /// New chain
 
     /// @notice register new chain

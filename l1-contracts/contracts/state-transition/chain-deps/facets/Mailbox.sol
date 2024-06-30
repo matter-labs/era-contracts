@@ -32,8 +32,6 @@ import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
-// import {SyncLayerState} from "../ZkSyncHyperchainStorage.sol";
-
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

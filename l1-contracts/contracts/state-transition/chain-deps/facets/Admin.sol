@@ -226,8 +226,6 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         uint256 protocolVersion = stm.protocolVersion();
 
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
-        // FIXME: this will be removed once we support the migration of the priority queue also.
-        // require(s.priorityQueue.getSize() == 0, "Migration is only allowed with empty priority queue");
 
         s.syncLayer = _syncLayer;
         chainBridgeMintData = abi.encode(_prepareChainCommitment());
