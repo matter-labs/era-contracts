@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 
+import "forge-std/console.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
@@ -23,7 +24,8 @@ address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000
 address constant L2_BOOTLOADER_ADDRESS = 0x0000000000000000000000000000000000008001;
 address constant L2_KNOWN_CODE_STORAGE_ADDRESS = 0x0000000000000000000000000000000000008004;
 address constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008;
-address constant PUBDATA_PUBLISHER_ADDRESS = 0x0000000000000000000000000000000000008011;
+// constant in tests, but can be arbitrary in real environments
+address constant L2_DA_VALIDATOR_ADDRESS = 0x2f3Bc0cB46C9780990afbf86A60bdf6439DE991C;
 
 uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
@@ -56,8 +58,8 @@ library Utils {
         return abi.encodePacked(servicePrefix, bytes2(0x0000), sender, key, value);
     }
 
-    function createSystemLogs() public pure returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](7);
+    function createSystemLogs(bytes32 _outputHash) public returns (bytes[] memory) {
+        bytes[] memory logs = new bytes[](9);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -95,13 +97,27 @@ library Utils {
             uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
             bytes32("")
         );
+
+        logs[7] = constructL2Log(
+            true,
+            L2_TO_L1_MESSENGER,
+            uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY),
+            _outputHash
+        );
+        logs[8] = constructL2Log(
+            true,
+            L2_TO_L1_MESSENGER,
+            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            bytes32(uint256(uint160(L2_DA_VALIDATOR_ADDRESS)))
+        );
+
         return logs;
     }
 
     function createSystemLogsWithUpgradeTransaction(
         bytes32 _expectedSystemContractUpgradeTxHash
-    ) public pure returns (bytes[] memory) {
-        bytes[] memory logsWithoutUpgradeTx = createSystemLogs();
+    ) public returns (bytes[] memory) {
+        bytes[] memory logsWithoutUpgradeTx = createSystemLogs(bytes32(0));
         bytes[] memory logs = new bytes[](logsWithoutUpgradeTx.length + 1);
         for (uint256 i = 0; i < logsWithoutUpgradeTx.length; i++) {
             logs[i] = logsWithoutUpgradeTx[i];
@@ -151,9 +167,9 @@ library Utils {
 
         return
             IExecutor.ProofInput({
-                recursiveAggregationInput: recursiveAggregationInput,
-                serializedProof: serializedProof
-            });
+            recursiveAggregationInput: recursiveAggregationInput,
+            serializedProof: serializedProof
+        });
     }
 
     function encodePacked(bytes[] memory data) public pure returns (bytes memory) {
@@ -290,13 +306,13 @@ library Utils {
     function makeFeeParams() public pure returns (FeeParams memory) {
         return
             FeeParams({
-                pubdataPricingMode: PubdataPricingMode.Rollup,
-                batchOverheadL1Gas: 1_000_000,
-                maxPubdataPerBatch: 110_000,
-                maxL2GasPerBatch: 80_000_000,
-                priorityTxMaxPubdata: 99_000,
-                minimalL2GasPrice: 250_000_000
-            });
+            pubdataPricingMode: PubdataPricingMode.Rollup,
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: 110_000,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: 99_000,
+            minimalL2GasPrice: 250_000_000
+        });
     }
 
     function makeInitializeData(address testnetVerifier) public returns (InitializeData memory) {
@@ -304,23 +320,23 @@ library Utils {
 
         return
             InitializeData({
-                chainId: 1,
-                bridgehub: address(dummyBridgehub),
-                stateTransitionManager: address(0x1234567890876543567890),
-                protocolVersion: 0,
-                admin: address(0x32149872498357874258787),
-                validatorTimelock: address(0x85430237648403822345345),
-                baseToken: address(0x923645439232223445),
-                baseTokenBridge: address(0x23746765237749923040872834),
-                storedBatchZero: bytes32(0),
-                verifier: makeVerifier(testnetVerifier),
-                verifierParams: makeVerifierParams(),
-                l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                priorityTxMaxGasLimit: 500000,
-                feeParams: makeFeeParams(),
-                blobVersionedHashRetriever: address(0x23746765237749923040872834)
-            });
+            chainId: 1,
+            bridgehub: address(dummyBridgehub),
+            stateTransitionManager: address(0x1234567890876543567890),
+            protocolVersion: 0,
+            admin: address(0x32149872498357874258787),
+            validatorTimelock: address(0x85430237648403822345345),
+            baseToken: address(0x923645439232223445),
+            baseTokenBridge: address(0x23746765237749923040872834),
+            storedBatchZero: bytes32(0),
+            verifier: makeVerifier(testnetVerifier),
+            verifierParams: makeVerifierParams(),
+            l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+            l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+            priorityTxMaxGasLimit: 500000,
+            feeParams: makeFeeParams(),
+            blobVersionedHashRetriever: address(0x23746765237749923040872834)
+        });
     }
 
     function makeInitializeDataForNewChain(
@@ -328,14 +344,14 @@ library Utils {
     ) public pure returns (InitializeDataNewChain memory) {
         return
             InitializeDataNewChain({
-                verifier: makeVerifier(testnetVerifier),
-                verifierParams: makeVerifierParams(),
-                l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                priorityTxMaxGasLimit: 80000000,
-                feeParams: makeFeeParams(),
-                blobVersionedHashRetriever: address(0x23746765237749923040872834)
-            });
+            verifier: makeVerifier(testnetVerifier),
+            verifierParams: makeVerifierParams(),
+            l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+            l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+            priorityTxMaxGasLimit: 80000000,
+            feeParams: makeFeeParams(),
+            blobVersionedHashRetriever: address(0x23746765237749923040872834)
+        });
     }
 
     function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address testnetVerifier) public returns (address) {
@@ -361,23 +377,23 @@ library Utils {
         uint256[] memory factoryDeps = new uint256[](1);
         return
             L2CanonicalTransaction({
-                txType: 0,
-                from: 0,
-                to: 0,
-                gasLimit: 0,
-                gasPerPubdataByteLimit: 0,
-                maxFeePerGas: 0,
-                maxPriorityFeePerGas: 0,
-                paymaster: 0,
-                nonce: 0,
-                value: 0,
-                reserved: reserved,
-                data: "",
-                signature: "",
-                factoryDeps: factoryDeps,
-                paymasterInput: "",
-                reservedDynamic: ""
-            });
+            txType: 0,
+            from: 0,
+            to: 0,
+            gasLimit: 0,
+            gasPerPubdataByteLimit: 0,
+            maxFeePerGas: 0,
+            maxPriorityFeePerGas: 0,
+            paymaster: 0,
+            nonce: 0,
+            value: 0,
+            reserved: reserved,
+            data: "",
+            signature: "",
+            factoryDeps: factoryDeps,
+            paymasterInput: "",
+            reservedDynamic: ""
+        });
     }
 
     function createBatchCommitment(
@@ -397,13 +413,13 @@ library Utils {
 
     function _batchPassThroughData(IExecutor.CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
         return
-            // solhint-disable-next-line func-named-parameters
+        // solhint-disable-next-line func-named-parameters
             abi.encodePacked(
-                _batch.indexRepeatedStorageChanges,
-                _batch.newStateRoot,
-                uint64(0), // index repeated storage changes in zkPorter
-                bytes32(0) // zkPorter batch hash
-            );
+            _batch.indexRepeatedStorageChanges,
+            _batch.newStateRoot,
+            uint64(0), // index repeated storage changes in zkPorter
+            bytes32(0) // zkPorter batch hash
+        );
     }
 
     function _batchMetaParameters() internal pure returns (bytes memory) {
@@ -421,14 +437,14 @@ library Utils {
         bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
 
         return
-            // solhint-disable-next-line func-named-parameters
+        // solhint-disable-next-line func-named-parameters
             abi.encodePacked(
-                l2ToL1LogsHash,
-                _stateDiffHash,
-                _batch.bootloaderHeapInitialContentsHash,
-                _batch.eventsQueueStateHash,
-                _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes)
-            );
+            l2ToL1LogsHash,
+            _stateDiffHash,
+            _batch.bootloaderHeapInitialContentsHash,
+            _batch.eventsQueueStateHash,
+            _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes)
+        );
     }
 
     /// @dev Encodes the commitment to blobs to be used in the auxiliary output of the batch commitment
@@ -441,8 +457,8 @@ library Utils {
     ) internal pure returns (bytes32[] memory blobAuxOutputWords) {
         // These invariants should be checked by the caller of this function, but we double check
         // just in case.
-        require(_blobCommitments.length == MAX_NUMBER_OF_BLOBS, "b10");
-        require(_blobHashes.length == MAX_NUMBER_OF_BLOBS, "b11");
+        require(_blobCommitments.length == TOTAL_BLOBS_IN_COMMITMENT, "b10");
+        require(_blobHashes.length == TOTAL_BLOBS_IN_COMMITMENT, "b11");
 
         // for each blob we have:
         // linear hash (hash of preimage from system logs) and
@@ -454,10 +470,47 @@ library Utils {
 
         blobAuxOutputWords = new bytes32[](2 * TOTAL_BLOBS_IN_COMMITMENT);
 
-        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
+        for (uint256 i = 0; i < TOTAL_BLOBS_IN_COMMITMENT; i++) {
             blobAuxOutputWords[i * 2] = _blobHashes[i];
             blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
         }
+    }
+
+    function constructRollupL2DAValidatorOutputHash(bytes32 _stateDiffHash, bytes32 _totalPubdataHash, uint8 _blobsAmount, bytes32[] memory _blobHashes) public pure returns (bytes32) {
+        return keccak256(
+            abi.encodePacked(
+                _stateDiffHash,
+                _totalPubdataHash,
+                _blobsAmount,
+                _blobHashes
+            )
+        );
+    }
+
+    function getDefaultBlobCommitment() public pure returns (bytes memory) {
+        bytes16 blobOpeningPoint = 0x7142c5851421a2dc03dde0aabdb0ffdb;
+        bytes32 blobClaimedValue = 0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0;
+        bytes memory commitment = hex"ad5a32c9486ad7ab553916b36b742ed89daffd4538d95f4fc8a6c5c07d11f4102e34b3c579d9b4eb6c295a78e484d3bf";
+        bytes memory blobProof = hex"b7565b1cf204d9f35cec98a582b8a15a1adff6d21f3a3a6eb6af5a91f0a385c069b34feb70bea141038dc7faca5ed364";
+
+        return abi.encodePacked(
+            blobOpeningPoint,
+            blobClaimedValue,
+            commitment,
+            blobProof
+        );
+    }
+
+    function defaultPointEvaluationPrecompileInput(bytes32 _versionedHash) public view returns (bytes memory) {
+        return abi.encodePacked(
+            _versionedHash,
+            bytes32(uint256(uint128(0x7142c5851421a2dc03dde0aabdb0ffdb))), // opening point
+            abi.encodePacked(
+                bytes32(0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0), // claimed value
+                hex"ad5a32c9486ad7ab553916b36b742ed89daffd4538d95f4fc8a6c5c07d11f4102e34b3c579d9b4eb6c295a78e484d3bf", // commitment
+                hex"b7565b1cf204d9f35cec98a582b8a15a1adff6d21f3a3a6eb6af5a91f0a385c069b34feb70bea141038dc7faca5ed364" // proof
+            )
+        );
     }
 
     // add this to be excluded from coverage report

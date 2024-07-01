@@ -186,12 +186,10 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         require(result == BLS_MODULUS, "precompile unexpected output");
     }
 
-    function _getBlobVersionedHash(uint256) internal view virtual returns (bytes32 versionedHash) {
-        // FIXME: enable blobs
-        revert("Blobs not supported on this codebase yet");
-        // assembly {
-        //     versionedHash := blobhash(_index)
-        // }
+    function _getBlobVersionedHash(uint256 _index) internal view virtual returns (bytes32 versionedHash) {
+         assembly {
+             versionedHash := blobhash(_index)
+         }
     }
 
     function supportsInterface(bytes4 interfaceId) override external view returns (bool) {

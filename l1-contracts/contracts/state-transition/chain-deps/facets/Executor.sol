@@ -153,7 +153,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bk");
                 logOutput.numberOfLayer1Txs = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)) {
-                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "bk");
+                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "vk");
                 require(s.l2DAValidator == address(uint160(uint256(logValue))), "lo");
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lp2");
