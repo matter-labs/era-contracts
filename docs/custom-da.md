@@ -7,7 +7,7 @@ We introduced modularity into our contracts to support multiple DA layers, easie
 ![The contracts for the rollup case](./Custom-da-contracts.png)
 ![The general architecture](./Custom-da-external.png)
 
-### Background:
+### Background
 
 **Pubdata** - information published by the ZK Chain that can be used to reconstruct its state, it consists of l2→l1 logs, l2→l1 messages, contract bytecodes, and compressed state diffs.
 
