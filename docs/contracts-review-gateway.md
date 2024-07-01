@@ -25,6 +25,8 @@ Known issues, and features that still need to be implemented:
 - Upgrade process, how do we upgrade to CAB bridge, to the new system contracts.
 - We had the syncLayer internal name previously for the Gateway. This has not been replaced everywhere yet.
 
+![Untitled](./Hyperchain-scheme.png)
+
 ## Initial Scope
 
 - l1-contracts/contracts/
