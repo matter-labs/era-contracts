@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-import {PriorityOperation} from "../state-transition/libraries/PriorityQueue.sol";
-
 /// @dev `keccak256("")`
 bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
@@ -108,11 +106,6 @@ address constant ETH_TOKEN_ADDRESS = address(1);
 
 bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
 
-/// @dev A virtual address, used in the assetId calculation for native assets.
-/// This is needed for automatic bridging, i.e. without deploying the AssetHandler contract,
-/// if the assetId can be calculated with this address then it is in fact an NTV asset
-address constant NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS = address(2);
-
 /// @dev https://eips.ethereum.org/EIPS/eip-1352
 address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint16).max));
 
@@ -125,6 +118,13 @@ struct StoredBatchHashInfo {
     bytes32 hash;
 }
 
+struct PriorityTreeCommitment {
+    uint256 nextLeafIndex;
+    uint256 startIndex;
+    uint256 unprocessedIndex;
+    bytes32[] sides;
+}
+
 // Info that allows to restore a chain.
 struct HyperchainCommitment {
     /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch
@@ -135,13 +135,11 @@ struct HyperchainCommitment {
     /// @notice Total number of committed batches i.e. batches[totalBatchesCommitted] points at the latest committed
     /// batch
     uint256 totalBatchesCommitted;
-    /// @notice total number of priority txs ever executed
-    uint256 priorityQueueHead;
-    PriorityOperation[] priorityQueueTxs;
     /// @notice
     bytes32 l2SystemContractsUpgradeTxHash;
     /// @notice
     uint256 l2SystemContractsUpgradeBatchNumber;
     bytes32[] batchHashes;
-    /// TODO: add priority queue here.
+    /// @notice Commitment to the priority merkle tree
+    PriorityTreeCommitment priorityTree;
 }

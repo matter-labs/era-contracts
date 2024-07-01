@@ -6,7 +6,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "./Utils.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
+// import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
 
 contract DeployL2Script is Script {
     using stdToml for string;
@@ -41,7 +41,6 @@ contract DeployL2Script is Script {
         deployFactoryDeps();
         deploySharedBridge();
         deploySharedBridgeProxy();
-        initializeChain();
 
         saveOutput();
     }
@@ -141,19 +140,6 @@ contract DeployL2Script is Script {
             chainId: config.chainId,
             bridgehubAddress: config.bridgehubAddress,
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
-        });
-    }
-
-    function initializeChain() public {
-        L1SharedBridge bridge = L1SharedBridge(config.l1SharedBridgeProxy);
-
-        Utils.executeUpgrade({
-            _governor: bridge.owner(),
-            _salt: bytes32(0),
-            _target: config.l1SharedBridgeProxy,
-            _data: abi.encodeCall(bridge.initializeChainGovernance, (config.chainId, config.l2SharedBridgeProxy)),
-            _value: 0,
-            _delay: 0
         });
     }
 }

@@ -18,13 +18,14 @@ import {InitializeData, InitializeDataNewChain} from "contracts/state-transition
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
 address constant L2_BOOTLOADER_ADDRESS = 0x0000000000000000000000000000000000008001;
 address constant L2_KNOWN_CODE_STORAGE_ADDRESS = 0x0000000000000000000000000000000000008004;
 address constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008;
-// constant in tests, but can be arbitrary in real environments
+// constant in tests, but can be arbitrary address in real environments
 address constant L2_DA_VALIDATOR_ADDRESS = 0x2f3Bc0cB46C9780990afbf86A60bdf6439DE991C;
 
 uint256 constant MAX_NUMBER_OF_BLOBS = 6;
@@ -181,7 +182,7 @@ library Utils {
     }
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](11);
+        bytes4[] memory selectors = new bytes4[](12);
         selectors[0] = AdminFacet.setPendingAdmin.selector;
         selectors[1] = AdminFacet.acceptAdmin.selector;
         selectors[2] = AdminFacet.setValidator.selector;
@@ -193,6 +194,7 @@ library Utils {
         selectors[8] = AdminFacet.executeUpgrade.selector;
         selectors[9] = AdminFacet.freezeDiamond.selector;
         selectors[10] = AdminFacet.unfreezeDiamond.selector;
+        selectors[11] = AdminFacet.genesisUpgrade.selector;
         return selectors;
     }
 
@@ -507,6 +509,13 @@ library Utils {
                     hex"b7565b1cf204d9f35cec98a582b8a15a1adff6d21f3a3a6eb6af5a91f0a385c069b34feb70bea141038dc7faca5ed364" // proof
                 )
             );
+    }
+
+    function emptyData() internal pure returns (PriorityOpsBatchInfo[] calldata _empty) {
+        assembly {
+            _empty.offset := 0
+            _empty.length := 0
+        }
     }
 
     // add this to be excluded from coverage report

@@ -10,7 +10,7 @@ import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/c
 import {SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "contracts/common/L2ContractAddresses.sol";
-import {BLS_MODULUS} from "contracts/state-transition/data-availability/RollupL1DAValidator.sol";
+import {BLS_MODULUS} from "da-contracts/DAUtils.sol";
 
 contract CommittingTest is ExecutorTest {
     bytes32[] defaultBlobVersionedHashes;

@@ -3,7 +3,6 @@
 pragma solidity 0.8.24;
 
 import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
-import {Arrays} from "../../common/libraries/openzeppelin/Arrays.sol";
 
 contract FullMerkleTest {
     using FullMerkle for FullMerkle.FullTree;
@@ -24,6 +23,10 @@ contract FullMerkleTest {
 
     function updateAllLeaves(bytes32[] memory _items) external {
         tree.updateAllLeaves(_items);
+    }
+
+    function updateAllNodesAtHeight(uint256 _height, bytes32[] memory _items) external {
+        tree.updateAllNodesAtHeight(_height, _items);
     }
 
     function root() external view returns (bytes32) {
@@ -47,6 +50,6 @@ contract FullMerkleTest {
     }
 
     function zeros(uint256 _index) external view returns (bytes32) {
-        return Arrays.unsafeAccess(tree._zeros, _index).value;
+        return tree._zeros[_index];
     }
 }

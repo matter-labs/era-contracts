@@ -7,12 +7,15 @@ import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
 contract MailboxTest is Test {
     IMailbox internal mailboxFacet;
+    IGetters internal gettersFacet;
     UtilsFacet internal utilsFacet;
     address sender;
     uint256 eraChainId = 9;
@@ -24,11 +27,17 @@ contract MailboxTest is Test {
         return selectors;
     }
 
+    function getGettersSelectors() public pure returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = IGetters.getPriorityTreeRoot.selector;
+        return selectors;
+    }
+
     function setUp() public virtual {
         sender = makeAddr("sender");
         vm.deal(sender, 100 ether);
 
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(new MailboxFacet(eraChainId)),
             action: Diamond.Action.Add,
@@ -41,10 +50,17 @@ contract MailboxTest is Test {
             isFreezable: true,
             selectors: Utils.getUtilsFacetSelectors()
         });
+        facetCuts[2] = Diamond.FacetCut({
+            facet: address(new GettersFacet()),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: getGettersSelectors()
+        });
 
         address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
         mailboxFacet = IMailbox(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
+        gettersFacet = IGetters(diamondProxy);
     }
 
     // add this to be excluded from coverage report

@@ -27,13 +27,14 @@ contract SetChainCreationParamsTest is StateTransitionManagerTest {
             genesisBatchHash: genesisBatchHash,
             genesisIndexRepeatedStorageChanges: genesisIndexRepeatedStorageChanges,
             genesisBatchCommitment: genesisBatchCommitment,
-            diamondCut: newDiamondCutData
+            diamondCut: newDiamondCutData,
+            forceDeploymentsData: bytes("")
         });
 
         chainContractAddress.setChainCreationParams(newChainCreationParams);
 
         assertEq(chainContractAddress.initialCutHash(), newCutHash, "Initial cut hash update was not successful");
-        assertEq(chainContractAddress.genesisUpgrade(), newGenesisUpgrade, "Genesis upgrade was not set correctly");
+        assertEq(chainContractAddress.l1GenesisUpgrade(), newGenesisUpgrade, "Genesis upgrade was not set correctly");
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
         IExecutor.StoredBatchInfo memory newBatchZero = IExecutor.StoredBatchInfo({

@@ -403,8 +403,8 @@ async function checkSTM() {
   await extractProxyInitializationData(contract, (await l1Provider.getTransaction(stmDeployTx)).data);
 }
 
-async function checkL1SharedBridgeImpl() {
-  const artifact = await hardhat.artifacts.readArtifact("L1SharedBridge");
+async function checkL1AssetRouterImpl() {
+  const artifact = await hardhat.artifacts.readArtifact("L1AssetRouter");
   const contract = new ethers.Contract(sharedBridgeImpl, artifact.abi, l1Provider);
 
   await checkCorrectInitCode(sharedBridgeImplDeployTx, contract, artifact.bytecode, [
@@ -418,7 +418,7 @@ async function checkL1SharedBridgeImpl() {
 }
 
 async function checkSharedBridge() {
-  const artifact = await hardhat.artifacts.readArtifact("L1SharedBridge");
+  const artifact = await hardhat.artifacts.readArtifact("L1AssetRouter");
   const contract = new ethers.Contract(sharedBridgeProxy, artifact.abi, l1Provider);
 
   const l2BridgeAddr = await contract.l2BridgeAddress(eraChainId);
@@ -487,7 +487,7 @@ async function main() {
     await checkValidatorTimelock();
     await checkBridgehub();
 
-    await checkL1SharedBridgeImpl();
+    await checkL1AssetRouterImpl();
     await checkSharedBridge();
 
     await checkLegacyBridge();
