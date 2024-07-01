@@ -36,7 +36,7 @@ contract ConsensusAuthority {
         bytes calldata validatorPubKey,
         bytes calldata validatorPoP,
         uint256 attesterWeight,
-    bytes calldata attesterPubKey
+        bytes calldata attesterPubKey
     ) external onlyOwner {
         validatorRegistry.add(nodeOwner, validatorWeight, validatorPubKey, validatorPoP);
         attesterRegistry.add(nodeOwner, attesterWeight, attesterPubKey);

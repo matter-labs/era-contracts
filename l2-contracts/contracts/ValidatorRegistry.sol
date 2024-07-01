@@ -8,8 +8,8 @@ contract ValidatorRegistry {
 
     // A map of node owners => validators (used for validator lookups).
     mapping(address => Validator) public validators;
-    // Array to keep track of validator node owners (used for iterating validators).
-    address[] public nodeOwners;
+    // An array to keep track of validator node owners (used for iterating validators).
+    address[] public validatorOwners;
 
     // The current committee list. Weight and public key are stored explicitly
     // since they might change after committee selection.
@@ -66,15 +66,15 @@ contract ValidatorRegistry {
         bytes calldata pop
     ) public onlyOwner {
         // Check if a validator with the same node owner or public key already exists.
-        for (uint256 i = 0; i < nodeOwners.length; i++) {
-            require(nodeOwners[i] != nodeOwner, "nodeOwner already exists");
-            require(!compareBytes(validators[nodeOwners[i]].pubKey, pubKey), "pubKey already exists");
+        for (uint256 i = 0; i < validatorOwners.length; i++) {
+            require(validatorOwners[i] != nodeOwner, "nodeOwner already exists");
+            require(!compareBytes(validators[validatorOwners[i]].pubKey, pubKey), "pubKey already exists");
         }
 
         verifyPoP(pubKey, pop);
 
         validators[nodeOwner] = Validator(weight, pubKey, pop, false, 0);
-        nodeOwners.push(nodeOwner);
+        validatorOwners.push(nodeOwner);
     }
 
     // Removes a validator. Should fail if the validator is still active or
@@ -90,8 +90,8 @@ contract ValidatorRegistry {
         delete validators[nodeOwner];
 
         // Remove from array by swapping the last element (gas-efficient, not preserving order).
-        nodeOwners[nodeOwnerIndex(nodeOwner)] = nodeOwners[nodeOwners.length - 1];
-        nodeOwners.pop();
+        validatorOwners[validatorOwnerIndex(nodeOwner)] = validatorOwners[validatorOwners.length - 1];
+        validatorOwners.pop();
     }
 
     // Inactivates a validator.
@@ -105,6 +105,7 @@ contract ValidatorRegistry {
     function activate(address nodeOwner) public onlyOwner {
         verifyExists(nodeOwner);
         validators[nodeOwner].isInactive = false;
+        validators[nodeOwner].inactiveSince = 0;
     }
 
     // Changes the weight.
@@ -137,18 +138,18 @@ contract ValidatorRegistry {
 
         // Populate `nextCommittee` based on active validators
         delete nextCommittee;
-        for (uint256 i = 0; i < nodeOwners.length; i++) {
-            Validator memory validator = validators[nodeOwners[i]];
+        for (uint256 i = 0; i < validatorOwners.length; i++) {
+            Validator memory validator = validators[validatorOwners[i]];
             if (!validator.isInactive) {
-                nextCommittee.push(CommitteeValidator(nodeOwners[i], validator.weight, validator.pubKey));
+                nextCommittee.push(CommitteeValidator(validatorOwners[i], validator.weight, validator.pubKey));
             }
         }
     }
 
-    // Finds the index of a node owner in the `nodeOwners` array.
-    function nodeOwnerIndex(address nodeOwner) private view returns (uint256) {
-        for (uint256 i = 0; i < nodeOwners.length; i++) {
-            if (nodeOwners[i] == nodeOwner) {
+    // Finds the index of a node owner in the `validatorOwners` array.
+    function validatorOwnerIndex(address nodeOwner) private view returns (uint256) {
+        for (uint256 i = 0; i < validatorOwners.length; i++) {
+            if (validatorOwners[i] == nodeOwner) {
                 return i;
             }
         }
@@ -167,5 +168,9 @@ contract ValidatorRegistry {
     // Verifies the proof-of-possession.
     function verifyPoP(bytes calldata pubKey, bytes calldata pop) internal pure {
         // TODO: implement or remove
+    }
+
+    function numValidators() public view returns (uint256) {
+        return validatorOwners.length;
     }
 }

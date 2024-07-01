@@ -8,8 +8,8 @@ contract AttesterRegistry {
 
     // A map of node owners => attesters (used for attester lookups).
     mapping(address => Attester) public attesters;
-    // Array to keep track of attester node owners (used for iterating attesters).
-    address[] public nodeOwners;
+    // An array to keep track of attester node owners (used for iterating attesters).
+    address[] public attesterOwners;
 
     // The current committee list. Weight and public key are stored explicitly
     // since they might change after committee selection.
@@ -63,13 +63,13 @@ contract AttesterRegistry {
         bytes calldata pubKey
     ) external onlyOwner {
         // Check if an attester with the same node owner or public key already exists.
-        for (uint256 i = 0; i < nodeOwners.length; i++) {
-            require(nodeOwners[i] != nodeOwner, "nodeOwner already exists");
-            require(!compareBytes(attesters[nodeOwners[i]].pubKey, pubKey), "pubKey already exists");
+        for (uint256 i = 0; i < attesterOwners.length; i++) {
+            require(attesterOwners[i] != nodeOwner, "nodeOwner already exists");
+            require(!compareBytes(attesters[attesterOwners[i]].pubKey, pubKey), "pubKey already exists");
         }
 
         attesters[nodeOwner] = Attester(weight, pubKey, false, 0);
-        nodeOwners.push(nodeOwner);
+        attesterOwners.push(nodeOwner);
     }
 
     // Removes an attester. Should fail if the validator is still active or
@@ -85,8 +85,8 @@ contract AttesterRegistry {
         delete attesters[nodeOwner];
 
         // Remove from array by swapping the last element (gas-efficient, not preserving order).
-        nodeOwners[nodeOwnerIndex(nodeOwner)] = nodeOwners[nodeOwners.length - 1];
-        nodeOwners.pop();
+        attesterOwners[nodeOwnerIndex(nodeOwner)] = attesterOwners[attesterOwners.length - 1];
+        attesterOwners.pop();
     }
 
     // Inactivates an attester.
@@ -100,6 +100,7 @@ contract AttesterRegistry {
     function activate(address nodeOwner) external onlyOwner {
         verifyExists(nodeOwner);
         attesters[nodeOwner].isInactive = false;
+        attesters[nodeOwner].inactiveSince = 0;
     }
 
     // Changes the weight.
@@ -126,18 +127,18 @@ contract AttesterRegistry {
 
         // Populate `nextCommittee` based on active attesters.
         delete nextCommittee;
-        for (uint256 i = 0; i < nodeOwners.length; i++) {
-            Attester memory attester = attesters[nodeOwners[i]];
+        for (uint256 i = 0; i < attesterOwners.length; i++) {
+            Attester memory attester = attesters[attesterOwners[i]];
             if (!attester.isInactive) {
-                nextCommittee.push(CommitteeAttester(nodeOwners[i], attester.weight, attester.pubKey));
+                nextCommittee.push(CommitteeAttester(attesterOwners[i], attester.weight, attester.pubKey));
             }
         }
     }
 
     // Finds the index of a node owner in the `nodeOwners` array.
     function nodeOwnerIndex(address nodeOwner) private view returns (uint256) {
-        for (uint256 i = 0; i < nodeOwners.length; i++) {
-            if (nodeOwners[i] == nodeOwner) {
+        for (uint256 i = 0; i < attesterOwners.length; i++) {
+            if (attesterOwners[i] == nodeOwner) {
                 return i;
             }
         }
@@ -150,5 +151,9 @@ contract AttesterRegistry {
 
     function compareBytes(bytes storage a, bytes calldata b) private pure returns (bool) {
         return keccak256(a) == keccak256(b);
+    }
+
+    function numAttesters() public view returns (uint256) {
+        return attesterOwners.length;
     }
 }
