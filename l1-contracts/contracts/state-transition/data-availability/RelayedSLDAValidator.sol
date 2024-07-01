@@ -9,8 +9,6 @@ import {IL1Messenger} from "../../common/interfaces/IL1Messenger.sol";
 
 import {CalldataDA} from "./CalldataDA.sol";
 
-import {PubdataSource} from "../chain-interfaces/IExecutor.sol";
-
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 
 uint256 constant BLOBS_SUPPORTED = 6;
