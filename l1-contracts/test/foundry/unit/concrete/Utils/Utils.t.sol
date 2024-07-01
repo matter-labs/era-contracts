@@ -121,13 +121,23 @@ contract UtilsTest is Test {
 
         assertEq(
             logs[7],
-            Utils.constructL2Log(true, L2_TO_L1_MESSENGER, uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY), bytes32(0)),
+            Utils.constructL2Log(
+                true,
+                L2_TO_L1_MESSENGER,
+                uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY),
+                bytes32(0)
+            ),
             "log[7] should be correct"
         );
 
         assertEq(
             logs[8],
-            Utils.constructL2Log(true, L2_TO_L1_MESSENGER, uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY), bytes32(uint256(uint160(L2_DA_VALIDATOR_ADDRESS)))),
+            Utils.constructL2Log(
+                true,
+                L2_TO_L1_MESSENGER,
+                uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+                bytes32(uint256(uint160(L2_DA_VALIDATOR_ADDRESS)))
+            ),
             "log[8] should be correct"
         );
     }

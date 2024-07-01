@@ -41,7 +41,12 @@ contract CommittingTest is ExecutorTest {
             EMPTY_PREPUBLISHED_COMMITMENT
         );
 
-        l2DAValidatorOutputHash = Utils.constructRollupL2DAValidatorOutputHash(uncompressedStateDiffHash, totalL2PubdataHash, uint8(numberOfBlobs), blobsLinearHashes);
+        l2DAValidatorOutputHash = Utils.constructRollupL2DAValidatorOutputHash(
+            uncompressedStateDiffHash,
+            totalL2PubdataHash,
+            uint8(numberOfBlobs),
+            blobsLinearHashes
+        );
 
         defaultBlobVersionedHashes = new bytes32[](1);
         defaultBlobVersionedHashes[0] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5;
@@ -313,32 +318,34 @@ contract CommittingTest is ExecutorTest {
 
     function test_RevertWhen_SystemLogIsFromIncorrectAddress() public {
         bytes32[9] memory values = [
-                            bytes32(""),
-                            bytes32(""),
-                            bytes32(""),
-                            bytes32(""),
-                            bytes32(""),
-                            bytes32(""),
-                            bytes32(""),
-                            bytes32(""),
-                            bytes32("")
-            ];
+            bytes32(""),
+            bytes32(""),
+            bytes32(""),
+            bytes32(""),
+            bytes32(""),
+            bytes32(""),
+            bytes32(""),
+            bytes32(""),
+            bytes32("")
+        ];
 
         bytes[9] memory errors = [
-                                bytes.concat("lm"),
-                                bytes.concat(""),
-                                bytes.concat(""),
-                                bytes.concat("sc"),
-                                bytes.concat("sv"),
-                                bytes.concat("bl"),
-                                bytes.concat("bk"),
-                                bytes.concat("lp2"),
-                                bytes.concat("vk")
-            ];
+            bytes.concat("lm"),
+            bytes.concat(""),
+            bytes.concat(""),
+            bytes.concat("sc"),
+            bytes.concat("sv"),
+            bytes.concat("bl"),
+            bytes.concat("bk"),
+            bytes.concat("lp2"),
+            bytes.concat("vk")
+        ];
 
         for (uint256 i = 0; i < values.length; i++) {
             // these logs are not checked by the executor, thus they can't cause a revert
-            if (i == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY) || i == uint256(SystemLogKey.STATE_DIFF_HASH_KEY)) {
+            if (
+                i == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY) || i == uint256(SystemLogKey.STATE_DIFF_HASH_KEY)
+            ) {
                 continue;
             }
 
@@ -359,24 +366,24 @@ contract CommittingTest is ExecutorTest {
         }
     }
 
-// FIXME: uncomment when old logs are removed
-//    function test_RevertWhen_SystemLogIsMissing() public {
-//        for (uint256 i = 0; i < 7; i++) {
-//            bytes[] memory l2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-//            delete l2Logs[i];
-//
-//            IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-//            wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(l2Logs);
-//
-//            IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
-//            wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
-//
-//            vm.prank(validator);
-//
-//            vm.expectRevert(bytes.concat("b7"));
-//            executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
-//        }
-//    }
+    // FIXME: uncomment when old logs are removed
+    //    function test_RevertWhen_SystemLogIsMissing() public {
+    //        for (uint256 i = 0; i < 7; i++) {
+    //            bytes[] memory l2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
+    //            delete l2Logs[i];
+    //
+    //            IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+    //            wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(l2Logs);
+    //
+    //            IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+    //            wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
+    //
+    //            vm.prank(validator);
+    //
+    //            vm.expectRevert(bytes.concat("b7"));
+    //            executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+    //        }
+    //    }
 
     function test_SuccessfullyCommitBatch() public {
         bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
@@ -395,7 +402,12 @@ contract CommittingTest is ExecutorTest {
             EMPTY_PREPUBLISHED_COMMITMENT
         );
 
-        l2DAValidatorOutputHash = Utils.constructRollupL2DAValidatorOutputHash(uncompressedStateDiffHash, totalL2PubdataHash, uint8(numberOfBlobs), blobsLinearHashes);
+        l2DAValidatorOutputHash = Utils.constructRollupL2DAValidatorOutputHash(
+            uncompressedStateDiffHash,
+            totalL2PubdataHash,
+            uint8(numberOfBlobs),
+            blobsLinearHashes
+        );
 
         bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
         correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
@@ -509,7 +521,12 @@ contract CommittingTest is ExecutorTest {
         blobVersionedHashes[0] = defaultBlobVersionedHashes[0];
         blobVersionedHashes[1] = defaultBlobVersionedHashes[0];
 
-        bytes32 outputHash = Utils.constructRollupL2DAValidatorOutputHash(uncompressedStateDiffHash, totalL2PubdataHash, uint8(numberOfBlobs), blobsLinearHashes);
+        bytes32 outputHash = Utils.constructRollupL2DAValidatorOutputHash(
+            uncompressedStateDiffHash,
+            totalL2PubdataHash,
+            uint8(numberOfBlobs),
+            blobsLinearHashes
+        );
 
         bytes[] memory correctL2Logs = Utils.createSystemLogs(outputHash);
         correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
@@ -763,7 +780,12 @@ contract CommittingTest is ExecutorTest {
         blobVersionedHashes[0] = defaultBlobVersionedHashes[0];
         blobVersionedHashes[1] = defaultBlobVersionedHashes[0];
 
-        bytes32 outputHash = Utils.constructRollupL2DAValidatorOutputHash(uncompressedStateDiffHash, totalL2PubdataHash, uint8(numberOfBlobs), blobsLinearHashes);
+        bytes32 outputHash = Utils.constructRollupL2DAValidatorOutputHash(
+            uncompressedStateDiffHash,
+            totalL2PubdataHash,
+            uint8(numberOfBlobs),
+            blobsLinearHashes
+        );
 
         bytes[] memory correctL2Logs = Utils.createSystemLogs(outputHash);
         correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(

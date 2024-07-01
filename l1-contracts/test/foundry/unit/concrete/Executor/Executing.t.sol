@@ -35,7 +35,12 @@ contract ExecutingTest is ExecutorTest {
             EMPTY_PREPUBLISHED_COMMITMENT
         );
 
-        l2DAValidatorOutputHash = Utils.constructRollupL2DAValidatorOutputHash(uncompressedStateDiffHash, totalL2PubdataHash, uint8(numberOfBlobs), blobsLinearHashes);
+        l2DAValidatorOutputHash = Utils.constructRollupL2DAValidatorOutputHash(
+            uncompressedStateDiffHash,
+            totalL2PubdataHash,
+            uint8(numberOfBlobs),
+            blobsLinearHashes
+        );
 
         blobVersionedHashes = new bytes32[](1);
         blobVersionedHashes[0] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5;
