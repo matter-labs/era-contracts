@@ -71,8 +71,6 @@ contract ValidatorRegistry {
             require(!compareBytes(validators[validatorOwners[i]].pubKey, pubKey), "pubKey already exists");
         }
 
-        verifyPoP(pubKey, pop);
-
         validators[nodeOwner] = Validator(weight, pubKey, pop, false, 0);
         validatorOwners.push(nodeOwner);
     }
@@ -121,7 +119,6 @@ contract ValidatorRegistry {
         bytes calldata pop
     ) public onlyOwner {
         verifyExists(nodeOwner);
-        verifyPoP(pubKey, pop);
         validators[nodeOwner].pubKey = pubKey;
         validators[nodeOwner].pop = pop;
     }
@@ -163,11 +160,6 @@ contract ValidatorRegistry {
 
     function compareBytes(bytes storage a, bytes calldata b) private pure returns (bool) {
         return keccak256(a) == keccak256(b);
-    }
-
-    // Verifies the proof-of-possession.
-    function verifyPoP(bytes calldata pubKey, bytes calldata pop) internal pure {
-        // TODO: implement or remove
     }
 
     function numValidators() public view returns (uint256) {
