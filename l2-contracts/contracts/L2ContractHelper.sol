@@ -173,7 +173,9 @@ library L2ContractHelper {
         if (bytecodeLenInWords % 2 == 0) {
             revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
         }
-        hashedBytecode = EfficientCall.sha(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+        hashedBytecode =
+            EfficientCall.sha(_bytecode) &
+            0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
         // Setting the version of the hash
         hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));
         // Setting the length

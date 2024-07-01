@@ -77,8 +77,4 @@ contract RelayedSLDAValidator is IL1DAValidator, CalldataDA {
             );
         }
     }
-
-    function supportsInterface(bytes4 interfaceId) override external view returns (bool) {
-        return interfaceId == type(IL1DAValidator).interfaceId;
-    }
 }

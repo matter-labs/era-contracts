@@ -22,8 +22,4 @@ contract ValidiumL1DAValidator is IL1DAValidator {
         // The rest of the fields that relate to blobs are empty.
         output.stateDiffHash = stateDiffHash;
     }
-
-    function supportsInterface(bytes4 interfaceId) override external view returns (bool) {
-        return interfaceId == type(IL1DAValidator).interfaceId;
-    }
 }

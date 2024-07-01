@@ -72,7 +72,7 @@ abstract contract CalldataDA {
     /// @param _fullPubdataHash Hash of the pubdata preimage.
     /// @param _maxBlobsSupported Maximum number of blobs supported.
     /// @param _pubdataInput Full pubdata + an additional 32 bytes containing the blob commitment for the pubdata.
-    /// @dev We supply the blob commitment as part of the pubdata because even with calldata the prover will check these values. 
+    /// @dev We supply the blob commitment as part of the pubdata because even with calldata the prover will check these values.
     function _processCalldataDA(
         uint256 _blobsProvided,
         bytes32 _fullPubdataHash,
