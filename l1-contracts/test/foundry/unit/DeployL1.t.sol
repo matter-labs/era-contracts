@@ -58,8 +58,8 @@ contract DeployL1Test is Test {
         DeployL1Utils._deployValidatorTimelock();
         DeployL1Utils._deployGovernance();
 
-        vm.startBroadcast(0x81B9233061E7A5447FE44385fd819f12d98Bfc2D);
         ProxyAdmin proxyAdmin = new ProxyAdmin();
+        vm.startBroadcast(proxyAdmin.owner());
         proxyAdmin.transferOwnership(DeployL1Utils.getOwnerAddress());
         vm.stopBroadcast();
         console.log("Transparent Proxy Admin deployed at:", address(proxyAdmin));
@@ -70,45 +70,45 @@ contract DeployL1Test is Test {
         DeployL1Utils._deployStateTransitionManagerContract();
 
         Bridgehub bridgehub = Bridgehub(DeployL1Utils.getBridgehubProxyAddress());
-        vm.startBroadcast(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
+        vm.startBroadcast(bridgehub.owner());
         bridgehub.addStateTransitionManager(DeployL1Utils.getBridgehubStateTransitionProxy());
         vm.stopBroadcast();
 
-        vm.startBroadcast(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
+        vm.startBroadcast(bridgehub.owner());
         ValidatorTimelock validatorTimelock = ValidatorTimelock(DeployL1Utils.getValidatorTimlock());
         validatorTimelock.setStateTransitionManager(
             IStateTransitionManager(DeployL1Utils.getBridgehubStateTransitionProxy())
         );
         console.log("StateTransitionManager set in ValidatorTimelock");
         vm.stopBroadcast();
-        //DeployL1Utils._deployDiamondProxy();
+
+        DeployL1Utils._deployDiamondProxy();
         DeployL1Utils._deploySharedBridgeContracts();
 
-        vm.startBroadcast(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
+        vm.startBroadcast(bridgehub.owner());
         bridgehub.addToken(DeployL1Utils.ADDRESS_ONE);
         bridgehub.setSharedBridge(DeployL1Utils.getBridgesProxy());
         vm.stopBroadcast();
         console.log("SharedBridge registered");
 
         DeployL1Utils._deployErc20BridgeImplementation();
-        
         DeployL1Utils._deployErc20BridgeProxy();
 
-        vm.startBroadcast(0xdF6c9B1247620f852E9B95CeB08E93A09eF02660);
         L1SharedBridge sharedBridge = L1SharedBridge(DeployL1Utils.getBridgesProxy());
+        vm.startBroadcast(sharedBridge.owner());
         sharedBridge.setL1Erc20Bridge(DeployL1Utils.getERC20Proxy());
         vm.stopBroadcast();
         console.log("SharedBridge updated with ERC20Bridge address");
 
-        vm.startBroadcast(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
+        vm.startBroadcast(bridgehub.owner());
         validatorTimelock.transferOwnership(DeployL1Utils.getOwnerAddress());
         vm.stopBroadcast();
 
-        vm.startBroadcast(0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38);
+        vm.startBroadcast(bridgehub.owner());
         bridgehub.transferOwnership(DeployL1Utils.getGovernanceAddress());
         vm.stopBroadcast();
 
-        vm.startBroadcast(0xdF6c9B1247620f852E9B95CeB08E93A09eF02660);
+        vm.startBroadcast(sharedBridge.owner());
         sharedBridge.transferOwnership(DeployL1Utils.getGovernanceAddress());
         vm.stopBroadcast();
 
@@ -119,10 +119,10 @@ contract DeployL1Test is Test {
         // l1Script = new DeployL1Script();
         // l1Script.run();
 
+        _run();
+
         // hyperchain = new RegisterHyperchainScript();
         // hyperchain.run();
-
-        _run();
 
         bridgehubProxyAddress = DeployL1Utils.getBridgehubProxyAddress();
         bridgeHub = Bridgehub(bridgehubProxyAddress);

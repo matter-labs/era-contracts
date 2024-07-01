@@ -3,11 +3,11 @@ pragma solidity 0.8.24;
 
 // solhint-disable no-console
 
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-
+import "forge-std/console.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
@@ -460,6 +460,8 @@ library DeployL1Utils {
             isFreezable: false,
             selectors: Utils.getAllSelectors(addresses().stateTransition.adminFacet.code)
         });
+        console.log("Facet", facetCuts[0].facet);
+        console.log("Admin", addresses().stateTransition.adminFacet);
         facetCuts[1] = Diamond.FacetCut({
             facet: addresses().stateTransition.gettersFacet,
             action: Diamond.Action.Add,
@@ -577,16 +579,19 @@ library DeployL1Utils {
             selectors: Utils.getAllSelectors(addresses().stateTransition.adminFacet.code)
         });
         console.log("Facet", facetCuts[0].facet);
+        console.log("Admin", addresses().stateTransition.adminFacet);
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(0),
             initCalldata: ""
         });
+
         bytes memory bytecode = abi.encodePacked(
             type(DiamondProxy).creationCode,
             abi.encode(config().l1ChainId, diamondCut)
         );
-        address contractAddress = _deployViaCreate2(bytecode);
+        console.logBytes(bytecode);
+        address contractAddress = _mockDeployViaCreate22(bytecode);
         console.log("DiamondProxy deployed at:", contractAddress);
         addresses().stateTransition.diamondProxy = contractAddress;
     }
@@ -717,14 +722,12 @@ library DeployL1Utils {
             addresses().bridges.sharedBridgeProxy
         );
 
-        console.log("A");
-        uint256 x = uint256(config().contracts.diamondInitPubdataPricingMode);
-        console.log("B");
+
 
         vm.serializeUint(
             "contracts_config",
             "diamond_init_pubdata_pricing_mode",
-            x
+            0
         );
 
 
@@ -829,20 +832,35 @@ library DeployL1Utils {
     }
 
     function _deployViaCreate22(bytes memory _bytecode) public returns (address) {
-        vm.startBroadcast(msg.sender);
+
         bytes32 _salt = config().contracts.create2FactorySalt;
         address _factory = addresses().create2Factory;
         (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
-
         address contractAddress = Utils.bytesToAddress(data);
-        //console.log("success", success);
-        //console.log("contract", contractAddress);
-        //console.log("length", contractAddress.code.length);
+        console.log("success", success);
+        console.log("contract", contractAddress);
+        console.log("length", contractAddress.code.length);
 
         if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
             revert("Failed to deploy contract via create2");
         }
-        vm.stopBroadcast();
+        return contractAddress;
+    }
+
+    function _mockDeployViaCreate22(bytes memory _bytecode) public returns (address) {
+
+        bytes32 _salt = config().contracts.create2FactorySalt;
+        address _factory = addresses().create2Factory;
+        vm.mockCall(_factory, abi.encodePacked(_salt, _bytecode), returnData);
+        (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
+        address contractAddress = Utils.bytesToAddress(data);
+        console.log("success", success);
+        console.log("contract", contractAddress);
+        console.log("length", contractAddress.code.length);
+
+        if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
+            revert("Failed to deploy contract via create2");
+        }
         return contractAddress;
     }
 }
