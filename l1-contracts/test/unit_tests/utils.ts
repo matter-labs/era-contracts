@@ -224,10 +224,6 @@ export function createSystemLogs(
       numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
     ),
 
-    // FIXME: these logs are not used anymore, but they needed for some of the tests' functionality to work.
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
-
     constructL2Log(
       true,
       L2_TO_L1_MESSENGER,
@@ -238,7 +234,7 @@ export function createSystemLogs(
       true,
       L2_TO_L1_MESSENGER,
       SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATOR_ADDRESS_KEY,
-      ethers.constants.AddressZero
+      process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR
     ),
   ];
 }
