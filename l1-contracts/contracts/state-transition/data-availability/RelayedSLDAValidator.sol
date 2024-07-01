@@ -11,8 +11,6 @@ import {CalldataDA} from "./CalldataDA.sol";
 
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 
-uint256 constant BLOBS_SUPPORTED = 6;
-
 /// @notice The DA validator intended to be used in Era-environment.
 /// @dev For compaitbility reasons it accepts calldata in the same format as the `RollupL1DAValidator`, but unlike the latter it
 /// does not support blobs.

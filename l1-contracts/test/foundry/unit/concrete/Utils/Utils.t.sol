@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {Utils, L2_TO_L1_MESSENGER, L2_SYSTEM_CONTEXT_ADDRESS, L2_BOOTLOADER_ADDRESS, PUBDATA_PUBLISHER_ADDRESS} from "./Utils.sol";
+import {Utils, L2_TO_L1_MESSENGER, L2_SYSTEM_CONTEXT_ADDRESS, L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER, L2_DA_VALIDATOR_ADDRESS} from "./Utils.sol";
 import {SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 // solhint-enable max-line-length
@@ -43,9 +43,9 @@ contract UtilsTest is Test {
     }
 
     function test_CreateSystemLogs() public {
-        bytes[] memory logs = Utils.createSystemLogs();
+        bytes[] memory logs = Utils.createSystemLogs(bytes32(0));
 
-        assertEq(logs.length, 13, "logs length should be correct");
+        assertEq(logs.length, 9, "logs length should be correct");
 
         assertEq(
             logs[0],
@@ -117,6 +117,28 @@ contract UtilsTest is Test {
                 bytes32("")
             ),
             "log[6] should be correct"
+        );
+
+        assertEq(
+            logs[7],
+            Utils.constructL2Log(
+                true,
+                L2_TO_L1_MESSENGER,
+                uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY),
+                bytes32(0)
+            ),
+            "log[7] should be correct"
+        );
+
+        assertEq(
+            logs[8],
+            Utils.constructL2Log(
+                true,
+                L2_TO_L1_MESSENGER,
+                uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+                bytes32(uint256(uint160(L2_DA_VALIDATOR_ADDRESS)))
+            ),
+            "log[8] should be correct"
         );
     }
 
