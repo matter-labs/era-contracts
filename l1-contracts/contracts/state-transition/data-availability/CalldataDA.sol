@@ -4,9 +4,10 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
-import {BLOB_SIZE_BYTES} from "../chain-interfaces/IExecutor.sol";
-
-uint256 constant BLOBS_SUPPORTED = 6;
+/// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
+/// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
+/// @dev Our circuits will prove that a EIP-4844 blob and our internal blob are the same.
+uint256 constant BLOB_SIZE_BYTES = 126_976;
 
 /// @notice Contract that contains the functionality for process the calldata DA.
 /// @dev The expected l2DAValidator that should be used with it `RollupL2DAValidator`.
@@ -67,7 +68,11 @@ abstract contract CalldataDA {
     }
 
     /// @notice Verify that the calldata DA was correctly provided.
-    /// todo: better doc comments
+    /// @param _blobsProvided The number of blobs provided.
+    /// @param _fullPubdataHash Hash of the pubdata preimage.
+    /// @param _maxBlobsSupported Maximum number of blobs supported.
+    /// @param _pubdataInput Full pubdata + an additional 32 bytes containing the blob commitment for the pubdata.
+    /// @dev We supply the blob commitment as part of the pubdata because even with calldata the prover will check these values.
     function _processCalldataDA(
         uint256 _blobsProvided,
         bytes32 _fullPubdataHash,

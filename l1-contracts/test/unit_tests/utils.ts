@@ -44,12 +44,6 @@ export enum SYSTEM_LOG_KEYS {
   PREV_BATCH_HASH_KEY,
   CHAINED_PRIORITY_TXN_HASH_KEY,
   NUMBER_OF_LAYER_1_TXS_KEY,
-  BLOB_ONE_HASH_KEY,
-  BLOB_TWO_HASH_KEY,
-  BLOB_THREE_HASH_KEY,
-  BLOB_FOUR_HASH_KEY,
-  BLOB_FIVE_HASH_KEY,
-  BLOB_SIX_HASH_KEY,
   L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
   USED_L2_DA_VALIDATOR_ADDRESS_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
@@ -229,28 +223,7 @@ export function createSystemLogs(
       SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
       numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
     ),
-    // FIXME: these logs are not used anymore, but they needed for some of the tests' functionality to work.
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
-    constructL2Log(
-      true,
-      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
-      SYSTEM_LOG_KEYS.BLOB_THREE_HASH_KEY,
-      ethers.constants.HashZero
-    ),
-    constructL2Log(
-      true,
-      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
-      SYSTEM_LOG_KEYS.BLOB_FOUR_HASH_KEY,
-      ethers.constants.HashZero
-    ),
-    constructL2Log(
-      true,
-      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
-      SYSTEM_LOG_KEYS.BLOB_FIVE_HASH_KEY,
-      ethers.constants.HashZero
-    ),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_SIX_HASH_KEY, ethers.constants.HashZero),
+
     constructL2Log(
       true,
       L2_TO_L1_MESSENGER,
@@ -261,7 +234,7 @@ export function createSystemLogs(
       true,
       L2_TO_L1_MESSENGER,
       SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATOR_ADDRESS_KEY,
-      process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR || ethers.constants.AddressZero
+      process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR
     ),
   ];
 }
@@ -301,28 +274,6 @@ export function createSystemLogsWithUpgrade(
       SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
       numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
     ),
-    // FIXME: these logs are not used anymore, but they needed for some of the tests' functionality to work.
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
-    constructL2Log(
-      true,
-      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
-      SYSTEM_LOG_KEYS.BLOB_THREE_HASH_KEY,
-      ethers.constants.HashZero
-    ),
-    constructL2Log(
-      true,
-      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
-      SYSTEM_LOG_KEYS.BLOB_FOUR_HASH_KEY,
-      ethers.constants.HashZero
-    ),
-    constructL2Log(
-      true,
-      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
-      SYSTEM_LOG_KEYS.BLOB_FIVE_HASH_KEY,
-      ethers.constants.HashZero
-    ),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_SIX_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
       L2_TO_L1_MESSENGER,

@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "../Utils/Utils.sol";
+import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_VALIDATOR_ADDRESS} from "../Utils/Utils.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
 import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
@@ -18,18 +18,23 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IL1DAValidator} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
+
 import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
-import {L1DAValidatorOutput} from "da-contracts/IL1DAValidator.sol";
+import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
+
+bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
+bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
 
 contract ExecutorTest is Test {
     address internal owner;
     address internal validator;
     address internal randomSigner;
     address internal blobVersionedHashRetriever;
+    address internal l1DAValidator;
     AdminFacet internal admin;
     TestExecutor internal executor;
     GettersFacet internal getters;
@@ -139,10 +144,11 @@ contract ExecutorTest is Test {
 
         eraChainId = 9;
 
-        executor = new TestExecutor();
         rollupL1DAValidator = new RollupL1DAValidator();
+
         admin = new AdminFacet();
         getters = new GettersFacet();
+        executor = new TestExecutor();
         mailbox = new MailboxFacet(eraChainId);
 
         DummyStateTransitionManager stateTransitionManager = new DummyStateTransitionManager();
@@ -238,18 +244,7 @@ contract ExecutorTest is Test {
         vm.prank(address(stateTransitionManager));
         admin.setTokenMultiplier(1, 1);
         vm.prank(address(owner));
-        admin.setDAValidatorPair(address(rollupL1DAValidator), address(rollupL1DAValidator));
-        L1DAValidatorOutput memory l1DAValidatorOutput = L1DAValidatorOutput({
-            stateDiffHash: Utils.randomBytes32("stateDiffHash"),
-            blobsLinearHashes: new bytes32[](TOTAL_BLOBS_IN_COMMITMENT),
-            blobsOpeningCommitments: new bytes32[](TOTAL_BLOBS_IN_COMMITMENT)
-        });
-        // todo we should not mock this.
-        vm.mockCall(
-            address(rollupL1DAValidator),
-            abi.encodeWithSelector(rollupL1DAValidator.checkDA.selector),
-            abi.encode(l1DAValidatorOutput)
-        );
+        admin.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_VALIDATOR_ADDRESS);
 
         uint256[] memory recursiveAggregationInput;
         uint256[] memory serializedProof;
@@ -260,7 +255,7 @@ contract ExecutorTest is Test {
         vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
 
-        bytes memory l2Logs = Utils.encodePacked(Utils.createSystemLogs());
+        bytes memory l2Logs = Utils.encodePacked(Utils.createSystemLogs(bytes32(0)));
         newCommitBatchInfo = IExecutor.CommitBatchInfo({
             batchNumber: 1,
             timestamp: uint64(currentTimestamp),

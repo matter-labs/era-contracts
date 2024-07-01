@@ -213,7 +213,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         bytes32[] memory l2ToL1LogsTreeArray = new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES);
         bytes32 reconstructedChainedLogsHash;
         for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
-            bytes32 hashedLog = keccak256(
+            bytes32 hashedLog = EfficientCall.keccak(
                 _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + L2_TO_L1_LOG_SERIALIZE_SIZE]
             );
             calldataPtr += L2_TO_L1_LOG_SERIALIZE_SIZE;
