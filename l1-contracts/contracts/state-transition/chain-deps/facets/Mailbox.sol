@@ -253,8 +253,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
                 // Very large amount
                 l2GasLimit: 72_000_000,
                 l2Calldata: data,
-                // TODO: use constant for that
-                l2GasPerPubdataByteLimit: 800,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),
                 // Tx is free, no so refund recipient needed
                 refundRecipient: address(0)
