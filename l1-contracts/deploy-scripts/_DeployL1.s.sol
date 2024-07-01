@@ -17,7 +17,7 @@ import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interf
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {GenesisUpgrade} from "contracts/upgrades/GenesisUpgrade.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {ValidatorTimelock} from "../contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "../contracts/bridgehub/Bridgehub.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -29,8 +29,8 @@ import {StateTransitionManagerInitializeData, ChainCreationParams} from "contrac
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
+import {FeeParams, PubdataPricingMode} from "../contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {L1SharedBridge} from "../contracts/bridge/L1SharedBridge.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {Vm} from "forge-std/Vm.sol";
@@ -123,6 +123,22 @@ library DeployL1Utils {
     struct TokensConfig {
         address tokenWethAddress;
     }
+    
+    function getGovernanceAddress() public view returns (address) {
+        return addresses().governance;
+    }
+
+    function getOwnerAddress() public view returns (address) {
+        return config().ownerAddress;
+    }
+
+    function getBridgesProxy() public view returns (address) {
+        return addresses().bridges.sharedBridgeProxy;
+    }
+
+    function getERC20Proxy() public view returns (address) {
+        return addresses().bridges.erc20BridgeProxy;
+    }
 
     function getValidatorTimlock() public view returns (address) {
         return addresses().validatorTimelock;
@@ -147,6 +163,10 @@ library DeployL1Utils {
 
     function getStateTransitionDiamondProxy() public view returns (address) {
         return addresses().stateTransition.diamondProxy;
+    }
+
+    function saveTransparentProxyAdminAddress(address addr) public {
+        addresses().transparentProxyAdmin = addr;
     }
 
     function bridgehubOwner() internal pure returns (address owner) {
@@ -213,14 +233,6 @@ library DeployL1Utils {
         addresses.blobVersionedHashRetriever = _blobVersionedHashRetriever;
         addresses.validatorTimelock = _validatorTimelock;
         addresses.create2Factory = _create2Factory;
-    }
-
-    function _initializeDeployerAddress(address addr) public {
-        config().deployerAddress = addr;
-    }
-
-    function _initializeGovernance(address addr) public {
-        addresses().governance = addr;
     }
 
     function _initializeConfig() public {
@@ -472,7 +484,7 @@ library DeployL1Utils {
             recursionLeafLevelVkHash: config().contracts.recursionLeafLevelVkHash,
             recursionCircuitsSetVksHash: config().contracts.recursionCircuitsSetVksHash
         });
-
+        console.log("Pubdata", uint(config().contracts.diamondInitPubdataPricingMode));
         FeeParams memory feeParams = FeeParams({
             pubdataPricingMode: config().contracts.diamondInitPubdataPricingMode,
             batchOverheadL1Gas: uint32(config().contracts.diamondInitBatchOverheadL1Gas),
@@ -481,7 +493,6 @@ library DeployL1Utils {
             priorityTxMaxPubdata: uint32(config().contracts.diamondInitPriorityTxMaxPubdata),
             minimalL2GasPrice: uint64(config().contracts.diamondInitMinimalL2GasPrice)
         });
-
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(addresses().stateTransition.verifier),
             verifierParams: verifierParams,
@@ -527,6 +538,7 @@ library DeployL1Utils {
         );
         console.log("StateTransitionManagerProxy deployed at:", contractAddress);
         addresses().stateTransition.stateTransitionProxy = contractAddress;
+        console.log("Pubdata", uint(config().contracts.diamondInitPubdataPricingMode));
         return contractAddress;
     }
 
@@ -564,6 +576,7 @@ library DeployL1Utils {
             isFreezable: false,
             selectors: Utils.getAllSelectors(addresses().stateTransition.adminFacet.code)
         });
+        console.log("Facet", facetCuts[0].facet);
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(0),
@@ -581,7 +594,7 @@ library DeployL1Utils {
     function _deploySharedBridgeContracts() public {
         _deploySharedBridgeImplementation();
         _deploySharedBridgeProxy();
-        _registerSharedBridge();
+        //_registerSharedBridge();
     }
 
     function _deploySharedBridgeImplementation() public {
@@ -687,7 +700,6 @@ library DeployL1Utils {
             "diamond_proxy_addr",
             addresses().stateTransition.diamondProxy
         );
-
         vm.serializeAddress(
             "bridges",
             "erc20_bridge_implementation_addr",
@@ -705,11 +717,19 @@ library DeployL1Utils {
             addresses().bridges.sharedBridgeProxy
         );
 
+        console.log("A");
+        uint256 x = uint256(config().contracts.diamondInitPubdataPricingMode);
+        console.log("B");
+
         vm.serializeUint(
             "contracts_config",
             "diamond_init_pubdata_pricing_mode",
-            uint256(config().contracts.diamondInitPubdataPricingMode)
+            x
         );
+
+
+
+
         vm.serializeUint(
             "contracts_config",
             "diamond_init_batch_overhead_l1_gas",
@@ -756,7 +776,6 @@ library DeployL1Utils {
             "diamond_cut_data",
             config().contracts.diamondCutData
         );
-
         vm.serializeAddress("deployed_addresses", "transparent_proxy_admin_addr", addresses().transparentProxyAdmin);
         vm.serializeAddress("deployed_addresses", "governance_addr", addresses().governance);
         vm.serializeAddress(
@@ -801,6 +820,7 @@ library DeployL1Utils {
             revert("Bytecode is not set");
         }
         address contractAddress = vm.computeCreate2Address(_salt, keccak256(_bytecode), _factory);
+        console.log("address", contractAddress);
         if (contractAddress.code.length != 0) {
             return contractAddress;
         }
@@ -809,16 +829,20 @@ library DeployL1Utils {
     }
 
     function _deployViaCreate22(bytes memory _bytecode) public returns (address) {
+        vm.startBroadcast(msg.sender);
         bytes32 _salt = config().contracts.create2FactorySalt;
         address _factory = addresses().create2Factory;
         (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
 
         address contractAddress = Utils.bytesToAddress(data);
+        //console.log("success", success);
+        //console.log("contract", contractAddress);
+        //console.log("length", contractAddress.code.length);
 
         if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
             revert("Failed to deploy contract via create2");
         }
-
+        vm.stopBroadcast();
         return contractAddress;
     }
 }
