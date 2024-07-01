@@ -62,7 +62,10 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         return keccak256(abi.encodePacked(blobVersionedHash, _commitment[:PUBDATA_COMMITMENT_COMMITMENT_OFFSET]));
     }
 
-    /// todo: better doc comments
+    /// @notice Verify that the blob DA was correctly provided.
+    /// @param _blobsProvided The number of blobs provided.
+    /// @param _maxBlobsSupported Maximum number of blobs supported.
+    /// @param _operatorDAInput Input used to verify that the blobs contain the data we expect.
     function _processBlobDA(
         uint256 _blobsProvided,
         uint256 _maxBlobsSupported,

@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
-
 /// @dev Enum used to determine the source of pubdata. At first we will support calldata and blobs but this can be extended.
 enum PubdataSource {
     Calldata,
@@ -22,7 +20,7 @@ struct L1DAValidatorOutput {
     bytes32[] blobsOpeningCommitments;
 }
 
-interface IL1DAValidator is IERC165 {
+interface IL1DAValidator {
     /// @notice The function that checks the data availability for the given batch input.
     /// @param chainId The chain id of the chain that is being committed.
     /// @param l2DAValidatorOutputHash The hash of that was returned by the l2DAValidator.
