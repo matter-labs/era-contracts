@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
+import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
@@ -75,7 +75,7 @@ interface IBridgehub is IL1AssetHandler {
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
-    function sharedBridge() external view returns (IL1SharedBridge);
+    function sharedBridge() external view returns (IL1AssetRouter);
 
     function getHyperchain(uint256 _chainId) external view returns (address);
 
@@ -122,10 +122,6 @@ interface IBridgehub is IL1AssetHandler {
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
 
-    /// FIXME: this method should not be present in the production code.
-    /// just used in code to register chain successfully until full migration is complete.
-    // function unsafeRegisterChain(uint256 _chainId, address _stateTransitionManager, address _baseToken) external;
-
     //// Registry
 
     function createNewChain(
@@ -134,7 +130,8 @@ interface IBridgehub is IL1AssetHandler {
         address _baseToken,
         uint256 _salt,
         address _admin,
-        bytes calldata _initData
+        bytes calldata _initData,
+        bytes[] calldata _factoryDeps
     ) external returns (uint256 chainId);
 
     function addStateTransitionManager(address _stateTransitionManager) external;
@@ -155,11 +152,7 @@ interface IBridgehub is IL1AssetHandler {
 
     event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
 
-    function registerCounterpart(uint256 _chainId, address _counterPart) external;
-
     function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
-
-    function bridgehubCounterParts(uint256 _chainId) external view returns (address);
 
     function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
 

@@ -4,9 +4,8 @@ import * as hardhat from "hardhat";
 import type { BytesLike } from "ethers/lib/utils";
 import { Interface } from "ethers/lib/utils";
 
-import type { Bridgehub, L1SharedBridge, GettersFacet, MockExecutorFacet } from "../../typechain";
+import type { Bridgehub, GettersFacet, MockExecutorFacet } from "../../typechain";
 import {
-  L1SharedBridgeFactory,
   BridgehubFactory,
   TestnetERC20TokenFactory,
   MailboxFacetFactory,
@@ -17,7 +16,7 @@ import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
 import type { IMailbox } from "../../typechain/IMailbox";
 
-import { ADDRESS_ONE, ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/utils";
 import { Action, facetCut } from "../../src.ts/diamondCut";
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
@@ -42,7 +41,7 @@ describe("Legacy Era tests", function () {
   let deployer: Deployer;
   let l1ERC20BridgeAddress: string;
   let l1ERC20Bridge: IL1ERC20Bridge;
-  let sharedBridgeProxy: L1SharedBridge;
+  // let sharedBridgeProxy: L1AssetRouter;
   let erc20TestToken: ethers.Contract;
   let bridgehub: Bridgehub;
   let chainId = "9"; // Hardhat config ERA_CHAIN_ID
@@ -87,7 +86,7 @@ describe("Legacy Era tests", function () {
     l1ERC20BridgeAddress = deployer.addresses.Bridges.ERC20BridgeProxy;
 
     l1ERC20Bridge = IL1ERC20BridgeFactory.connect(l1ERC20BridgeAddress, deployWallet);
-    sharedBridgeProxy = L1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
+    // sharedBridgeProxy = L1AssetRouterFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
 
     const tokens = getTokens();
     const tokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
@@ -96,7 +95,7 @@ describe("Legacy Era tests", function () {
     await erc20TestToken.mint(await randomSigner.getAddress(), ethers.utils.parseUnits("10000", 18));
     await erc20TestToken.connect(randomSigner).approve(l1ERC20BridgeAddress, ethers.utils.parseUnits("10000", 18));
 
-    const sharedBridgeFactory = await hardhat.ethers.getContractFactory("L1SharedBridge");
+    const sharedBridgeFactory = await hardhat.ethers.getContractFactory("L1AssetRouter");
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const sharedBridge = await sharedBridgeFactory.deploy(
       l1WethToken,
@@ -113,7 +112,7 @@ describe("Legacy Era tests", function () {
 
     await deployer.executeUpgrade(deployer.addresses.TransparentProxyAdmin, 0, calldata);
     if (deployer.verbose) {
-      console.log("L1SharedBridge upgrade sent for testing");
+      console.log("L1AssetRouter upgrade sent for testing");
     }
 
     mailbox = MailboxFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
@@ -130,22 +129,10 @@ describe("Legacy Era tests", function () {
     const l1Receiver = await randomSigner.getAddress();
     l2ToL1message = ethers.utils.hexConcat([
       functionSignature,
-      "0x".concat(l1Receiver.slice(2).padStart(64, "0")),
-      "0x".concat(ethers.utils.parseUnits("800", 18).toHexString().slice(2).padStart(64, "0")),
-      "0x".concat(erc20TestToken.address.slice(2).padStart(64, "0")),
+      l1Receiver,
+      erc20TestToken.address,
+      ethers.constants.HashZero,
     ]);
-  });
-
-  it("Check should initialize through governance", async () => {
-    const l1SharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
-    const upgradeCall = l1SharedBridgeInterface.encodeFunctionData("initializeChainGovernance(uint256,address)", [
-      chainId,
-      ADDRESS_ONE,
-    ]);
-
-    const txHash = await deployer.executeUpgrade(sharedBridgeProxy.address, 0, upgradeCall);
-
-    expect(txHash).not.equal(ethers.constants.HashZero);
   });
 
   it("Should not allow depositing zero amount", async () => {

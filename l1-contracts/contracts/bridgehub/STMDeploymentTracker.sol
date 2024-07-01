@@ -10,9 +10,10 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/
 import {L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 
-import {IBridgehub, IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
+import {IBridgehub, IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -22,7 +23,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     IBridgehub public immutable override BRIDGE_HUB;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    IL1SharedBridge public immutable override SHARED_BRIDGE;
+    IL1AssetRouter public immutable override SHARED_BRIDGE;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -33,7 +34,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub, IL1SharedBridge _sharedBridge) reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgehub, IL1AssetRouter _sharedBridge) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
         SHARED_BRIDGE = _sharedBridge;
@@ -80,7 +81,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         request = _registerSTMAssetOnL2Bridgehub(_chainId, _stmL1Address, _stmL2Address);
     }
 
-    // todo this has to be put in L1SharedBridge via TwoBridges. Hard, because we have to have multiple msg types
+    // todo this has to be put in L1AssetRouter via TwoBridges. Hard, because we have to have multiple msg types
     function registerSTMAssetOnL2SharedBridge(
         uint256 _chainId,
         address _stmL1Address,
@@ -90,12 +91,10 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         address _refundRecipient
     ) public payable {
         bytes32 assetId;
-        address bhCounterPart;
         {
             assetId = getAssetId(_stmL1Address);
-            bhCounterPart = BRIDGE_HUB.bridgehubCounterParts(_chainId);
         }
-        // slither-disable-next-line usused-return
+        // slither-disable-next-line unused-return
         SHARED_BRIDGE.setAssetHandlerAddressOnCounterPart{value: msg.value}({
             _chainId: _chainId,
             _mintValue: _mintValue,
@@ -103,15 +102,16 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
             _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByteLimit,
             _refundRecipient: _refundRecipient,
             _assetId: assetId,
-            _assetAddressOnCounterPart: bhCounterPart
+            _assetAddressOnCounterPart: L2_BRIDGEHUB_ADDR
         });
     }
     // Todo this works for now, but it will not work in the future if we want to change STM DTs. Probably ok.
     function _registerSTMAssetOnL2Bridgehub(
+        // solhint-disable-next-line no-unused-vars
         uint256 _chainId,
         address _stmL1Address,
         address _stmL2Address
-    ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal pure returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes memory l2TxCalldata = abi.encodeWithSelector(
             /// todo it should not be initial in setAssetHandlerAddressInitial
             IBridgehub.setAssetHandlerAddressInitial.selector,
@@ -121,14 +121,14 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
-            l2Contract: BRIDGE_HUB.bridgehubCounterParts(_chainId),
+            l2Contract: L2_BRIDGEHUB_ADDR,
             l2Calldata: l2TxCalldata,
             factoryDeps: new bytes[](0),
             txDataHash: bytes32(0)
         });
     }
 
-    /// @dev we need to implement this for the bridgehub
+    /// @dev we need to implement this for the bridgehub for the TwoBridges logic
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {
         // This function is typically used on bridges for e.g.
     }

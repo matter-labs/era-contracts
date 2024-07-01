@@ -228,7 +228,7 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(dan);
         vm.warp(timestamp + executionDelay + 1);
-        validator.executeBatches(storedBatches);
+        validator.executeBatches(storedBatches, Utils.emptyData());
     }
 
     function test_executeBatchesSharedBridge() public {
@@ -258,7 +258,7 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(alice);
         vm.warp(timestamp + executionDelay + 1);
-        validator.executeBatchesSharedBridge(chainId, storedBatches);
+        validator.executeBatchesSharedBridge(chainId, storedBatches, Utils.emptyData());
     }
 
     function test_RevertWhen_setExecutionDelayNotOwner() public {
@@ -361,7 +361,7 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(bob);
         vm.expectRevert("ValidatorTimelock: only validator");
-        validator.executeBatches(storedBatches);
+        validator.executeBatches(storedBatches, Utils.emptyData());
     }
 
     function test_RevertWhen_executeBatchesSharedBridgeNotValidator() public {
@@ -372,7 +372,7 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(bob);
         vm.expectRevert("ValidatorTimelock: only validator");
-        validator.executeBatchesSharedBridge(chainId, storedBatches);
+        validator.executeBatchesSharedBridge(chainId, storedBatches, Utils.emptyData());
     }
 
     function test_RevertWhen_executeBatchesTooEarly() public {
@@ -401,7 +401,7 @@ contract ValidatorTimelockTest is Test {
         vm.prank(dan);
         vm.warp(timestamp + executionDelay - 1);
         vm.expectRevert(bytes("5c"));
-        validator.executeBatches(storedBatches);
+        validator.executeBatches(storedBatches, Utils.emptyData());
     }
 
     function test_RevertWhen_executeBatchesSharedBridgeTooEarly() public {
@@ -430,6 +430,6 @@ contract ValidatorTimelockTest is Test {
         vm.prank(alice);
         vm.warp(timestamp + executionDelay - 1);
         vm.expectRevert(bytes("5c"));
-        validator.executeBatchesSharedBridge(chainId, storedBatches);
+        validator.executeBatchesSharedBridge(chainId, storedBatches, Utils.emptyData());
     }
 }

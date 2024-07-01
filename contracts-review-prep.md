@@ -4,12 +4,12 @@
 
 ### Reason for changes
 
-The goal was to be build a foundation to be able to support bridging of tokens with custom logic on receiving chain (not wrapped), as well as custom bridging logic (assets, which accrue value over time, like LRTs).
+The goal was to be build a foundation to be able to support token bridging with custom logic on receiving chain (not wrapped), as well as custom bridging logic (assets, which accrue value over time, like LRTs).
 For clarity, we only developed a framework, the exact logic for custom tokens and custom bridging will follow.
 
 ### Major changes
 
-In order to achieve it, we separated the liquidity managing logic from the Shared Bridges to `Asset Handlers`. The basic cases will be handled by `Native Token Vaults`, which are handling all of the standard `ERC20 tokens`, as well as `ETH`.
+In order to achieve it, we separated the liquidity managing logic from the Shared Bridge to `Asset Handlers`. The basic cases will be handled by `Native Token Vaults`, which are handling all of the standard `ERC20 tokens`, as well as `ETH`.
 
 ### New concepts
 
@@ -20,7 +20,7 @@ In order to achieve it, we separated the liquidity managing logic from the Share
 
 ### storage layout
 
-L2SharedBridge will be a system contract, L2NativeTokenVault will replace it ( the storage layout is still not yet backwards compatible)
+L2SharedBridge will be a system contract, L2NativeTokenVault will replace it (the storage layout is still not yet backwards compatible)
 
 ### bridgehubDeposit API change
 
@@ -46,33 +46,12 @@ We need to either:
   for Markdown's syntax, type some text into the left window and
   watch the results in the right.
 
-### redundant call \_getAssetProperties
-
-> (, \_assetId) = \_getAssetProperties(\_assetId); // Handles the non-legacy case
-
-Most likely a redundant call:
-
-- for the new assets not needed
-- for legacy tokens the handleLegacyData already provided the correct data.
-
-This one could be used in theory if the data has new format, but still uses the address instead of normal id. However, not sure we should support such cases, so it will be removed and tests updated.
-
 ### not allowing legacy withdrawals
 
 > require(!\_isEraLegacyEthWithdrawal(\_chainId, \_l2BatchNumber), "ShB: legacy eth withdrawal");
 
 No method to finalize an old withdrawal.
 We will manually finalize all legacy withdrawals before the upgrade, i.e. withdrawals that happened before the previous Bridgehub upgrade.
-
-### empty branch when matching function signatures
-
-> (assetId, offset) = UnsafeBytes.readBytes32(\_l2ToL1message, offset);
-
-        transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
-    } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
-        //todo
-
-Currently, the support of old selector with ERC20 is completed, but the new format with chainId in the `finalizeWithdraw` selector hasn't been implemented in the `_parseL2WithdrawalMessage` function.
 
 ### Custom Errors not implemented
 
@@ -82,5 +61,5 @@ Custom errors will be introduced for all contracts.
 
 ## Migration plan
 
-- Bulkheads will need o be migrated
-- Tokens will have to be transferred
+- Bulkheads will need to be migrated (methods added)
+- Tokens will have to be transferred (methods added)

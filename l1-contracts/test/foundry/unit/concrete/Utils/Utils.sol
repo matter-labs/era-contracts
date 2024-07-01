@@ -17,6 +17,7 @@ import {InitializeData, InitializeDataNewChain} from "contracts/state-transition
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -165,7 +166,7 @@ library Utils {
     }
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](11);
+        bytes4[] memory selectors = new bytes4[](12);
         selectors[0] = AdminFacet.setPendingAdmin.selector;
         selectors[1] = AdminFacet.acceptAdmin.selector;
         selectors[2] = AdminFacet.setValidator.selector;
@@ -177,6 +178,7 @@ library Utils {
         selectors[8] = AdminFacet.executeUpgrade.selector;
         selectors[9] = AdminFacet.freezeDiamond.selector;
         selectors[10] = AdminFacet.unfreezeDiamond.selector;
+        selectors[11] = AdminFacet.genesisUpgrade.selector;
         return selectors;
     }
 
@@ -457,6 +459,13 @@ library Utils {
         for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
             blobAuxOutputWords[i * 2] = _blobHashes[i];
             blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
+        }
+    }
+
+    function emptyData() internal pure returns (PriorityOpsBatchInfo[] calldata _empty) {
+        assembly {
+            _empty.offset := 0
+            _empty.length := 0
         }
     }
 

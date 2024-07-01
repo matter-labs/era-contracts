@@ -13,6 +13,7 @@ import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {Merkle} from "../../../common/libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
+import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
@@ -21,17 +22,15 @@ import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../../common/L2ContractAddresses.sol";
 
+import {IL1AssetRouter} from "../../../bridge/interfaces/IL1AssetRouter.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
-import {IL1SharedBridge} from "../../../bridge/interfaces/IL1SharedBridge.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
-
-// import {SyncLayerState} from "../ZkSyncHyperchainStorage.sol";
 
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -39,12 +38,13 @@ import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBas
 contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
+    using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "MailboxFacet";
 
     /// @dev Era's chainID
-    uint256 public immutable ERA_CHAIN_ID;
+    uint256 internal immutable ERA_CHAIN_ID;
 
     constructor(uint256 _eraChainId) {
         ERA_CHAIN_ID = _eraChainId;
@@ -247,14 +247,13 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         return
             BridgehubL2TransactionRequest({
                 sender: s.bridgehub,
-                contractL2: IBridgehub(s.bridgehub).bridgehubCounterParts(s.chainId),
+                contractL2: L2_BRIDGEHUB_ADDR,
                 mintValue: 0,
                 l2Value: 0,
                 // Very large amount
                 l2GasLimit: 72_000_000,
                 l2Calldata: data,
-                // TODO: use constant for that
-                l2GasPerPubdataByteLimit: 800,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),
                 // Tx is free, no so refund recipient needed
                 refundRecipient: address(0)
@@ -296,7 +295,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         BridgehubL2TransactionRequest memory request = _params.request;
 
         require(request.factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
-        _params.txId = s.priorityQueue.getTotalPriorityTxs();
+        _params.txId = _nextPriorityTxId();
 
         // Checking that the user provided enough ether to pay for the transaction.
         _params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, request.l2GasPerPubdataByteLimit);
@@ -330,12 +329,20 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         }
     }
 
+    function _nextPriorityTxId() internal view returns (uint256) {
+        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
+            return s.priorityTree.getTotalPriorityTxs();
+        } else {
+            return s.priorityQueue.getTotalPriorityTxs();
+        }
+    }
+
     function _requestL2TransactionToSyncLayerFree(
         BridgehubL2TransactionRequest memory _request
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         WritePriorityOpParams memory params = WritePriorityOpParams({
             request: _request,
-            txId: s.priorityQueue.getTotalPriorityTxs(),
+            txId: _nextPriorityTxId(),
             l2GasPrice: 0,
             expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
         });
@@ -391,14 +398,16 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) internal {
-        s.priorityQueue.pushBack(
-            PriorityOperation({
-                canonicalTxHash: _canonicalTxHash,
-                // FIXME: safe downcast
-                expirationTimestamp: _expirationTimestamp,
-                layer2Tip: uint192(0) // TODO: Restore after fee modeling will be stable. (SMA-1230)
-            })
-        );
+        if (s.priorityTree.startIndex > s.priorityQueue.getFirstUnprocessedPriorityTx()) {
+            s.priorityQueue.pushBack(
+                PriorityOperation({
+                    canonicalTxHash: _canonicalTxHash,
+                    expirationTimestamp: _expirationTimestamp,
+                    layer2Tip: uint192(0) // TODO: Restore after fee modeling will be stable. (SMA-1230)
+                })
+            );
+        }
+        s.priorityTree.push(_canonicalTxHash);
 
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters
@@ -431,7 +440,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
         require(s.chainId == ERA_CHAIN_ID, "Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
-        IL1SharedBridge(s.baseTokenBridge).finalizeWithdrawal({
+        IL1AssetRouter(s.baseTokenBridge).finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
@@ -465,7 +474,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
                 refundRecipient: _refundRecipient
             })
         );
-        IL1SharedBridge(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
+        IL1AssetRouter(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
             s.baseTokenAssetId,
             msg.sender,

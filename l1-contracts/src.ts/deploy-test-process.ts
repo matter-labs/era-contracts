@@ -121,9 +121,6 @@ export async function registerHyperchainWithBridgeRegistration(
 ) {
   chainId = chainId ?? deployer.chainId.toString();
   await registerHyperchain(deployer, onlyVerifier, extraFacets, gasPrice, baseTokenName, chainId, true);
-  const l1SharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
-  const upgradeCall = l1SharedBridge.interface.encodeFunctionData("initializeChainGovernance", [chainId, ADDRESS_ONE]);
-  await deployer.executeUpgrade(l1SharedBridge.address, 0, upgradeCall);
   await registerTestDAValidators(deployer);
 }
 

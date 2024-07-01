@@ -2,7 +2,12 @@
 
 pragma solidity 0.8.20;
 
+<<<<<<< HEAD
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
+=======
+import {IL2AssetRouter} from "./bridge/interfaces/IL2AssetRouter.sol";
+import {IL2NativeTokenVault} from "./bridge/interfaces/IL2NativeTokenVault.sol";
+>>>>>>> kl/sync-layer-reorg
 import {MalformedBytecode, BytecodeError} from "./L2ContractErrors.sol";
 
 /**
@@ -97,11 +102,18 @@ interface IPubdataChunkPublisher {
 
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
 
+uint160 constant KERNEL_SPACE_OFFSET = 0x10000; // 2^16
+
 address constant BOOTLOADER_ADDRESS = address(SYSTEM_CONTRACTS_OFFSET + 0x01);
 address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
 address constant DEPLOYER_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x06);
 
-address constant NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS = address(2);
+address constant L2_BRIDGEHUB_ADDRESS = address(KERNEL_SPACE_OFFSET + 0x02);
+
+IL2AssetRouter constant L2_ASSET_ROUTER = IL2AssetRouter(address(KERNEL_SPACE_OFFSET + 0x03));
+
+/// @dev The contract responsible for handling tokens native to a single chain.
+IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(address(KERNEL_SPACE_OFFSET + 0x04));
 
 IL2Messenger constant L2_MESSENGER = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
 

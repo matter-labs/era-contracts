@@ -9,6 +9,8 @@ import {IL1Messenger} from "../../common/interfaces/IL1Messenger.sol";
 
 import {CalldataDA} from "./CalldataDA.sol";
 
+import {PubdataSource} from "../chain-interfaces/IExecutor.sol";
+
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 
 uint256 constant BLOBS_SUPPORTED = 6;
@@ -59,6 +61,7 @@ contract RelayedSLDAValidator is IL1DAValidator, CalldataDA {
             );
 
             // Re-sending all the pubdata in pure form to L1.
+            // slither-disable-next-line unused-return
             IL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(abi.encode(_chainId, pubdata));
 
             output.blobsOpeningCommitments = blobCommitments;
