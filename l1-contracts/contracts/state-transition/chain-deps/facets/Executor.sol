@@ -70,14 +70,9 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             if (_newBatch.pubdataCommitments.length > BLOB_SIZE_BYTES) {
                 revert InvalidPubdataLength();
             }
-            if (
-                logOutput.pubdataHash !=
-                keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32])
-            ) {
-                revert InvalidPubdataHash(
-                    keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32]),
-                    logOutput.pubdataHash
-                );
+            bytes32 pubdataHash = keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32]);
+            if (logOutput.pubdataHash != pubdataHash) {
+                revert InvalidPubdataHash(pubdataHash, logOutput.pubdataHash);
             }
             blobCommitments[0] = bytes32(
                 _newBatch.pubdataCommitments[_newBatch.pubdataCommitments.length - 32:_newBatch
