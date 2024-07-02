@@ -508,7 +508,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(stm != address(0), "BH: assetInfo 2");
         require(settlementLayer[_chainId] != block.chainid, "BH: already current SL");
 
-        IMessageRoot(messageRoot).addNewChainIfNeeded(_chainId);
 
         settlementLayer[_chainId] = block.chainid;
         stateTransitionManager[_chainId] = stm;
@@ -517,6 +516,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(_chainId, _stmData);
         }
 
+        IMessageRoot(messageRoot).addNewChainIfNeeded(_chainId);
         IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData);
         return address(0);
     }
