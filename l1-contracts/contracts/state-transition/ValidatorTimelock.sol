@@ -87,9 +87,6 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @dev Sets an address as a validator.
     function addValidator(uint256 _chainId, address _newValidator) external onlyChainAdmin(_chainId) {
-        if (_newValidator == address(0)) {
-            revert ZeroAddress();
-        }
         if (validators[_chainId][_newValidator]) {
             revert AddressAlreadyValidator(_chainId);
         }
