@@ -20,7 +20,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
     ) internal override returns (uint32 newMinorVersion, bool patchOnly) {
         uint256 previousProtocolVersion = s.protocolVersion;
         if (
-            // IMPORTANT Genesis Upgrade difference: Note this is the only thing change > to >=
+            // IMPORTANT Genesis Upgrade difference: Note this is the only thing change <= to <
             _newProtocolVersion < previousProtocolVersion
         ) {
             revert ProtocolVersionShouldBeGreater(previousProtocolVersion, _newProtocolVersion);
@@ -55,7 +55,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
 
         // If the minor version changes also, we need to ensure that the previous upgrade has been finalized.
         // In case the minor version does not change, we permit to keep the old upgrade transaction in the system, but it
-        // must be ensured in the other parts of the upgrade that the is not overridden.
+        // must be ensured in the other parts of the upgrade that the upgrade transaction is not overridden.
         if (!patchOnly) {
             // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
             // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
