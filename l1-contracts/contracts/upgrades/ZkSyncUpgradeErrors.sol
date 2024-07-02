@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.24;
 
-// 0x6d172ab2
-error ProtocolVersionShouldBeGreater(uint256 _oldProtocolVersion, uint256 _newProtocolVersion);
+// 0x88d7b498
+error ProtocolVersionTooSmall();
 // 0xe1a9736b
 error ProtocolVersionDeltaTooLarge(uint256 _proposedDelta, uint256 _maxDelta);
 // 0xa0bdf77d

@@ -8,7 +8,7 @@ import {Utils} from "./libraries/Utils.sol";
 import {UnsafeBytesCalldata} from "./libraries/UnsafeBytesCalldata.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {L1_MESSENGER_CONTRACT, STATE_DIFF_ENTRY_SIZE, KNOWN_CODE_STORAGE_CONTRACT} from "./Constants.sol";
-import {DerivedKeyNotEqualToCompressedValue, EncodedAndRealBytecodeChunkNotEqual, DictionaryLengthNotFourTimesSmallerThanEncoded, EncodedLengthNotFourTimesSmallerThanOriginal, IndexOutOfBounds, IndexSizeError, ValuesNotEqual, UnsupportedOperation} from "./SystemContractErrors.sol";
+import {DerivedKeyNotEqualToCompressedValue, EncodedAndRealBytecodeChunkNotEqual, DictionaryLengthNotFourTimesSmallerThanEncoded, EncodedLengthNotFourTimesSmallerThanOriginal, IndexOutOfBounds, IndexSizeError, ValueMismatch, UnsupportedOperation} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -163,7 +163,7 @@ contract Compressor is ICompressor, ISystemContract {
         }
 
         if (numInitialWritesProcessed != numberOfInitialWrites) {
-            revert ValuesNotEqual(numberOfInitialWrites, numInitialWritesProcessed);
+            revert ValueMismatch(numberOfInitialWrites, numInitialWritesProcessed);
         }
 
         // Process repeated writes
@@ -180,7 +180,7 @@ contract Compressor is ICompressor, ISystemContract {
                 _compressedStateDiffs[stateDiffPtr:stateDiffPtr + _enumerationIndexSize]
             );
             if (enumIndex != compressedEnumIndex) {
-                revert ValuesNotEqual(enumIndex, compressedEnumIndex);
+                revert ValueMismatch(enumIndex, compressedEnumIndex);
             }
             stateDiffPtr += _enumerationIndexSize;
 
@@ -198,7 +198,7 @@ contract Compressor is ICompressor, ISystemContract {
         }
 
         if (stateDiffPtr != _compressedStateDiffs.length) {
-            revert ValuesNotEqual(stateDiffPtr, _compressedStateDiffs.length);
+            revert ValueMismatch(stateDiffPtr, _compressedStateDiffs.length);
         }
 
         stateDiffHash = EfficientCall.keccak(_stateDiffs);
@@ -243,15 +243,15 @@ contract Compressor is ICompressor, ISystemContract {
         unchecked {
             if (_operation == 0 || _operation == 3) {
                 if (convertedValue != _finalValue) {
-                    revert ValuesNotEqual(_finalValue, convertedValue);
+                    revert ValueMismatch(_finalValue, convertedValue);
                 }
             } else if (_operation == 1) {
                 if (_initialValue + convertedValue != _finalValue) {
-                    revert ValuesNotEqual(_finalValue, _initialValue + convertedValue);
+                    revert ValueMismatch(_finalValue, _initialValue + convertedValue);
                 }
             } else if (_operation == 2) {
                 if (_initialValue - convertedValue != _finalValue) {
-                    revert ValuesNotEqual(_finalValue, _initialValue - convertedValue);
+                    revert ValueMismatch(_finalValue, _initialValue - convertedValue);
                 }
             } else {
                 revert UnsupportedOperation();
