@@ -56,6 +56,7 @@ library AddressAliasHelper {
             _recipient = _prevMsgSender == tx.origin
                 ? _prevMsgSender
                 : AddressAliasHelper.applyL1ToL2Alias(_prevMsgSender);
+            // solhint-enable avoid-tx-origin
         } else if (_refundRecipient.code.length > 0) {
             // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
             _recipient = AddressAliasHelper.applyL1ToL2Alias(_refundRecipient);
