@@ -8,7 +8,6 @@ import {IL1DAValidator, L1DAValidatorOutput} from "./IL1DAValidator.sol";
 
 import {CalldataDA} from "./CalldataDA.sol";
 
-// TODO: maybe move it here
 import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE, POINT_EVALUATION_PRECOMPILE_ADDR} from "./DAUtils.sol";
 
 uint256 constant BLOBS_SUPPORTED = 6;
@@ -63,7 +62,10 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         return keccak256(abi.encodePacked(blobVersionedHash, _commitment[:PUBDATA_COMMITMENT_COMMITMENT_OFFSET]));
     }
 
-    /// todo: better doc comments
+    /// @notice Verify that the blob DA was correctly provided.
+    /// @param _blobsProvided The number of blobs provided.
+    /// @param _maxBlobsSupported Maximum number of blobs supported.
+    /// @param _operatorDAInput Input used to verify that the blobs contain the data we expect.
     function _processBlobDA(
         uint256 _blobsProvided,
         uint256 _maxBlobsSupported,

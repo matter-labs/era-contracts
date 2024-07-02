@@ -7,6 +7,8 @@ pragma solidity 0.8.20;
 import {ReconstructionMismatch, PubdataField} from "./DAErrors.sol";
 import {COMPRESSOR_CONTRACT, L2ContractHelper} from "../L2ContractHelper.sol";
 
+import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
+
 /// @dev The current version of state diff compression being used.
 uint256 constant STATE_DIFF_COMPRESSION_VERSION_NUMBER = 1;
 
@@ -42,7 +44,7 @@ abstract contract StateDiffL2DAValidator {
 
         bytes32 reconstructedChainedLogsHash;
         for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
-            bytes32 hashedLog = keccak256(
+            bytes32 hashedLog = EfficientCall.keccak(
                 _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + L2_TO_L1_LOG_SERIALIZE_SIZE]
             );
             calldataPtr += L2_TO_L1_LOG_SERIALIZE_SIZE;
@@ -59,7 +61,7 @@ abstract contract StateDiffL2DAValidator {
         for (uint256 i = 0; i < numberOfMessages; ++i) {
             uint32 currentMessageLength = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
             calldataPtr += 4;
-            bytes32 hashedMessage = keccak256(
+            bytes32 hashedMessage = EfficientCall.keccak(
                 _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentMessageLength]
             );
             calldataPtr += currentMessageLength;

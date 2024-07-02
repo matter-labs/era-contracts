@@ -13,6 +13,7 @@ import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {Merkle} from "../../../common/libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
+import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
 import {Messaging} from "../../../common/libraries/Messaging.sol";
@@ -32,14 +33,13 @@ import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
-// import {SyncLayerState} from "../ZkSyncHyperchainStorage.sol";
-
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
+    using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "MailboxFacet";
@@ -352,8 +352,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
                 // Very large amount
                 l2GasLimit: 72_000_000,
                 l2Calldata: data,
-                // TODO: use constant for that
-                l2GasPerPubdataByteLimit: 800,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),
                 // Tx is free, no so refund recipient needed
                 refundRecipient: address(0)
@@ -395,7 +394,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         BridgehubL2TransactionRequest memory request = _params.request;
 
         require(request.factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
-        _params.txId = s.priorityQueue.getTotalPriorityTxs();
+        _params.txId = _nextPriorityTxId();
 
         // Checking that the user provided enough ether to pay for the transaction.
         _params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, request.l2GasPerPubdataByteLimit);
@@ -428,12 +427,20 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         }
     }
 
+    function _nextPriorityTxId() internal view returns (uint256) {
+        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
+            return s.priorityTree.getTotalPriorityTxs();
+        } else {
+            return s.priorityQueue.getTotalPriorityTxs();
+        }
+    }
+
     function _requestL2TransactionToSyncLayerFree(
         BridgehubL2TransactionRequest memory _request
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         WritePriorityOpParams memory params = WritePriorityOpParams({
             request: _request,
-            txId: s.priorityQueue.getTotalPriorityTxs(),
+            txId: _nextPriorityTxId(),
             l2GasPrice: 0,
             expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
         });
@@ -489,14 +496,16 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) internal {
-        s.priorityQueue.pushBack(
-            PriorityOperation({
-                canonicalTxHash: _canonicalTxHash,
-                // FIXME: safe downcast
-                expirationTimestamp: _expirationTimestamp,
-                layer2Tip: uint192(0) // TODO: Restore after fee modeling will be stable. (SMA-1230)
-            })
-        );
+        if (s.priorityTree.startIndex > s.priorityQueue.getFirstUnprocessedPriorityTx()) {
+            s.priorityQueue.pushBack(
+                PriorityOperation({
+                    canonicalTxHash: _canonicalTxHash,
+                    expirationTimestamp: _expirationTimestamp,
+                    layer2Tip: uint192(0) // TODO: Restore after fee modeling will be stable. (SMA-1230)
+                })
+            );
+        }
+        s.priorityTree.push(_canonicalTxHash);
 
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters

@@ -4,17 +4,12 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
-import {IL1DAValidator, L1DAValidatorOutput} from "../chain-interfaces/IL1DAValidator.sol";
+import {IL1DAValidator, L1DAValidatorOutput, PubdataSource} from "../chain-interfaces/IL1DAValidator.sol";
 import {IL1Messenger} from "../../common/interfaces/IL1Messenger.sol";
 
 import {CalldataDA} from "./CalldataDA.sol";
 
-// TODO: maybe move it here
-import {PubdataSource} from "../chain-interfaces/IExecutor.sol";
-
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
-
-uint256 constant BLOBS_SUPPORTED = 6;
 
 /// @notice The DA validator intended to be used in Era-environment.
 /// @dev For compaitbility reasons it accepts calldata in the same format as the `RollupL1DAValidator`, but unlike the latter it

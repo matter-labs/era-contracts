@@ -4,8 +4,8 @@ import { ethers } from "ethers";
 import * as hre from "hardhat";
 import { Provider, Wallet } from "zksync-ethers";
 import type { L2WrappedBaseToken } from "../typechain/L2WrappedBaseToken";
-import type { L2SharedBridge } from "../typechain/L2SharedBridge";
-import { L2SharedBridgeFactory } from "../typechain/L2SharedBridgeFactory";
+import type { L2AssetRouter } from "../typechain/L2AssetRouter";
+import { L2AssetRouterFactory } from "../typechain/L2AssetRouterFactory";
 import { L2WrappedBaseTokenFactory } from "../typechain/L2WrappedBaseTokenFactory";
 
 const richAccount = {
@@ -20,7 +20,7 @@ describe("WETH token & WETH bridge", function () {
   const provider = new Provider(hre.config.networks.localhost.url);
   const wallet = new Wallet(richAccount.privateKey, provider);
   let wethToken: L2WrappedBaseToken;
-  let wethBridge: L2SharedBridge;
+  let wethBridge: L2AssetRouter;
 
   before("Deploy token and bridge", async function () {
     const deployer = new Deployer(hre, wallet);
@@ -45,7 +45,7 @@ describe("WETH token & WETH bridge", function () {
     ]);
 
     wethToken = L2WrappedBaseTokenFactory.connect(wethTokenProxy.address, wallet);
-    wethBridge = L2SharedBridgeFactory.connect(wethBridgeProxy.address, wallet);
+    wethBridge = L2AssetRouterFactory.connect(wethBridgeProxy.address, wallet);
 
     // await wethToken.initialize();
     await wethToken.initializeV2("Wrapped Ether", "WETH", wethBridge.address, randomAddress);

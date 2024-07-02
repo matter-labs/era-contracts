@@ -5,9 +5,7 @@ pragma solidity 0.8.24;
 // solhint-disable reason-string, gas-custom-errors
 
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
-// This importing issue should not be pushed to main, we only need this while we did not import OZ-v5 and v4 in parallel. Once we merge that it will be removed
-import {Arrays} from "./openzeppelin/Arrays.sol";
-import {Hashes} from "./openzeppelin/Hashes.sol";
+import {Merkle} from "./Merkle.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -22,7 +20,7 @@ library FullMerkle {
     }
 
     /**
-     * @dev Initialize a {Bytes32PushTree} using {Hashes-Keccak256} to hash internal nodes.
+     * @dev Initialize a {Bytes32PushTree} using {Merkle.efficientHash} to hash internal nodes.
      * The capacity of the tree (i.e. number of leaves) is set to `2**levels`.
      *
      * Calling this function on MerkleTree that was already setup and used will reset it to a blank state.
@@ -32,8 +30,7 @@ library FullMerkle {
      */
     function setup(FullTree storage self, bytes32 zero) internal returns (bytes32 initialRoot) {
         // Store depth in the dynamic array
-        Arrays.unsafeSetLength(self._zeros, 1);
-        Arrays.unsafeAccess(self._zeros, 0).value = zero;
+        self._zeros.push(zero);
         self._nodes.push([zero]);
 
         return zero;
@@ -43,11 +40,11 @@ library FullMerkle {
         // solhint-disable-next-line gas-increment-by-one
         uint256 index = self._leafNumber++;
 
-        if ((index == 1 << self._height)) {
+        if (index == 1 << self._height) {
             uint256 newHeight = self._height.uncheckedInc();
             self._height = newHeight;
             bytes32 topZero = self._zeros[newHeight - 1];
-            bytes32 newZero = Hashes.Keccak256(topZero, topZero);
+            bytes32 newZero = Merkle.efficientHash(topZero, topZero);
             self._zeros.push(newZero);
             self._nodes.push([newZero]);
         }
@@ -74,12 +71,12 @@ library FullMerkle {
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < self._height; i = i.uncheckedInc()) {
             if (_index % 2 == 0) {
-                currentHash = Hashes.Keccak256(
+                currentHash = Merkle.efficientHash(
                     currentHash,
                     maxNodeNumber == _index ? self._zeros[i] : self._nodes[i][_index + 1]
                 );
             } else {
-                currentHash = Hashes.Keccak256(self._nodes[i][_index - 1], currentHash);
+                currentHash = Merkle.efficientHash(self._nodes[i][_index - 1], currentHash);
             }
             _index /= 2;
             maxNodeNumber /= 2;
@@ -103,12 +100,20 @@ library FullMerkle {
             self._nodes[_height][0] = _newNodes[0];
             return _newNodes[0];
         }
-        bytes32[] memory _newRow;
+
+        uint256 newRowLength = (_newNodes.length + 1) / 2;
+        bytes32[] memory _newRow = new bytes32[](newRowLength);
+
         uint256 length = _newNodes.length;
         for (uint256 i; i < length; i = i.uncheckedAdd(2)) {
             self._nodes[_height][i] = _newNodes[i];
-            self._nodes[_height][i + 1] = _newNodes[i + 1];
-            _newRow[i / 2] = Hashes.Keccak256(_newNodes[i], _newNodes[i + 1]);
+            if (i + 1 < length) {
+                self._nodes[_height][i + 1] = _newNodes[i + 1];
+                _newRow[i / 2] = Merkle.efficientHash(_newNodes[i], _newNodes[i + 1]);
+            } else {
+                // Handle odd number of nodes by hashing the last node with zero
+                _newRow[i / 2] = Merkle.efficientHash(_newNodes[i], self._zeros[_height]);
+            }
         }
         return updateAllNodesAtHeight(self, _height + 1, _newRow);
     }

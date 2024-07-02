@@ -2,6 +2,12 @@
 
 pragma solidity 0.8.24;
 
+/// @dev Enum used to determine the source of pubdata. At first we will support calldata and blobs but this can be extended.
+enum PubdataSource {
+    Calldata,
+    Blob
+}
+
 struct L1DAValidatorOutput {
     /// @dev The hash of the uncompressed state diff.
     bytes32 stateDiffHash;
@@ -14,7 +20,6 @@ struct L1DAValidatorOutput {
     bytes32[] blobsOpeningCommitments;
 }
 
-// TODO: require EIP165 support as this will allow changes for future compatibility.
 interface IL1DAValidator {
     /// @notice The function that checks the data availability for the given batch input.
     /// @param chainId The chain id of the chain that is being committed.

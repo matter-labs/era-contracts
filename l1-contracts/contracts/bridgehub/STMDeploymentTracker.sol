@@ -128,7 +128,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         });
     }
 
-    /// @dev we need to implement this for the bridgehub
+    /// @dev we need to implement this for the bridgehub for the TwoBridges logic
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {
         // This function is typically used on bridges for e.g.
     }

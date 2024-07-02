@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.20;
 
+import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
 import {IL2AssetRouter} from "./bridge/interfaces/IL2AssetRouter.sol";
 import {IL2NativeTokenVault} from "./bridge/interfaces/IL2NativeTokenVault.sol";
 import {MalformedBytecode, BytecodeError} from "./L2ContractErrors.sol";
@@ -167,7 +168,7 @@ library L2ContractHelper {
     /// - Bytecode bytes length is not a multiple of 32
     /// - Bytecode bytes length is not less than 2^21 bytes (2^16 words)
     /// - Bytecode words length is not odd
-    function hashL2Bytecode(bytes calldata _bytecode) internal pure returns (bytes32 hashedBytecode) {
+    function hashL2Bytecode(bytes calldata _bytecode) internal view returns (bytes32 hashedBytecode) {
         // Note that the length of the bytecode must be provided in 32-byte words.
         if (_bytecode.length % 32 != 0) {
             revert MalformedBytecode(BytecodeError.Length);
@@ -182,7 +183,9 @@ library L2ContractHelper {
         if (bytecodeLenInWords % 2 == 0) {
             revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
         }
-        hashedBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+        hashedBytecode =
+            EfficientCall.sha(_bytecode) &
+            0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
         // Setting the version of the hash
         hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));
         // Setting the length

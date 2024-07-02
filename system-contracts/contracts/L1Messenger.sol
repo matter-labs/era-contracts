@@ -200,6 +200,56 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     ) external onlyCallFromBootloader {
         uint256 calldataPtr = 0;
 
+        // Check function sig and data in the other hashes
+        // 4 + 32 + 32 + 32 + 32 + 32 + 32
+        // 4 bytes for L2 DA Validator `validatePubdata` function selector
+        // 32 bytes for rolling hash of user L2 -> L1 logs
+        // 32 bytes for root hash of user L2 -> L1 logs
+        // 32 bytes for hash of messages
+        // 32 bytes for hash of uncompressed bytecodes sent to L1
+        // Operator data: 32 bytes for offset
+        //                32 bytes for length
+
+        bytes4 inputL2DAValidatePubdataFunctionSig = bytes4(
+            _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]
+        );
+        if (inputL2DAValidatePubdataFunctionSig != IL2DAValidator.validatePubdata.selector) {
+            revert ReconstructionMismatch(
+                PubdataField.InputDAFunctionSig,
+                bytes32(IL2DAValidator.validatePubdata.selector),
+                bytes32(inputL2DAValidatePubdataFunctionSig)
+            );
+        }
+        calldataPtr += 4;
+
+        bytes32 inputChainedLogsHash = bytes32(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 32]);
+        if (inputChainedLogsHash != chainedLogsHash) {
+            revert ReconstructionMismatch(PubdataField.InputLogsHash, chainedLogsHash, inputChainedLogsHash);
+        }
+        calldataPtr += 32;
+
+        // Check happens below after we reconstruct the logs root hash
+        bytes32 inputChainedLogsRootHash = bytes32(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 32]);
+        calldataPtr += 32;
+
+        bytes32 inputChainedMsgsHash = bytes32(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 32]);
+        if (inputChainedMsgsHash != chainedMessagesHash) {
+            revert ReconstructionMismatch(PubdataField.InputMsgsHash, chainedMessagesHash, inputChainedMsgsHash);
+        }
+        calldataPtr += 32;
+
+        bytes32 inputChainedBytecodesHash = bytes32(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 32]);
+        if (inputChainedBytecodesHash != chainedL1BytecodesRevealDataHash) {
+            revert ReconstructionMismatch(
+                PubdataField.InputBytecodeHash,
+                chainedL1BytecodesRevealDataHash,
+                inputChainedBytecodesHash
+            );
+        }
+        calldataPtr += 32;
+        // Shift calldata ptr past the pubdata offset and len
+        calldataPtr += 64;
+
         /// Check logs
         uint32 numberOfL2ToL1Logs = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
         if (numberOfL2ToL1Logs > L2_TO_L1_LOGS_MERKLE_TREE_LEAVES) {
@@ -214,7 +264,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         bytes32[] memory l2ToL1LogsTreeArray = new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES);
         bytes32 reconstructedChainedLogsHash;
         for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
-            bytes32 hashedLog = keccak256(
+            bytes32 hashedLog = EfficientCall.keccak(
                 _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + L2_TO_L1_LOG_SERIALIZE_SIZE]
             );
             calldataPtr += L2_TO_L1_LOG_SERIALIZE_SIZE;
@@ -240,17 +290,19 @@ contract L1Messenger is IL1Messenger, ISystemContract {
 
         bytes32 aggregatedRootHash = L2_MESSAGE_ROOT.getAggregatedRoot();
 
-        // FIXME; this is inefficient and leads to copying the entire array of uncompressed state diffs
-        // Better to use efficient call
-        bytes32 l2DAValidatorOutputhash = IL2DAValidator(_l2DAValidator).validatePubdata({
-            _chainedLogsHash: chainedLogsHash,
-            _logsRootHash: localLogsRootHash,
-            _chainedMessagesHash: chainedMessagesHash,
-            _chainedBytescodesHash: chainedL1BytecodesRevealDataHash,
-            _operatorInput: _totalL2ToL1PubdataAndStateDiffs
+        if (inputChainedLogsRootHash != l2ToL1LogsTreeRoot) {
+            revert ReconstructionMismatch(PubdataField.InputLogsRootHash, l2ToL1LogsTreeRoot, inputChainedLogsRootHash);
+        }
+
+        bytes memory returnData = EfficientCall.call({
+            _gas: gasleft(),
+            _address: _l2DAValidator,
+            _value: 0,
+            _data: _totalL2ToL1PubdataAndStateDiffs,
+            _isSystem: false
         });
 
-        bytes32 fullRootHash = keccak256(bytes.concat(localLogsRootHash, aggregatedRootHash));
+        bytes32 l2DAValidatorOutputhash = abi.decode(returnData, (bytes32));
 
         /// Native (VM) L2 to L1 log
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), fullRootHash);
