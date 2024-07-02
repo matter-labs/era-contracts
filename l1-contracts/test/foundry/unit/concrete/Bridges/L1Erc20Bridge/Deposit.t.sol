@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
-import {EmptyDeposit, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
+import {EmptyDeposit, ValueMismatch, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
 
 contract DepositTest is L1Erc20BridgeTest {
     event DepositInitiated(
@@ -85,7 +85,7 @@ contract DepositTest is L1Erc20BridgeTest {
         uint256 amount = 2;
         vm.prank(alice);
         feeOnTransferToken.approve(address(bridge), amount);
-        vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, amount, amount - 1));
+        vm.expectRevert(TokensWithFeesNotSupported.selector);
         vm.prank(alice);
         bridge.deposit({
             _l2Receiver: randomSigner,
@@ -100,7 +100,7 @@ contract DepositTest is L1Erc20BridgeTest {
         uint256 amount = 4;
         vm.prank(alice);
         feeOnTransferToken.approve(address(bridge), amount);
-        vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, amount, amount - 1));
+        vm.expectRevert(TokensWithFeesNotSupported.selector);
         vm.prank(alice);
         bridge.deposit({
             _l2Receiver: randomSigner,
