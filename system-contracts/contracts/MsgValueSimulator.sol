@@ -34,12 +34,12 @@ contract MsgValueSimulator is ISystemContract {
     }
 
     /// @notice The maximal number of gas out of the stipend that should be passed to the callee.
-    uint256 internal constant GAS_TO_PASS = 2300;
+    uint256 private constant GAS_TO_PASS = 2300;
 
     /// @notice The amount of gas that is passed to the MsgValueSimulator as a stipend.
     /// This number servers to pay for the ETH transfer as well as to provide gas for the `GAS_TO_PASS` gas.
     /// It is equal to the following constant: https://github.com/matter-labs/era-zkevm_opcode_defs/blob/7bf8016f5bb13a73289f321ad6ea8f614540ece9/src/system_params.rs#L96.
-    uint256 internal constant MSG_VALUE_SIMULATOR_STIPEND_GAS = 27000;
+    uint256 private constant MSG_VALUE_SIMULATOR_STIPEND_GAS = 27000;
 
     /// @notice The fallback function that is the main entry point for the MsgValueSimulator.
     /// @dev The contract accepts value, the callee and whether the call should be a system one via its ABI params.

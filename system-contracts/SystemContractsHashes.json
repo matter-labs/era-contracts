@@ -3,8 +3,8 @@
     "contractName": "AccountCodeStorage",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/AccountCodeStorage.sol/AccountCodeStorage.json",
     "sourceCodePath": "contracts-preprocessed/AccountCodeStorage.sol",
-    "bytecodeHash": "0x0100005d16064af2e0104c0b18670c50c04722ee1a78ec22f5884dee976156de",
-    "sourceCodeHash": "0x69d2533e5481ff13e65f4442e650f4b90c46a48ac643cac9798bbbf421194353"
+    "bytecodeHash": "0x0100005d860e12b73ec0eee12c4a311201780304be0902467d93960a633c35c5",
+    "sourceCodeHash": "0x5d544ebe1b1d4f99fe4410c9be644cd0b407109e30f632e968b484bf2d456994"
   },
   {
     "contractName": "BootloaderUtilities",
@@ -87,8 +87,8 @@
     "contractName": "MsgValueSimulator",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/MsgValueSimulator.sol/MsgValueSimulator.json",
     "sourceCodePath": "contracts-preprocessed/MsgValueSimulator.sol",
-    "bytecodeHash": "0x0100005d4ab32122db6950a743448c6225a25655747d4b4e08202922c036e0e0",
-    "sourceCodeHash": "0x4834adf62dbaefa1a1c15d36b5ad1bf2826e7d888a17be495f7ed4e4ea381aa8"
+    "bytecodeHash": "0x0100005dd2fa9d9f36e3304ba0bcd5ce170d14b215d49dd82d51319424ac82e0",
+    "sourceCodeHash": "0x3be84b36bf9412b93e7217819c163aba608b707dae8c71007c41ce91a926f905"
   },
   {
     "contractName": "NonceHolder",
