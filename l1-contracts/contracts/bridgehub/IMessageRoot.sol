@@ -9,7 +9,9 @@ interface IMessageRoot {
 
     function addNewChain(uint256 _chainId) external;
 
-    function chainMessageRoot(uint256 _chainId) external view returns (bytes32);
+    function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
 
-    function addChainBatchRoot(uint256 _chainId, bytes32 _chainBatchRoot) external;
+    function clearTreeAndProvidePubdata() external returns (bytes memory pubdata);
+
+    function addNewChainIfNeeded(uint256 _chainId) external;
 }

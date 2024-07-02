@@ -52,6 +52,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev used to accept the admin role
     address private pendingAdmin;
 
+    // FIXME: `messageRoot` DOES NOT contain messages that come from the current layer and go to the settlement layer.
+    // it may make sense to store the final root somewhere for interop purposes.
+    // THough maybe it can be postponed.
     IMessageRoot public override messageRoot;
 
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
@@ -134,7 +137,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         sharedBridge = IL1AssetRouter(_sharedBridge);
         stmDeployer = _stmDeployer;
         messageRoot = _messageRoot;
-        _messageRoot.addNewChain(block.chainid);
     }
 
     //// Registry
@@ -513,6 +515,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(_chainId, _stmData);
         }
 
+        IMessageRoot(messageRoot).addNewChainIfNeeded(_chainId);
         IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData);
         return address(0);
     }

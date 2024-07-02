@@ -23,6 +23,8 @@ import {IL1DAValidator} from "contracts/state-transition/chain-interfaces/IL1DAV
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
 import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
@@ -47,6 +49,7 @@ contract ExecutorTest is Test {
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
     DummyEraBaseTokenBridge internal sharedBridge;
     RollupL1DAValidator internal rollupL1DAValidator;
+    MessageRoot internal messageRoot;
 
     uint256 eraChainId;
 
@@ -141,7 +144,15 @@ contract ExecutorTest is Test {
         randomSigner = makeAddr("randomSigner");
         blobVersionedHashRetriever = makeAddr("blobVersionedHashRetriever");
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
+        messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)));
+        dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
+
+        vm.mockCall(
+            address(messageRoot),
+            abi.encodeWithSelector(MessageRoot.addChainBatchRoot.selector, 9, 1, bytes32(0)),
+            abi.encode()
+        );
 
         eraChainId = 9;
 
