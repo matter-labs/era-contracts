@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
+import {SystemContractBase} from "./SystemContractBase.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, REAL_BASE_TOKEN_SYSTEM_CONTRACT} from "./Constants.sol";
 import {InvalidCall} from "./SystemContractErrors.sol";
@@ -17,7 +17,7 @@ import {InvalidCall} from "./SystemContractErrors.sol";
  * the address to call in the second extraAbi param, transfers the funds and uses `mimicCall` to continue the
  * call with the same msg.sender.
  */
-contract MsgValueSimulator is ISystemContract {
+contract MsgValueSimulator is SystemContractBase {
     /// @notice Extract value, isSystemCall and to from the extraAbi params.
     /// @dev The contract accepts value, the callee and whether the call should be a system one via its ABI params.
     /// @dev The first ABI param contains the value in the [0..127] bits. The 128th contains

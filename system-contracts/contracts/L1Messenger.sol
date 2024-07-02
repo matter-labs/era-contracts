@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {IL1Messenger, L2ToL1Log, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE, STATE_DIFF_COMPRESSION_VERSION_NUMBER} from "./interfaces/IL1Messenger.sol";
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
+import {SystemContractBase} from "./SystemContractBase.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
@@ -23,7 +23,7 @@ import {ReconstructionMismatch, PubdataField} from "./SystemContractErrors.sol";
  * - The contract on L1 accepts all sent messages and if the message came from this system contract
  * it requires that the preimage of `value` be provided.
  */
-contract L1Messenger is IL1Messenger, ISystemContract {
+contract L1Messenger is IL1Messenger, SystemContractBase {
     /// @notice Sequential hash of logs sent in the current block.
     /// @dev Will be reset at the end of the block to zero value.
     bytes32 internal chainedLogsHash;
