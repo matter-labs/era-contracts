@@ -29,6 +29,13 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
 
     mapping(bytes32 assetId => address tokenAddress) public override tokenAddress;
 
+    mapping(bytes32 assetId => bool native) public override l2NativeToken;
+
+    /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chain.
+    /// This serves as a security measure until hyperbridging is implemented.
+    /// NOTE: this function may be removed in the future, don't rely on it!
+    mapping(uint256 chainId => mapping(address l2Token => uint256 balance)) public chainBalance;
+
     modifier onlyBridge() {
         if (msg.sender != address(L2_ASSET_ROUTER)) {
             revert InvalidCaller(msg.sender);
@@ -77,23 +84,34 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         address token = tokenAddress[_assetId];
         (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken) = abi
             .decode(_transferData, (address, uint256, address, bytes, address));
-        address expectedToken = l2TokenAddress(originToken);
-        if (token == address(0)) {
-            bytes32 expectedAssetId = keccak256(
-                abi.encode(_chainId, address(L2_NATIVE_TOKEN_VAULT), bytes32(uint256(uint160(originToken))))
-            );
-            if (_assetId != expectedAssetId) {
-                // Make sure that a NativeTokenVault sent the message
-                revert AssetIdMismatch(_assetId, expectedAssetId);
+
+        if (l2NativeToken[_assetId]) {
+            require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
+            address l2Token = tokenAddress[_assetId];
+            chainBalance[_chainId][l2Token] -= amount;
+
+            // Withdraw funds
+            IERC20(l2Token).safeTransfer(_l2Receiver, amount);
+        } else {
+            address expectedToken = l2TokenAddress(originToken);
+            if (token == address(0)) {
+                bytes32 expectedAssetId = keccak256(
+                    abi.encode(_chainId, address(L2_NATIVE_TOKEN_VAULT), bytes32(uint256(uint160(originToken))))
+                );
+                if (_assetId != expectedAssetId) {
+                    // Make sure that a NativeTokenVault sent the message
+                    revert AssetIdMismatch(_assetId, expectedAssetId);
+                }
+                address deployedToken = _deployL2Token(originToken, erc20Data);
+                if (deployedToken != expectedToken) {
+                    revert AddressMismatch(expectedToken, deployedToken);
+                }
+                tokenAddress[_assetId] = expectedToken;
             }
-            address deployedToken = _deployL2Token(originToken, erc20Data);
-            if (deployedToken != expectedToken) {
-                revert AddressMismatch(expectedToken, deployedToken);
-            }
-            tokenAddress[_assetId] = expectedToken;
+
+            IL2StandardToken(expectedToken).bridgeMint(_l2Receiver, _amount);
         }
 
-        IL2StandardToken(expectedToken).bridgeMint(_l2Receiver, _amount);
         /// backwards compatible event
         emit FinalizeDeposit(_l1Sender, _l2Receiver, expectedToken, _amount);
         // solhint-disable-next-line func-named-parameters
@@ -122,13 +140,32 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         }
 
         address l2Token = tokenAddress[_assetId];
-        IL2StandardToken(l2Token).bridgeBurn(_prevMsgSender, _amount);
+        if (l2NativeToken[_assetId]) {
+            _depositFunds(_prevMsgSender, l2Token, _amount);
+            chainBalance[_chainId][l2Token] += _amount;
+        } else {
+            IL2StandardToken(l2Token).bridgeBurn(_prevMsgSender, _amount);
+        }
 
         /// backwards compatible event
         emit WithdrawalInitiated(_prevMsgSender, _l1Receiver, l2Token, _amount);
         // solhint-disable-next-line func-named-parameters
         emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _l1Receiver, _mintValue, _amount);
         l1BridgeMintData = _transferData;
+    }
+
+    /// @notice Transfers tokens from the depositor address to the smart contract address.
+    /// @param _from The address of the depositor.
+    /// @param _token The ERC20 token to be transferred.
+    /// @param _amount The amount to be transferred.
+    /// @return The difference between the contract balance before and after the transferring of funds.
+    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
+        uint256 balanceBefore = _token.balanceOf(address(this));
+        // slither-disable-next-line arbitrary-send-erc20
+        _token.safeTransferFrom(from, address(this), _amount);
+        uint256 balanceAfter = _token.balanceOf(address(this));
+
+        return balanceAfter - balanceBefore;
     }
 
     /// @notice Deploys and initializes the L2 token for the L1 counterpart.
@@ -182,5 +219,24 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         bytes32 salt = _getCreate2Salt(_l1Token);
         return
             L2ContractHelper.computeCreate2Address(address(this), salt, l2TokenProxyBytecodeHash, constructorInputHash);
+    }
+
+    /// @notice Registers tokens within the NTV.
+    /// @dev The goal was to allow bridging L2 native tokens automatically, by registering them on the fly.
+    /// @notice Allows the asset router to register a token address for the vault.
+    /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
+    function registerToken(address _l2Token) external {
+        require(_l2Token.code.length > 0, "NTV: empty token");
+        bytes32 assetId = getAssetId(_l2Token);
+        L1_SHARED_BRIDGE.setAssetHandlerAddress(bytes32(uint256(uint160(_l2Token))), address(this));
+        tokenAddress[assetId] = _l2Token;
+        l2NativeToken[assetId] = true;
+    }
+
+    /// @notice Returns the parsed assetId.
+    /// @param _l2TokenAddress The address of the token to be parsed.
+    /// @return The asset ID.
+    function getAssetId(address _l2TokenAddress) public view override returns (bytes32) {
+        return keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT, _l2TokenAddress));
     }
 }
