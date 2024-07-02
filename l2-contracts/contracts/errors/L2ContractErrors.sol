@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 // 0xcbd9d2e0
-error InvalidCaller(address);
+error InvalidCaller(address caller);
 // 0xb4fa3fb3
 error InvalidInput();
 // 0x2a1b2dd8
@@ -29,7 +29,7 @@ error NonSequentialVersion();
 // 0x6e128399
 error Unimplemented();
 // 0xa4dde386
-error UnimplementedMessage(string);
+error UnimplementedMessage(string message);
 // 0x750b219c
 error WithdrawFailed();
 

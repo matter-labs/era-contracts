@@ -106,7 +106,7 @@ error NonIncreasingTimestamp();
 // 0x2d50c33b
 error TimestampError();
 // 0x1b6825bb
-error LogAlreadyProcessed(uint8);
+error LogAlreadyProcessed(uint8 logKey);
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
 // 0x6aa39880
@@ -240,7 +240,7 @@ error PriorityOperationsRollingHashMismatch();
 // 0xae43b424
 error SystemLogsSizeTooBig();
 // 0x8d5851de
-error PointEvalCallFailed(bytes);
+error PointEvalCallFailed(bytes data);
 // 0x53dee67b
 error PubdataCommitmentsEmpty();
 // 0x7734c31a
