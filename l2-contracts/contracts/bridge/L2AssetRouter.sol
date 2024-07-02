@@ -49,14 +49,21 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
     mapping(bytes32 assetId => address assetHandlerAddress) public override assetHandlerAddress;
 
     /// @notice Checks that the message sender is the legacy bridge.
-    modifier onlyL1Bridge() {
+    modifier onlyL1BridgeOrNTV() {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
         if (
-            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
-            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge
+            msg.sender == L2_NATIVE_TOKEN_VAULT ||
+            (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
+                AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge)
         ) {
             revert InvalidCaller(msg.sender);
         }
+        _;
+    }
+
+    /// @notice Checks that the message sender is the bridgehub.
+    modifier onlyBridgehub() {
+        require(msg.sender == address(L2_BRIDGEHUB_ADDRESS), "NTV not BH");
         _;
     }
 
@@ -83,10 +90,10 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
         _disableInitializers();
     }
 
-    /// @notice Finalizes the deposit and mint funds.
+    /// @notice Finalizes the deposit / withdrawal and mint funds.
     /// @param _assetId The encoding of the asset on L2.
     /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken).
-    function finalizeDeposit(bytes32 _assetId, bytes memory _transferData) public override onlyL1Bridge {
+    function finalizeTransfer(bytes32 _assetId, bytes memory _transferData) public override onlyL1Bridge {
         address assetHandler = assetHandlerAddress[_assetId];
         if (assetHandler != address(0)) {
             IL2AssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
@@ -95,7 +102,7 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
             assetHandlerAddress[_assetId] = address(L2_NATIVE_TOKEN_VAULT);
         }
 
-        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, keccak256(_transferData));
+        emit FinalizeTransferSharedBridge(L1_CHAIN_ID, _assetId, keccak256(_transferData));
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -115,7 +122,27 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
         bytes memory message = _getL1WithdrawMessage(_assetId, _l1bridgeMintData);
         L2ContractHelper.sendMessageToL1(message);
 
-        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, msg.sender, _assetId, keccak256(_transferData));
+        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, msg.sender, _assetId, _transferData);
+    }
+
+    /// @notice Initiates a deposit by locking funds on the contract and sending the message to L1
+    /// where tokens would be minted.
+    /// @param _assetId The encoding of the asset on L2 which is withdrawn.
+    /// @param _transferData The data that is passed to the asset handler contract.
+    function deposit(bytes32 _assetId, bytes memory _transferData) public override {
+        address assetHandler = assetHandlerAddress[_assetId];
+        bytes memory _l1bridgeMintData = IL2AssetHandler(assetHandler).bridgeBurn({
+            _chainId: L1_CHAIN_ID,
+            _mintValue: 0,
+            _assetId: _assetId,
+            _prevMsgSender: msg.sender,
+            _transferData: _transferData
+        });
+
+        bytes memory message = _getL1DepositMessage(_assetId, _l1bridgeMintData);
+        L2ContractHelper.sendMessageToL1(message);
+
+        emit DepositInitiatedSharedBridge(L1_CHAIN_ID, msg.sender, _assetId, _transferData);
     }
 
     /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
@@ -125,18 +152,36 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
         bytes32 _assetId,
         bytes memory _l1bridgeMintData
     ) internal pure returns (bytes memory) {
-        // note we use the IL1ERC20Bridge.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
+        // note we use the IL1AssetRouter.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
         // and we use this interface so that when the switch happened the old messages could be processed
         // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IL1AssetRouter.finalizeWithdrawal.selector, _assetId, _l1bridgeMintData);
     }
 
+    /// @notice Encodes the message for l2ToL1log sent during deposit initialization.
+    /// @param _assetId The encoding of the asset on L2 which is withdrawn.
+    /// @param _l1bridgeMintData The calldata used by l1 asset handler to unlock tokens for recipient.
+    function _getL1DepositMessage(
+        bytes32 _assetId,
+        bytes memory _l1bridgeMintData
+    ) internal pure returns (bytes memory) {
+        // note we use the IL1AssetRouter.finalizeDeposit function selector to specify the selector for L1<>L2 messages,
+        // and we use this interface so that when the switch happened the old messages could be processed
+        // solhint-disable-next-line func-named-parameters
+        return abi.encodePacked(IL1AssetRouter.finalizeDeposit.selector, _assetId, _l1bridgeMintData);
+    }
+
     /// @notice Sets the asset handler address for a given assetId.
-    /// @dev Will be called by ZK Gateway.
-    /// @param _assetId The encoding of the asset on L2.
+    /// @dev Will be called by ZK Gateway or NTV.
+    /// @param _assetData The encoding of the asset on L2.
     /// @param _assetHandlerAddress The address of the asset handler, which will hold the token of interest.
-    function setAssetHandlerAddress(bytes32 _assetId, address _assetHandlerAddress) external onlyL1Bridge {
-        assetHandlerAddress[_assetId] = _assetHandlerAddress;
+    function setAssetHandlerAddress(bytes32 _assetData, address _assetHandlerAddress) external onlyL1BridgeOrNTV {
+        if (msg.sender == L2_NATIVE_TOKEN_VAULT) {
+            bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), L2_NATIVE_TOKEN_VAULT, _assetData));
+            assetHandlerAddress[assetId] = _assetHandlerAddress;
+        } else {
+            assetHandlerAddress[_assetId] = _assetHandlerAddress;
+        }
         emit AssetHandlerRegistered(_assetId, _assetHandlerAddress);
     }
 
