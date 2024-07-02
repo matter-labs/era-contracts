@@ -153,8 +153,6 @@ error BaseTokenGasPriceDenominatorNotSet();
 error TransactionNotAllowed();
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
-// 0x76da24b9
-error TooManyFactoryDeps();
 // 0xb385a3da
 error MsgValueTooLow(uint256 required, uint256 provided);
 // 0xa6fef710
@@ -185,8 +183,6 @@ error QueueIsEmpty();
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xdd629f86
 error NotEnoughGas();
-// 0x5cb29523
-error InvalidTxType(uint256 txType);
 // 0x826fb11e
 error InsufficientChainBalance();
 // 0x27fcd9d1
@@ -255,8 +251,6 @@ error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 error TxnBodyGasLimitNotEnoughGas();
 // 0x47b3b145
 error ValidateTxnNotEnoughGas();
-// 0x08753982
-error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
 // 0xc1d9246c
 error SharedBridgeBalanceMismatch();
 // 0x3a1a8589
