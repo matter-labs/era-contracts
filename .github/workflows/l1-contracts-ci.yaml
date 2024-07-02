@@ -3,6 +3,11 @@ name: L1 contracts CI
 on:
   pull_request:
 
+# We need this permissions for this CI to work with external contributions
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
