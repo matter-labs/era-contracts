@@ -4,12 +4,16 @@ pragma solidity 0.8.24;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS} from "contracts/common/Config.sol";
 import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransactionFiltererTrue.sol";
 import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
 
-contract BridgehubRequestL2TransactionTest is MailboxTest {
-    function test_successWithoutFilterer() public {
+contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
+    function setUp() public virtual {
+        setupDiamondProxy();
+    }
+
+    function test_success_withoutFilterer() public {
         address bridgehub = makeAddr("bridgehub");
 
         utilsFacet.util_setBridgehub(bridgehub);
@@ -24,7 +28,7 @@ contract BridgehubRequestL2TransactionTest is MailboxTest {
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
     }
 
-    function test_successWithFilterer() public {
+    function test_success_withFilterer() public {
         address bridgehub = makeAddr("bridgehub");
         TransactionFiltererTrue tf = new TransactionFiltererTrue();
 
@@ -55,6 +59,16 @@ contract BridgehubRequestL2TransactionTest is MailboxTest {
         vm.deal(bridgehub, 100 ether);
         vm.prank(address(bridgehub));
         vm.expectRevert(bytes("tf"));
+        mailboxFacet.bridgehubRequestL2Transaction(req);
+    }
+
+    function test_revertWhen_notBridgehub() public {
+        address bridgehub = makeAddr("bridgehub");
+        utilsFacet.util_setBridgehub(bridgehub);
+        BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
+        vm.deal(bridgehub, 100 ether);
+        vm.prank(address(sender));
+        vm.expectRevert("Hyperchain: not bridgehub");
         mailboxFacet.bridgehubRequestL2Transaction(req);
     }
 
