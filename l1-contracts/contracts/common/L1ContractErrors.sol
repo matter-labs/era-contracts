@@ -37,8 +37,8 @@ error DepositDoesNotExist();
 error InsufficientFunds();
 // 0x79cacff1
 error DepositFailed();
-// 0xfc1a3c3a
-error ShareadBridgeValueNotSet(SharedBridgeKey);
+// 0x7774d2f9
+error SharedBridgeValueNotSet(SharedBridgeKey);
 // 0x750b219c
 error WithdrawFailed();
 // 0x16509b9a

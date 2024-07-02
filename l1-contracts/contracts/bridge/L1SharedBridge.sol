@@ -22,7 +22,7 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
-import {Unauthorized, ZeroAddress, SharedBridgeValueAlreadySet, SharedBridgeKey, NoFundsTransferred, ZeroBalance, ValueMismatch, NonEmptyMsgValue, L2BridgeNotSet, TokenNotSupported, WithdrawIncorrectAmount, EmptyDeposit, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, InsufficientChainBalance, WithdrawalFailed, ShareadBridgeValueNotSet, WithdrawalAlreadyFinalized, WithdrawalFailed, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeBalanceMismatch} from "../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress, SharedBridgeValueAlreadySet, SharedBridgeKey, NoFundsTransferred, ZeroBalance, ValueMismatch, NonEmptyMsgValue, L2BridgeNotSet, TokenNotSupported, WithdrawIncorrectAmount, EmptyDeposit, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, InsufficientChainBalance, WithdrawalFailed, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, WithdrawalFailed, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeBalanceMismatch} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -527,7 +527,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @return Whether withdrawal was initiated on zkSync Era before diamond proxy upgrade.
     function _isEraLegacyEthWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
         if ((_chainId == ERA_CHAIN_ID) && eraPostDiamondUpgradeFirstBatch == 0) {
-            revert ShareadBridgeValueNotSet(SharedBridgeKey.PostUpgradeFirstBatch);
+            revert SharedBridgeValueNotSet(SharedBridgeKey.PostUpgradeFirstBatch);
         }
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostDiamondUpgradeFirstBatch);
     }
@@ -538,7 +538,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @return Whether withdrawal was initiated on zkSync Era before Legacy Bridge upgrade.
     function _isEraLegacyTokenWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
         if ((_chainId == ERA_CHAIN_ID) && eraPostLegacyBridgeUpgradeFirstBatch == 0) {
-            revert ShareadBridgeValueNotSet(SharedBridgeKey.LegacyBridgeFirstBatch);
+            revert SharedBridgeValueNotSet(SharedBridgeKey.LegacyBridgeFirstBatch);
         }
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostLegacyBridgeUpgradeFirstBatch);
     }
@@ -554,7 +554,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _l2TxNumberInBatch
     ) internal view returns (bool) {
         if ((_chainId == ERA_CHAIN_ID) && (eraLegacyBridgeLastDepositBatch == 0)) {
-            revert ShareadBridgeValueNotSet(SharedBridgeKey.LegacyBridgeLastDepositBatch);
+            revert SharedBridgeValueNotSet(SharedBridgeKey.LegacyBridgeLastDepositBatch);
         }
         return
             (_chainId == ERA_CHAIN_ID) &&
