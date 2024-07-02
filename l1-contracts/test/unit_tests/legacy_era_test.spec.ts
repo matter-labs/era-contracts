@@ -28,6 +28,8 @@ import {
   L2_TO_L1_MESSENGER,
   getCallRevertReason,
   requestExecuteDirect,
+  DUMMY_MERKLE_PROOF_START,
+  DUMMY_MERKLE_PROOF_2_START,
 } from "./utils";
 
 // This test is mimicking the legacy Era functions. Era's Address was known at the upgrade, so we hardcoded them in the contracts,
@@ -53,6 +55,8 @@ describe("Legacy Era tests", function () {
   let proxyAsMockExecutor: MockExecutorFacet;
   const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
   const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
+  const dummyProof = Array(9).fill(ethers.constants.HashZero);
+  dummyProof[0] = DUMMY_MERKLE_PROOF_START;
 
   before(async () => {
     [owner, randomSigner] = await hardhat.ethers.getSigners();
@@ -123,6 +127,13 @@ describe("Legacy Era tests", function () {
       mockExecutorContract.signer
     );
 
+    await (
+      await proxyAsMockExecutor.saveL2LogsRootHash(
+        1,
+        "0x0000000000000000000000000000000000000000000000000000000000000001"
+      )
+    ).wait();
+
     const txExecute = await proxyAsMockExecutor.setExecutedBatches(1);
     await txExecute.wait();
 
@@ -176,23 +187,14 @@ describe("Legacy Era tests", function () {
 
   it("Should revert on finalizing a withdrawal with wrong batch number", async () => {
     const revertReason = await getCallRevertReason(
-      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(10, 0, 0, l2ToL1message, [])
+      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(10, 0, 0, l2ToL1message, dummyProof)
     );
-    expect(revertReason).equal("xx");
-  });
-
-  it("Should revert on finalizing a withdrawal with wrong length of proof", async () => {
-    const revertReason = await getCallRevertReason(
-      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(1, 0, 0, l2ToL1message, [])
-    );
-    expect(revertReason).equal("xc");
+    expect(revertReason).equal("local root is 0");
   });
 
   it("Should revert on finalizing a withdrawal with wrong proof", async () => {
     const revertReason = await getCallRevertReason(
-      l1ERC20Bridge
-        .connect(randomSigner)
-        .finalizeWithdrawal(1, 0, 0, l2ToL1message, Array(9).fill(ethers.constants.HashZero))
+      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(1, 0, 0, l2ToL1message, dummyProof)
     );
     expect(revertReason).equal("ShB withd w proof");
   });
@@ -236,6 +238,7 @@ describe("Legacy Era tests", function () {
     );
 
     const MERKLE_PROOF = [
+      DUMMY_MERKLE_PROOF_2_START,
       "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba",
       "0xc3d03eebfd83049991ea3d3e358b6712e7aa2e2e63dc2d4b438987cec28ac8d0",
       "0xe3697c7f33c31a9b0f0aeb8542287d0d21e8c4cf82163d0c44c7a98aa11aa111",
@@ -248,7 +251,7 @@ describe("Legacy Era tests", function () {
     ];
 
     let L2_LOGS_TREE_ROOT = HASHED_LOG;
-    for (let i = 0; i < MERKLE_PROOF.length; i++) {
+    for (let i = 1; i < MERKLE_PROOF.length; i++) {
       L2_LOGS_TREE_ROOT = ethers.utils.keccak256(L2_LOGS_TREE_ROOT + MERKLE_PROOF[i].slice(2));
     }
 
@@ -258,7 +261,7 @@ describe("Legacy Era tests", function () {
 
     it("Reverts when proof is invalid", async () => {
       const invalidProof = [...MERKLE_PROOF];
-      invalidProof[0] = "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43bb";
+      invalidProof[1] = "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43bb";
 
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
