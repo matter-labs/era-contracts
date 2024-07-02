@@ -591,6 +591,7 @@ library DeployL1Utils {
             abi.encode(config().l1ChainId, diamondCut)
         );
         console.logBytes(bytecode);
+        vm.expectRevert();
         address contractAddress = _mockDeployViaCreate22(bytecode);
         console.log("DiamondProxy deployed at:", contractAddress);
         addresses().stateTransition.diamondProxy = contractAddress;
@@ -848,11 +849,12 @@ library DeployL1Utils {
     }
 
     function _mockDeployViaCreate22(bytes memory _bytecode) public returns (address) {
-
         bytes32 _salt = config().contracts.create2FactorySalt;
         address _factory = addresses().create2Factory;
-        vm.mockCall(_factory, abi.encodePacked(_salt, _bytecode), returnData);
-        (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
+        bytes memory data = abi.encode(0x00a14b0623d015dda126cd99ea1a39d0ac25d6a80d);
+        bool success = true;
+        vm.mockCall(_factory, abi.encodePacked(_salt, _bytecode), data);
+        // (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
         address contractAddress = Utils.bytesToAddress(data);
         console.log("success", success);
         console.log("contract", contractAddress);

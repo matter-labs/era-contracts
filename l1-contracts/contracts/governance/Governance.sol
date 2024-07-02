@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IGovernance} from "./IGovernance.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -127,6 +128,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @param _operation The operation parameters will be executed with the upgrade.
     /// @param _delay The delay time (in seconds) after which the proposed upgrade can be executed by the owner.
     function scheduleTransparent(Operation calldata _operation, uint256 _delay) external onlyOwner {
+        console.log("6");
         bytes32 id = hashOperation(_operation);
         _schedule(id, _delay);
         emit TransparentOperationScheduled(id, _delay, _operation);
