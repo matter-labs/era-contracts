@@ -43,6 +43,9 @@ contract Governance is IGovernance, Ownable2Step {
         if (_admin == address(0)) {
             revert ZeroAddress();
         }
+        if (_securityCouncil == address(0)) {
+            revert ZeroAddress();
+        }
 
         _transferOwnership(_admin);
 
