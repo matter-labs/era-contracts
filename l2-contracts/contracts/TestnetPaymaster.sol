@@ -16,7 +16,7 @@ contract TestnetPaymaster is IPaymaster {
         bytes32,
         bytes32,
         Transaction calldata _transaction
-    ) external payable returns (bytes4 magic, bytes memory context) {
+    ) external payable returns (bytes4 magic, bytes memory) {
         // By default we consider the transaction as accepted.
         magic = PAYMASTER_VALIDATION_SUCCESS_MAGIC;
 
