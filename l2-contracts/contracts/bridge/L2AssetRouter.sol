@@ -5,16 +5,15 @@ pragma solidity 0.8.20;
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
-import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
+import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
+import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IL2AssetHandler} from "./interfaces/IL2AssetHandler.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
-import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {L2ContractHelper, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../L2ContractHelper.sol";
+import {L2ContractHelper, L2_NATIVE_TOKEN_VAULT} from "../L2ContractHelper.sol";
 
 import {EmptyAddress, InvalidCaller} from "../L2ContractErrors.sol";
 
@@ -22,7 +21,13 @@ import {EmptyAddress, InvalidCaller} from "../L2ContractErrors.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable {
+contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
+    /// @dev Chain ID of Era for legacy reasons
+    uint256 public immutable ERA_CHAIN_ID;
+
+    /// @dev Chain ID of L1 for bridging reasons
+    uint256 public immutable L1_CHAIN_ID;
+
     /// @dev The address of the L1 shared bridge counterpart.
     address public override l1SharedBridge;
 
@@ -39,15 +44,6 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @dev The address of the legacy L1 erc20 bridge counterpart.
     /// This is non-zero only on Era, and should not be renamed for backward compatibility with the SDKs.
     address public override l1Bridge;
-
-    /// @dev Chain ID of Era for legacy reasons.
-    uint256 public immutable ERA_CHAIN_ID;
-
-    /// @dev Chain ID of L1 for bridging reasons.
-    uint256 public immutable L1_CHAIN_ID;
-
-    /// @dev The contract responsible for handling tokens native to a single chain.
-    IL2NativeTokenVault public nativeTokenVault;
 
     /// @dev A mapping l2 token address => l1 token address.
     mapping(bytes32 assetId => address assetHandlerAddress) public override assetHandlerAddress;
@@ -66,30 +62,16 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
-    constructor(uint256 _eraChainId, uint256 _l1ChainId) {
-        ERA_CHAIN_ID = _eraChainId;
-        L1_CHAIN_ID = _l1ChainId;
-        _disableInitializers();
-    }
-
-    /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
     /// @param _l1SharedBridge The address of the L1 Bridge contract.
     /// @param _l1Bridge The address of the legacy L1 Bridge contract.
-    /// @param _assetHandler The address of the nativeTokenVault contract.
-    function initialize(
-        address _l1SharedBridge,
-        address _l1Bridge,
-        IL2NativeTokenVault _assetHandler
-    ) external reinitializer(3) {
+    constructor(uint256 _eraChainId, uint256 _l1ChainId, address _l1SharedBridge, address _l1Bridge) {
+        ERA_CHAIN_ID = _eraChainId;
+        L1_CHAIN_ID = _l1ChainId;
         if (_l1SharedBridge == address(0)) {
-            revert EmptyAddress();
-        }
-        if (address(_assetHandler) == address(0)) {
             revert EmptyAddress();
         }
 
         l1SharedBridge = _l1SharedBridge;
-        nativeTokenVault = _assetHandler;
         if (block.chainid == ERA_CHAIN_ID) {
             if (_l1Bridge == address(0)) {
                 revert EmptyAddress();
@@ -98,6 +80,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
                 l1Bridge = _l1Bridge;
             }
         }
+        _disableInitializers();
     }
 
     /// @notice Finalizes the deposit and mint funds.
@@ -108,8 +91,8 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         if (assetHandler != address(0)) {
             IL2AssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
         } else {
-            IL2AssetHandler(nativeTokenVault).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
-            assetHandlerAddress[_assetId] = address(nativeTokenVault);
+            L2_NATIVE_TOKEN_VAULT.bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
+            assetHandlerAddress[_assetId] = address(L2_NATIVE_TOKEN_VAULT);
         }
 
         emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, keccak256(_transferData));
@@ -145,7 +128,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         // note we use the IL1ERC20Bridge.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
         // and we use this interface so that when the switch happened the old messages could be processed
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IL1SharedBridge.finalizeWithdrawal.selector, _assetId, _l1bridgeMintData);
+        return abi.encodePacked(IL1AssetRouter.finalizeWithdrawal.selector, _assetId, _l1bridgeMintData);
     }
 
     /// @notice Sets the asset handler address for a given assetId.
@@ -175,7 +158,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         bytes calldata erc20Data
     ) external override {
         // onlyBridge {
-        bytes32 assetId = keccak256(abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _l1Token));
+        bytes32 assetId = keccak256(abi.encode(L1_CHAIN_ID, address(L2_NATIVE_TOKEN_VAULT), _l1Token));
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encode(_l1Sender, _amount, _l2Receiver, erc20Data, _l1Token);
         finalizeDeposit(assetId, data);
@@ -188,7 +171,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @param _amount The amount of the token transferred.
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
         bytes32 assetId = keccak256(
-            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, getL1TokenAddress(_l2Token))
+            abi.encode(L1_CHAIN_ID, address(L2_NATIVE_TOKEN_VAULT), getL1TokenAddress(_l2Token))
         );
         bytes memory data = abi.encode(_amount, _l1Receiver);
         withdraw(assetId, data);
@@ -205,6 +188,6 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @param _l1Token The address of token on L1.
     /// @return The address of token on L2.
     function l2TokenAddress(address _l1Token) public view returns (address) {
-        return nativeTokenVault.l2TokenAddress(_l1Token);
+        return L2_NATIVE_TOKEN_VAULT.l2TokenAddress(_l1Token);
     }
 }

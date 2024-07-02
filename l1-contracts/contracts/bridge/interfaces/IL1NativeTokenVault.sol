@@ -2,15 +2,15 @@
 
 pragma solidity 0.8.24;
 
-import {IL1SharedBridge} from "./IL1SharedBridge.sol";
+import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 
 /// @title L1 Native token vault contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The NTV is an Asset Handler for the L1SharedBridge to handle native tokens
+/// @notice The NTV is an Asset Handler for the L1AssetRouter to handle native tokens
 interface IL1NativeTokenVault {
-    /// @notice The L1SharedBridge contract
-    function L1_SHARED_BRIDGE() external view returns (IL1SharedBridge);
+    /// @notice The L1AssetRouter contract
+    function L1_SHARED_BRIDGE() external view returns (IL1AssetRouter);
 
     /// @notice The weth contract
     function L1_WETH_TOKEN() external view returns (address);

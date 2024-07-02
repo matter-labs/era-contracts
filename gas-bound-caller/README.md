@@ -20,12 +20,10 @@ If the call to the `_to` address succeeds, the `GasBoundCaller` will ensure that
 
 Summing up the information from the previous chapter, the `GasBoundCaller` should be used in the following way:
 
-TODO(EVM-585): switch `addr` with address.
-
 ```solidity
 uint256 computeGasBefore = gasleft();
 
-(bool success, bytes memory returnData) = address(this).call{gas: _gasToPass}(abi.encodeWithSelector(GasBoundCaller.gasBoundCall.selector, _to, _maxTotalGas, _data));
+(bool success, bytes memory returnData) = address(0xc706EC7dfA5D4Dc87f29f859094165E8290530f5).call{gas: _gasToPass}(abi.encodeWithSelector(GasBoundCaller.gasBoundCall.selector, _to, _maxTotalGas, _data));
 
 uint256 pubdataGasSpent;
 if (success) {
@@ -48,4 +46,4 @@ Since `GasBoundCaller` would be the contract that calls the `_to` contract, the 
 
 It should be deployed via a built-in CREATE2 factory on each individual chain.
 
-TODO(EVM-585)
+The current address on both sepolia testnet and mainnet for zkSync Era is `0xc706EC7dfA5D4Dc87f29f859094165E8290530f5`.

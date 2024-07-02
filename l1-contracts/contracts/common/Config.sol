@@ -106,10 +106,40 @@ address constant ETH_TOKEN_ADDRESS = address(1);
 
 bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
 
-/// @dev A virtual address, used in the assetId calculation for native assets.
-/// This is needed for automatic bridging, i.e. without deploying the AssetHandler contract,
-/// if the assetId can be calculated with this address then it is in fact an NTV asset
-address constant NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS = address(2);
-
 /// @dev https://eips.ethereum.org/EIPS/eip-1352
 address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint16).max));
+
+uint256 constant MAX_NUMBER_OF_HYPERCHAINS = 100;
+
+/// FIXME: move to a different file
+
+struct StoredBatchHashInfo {
+    uint256 number;
+    bytes32 hash;
+}
+
+struct PriorityTreeCommitment {
+    uint256 nextLeafIndex;
+    uint256 startIndex;
+    uint256 unprocessedIndex;
+    bytes32[] sides;
+}
+
+// Info that allows to restore a chain.
+struct HyperchainCommitment {
+    /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch
+    /// (batch 0 is genesis)
+    uint256 totalBatchesExecuted;
+    /// @notice Total number of proved batches i.e. batches[totalBatchesProved] points at the latest proved batch
+    uint256 totalBatchesVerified;
+    /// @notice Total number of committed batches i.e. batches[totalBatchesCommitted] points at the latest committed
+    /// batch
+    uint256 totalBatchesCommitted;
+    /// @notice
+    bytes32 l2SystemContractsUpgradeTxHash;
+    /// @notice
+    uint256 l2SystemContractsUpgradeBatchNumber;
+    bytes32[] batchHashes;
+    /// @notice Commitment to the priority merkle tree
+    PriorityTreeCommitment priorityTree;
+}

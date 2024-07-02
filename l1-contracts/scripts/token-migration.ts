@@ -197,7 +197,7 @@ async function prepareGovernanceTokenMigrationCall(
   delay: number
 ) {
   const governanceAbi = new ethers.utils.Interface((await hardhat.artifacts.readArtifact("IGovernance")).abi);
-  const sharedBridgeAbi = new ethers.utils.Interface((await hardhat.artifacts.readArtifact("L1SharedBridge")).abi);
+  const sharedBridgeAbi = new ethers.utils.Interface((await hardhat.artifacts.readArtifact("L1AssetRouter")).abi);
   const calls = tokens.map((token) => {
     const target = token == utils.ETH_ADDRESS_IN_CONTRACTS ? eraChainAddress : l1LegacyBridgeAddr;
 

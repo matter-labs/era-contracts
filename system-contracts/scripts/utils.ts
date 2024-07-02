@@ -17,6 +17,8 @@ import { spawn as _spawn } from "child_process";
 import { createHash } from "crypto";
 import { CompilerDownloader } from "hardhat/internal/solidity/compiler/downloader";
 
+export type HttpMethod = "POST" | "GET";
+
 export interface Dependency {
   name: string;
   bytecodes: BytesLike[];

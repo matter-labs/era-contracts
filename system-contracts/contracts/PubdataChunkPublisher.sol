@@ -3,8 +3,7 @@ pragma solidity 0.8.20;
 
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
-import {L1_MESSENGER_CONTRACT, BLOB_SIZE_BYTES, MAX_NUMBER_OF_BLOBS, SystemLogKey} from "./Constants.sol";
-import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
+import {BLOB_SIZE_BYTES, MAX_NUMBER_OF_BLOBS} from "./Constants.sol";
 import {TooMuchPubdata} from "./SystemContractErrors.sol";
 
 /**
@@ -16,17 +15,19 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
     /// @notice Chunks pubdata into pieces that can fit into blobs.
     /// @param _pubdata The total l2 to l1 pubdata that will be sent via L1 blobs.
     /// @dev Note: This is an early implementation, in the future we plan to support up to 16 blobs per l1 batch.
-    /// @dev We always publish 6 system logs even if our pubdata fits into a single blob. This makes processing logs on L1 easier.
-    function chunkAndPublishPubdata(bytes calldata _pubdata) external onlyCallFrom(address(L1_MESSENGER_CONTRACT)) {
+    function chunkPubdataToBlobs(bytes calldata _pubdata) external pure returns (bytes32[] memory blobLinearHashes) {
         if (_pubdata.length > BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS) {
             revert TooMuchPubdata(BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS, _pubdata.length);
         }
 
-        bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
+        // `+BLOB_SIZE_BYTES-1` is used to round up the division.
+        uint256 blobCount = (_pubdata.length + BLOB_SIZE_BYTES - 1) / BLOB_SIZE_BYTES;
 
-        // We allocate to the full size of MAX_NUMBER_OF_BLOBS * BLOB_SIZE_BYTES because we need to pad
+        blobLinearHashes = new bytes32[](blobCount);
+
+        // We allocate to the full size of blobLinearHashes * BLOB_SIZE_BYTES because we need to pad
         // the data on the right with 0s if it doesn't take up the full blob
-        bytes memory totalBlobs = new bytes(BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS);
+        bytes memory totalBlobs = new bytes(BLOB_SIZE_BYTES * blobCount);
 
         assembly {
             // The pointer to the allocated memory above. We skip 32 bytes to avoid overwriting the length.
@@ -34,7 +35,7 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
             calldatacopy(ptr, _pubdata.offset, _pubdata.length)
         }
 
-        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; ++i) {
+        for (uint256 i = 0; i < blobCount; ++i) {
             uint256 start = BLOB_SIZE_BYTES * i;
 
             // We break if the pubdata isn't enough to cover all 6 blobs. On L1 it is expected that the hash
@@ -50,15 +51,7 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
                 blobHash := keccak256(add(ptr, start), BLOB_SIZE_BYTES)
             }
 
-            blobHashes[i] = blobHash;
-        }
-
-        for (uint8 i = 0; i < MAX_NUMBER_OF_BLOBS; ++i) {
-            SystemContractHelper.toL1(
-                true,
-                bytes32(uint256(SystemLogKey(i + uint256(SystemLogKey.BLOB_ONE_HASH_KEY)))),
-                blobHashes[i]
-            );
+            blobLinearHashes[i] = blobHash;
         }
     }
 }
