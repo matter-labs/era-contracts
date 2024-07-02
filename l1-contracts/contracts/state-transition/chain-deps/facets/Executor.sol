@@ -334,6 +334,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) internal {
+        // Disabling solhint bc calldata array length is cheap
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
             _lastCommittedBatchData = _commitOneBatch(_lastCommittedBatchData, _newBatchesData[i], bytes32(0));
