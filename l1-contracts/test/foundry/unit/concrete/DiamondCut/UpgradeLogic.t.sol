@@ -14,6 +14,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
     DiamondProxy private diamondProxy;
@@ -45,6 +46,7 @@ contract UpgradeLogicTest is DiamondCutTest {
         admin = makeAddr("admin");
         stateTransitionManager = address(new DummyStateTransitionManager());
         randomSigner = makeAddr("randomSigner");
+        DummyBridgehub dummyBridgehub = new DummyBridgehub();
 
         diamondCutTestContract = new DiamondCutTestContract();
         diamondInit = new DiamondInit();
@@ -74,7 +76,7 @@ contract UpgradeLogicTest is DiamondCutTest {
         InitializeData memory params = InitializeData({
             // TODO REVIEW
             chainId: 1,
-            bridgehub: makeAddr("bridgehub"),
+            bridgehub: address(dummyBridgehub),
             stateTransitionManager: stateTransitionManager,
             protocolVersion: 0,
             admin: admin,

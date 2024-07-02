@@ -6,8 +6,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {IL1NativeTokenVault} from "../../bridge/L1NativeTokenVault.sol";
+import {NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../../common/Config.sol";
 
 contract DummySharedBridge {
+    IL1NativeTokenVault public nativeTokenVault;
+
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,
         address indexed from,
@@ -27,6 +31,11 @@ contract DummySharedBridge {
     address l1ReceiverReturnInFinalizeWithdrawal;
     address l1TokenReturnInFinalizeWithdrawal;
     uint256 amountReturnInFinalizeWithdrawal;
+
+    /// @dev A mapping assetId => assetHandlerAddress
+    /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset
+    /// @dev P.S. this liquidity was locked directly in SharedBridge before
+    mapping(bytes32 assetId => address assetHandlerAddress) public assetHandlerAddress;
 
     constructor(bytes32 _dummyL2DepositTxHash) {
         dummyL2DepositTxHash = _dummyL2DepositTxHash;
@@ -87,7 +96,7 @@ contract DummySharedBridge {
             // The Bridgehub also checks this, but we want to be sure
             require(msg.value == 0, "ShB m.v > 0 b d.it");
             uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
-            require(amount == _amount, "3T"); // The token has non-standard transfer logic
+            require(amount == _amount, "5T"); // The token has non-standard transfer logic
         }
 
         if (!hyperbridgingEnabled[_chainId]) {
@@ -127,4 +136,20 @@ contract DummySharedBridge {
     }
 
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {}
+
+    /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
+    function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external {
+        require(address(nativeTokenVault) == address(0), "ShB: legacy bridge already set");
+        require(address(_nativeTokenVault) != address(0), "ShB: legacy bridge 0");
+        nativeTokenVault = _nativeTokenVault;
+    }
+
+    /// @dev Used to set the assedAddress for a given assetId.
+    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external {
+        address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
+        bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData));
+        assetHandlerAddress[assetId] = _assetHandlerAddress;
+        // assetDeploymentTracker[assetId] = sender;
+        // emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _additionalData, sender);
+    }
 }

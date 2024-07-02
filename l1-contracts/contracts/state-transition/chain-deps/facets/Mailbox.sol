@@ -17,7 +17,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, ETH_TOKEN_ADDRESS, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 
 import {IL1SharedBridge} from "../../../bridge/interfaces/IL1SharedBridge.sol";
@@ -40,15 +40,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
     constructor(uint256 _eraChainId) {
         ERA_CHAIN_ID = _eraChainId;
-    }
-
-    /// @inheritdoc IMailbox
-    function transferEthToSharedBridge() external onlyBaseTokenBridge {
-        require(s.chainId == ERA_CHAIN_ID, "Mailbox: transferEthToSharedBridge only available for Era on mailbox");
-
-        uint256 amount = address(this).balance;
-        address baseTokenBridgeAddress = s.baseTokenBridge;
-        IL1SharedBridge(baseTokenBridgeAddress).receiveEth{value: amount}(ERA_CHAIN_ID);
     }
 
     /// @notice when requesting transactions through the bridgehub
@@ -230,8 +221,8 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         );
         IL1SharedBridge(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
+            s.baseTokenAssetId,
             msg.sender,
-            ETH_TOKEN_ADDRESS,
             msg.value
         );
     }

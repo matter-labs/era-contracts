@@ -4,35 +4,33 @@ pragma solidity 0.8.20;
 
 /// @author Matter Labs
 interface IL2SharedBridge {
-    event FinalizeDeposit(
-        address indexed l1Sender,
-        address indexed l2Receiver,
-        address indexed l2Token,
-        uint256 amount
-    );
+    event FinalizeDepositSharedBridge(uint256 chainId, bytes32 indexed assetId, bytes32 assetDataHash);
 
-    event WithdrawalInitiated(
+    event WithdrawalInitiatedSharedBridge(
+        uint256 chainId,
         address indexed l2Sender,
-        address indexed l1Receiver,
-        address indexed l2Token,
-        uint256 amount
+        bytes32 indexed assetId,
+        bytes32 assetDataHash
     );
 
-    function finalizeDeposit(
-        address _l1Sender,
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        bytes calldata _data
-    ) external;
+    event AssetHandlerRegisteredInitial(
+        bytes32 indexed assetId,
+        address indexed _assetAddress,
+        bytes32 indexed additionalData,
+        address sender
+    );
 
-    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external;
+    event AssetHandlerRegistered(bytes32 indexed assetId, address indexed _assetAddress);
 
-    function l1TokenAddress(address _l2Token) external view returns (address);
+    function finalizeDeposit(bytes32 _assetId, bytes calldata _data) external;
 
-    function l2TokenAddress(address _l1Token) external view returns (address);
+    function withdraw(bytes32 _assetId, bytes calldata _data) external;
 
     function l1Bridge() external view returns (address);
 
+    function assetHandlerAddress(bytes32 _assetId) external view returns (address);
+
     function l1SharedBridge() external view returns (address);
+
+    function l1TokenAddress(address _l2Token) external view returns (address);
 }

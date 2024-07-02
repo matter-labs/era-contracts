@@ -16,6 +16,7 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -319,11 +320,13 @@ library Utils {
             });
     }
 
-    function makeInitializeData(address testnetVerifier) public pure returns (InitializeData memory) {
+    function makeInitializeData(address testnetVerifier) public returns (InitializeData memory) {
+        DummyBridgehub dummyBridgehub = new DummyBridgehub();
+
         return
             InitializeData({
                 chainId: 1,
-                bridgehub: address(0x876543567890),
+                bridgehub: address(dummyBridgehub),
                 stateTransitionManager: address(0x1234567890876543567890),
                 protocolVersion: 0,
                 admin: address(0x32149872498357874258787),

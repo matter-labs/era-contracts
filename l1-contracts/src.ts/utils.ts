@@ -179,6 +179,12 @@ export interface L2CanonicalTransaction {
   reservedDynamic: BytesLike;
 }
 
+const LOCAL_NETWORKS = ["localhost", "hardhat", "localhostL2"];
+
+export function isCurrentNetworkLocal(): boolean {
+  return LOCAL_NETWORKS.includes(process.env.CHAIN_ETH_NETWORK);
+}
+
 // Checks that the initial cut hash params are valid.
 // Sometimes it makes sense to allow dummy values for testing purposes, but in production
 // these values should be set correctly.
