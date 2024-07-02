@@ -57,6 +57,7 @@ contract Compressor is ICompressor, ISystemContract {
                 revert DictionaryLengthNotFourTimesSmallerThanEncoded();
             }
 
+            // We disable this check because calldata array length is cheap.
             // solhint-disable-next-line gas-length-in-loops
             for (uint256 encodedDataPointer = 0; encodedDataPointer < encodedData.length; encodedDataPointer += 2) {
                 uint256 indexOfEncodedChunk = uint256(encodedData.readUint16(encodedDataPointer)) * 8;

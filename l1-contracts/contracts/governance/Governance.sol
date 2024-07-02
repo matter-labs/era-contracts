@@ -246,6 +246,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @dev Execute an operation's calls.
     /// @param _calls The array of calls to be executed.
     function _execute(Call[] calldata _calls) internal {
+        // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _calls.length; ++i) {
             // slither-disable-next-line arbitrary-send-eth

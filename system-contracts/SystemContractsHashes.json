@@ -24,8 +24,8 @@
     "contractName": "Compressor",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/Compressor.sol/Compressor.json",
     "sourceCodePath": "contracts-preprocessed/Compressor.sol",
-    "bytecodeHash": "0x010001495ad07263318ef892ad2e8a59d4749e3b4359d5259ad72f16776ff4de",
-    "sourceCodeHash": "0xc2ead35998e9c2e848a3f395a31b9ed47cbd687960337303d0863d217d4e5a43"
+    "bytecodeHash": "0x0100014998f41c23eba57975402718a813e531498bcd8775a9de1ce590dcbaf3",
+    "sourceCodeHash": "0xfc54971fe4b80ed6dd32853ce65cdc65850bb19fe6259a05cdb84c54aeb25349"
   },
   {
     "contractName": "ContractDeployer",
