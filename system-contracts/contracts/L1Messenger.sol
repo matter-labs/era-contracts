@@ -209,7 +209,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         calldataPtr += 4;
 
         bytes32[] memory l2ToL1LogsTreeArray = new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES);
-        bytes32 reconstructedChainedLogsHash;
+        bytes32 reconstructedChainedLogsHash = bytes32(0);
         for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
             bytes32 hashedLog = EfficientCall.keccak(
                 _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + L2_TO_L1_LOG_SERIALIZE_SIZE]
@@ -238,7 +238,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         /// Check messages
         uint32 numberOfMessages = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
         calldataPtr += 4;
-        bytes32 reconstructedChainedMessagesHash;
+        bytes32 reconstructedChainedMessagesHash = bytes32(0);
         for (uint256 i = 0; i < numberOfMessages; ++i) {
             uint32 currentMessageLength = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
             calldataPtr += 4;
@@ -255,7 +255,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         /// Check bytecodes
         uint32 numberOfBytecodes = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
         calldataPtr += 4;
-        bytes32 reconstructedChainedL1BytecodesRevealDataHash;
+        bytes32 reconstructedChainedL1BytecodesRevealDataHash = bytes32(0);
         for (uint256 i = 0; i < numberOfBytecodes; ++i) {
             uint32 currentBytecodeLength = uint32(
                 bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4])

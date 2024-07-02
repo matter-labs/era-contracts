@@ -174,7 +174,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         // Used as bitmap to set/check log processing happens exactly once.
         // See SystemLogKey enum in Constants.sol for ordering.
-        uint256 processedLogs;
+        uint256 processedLogs = 0;
 
         // linear traversal of the logs
         uint256 logsLength = emittedL2Logs.length;
