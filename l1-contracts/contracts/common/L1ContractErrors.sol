@@ -187,12 +187,6 @@ error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 error NotEnoughGas();
 // 0x5cb29523
 error InvalidTxType(uint256 txType);
-// 0x07218375
-error UnexpectedNumberOfFactoryDeps();
-// 0x101ba748
-error PreviousUpgradeNotFinalized(bytes32 txHash);
-// 0xa0f47245
-error PreviousUpgradeNotCleaned();
 // 0x826fb11e
 error InsufficientChainBalance();
 // 0x27fcd9d1
@@ -263,26 +257,6 @@ error TxnBodyGasLimitNotEnoughGas();
 error ValidateTxnNotEnoughGas();
 // 0x08753982
 error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
-// 0xd7f50a9d
-error PatchCantSetUpgradeTxn();
-// 0xd2c011d6
-error L2UpgradeNonceNotEqualToNewProtocolVersion(uint256 nonce, uint256 protocolVersion);
-// 0xcb5e4247
-error L2BytecodeHashMismatch(bytes32 expected, bytes32 provided);
-// 0x88d7b498
-error ProtocolVersionTooSmall();
-// 0x56d45b12
-error ProtocolVersionTooBig();
-// 0x5c598b60
-error PreviousProtocolMajorVersionNotZero();
-// 0x72ea85ad
-error NewProtocolMajorVersionNotZero();
-// 0xd328c12a
-error ProtocolVersionMinorDeltaTooBig(uint256 limit, uint256 proposed);
-// 0x559cc34e
-error PatchUpgradeCantSetDefaultAccount();
-// 0x962fd7d0
-error PatchUpgradeCantSetBootloader();
 // 0xc1d9246c
 error SharedBridgeBalanceMismatch();
 // 0x3a1a8589

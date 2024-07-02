@@ -60,7 +60,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
             // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
             // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
             if (s.l2SystemContractsUpgradeTxHash != bytes32(0)) {
-                revert PreviousUpgradeNotFinalized();
+                revert PreviousUpgradeNotFinalized(s.l2SystemContractsUpgradeTxHash);
             }
             if (s.l2SystemContractsUpgradeBatchNumber != 0) {
                 revert PreviousUpgradeBatchNotCleared();
