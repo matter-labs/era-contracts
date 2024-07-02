@@ -1216,13 +1216,6 @@ function genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, 
         revertWithGas(evmGasLeftOld)
     }
 
-    let nonceNewAddr := getNonce(addr)
-    let bytecodeNewAddr := extcodesize(addr)
-    if or(gt(nonceNewAddr, 0), gt(bytecodeNewAddr, 0)) {
-        incrementNonce(address())
-        revertWithGas(evmGasLeftOld)
-    }
-
     offset := add(MEM_OFFSET_INNER(), offset)
 
     sp := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeft)
