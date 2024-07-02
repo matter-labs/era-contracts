@@ -63,10 +63,10 @@ error AddressTooLow(address);
 error SlotOccupied();
 // 0x43e266b0
 error MalformedBytecode(BytecodeError);
-// 0x72afcbf4
-error OperationShouldBeReady();
-// 0xee454a75
-error OperationShouldBePending();
+// 0xe1c1ff37
+error OperationMustBeReady();
+// 0xeda2fbb1
+error OperationMustBePending();
 // 0x1a21feed
 error OperationExists();
 // 0x4fbe5dba
@@ -83,8 +83,8 @@ error TooMuchGas();
 error MalformedCalldata();
 // 0x79e12cc3
 error FacetIsFrozen(bytes4 func);
-// 0x2a4a14df
-error PubdataPerBatchIsLessThanTxn();
+// 0x1a4d284a
+error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 // 0x6f1cf752
 error InvalidPubdataPricingMode();
 // 0xaa7feadc
@@ -125,10 +125,10 @@ error NonSequentialBatch();
 error CantExecuteUnprovenBatches();
 // 0xd8e9405c
 error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 numHashes);
-// 0x2dbdba00
-error VerifyProofCommittedVerifiedMismatch();
-// 0xdab52f4b
-error RevertedBatchBeforeNewBatch();
+// 0xe1022469
+error VerifiedBatchesExceedsCommittedBatches();
+// 0x9a67c1cb
+error RevertedBatchNotAfterNewLastBatch();
 // 0xe18cb383
 error CantRevertExecutedBatch();
 // 0x4daa985d

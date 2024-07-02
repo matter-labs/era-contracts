@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {PubdataPricingMode, FeeParams} from "../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {PubdataPerBatchIsLessThanTxn} from "../common/L1ContractErrors.sol";
+import {PriorityTxPubdataExceedsMaxPubDataPerBatch} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -26,7 +26,7 @@ contract Upgrade_v1_4_1 is BaseZkSyncUpgrade {
         // Double checking that the new fee params are valid, i.e.
         // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
         if (_newFeeParams.maxPubdataPerBatch < _newFeeParams.priorityTxMaxPubdata) {
-            revert PubdataPerBatchIsLessThanTxn();
+            revert PriorityTxPubdataExceedsMaxPubDataPerBatch();
         }
 
         FeeParams memory oldFeeParams = s.feeParams;
