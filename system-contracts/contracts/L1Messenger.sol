@@ -289,9 +289,10 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         bytes32 localLogsRootHash = l2ToL1LogsTreeArray[0];
 
         bytes32 aggregatedRootHash = L2_MESSAGE_ROOT.getAggregatedRoot();
+        bytes32 fullRootHash = keccak256(bytes.concat(localLogsRootHash, aggregatedRootHash));
 
-        if (inputChainedLogsRootHash != l2ToL1LogsTreeRoot) {
-            revert ReconstructionMismatch(PubdataField.InputLogsRootHash, l2ToL1LogsTreeRoot, inputChainedLogsRootHash);
+        if (inputChainedLogsRootHash != localLogsRootHash) {
+            revert ReconstructionMismatch(PubdataField.InputLogsRootHash, localLogsRootHash, inputChainedLogsRootHash);
         }
 
         bytes memory returnData = EfficientCall.call({

@@ -508,7 +508,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(stm != address(0), "BH: assetInfo 2");
         require(settlementLayer[_chainId] != block.chainid, "BH: already current SL");
 
-
         settlementLayer[_chainId] = block.chainid;
         stateTransitionManager[_chainId] = stm;
         address hyperchain = getHyperchain(_chainId);
