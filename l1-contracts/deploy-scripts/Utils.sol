@@ -5,11 +5,12 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
-import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {IGovernance} from "../contracts/governance/IGovernance.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import "forge-std/console.sol";
 
 library Utils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
@@ -144,6 +145,7 @@ library Utils {
      * @dev Deploys contract using CREATE2.
      */
     function deployViaCreate2(bytes memory _bytecode, bytes32 _salt, address _factory) internal returns (address) {
+        console.log("Sender", msg.sender);
         if (_bytecode.length == 0) {
             revert("Bytecode is not set");
         }
@@ -154,7 +156,10 @@ library Utils {
 
         vm.broadcast();
         (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
+        console.log("Data");
+        console.logBytes(data);
         contractAddress = bytesToAddress(data);
+        console.log("Contract", contractAddress);
 
         if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
             revert("Failed to deploy contract via create2");
@@ -297,21 +302,25 @@ library Utils {
         uint256 _delay
     ) internal {
         IGovernance governance = IGovernance(_governor);
-
+        console.log("3");
         IGovernance.Call[] memory calls = new IGovernance.Call[](1);
         calls[0] = IGovernance.Call({target: _target, value: _value, data: _data});
-
+        console.log(_target);
+        console.log(_value);
+        console.log(_delay);
         IGovernance.Operation memory operation = IGovernance.Operation({
             calls: calls,
             predecessor: bytes32(0),
             salt: _salt
         });
-
-        vm.startBroadcast();
+        console.log("5");
+        vm.startBroadcast(msg.sender);
         governance.scheduleTransparent(operation, _delay);
+        console.log("6");
         if (_delay == 0) {
             governance.execute{value: _value}(operation);
         }
         vm.stopBroadcast();
+
     }
 }
