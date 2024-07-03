@@ -32,8 +32,17 @@ contract ValidatorRegistry {
         bytes pubKey;
     }
 
+    error UnauthorizedOnlyOwner();
+    error NodeOwnerAlreadyExists();
+    error NodeOwnerNotFound();
+    error PubKeyAlreadyExists();
+    error ValidatorDoesNotExist();
+    error ValidatorIsActive();
+
     modifier onlyOwner() {
-        require(msg.sender == owner, "Unauthorized: onlyOwner");
+        if (msg.sender != owner) {
+            revert UnauthorizedOnlyOwner();
+        }
         _;
     }
 
@@ -52,8 +61,12 @@ contract ValidatorRegistry {
         // Check if a validator with the same node owner or public key already exists.
         uint256 len = validatorOwners.length;
         for (uint256 i = 0; i < len; ++i) {
-            require(validatorOwners[i] != nodeOwner, "nodeOwner already exists");
-            require(!compareBytes(validators[validatorOwners[i]].pubKey, pubKey), "pubKey already exists");
+            if (validatorOwners[i] == nodeOwner) {
+                revert NodeOwnerAlreadyExists();
+            }
+            if (compareBytes(validators[validatorOwners[i]].pubKey, pubKey)) {
+                revert PubKeyAlreadyExists();
+            }
         }
 
         validators[nodeOwner] = Validator(weight, pubKey, pop, false);
@@ -64,7 +77,9 @@ contract ValidatorRegistry {
     // the inactivity delay has not passed.
     function remove(address nodeOwner) public onlyOwner {
         verifyExists(nodeOwner);
-        require(validators[nodeOwner].isInactive, "Validator is still active");
+        if (!validators[nodeOwner].isInactive) {
+            revert ValidatorIsActive();
+        }
 
         // Remove from mapping.
         delete validators[nodeOwner];
@@ -124,12 +139,14 @@ contract ValidatorRegistry {
                 return i;
             }
         }
-        revert("nodeOwner not found");
+        revert NodeOwnerNotFound();
     }
 
     // Verifies that a validator exists.
     function verifyExists(address nodeOwner) private view {
-        require(validators[nodeOwner].pubKey.length != 0, "Validator doesn't exist");
+        if (validators[nodeOwner].pubKey.length == 0) {
+            revert ValidatorDoesNotExist();
+        }
     }
 
     function compareBytes(bytes storage a, bytes calldata b) private pure returns (bool) {

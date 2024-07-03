@@ -13,13 +13,20 @@ contract ConsensusAuthority {
     // The attester registry instance.
     AttesterRegistry public attesterRegistry;
 
+    error UnauthorizedOnlyOwner();
+    error UnauthorizedOnlyOwnerOrNodeOwner();
+
     modifier onlyOwner() {
-        require(msg.sender == owner, "Unauthorized: onlyOwner");
+        if (msg.sender != owner) {
+            revert UnauthorizedOnlyOwner();
+        }
         _;
     }
 
     modifier onlyOwnerOrNodeOwner(address nodeOwner) {
-        require(msg.sender == owner || msg.sender == nodeOwner, "Unauthorized: onlyOwnerOrNodeOwner");
+        if (msg.sender != owner && msg.sender != nodeOwner) {
+            revert UnauthorizedOnlyOwnerOrNodeOwner();
+        }
         _;
     }
 

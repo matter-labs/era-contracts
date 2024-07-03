@@ -34,8 +34,17 @@ contract AttesterRegistry {
         bytes pubKey;
     }
 
+    error UnauthorizedOnlyOwner();
+    error NodeOwnerAlreadyExists();
+    error NodeOwnerNotFound();
+    error PubKeyAlreadyExists();
+    error AttesterDoesNotExist();
+    error AttesterIsActive();
+
     modifier onlyOwner() {
-        require(msg.sender == owner, "Unauthorized: onlyOwner");
+        if (msg.sender != owner) {
+            revert UnauthorizedOnlyOwner();
+        }
         _;
     }
 
@@ -53,8 +62,12 @@ contract AttesterRegistry {
         // Check if an attester with the same node owner or public key already exists.
         uint256 len = attesterOwners.length;
         for (uint256 i = 0; i < len; ++i) {
-            require(attesterOwners[i] != nodeOwner, "nodeOwner already exists");
-            require(!compareBytes(attesters[attesterOwners[i]].pubKey, pubKey), "pubKey already exists");
+            if (attesterOwners[i] == nodeOwner) {
+                revert NodeOwnerAlreadyExists();
+            }
+            if (compareBytes(attesters[attesterOwners[i]].pubKey, pubKey)) {
+                revert PubKeyAlreadyExists();
+            }
         }
 
         attesters[nodeOwner] = Attester(weight, pubKey, false, 0);
@@ -65,7 +78,9 @@ contract AttesterRegistry {
     // the inactivity delay has not passed.
     function remove(address nodeOwner) external onlyOwner {
         verifyExists(nodeOwner);
-        require(attesters[nodeOwner].isInactive, "Attester is still active");
+        if (!attesters[nodeOwner].isInactive) {
+            revert AttesterIsActive();
+        }
 
         // Remove from mapping.
         delete attesters[nodeOwner];
@@ -120,11 +135,13 @@ contract AttesterRegistry {
                 return i;
             }
         }
-        revert("nodeOwner not found");
+        revert NodeOwnerNotFound();
     }
     // Verifies that an attester exists.
     function verifyExists(address nodeOwner) private view {
-        require(attesters[nodeOwner].pubKey.length != 0, "Attester doesn't exist");
+        if (attesters[nodeOwner].pubKey.length == 0) {
+            revert AttesterDoesNotExist();
+        }
     }
 
     function compareBytes(bytes storage a, bytes calldata b) private pure returns (bool) {
