@@ -22,9 +22,10 @@ import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../../common/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/interfaces/IL1AssetRouter.sol";
+import {IL1Nullifier, FinalizeWithdrawalParams} from "../../../bridge/interfaces/IL1Nullifier.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
@@ -440,14 +441,17 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
         require(s.chainId == ERA_CHAIN_ID, "Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
-        IL1AssetRouter(s.baseTokenBridge).finalizeWithdrawal({
-            _chainId: ERA_CHAIN_ID,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _message: _message,
-            _merkleProof: _merkleProof
-        });
+        IL1Nullifier(s.baseTokenBridge).finalizeWithdrawal(
+            FinalizeWithdrawalParams(
+                ERA_CHAIN_ID,
+                _l2BatchNumber,
+                _l2MessageIndex,
+                L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+                _l2TxNumberInBatch,
+                _message,
+                _merkleProof
+            )
+        );
     }
 
     ///  @inheritdoc IMailbox

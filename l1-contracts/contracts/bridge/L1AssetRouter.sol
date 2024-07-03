@@ -7,11 +7,9 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
 import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
@@ -19,16 +17,12 @@ import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 
-import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
-import {L2Message, TxStatus} from "../common/Messaging.sol";
-import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

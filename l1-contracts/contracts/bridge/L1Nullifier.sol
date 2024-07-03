@@ -15,8 +15,6 @@ import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {IL1Nullifier, FinalizeWithdrawalParams} from "./interfaces/IL1Nullifier.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
-import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
-import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
@@ -24,10 +22,10 @@ import {L2Message, TxStatus} from "../common/Messaging.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 
-import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
 
 /// @author Matter Labs
@@ -297,7 +295,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @notice Finalize the withdrawal and release funds.
     /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
     function finalizeWithdrawal(
-        FinalizeWithdrawalParams memory _finalizeWithdrawalParams
+        FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
     ) external override returns (address l1Receiver, bytes32 assetId, uint256 amount) {
         (l1Receiver, assetId, amount) = _finalizeWithdrawal(_finalizeWithdrawalParams);
     }
@@ -308,7 +306,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @return assetId The bridged asset ID.
     /// @return amount The amount of asset bridged.
     function _finalizeWithdrawal(
-        FinalizeWithdrawalParams memory _finalizeWithdrawalParams
+        FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
     ) internal nonReentrant whenNotPaused returns (address l1Receiver, bytes32 assetId, uint256 amount) {
         bytes memory transferData;
         (assetId, transferData) = _verifyAndGetWithdrawalData(_finalizeWithdrawalParams);
@@ -367,7 +365,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @return assetId The bridged asset ID.
     /// @return transferData The encoded transfer data.
     function _verifyAndGetWithdrawalData(
-        FinalizeWithdrawalParams memory _finalizeWithdrawalParams
+        FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
     ) internal nonReentrant whenNotPaused returns (bytes32 assetId, bytes memory transferData) {
         require(
             !isWithdrawalFinalized[_finalizeWithdrawalParams.chainId][_finalizeWithdrawalParams.l2BatchNumber][
@@ -397,7 +395,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @return assetId The ID of the bridged asset.
     /// @return transferData The transfer data used to finalize withdawal.
     function _checkWithdrawal(
-        FinalizeWithdrawalParams memory _finalizeWithdrawalParams
+        FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
     ) internal view returns (bytes32 assetId, bytes memory transferData) {
         (assetId, transferData) = _parseL2WithdrawalMessage(
             _finalizeWithdrawalParams.chainId,
@@ -666,7 +664,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge returns (address l1Receiver, address l1Asset, uint256 amount) {
         bytes32 assetId;
-        (l1Receiver, assetId, amount) = _finalizeWithdrawal(
+        (l1Receiver, assetId, amount) = this.finalizeWithdrawal(
             FinalizeWithdrawalParams(
                 ERA_CHAIN_ID,
                 _l2BatchNumber,

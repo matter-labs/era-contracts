@@ -4,7 +4,6 @@ pragma solidity 0.8.24;
 
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
 import {IL1Nullifier} from "./IL1Nullifier.sol";
 

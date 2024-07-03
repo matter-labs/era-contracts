@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.24;
 
-import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IL1Nullifier} from "./IL1Nullifier.sol";
 import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
 
