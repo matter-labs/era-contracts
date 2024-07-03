@@ -263,6 +263,10 @@ error GenesisIndexStorageZero();
 error GenesisBatchCommitmentZero();
 // 0xa2d4b16c
 error RemoveFunctionFacetAddressZero();
+// 0x76da24b9
+error TooManyFactoryDeps();
+// 0x08753982
+error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
