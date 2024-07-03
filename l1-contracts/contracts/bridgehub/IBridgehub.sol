@@ -142,7 +142,6 @@ interface IBridgehub is IL1AssetHandler {
 
     function setAddresses(
         address _sharedBridge,
-        address _l1Nullifier,
         ISTMDeploymentTracker _stmDeployer,
         IMessageRoot _messageRoot
     ) external;

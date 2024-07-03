@@ -3,7 +3,6 @@
 pragma solidity 0.8.24;
 
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
-import {IL1Nullifier} from "./IL1Nullifier.sol";
 
 /// @title L1 Native token vault contract interface
 /// @author Matter Labs
@@ -12,9 +11,6 @@ import {IL1Nullifier} from "./IL1Nullifier.sol";
 interface IL1NativeTokenVault {
     /// @notice The L1AssetRouter contract
     function L1_SHARED_BRIDGE() external view returns (IL1AssetRouter);
-
-    /// @notice The L1Nullifier contract
-    function L1_NULLIFIER() external view returns (IL1Nullifier);
 
     /// @notice The weth contract
     function L1_WETH_TOKEN() external view returns (address);

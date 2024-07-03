@@ -60,9 +60,12 @@ interface IL1AssetRouter {
 
     function finalizeWithdrawal(
         uint256 _chainId,
-        bytes32 _assetId,
-        bytes calldata _transferData
-    ) external returns (address l1Receiver, uint256 amount);
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external returns (address l1Receiver, bytes32 assetId, uint256 amount);
 
     function BRIDGE_HUB() external view returns (IBridgehub);
 
@@ -104,8 +107,9 @@ interface IL1AssetRouter {
 
     function setL1Nullifier(IL1Nullifier _l1Nullifier) external;
 
+    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
+
     function bridgeRecoverFailedTransfer(
-        bool _checkedInLegacyBridge,
         uint256 _chainId,
         address _depositSender,
         bytes32 _assetId,

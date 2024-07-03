@@ -3,7 +3,6 @@
 pragma solidity 0.8.24;
 
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
-import {IL1Nullifier} from "./IL1Nullifier.sol";
 import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
 
 /// @title L1 Bridge contract legacy interface
@@ -62,7 +61,7 @@ interface IL1ERC20Bridge {
 
     function l2TokenAddress(address _l1Token) external view returns (address);
 
-    function L1_NULLIFIER() external view returns (IL1Nullifier);
+    function SHARED_BRIDGE() external view returns (IL1AssetRouter);
 
     function NATIVE_TOKEN_VAULT() external view returns (IL1NativeTokenVault);
 

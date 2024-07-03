@@ -8,23 +8,6 @@ import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 
-/// @param chainId The chain ID of the transaction to check.
-/// @param l2BatchNumber The L2 batch number where the withdrawal was processed.
-/// @param l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-/// @param l2sender The address of the message sender on L2 (base token system contract address or asset handler)
-/// @param l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent.
-/// @param message The L2 withdraw data, stored in an L2 -> L1 message.
-/// @param merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization.
-struct FinalizeWithdrawalParams {
-    uint256 chainId;
-    uint256 l2BatchNumber;
-    uint256 l2MessageIndex;
-    address l2Sender;
-    uint16 l2TxNumberInBatch;
-    bytes message;
-    bytes32[] merkleProof;
-}
-
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -92,7 +75,6 @@ interface IL1Nullifier {
     ) external returns (address l1Receiver, address l1Token, uint256 amount);
 
     function bridgeVerifyFailedTransfer(
-        bool _checkedInLegacyBridge,
         uint256 _chainId,
         bytes32 _assetId,
         bytes memory _transferData,
@@ -103,9 +85,14 @@ interface IL1Nullifier {
         bytes32[] calldata _merkleProof
     ) external;
 
-    function finalizeWithdrawal(
-        FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
-    ) external returns (address l1Receiver, bytes32 assetId, uint256 amount);
+    function verifyAndGetWithdrawalData(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external returns (bytes32 assetId, bytes memory transferData);
 
     function L1_WETH_TOKEN() external view returns (address);
 
