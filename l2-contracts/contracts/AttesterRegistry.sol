@@ -51,7 +51,8 @@ contract AttesterRegistry {
         bytes calldata pubKey
     ) external onlyOwner {
         // Check if an attester with the same node owner or public key already exists.
-        for (uint256 i = 0; i < attesterOwners.length; i++) {
+        uint256 len = attesterOwners.length;
+        for (uint256 i = 0; i < len; ++i) {
             require(attesterOwners[i] != nodeOwner, "nodeOwner already exists");
             require(!compareBytes(attesters[attesterOwners[i]].pubKey, pubKey), "pubKey already exists");
         }
@@ -102,7 +103,8 @@ contract AttesterRegistry {
     function setCommittee() external onlyOwner {
         // Creates a new committee based on active attesters.
         delete committee;
-        for (uint256 i = 0; i < attesterOwners.length; i++) {
+        uint256 len = attesterOwners.length;
+        for (uint256 i = 0; i < len; ++i) {
             Attester memory attester = attesters[attesterOwners[i]];
             if (!attester.isInactive) {
                 committee.push(CommitteeAttester(attester.weight, attesterOwners[i], attester.pubKey));
@@ -112,7 +114,8 @@ contract AttesterRegistry {
 
     // Finds the index of a node owner in the `nodeOwners` array.
     function nodeOwnerIndex(address nodeOwner) private view returns (uint256) {
-        for (uint256 i = 0; i < attesterOwners.length; i++) {
+        uint256 len = attesterOwners.length;
+        for (uint256 i = 0; i < len; ++i) {
             if (attesterOwners[i] == nodeOwner) {
                 return i;
             }

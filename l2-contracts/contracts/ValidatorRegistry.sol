@@ -50,7 +50,8 @@ contract ValidatorRegistry {
         bytes calldata pop
     ) public onlyOwner {
         // Check if a validator with the same node owner or public key already exists.
-        for (uint256 i = 0; i < validatorOwners.length; i++) {
+        uint256 len = validatorOwners.length;
+        for (uint256 i = 0; i < len; ++i) {
             require(validatorOwners[i] != nodeOwner, "nodeOwner already exists");
             require(!compareBytes(validators[validatorOwners[i]].pubKey, pubKey), "pubKey already exists");
         }
@@ -106,7 +107,8 @@ contract ValidatorRegistry {
     function setCommittee() external onlyOwner {
         // Creates a new committee based on active validators.
         delete committee;
-        for (uint256 i = 0; i < validatorOwners.length; i++) {
+        uint256 len = validatorOwners.length;
+        for (uint256 i = 0; i < len; ++i) {
             Validator memory validator = validators[validatorOwners[i]];
             if (!validator.isInactive) {
                 committee.push(CommitteeValidator(validatorOwners[i], validator.weight, validator.pubKey));
@@ -116,7 +118,8 @@ contract ValidatorRegistry {
 
     // Finds the index of a node owner in the `validatorOwners` array.
     function validatorOwnerIndex(address nodeOwner) private view returns (uint256) {
-        for (uint256 i = 0; i < validatorOwners.length; i++) {
+        uint256 len = validatorOwners.length;
+        for (uint256 i = 0; i < len; ++i) {
             if (validatorOwners[i] == nodeOwner) {
                 return i;
             }
