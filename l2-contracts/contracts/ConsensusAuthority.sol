@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import "./ValidatorRegistry.sol";
-import "./AttesterRegistry.sol";
+import {ValidatorRegistry} from "./ValidatorRegistry.sol";
+import {AttesterRegistry} from "./AttesterRegistry.sol";
 
 contract ConsensusAuthority {
     // Owner of the contract (i.e., the governance contract).
