@@ -12,13 +12,13 @@ object "Bootloader" {
             // While we definitely cannot control the pubdata price on L1,
             // we need to check the operator does not provide any absurd numbers there
             function MAX_ALLOWED_FAIR_PUBDATA_PRICE() -> ret {
-                // 1M gwei
-                ret := 1000000000000000
+                // 2^128 - 1
+                ret := 340282366920938463463374607431768211455
             }
 
             function MAX_ALLOWED_FAIR_L2_GAS_PRICE() -> ret {
-                // 10k gwei
-                ret := 10000000000000
+                // 2^128 - 1
+                ret := 340282366920938463463374607431768211455
             }
 
             /// @dev This method ensures that the prices provided by the operator
@@ -619,10 +619,10 @@ object "Bootloader" {
                         switch isETHCall
                             case 1 {
                                 let gasLimitForTx, reservedGas := getGasLimitForTx(
-                                    innerTxDataOffset, 
-                                    transactionIndex, 
+                                    innerTxDataOffset,
+                                    transactionIndex,
                                     gasPerPubdata,
-                                    L2_TX_INTRINSIC_GAS(), 
+                                    L2_TX_INTRINSIC_GAS(),
                                     L2_TX_INTRINSIC_PUBDATA()
                                 )
 
@@ -691,15 +691,15 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
-            /// @dev The function that is temporarily needed to upgrade the SystemContext system contract. This function is to be removed 
+            /// @dev The function that is temporarily needed to upgrade the SystemContext system contract. This function is to be removed
             /// once the upgrade is complete.
             /// @dev Checks whether the code hash of the SystemContext contract is correct and updates it if needed.
             /// @dev The bootloader calls `setPubdataInfo` before each transaction, including the upgrade one.
-            /// However, the old SystemContext does not have this method. So the bootloader should invoke this function 
+            /// However, the old SystemContext does not have this method. So the bootloader should invoke this function
             /// before starting any transaction.
             function upgradeSystemContextIfNeeded() {
                 let expectedCodeHash := {{SYSTEM_CONTEXT_EXPECTED_CODE_HASH}}
-                
+
                 let actualCodeHash := getRawCodeHash(SYSTEM_CONTEXT_ADDR(), true)
                 if iszero(eq(expectedCodeHash, actualCodeHash)) {
                     // Now, we need to encode the call to the `ContractDeployer.forceDeployOnAddresses()` function.
@@ -714,7 +714,7 @@ object "Bootloader" {
                     // Only one force deployment
                     mstore(68, 0x0000000000000000000000000000000000000000000000000000000000000001)
 
-                    // Now, starts the description of the forced deployment itself. 
+                    // Now, starts the description of the forced deployment itself.
                     // Firstly, the offset.
                     mstore(100, 0x0000000000000000000000000000000000000000000000000000000000000020)
                     // The new hash of the SystemContext contract.
@@ -729,11 +729,11 @@ object "Bootloader" {
                     mstore(260, 0x00000000000000000000000000000000000000000000000000000000000000a0)
                     // No input is provided, the array is empty.
                     mstore(292, 0x0000000000000000000000000000000000000000000000000000000000000000)
-                    
+
                     // We'll use a mimicCall to simulate the correct sender.
                     let success := mimicCallOnlyResult(
                         CONTRACT_DEPLOYER_ADDR(),
-                        FORCE_DEPLOYER(), 
+                        FORCE_DEPLOYER(),
                         0,
                         0,
                         0,
@@ -1335,7 +1335,7 @@ object "Bootloader" {
             /// @param gasLimitForTx The L2 gas limit for the transaction validation & execution.
             /// @param gasPrice The L2 gas price that should be used by the transaction.
             /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
-            /// @param reservedGas The amount of gas reserved for the pubdata.            
+            /// @param reservedGas The amount of gas reserved for the pubdata.
             /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             /// @return gasLeft The gas left after the validation step.
             function l2TxValidation(
@@ -1399,7 +1399,7 @@ object "Bootloader" {
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
             /// @param gasLeft The gas left after the validation step.
             /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
-            /// @param reservedGas The amount of gas reserved for the pubdata.            
+            /// @param reservedGas The amount of gas reserved for the pubdata.
             /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             /// @return success Whether or not the execution step was successful.
             /// @return gasSpentOnExecute The gas spent on the transaction execution.
@@ -1496,7 +1496,7 @@ object "Bootloader" {
             /// @param abi The nearCall ABI. It is implicitly used as gasLimit for the call of this function.
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
             /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
-            /// @param reservedGas The amount of gas reserved for the pubdata.            
+            /// @param reservedGas The amount of gas reserved for the pubdata.
             /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             function ZKSYNC_NEAR_CALL_executeL2Tx(
                 abi,
@@ -1539,7 +1539,7 @@ object "Bootloader" {
             /// @param abi The nearCall ABI. It is implicitly used as gasLimit for the call of this function.
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
             /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
-            /// @param reservedGas The amount of gas reserved for the pubdata.            
+            /// @param reservedGas The amount of gas reserved for the pubdata.
             /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             function ZKSYNC_NEAR_CALL_markFactoryDepsL2(
                 abi,
@@ -2324,7 +2324,7 @@ object "Bootloader" {
             /// @param maxRefundedGas The maximum number of gas the bootloader can be refunded.
             /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
             /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
-            /// @param reservedGas The amount of gas reserved for the pubdata.            
+            /// @param reservedGas The amount of gas reserved for the pubdata.
             /// This is the `maximum` number because it does not take into account the number of gas that
             /// can be spent by the paymaster itself.
             function ZKSYNC_NEAR_CALL_callPostOp(
@@ -2845,7 +2845,7 @@ object "Bootloader" {
                 let spentErgs := getErgsSpentForPubdata(basePubdataSpent, gasPerPubdata)
                 debugLog("spentErgsPubdata", spentErgs)
                 let allowedGasLimit := add(computeGas, reservedGas)
-                
+
                 ret := lt(allowedGasLimit, spentErgs)
             }
 
@@ -3635,7 +3635,7 @@ object "Bootloader" {
             }
 
             /// @dev Asks operator for the refund for the transaction. The function provides
-            /// the operator with the proposed refund gas by the bootloader, 
+            /// the operator with the proposed refund gas by the bootloader,
             /// total spent gas on the pubdata and gas per 1 byte of pubdata.
             /// This function is called before the refund stage, because at that point
             /// only the operator knows how close does a transaction
