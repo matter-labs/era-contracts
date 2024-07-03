@@ -68,6 +68,12 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         _;
     }
 
+    /// @notice Checks that the message sender is the nullifier.
+    modifier onlyNullifier() {
+        require(msg.sender == address(l1Nullifier), "ShB not BH");
+        _;
+    }
+
     /// @notice Checks that the message sender is the bridgehub or zkSync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
@@ -373,19 +379,6 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         });
     }
 
-    /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
-    /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
-    /// @param _chainId The chain ID of the ZK chain to which confirm the deposit.
-    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
-    /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
-    function bridgehubConfirmL2Transaction(
-        uint256 _chainId,
-        bytes32 _txDataHash,
-        bytes32 _txHash
-    ) external override onlyBridgehub whenNotPaused {
-        l1Nullifier.bridgehubConfirmL2Transaction(_chainId, _txDataHash, _txHash);
-    }
-
     /// @notice Generates a calldata for calling the deposit finalization on the L2 native token contract.
     /// @param _l1Sender The address of the deposit initiator.
     /// @param _assetId The deposited asset ID.
@@ -414,6 +407,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
+    /// @param _checkedInLegacyBridge The boolean check that deposit hash was nullified in legacy bridge
     /// @param _depositSender The address of the deposit initiator.
     /// @param _assetId The address of the deposited L1 ERC20 token.
     /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
@@ -424,6 +418,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
     function bridgeRecoverFailedTransfer(
+        bool _checkedInLegacyBridge,
         uint256 _chainId,
         address _depositSender,
         bytes32 _assetId,
@@ -435,6 +430,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes32[] calldata _merkleProof
     ) public nonReentrant whenNotPaused {
         l1Nullifier.bridgeVerifyFailedTransfer(
+            _checkedInLegacyBridge,
             _chainId,
             _assetId,
             _transferData,
@@ -452,63 +448,19 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
 
     /// @notice Finalize the withdrawal and release funds.
     /// @param _chainId The chain ID of the transaction to check.
-    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed.
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent.
-    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message.
-    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization.
+    /// @param _assetId The bridged asset ID.
+    /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
     function finalizeWithdrawal(
         uint256 _chainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external override returns (address l1Receiver, bytes32 assetId, uint256 amount) {
-        (l1Receiver, assetId, amount) = _finalizeWithdrawal({
-            _chainId: _chainId,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _message: _message,
-            _merkleProof: _merkleProof
-        });
-    }
-
-    /// @notice Internal function that handles the logic for finalizing withdrawals, supporting both the current bridge system and the legacy ERC20 bridge.
-    /// @param _chainId The chain ID of the transaction to check.
-    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed.
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent.
-    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message.
-    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization.
-    /// @return l1Receiver The address to receive bridged assets.
-    /// @return assetId The bridged asset ID.
-    /// @return amount The amount of asset bridged.
-    function _finalizeWithdrawal(
-        uint256 _chainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) internal nonReentrant whenNotPaused returns (address l1Receiver, bytes32 assetId, uint256 amount) {
-        bytes memory transferData;
-        (assetId, transferData) = l1Nullifier.verifyAndGetWithdrawalData(
-            _chainId,
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _message,
-            _merkleProof
-        );
-
-        address l1AssetHandler = assetHandlerAddress[assetId];
+        bytes32 _assetId,
+        bytes calldata _transferData
+    ) external override onlyNullifier returns (address l1Receiver, uint256 amount) {
+        address l1AssetHandler = assetHandlerAddress[_assetId];
         // slither-disable-next-line unused-return
-        IL1AssetHandler(l1AssetHandler).bridgeMint(_chainId, assetId, transferData);
-        (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
+        IL1AssetHandler(l1AssetHandler).bridgeMint(_chainId, _assetId, _transferData);
+        (amount, l1Receiver) = abi.decode(_transferData, (uint256, address));
 
-        emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetId, amount);
+        emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, _assetId, amount);
     }
 
     /*//////////////////////////////////////////////////////////////

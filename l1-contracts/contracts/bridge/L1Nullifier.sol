@@ -13,7 +13,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
-import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
+import {IL1Nullifier, FinalizeWithdrawalParams} from "./interfaces/IL1Nullifier.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
 import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
@@ -105,6 +105,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyAssetRouter() {
         require(msg.sender == address(BRIDGE_HUB), "Nullifier: not asset router");
+        _;
+    }
+
+    /// @notice Checks that the message sender is the bridgehub.
+    modifier onlyBridgehub() {
+        require(msg.sender == address(BRIDGE_HUB), "ShB not BH");
         _;
     }
 
@@ -227,13 +233,14 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash
-    ) external override onlyAssetRouter whenNotPaused {
+    ) external override onlyBridgehub whenNotPaused {
         require(depositHappened[_chainId][_txHash] == 0x00, "ShB tx hap");
         depositHappened[_chainId][_txHash] = _txDataHash;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
+    /// @param _checkedInLegacyBridge The boolean notifying in deposit was checked in legacy bridge.
     /// @param _assetId The address of the deposited L1 ERC20 token.
     /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
     /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization.
@@ -243,6 +250,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
     function bridgeVerifyFailedTransfer(
+        bool _checkedInLegacyBridge,
         uint256 _chainId,
         bytes32 _assetId,
         bytes memory _transferData,
@@ -265,15 +273,51 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             require(proofValid, "yn");
         }
 
-        require(!_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch), "ShB: legacy cFD");
         {
-            bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
-            address l1Token = nativeTokenVault.tokenAddress(_assetId);
-            (uint256 amount, address prevMsgSender) = abi.decode(_transferData, (uint256, address));
-            bytes32 txDataHash = keccak256(abi.encode(prevMsgSender, l1Token, amount));
-            require(dataHash == txDataHash, "ShB: d.it not hap");
+            bool notCheckedInLegacyBridgeOrWeCanCheckDeposit;
+            {
+                // Deposits that happened before the upgrade cannot be checked here, they have to be claimed and checked in the legacyBridge
+                bool weCanCheckDepositHere = !_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch);
+                // Double claims are not possible, as depositHappened is checked here for all except legacy deposits (which have to happen through the legacy bridge)
+                // Funds claimed before the update will still be recorded in the legacy bridge
+                // Note we double check NEW deposits if they are called from the legacy bridge
+                notCheckedInLegacyBridgeOrWeCanCheckDeposit = (!_checkedInLegacyBridge) || weCanCheckDepositHere;
+            }
+            if (notCheckedInLegacyBridgeOrWeCanCheckDeposit) {
+                bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
+                address l1Token = nativeTokenVault.tokenAddress(_assetId);
+                (uint256 amount, address prevMsgSender) = abi.decode(_transferData, (uint256, address));
+                bytes32 txDataHash = keccak256(abi.encode(prevMsgSender, l1Token, amount));
+                require(dataHash == txDataHash, "ShB: d.it not hap");
+                delete depositHappened[_chainId][_l2TxHash];
+            }
         }
-        delete depositHappened[_chainId][_l2TxHash];
+    }
+
+    /// @notice Finalize the withdrawal and release funds.
+    /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
+    function finalizeWithdrawal(
+        FinalizeWithdrawalParams memory _finalizeWithdrawalParams
+    ) external override returns (address l1Receiver, bytes32 assetId, uint256 amount) {
+        (l1Receiver, assetId, amount) = _finalizeWithdrawal(_finalizeWithdrawalParams);
+    }
+
+    /// @notice Internal function that handles the logic for finalizing withdrawals, supporting both the current bridge system and the legacy ERC20 bridge.
+    /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
+    /// @return l1Receiver The address to receive bridged assets.
+    /// @return assetId The bridged asset ID.
+    /// @return amount The amount of asset bridged.
+    function _finalizeWithdrawal(
+        FinalizeWithdrawalParams memory _finalizeWithdrawalParams
+    ) internal nonReentrant whenNotPaused returns (address l1Receiver, bytes32 assetId, uint256 amount) {
+        bytes memory transferData;
+        (assetId, transferData) = _verifyAndGetWithdrawalData(_finalizeWithdrawalParams);
+
+        (l1Receiver, amount) = l1AssetRouter.finalizeWithdrawal(
+            _finalizeWithdrawalParams.chainId,
+            assetId,
+            transferData
+        );
     }
 
     /// @dev Determines if an eth withdrawal was initiated on zkSync Era before the upgrade to the Shared Bridge.
@@ -318,77 +362,70 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                     _l2BatchNumber == eraLegacyBridgeLastDepositBatch));
     }
 
-    struct MessageParams {
-        uint256 l2BatchNumber;
-        uint256 l2MessageIndex;
-        uint16 l2TxNumberInBatch;
-    }
-
     /// @notice Internal function that handles the logic for finalizing withdrawals, supporting both the current bridge system and the legacy ERC20 bridge.
-    /// @param _chainId The chain ID of the transaction to check.
-    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed.
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent.
-    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message.
-    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization.
+    /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
     /// @return assetId The bridged asset ID.
     /// @return transferData The encoded transfer data.
-    function verifyAndGetWithdrawalData(
-        uint256 _chainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external onlyAssetRouter nonReentrant whenNotPaused returns (bytes32 assetId, bytes memory transferData) {
-        require(!isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");
-        isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
+    function _verifyAndGetWithdrawalData(
+        FinalizeWithdrawalParams memory _finalizeWithdrawalParams
+    ) internal nonReentrant whenNotPaused returns (bytes32 assetId, bytes memory transferData) {
+        require(
+            !isWithdrawalFinalized[_finalizeWithdrawalParams.chainId][_finalizeWithdrawalParams.l2BatchNumber][
+                _finalizeWithdrawalParams.l2MessageIndex
+            ],
+            "Withdrawal is already finalized"
+        );
+        isWithdrawalFinalized[_finalizeWithdrawalParams.chainId][_finalizeWithdrawalParams.l2BatchNumber][
+            _finalizeWithdrawalParams.l2MessageIndex
+        ] = true;
 
         // Handling special case for withdrawal from zkSync Era initiated before Shared Bridge.
-        require(!_isEraLegacyEthWithdrawal(_chainId, _l2BatchNumber), "ShB: legacy eth withdrawal");
-        require(!_isEraLegacyTokenWithdrawal(_chainId, _l2BatchNumber), "ShB: legacy token withdrawal");
-        {
-            MessageParams memory messageParams = MessageParams({
-                l2BatchNumber: _l2BatchNumber,
-                l2MessageIndex: _l2MessageIndex,
-                l2TxNumberInBatch: _l2TxNumberInBatch
-            });
-            (assetId, transferData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
-        }
+        require(
+            !_isEraLegacyEthWithdrawal(_finalizeWithdrawalParams.chainId, _finalizeWithdrawalParams.l2BatchNumber),
+            "ShB: legacy eth withdrawal"
+        );
+        require(
+            !_isEraLegacyTokenWithdrawal(_finalizeWithdrawalParams.chainId, _finalizeWithdrawalParams.l2BatchNumber),
+            "ShB: legacy token withdrawal"
+        );
+
+        (assetId, transferData) = _checkWithdrawal(_finalizeWithdrawalParams);
     }
 
     /// @notice Verifies the validity of a withdrawal message from L2 and returns withdrawal details.
-    /// @param _chainId The chain ID of the transaction to check.
-    /// @param _messageParams The message params, which include batch number, message index, and L2 tx number in batch.
-    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message.
-    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization.
+    /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
     /// @return assetId The ID of the bridged asset.
     /// @return transferData The transfer data used to finalize withdawal.
     function _checkWithdrawal(
-        uint256 _chainId,
-        MessageParams memory _messageParams,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
+        FinalizeWithdrawalParams memory _finalizeWithdrawalParams
     ) internal view returns (bytes32 assetId, bytes memory transferData) {
-        (assetId, transferData) = _parseL2WithdrawalMessage(_chainId, _message);
+        (assetId, transferData) = _parseL2WithdrawalMessage(
+            _finalizeWithdrawalParams.chainId,
+            _finalizeWithdrawalParams.message
+        );
         L2Message memory l2ToL1Message;
         {
-            bool baseTokenWithdrawal = (assetId == BRIDGE_HUB.baseTokenAssetId(_chainId));
-            address l2Sender = baseTokenWithdrawal ? L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR : L2_ASSET_ROUTER_ADDR;
+            bool baseTokenWithdrawal = (assetId == BRIDGE_HUB.baseTokenAssetId(_finalizeWithdrawalParams.chainId));
+            if (baseTokenWithdrawal) {
+                require(
+                    _finalizeWithdrawalParams.l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+                    "Nullifier: wrong l2 sender"
+                );
+            }
 
             l2ToL1Message = L2Message({
-                txNumberInBatch: _messageParams.l2TxNumberInBatch,
-                sender: l2Sender,
-                data: _message
+                txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
+                sender: _finalizeWithdrawalParams.l2Sender,
+                data: _finalizeWithdrawalParams.message
             });
         }
 
         bool success = BRIDGE_HUB.proveL2MessageInclusion({
-            _chainId: _chainId,
-            _batchNumber: _messageParams.l2BatchNumber,
-            _index: _messageParams.l2MessageIndex,
+            _chainId: _finalizeWithdrawalParams.chainId,
+            _batchNumber: _finalizeWithdrawalParams.l2BatchNumber,
+            _index: _finalizeWithdrawalParams.l2MessageIndex,
             _message: l2ToL1Message,
-            _proof: _merkleProof
+            _proof: _finalizeWithdrawalParams.merkleProof
         });
         require(success, "ShB withd w proof"); // withdrawal wrong proof
     }
@@ -474,6 +511,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32 assetId = nativeTokenVault.getAssetId(_l1Token);
         bytes memory transferData = abi.encode(_amount, _depositSender);
         l1AssetRouter.bridgeRecoverFailedTransfer({
+            _checkedInLegacyBridge: false,
             _chainId: _chainId,
             _depositSender: _depositSender,
             _assetId: assetId,
@@ -628,14 +666,17 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge returns (address l1Receiver, address l1Asset, uint256 amount) {
         bytes32 assetId;
-        (l1Receiver, assetId, amount) = l1AssetRouter.finalizeWithdrawal({
-            _chainId: ERA_CHAIN_ID,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _message: _message,
-            _merkleProof: _merkleProof
-        });
+        (l1Receiver, assetId, amount) = _finalizeWithdrawal(
+            FinalizeWithdrawalParams(
+                ERA_CHAIN_ID,
+                _l2BatchNumber,
+                _l2MessageIndex,
+                L2_ASSET_ROUTER_ADDR,
+                _l2TxNumberInBatch,
+                _message,
+                _merkleProof
+            )
+        );
         l1Asset = nativeTokenVault.tokenAddress(assetId);
     }
 
@@ -663,6 +704,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     ) external override onlyLegacyBridge {
         bytes memory transferData = abi.encode(_amount, _depositSender);
         l1AssetRouter.bridgeRecoverFailedTransfer({
+            _checkedInLegacyBridge: true,
             _chainId: ERA_CHAIN_ID,
             _depositSender: _depositSender,
             _assetId: nativeTokenVault.getAssetId(_l1Asset),
