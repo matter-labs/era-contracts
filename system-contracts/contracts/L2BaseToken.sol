@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {IBaseToken} from "./interfaces/IBaseToken.sol";
-import {SystemContractBase} from "./SystemContractBase.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {MSG_VALUE_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS, L1_MESSENGER_CONTRACT} from "./Constants.sol";
 import {IMailbox} from "./interfaces/IMailbox.sol";
 import {Unauthorized, InsufficientFunds} from "./SystemContractErrors.sol";

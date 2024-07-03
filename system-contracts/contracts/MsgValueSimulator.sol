@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {SystemContractBase} from "./SystemContractBase.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, REAL_BASE_TOKEN_SYSTEM_CONTRACT} from "./Constants.sol";
 import {InvalidCall} from "./SystemContractErrors.sol";

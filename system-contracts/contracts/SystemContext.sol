@@ -5,7 +5,7 @@
 pragma solidity 0.8.20;
 
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
-import {SystemContractBase} from "./SystemContractBase.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {BOOTLOADER_FORMAL_ADDRESS, SystemLogKey} from "./Constants.sol";

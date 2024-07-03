@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {IKnownCodesStorage} from "./interfaces/IKnownCodesStorage.sol";
-import {SystemContractBase} from "./SystemContractBase.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {COMPRESSOR_CONTRACT, L1_MESSENGER_CONTRACT} from "./Constants.sol";
 import {Unauthorized, MalformedBytecode, BytecodeError} from "./SystemContractErrors.sol";

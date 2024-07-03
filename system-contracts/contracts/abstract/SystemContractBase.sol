@@ -2,9 +2,9 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, FORCE_DEPLOYER} from "./Constants.sol";
-import {SystemCallFlagRequired, Unauthorized, CallerMustBeSystemContract, CallerMustBeBootloader, CallerMustBeForceDeployer} from "./SystemContractErrors.sol";
+import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, FORCE_DEPLOYER} from "../Constants.sol";
+import {SystemCallFlagRequired, Unauthorized, CallerMustBeSystemContract, CallerMustBeBootloader, CallerMustBeForceDeployer} from "../SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
