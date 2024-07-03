@@ -1965,6 +1965,10 @@ object "EVMInterpreter" {
                         evmGasLeft := chargeGas(evmGasLeft, 2500) 
                     }
             
+                    if iszero(addr) {
+                        sp := pushStackItem(sp, 0, evmGasLeft)
+                        continue
+                    }
                     sp := pushStackItem(sp, extcodehash(addr), evmGasLeft)
                 }
                 case 0x40 { // OP_BLOCKHASH
@@ -4723,6 +4727,10 @@ object "EVMInterpreter" {
                         evmGasLeft := chargeGas(evmGasLeft, 2500) 
                     }
             
+                    if iszero(addr) {
+                        sp := pushStackItem(sp, 0, evmGasLeft)
+                        continue
+                    }
                     sp := pushStackItem(sp, extcodehash(addr), evmGasLeft)
                 }
                 case 0x40 { // OP_BLOCKHASH
