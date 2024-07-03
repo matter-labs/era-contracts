@@ -8,6 +8,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "forge-std/console.sol";
+import {console2} from "forge-std/Script.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
@@ -256,6 +257,7 @@ library DeployL1Utils {
         config().contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
         config().contracts.maxNumberOfChains = toml.readUint("$.contracts.max_number_of_chains");
         config().contracts.create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
+        console.logBytes32(config().contracts.create2FactorySalt);
         if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
             config().contracts.create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
         }
@@ -341,7 +343,12 @@ library DeployL1Utils {
     }
 
     function _deployDefaultUpgrade() public {
+        config().contracts.create2FactorySalt = 0x00000000000000000000000000000000000000000000000000000000000000ff;
+        console.log("Before");
+        console.logBytes32(config().contracts.create2FactorySalt);
         address contractAddress = _deployViaCreate2(type(DefaultUpgrade).creationCode);
+        console.log("After");
+        console.logBytes32(config().contracts.create2FactorySalt);
         console.log("DefaultUpgrade deployed at:", contractAddress);
         addresses().stateTransition.defaultUpgrade = contractAddress;
     }
@@ -578,8 +585,8 @@ library DeployL1Utils {
             isFreezable: false,
             selectors: Utils.getAllSelectors(addresses().stateTransition.adminFacet.code)
         });
-        console.log("Facet", facetCuts[0].facet);
-        console.log("Admin", addresses().stateTransition.adminFacet);
+        // console.log("Facet", facetCuts[0].facet);
+        // console.log("Admin", addresses().stateTransition.adminFacet);
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(0),
@@ -590,9 +597,9 @@ library DeployL1Utils {
             type(DiamondProxy).creationCode,
             abi.encode(config().l1ChainId, diamondCut)
         );
-        console.logBytes(bytecode);
+        //console.logBytes(bytecode);
         vm.expectRevert();
-        address contractAddress = _mockDeployViaCreate22(bytecode);
+        address contractAddress = _deployViaCreate2a(bytecode);
         console.log("DiamondProxy deployed at:", contractAddress);
         addresses().stateTransition.diamondProxy = contractAddress;
     }
@@ -817,14 +824,45 @@ library DeployL1Utils {
         return contractAddress;
     }
 
-    function _deployViaCreate21(bytes memory _bytecode) public returns (address) {
+    function _deployViaCreate2a(bytes memory _bytecode) public returns (address) {
         bytes32 _salt = config().contracts.create2FactorySalt;
+        console.log("Salt1");
+        console.logBytes32(_salt);
         address _factory = addresses().create2Factory;
+        console2.log("Factory1", _factory);
+
         if (_bytecode.length == 0) {
             revert("Bytecode is not set");
         }
         address contractAddress = vm.computeCreate2Address(_salt, keccak256(_bytecode), _factory);
-        console.log("address", contractAddress);
+        console.log("Address1", contractAddress);
+        if (contractAddress.code.length != 0) {
+            return contractAddress;
+        }    
+
+        vm.broadcast(_factory);
+
+        (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
+        contractAddress = Utils.bytesToAddress(data);
+        console2.log("Address", contractAddress);
+        if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
+            revert("Failed to deploy contract via create2");
+        }
+
+        return contractAddress;
+    }
+
+    function _deployViaCreate21(bytes memory _bytecode) public returns (address) {
+        bytes32 _salt = config().contracts.create2FactorySalt;
+        console.log("Salt1");
+        console.logBytes32(_salt);
+        address _factory = addresses().create2Factory;
+        console2.log("Factory1", _factory);
+        if (_bytecode.length == 0) {
+            revert("Bytecode is not set");
+        }
+        address contractAddress = vm.computeCreate2Address(_salt, keccak256(_bytecode), _factory);
+        console.log("Address1", contractAddress);
         if (contractAddress.code.length != 0) {
             return contractAddress;
         }
@@ -833,32 +871,18 @@ library DeployL1Utils {
     }
 
     function _deployViaCreate22(bytes memory _bytecode) public returns (address) {
-
+        // console.log("Bytes");
+        // console.logBytes(_bytecode);
         bytes32 _salt = config().contracts.create2FactorySalt;
+        console.log("Salt2");
+        console.logBytes32(_salt);
         address _factory = addresses().create2Factory;
+        console2.log("Factory2", _factory);
         (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
         address contractAddress = Utils.bytesToAddress(data);
-        console.log("success", success);
-        console.log("contract", contractAddress);
-        console.log("length", contractAddress.code.length);
-
-        if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
-            revert("Failed to deploy contract via create2");
-        }
-        return contractAddress;
-    }
-
-    function _mockDeployViaCreate22(bytes memory _bytecode) public returns (address) {
-        bytes32 _salt = config().contracts.create2FactorySalt;
-        address _factory = addresses().create2Factory;
-        bytes memory data = abi.encode(0x00a14b0623d015dda126cd99ea1a39d0ac25d6a80d);
-        bool success = true;
-        vm.mockCall(_factory, abi.encodePacked(_salt, _bytecode), data);
-        // (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
-        address contractAddress = Utils.bytesToAddress(data);
-        console.log("success", success);
-        console.log("contract", contractAddress);
-        console.log("length", contractAddress.code.length);
+        // console.log("success", success);
+        console.log("Address2", contractAddress);
+        // console.log("length", contractAddress.code.length);
 
         if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
             revert("Failed to deploy contract via create2");
