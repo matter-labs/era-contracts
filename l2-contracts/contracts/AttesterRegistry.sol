@@ -29,8 +29,8 @@ contract AttesterRegistry {
     }
 
     struct CommitteeAttester {
-        address nodeOwner;
         uint256 weight;
+        address nodeOwner;
         bytes pubKey;
     }
 
@@ -105,7 +105,7 @@ contract AttesterRegistry {
         for (uint256 i = 0; i < attesterOwners.length; i++) {
             Attester memory attester = attesters[attesterOwners[i]];
             if (!attester.isInactive) {
-                committee.push(CommitteeAttester(attesterOwners[i], attester.weight, attester.pubKey));
+                committee.push(CommitteeAttester(attester.weight, attesterOwners[i], attester.pubKey));
             }
         }
     }
