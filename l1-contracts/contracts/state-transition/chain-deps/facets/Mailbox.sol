@@ -442,6 +442,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     ) external nonReentrant {
         require(s.chainId == ERA_CHAIN_ID, "Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
         IL1Nullifier(s.baseTokenBridge).finalizeWithdrawal(
+            // solhint-disable-next-line func-named-parameters
             FinalizeWithdrawalParams(
                 ERA_CHAIN_ID,
                 _l2BatchNumber,

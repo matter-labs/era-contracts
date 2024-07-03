@@ -664,6 +664,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     ) external override onlyLegacyBridge returns (address l1Receiver, address l1Asset, uint256 amount) {
         bytes32 assetId;
         (l1Receiver, assetId, amount) = this.finalizeWithdrawal(
+            // solhint-disable-next-line func-named-parameters
             FinalizeWithdrawalParams(
                 ERA_CHAIN_ID,
                 _l2BatchNumber,

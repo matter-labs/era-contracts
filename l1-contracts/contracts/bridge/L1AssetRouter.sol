@@ -423,17 +423,17 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) public nonReentrant whenNotPaused {
-        l1Nullifier.bridgeVerifyFailedTransfer(
-            _checkedInLegacyBridge,
-            _chainId,
-            _assetId,
-            _transferData,
-            _l2TxHash,
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _merkleProof
-        );
+        l1Nullifier.bridgeVerifyFailedTransfer({
+            _checkedInLegacyBridge: _checkedInLegacyBridge,
+            _chainId: _chainId,
+            _assetId: _assetId,
+            _transferData: _transferData,
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _merkleProof: _merkleProof
+        });
 
         IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(_chainId, _assetId, _transferData);
 
