@@ -8,7 +8,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
-import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 
