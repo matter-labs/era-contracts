@@ -7,7 +7,7 @@ pragma solidity 0.8.24;
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 
 import {IBridgehub} from "./IBridgehub.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
+import {IMessageRootAggregator} from "./IMessageRootAggregator.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
@@ -17,7 +17,7 @@ import {MAX_NUMBER_OF_HYPERCHAINS} from "../common/Config.sol";
 // FIXME: explain why it can not collide with real root
 bytes32 constant EMPTY_LOG_ROOT = keccak256("New Tree zero hash");
 
-contract MessageRoot is IMessageRoot, ReentrancyGuard {
+contract MessageRootAggregator is IMessageRootAggregator, ReentrancyGuard {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.

@@ -104,8 +104,8 @@ export interface DeployedAddresses {
     BridgehubImplementation: string;
     STMDeploymentTrackerImplementation: string;
     STMDeploymentTrackerProxy: string;
-    MessageRootImplementation: string;
-    MessageRootProxy: string;
+    MessageRootAggregatorImplementation: string;
+    MessageRootAggregatorProxy: string;
   };
   StateTransition: {
     StateTransitionProxy: string;
@@ -152,8 +152,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       BridgehubImplementation: getAddressFromEnv("CONTRACTS_BRIDGEHUB_IMPL_ADDR"),
       STMDeploymentTrackerImplementation: getAddressFromEnv("CONTRACTS_STM_DEPLOYMENT_TRACKER_IMPL_ADDR"),
       STMDeploymentTrackerProxy: getAddressFromEnv("CONTRACTS_STM_DEPLOYMENT_TRACKER_PROXY_ADDR"),
-      MessageRootImplementation: getAddressFromEnv("CONTRACTS_MESSAGE_ROOT_IMPL_ADDR"),
-      MessageRootProxy: getAddressFromEnv("CONTRACTS_MESSAGE_ROOT_PROXY_ADDR"),
+      MessageRootAggregatorImplementation: getAddressFromEnv("CONTRACTS_MESSAGE_ROOT_AGGREGATOR_IMPL_ADDR"),
+      MessageRootAggregatorProxy: getAddressFromEnv("CONTRACTS_MESSAGE_ROOT_AGGREGATOR_PROXY_ADDR"),
     },
     StateTransition: {
       StateTransitionProxy: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_PROXY_ADDR"),

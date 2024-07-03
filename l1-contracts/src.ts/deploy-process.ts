@@ -12,7 +12,12 @@ import type { FacetCut } from "./diamondCut";
 import type { Deployer } from "./deploy";
 import { getTokens } from "./deploy-token";
 
-import { ADDRESS_ONE, L2_BRIDGEHUB_ADDRESS, L2_MESSAGE_ROOT_ADDRESS, isCurrentNetworkLocal } from "../src.ts/utils";
+import {
+  ADDRESS_ONE,
+  L2_BRIDGEHUB_ADDRESS,
+  L2_MESSAGE_ROOT_AGGREGATOR_ADDRESS,
+  isCurrentNetworkLocal,
+} from "../src.ts/utils";
 
 export const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000";
 export const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
@@ -66,12 +71,12 @@ export async function initialBridgehubDeployment(
     await deployer.deployBridgehubContract(create2Salt, gasPrice);
   } else {
     deployer.addresses.Bridgehub.BridgehubProxy = L2_BRIDGEHUB_ADDRESS;
-    deployer.addresses.Bridgehub.MessageRootProxy = L2_MESSAGE_ROOT_ADDRESS;
+    deployer.addresses.Bridgehub.MessageRootAggregatorProxy = L2_MESSAGE_ROOT_AGGREGATOR_ADDRESS;
 
     console.log(`CONTRACTS_BRIDGEHUB_IMPL_ADDR=${L2_BRIDGEHUB_ADDRESS}`);
     console.log(`CONTRACTS_BRIDGEHUB_PROXY_ADDR=${L2_BRIDGEHUB_ADDRESS}`);
-    console.log(`CONTRACTS_MESSAGE_ROOT_IMPL_ADDR=${L2_MESSAGE_ROOT_ADDRESS}`);
-    console.log(`CONTRACTS_MESSAGE_ROOT_PROXY_ADDR=${L2_MESSAGE_ROOT_ADDRESS}`);
+    console.log(`CONTRACTS_MESSAGE_ROOT_AGGREGATOR_IMPL_ADDR=${L2_MESSAGE_ROOT_AGGREGATOR_ADDRESS}`);
+    console.log(`CONTRACTS_MESSAGE_ROOT_AGGREGATOR_PROXY_ADDR=${L2_MESSAGE_ROOT_AGGREGATOR_ADDRESS}`);
   }
 
   // L2 Asset Router Bridge already deployed

@@ -39,7 +39,7 @@ import {
   DIAMOND_CUT_DATA_ABI_STRING,
   FORCE_DEPLOYMENT_ABI_STRING,
   L2_BRIDGEHUB_ADDRESS,
-  L2_MESSAGE_ROOT_ADDRESS,
+  L2_MESSAGE_ROOT_AGGREGATOR_ADDRESS,
   L2_NATIVE_TOKEN_VAULT_ADDRESS,
   L2_ASSET_ROUTER_ADDRESS,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -176,13 +176,13 @@ export class Deployer {
 
   public async genesisForceDeploymentsData() {
     let bridgehubZKBytecode = ethers.constants.HashZero;
-    let messageRootZKBytecode = ethers.constants.HashZero;
+    let messageRootAggregatorZKBytecode = ethers.constants.HashZero;
     let assetRouterZKBytecode = ethers.constants.HashZero;
     let nativeTokenVaultZKBytecode = ethers.constants.HashZero;
     let l2TokenProxyBytecodeHash = ethers.constants.HashZero;
     if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
       bridgehubZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "Bridgehub");
-      messageRootZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "MessageRoot");
+      messageRootAggregatorZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "MessageRootAggregator");
       assetRouterZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2AssetRouter");
       nativeTokenVaultZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2NativeTokenVault");
       const l2TokenProxyBytecode = readBytecode(
@@ -203,8 +203,8 @@ export class Deployer {
       ),
     };
     const messageRootDeployment = {
-      bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(messageRootZKBytecode)),
-      newAddress: L2_MESSAGE_ROOT_ADDRESS,
+      bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(messageRootAggregatorZKBytecode)),
+      newAddress: L2_MESSAGE_ROOT_AGGREGATOR_ADDRESS,
       callConstructor: true,
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(["address"], [L2_BRIDGEHUB_ADDRESS]),
@@ -445,38 +445,48 @@ export class Deployer {
     this.addresses.Bridgehub.BridgehubProxy = contractAddress;
   }
 
-  public async deployMessageRootImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployMessageRootAggregatorImplementation(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
     const contractAddress = await this.deployViaCreate2(
-      "MessageRoot",
+      "MessageRootAggregator",
       [this.addresses.Bridgehub.BridgehubProxy],
       create2Salt,
       ethTxOptions
     );
 
     if (this.verbose) {
-      console.log(`CONTRACTS_MESSAGE_ROOT_IMPL_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_MESSAGE_ROOT_AGGREGATOR_IMPL_ADDR=${contractAddress}`);
     }
 
-    this.addresses.Bridgehub.MessageRootImplementation = contractAddress;
+    this.addresses.Bridgehub.MessageRootAggregatorImplementation = contractAddress;
   }
 
-  public async deployMessageRootProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const messageRoot = new Interface(hardhat.artifacts.readArtifactSync("MessageRoot").abi);
+  public async deployMessageRootAggregatorProxy(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
+    const messageRoot = new Interface(hardhat.artifacts.readArtifactSync("MessageRootAggregator").abi);
 
     const initCalldata = messageRoot.encodeFunctionData("initialize");
 
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
-      [this.addresses.Bridgehub.MessageRootImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
+      [
+        this.addresses.Bridgehub.MessageRootAggregatorImplementation,
+        this.addresses.TransparentProxyAdmin,
+        initCalldata,
+      ],
       create2Salt,
       ethTxOptions
     );
 
     if (this.verbose) {
-      console.log(`CONTRACTS_MESSAGE_ROOT_PROXY_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_MESSAGE_ROOT_AGGREGATOR_PROXY_ADDR=${contractAddress}`);
     }
 
-    this.addresses.Bridgehub.MessageRootProxy = contractAddress;
+    this.addresses.Bridgehub.MessageRootAggregatorProxy = contractAddress;
   }
 
   public async deployStateTransitionManagerImplementation(
@@ -937,7 +947,7 @@ export class Deployer {
     const upgradeData2 = bridgehub.interface.encodeFunctionData("setAddresses", [
       this.addresses.Bridges.SharedBridgeProxy,
       this.addresses.Bridgehub.STMDeploymentTrackerProxy,
-      this.addresses.Bridgehub.MessageRootProxy,
+      this.addresses.Bridgehub.MessageRootAggregatorProxy,
     ]);
     await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
     if (this.verbose) {
@@ -1003,8 +1013,8 @@ export class Deployer {
 
     await this.deployBridgehubImplementation(create2Salt, { gasPrice, nonce });
     await this.deployBridgehubProxy(create2Salt, { gasPrice });
-    await this.deployMessageRootImplementation(create2Salt, { gasPrice });
-    await this.deployMessageRootProxy(create2Salt, { gasPrice });
+    await this.deployMessageRootAggregatorImplementation(create2Salt, { gasPrice });
+    await this.deployMessageRootAggregatorProxy(create2Salt, { gasPrice });
   }
 
   public async deployStateTransitionManagerContract(

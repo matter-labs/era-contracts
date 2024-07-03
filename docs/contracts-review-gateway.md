@@ -9,7 +9,7 @@ List of changes and new features:
 - Priority Queue uses a Merkle tree structure to store the transactions. This is needed for efficient migration to and from the Gateway. The merkle tree is a DynamicIncrementalMerkleTree, for more information see the PriorityQueue doc.
 - Custom Data Availability contracts. This is needed to handle the relayed data availability on the Gateway.
 - L1 -> Gateway -> ZKChain transactions. This is done by forwarding transactions to Chain's Mailbox on the Gateway via the Gateway's Mailbox.
-- ZKChain -> Gateway -> L1 transactions. This is done by aggregating the logs of different chains in the MessageRoot contract, and sending a single log to L1.
+- ZKChain -> Gateway -> L1 transactions. This is done by aggregating the logs of different chains in the MessageRootAggregator contract, and sending a single log to L1.
 - Migration of chains to and from the Gateway. This is done using our Custom Asset Bridging framework, each STM has an assetId and is managed by a shared STMDeploymentTracker, the L2AssetRouter = L2SharedBridge is deployed on the Gateway, but only holds the chains as assets, with the Bridgehub as the AssetHandler.
 
 Other smaller changes:

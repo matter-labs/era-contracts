@@ -404,7 +404,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
             (uint256 _depositAmount, ) = abi.decode(transferData, (uint256, address));
             txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(assetId), _depositAmount));
         } else {
-            txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(_prevMsgSender, assetId, transferData)));
+            txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(assetId, l2BridgeMintCalldata)));
         }
 
         request = _requestToBridge({
@@ -555,9 +555,14 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         {
             bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
             address l1Token = nativeTokenVault.tokenAddress(_assetId);
-            (uint256 amount, address prevMsgSender) = abi.decode(_transferData, (uint256, address));
-            bytes32 txDataHash = keccak256(abi.encode(prevMsgSender, l1Token, amount));
-            require(dataHash == txDataHash, "ShB: d.it not hap");
+            if (l1Token != address(0)) {
+                (uint256 amount, address prevMsgSender) = abi.decode(_transferData, (uint256, address));
+                bytes32 txDataHash = keccak256(abi.encode(prevMsgSender, l1Token, amount));
+                require(dataHash == txDataHash, "ShB: d.it not hap");
+            } else {
+                bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(_assetId, _transferData)));
+                require(dataHash == txDataHash, "ShB: d.it not hap2");
+            }
         }
         delete depositHappened[_chainId][_l2TxHash];
 
