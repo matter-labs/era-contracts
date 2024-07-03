@@ -5,25 +5,13 @@ pragma solidity 0.8.20;
 contract AttesterRegistry {
     // Owner of the contract (the ConsensusAuthority contract).
     address public owner;
-
     // A map of node owners => attesters (used for attester lookups).
     mapping(address => Attester) public attesters;
     // An array to keep track of attester node owners (used for iterating attesters).
     address[] public attesterOwners;
-
     // The current committee list. Weight and public key are stored explicitly
     // since they might change after committee selection.
     CommitteeAttester[] public committee;
-    // The committee list for the next epoch.
-    CommitteeAttester[] public nextCommittee;
-
-    // The current epoch number.
-    uint256 public epoch;
-    // The number of epochs that an attester must be inactive before being
-    // possible to remove it. Needs to be at least 2, in order to guarantee
-    // that any attester in the current or next committee lists is still
-    // available in the registry.
-    uint256 public constant INACTIVITY_DELAY = 2;
 
     struct Attester {
         // Voting weight.
@@ -77,9 +65,6 @@ contract AttesterRegistry {
     function remove(address nodeOwner) external onlyOwner {
         verifyExists(nodeOwner);
         require(attesters[nodeOwner].isInactive, "Attester is still active");
-        require(epoch >= attesters[nodeOwner].inactiveSince + INACTIVITY_DELAY,
-            "Attester's inactivity delay has not passed"
-        );
 
         // Remove from mapping.
         delete attesters[nodeOwner];
@@ -93,14 +78,12 @@ contract AttesterRegistry {
     function inactivate(address nodeOwner) external onlyOwner {
         verifyExists(nodeOwner);
         attesters[nodeOwner].isInactive = true;
-        attesters[nodeOwner].inactiveSince = epoch;
     }
 
     // Activates an attester.
     function activate(address nodeOwner) external onlyOwner {
         verifyExists(nodeOwner);
         attesters[nodeOwner].isInactive = false;
-        attesters[nodeOwner].inactiveSince = 0;
     }
 
     // Changes the weight.
@@ -115,22 +98,14 @@ contract AttesterRegistry {
         attesters[nodeOwner].pubKey = pubKey;
     }
 
-    // Creates a new committee list which will become the next committee list.
-    function setNextCommittee() external onlyOwner {
-        epoch += 1;
-
-        // Replace current committee with next committee.
+    // Creates a new committee list.
+    function setCommittee() external onlyOwner {
+        // Creates a new committee based on active attesters.
         delete committee;
-        for (uint256 i = 0; i < nextCommittee.length; i++) {
-            committee.push(nextCommittee[i]);
-        }
-
-        // Populate `nextCommittee` based on active attesters.
-        delete nextCommittee;
         for (uint256 i = 0; i < attesterOwners.length; i++) {
             Attester memory attester = attesters[attesterOwners[i]];
             if (!attester.isInactive) {
-                nextCommittee.push(CommitteeAttester(attesterOwners[i], attester.weight, attester.pubKey));
+                committee.push(CommitteeAttester(attesterOwners[i], attester.weight, attester.pubKey));
             }
         }
     }

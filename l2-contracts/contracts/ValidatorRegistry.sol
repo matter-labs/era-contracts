@@ -5,25 +5,13 @@ pragma solidity 0.8.20;
 contract ValidatorRegistry {
     // Owner of the contract (the ConsensusAuthority contract).
     address public owner;
-
     // A map of node owners => validators (used for validator lookups).
     mapping(address => Validator) public validators;
     // An array to keep track of validator node owners (used for iterating validators).
     address[] public validatorOwners;
-
     // The current committee list. Weight and public key are stored explicitly
     // since they might change after committee selection.
     CommitteeValidator[] public committee;
-    // The committee list for the next epoch.
-    CommitteeValidator[] public nextCommittee;
-
-    // The current epoch number.
-    uint256 public epoch;
-    // The number of epochs that a validator must be inactive before being
-    // possible to remove it. Needs to be at least 2, in order to guarantee
-    // that any validator in the current or next committee lists is still
-    // available in the registry.
-    uint256 public constant INACTIVITY_DELAY = 2;
 
     struct Validator {
         // Voting weight.
@@ -36,10 +24,6 @@ contract ValidatorRegistry {
         // considered when selecting committees. Only inactive validators can
         // be removed from the registry.
         bool isInactive;
-        // The epoch in which the validator became inactive. We need to store this since
-        // we may want to impose a delay between a validator becoming inactive and
-        // being able to be removed.
-        uint256 inactiveSince;
     }
 
     struct CommitteeValidator {
@@ -71,7 +55,7 @@ contract ValidatorRegistry {
             require(!compareBytes(validators[validatorOwners[i]].pubKey, pubKey), "pubKey already exists");
         }
 
-        validators[nodeOwner] = Validator(weight, pubKey, pop, false, 0);
+        validators[nodeOwner] = Validator(weight, pubKey, pop, false);
         validatorOwners.push(nodeOwner);
     }
 
@@ -80,9 +64,6 @@ contract ValidatorRegistry {
     function remove(address nodeOwner) public onlyOwner {
         verifyExists(nodeOwner);
         require(validators[nodeOwner].isInactive, "Validator is still active");
-        require(epoch >= validators[nodeOwner].inactiveSince + INACTIVITY_DELAY,
-            "Validator's inactivity delay has not passed"
-        );
 
         // Remove from mapping.
         delete validators[nodeOwner];
@@ -96,14 +77,12 @@ contract ValidatorRegistry {
     function inactivate(address nodeOwner) public onlyOwner {
         verifyExists(nodeOwner);
         validators[nodeOwner].isInactive = true;
-        validators[nodeOwner].inactiveSince = epoch;
     }
 
     // Activates a validator.
     function activate(address nodeOwner) public onlyOwner {
         verifyExists(nodeOwner);
         validators[nodeOwner].isInactive = false;
-        validators[nodeOwner].inactiveSince = 0;
     }
 
     // Changes the weight.
@@ -123,22 +102,14 @@ contract ValidatorRegistry {
         validators[nodeOwner].pop = pop;
     }
 
-    // Creates a new committee list which will become the next committee list.
-    function setNextCommittee() external onlyOwner {
-        epoch += 1;
-
-        // Replace current committee with next committee
+    // Creates a new committee list.
+    function setCommittee() external onlyOwner {
+        // Creates a new committee based on active validators.
         delete committee;
-        for (uint256 i = 0; i < nextCommittee.length; i++) {
-            committee.push(nextCommittee[i]);
-        }
-
-        // Populate `nextCommittee` based on active validators
-        delete nextCommittee;
         for (uint256 i = 0; i < validatorOwners.length; i++) {
             Validator memory validator = validators[validatorOwners[i]];
             if (!validator.isInactive) {
-                nextCommittee.push(CommitteeValidator(validatorOwners[i], validator.weight, validator.pubKey));
+                committee.push(CommitteeValidator(validatorOwners[i], validator.weight, validator.pubKey));
             }
         }
     }

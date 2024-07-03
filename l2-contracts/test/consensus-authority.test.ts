@@ -101,7 +101,6 @@ describe("ConsensusAuthority", function () {
             expect(validator.pubKey).to.equal(nodeEntries[i].validatorPubKey);
             expect(validator[2]).to.equal(nodeEntries[i].validatorPoP);
             expect(validator.isInactive).to.equal(false);
-            expect(validator.inactiveSince).to.equal(0);
 
             const attesterOwner = await attesterRegistry["attesterOwners(uint256)"](i);
             expect(attesterOwner).to.equal(nodeEntries[i].ownerAddr);
@@ -109,7 +108,6 @@ describe("ConsensusAuthority", function () {
             expect(attester.weight).to.equal(nodeEntries[i].validatorWeight);
             expect(attester.pubKey).to.equal(nodeEntries[i].validatorPubKey);
             expect(attester.isInactive).to.equal(false);
-            expect(attester.inactiveSince).to.equal(0);
         }
     });
 
