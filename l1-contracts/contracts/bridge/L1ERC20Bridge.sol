@@ -173,10 +173,10 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         });
         depositAmount[msg.sender][_l1Token][l2TxHash] = _amount;
         emit DepositInitiated({
-            l2DepositTxHash: l2TxHash, 
-            from: msg.sender, 
-            to: _l2Receiver, 
-            l1Token: _l1Token, 
+            l2DepositTxHash: l2TxHash,
+            from: msg.sender,
+            to: _l2Receiver,
+            l1Token: _l1Token,
             amount: _amount
         });
     }
