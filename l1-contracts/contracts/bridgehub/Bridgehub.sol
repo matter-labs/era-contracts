@@ -9,6 +9,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
+import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
@@ -67,6 +68,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @dev Sync layer chain is expected to have .. as the base token.
     mapping(uint256 chainId => bool isWhitelistedSyncLayer) public whitelistedSettlementLayers;
+
+    /// @dev The contract responsible for confirming l2 tx, and is withdrawal finalized mapping.
+    IL1Nullifier public l1Nullifier;
 
     /// @notice to avoid parity hack
     constructor(uint256 _l1ChainId, address _owner) reentrancyGuardInitializer {
@@ -128,10 +132,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
     function setAddresses(
         address _sharedBridge,
+        address _l1Nullifier,
         ISTMDeploymentTracker _stmDeployer,
         IMessageRoot _messageRoot
     ) external onlyOwner {
         sharedBridge = IL1AssetRouter(_sharedBridge);
+        l1Nullifier = IL1Nullifier(_l1Nullifier);
         stmDeployer = _stmDeployer;
         messageRoot = _messageRoot;
         _messageRoot.addNewChain(block.chainid);
@@ -437,11 +443,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             })
         );
 
-        IL1AssetRouter(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
-            _request.chainId,
-            outputRequest.txDataHash,
-            canonicalTxHash
-        );
+        l1Nullifier.bridgehubConfirmL2Transaction(_request.chainId, outputRequest.txDataHash, canonicalTxHash);
     }
 
     function forwardTransactionOnSyncLayer(
