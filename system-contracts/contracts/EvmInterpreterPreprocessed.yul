@@ -851,7 +851,12 @@ object "EVMInterpreter" {
         function _getZkEVMGas(_evmGas, addr) -> zkevmGas {
             zkevmGas := mul(_evmGas, GAS_DIVISOR())
             let byteSize := extcodesize(addr)
-            zkevmGas := add(zkevmGas, mul(byteSize, DECOMMIT_COST_PER_WORD()))
+            let should_ceil := mod(byteSize, 32)
+            if gt(should_ceil, 0) {
+                byteSize := add(byteSize, sub(32, should_ceil))
+            }
+            let decommitGasCost := mul(div(byteSize,32), DECOMMIT_COST_PER_WORD())
+            zkevmGas := sub(zkevmGas, decommitGasCost)
             if gt(zkevmGas, UINT32_MAX()) {
                 zkevmGas := UINT32_MAX()
             }
@@ -3474,7 +3479,12 @@ object "EVMInterpreter" {
             function _getZkEVMGas(_evmGas, addr) -> zkevmGas {
                 zkevmGas := mul(_evmGas, GAS_DIVISOR())
                 let byteSize := extcodesize(addr)
-                zkevmGas := add(zkevmGas, mul(byteSize, DECOMMIT_COST_PER_WORD()))
+                let should_ceil := mod(byteSize, 32)
+                if gt(should_ceil, 0) {
+                    byteSize := add(byteSize, sub(32, should_ceil))
+                }
+                let decommitGasCost := mul(div(byteSize,32), DECOMMIT_COST_PER_WORD())
+                zkevmGas := sub(zkevmGas, decommitGasCost)
                 if gt(zkevmGas, UINT32_MAX()) {
                     zkevmGas := UINT32_MAX()
                 }
