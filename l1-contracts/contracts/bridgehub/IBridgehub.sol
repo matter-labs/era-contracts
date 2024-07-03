@@ -6,7 +6,7 @@ import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
+import {IMessageRootAggregator} from "./IMessageRootAggregator.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -143,7 +143,7 @@ interface IBridgehub is IL1AssetHandler {
     function setAddresses(
         address _sharedBridge,
         ISTMDeploymentTracker _stmDeployer,
-        IMessageRoot _messageRoot
+        IMessageRootAggregator _messageRootAggregator
     ) external;
 
     // function relayTxThroughBH(uint256 _baseDestChainId, uint256 _destChainId, bytes calldata _dataToRelay) external;
@@ -188,5 +188,5 @@ interface IBridgehub is IL1AssetHandler {
 
     function L1_CHAIN_ID() external view returns (uint256);
 
-    function messageRoot() external view returns (IMessageRoot);
+    function messageRootAggregator() external view returns (IMessageRootAggregator);
 }

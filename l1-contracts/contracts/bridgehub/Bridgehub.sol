@@ -16,7 +16,7 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
+import {IMessageRootAggregator} from "./IMessageRootAggregator.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
@@ -52,7 +52,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev used to accept the admin role
     address private pendingAdmin;
 
-    IMessageRoot public override messageRoot;
+    /// @dev the messageRootAggregator hold the aggre
+    IMessageRootAggregator public override messageRootAggregator;
 
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
     mapping(uint256 chainId => bytes32 baseTokenAssetId) public baseTokenAssetId;
@@ -129,12 +130,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function setAddresses(
         address _sharedBridge,
         ISTMDeploymentTracker _stmDeployer,
-        IMessageRoot _messageRoot
+        IMessageRootAggregator _messageRootAggregator
     ) external onlyOwner {
         sharedBridge = IL1AssetRouter(_sharedBridge);
         stmDeployer = _stmDeployer;
-        messageRoot = _messageRoot;
-        _messageRoot.addNewChain(block.chainid);
+        messageRootAggregator = _messageRootAggregator;
+        _messageRootAggregator.addNewChain(block.chainid);
     }
 
     //// Registry
@@ -239,7 +240,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _initData: _initData,
             _factoryDeps: _factoryDeps
         });
-        messageRoot.addNewChain(_chainId);
+        messageRootAggregator.addNewChain(_chainId);
 
         emit NewChain(_chainId, _stateTransitionManager, _admin);
         return _chainId;

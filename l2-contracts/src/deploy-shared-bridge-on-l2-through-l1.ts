@@ -13,7 +13,7 @@ import {
   ADDRESS_ONE,
   L2_ASSET_ROUTER_ADDRESS,
   L2_BRIDGEHUB_ADDRESS,
-  L2_MESSAGE_ROOT_ADDRESS,
+  L2_MESSAGE_ROOT_AGGREGATOR_ADDRESS,
   L2_NATIVE_TOKEN_VAULT_ADDRESS,
 } from "../../l1-contracts/src.ts/utils";
 
@@ -77,7 +77,7 @@ async function setL2TokenBeacon(deployer: Deployer, chainId: string, gasPrice: B
     bridgehub.interface.encodeFunctionData("setAddresses", [
       L2_ASSET_ROUTER_ADDRESS,
       ADDRESS_ONE,
-      L2_MESSAGE_ROOT_ADDRESS,
+      L2_MESSAGE_ROOT_AGGREGATOR_ADDRESS,
     ]),
     priorityTxMaxGasLimit
   );
