@@ -21,8 +21,8 @@ for { } true { } {
 
         let a, b
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, add(a, b), evmGasLeft)
     }
@@ -31,8 +31,8 @@ for { } true { } {
 
         let a, b
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, mul(a, b), evmGasLeft)
     }
@@ -41,8 +41,8 @@ for { } true { } {
 
         let a, b
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, sub(a, b), evmGasLeft)
     }
@@ -51,8 +51,8 @@ for { } true { } {
 
         let a, b
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, div(a, b), evmGasLeft)
     }
@@ -61,8 +61,8 @@ for { } true { } {
 
         let a, b
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, sdiv(a, b), evmGasLeft)
     }
@@ -71,8 +71,8 @@ for { } true { } {
 
         let a, b
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, mod(a, b), evmGasLeft)
     }
@@ -81,8 +81,8 @@ for { } true { } {
 
         let a, b
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, smod(a, b), evmGasLeft)
     }
@@ -91,9 +91,9 @@ for { } true { } {
 
         let a, b, N
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
-        N, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
+        N, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, addmod(a, b, N), evmGasLeft)
     }
@@ -102,9 +102,9 @@ for { } true { } {
 
         let a, b, N
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
-        N, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
+        N, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, mulmod(a, b, N), evmGasLeft)
     }
@@ -113,8 +113,8 @@ for { } true { } {
 
         let a, exponent
 
-        a, sp := popStackItem(sp)
-        exponent, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        exponent, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, exp(a, exponent), evmGasLeft)
 
@@ -130,8 +130,8 @@ for { } true { } {
 
         let b, x
 
-        b, sp := popStackItem(sp)
-        x, sp := popStackItem(sp)
+        b, sp := popStackItem(sp, evmGasLeft)
+        x, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, signextend(b, x), evmGasLeft)
     }
@@ -140,8 +140,8 @@ for { } true { } {
 
         let a, b
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, lt(a, b), evmGasLeft)
     }
@@ -150,8 +150,8 @@ for { } true { } {
 
         let a, b
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, gt(a, b), evmGasLeft)
     }
@@ -160,8 +160,8 @@ for { } true { } {
 
         let a, b
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, slt(a, b), evmGasLeft)
     }
@@ -170,8 +170,8 @@ for { } true { } {
 
         let a, b
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, sgt(a, b), evmGasLeft)
     }
@@ -180,8 +180,8 @@ for { } true { } {
 
         let a, b
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, eq(a, b), evmGasLeft)
     }
@@ -190,7 +190,7 @@ for { } true { } {
 
         let a
 
-        a, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, iszero(a), evmGasLeft)
     }
@@ -199,8 +199,8 @@ for { } true { } {
 
         let a, b
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, and(a,b), evmGasLeft)
     }
@@ -209,8 +209,8 @@ for { } true { } {
 
         let a, b
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, or(a,b), evmGasLeft)
     }
@@ -219,8 +219,8 @@ for { } true { } {
 
         let a, b
 
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, xor(a, b), evmGasLeft)
     }
@@ -229,7 +229,7 @@ for { } true { } {
 
         let a
 
-        a, sp := popStackItem(sp)
+        a, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, not(a), evmGasLeft)
     }
@@ -238,8 +238,8 @@ for { } true { } {
 
         let i, x
 
-        i, sp := popStackItem(sp)
-        x, sp := popStackItem(sp)
+        i, sp := popStackItem(sp, evmGasLeft)
+        x, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, byte(i, x), evmGasLeft)
     }
@@ -248,8 +248,8 @@ for { } true { } {
 
         let shift, value
 
-        shift, sp := popStackItem(sp)
-        value, sp := popStackItem(sp)
+        shift, sp := popStackItem(sp, evmGasLeft)
+        value, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, shl(shift, value), evmGasLeft)
     }
@@ -258,8 +258,8 @@ for { } true { } {
 
         let shift, value
 
-        shift, sp := popStackItem(sp)
-        value, sp := popStackItem(sp)
+        shift, sp := popStackItem(sp, evmGasLeft)
+        value, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, shr(shift, value), evmGasLeft)
     }
@@ -268,8 +268,8 @@ for { } true { } {
 
         let shift, value
 
-        shift, sp := popStackItem(sp)
-        value, sp := popStackItem(sp)
+        shift, sp := popStackItem(sp, evmGasLeft)
+        value, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, sar(shift, value), evmGasLeft)
     }
@@ -278,8 +278,8 @@ for { } true { } {
 
         let offset, size
 
-        offset, sp := popStackItem(sp)
-        size, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp, evmGasLeft)
+        size, sp := popStackItem(sp, evmGasLeft)
 
         checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
         checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
@@ -304,7 +304,7 @@ for { } true { } {
 
         let addr
 
-        addr, sp := popStackItem(sp)
+        addr, sp := popStackItem(sp, evmGasLeft)
         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
         if iszero(warmAddress(addr)) {
@@ -333,7 +333,7 @@ for { } true { } {
 
         let i
 
-        i, sp := popStackItem(sp)
+        i, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, calldataload(i), evmGasLeft)
     }
@@ -347,9 +347,9 @@ for { } true { } {
 
         let destOffset, offset, size
 
-        destOffset, sp := popStackItem(sp)
-        offset, sp := popStackItem(sp)
-        size, sp := popStackItem(sp)
+        destOffset, sp := popStackItem(sp, evmGasLeft)
+        offset, sp := popStackItem(sp, evmGasLeft)
+        size, sp := popStackItem(sp, evmGasLeft)
 
         checkMultipleOverflow(offset,size,MEM_OFFSET_INNER(), evmGasLeft)
         checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER(), evmGasLeft)
@@ -383,9 +383,9 @@ for { } true { } {
 
         let dst, offset, len
 
-        dst, sp := popStackItem(sp)
-        offset, sp := popStackItem(sp)
-        len, sp := popStackItem(sp)
+        dst, sp := popStackItem(sp, evmGasLeft)
+        offset, sp := popStackItem(sp, evmGasLeft)
+        len, sp := popStackItem(sp, evmGasLeft)
 
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
@@ -419,7 +419,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
         let addr
-        addr, sp := popStackItem(sp)
+        addr, sp := popStackItem(sp, evmGasLeft)
 
         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
         if iszero(warmAddress(addr)) {
@@ -448,9 +448,9 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         let dest, offset, len
-        dest, sp := popStackItem(sp)
-        offset, sp := popStackItem(sp)
-        len, sp := popStackItem(sp)
+        dest, sp := popStackItem(sp, evmGasLeft)
+        offset, sp := popStackItem(sp, evmGasLeft)
+        len, sp := popStackItem(sp, evmGasLeft)
 
         // TODO: check if these conditions are met
         // The addition offset + size overflows.
@@ -472,7 +472,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
         let addr
-        addr, sp := popStackItem(sp)
+        addr, sp := popStackItem(sp, evmGasLeft)
         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
         if iszero(warmAddress(addr)) {
@@ -485,7 +485,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 20)
 
         let blockNumber
-        blockNumber, sp := popStackItem(sp)
+        blockNumber, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, blockhash(blockNumber), evmGasLeft)
     }
@@ -526,14 +526,14 @@ for { } true { } {
 
         let _y
 
-        _y, sp := popStackItem(sp)
+        _y, sp := popStackItem(sp, evmGasLeft)
     }
     case 0x51 { // OP_MLOAD
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
         let offset
 
-        offset, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp, evmGasLeft)
 
         checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
         let expansionGas := expandMemory(add(offset, 32))
@@ -548,8 +548,8 @@ for { } true { } {
 
         let offset, value
 
-        offset, sp := popStackItem(sp)
-        value, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp, evmGasLeft)
+        value, sp := popStackItem(sp, evmGasLeft)
 
         checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
         let expansionGas := expandMemory(add(offset, 32))
@@ -563,8 +563,8 @@ for { } true { } {
 
         let offset, value
 
-        offset, sp := popStackItem(sp)
-        value, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp, evmGasLeft)
+        value, sp := popStackItem(sp, evmGasLeft)
 
         checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
         let expansionGas := expandMemory(add(offset, 1))
@@ -579,7 +579,7 @@ for { } true { } {
 
         let key, value, isWarm
 
-        key, sp := popStackItem(sp)
+        key, sp := popStackItem(sp, evmGasLeft)
 
         let wasWarm := isSlotWarm(key)
 
@@ -605,8 +605,8 @@ for { } true { } {
 
         let key, value, gasSpent
 
-        key, sp := popStackItem(sp)
-        value, sp := popStackItem(sp)
+        key, sp := popStackItem(sp, evmGasLeft)
+        value, sp := popStackItem(sp, evmGasLeft)
 
         {
             // Here it is okay to read before we charge since we known anyway that
@@ -642,7 +642,7 @@ for { } true { } {
 
         let counter
 
-        counter, sp := popStackItem(sp)
+        counter, sp := popStackItem(sp, evmGasLeft)
 
         ip := add(add(BYTECODE_OFFSET(), 32), counter)
 
@@ -657,8 +657,8 @@ for { } true { } {
 
         let counter, b
 
-        counter, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
+        counter, sp := popStackItem(sp, evmGasLeft)
+        b, sp := popStackItem(sp, evmGasLeft)
 
         if iszero(b) {
             continue
@@ -700,7 +700,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
         let key
-        key, sp := popStackItem(sp)
+        key, sp := popStackItem(sp, evmGasLeft)
 
         sp := pushStackItem(sp, tload(key), evmGasLeft)
     }
@@ -712,16 +712,16 @@ for { } true { } {
         }
 
         let key, value
-        key, sp := popStackItem(sp)
-        value, sp := popStackItem(sp)
+        key, sp := popStackItem(sp, evmGasLeft)
+        value, sp := popStackItem(sp, evmGasLeft)
 
         tstore(key, value)
     }
     case 0x5E { // OP_MCOPY
         let destOffset, offset, size
-        destOffset, sp := popStackItem(sp)
-        offset, sp := popStackItem(sp)
-        size, sp := popStackItem(sp)
+        destOffset, sp := popStackItem(sp, evmGasLeft)
+        offset, sp := popStackItem(sp, evmGasLeft)
+        size, sp := popStackItem(sp, evmGasLeft)
 
         expandMemory(add(destOffset, size))
         expandMemory(add(offset, size))
@@ -1111,8 +1111,8 @@ for { } true { } {
         }
 
         let offset, size
-        offset, sp := popStackItem(sp)
-        size, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp, evmGasLeft)
+        size, sp := popStackItem(sp, evmGasLeft)
 
         checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
@@ -1131,9 +1131,9 @@ for { } true { } {
         }
 
         let offset, size, topic1
-        offset, sp := popStackItem(sp)
-        size, sp := popStackItem(sp)
-        topic1, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp, evmGasLeft)
+        size, sp := popStackItem(sp, evmGasLeft)
+        topic1, sp := popStackItem(sp, evmGasLeft)
 
         checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
@@ -1152,8 +1152,8 @@ for { } true { } {
         }
 
         let offset, size
-        offset, sp := popStackItem(sp)
-        size, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp, evmGasLeft)
+        size, sp := popStackItem(sp, evmGasLeft)
 
         checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
@@ -1165,8 +1165,8 @@ for { } true { } {
 
         {
             let topic1, topic2
-            topic1, sp := popStackItem(sp)
-            topic2, sp := popStackItem(sp)
+            topic1, sp := popStackItem(sp, evmGasLeft)
+            topic2, sp := popStackItem(sp, evmGasLeft)
             log2(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2)
         }
     }
@@ -1178,8 +1178,8 @@ for { } true { } {
         }
 
         let offset, size
-        offset, sp := popStackItem(sp)
-        size, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp, evmGasLeft)
+        size, sp := popStackItem(sp, evmGasLeft)
 
         checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
 
@@ -1192,9 +1192,9 @@ for { } true { } {
 
         {
             let topic1, topic2, topic3
-            topic1, sp := popStackItem(sp)
-            topic2, sp := popStackItem(sp)
-            topic3, sp := popStackItem(sp)
+            topic1, sp := popStackItem(sp, evmGasLeft)
+            topic2, sp := popStackItem(sp, evmGasLeft)
+            topic3, sp := popStackItem(sp, evmGasLeft)
             log3(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2, topic3)
         }     
     }
@@ -1206,8 +1206,8 @@ for { } true { } {
         }
 
         let offset, size
-        offset, sp := popStackItem(sp)
-        size, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp, evmGasLeft)
+        size, sp := popStackItem(sp, evmGasLeft)
 
         checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
@@ -1219,10 +1219,10 @@ for { } true { } {
 
         {
             let topic1, topic2, topic3, topic4
-            topic1, sp := popStackItem(sp)
-            topic2, sp := popStackItem(sp)
-            topic3, sp := popStackItem(sp)
-            topic4, sp := popStackItem(sp)
+            topic1, sp := popStackItem(sp, evmGasLeft)
+            topic2, sp := popStackItem(sp, evmGasLeft)
+            topic3, sp := popStackItem(sp, evmGasLeft)
+            topic4, sp := popStackItem(sp, evmGasLeft)
             log4(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2, topic3, topic4)
         }     
     }
@@ -1243,8 +1243,8 @@ for { } true { } {
     case 0xF3 { // OP_RETURN
         let offset,size
 
-        offset, sp := popStackItem(sp)
-        size, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp, evmGasLeft)
+        size, sp := popStackItem(sp, evmGasLeft)
 
         checkOverflow(offset,size, evmGasLeft)
         evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
@@ -1279,8 +1279,8 @@ for { } true { } {
     case 0xFD { // OP_REVERT
         let offset,size
 
-        offset, sp := popStackItem(sp)
-        size, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp, evmGasLeft)
+        size, sp := popStackItem(sp, evmGasLeft)
 
         ensureAcceptableMemLocation(offset)
         ensureAcceptableMemLocation(size)

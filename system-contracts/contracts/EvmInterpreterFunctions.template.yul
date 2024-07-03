@@ -129,10 +129,10 @@ function swapStackItem(sp, evmGas, position) ->  evmGasLeft {
     mstore(tempSp, s2)
 }
 
-function popStackItem(sp) -> a, newSp {
+function popStackItem(sp, evmGasLeft) -> a, newSp {
     // We can not return any error here, because it would break compatibility
     if lt(sp, STACK_OFFSET()) {
-        revert(0, 0)
+        revertWithGas(evmGasLeft)
     }
 
     a := mload(sp)
@@ -861,12 +861,12 @@ function _saveReturndataAfterZkEVMCall() {
 function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
     let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
 
-    gasToPass, sp := popStackItem(oldSp)
-    addr, sp := popStackItem(sp)
-    argsOffset, sp := popStackItem(sp)
-    argsSize, sp := popStackItem(sp)
-    retOffset, sp := popStackItem(sp)
-    retSize, sp := popStackItem(sp)
+    gasToPass, sp := popStackItem(oldSp, evmGasLeft)
+    addr, sp := popStackItem(sp, evmGasLeft)
+    argsOffset, sp := popStackItem(sp, evmGasLeft)
+    argsSize, sp := popStackItem(sp, evmGasLeft)
+    retOffset, sp := popStackItem(sp, evmGasLeft)
+    retSize, sp := popStackItem(sp, evmGasLeft)
 
     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
@@ -983,13 +983,13 @@ function _performCall(addr,gasToPass,value,argsOffset,argsSize,retOffset,retSize
 function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
     let gasToPass,addr,value,argsOffset,argsSize,retOffset,retSize
 
-    gasToPass, sp := popStackItem(oldSp)
-    addr, sp := popStackItem(sp)
-    value, sp := popStackItem(sp)
-    argsOffset, sp := popStackItem(sp)
-    argsSize, sp := popStackItem(sp)
-    retOffset, sp := popStackItem(sp)
-    retSize, sp := popStackItem(sp)
+    gasToPass, sp := popStackItem(oldSp, evmGasLeft)
+    addr, sp := popStackItem(sp, evmGasLeft)
+    value, sp := popStackItem(sp, evmGasLeft)
+    argsOffset, sp := popStackItem(sp, evmGasLeft)
+    argsSize, sp := popStackItem(sp, evmGasLeft)
+    retOffset, sp := popStackItem(sp, evmGasLeft)
+    retSize, sp := popStackItem(sp, evmGasLeft)
 
     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
@@ -1051,12 +1051,12 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
     sp := oldSp
     isStatic := oldIsStatic
 
-    gasToPass, sp := popStackItem(sp)
-    addr, sp := popStackItem(sp)
-    argsOffset, sp := popStackItem(sp)
-    argsSize, sp := popStackItem(sp)
-    retOffset, sp := popStackItem(sp)
-    retSize, sp := popStackItem(sp)
+    gasToPass, sp := popStackItem(sp, evmGasLeft)
+    addr, sp := popStackItem(sp, evmGasLeft)
+    argsOffset, sp := popStackItem(sp, evmGasLeft)
+    argsSize, sp := popStackItem(sp, evmGasLeft)
+    retOffset, sp := popStackItem(sp, evmGasLeft)
+    retSize, sp := popStackItem(sp, evmGasLeft)
 
     // addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
@@ -1255,13 +1255,13 @@ function genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, 
 
     let back
 
-    back, sp := popStackItem(sp)
+    back, sp := popStackItem(sp, evmGasLeft)
     mstore(sub(offset, 0x20), back)
-    back, sp := popStackItem(sp)
+    back, sp := popStackItem(sp, evmGasLeft)
     mstore(sub(offset, 0x40), back)
-    back, sp := popStackItem(sp)
+    back, sp := popStackItem(sp, evmGasLeft)
     mstore(sub(offset, 0x60), back)
-    back, sp := popStackItem(sp)
+    back, sp := popStackItem(sp, evmGasLeft)
     mstore(sub(offset, 0x80), back)
 }
 
@@ -1269,10 +1269,10 @@ function performExtCodeCopy(evmGas,oldSp) -> evmGasLeft, sp {
     evmGasLeft := chargeGas(evmGas, 100)
 
     let addr, dest, offset, len
-    addr, sp := popStackItem(oldSp)
-    dest, sp := popStackItem(sp)
-    offset, sp := popStackItem(sp)
-    len, sp := popStackItem(sp)
+    addr, sp := popStackItem(oldSp, evmGasLeft)
+    dest, sp := popStackItem(sp, evmGasLeft)
+    offset, sp := popStackItem(sp, evmGasLeft)
+    len, sp := popStackItem(sp, evmGasLeft)
 
     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
     // minimum_word_size = (size + 31) / 32
@@ -1312,9 +1312,9 @@ function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
 
     let value, offset, size
 
-    value, sp := popStackItem(oldSp)
-    offset, sp := popStackItem(sp)
-    size, sp := popStackItem(sp)
+    value, sp := popStackItem(oldSp, evmGasLeft)
+    offset, sp := popStackItem(sp, evmGasLeft)
+    size, sp := popStackItem(sp, evmGasLeft)
 
     checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
 
@@ -1357,10 +1357,10 @@ function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp, result, addr
 
     let value, offset, size, salt
 
-    value, sp := popStackItem(oldSp)
-    offset, sp := popStackItem(sp)
-    size, sp := popStackItem(sp)
-    salt, sp := popStackItem(sp)
+    value, sp := popStackItem(oldSp, evmGasLeft)
+    offset, sp := popStackItem(sp, evmGasLeft)
+    size, sp := popStackItem(sp, evmGasLeft)
+    salt, sp := popStackItem(sp, evmGasLeft)
 
     checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
 
