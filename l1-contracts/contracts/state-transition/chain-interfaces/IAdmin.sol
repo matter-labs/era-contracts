@@ -144,12 +144,7 @@ interface IAdmin is IZkSyncHyperchainBase {
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);
 
-    function forwardedBridgeClaimFailedBurn(
-        uint256 _chainId,
-        bytes32 _assetInfo,
-        address _prevMsgSender,
-        bytes calldata _data
-    ) external payable;
+    function forwardedBridgeRecoverFailedTransfer(bytes calldata _data) external payable;
 
     function forwardedBridgeMint(bytes calldata _data) external payable;
 }

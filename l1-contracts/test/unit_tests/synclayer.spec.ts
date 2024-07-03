@@ -83,6 +83,8 @@ describe("Synclayer", function () {
     await syncLayerDeployer.registerSyncLayer();
   });
 
+  // note from the pov the BH, STM and Admin L1->SL and SL -> L1 migrations are the similar,
+  // the difference is in the bridge contracts, and the fact that the chain is already deployed.
   it("Check start move chain to synclayer", async () => {
     const gasPrice = await owner.provider.getGasPrice();
     await migratingDeployer.moveChainToSyncLayer(syncLayerDeployer.chainId.toString(), gasPrice, false);

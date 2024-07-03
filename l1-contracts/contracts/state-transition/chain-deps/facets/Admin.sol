@@ -216,7 +216,6 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         address _prevMsgSender,
         bytes calldata
     ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
-        // (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
         require(s.syncLayer == address(0), "Af: already migrated");
         require(_prevMsgSender == s.admin, "Af: not chainAdmin");
         IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
@@ -271,12 +270,9 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         emit MigrationComplete();
     }
 
-    function forwardedBridgeClaimFailedBurn(
-        uint256 _chainId,
-        bytes32 _assetInfo,
-        address _prevMsgSender,
-        bytes calldata _data
-    ) external payable override {}
+    function forwardedBridgeRecoverFailedTransfer(bytes calldata) external payable override {
+        s.syncLayer == address(0);
+    }
 
     // todo make internal. For now useful for testing
     function _prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {

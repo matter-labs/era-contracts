@@ -519,10 +519,23 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     function bridgeRecoverFailedTransfer(
-        uint256 _chainId,
+        uint256 _settlementChainId,
         bytes32 _assetId,
-        bytes calldata _data
-    ) external payable override {}
+        bytes calldata _bridgehubMintData
+    ) external payable override {
+        (uint256 _chainId, bytes memory _stmData, bytes memory _chainMintData) = abi.decode(
+            _bridgehubMintData,
+            (uint256, bytes, bytes)
+        );
+        address stm = stmAssetInfoToAddress[_assetId];
+        require(stm == stateTransitionManager[_chainId], "BH: assetInfo 2");
+        require(_settlementChainId == settlementLayer[_chainId], "BH: not current SL"); // extra sanity check
+
+        settlementLayer[_chainId] = block.chainid;
+        address hyperchain = getHyperchain(_chainId);
+
+        IZkSyncHyperchain(hyperchain).forwardedBridgeRecoverFailedTransfer(_chainMintData);
+    }
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE
