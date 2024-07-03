@@ -12,9 +12,11 @@ import {L1SharedBridge} from "../../../contracts/bridge/L1SharedBridge.sol";
 import {DeployL1Utils} from "../../../deploy-scripts/_DeployL1.s.sol";
 import {RegisterHyperchainScript} from "../../../deploy-scripts/RegisterHyperchain.s.sol";
 import {ValidatorTimelock} from "../../../contracts/state-transition/ValidatorTimelock.sol";
-import {console2 as console} from "forge-std/Script.sol";
+import {console2} from "forge-std/Script.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import "forge-std/console.sol";
+import {AcceptAdmin} from "../../../deploy-scripts/AcceptAdmin.s.sol";
 
 contract DeployL1Test is Test {
     using stdStorage for StdStorage;
@@ -82,7 +84,7 @@ contract DeployL1Test is Test {
         console.log("StateTransitionManager set in ValidatorTimelock");
         vm.stopBroadcast();
 
-        DeployL1Utils._deployDiamondProxy();
+        //DeployL1Utils._deployDiamondProxy();
         DeployL1Utils._deploySharedBridgeContracts();
 
         vm.startBroadcast(bridgehub.owner());
@@ -121,8 +123,11 @@ contract DeployL1Test is Test {
 
         _run();
 
-        // hyperchain = new RegisterHyperchainScript();
-        // hyperchain.run();
+        AcceptAdmin acceptAdminScript = new AcceptAdmin();
+        acceptAdminScript.run();
+
+        hyperchain = new RegisterHyperchainScript();
+        hyperchain.run();
 
         bridgehubProxyAddress = DeployL1Utils.getBridgehubProxyAddress();
         bridgeHub = Bridgehub(bridgehubProxyAddress);

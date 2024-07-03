@@ -18,12 +18,18 @@ contract AcceptAdmin is Script {
 
     Config config;
 
+    function run() public {
+        initConfig();
+        acceptOwner();
+        acceptAdmin();
+    }
+
     function initConfig() public {
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/config-accept-admin.toml");
+        string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
         string memory toml = vm.readFile(path);
-        config.admin = toml.readAddress("$.target_addr");
-        config.governor = toml.readAddress("$.governor");
+        config.admin = toml.readAddress("$.owner_addr");
+        config.governor = toml.readAddress("$.deployed_addresses.governance_addr");
     }
 
     // This function should be called by the owner to accept the admin role
