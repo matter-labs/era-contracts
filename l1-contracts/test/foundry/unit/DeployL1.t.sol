@@ -124,8 +124,11 @@ contract DeployL1Test is Test {
         _run();
 
         AcceptAdmin acceptAdminScript = new AcceptAdmin();
-        acceptAdminScript.run();
-
+        // acceptAdminScript.run();
+        
+        address _governance = DeployL1Utils.addresses().governance;
+        acceptAdminScript.acceptAdmin();
+        
         hyperchain = new RegisterHyperchainScript();
         hyperchain.run();
 

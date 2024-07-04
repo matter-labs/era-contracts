@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
@@ -34,6 +34,7 @@ contract AcceptAdmin is Script {
 
     // This function should be called by the owner to accept the admin role
     function acceptOwner() public {
+        console.log("Owner");
         initConfig();
 
         Ownable2Step adminContract = Ownable2Step(config.admin);
@@ -49,6 +50,7 @@ contract AcceptAdmin is Script {
 
     // This function should be called by the owner to accept the admin role
     function acceptAdmin() public {
+        console.log("Admin");
         initConfig();
         IZkSyncHyperchain adminContract = IZkSyncHyperchain(config.admin);
         Utils.executeUpgrade({

@@ -164,7 +164,6 @@ contract RegisterHyperchainScript is Script {
                 config.diamondCutData
             )
         );
-        console.logBytes(data);
         Utils.executeUpgrade({
             _governor: ownable.owner(),
             _salt: bytes32(config.bridgehubCreateNewChainSalt),

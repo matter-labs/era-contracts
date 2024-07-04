@@ -301,22 +301,19 @@ library Utils {
         uint256 _value,
         uint256 _delay
     ) internal {
+        console.log("exeUp");
+        _delay = 1;
         IGovernance governance = IGovernance(_governor);
-        console.log("3");
         IGovernance.Call[] memory calls = new IGovernance.Call[](1);
         calls[0] = IGovernance.Call({target: _target, value: _value, data: _data});
-        console.log(_target);
-        console.log(_value);
-        console.log(_delay);
         IGovernance.Operation memory operation = IGovernance.Operation({
             calls: calls,
             predecessor: bytes32(0),
             salt: _salt
         });
-        console.log("5");
         vm.startBroadcast(0x70997970C51812dc3A010C7d01b50e0d17dc79C8);
+        console.log("Before");
         governance.scheduleTransparent(operation, _delay);
-        console.log("6");
         vm.warp(100);
         if (_delay == 0) {
             governance.execute{value: _value}(operation);
