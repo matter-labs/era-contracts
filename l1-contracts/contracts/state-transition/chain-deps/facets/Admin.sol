@@ -135,7 +135,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAdmin
-    function freezeDiamond() external onlyStateTransitionManager {
+    function freezeDiamond() external onlyAdminOrStateTransitionManager {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         require(!diamondStorage.isFrozen, "a9"); // diamond proxy is frozen already
