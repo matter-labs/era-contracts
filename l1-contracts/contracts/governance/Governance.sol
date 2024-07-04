@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IGovernance} from "./IGovernance.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -104,13 +105,19 @@ contract Governance is IGovernance, Ownable2Step {
     /// @dev Returns operation state.
     function getOperationState(bytes32 _id) public view returns (OperationState) {
         uint256 timestamp = timestamps[_id];
+        console.log("Timestamp", timestamp);
+        console.log("Block", block.timestamp);
         if (timestamp == 0) {
+            console.log("Unset");
             return OperationState.Unset;
         } else if (timestamp == EXECUTED_PROPOSAL_TIMESTAMP) {
+            console.log("Done");
             return OperationState.Done;
         } else if (timestamp > block.timestamp) {
+            console.log("Waiting");
             return OperationState.Waiting;
         } else {
+            console.log("Ready");
             return OperationState.Ready;
         }
     }
@@ -170,13 +177,16 @@ contract Governance is IGovernance, Ownable2Step {
         // Check if the predecessor operation is completed.
         _checkPredecessorDone(_operation.predecessor);
         // Ensure that the operation is ready to proceed.
+        console.log("sxsx");
         require(isOperationReady(id), "Operation must be ready before execution");
+        console.log("1st");
         // Execute operation.
         // slither-disable-next-line reentrancy-eth
         _execute(_operation.calls);
         // Reconfirming that the operation is still ready after execution.
         // This is needed to avoid unexpected reentrancy attacks of re-executing the same operation.
         require(isOperationReady(id), "Operation must be ready after execution");
+        console.log("2nd");
         // Set operation to be done
         timestamps[id] = EXECUTED_PROPOSAL_TIMESTAMP;
         emit OperationExecuted(id);

@@ -124,7 +124,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev initialize
     function initialize(
         StateTransitionManagerInitializeData calldata _initializeData
-    ) external reentrancyGuardInitializer {
+    ) public reentrancyGuardInitializer {
         require(_initializeData.owner != address(0), "STM: owner zero");
         _transferOwnership(_initializeData.owner);
 
