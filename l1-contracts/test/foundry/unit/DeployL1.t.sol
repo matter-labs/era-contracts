@@ -84,7 +84,7 @@ contract DeployL1Test is Test {
         console.log("StateTransitionManager set in ValidatorTimelock");
         vm.stopBroadcast();
 
-        //DeployL1Utils._deployDiamondProxy();
+        DeployL1Utils._deployDiamondProxy();
         DeployL1Utils._deploySharedBridgeContracts();
 
         vm.startBroadcast(bridgehub.owner());
@@ -109,8 +109,7 @@ contract DeployL1Test is Test {
         vm.startBroadcast(bridgehub.owner());
         bridgehub.transferOwnership(DeployL1Utils.getGovernanceAddress());
         vm.stopBroadcast();
-        AcceptAdmin acceptAdminScript = new AcceptAdmin();
-        acceptAdminScript.run();
+        _acceptOwnership(bridgehub);
         console.log("Bridge Owner", bridgehub.owner());
         console.log("Governance", DeployL1Utils.getGovernanceAddress());
         vm.startBroadcast(sharedBridge.owner());
@@ -120,15 +119,23 @@ contract DeployL1Test is Test {
         DeployL1Utils._saveOutput();
     }
 
+    function _acceptOwnership(Bridgehub bridgeHub) private {
+        vm.startPrank(bridgeHub.pendingOwner());
+        bridgeHub.acceptOwnership();
+        vm.stopPrank();
+    }
+
     function setUp() public {
         // l1Script = new DeployL1Script();
         // l1Script.run();
 
         _run();
 
-        AcceptAdmin acceptAdminScript = new AcceptAdmin();
-        acceptAdminScript.run();
+        // AcceptAdmin acceptAdminScript = new AcceptAdmin();
+        // acceptAdminScript.run();
         
+        vm.warp(100);
+
         hyperchain = new RegisterHyperchainScript();
         hyperchain.run();
 
