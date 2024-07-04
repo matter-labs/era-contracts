@@ -340,15 +340,11 @@ library DeployL1Utils {
         address contractAddress = _deployViaCreate2(code);
         console.log("Verifier deployed at:", contractAddress);
         addresses().stateTransition.verifier = contractAddress;
+        config().contracts.create2FactorySalt = 0x00000000000000000000000000000000000000000000000000000000000000ff;
     }
 
     function _deployDefaultUpgrade() public {
-        config().contracts.create2FactorySalt = 0x00000000000000000000000000000000000000000000000000000000000000ff;
-        console.log("Before");
-        console.logBytes32(config().contracts.create2FactorySalt);
         address contractAddress = _deployViaCreate2(type(DefaultUpgrade).creationCode);
-        console.log("After");
-        console.logBytes32(config().contracts.create2FactorySalt);
         console.log("DefaultUpgrade deployed at:", contractAddress);
         addresses().stateTransition.defaultUpgrade = contractAddress;
     }
@@ -677,7 +673,7 @@ library DeployL1Utils {
 
         Bridgehub bridgehub = Bridgehub(addresses().bridgehub.bridgehubProxy);
         bridgehub.transferOwnership(addresses().governance);
-
+        
         L1SharedBridge sharedBridge = L1SharedBridge(addresses().bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses().governance);
     }
@@ -829,7 +825,6 @@ library DeployL1Utils {
         console.log("Salt1");
         console.logBytes32(_salt);
         address _factory = addresses().create2Factory;
-        console2.log("Factory1", _factory);
 
         if (_bytecode.length == 0) {
             revert("Bytecode is not set");
@@ -857,7 +852,6 @@ library DeployL1Utils {
         console.log("Salt1");
         console.logBytes32(_salt);
         address _factory = addresses().create2Factory;
-        console2.log("Factory1", _factory);
         if (_bytecode.length == 0) {
             revert("Bytecode is not set");
         }
@@ -877,12 +871,9 @@ library DeployL1Utils {
         console.log("Salt2");
         console.logBytes32(_salt);
         address _factory = addresses().create2Factory;
-        console2.log("Factory2", _factory);
         (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
         address contractAddress = Utils.bytesToAddress(data);
-        // console.log("success", success);
         console.log("Address2", contractAddress);
-        // console.log("length", contractAddress.code.length);
 
         if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
             revert("Failed to deploy contract via create2");

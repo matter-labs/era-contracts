@@ -109,7 +109,10 @@ contract DeployL1Test is Test {
         vm.startBroadcast(bridgehub.owner());
         bridgehub.transferOwnership(DeployL1Utils.getGovernanceAddress());
         vm.stopBroadcast();
-
+        AcceptAdmin acceptAdminScript = new AcceptAdmin();
+        acceptAdminScript.run();
+        console.log("Bridge Owner", bridgehub.owner());
+        console.log("Governance", DeployL1Utils.getGovernanceAddress());
         vm.startBroadcast(sharedBridge.owner());
         sharedBridge.transferOwnership(DeployL1Utils.getGovernanceAddress());
         vm.stopBroadcast();
@@ -124,10 +127,7 @@ contract DeployL1Test is Test {
         _run();
 
         AcceptAdmin acceptAdminScript = new AcceptAdmin();
-        // acceptAdminScript.run();
-        
-        address _governance = DeployL1Utils.addresses().governance;
-        acceptAdminScript.acceptAdmin();
+        acceptAdminScript.run();
         
         hyperchain = new RegisterHyperchainScript();
         hyperchain.run();

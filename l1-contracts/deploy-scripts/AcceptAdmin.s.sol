@@ -28,13 +28,14 @@ contract AcceptAdmin is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
         string memory toml = vm.readFile(path);
-        config.admin = toml.readAddress("$.owner_addr");
+        config.admin = 0x09d1367Ce5E539c5B95ba4aEaCb60779797F9fBa;
         config.governor = toml.readAddress("$.deployed_addresses.governance_addr");
     }
 
     // This function should be called by the owner to accept the admin role
     function acceptOwner() public {
-        console.log("Owner");
+        console.log("Owner", config.governor);
+        console.log("Admin", config.admin);
         initConfig();
 
         Ownable2Step adminContract = Ownable2Step(config.admin);

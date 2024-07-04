@@ -302,7 +302,6 @@ library Utils {
         uint256 _delay
     ) internal {
         console.log("exeUp");
-        _delay = 1;
         IGovernance governance = IGovernance(_governor);
         IGovernance.Call[] memory calls = new IGovernance.Call[](1);
         calls[0] = IGovernance.Call({target: _target, value: _value, data: _data});
