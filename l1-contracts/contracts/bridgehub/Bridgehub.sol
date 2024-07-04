@@ -8,8 +8,8 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/acces
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
-import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
-import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
+import {IAssetRouterBase} from "../bridge/interfaces/IAssetRouterBase.sol";
+import {INullifier} from "../bridge/interfaces/INullifier.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
@@ -34,7 +34,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     uint256 public immutable L1_CHAIN_ID;
 
     /// @notice all the ether is held by the weth bridge
-    IL1AssetRouter public sharedBridge;
+    IAssetRouterBase public sharedBridge;
 
     /// @notice we store registered stateTransitionManagers
     mapping(address stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
@@ -70,7 +70,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     mapping(uint256 chainId => bool isWhitelistedSyncLayer) public whitelistedSettlementLayers;
 
     /// @dev The contract responsible for confirming l2 tx, and is withdrawal finalized mapping.
-    IL1Nullifier public l1Nullifier;
+    INullifier public nullifier;
 
     /// @notice to avoid parity hack
     constructor(uint256 _l1ChainId, address _owner) reentrancyGuardInitializer {
@@ -132,12 +132,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
     function setAddresses(
         address _sharedBridge,
-        address _l1Nullifier,
+        address _nullifier,
         ISTMDeploymentTracker _stmDeployer,
         IMessageRoot _messageRoot
     ) external onlyOwner {
-        sharedBridge = IL1AssetRouter(_sharedBridge);
-        l1Nullifier = IL1Nullifier(_l1Nullifier);
+        sharedBridge = IAssetRouterBase(_sharedBridge);
+        nullifier = INullifier(_nullifier);
         stmDeployer = _stmDeployer;
         messageRoot = _messageRoot;
         _messageRoot.addNewChain(block.chainid);
@@ -173,7 +173,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
     function setSharedBridge(address _sharedBridge) external onlyOwner {
-        sharedBridge = IL1AssetRouter(_sharedBridge);
+        sharedBridge = IAssetRouterBase(_sharedBridge);
     }
 
     function registerSyncLayer(
@@ -413,7 +413,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address hyperchain = getHyperchain(_request.chainId);
 
         // slither-disable-next-line arbitrary-send-eth
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1AssetRouter(_request.secondBridgeAddress)
+        L2TransactionRequestTwoBridgesInner memory outputRequest = IAssetRouterBase(_request.secondBridgeAddress)
             .bridgehubDeposit{value: _request.secondBridgeValue}(
             _request.chainId,
             msg.sender,
@@ -443,7 +443,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             })
         );
 
-        l1Nullifier.bridgehubConfirmL2Transaction(_request.chainId, outputRequest.txDataHash, canonicalTxHash);
+        nullifier.bridgehubConfirmL2Transaction(_request.chainId, outputRequest.txDataHash, canonicalTxHash);
     }
 
     function forwardTransactionOnSyncLayer(

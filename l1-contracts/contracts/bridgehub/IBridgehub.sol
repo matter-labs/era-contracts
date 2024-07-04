@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
+import {IAssetRouterBase} from "../bridge/interfaces/IAssetRouterBase.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 
@@ -75,7 +76,7 @@ interface IBridgehub is IL1AssetHandler {
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
-    function sharedBridge() external view returns (IL1AssetRouter);
+    function sharedBridge() external view returns (IAssetRouterBase);
 
     function getHyperchain(uint256 _chainId) external view returns (address);
 

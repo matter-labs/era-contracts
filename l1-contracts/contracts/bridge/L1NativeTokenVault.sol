@@ -13,7 +13,8 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
-import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
+import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
+import {INullifier} from "./interfaces/INullifier.sol";
 
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
@@ -30,10 +31,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     address public immutable override L1_WETH_TOKEN;
 
     /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
-    IL1AssetRouter public immutable override L1_SHARED_BRIDGE;
+    IAssetRouterBase public immutable override L1_SHARED_BRIDGE;
 
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
-    IL1Nullifier public immutable override L1_NULLIFIER;
+    INullifier public immutable override NULLIFIER;
 
     /// @dev Era's chainID
     uint256 public immutable ERA_CHAIN_ID;
@@ -62,15 +63,15 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
         address _l1WethAddress,
-        IL1AssetRouter _l1SharedBridge,
+        IAssetRouterBase _l1SharedBridge,
         uint256 _eraChainId,
-        IL1Nullifier _l1Nullifier
+        INullifier _l1Nullifier
     ) {
         _disableInitializers();
         L1_WETH_TOKEN = _l1WethAddress;
         ERA_CHAIN_ID = _eraChainId;
         L1_SHARED_BRIDGE = _l1SharedBridge;
-        L1_NULLIFIER = _l1Nullifier;
+        NULLIFIER = _l1Nullifier;
     }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy.
@@ -93,14 +94,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     function transferFundsFromSharedBridge(address _token) external {
         if (_token == ETH_TOKEN_ADDRESS) {
             uint256 balanceBefore = address(this).balance;
-            L1_NULLIFIER.transferTokenToNTV(_token);
+            NULLIFIER.transferTokenToNTV(_token);
             uint256 balanceAfter = address(this).balance;
             require(balanceAfter > balanceBefore, "NTV: 0 eth transferred");
         } else {
             uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
             uint256 sharedBridgeChainBalance = IERC20(_token).balanceOf(address(L1_SHARED_BRIDGE));
             require(sharedBridgeChainBalance > 0, "NTV: 0 amount to transfer");
-            L1_NULLIFIER.transferTokenToNTV(_token);
+            NULLIFIER.transferTokenToNTV(_token);
             uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
             require(balanceAfter - balanceBefore >= sharedBridgeChainBalance, "NTV: wrong amount transferred");
         }
@@ -111,9 +112,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     /// @param _targetChainId The chain ID of the corresponding ZK chain.
     function transferBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
-        uint256 sharedBridgeChainBalance = L1_NULLIFIER.chainBalance(_targetChainId, _token);
+        uint256 sharedBridgeChainBalance = NULLIFIER.chainBalance(_targetChainId, _token);
         chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + sharedBridgeChainBalance;
-        L1_NULLIFIER.clearChainBalance(_targetChainId, _token);
+        NULLIFIER.clearChainBalance(_targetChainId, _token);
     }
 
     /// @notice Registers tokens within the NTV.
@@ -124,7 +125,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         require(_l1Token != L1_WETH_TOKEN, "NTV: WETH deposit not supported");
         require(_l1Token == ETH_TOKEN_ADDRESS || _l1Token.code.length > 0, "NTV: empty token");
         bytes32 assetId = getAssetId(_l1Token);
-        L1_SHARED_BRIDGE.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_l1Token))), address(this));
+        L1_SHARED_BRIDGE.setAssetHandlerAddress(bytes32(uint256(uint160(_l1Token))), address(this));
         tokenAddress[assetId] = _l1Token;
     }
 
