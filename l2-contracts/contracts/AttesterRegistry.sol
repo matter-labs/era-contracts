@@ -22,10 +22,6 @@ contract AttesterRegistry {
         // considered when selecting committees. Only inactive attesters can
         // be removed from the registry.
         bool isInactive;
-        // The epoch in which the attester became inactive. We need to store this since
-        // we may want to impose a delay between an attester becoming inactive and
-        // being able to be removed.
-        uint256 inactiveSince;
     }
 
     struct CommitteeAttester {
@@ -70,7 +66,7 @@ contract AttesterRegistry {
             }
         }
 
-        attesters[nodeOwner] = Attester(weight, pubKey, false, 0);
+        attesters[nodeOwner] = Attester(weight, pubKey, false);
         attesterOwners.push(nodeOwner);
     }
 
