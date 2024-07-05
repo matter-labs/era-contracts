@@ -64,10 +64,13 @@ interface IStateTransitionManager {
         bytes32 newInitialCutHash
     );
 
-    /// @notice new UpgradeCutHash
+    /// @notice New UpgradeCutHash
     event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
 
-    /// @notice new ProtocolVersion
+    /// @notice New UpgradeCutData
+    event NewUpgradeCutData(uint256 indexed protocolVersion, Diamond.DiamondCutData diamondCutData);
+
+    /// @notice New ProtocolVersion
     event NewProtocolVersion(uint256 indexed oldProtocolVersion, uint256 indexed newProtocolVersion);
 
     function BRIDGE_HUB() external view returns (address);
