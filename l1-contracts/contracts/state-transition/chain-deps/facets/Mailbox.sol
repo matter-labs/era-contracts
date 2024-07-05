@@ -417,6 +417,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
         if (s.syncLayer != address(0)) {
+            // slither-disable-next-line unused-return
             IMailbox(s.syncLayer).requestL2TransactionToSyncLayerMailbox({
                 _chainId: s.chainId,
                 _transaction: transaction,
