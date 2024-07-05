@@ -170,7 +170,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     /// NO DA is provided here ATM !!!
     /// @notice To be called by the bootloader by the L1Messenger at the end of the batch to produce the final root and send it to the underlying layer.
     /// @return pubdata The pubdata to be relayed to the DA layer.
-    function clearTreeAndProvidePubdata() external returns (bytes memory pubdata) {
+    function clearTreeAndProvidePubdata() external returns (bytes memory) {
         // FIXME: access control: only to be called by the l1 messenger.
         // uint256 cachedChainCount = chainCount;
         // // We will send the updated roots for all chains.
