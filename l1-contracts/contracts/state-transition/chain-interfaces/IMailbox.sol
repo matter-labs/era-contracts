@@ -125,6 +125,13 @@ interface IMailbox is IZkSyncHyperchainBase {
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
 
+    function proveL2LeafInclusion(
+        uint256 _batchNumber,
+        uint256 _batchRootMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) external view returns (bool);
+
     /// @notice transfer Eth to shared bridge as part of migration process
     // function transferEthToSharedBridge() external;
 

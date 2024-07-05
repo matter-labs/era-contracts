@@ -15,9 +15,10 @@ import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
-// import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
+import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -45,11 +46,18 @@ contract DeployL1Script is Script {
         BridgehubDeployedAddresses bridgehub;
         StateTransitionDeployedAddresses stateTransition;
         BridgesDeployedAddresses bridges;
+        L1NativeTokenVaultAddresses vaults;
         address transparentProxyAdmin;
         address governance;
         address blobVersionedHashRetriever;
         address validatorTimelock;
         address create2Factory;
+    }
+
+    // solhint-disable-next-line gas-struct-packing
+    struct L1NativeTokenVaultAddresses {
+        address l1NativeTokenVaultImplementation;
+        address l1NativeTokenVaultProxy;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -118,6 +126,7 @@ contract DeployL1Script is Script {
         bytes diamondCutData;
         bytes32 bootloaderHash;
         bytes32 defaultAAHash;
+        bytes forceDeploymentsData;
     }
 
     struct TokensConfig {
@@ -151,6 +160,8 @@ contract DeployL1Script is Script {
         deployDiamondProxy();
 
         deploySharedBridgeContracts();
+        deployL1NativeTokenVaultImplementation();
+        deployL1NativeTokenVaultProxy();
         deployErc20BridgeImplementation();
         deployErc20BridgeProxy();
         updateSharedBridge();
@@ -213,6 +224,8 @@ contract DeployL1Script is Script {
         config.contracts.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
+
+        config.contracts.forceDeploymentsData = toml.readBytes("$.contracts.force_deployments_data");
     }
 
     function instantiateCreate2Factory() internal {
@@ -268,7 +281,7 @@ contract DeployL1Script is Script {
     }
 
     function deployGenesisUpgrade() internal {
-        address contractAddress = deployViaCreate2(type(GenesisUpgrade).creationCode);
+        address contractAddress = deployViaCreate2(type(L1GenesisUpgrade).creationCode);
         console.log("GenesisUpgrade deployed at:", contractAddress);
         addresses.stateTransition.genesisUpgrade = contractAddress;
     }
@@ -308,7 +321,11 @@ contract DeployL1Script is Script {
     }
 
     function deployBridgehubContract() internal {
-        address bridgehubImplementation = deployViaCreate2(type(Bridgehub).creationCode);
+        bytes memory bridgeHubBytecode = abi.encodePacked(
+            type(Bridgehub).creationCode,
+            abi.encode(config.eraChainId, config.ownerAddress)
+        );
+        address bridgehubImplementation = deployViaCreate2(bridgeHubBytecode);
         console.log("Bridgehub Implementation deployed at:", bridgehubImplementation);
         addresses.bridgehub.bridgehubImplementation = bridgehubImplementation;
 
@@ -440,7 +457,8 @@ contract DeployL1Script is Script {
             genesisBatchHash: config.contracts.genesisRoot,
             genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.genesisBatchCommitment,
-            diamondCut: diamondCut
+            diamondCut: diamondCut,
+            forceDeploymentsData: config.contracts.forceDeploymentsData
         });
 
         StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
@@ -547,7 +565,7 @@ contract DeployL1Script is Script {
     function deployErc20BridgeImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(L1ERC20Bridge).creationCode,
-            abi.encode(addresses.bridges.sharedBridgeProxy)
+            abi.encode(addresses.bridges.sharedBridgeProxy, addresses.vaults.l1NativeTokenVaultProxy)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("Erc20BridgeImplementation deployed at:", contractAddress);
@@ -570,6 +588,27 @@ contract DeployL1Script is Script {
         vm.broadcast();
         sharedBridge.setL1Erc20Bridge(addresses.bridges.erc20BridgeProxy);
         console.log("SharedBridge updated with ERC20Bridge address");
+    }
+
+    function deployL1NativeTokenVaultImplementation() internal {
+        bytes memory bytecode = abi.encodePacked(
+            type(L1NativeTokenVault).creationCode,
+            abi.encode(config.tokens.tokenWethAddress, addresses.bridges.sharedBridgeProxy, config.eraChainId)
+        );
+        address contractAddress = deployViaCreate2(bytecode);
+        console.log("L1NativeTokenVaultImplementation deployed at:", contractAddress);
+        addresses.vaults.l1NativeTokenVaultImplementation = contractAddress;
+    }
+
+    function deployL1NativeTokenVaultProxy() internal {
+        bytes memory initCalldata = abi.encodeCall(L1NativeTokenVault.initialize, config.ownerAddress);
+        bytes memory bytecode = abi.encodePacked(
+            type(TransparentUpgradeableProxy).creationCode,
+            abi.encode(addresses.vaults.l1NativeTokenVaultImplementation, addresses.transparentProxyAdmin, initCalldata)
+        );
+        address contractAddress = deployViaCreate2(bytecode);
+        console.log("L1NativeTokenVaultProxy deployed at:", contractAddress);
+        addresses.vaults.l1NativeTokenVaultProxy = contractAddress;
     }
 
     function updateOwners() internal {
