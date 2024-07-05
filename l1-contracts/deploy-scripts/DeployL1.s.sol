@@ -15,7 +15,7 @@ import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
-// import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
+import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -268,7 +268,7 @@ contract DeployL1Script is Script {
     }
 
     function deployGenesisUpgrade() internal {
-        address contractAddress = deployViaCreate2(type(GenesisUpgrade).creationCode);
+        address contractAddress = deployViaCreate2(type(L1GenesisUpgrade).creationCode);
         console.log("GenesisUpgrade deployed at:", contractAddress);
         addresses.stateTransition.genesisUpgrade = contractAddress;
     }
@@ -440,7 +440,8 @@ contract DeployL1Script is Script {
             genesisBatchHash: config.contracts.genesisRoot,
             genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.genesisBatchCommitment,
-            diamondCut: diamondCut
+            diamondCut: diamondCut,
+            forceDeploymentsData: ""
         });
 
         StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({

@@ -162,6 +162,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         bytes32 initialRoot = chainTree[chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
 
         if (_updateTree) {
+            // slither-disable-next-line unused-return
             sharedTree.updateLeaf(_index, Messaging.chainIdLeafHash(initialRoot, chainId));
         }
     }
