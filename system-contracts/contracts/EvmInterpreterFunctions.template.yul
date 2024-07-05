@@ -96,11 +96,11 @@ function dupStackItem(sp, evmGas, position) -> newSp, evmGasLeft {
     let tempSp := sub(sp, mul(0x20, sub(position, 1)))
 
     if or(gt(tempSp, BYTECODE_OFFSET()), eq(tempSp, BYTECODE_OFFSET())) {
-        revert(0, 0)
+        revertWithGas(evmGasLeft)
     }
 
     if lt(tempSp, STACK_OFFSET()) {
-        revert(0, 0)
+        revertWithGas(evmGasLeft)
     }
 
     let dup := mload(tempSp)                    
@@ -114,11 +114,11 @@ function swapStackItem(sp, evmGas, position) ->  evmGasLeft {
     let tempSp := sub(sp, mul(0x20, position))
 
     if or(gt(tempSp, BYTECODE_OFFSET()), eq(tempSp, BYTECODE_OFFSET())) {
-        revert(0, 0)
+        revertWithGas(evmGasLeft)
     }
 
     if lt(tempSp, STACK_OFFSET()) {
-        revert(0, 0)
+        revertWithGas(evmGasLeft)
     }
 
 
@@ -129,19 +129,19 @@ function swapStackItem(sp, evmGas, position) ->  evmGasLeft {
     mstore(tempSp, s2)
 }
 
-function popStackItem(sp) -> a, newSp {
+function popStackItem(sp, evmGasLeft) -> a, newSp {
     // We can not return any error here, because it would break compatibility
     if lt(sp, STACK_OFFSET()) {
-        revert(0, 0)
+        revertWithGas(evmGasLeft)
     }
 
     a := mload(sp)
     newSp := sub(sp, 0x20)
 }
 
-function pushStackItem(sp, item) -> newSp {
+function pushStackItem(sp, item, evmGasLeft) -> newSp {
     if or(gt(sp, BYTECODE_OFFSET()), eq(sp, BYTECODE_OFFSET())) {
-        revert(0, 0)
+        revertWithGas(evmGasLeft)
     }
 
     newSp := add(sp, 0x20)
@@ -257,14 +257,20 @@ function _fetchDeployedCodeLen(addr) -> codeLen {
 
     let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
 
-    if iszero(success) {
-        // This error should never happen
-        revert(0, 0)
+    switch iszero(success)
+    case 1 {
+        // The code oracle call can only fail in the case where the contract
+        // we are querying is the current one executing and it has not yet been
+        // deployed, i.e., if someone calls codesize (or extcodesize(address()))
+        // inside the constructor. In that case, code length is zero.
+        codeLen := 0
+    }
+    default {
+        // The first word is the true length of the bytecode
+        returndatacopy(0, 0, 32)
+        codeLen := mload(0)
     }
 
-    // The first word is the true length of the bytecode
-    returndatacopy(0, 0, 32)
-    codeLen := mload(0)
 }
 
 function getDeployedBytecode() {
@@ -302,7 +308,7 @@ function consumeEvmFrame() -> passGas, isStatic, callerEVM {
 
 function chargeGas(prevGas, toCharge) -> gasRemaining {
     if lt(prevGas, toCharge) {
-        revert(0, 0)
+        revertWithGas(0)
     }
 
     gasRemaining := sub(prevGas, toCharge)
@@ -463,10 +469,29 @@ function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
         }
 }
 
-function checkMemOverflow(location) {
+function checkMemOverflow(location, evmGasLeft) {
     if gt(location, MAX_MEMORY_FRAME()) {
-        revert(0, 0)
+        mstore(0, evmGasLeft)
+        revert(0, 32)
     }
+}
+
+function checkMultipleOverflow(data1, data2, data3, evmGasLeft) {
+    checkOverflow(data1, data2, evmGasLeft)
+    checkOverflow(data1, data3, evmGasLeft)
+    checkOverflow(data2, data3, evmGasLeft)
+    checkOverflow(add(data1, data2), data3, evmGasLeft)
+}
+
+function checkOverflow(data1, data2, evmGasLeft) {
+    if lt(add(data1, data2), data2) {
+        revertWithGas(evmGasLeft)
+    }
+}
+
+function revertWithGas(evmGasLeft) {
+    mstore(0, evmGasLeft)
+    revert(0, 32)
 }
 
 // This function can overflow, it is the job of the caller to ensure that it does not.
@@ -776,7 +801,7 @@ function getEVMGas() -> evmGas {
     if lt(sub(_gas,shl(30,1)), requiredGas) {
         // This cheks if enough zkevm gas was provided, we are substracting 2^30 since that's the stipend, 
         // and we need to make sure that the gas provided over that is enough for security reasons
-        // revert(0, 0)
+        revert(0, 0)
     }
     evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
 }
@@ -804,7 +829,13 @@ function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft{
         default {
             returndatacopy(0, 0, 32)
             _gasLeft := mload(0)
-            returndatacopy(_outputOffset, 32, _outputLen)
+
+            // We copy as much returndata as possible without going over the 
+            // returndata size.
+            switch lt(sub(rtsz, 32), _outputLen)
+                case 0 { returndatacopy(_outputOffset, 32, _outputLen) }
+                default { returndatacopy(_outputOffset, 32, sub(rtsz, 32)) }
+
             mstore(lastRtSzOffset, sub(rtsz, 32))
 
             // Skip the returnData
@@ -830,15 +861,20 @@ function _saveReturndataAfterZkEVMCall() {
 function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
     let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
 
-    gasToPass, sp := popStackItem(oldSp)
-    addr, sp := popStackItem(sp)
-    argsOffset, sp := popStackItem(sp)
-    argsSize, sp := popStackItem(sp)
-    retOffset, sp := popStackItem(sp)
-    retSize, sp := popStackItem(sp)
+    gasToPass, sp := popStackItem(oldSp, evmGasLeft)
+    addr, sp := popStackItem(sp, evmGasLeft)
+    argsOffset, sp := popStackItem(sp, evmGasLeft)
+    argsSize, sp := popStackItem(sp, evmGasLeft)
+    retOffset, sp := popStackItem(sp, evmGasLeft)
+    retSize, sp := popStackItem(sp, evmGasLeft)
 
-    checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()))
-    checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()))
+    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+
+    checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER(), evmGasLeft)
+    checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER(), evmGasLeft)
+
+    checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()), evmGasLeft)
+    checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()), evmGasLeft)
 
     extraCost := 0
     if iszero(warmAddress(addr)) {
@@ -883,7 +919,7 @@ function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
 
     extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
     extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
-    sp := pushStackItem(sp, success)
+    sp := pushStackItem(sp, success, evmGasLeft)
 }
 function capGas(evmGasLeft,oldGasToPass) -> gasToPass {
     let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
@@ -909,7 +945,7 @@ function _performCall(addr,gasToPass,value,argsOffset,argsSize,retOffset,retSize
     let is_evm := _isEVM(addr)
     if isStatic {
         if value {
-            revert(0, 0)
+            revertWithGas(gasToPassNew)
         }
         success, frameGasLeft:= _performStaticCall(
             is_evm,
@@ -924,7 +960,7 @@ function _performCall(addr,gasToPass,value,argsOffset,argsSize,retOffset,retSize
 
     if and(is_evm, iszero(isStatic)) {
         _pushEVMFrame(gasToPassNew, isStatic)
-        success := call(gasToPassNew, addr, value, argsOffset, argsSize, 0, 0)
+        success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
         frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
         _popEVMFrame()
     }
@@ -947,13 +983,15 @@ function _performCall(addr,gasToPass,value,argsOffset,argsSize,retOffset,retSize
 function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
     let gasToPass,addr,value,argsOffset,argsSize,retOffset,retSize
 
-    gasToPass, sp := popStackItem(oldSp)
-    addr, sp := popStackItem(sp)
-    value, sp := popStackItem(sp)
-    argsOffset, sp := popStackItem(sp)
-    argsSize, sp := popStackItem(sp)
-    retOffset, sp := popStackItem(sp)
-    retSize, sp := popStackItem(sp)
+    gasToPass, sp := popStackItem(oldSp, evmGasLeft)
+    addr, sp := popStackItem(sp, evmGasLeft)
+    value, sp := popStackItem(sp, evmGasLeft)
+    argsOffset, sp := popStackItem(sp, evmGasLeft)
+    argsSize, sp := popStackItem(sp, evmGasLeft)
+    retOffset, sp := popStackItem(sp, evmGasLeft)
+    retSize, sp := popStackItem(sp, evmGasLeft)
+
+    addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
     // static_gas = 0
     // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
@@ -984,8 +1022,11 @@ function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
     argsOffset := add(argsOffset,MEM_OFFSET_INNER())
     retOffset := add(retOffset,MEM_OFFSET_INNER())
 
-    checkMemOverflow(add(argsOffset, argsSize))
-    checkMemOverflow(add(retOffset, retSize))
+    checkOverflow(argsOffset,argsSize, evmGasLeft)
+    checkOverflow(retOffset,retSize, evmGasLeft)
+
+    checkMemOverflow(add(argsOffset, argsSize), evmGasLeft)
+    checkMemOverflow(add(retOffset, retSize), evmGasLeft)
 
     let success, frameGasLeft 
     success, frameGasLeft, gasToPass:= _performCall(
@@ -1001,7 +1042,7 @@ function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
 
     extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
     extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
-    sp := pushStackItem(sp,success) 
+    sp := pushStackItem(sp,success, evmGasLeft) 
 }
 
 function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost {
@@ -1010,18 +1051,23 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
     sp := oldSp
     isStatic := oldIsStatic
 
-    gasToPass, sp := popStackItem(sp)
-    addr, sp := popStackItem(sp)
-    argsOffset, sp := popStackItem(sp)
-    argsSize, sp := popStackItem(sp)
-    retOffset, sp := popStackItem(sp)
-    retSize, sp := popStackItem(sp)
+    gasToPass, sp := popStackItem(sp, evmGasLeft)
+    addr, sp := popStackItem(sp, evmGasLeft)
+    argsOffset, sp := popStackItem(sp, evmGasLeft)
+    argsSize, sp := popStackItem(sp, evmGasLeft)
+    retOffset, sp := popStackItem(sp, evmGasLeft)
+    retSize, sp := popStackItem(sp, evmGasLeft)
 
-    checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()))
-    checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()))
+    // addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
+
+    checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER(), evmGasLeft)
+    checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER(), evmGasLeft)
+
+    checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()), evmGasLeft)
+    checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()), evmGasLeft)
 
     if iszero(_isEVM(addr)) {
-        revert(0, 0)
+        revertWithGas(evmGasLeft)
     }
 
     extraCost := 0
@@ -1045,7 +1091,7 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
     _pushEVMFrame(gasToPass, isStatic)
     let success := delegatecall(
         // We can not just pass all gas here to prevert overflow of zkEVM gas counter
-        gasToPass,
+        EVM_GAS_STIPEND(),
         addr,
         add(MEM_OFFSET_INNER(), argsOffset),
         argsSize,
@@ -1059,7 +1105,7 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
 
     extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
     extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
-    sp := pushStackItem(sp, success)
+    sp := pushStackItem(sp, success, evmGasLeft)
 }
 
 function getMessageCallGas (
@@ -1107,7 +1153,7 @@ function _performStaticCall(
         _pushEVMFrame(_calleeGas, true)
         // TODO Check the following comment from zkSync .sol.
         // We can not just pass all gas here to prevert overflow of zkEVM gas counter
-        success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, 0, 0)
+        success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
 
         _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
         _popEVMFrame()
@@ -1166,23 +1212,16 @@ function genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, 
 
     let gasForTheCall := capGas(evmGasLeftOld,INF_PASS_GAS())
 
-    if lt(balance(addr),value) {
-        revert(0,0)
-    }
-
-    let nonceNewAddr := getNonce(addr)
-    let bytecodeNewAddr := extcodesize(addr)
-    if or(gt(nonceNewAddr, 0), gt(bytecodeNewAddr, 0)) {
-        incrementNonce(address())
-        revert(0, 0)
+    if lt(selfbalance(),value) {
+        revertWithGas(evmGasLeftOld)
     }
 
     offset := add(MEM_OFFSET_INNER(), offset)
 
-    sp := pushStackItem(sp, mload(sub(offset, 0x80)))
-    sp := pushStackItem(sp, mload(sub(offset, 0x60)))
-    sp := pushStackItem(sp, mload(sub(offset, 0x40)))
-    sp := pushStackItem(sp, mload(sub(offset, 0x20)))
+    sp := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeft)
+    sp := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeft)
+    sp := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeft)
+    sp := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeft)
 
     // Selector
     mstore(sub(offset, 0x80), 0x5b16a23c)
@@ -1216,13 +1255,13 @@ function genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, 
 
     let back
 
-    back, sp := popStackItem(sp)
+    back, sp := popStackItem(sp, evmGasLeft)
     mstore(sub(offset, 0x20), back)
-    back, sp := popStackItem(sp)
+    back, sp := popStackItem(sp, evmGasLeft)
     mstore(sub(offset, 0x40), back)
-    back, sp := popStackItem(sp)
+    back, sp := popStackItem(sp, evmGasLeft)
     mstore(sub(offset, 0x60), back)
-    back, sp := popStackItem(sp)
+    back, sp := popStackItem(sp, evmGasLeft)
     mstore(sub(offset, 0x80), back)
 }
 
@@ -1230,10 +1269,10 @@ function performExtCodeCopy(evmGas,oldSp) -> evmGasLeft, sp {
     evmGasLeft := chargeGas(evmGas, 100)
 
     let addr, dest, offset, len
-    addr, sp := popStackItem(oldSp)
-    dest, sp := popStackItem(sp)
-    offset, sp := popStackItem(sp)
-    len, sp := popStackItem(sp)
+    addr, sp := popStackItem(oldSp, evmGasLeft)
+    dest, sp := popStackItem(sp, evmGasLeft)
+    offset, sp := popStackItem(sp, evmGasLeft)
+    len, sp := popStackItem(sp, evmGasLeft)
 
     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
     // minimum_word_size = (size + 31) / 32
@@ -1268,23 +1307,25 @@ function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
     evmGasLeft := chargeGas(evmGas, 32000)
 
     if isStatic {
-        revert(0, 0)
+        revertWithGas(evmGasLeft)
     }
 
     let value, offset, size
 
-    value, sp := popStackItem(oldSp)
-    offset, sp := popStackItem(sp)
-    size, sp := popStackItem(sp)
+    value, sp := popStackItem(oldSp, evmGasLeft)
+    offset, sp := popStackItem(sp, evmGasLeft)
+    size, sp := popStackItem(sp, evmGasLeft)
 
-    checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)))
+    checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
+
+    checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
 
     if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
-        revert(0, 0)
+        revertWithGas(evmGasLeft)
     }
 
     if gt(value, balance(address())) {
-        revert(0, 0)
+        revertWithGas(evmGasLeft)
     }
 
     // dynamicGas = init_code_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
@@ -1303,32 +1344,34 @@ function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
     result, evmGasLeft := genericCreate(addr, offset, size, sp, value, evmGasLeft)
 
     switch result
-        case 0 { sp := pushStackItem(sp, 0) }
-        default { sp := pushStackItem(sp, addr) }
+        case 0 { sp := pushStackItem(sp, 0, evmGasLeft) }
+        default { sp := pushStackItem(sp, addr, evmGasLeft) }
 }
 
 function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp, result, addr{
     evmGasLeft := chargeGas(evmGas, 32000)
 
     if isStatic {
-        revert(0, 0)
+        revertWithGas(evmGasLeft)
     }
 
     let value, offset, size, salt
 
-    value, sp := popStackItem(oldSp)
-    offset, sp := popStackItem(sp)
-    size, sp := popStackItem(sp)
-    salt, sp := popStackItem(sp)
+    value, sp := popStackItem(oldSp, evmGasLeft)
+    offset, sp := popStackItem(sp, evmGasLeft)
+    size, sp := popStackItem(sp, evmGasLeft)
+    salt, sp := popStackItem(sp, evmGasLeft)
 
-    checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)))
+    checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
+
+    checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
 
     if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
-        revert(0, 0)
+        revertWithGas(evmGasLeft)
     }
 
     if gt(value, balance(address())) {
-        revert(0, 0)
+        revertWithGas(evmGasLeft)
     }
 
     // dynamicGas = init_code_cost + hash_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
