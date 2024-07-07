@@ -14,7 +14,6 @@ import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
 import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
-import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 import {INullifier} from "./interfaces/INullifier.sol";
 import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 
@@ -145,83 +144,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         l2TxHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
     }
 
-    /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
-    /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
-    /// @param _chainId The chain ID of the ZK chain to which deposit.
-    /// @param _assetId The deposited asset ID.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    /// @param _amount The total amount of tokens to be bridged.
-    function bridgehubDepositBaseToken(
-        uint256 _chainId,
-        bytes32 _assetId,
-        address _prevMsgSender,
-        uint256 _amount
-    ) external payable override onlyBridgehubOrEra(_chainId) whenNotPaused {
-        address l1AssetHandler = assetHandlerAddress[_assetId];
-        _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
-        // slither-disable-next-line unused-return
-        IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
-            _chainId: _chainId,
-            _mintValue: _amount,
-            _assetId: _assetId,
-            _prevMsgSender: _prevMsgSender,
-            _data: abi.encode(_amount, address(0))
-        });
-
-        // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
-        emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _assetId, _amount);
-    }
-
-    /// @notice Decodes the transfer input for legacy data and transfers allowance to NTV.
-    /// @dev Is not applicable for custom asset handlers.
-    /// @param _data The encoded transfer data (address _l1Token, uint256 _depositAmount, address _l2Receiver).
-    /// @param _prevMsgSender The address of the deposit initiator.
-    /// @return Tuple of asset ID and encoded transfer data to conform with new encoding standard.
-    function _handleLegacyData(bytes calldata _data, address _prevMsgSender) internal returns (bytes32, bytes memory) {
-        (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
-            _data,
-            (address, uint256, address)
-        );
-        bytes32 assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-        _transferAllowanceToNTV(assetId, _depositAmount, _prevMsgSender);
-        return (assetId, abi.encode(_depositAmount, _l2Receiver));
-    }
-
-    /// @notice Ensures that token is registered with native token vault.
-    /// @dev Only used when deposit is made with legacy data encoding format.
-    /// @param _l1Token The L1 token address which should be registered with native token vault.
-    /// @return assetId The asset ID of the token provided.
-    function _ensureTokenRegisteredWithNTV(address _l1Token) internal returns (bytes32 assetId) {
-        assetId = nativeTokenVault.getAssetId(_l1Token);
-        if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
-            nativeTokenVault.registerToken(_l1Token);
-        }
-    }
-
-    /// @notice Transfers allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
-    /// @dev assetId is not the padded address, but the correct encoded ID (NTV stores respective format for IDs).
-    /// @param _assetId The encoding of asset ID.
-    /// @param _amount The asset amount to be transferred to native token vault.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    function _transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) internal {
-        address l1TokenAddress = nativeTokenVault.tokenAddress(_assetId);
-        if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
-            return;
-        }
-        IERC20 l1Token = IERC20(l1TokenAddress);
-
-        // Do the transfer if allowance to Shared bridge is bigger than amount
-        // And if there is not enough allowance for the NTV
-        if (
-            l1Token.allowance(_prevMsgSender, address(this)) >= _amount &&
-            l1Token.allowance(_prevMsgSender, address(nativeTokenVault)) < _amount
-        ) {
-            // slither-disable-next-line arbitrary-send-erc20
-            l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
-            l1Token.safeIncreaseAllowance(address(nativeTokenVault), _amount);
-        }
-    }
-
     /// @notice Initiates a deposit transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
     /// @param _chainId The chain ID of the ZK chain to which deposit.
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
@@ -257,7 +179,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
         bytes memory l2BridgeMintCalldata = _burn({
             _chainId: _chainId,
-            _l2Value: _l2Value,
+            _value: _l2Value,
             _assetId: assetId,
             _prevMsgSender: _prevMsgSender,
             _transferData: transferData
@@ -289,101 +211,13 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         });
     }
 
-    /// @notice Forwards the burn request for specific asset to respective asset handler.
-    /// @param _chainId The chain ID of the ZK chain to which to deposit.
-    /// @param _l2Value The L2 `msg.value` from the L1 -> L2 deposit transaction.
-    /// @param _assetId The deposited asset ID.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
-    /// @return l2BridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
-    function _burn(
-        uint256 _chainId,
-        uint256 _l2Value,
-        bytes32 _assetId,
-        address _prevMsgSender,
-        bytes memory _transferData
-    ) internal returns (bytes memory l2BridgeMintCalldata) {
-        address l1AssetHandler = assetHandlerAddress[_assetId];
-        l2BridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
-            _chainId: _chainId,
-            _mintValue: _l2Value,
-            _assetId: _assetId,
-            _prevMsgSender: _prevMsgSender,
-            _data: _transferData
-        });
-    }
-
-    /// @dev The request data that is passed to the bridgehub.
-    /// @param _chainId The chain ID of the ZK chain to which deposit.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    /// @param _assetId The deposited asset ID.
-    /// @param _l2BridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
-    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
-    /// @param _deposit The boolean true if deposit, false if withdrawal.
-    /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
-    function _requestToBridge(
-        // solhint-disable-next-line no-unused-vars
-        uint256 _chainId,
-        address _prevMsgSender,
-        bytes32 _assetId,
-        bytes memory _l2BridgeMintCalldata,
-        bytes32 _txDataHash,
-        bool _deposit
-    ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
-        bytes memory l2TxCalldata;
-        if (_deposit) {
-            // Request the finalization of the deposit on the L2 side
-            l2TxCalldata = _getDepositL2Calldata(_chainId, _prevMsgSender, _assetId, _l2BridgeMintCalldata);
-        } else {
-            // Request the finalization of the withdrawal on the L2 side
-            l2TxCalldata = _getWithdrawalL2Calldata(_assetId, _l2BridgeMintCalldata);
-        }
-
-        request = L2TransactionRequestTwoBridgesInner({
-            magicValue: TWO_BRIDGES_MAGIC_VALUE,
-            l2Contract: L2_ASSET_ROUTER_ADDR,
-            l2Calldata: l2TxCalldata,
-            factoryDeps: new bytes[](0),
-            txDataHash: _txDataHash
-        });
-    }
-
-    /// @notice Generates a calldata for calling the deposit finalization on the L2 native token contract.
-    /// @param _chainId The chain ID of the ZK chain to which deposit.
-    /// @param _l1Sender The address of the deposit initiator.
-    /// @param _assetId The deposited asset ID.
-    /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
-    /// @return Returns calldata used on ZK chain.
-    function _getDepositL2Calldata(
-        uint256 _chainId,
-        address _l1Sender,
-        bytes32 _assetId,
-        bytes memory _transferData
-    ) public view returns (bytes memory) {
-        // First branch covers the case when asset is not registered with NTV (custom asset handler)
-        // Second branch handles tokens registered with NTV and uses legacy calldata encoding
-        if (nativeTokenVault.tokenAddress(_assetId) == address(0)) {
-            return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (_chainId, _assetId, _transferData));
-        } else {
-            (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = abi.decode(
-                _transferData,
-                (uint256, address, address, bytes, address)
-            );
-            return
-                abi.encodeCall(
-                    IL2BridgeLegacy.finalizeDeposit,
-                    (_l1Sender, _l2Receiver, _parsedL1Token, _amount, _gettersData)
-                );
-        }
-    }
-
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked.
     /// @param _chainId The chain ID of the ZK chain to which to withdraw.
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
     /// @param _assetId The encoding of the asset on L2 which is withdrawn.
     /// @param _transferData The data that is passed to the asset handler contract.
-    function bridgehubWithdraw(
+    function bridgehubWithdraw( // ToDo: how to unify L1 and L2 withdraw? 1 is done via system contract, another one via request, so input / output is inhenerently different
         uint256 _chainId,
         address _prevMsgSender,
         bytes32 _assetId,
@@ -393,7 +227,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
         bytes memory l2BridgeMintCalldata = _burn({
             _chainId: _chainId,
-            _l2Value: 0,
+            _value: 0,
             _assetId: _assetId,
             _prevMsgSender: _prevMsgSender,
             _transferData: _transferData
@@ -412,17 +246,15 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         emit BridgehubWithdrawalInitiated(_chainId, msg.sender, _assetId, keccak256(_transferData));
     }
 
-    /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
-    /// @param _assetId The encoding of the asset on L2 which is withdrawn.
-    /// @param _l2bridgeMintData The calldata used by L2 asset handler to unlock tokens for recipient.
-    function _getWithdrawalL2Calldata(
-        bytes32 _assetId,
-        bytes memory _l2bridgeMintData
-    ) internal pure returns (bytes memory) {
-        // note we use the IL1ERC20Bridge.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
-        // and we use this interface so that when the switch happened the old messages could be processed
-        // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IAssetRouterBase.finalizeWithdrawal.selector, _assetId, _l2bridgeMintData);
+    /// @notice Ensures that token is registered with native token vault.
+    /// @dev Only used when deposit is made with legacy data encoding format.
+    /// @param _l1Token The L1 token address which should be registered with native token vault.
+    /// @return assetId The asset ID of the token provided.
+    function _ensureTokenRegisteredWithNTV(address _l1Token) internal returns (bytes32 assetId) {
+        assetId = nativeTokenVault.getAssetId(_l1Token);
+        if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
+            nativeTokenVault.registerToken(_l1Token);
+        }
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
@@ -463,5 +295,110 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(_chainId, _assetId, _transferData);
 
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetId, _transferData);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                     Legacy Functions & Helpers
+    //////////////////////////////////////////////////////////////*/
+
+
+    /// @dev The request data that is passed to the bridgehub.
+    /// @param _chainId The chain ID of the ZK chain to which deposit.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @param _assetId The deposited asset ID.
+    /// @param _l2BridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
+    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
+    /// @param _deposit The boolean true if deposit, false if withdrawal.
+    /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
+    function _requestToBridge(
+        // solhint-disable-next-line no-unused-vars
+        uint256 _chainId,
+        address _prevMsgSender,
+        bytes32 _assetId,
+        bytes memory _l2BridgeMintCalldata,
+        bytes32 _txDataHash,
+        bool _deposit
+    ) internal override view returns (L2TransactionRequestTwoBridgesInner memory request) {
+        bytes memory l2TxCalldata;
+        if (_deposit) {
+            // Request the finalization of the deposit on the L2 side
+            l2TxCalldata = _getDepositL2Calldata(_chainId, _prevMsgSender, _assetId, _l2BridgeMintCalldata);
+        }
+
+        request = L2TransactionRequestTwoBridgesInner({
+            magicValue: TWO_BRIDGES_MAGIC_VALUE,
+            l2Contract: L2_ASSET_ROUTER_ADDR,
+            l2Calldata: l2TxCalldata,
+            factoryDeps: new bytes[](0),
+            txDataHash: _txDataHash
+        });
+    }
+
+
+    /// @notice Decodes the transfer input for legacy data and transfers allowance to NTV.
+    /// @dev Is not applicable for custom asset handlers.
+    /// @param _data The encoded transfer data (address _l1Token, uint256 _depositAmount, address _l2Receiver).
+    /// @param _prevMsgSender The address of the deposit initiator.
+    /// @return Tuple of asset ID and encoded transfer data to conform with new encoding standard.
+    function _handleLegacyData(bytes calldata _data, address _prevMsgSender) internal returns (bytes32, bytes memory) {
+        (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
+            _data,
+            (address, uint256, address)
+        );
+        bytes32 assetId = _ensureTokenRegisteredWithNTV(_l1Token);
+        _transferAllowanceToNTV(assetId, _depositAmount, _prevMsgSender);
+        return (assetId, abi.encode(_depositAmount, _l2Receiver));
+    }
+
+    /// @notice Generates a calldata for calling the deposit finalization on the L2 native token contract.
+    /// @param _chainId The chain ID of the ZK chain to which deposit.
+    /// @param _l1Sender The address of the deposit initiator.
+    /// @param _assetId The deposited asset ID.
+    /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
+    /// @return Returns calldata used on ZK chain.
+    function _getDepositL2Calldata(
+        uint256 _chainId,
+        address _l1Sender,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) public view returns (bytes memory) {
+        // First branch covers the case when asset is not registered with NTV (custom asset handler)
+        // Second branch handles tokens registered with NTV and uses legacy calldata encoding
+        if (nativeTokenVault.tokenAddress(_assetId) == address(0)) {
+            return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (_chainId, _assetId, _transferData));
+        } else {
+            (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = abi.decode(
+                _transferData,
+                (uint256, address, address, bytes, address)
+            );
+            return
+                abi.encodeCall(
+                    IL2BridgeLegacy.finalizeDeposit,
+                    (_l1Sender, _l2Receiver, _parsedL1Token, _amount, _gettersData)
+                );
+        }
+    }
+
+    /// @notice Finalize the withdrawal and release funds.
+    /// @param _chainId The chain ID of the transaction to check.
+    /// @param _assetId The bridged asset ID.
+    /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+    function finalizeWithdrawal(
+        uint256 _chainId,
+        bytes32 _assetId,
+        bytes calldata _transferData
+    ) external virtual override returns (address l1Receiver, uint256 amount) {
+        address assetHandler = assetHandlerAddress[_assetId];
+
+        if (assetHandler != address(0)) {
+            IL1AssetHandler(assetHandler).bridgeMint(_chainId, _assetId, _transferData);
+        } else {
+            IL1AssetHandler(address(nativeTokenVault)).bridgeMint(_chainId, _assetId, _transferData); // Maybe it's better to receive amount and receiver here? transferData may have different encoding
+            assetHandlerAddress[_assetId] = address(nativeTokenVault);
+        }
+
+        (amount, l1Receiver) = abi.decode(_transferData, (uint256, address));
+
+        emit WithdrawalFinalizedAssetRouter(_chainId, l1Receiver, _assetId, amount);
     }
 }

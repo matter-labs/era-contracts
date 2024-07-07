@@ -13,7 +13,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
-import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 import {INullifier, FinalizeWithdrawalParams} from "./interfaces/INullifier.sol";
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 
@@ -311,7 +310,7 @@ contract L1Nullifier is INullifier, ReentrancyGuard, Ownable2StepUpgradeable, Pa
         bytes memory transferData;
         (assetId, transferData) = _verifyAndGetWithdrawalData(_finalizeWithdrawalParams);
 
-        (l1Receiver, amount) = IAssetRouterBase(address(l1AssetRouter)).finalizeWithdrawal(
+        (l1Receiver, amount) = IL1AssetRouter(l1AssetRouter).finalizeWithdrawal(
             _finalizeWithdrawalParams.chainId,
             assetId,
             transferData
@@ -473,7 +472,7 @@ contract L1Nullifier is INullifier, ReentrancyGuard, Ownable2StepUpgradeable, Pa
 
             assetId = keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, l1Token));
             transferData = abi.encode(amount, l1Receiver);
-        } else if (bytes4(functionSignature) == IAssetRouterBase.finalizeWithdrawal.selector) {
+        } else if (bytes4(functionSignature) == IL1AssetRouter.finalizeWithdrawal.selector) {
             //todo
             (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
             transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);

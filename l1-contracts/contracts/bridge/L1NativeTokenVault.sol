@@ -31,7 +31,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     address public immutable override L1_WETH_TOKEN;
 
     /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
-    IAssetRouterBase public immutable override L1_SHARED_BRIDGE;
+    IL1AssetRouter public immutable override L1_SHARED_BRIDGE;
 
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     INullifier public immutable override NULLIFIER;
@@ -63,7 +63,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
         address _l1WethAddress,
-        IAssetRouterBase _l1SharedBridge,
+        IL1AssetRouter _l1SharedBridge,
         uint256 _eraChainId,
         INullifier _l1Nullifier
     ) {

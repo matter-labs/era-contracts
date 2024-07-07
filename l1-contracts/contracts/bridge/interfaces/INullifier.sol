@@ -4,8 +4,8 @@ pragma solidity 0.8.24;
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
-import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
-import {IL1AssetRouter} from "./IL1AssetRouter.sol";
+import {INativeTokenVault} from "./INativeTokenVault.sol";
+import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 
 /// @param chainId The chain ID of the transaction to check.
 /// @param l2BatchNumber The L2 batch number where the withdrawal was processed.
@@ -118,11 +118,11 @@ interface INullifier {
 
     function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
 
-    function nativeTokenVault() external view returns (IL1NativeTokenVault);
+    function nativeTokenVault() external view returns (INativeTokenVault);
 
-    function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external;
+    function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external;
 
-    function setL1AssetRouter(IL1AssetRouter _l1AssetRouter) external;
+    function setL1AssetRouter(IAssetRouterBase _l1AssetRouter) external;
 
     function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
 
