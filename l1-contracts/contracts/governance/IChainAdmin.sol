@@ -16,7 +16,7 @@ interface IChainAdmin {
         bytes data;
     }
 
-    /// @notice Emitted when the expected upgrade timestamp for a specific protocol version.
+    /// @notice Emitted when the expected upgrade timestamp for a specific protocol version is set.
     event UpdateUpgradeTimestamp(uint256 indexed _protocolVersion, uint256 _upgradeTimestamp);
 
     /// @notice Emitted when the call is executed from the contract.
