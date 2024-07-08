@@ -14,7 +14,8 @@ List of changes and new features:
 
 Other smaller changes:
 
-- The L2SharedBridge and L2NativeTokenVault contracts are now deployed at genesis at fixed addresses in user space. This is done in the genesis upgrade, previously called setChainId upgrade.
+- The setChainId upgrade is updated to become the Genesis upgrade with an L2 contract (deployed at genesis in user-space).
+- The Bridgehub, MessageRoot, L2SharedBridge and L2NativeTokenVault contracts are now deployed at genesis on the L2 at fixed addresses in user space.
 - The SharedBridges are renamed to AssetRouters.
 - Merkle.sol was moved from state-transition/libraries to common/libraries.
 
@@ -46,3 +47,5 @@ Known issues, and features that still need to be implemented:
 - l2-contracts/contracts/
   - data-availability/\*
   - L2ContractHelper.sol
+
+## Later scope
