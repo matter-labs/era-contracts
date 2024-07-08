@@ -414,7 +414,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         // slither-disable-next-line arbitrary-send-eth
         L2TransactionRequestTwoBridgesInner memory outputRequest = IAssetRouterBase(_request.secondBridgeAddress)
-            .bridgehubDeposit{value: _request.secondBridgeValue}(
+            .bridgehubTransfer{value: _request.secondBridgeValue}(
             _request.chainId,
             msg.sender,
             _request.l2Value,

@@ -16,7 +16,7 @@ interface IAssetRouterBase {
         uint256 amount
     );
 
-    event BridgehubDepositInitiated(
+    event BridgehubTransferInitiated(
         uint256 indexed chainId,
         bytes32 indexed txDataHash,
         address indexed from,
@@ -41,6 +41,7 @@ interface IAssetRouterBase {
     );
 
     function BRIDGE_HUB() external view returns (IBridgehub);
+    function BASE_TOKEN_ADDRESS() external view returns (address);
 
     function bridgehubDepositBaseToken(
         uint256 _chainId,
@@ -53,7 +54,7 @@ interface IAssetRouterBase {
     /// address _l1Token,
     /// uint256 _amount,
     /// address _l2Receiver
-    function bridgehubDeposit(
+    function bridgehubTransfer(
         uint256 _chainId,
         address _prevMsgSender,
         uint256 _value,

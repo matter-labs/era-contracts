@@ -6,33 +6,32 @@ pragma solidity 0.8.24;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
+import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
 import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
-
 import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
+
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
+
+import {NativeTokenVault} from "./NativeTokenVault.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the ZK chains.
 /// @dev Designed for use with a proxy for upgradability.
-contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2StepUpgradeable, PausableUpgradeable {
+contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeTokenVault {
     using SafeERC20 for IERC20;
-
-    /// @dev The address of the WETH token on L1.
-    address public immutable override L1_WETH_TOKEN;
-
-    /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
-    IAssetRouterBase public immutable override ASSET_ROUTER;
 
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable override NULLIFIER;
@@ -40,19 +39,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     /// @dev Era's chainID
     uint256 public immutable ERA_CHAIN_ID;
 
-    /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
-    /// This serves as a security measure until hyperbridging is implemented.
-    /// NOTE: this function may be removed in the future, don't rely on it!
-    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
-
-    /// @dev A mapping assetId => tokenAddress
-    mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
-
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridge() {
-        require(msg.sender == address(ASSET_ROUTER), "NTV not ShB");
-        _;
-    }
+    bytes public wrappedTokenProxyBytecode;
 
     /// @notice Checks that the message sender is the native token vault itself.
     modifier onlySelf() {
@@ -63,29 +50,15 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
-        address _l1WethAddress,
+        address _wethAddress,
         IAssetRouterBase _l1AssetRouter,
         uint256 _eraChainId,
-        IL1Nullifier _l1Nullifier
-    ) {
-        _disableInitializers();
-        L1_WETH_TOKEN = _l1WethAddress;
+        IL1Nullifier _l1Nullifier,
+        bytes memory _wrappedTokenProxyBytecode
+    ) NativeTokenVault(_wethAddress, _l1AssetRouter) {
         ERA_CHAIN_ID = _eraChainId;
-        ASSET_ROUTER = _l1AssetRouter;
         NULLIFIER = _l1Nullifier;
-    }
-
-    /// @dev Initializes a contract for later use. Expected to be used in the proxy.
-    /// @param _owner Address which can change pause / unpause the NTV.
-    /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    function initialize(address _owner) external initializer {
-        require(_owner != address(0), "NTV owner 0");
-        _transferOwnership(_owner);
-    }
-
-    /// @dev Accepts ether only from the Shared Bridge.
-    receive() external payable {
-        require(address(ASSET_ROUTER) == msg.sender, "NTV: ETH only accepted from Shared Bridge");
+        wrappedTokenProxyBytecode = _wrappedTokenProxyBytecode;
     }
 
     /// @notice Transfers tokens from shared bridge as part of the migration process.
@@ -118,128 +91,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         NULLIFIER.clearChainBalance(_targetChainId, _token);
     }
 
-    /// @notice Registers tokens within the NTV.
-    /// @dev The goal was to allow bridging L1 native tokens automatically, by registering them on the fly.
-    /// @notice Allows the bridge to register a token address for the vault.
-    /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
-    function registerToken(address _l1Token) external {
-        require(_l1Token != L1_WETH_TOKEN, "NTV: WETH deposit not supported");
-        require(_l1Token == ETH_TOKEN_ADDRESS || _l1Token.code.length > 0, "NTV: empty token");
-        bytes32 assetId = getAssetId(_l1Token);
-        ASSET_ROUTER.setAssetHandlerAddress(bytes32(uint256(uint160(_l1Token))), address(this));
-        tokenAddress[assetId] = _l1Token;
-    }
-
-    /// @inheritdoc IAssetHandler
-    /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
-    /// @dev In case of native token vault _data is the tuple of _depositAmount and _l2Receiver.
-    function bridgeBurn(
-        uint256 _chainId,
-        uint256,
-        bytes32 _assetId,
-        address _prevMsgSender,
-        bytes calldata _data
-    ) external payable override onlyBridge whenNotPaused returns (bytes memory _bridgeMintData) {
-        (uint256 _depositAmount, address _l2Receiver) = abi.decode(_data, (uint256, address));
-
-        uint256 amount;
-        address l1Token = tokenAddress[_assetId];
-        if (l1Token == ETH_TOKEN_ADDRESS) {
-            amount = msg.value;
-
-            // In the old SDK/contracts the user had to always provide `0` as the deposit amount for ETH token, while
-            // ultimately the provided `msg.value` was used as the deposit amount. This check is needed for backwards compatibility.
-            if (_depositAmount == 0) {
-                _depositAmount = amount;
-            }
-
-            require(_depositAmount == amount, "L1NTV: msg.value not equal to amount");
-        } else {
-            // The Bridgehub also checks this, but we want to be sure
-            require(msg.value == 0, "NTV m.v > 0 b d.it");
-            amount = _depositAmount;
-
-            uint256 expectedDepositAmount = _depositFunds(_prevMsgSender, IERC20(l1Token), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
-            require(expectedDepositAmount == _depositAmount, "5T"); // The token has non-standard transfer logic
-        }
-        require(amount != 0, "6T"); // empty deposit amount
-
-        chainBalance[_chainId][l1Token] += amount;
-
-        // solhint-disable-next-line func-named-parameters
-        _bridgeMintData = abi.encode(amount, _prevMsgSender, _l2Receiver, getERC20Getters(l1Token), l1Token);
-        // solhint-disable-next-line func-named-parameters
-        emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _l2Receiver, amount);
-    }
-
-    /// @notice Transfers tokens from the depositor address to the smart contract address.
-    /// @param _from The address of the depositor.
-    /// @param _token The ERC20 token to be transferred.
-    /// @param _amount The amount to be transferred.
-    /// @return The difference between the contract balance before and after the transferring of funds.
-    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
-        uint256 balanceBefore = _token.balanceOf(address(this));
-        address from = _from;
-        // in the legacy scenario the SharedBridge was granting the allowance, we have to transfer from them instead of the user
-        if (
-            _token.allowance(address(ASSET_ROUTER), address(this)) >= _amount &&
-            _token.allowance(_from, address(this)) < _amount
-        ) {
-            from = address(ASSET_ROUTER);
-        }
-        // slither-disable-next-line arbitrary-send-erc20
-        _token.safeTransferFrom(from, address(this), _amount);
-        uint256 balanceAfter = _token.balanceOf(address(this));
-
-        return balanceAfter - balanceBefore;
-    }
-
-    /// @notice Receives and parses (name, symbol, decimals) from the token contract.
-    /// @param _token The address of token of interest.
-    /// @return Returns encoded name, symbol, and decimals for specific token.
-    function getERC20Getters(address _token) public view returns (bytes memory) {
-        if (_token == ETH_TOKEN_ADDRESS) {
-            bytes memory name = bytes("Ether");
-            bytes memory symbol = bytes("ETH");
-            bytes memory decimals = abi.encode(uint8(18));
-            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
-        }
-
-        (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
-        (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
-        (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
-        return abi.encode(data1, data2, data3);
-    }
-
-    ///  @inheritdoc IAssetHandler
-    function bridgeMint(
-        uint256 _chainId,
-        bytes32 _assetId,
-        bytes calldata _data
-    ) external payable override onlyBridge whenNotPaused returns (address l1Receiver) {
-        // here we are minting the tokens after the bridgeBurn has happened on an L2, so we can assume the l1Token is not zero
-        address l1Token = tokenAddress[_assetId];
-        uint256 amount;
-        (amount, l1Receiver) = abi.decode(_data, (uint256, address));
-        // Check that the chain has sufficient balance
-        require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
-        chainBalance[_chainId][l1Token] -= amount;
-
-        if (l1Token == ETH_TOKEN_ADDRESS) {
-            bool callSuccess;
-            // Low-level assembly call, to avoid any memory copying (save gas)
-            assembly {
-                callSuccess := call(gas(), l1Receiver, amount, 0, 0, 0, 0)
-            }
-            require(callSuccess, "NTV: withdrawal failed, no funds or cannot transfer to receiver");
-        } else {
-            // Withdraw funds
-            IERC20(l1Token).safeTransfer(l1Receiver, amount);
-        }
-        // solhint-disable-next-line func-named-parameters
-        emit BridgeMint(_chainId, _assetId, l1Receiver, amount);
-    }
-
     ///  @inheritdoc IL1AssetHandler
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
@@ -268,24 +119,19 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         }
     }
 
-    /// @notice Returns the parsed assetId.
-    /// @param _l1TokenAddress The address of the token to be parsed.
-    /// @return The asset ID.
-    function getAssetId(address _l1TokenAddress) public view override returns (bytes32) {
-        return keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, _l1TokenAddress));
+    // get the computed address before the contract DeployWithCreate2 deployed using Bytecode of contract DeployWithCreate2 and salt specified by the sender
+    function wrappedTokenAddress(
+        address _salt
+    ) public view override(INativeTokenVault, NativeTokenVault) returns (address) {
+        bytes32 hash = keccak256(
+            abi.encodePacked(bytes1(0xff), address(this), uint256(uint160(_salt)), keccak256(wrappedTokenProxyBytecode))
+        );
+        return address(uint160(uint256(hash)));
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            PAUSE
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
-    function unpause() external onlyOwner {
-        _unpause();
+    function _deployBeaconProxy(bytes32 _salt) internal override returns (BeaconProxy proxy) {
+        // Use CREATE2 to deploy the BeaconProxy
+        address proxyAddress = Create2.deploy(0, _salt, wrappedTokenProxyBytecode);
+        return BeaconProxy(payable(proxyAddress));
     }
 }

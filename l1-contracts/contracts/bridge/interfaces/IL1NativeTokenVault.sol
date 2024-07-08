@@ -12,7 +12,4 @@ import {INativeTokenVault} from "./INativeTokenVault.sol";
 interface IL1NativeTokenVault is INativeTokenVault {
     /// @notice The L1Nullifier contract
     function NULLIFIER() external view returns (IL1Nullifier);
-
-    /// @notice The weth contract
-    function L1_WETH_TOKEN() external view returns (address);
 }

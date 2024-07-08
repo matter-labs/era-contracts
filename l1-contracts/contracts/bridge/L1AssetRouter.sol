@@ -151,7 +151,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @param _l2Value The L2 `msg.value` from the L1 -> L2 deposit transaction.
     /// @param _data The calldata for the second bridge deposit.
     /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
-    function bridgehubDeposit(
+    function bridgehubTransfer(
         uint256 _chainId,
         address _prevMsgSender,
         uint256 _l2Value,
@@ -198,12 +198,11 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             _chainId: _chainId,
             _prevMsgSender: _prevMsgSender,
             _assetId: assetId,
-            _l2BridgeMintCalldata: l2BridgeMintCalldata,
-            _txDataHash: txDataHash,
-            _deposit: true
+            _bridgeMintCalldata: l2BridgeMintCalldata,
+            _txDataHash: txDataHash
         });
 
-        emit BridgehubDepositInitiated({
+        emit BridgehubTransferInitiated({
             chainId: _chainId,
             txDataHash: txDataHash,
             from: _prevMsgSender,
@@ -240,9 +239,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             _chainId: _chainId,
             _prevMsgSender: _prevMsgSender,
             _assetId: _assetId,
-            _l2BridgeMintCalldata: l2BridgeMintCalldata,
-            _txDataHash: txDataHash,
-            _deposit: false
+            _bridgeMintCalldata: l2BridgeMintCalldata,
+            _txDataHash: txDataHash
         });
 
         emit BridgehubWithdrawalInitiated(_chainId, msg.sender, _assetId, keccak256(_transferData));
@@ -314,38 +312,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /*//////////////////////////////////////////////////////////////
                      Legacy Functions & Helpers
     //////////////////////////////////////////////////////////////*/
-
-    /// @dev The request data that is passed to the bridgehub.
-    /// @param _chainId The chain ID of the ZK chain to which deposit.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    /// @param _assetId The deposited asset ID.
-    /// @param _l2BridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
-    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
-    /// @param _deposit The boolean true if deposit, false if withdrawal.
-    /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
-    function _requestToBridge(
-        // solhint-disable-next-line no-unused-vars
-        uint256 _chainId,
-        address _prevMsgSender,
-        bytes32 _assetId,
-        bytes memory _l2BridgeMintCalldata,
-        bytes32 _txDataHash,
-        bool _deposit
-    ) internal view override returns (L2TransactionRequestTwoBridgesInner memory request) {
-        bytes memory l2TxCalldata;
-        if (_deposit) {
-            // Request the finalization of the deposit on the L2 side
-            l2TxCalldata = _getDepositL2Calldata(_chainId, _prevMsgSender, _assetId, _l2BridgeMintCalldata);
-        }
-
-        request = L2TransactionRequestTwoBridgesInner({
-            magicValue: TWO_BRIDGES_MAGIC_VALUE,
-            l2Contract: L2_ASSET_ROUTER_ADDR,
-            l2Calldata: l2TxCalldata,
-            factoryDeps: new bytes[](0),
-            txDataHash: _txDataHash
-        });
-    }
 
     /// @notice Decodes the transfer input for legacy data and transfers allowance to NTV.
     /// @dev Is not applicable for custom asset handlers.
