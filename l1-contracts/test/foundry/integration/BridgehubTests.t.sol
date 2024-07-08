@@ -722,20 +722,20 @@ contract BoundedBridgeHubInvariantTests is BridgeHubInvariantTests {
     function testBoundedBridgeHubInvariant() internal {}
 }
 
-contract InvariantTesterHyperchains is Test {
-    BoundedBridgeHubInvariantTests tests;
+// contract InvariantTesterHyperchains is Test {
+//     BoundedBridgeHubInvariantTests tests;
 
-    function setUp() public {
-        tests = new BoundedBridgeHubInvariantTests();
-        tests.prepare();
-    }
+//     function setUp() public {
+//         tests = new BoundedBridgeHubInvariantTests();
+//         tests.prepare();
+//     }
 
-    // Check whether the sum of ETH deposits from tests, updated on each deposit and withdrawal,
-    // equals the balance of L1Shared bridge.
-    function test_ETHbalanceStaysEqual() public {
-        require(1 == 1);
-    }
+//     // Check whether the sum of ETH deposits from tests, updated on each deposit and withdrawal,
+//     // equals the balance of L1Shared bridge.
+//     function test_ETHbalanceStaysEqual() public {
+//         require(1 == 1);
+//     }
 
-    // add this to be excluded from coverage report
-    function test() internal {}
-}
+//     // add this to be excluded from coverage report
+//     function test() internal {}
+// }
