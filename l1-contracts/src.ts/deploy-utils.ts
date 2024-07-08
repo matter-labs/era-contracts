@@ -113,6 +113,7 @@ export interface DeployedAddresses {
   BaseToken: string;
   TransparentProxyAdmin: string;
   Governance: string;
+  ChainAdmin: string;
   BlobVersionedHashRetriever: string;
   ValidatorTimeLock: string;
   Create2Factory: string;
@@ -152,5 +153,6 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     BlobVersionedHashRetriever: getAddressFromEnv("CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR"),
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
     Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
+    ChainAdmin: getAddressFromEnv("CONTRACTS_CHAIN_ADMIN_ADDR"),
   };
 }
