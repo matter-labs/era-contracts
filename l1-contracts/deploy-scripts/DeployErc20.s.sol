@@ -153,4 +153,7 @@ contract DeployErc20Script is Script {
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
         return Utils.deployViaCreate2(_bytecode, config.create2FactorySalt, config.create2FactoryAddr);
     }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }

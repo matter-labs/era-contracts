@@ -762,4 +762,7 @@ contract DeployL1Script is Script {
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
         return Utils.deployViaCreate2(_bytecode, config.contracts.create2FactorySalt, addresses.create2Factory);
     }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }

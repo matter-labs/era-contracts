@@ -321,4 +321,7 @@ library Utils {
         }
         vm.stopBroadcast();
     }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }

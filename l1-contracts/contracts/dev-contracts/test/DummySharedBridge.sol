@@ -152,4 +152,7 @@ contract DummySharedBridge {
         // assetDeploymentTracker[assetId] = sender;
         // emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _additionalData, sender);
     }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }
