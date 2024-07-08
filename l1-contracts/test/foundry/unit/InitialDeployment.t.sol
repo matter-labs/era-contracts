@@ -78,8 +78,8 @@ contract DeployL1Test is Test {
         addr.diamondInit = toml.readAddress(string.concat(key, ".diamond_init_addr"));
         addr.genesisUpgrade = toml.readAddress(string.concat(key, ".genesis_upgrade_addr"));
         addr.defaultUpgrade = toml.readAddress(string.concat(key, ".default_upgrade_addr"));
-        
-        path = string.concat(root,"/script-out/output-register-hyperchain.toml");
+
+        path = string.concat(root, "/script-out/output-register-hyperchain.toml");
         toml = vm.readFile(path);
 
         addr.diamondProxy = toml.readAddress(string.concat("$.diamond_proxy_addr"));

@@ -107,7 +107,7 @@ contract RegisterHyperchainScript is Script {
         config.governanceSecurityCouncilAddress = toml.readAddress("$.chain.governance_security_council_address");
     }
 
-    function getValidatorAdmin() public returns(address) {
+    function getValidatorAdmin() public returns (address) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
         string memory toml = vm.readFile(path);

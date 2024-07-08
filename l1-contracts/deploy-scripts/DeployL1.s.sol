@@ -71,7 +71,7 @@ contract DeployL1Script is _DeployL1Script {
     }
 
     function initializeConfig() internal {
-       _initializeConfig();
+        _initializeConfig();
     }
 
     function instantiateCreate2Factory() internal {
