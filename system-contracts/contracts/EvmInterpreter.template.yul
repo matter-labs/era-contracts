@@ -116,6 +116,27 @@ object "EVMInterpreter" {
         code {
             <!-- @include EvmInterpreterFunctions.template.yul -->
 
+            function $llvm_NoInline_llvm$_simulate(
+                isCallerEVM,
+                evmGasLeft,
+                isStatic,
+            ) -> returnOffset, returnLen {
+
+                returnOffset := MEM_OFFSET_INNER()
+                returnLen := 0
+
+                <!-- @include EvmInterpreterLoop.template.yul -->
+
+                if eq(isCallerEVM, 1) {
+                    // Includes gas
+                    returnOffset := sub(returnOffset, 32)
+                    checkOverflow(returnLen, 32, evmGasLeft)
+                    returnLen := add(returnLen, 32)
+
+                    mstore(returnOffset, evmGasLeft)
+                }
+            }
+
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
@@ -131,22 +152,9 @@ object "EVMInterpreter" {
             // segment of memory.
             getDeployedBytecode()
 
-            let returnOffset := MEM_OFFSET_INNER()
-            let returnLen := 0
-
             pop(warmAddress(address()))
 
-            <!-- @include EvmInterpreterLoop.template.yul -->
-
-            if eq(isCallerEVM, 1) {
-                // Includes gas
-                returnOffset := sub(returnOffset, 32)
-                checkOverflow(returnLen, 32, evmGasLeft)
-                returnLen := add(returnLen, 32)
-
-                mstore(returnOffset, evmGasLeft)
-            }
-
+            let returnOffset, returnLen := $llvm_NoInline_llvm$_simulate(isCallerEVM, evmGasLeft, isStatic)
             return(returnOffset, returnLen)
         }
     }
