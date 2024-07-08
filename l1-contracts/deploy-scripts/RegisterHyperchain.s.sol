@@ -11,7 +11,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {Governance} from "contracts/governance/Governance.sol";
+import {Governance} from "../contracts/governance/Governance.sol";
 import {Utils} from "./Utils.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 
@@ -45,6 +45,10 @@ contract RegisterHyperchainScript is Script {
 
     Config internal config;
 
+    function getStateTransitionProxy() public view returns (address) {
+        return config.stateTransitionProxy;
+    }
+
     function run() public {
         console.log("Deploying Hyperchain");
 
@@ -64,15 +68,17 @@ contract RegisterHyperchainScript is Script {
     function initializeConfig() internal {
         // Grab config from output of l1 deployment
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/register-hyperchain.toml");
+        string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
         string memory toml = vm.readFile(path);
+
+        address validatorAdmin = toml.readAddress("$.deployer_addr");
 
         config.deployerAddress = msg.sender;
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
-        config.ownerAddress = toml.readAddress("$.owner_address");
+        config.ownerAddress = toml.readAddress("$.owner_addr");
 
         config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
         config.stateTransitionProxy = toml.readAddress(
@@ -81,6 +87,9 @@ contract RegisterHyperchainScript is Script {
         config.validatorTimelock = toml.readAddress("$.deployed_addresses.validator_timelock_addr");
 
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
+
+        path = string.concat(root, "/deploy-script-config-template/register-hyperchain.toml");
+        toml = vm.readFile(path);
 
         config.chainChainId = toml.readUint("$.chain.chain_chain_id");
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
@@ -96,6 +105,16 @@ contract RegisterHyperchainScript is Script {
         );
         config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
         config.governanceSecurityCouncilAddress = toml.readAddress("$.chain.governance_security_council_address");
+    }
+
+    function getValidatorAdmin() public returns(address) {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
+        string memory toml = vm.readFile(path);
+
+        address validatorAdmin = toml.readAddress("$.deployer_addr");
+
+        return validatorAdmin;
     }
 
     function checkTokenAddress() internal view {
@@ -149,7 +168,6 @@ contract RegisterHyperchainScript is Script {
     function registerHyperchain() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         Ownable ownable = Ownable(config.bridgehub);
-
         vm.recordLogs();
         bytes memory data = abi.encodeCall(
             bridgehub.createNewChain,
@@ -162,7 +180,6 @@ contract RegisterHyperchainScript is Script {
                 config.diamondCutData
             )
         );
-
         Utils.executeUpgrade({
             _governor: ownable.owner(),
             _salt: bytes32(config.bridgehubCreateNewChainSalt),
@@ -193,7 +210,7 @@ contract RegisterHyperchainScript is Script {
     function addValidators() internal {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(config.validatorTimelock);
 
-        vm.startBroadcast();
+        vm.startBroadcast(getValidatorAdmin());
         validatorTimelock.addValidator(config.chainChainId, config.validatorSenderOperatorCommitEth);
         validatorTimelock.addValidator(config.chainChainId, config.validatorSenderOperatorBlobsEth);
         vm.stopBroadcast();
@@ -204,7 +221,7 @@ contract RegisterHyperchainScript is Script {
     function configureZkSyncStateTransition() internal {
         IZkSyncHyperchain hyperchain = IZkSyncHyperchain(config.newDiamondProxy);
 
-        vm.startBroadcast();
+        vm.startBroadcast(getValidatorAdmin());
         hyperchain.setTokenMultiplier(
             config.baseTokenGasPriceMultiplierNominator,
             config.baseTokenGasPriceMultiplierDenominator
@@ -221,7 +238,7 @@ contract RegisterHyperchainScript is Script {
     function setPendingAdmin() internal {
         IZkSyncHyperchain hyperchain = IZkSyncHyperchain(config.newDiamondProxy);
 
-        vm.broadcast();
+        vm.broadcast(getValidatorAdmin());
         hyperchain.setPendingAdmin(config.governance);
         console.log("Owner for ", config.newDiamondProxy, "set to", config.governance);
     }
