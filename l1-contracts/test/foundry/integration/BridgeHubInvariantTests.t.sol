@@ -735,4 +735,7 @@ contract InvariantTesterHyperchains is Test {
     // function invariant_ETHbalanceStaysEqual() public {
     //     require(1==1);
     // }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }
