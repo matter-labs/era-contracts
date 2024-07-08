@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
-import {INullifier} from "./INullifier.sol";
+import {IL1Nullifier} from "./IL1Nullifier.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
@@ -35,7 +35,7 @@ interface IL1AssetRouter {
         address _assetAddressOnCounterPart
     ) external payable returns (bytes32 l2TxHash);
 
-    function setL1Nullifier(INullifier _l1Nullifier) external;
+    function setL1Nullifier(IL1Nullifier _l1Nullifier) external;
 
     function bridgehubWithdraw(
         uint256 _chainId,

@@ -9,7 +9,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {IAssetRouterBase} from "../bridge/interfaces/IAssetRouterBase.sol";
-import {INullifier} from "../bridge/interfaces/INullifier.sol";
+import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
@@ -70,7 +70,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     mapping(uint256 chainId => bool isWhitelistedSyncLayer) public whitelistedSettlementLayers;
 
     /// @dev The contract responsible for confirming l2 tx, and is withdrawal finalized mapping.
-    INullifier public nullifier;
+    IL1Nullifier public nullifier;
 
     /// @notice to avoid parity hack
     constructor(uint256 _l1ChainId, address _owner) reentrancyGuardInitializer {
@@ -137,7 +137,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         IMessageRoot _messageRoot
     ) external onlyOwner {
         sharedBridge = IAssetRouterBase(_sharedBridge);
-        nullifier = INullifier(_nullifier);
+        nullifier = IL1Nullifier(_nullifier);
         stmDeployer = _stmDeployer;
         messageRoot = _messageRoot;
         _messageRoot.addNewChain(block.chainid);

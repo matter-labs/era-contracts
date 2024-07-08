@@ -8,7 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
-import {INullifier} from "./interfaces/INullifier.sol";
+import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
@@ -23,7 +23,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @dev The shared bridge that is now used for all bridging, replacing the legacy contract.
-    INullifier public immutable override NULLIFIER;
+    IL1Nullifier public immutable override NULLIFIER;
 
     /// @dev The native token vault, which holds deposited tokens.
     IL1NativeTokenVault public immutable override NATIVE_TOKEN_VAULT;
@@ -62,7 +62,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(INullifier _nullifier, IL1NativeTokenVault _nativeTokenVault) reentrancyGuardInitializer {
+    constructor(IL1Nullifier _nullifier, IL1NativeTokenVault _nativeTokenVault) reentrancyGuardInitializer {
         NULLIFIER = _nullifier;
         NATIVE_TOKEN_VAULT = _nativeTokenVault;
     }

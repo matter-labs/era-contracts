@@ -11,10 +11,11 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
 import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
-import {INullifier} from "./interfaces/INullifier.sol";
+import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -45,7 +46,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     mapping(bytes32 assetId => address assetDeploymentTracker) public assetDeploymentTracker;
 
     /// @dev Address of nullifier.
-    INullifier public nullifierStorage;
+    IL1Nullifier public nullifierStorage;
 
     /// @notice Checks that the message sender is the nullifier.
     modifier onlyNullifier() {
@@ -86,7 +87,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
     /// @param _nullifier The address of the nullifier.
-    function setL1Nullifier(INullifier _nullifier) external onlyOwner {
+    function setL1Nullifier(IL1Nullifier _nullifier) external onlyOwner {
         require(address(_nullifier) == address(0), "ShB: nullifier already set");
         require(address(_nullifier) != address(0), "ShB: nullifier 0");
         nullifierStorage = _nullifier;
@@ -217,7 +218,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
     /// @param _assetId The encoding of the asset on L2 which is withdrawn.
     /// @param _transferData The data that is passed to the asset handler contract.
-    function bridgehubWithdraw( // ToDo: how to unify L1 and L2 withdraw? 1 is done via system contract, another one via request, so input / output is inhenerently different
+    function bridgehubWithdraw(
+        // ToDo: how to unify L1 and L2 withdraw? 1 is done via system contract, another one via request, so input / output is inhenerently different
         uint256 _chainId,
         address _prevMsgSender,
         bytes32 _assetId,
@@ -297,10 +299,21 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetId, _transferData);
     }
 
+    /// @notice Finalize the withdrawal and release funds.
+    /// @param _chainId The chain ID of the transaction to check.
+    /// @param _assetId The bridged asset ID.
+    /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+    function finalizeTransfer(
+        uint256 _chainId,
+        bytes32 _assetId,
+        bytes calldata _transferData
+    ) public override onlyNullifier returns (address l1Receiver, uint256 amount) {
+        (l1Receiver, amount) = super.finalizeTransfer(_chainId, _assetId, _transferData);
+    }
+
     /*//////////////////////////////////////////////////////////////
                      Legacy Functions & Helpers
     //////////////////////////////////////////////////////////////*/
-
 
     /// @dev The request data that is passed to the bridgehub.
     /// @param _chainId The chain ID of the ZK chain to which deposit.
@@ -318,7 +331,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes memory _l2BridgeMintCalldata,
         bytes32 _txDataHash,
         bool _deposit
-    ) internal override view returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal view override returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes memory l2TxCalldata;
         if (_deposit) {
             // Request the finalization of the deposit on the L2 side
@@ -333,7 +346,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             txDataHash: _txDataHash
         });
     }
-
 
     /// @notice Decodes the transfer input for legacy data and transfers allowance to NTV.
     /// @dev Is not applicable for custom asset handlers.
@@ -365,7 +377,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         // First branch covers the case when asset is not registered with NTV (custom asset handler)
         // Second branch handles tokens registered with NTV and uses legacy calldata encoding
         if (nativeTokenVault.tokenAddress(_assetId) == address(0)) {
-            return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (_chainId, _assetId, _transferData));
+            return abi.encodeCall(IAssetRouterBase.finalizeTransfer, (_chainId, _assetId, _transferData));
         } else {
             (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = abi.decode(
                 _transferData,
@@ -387,7 +399,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) external virtual override returns (address l1Receiver, uint256 amount) {
+    ) external override onlyNullifier returns (address l1Receiver, uint256 amount) {
         address assetHandler = assetHandlerAddress[_assetId];
 
         if (assetHandler != address(0)) {

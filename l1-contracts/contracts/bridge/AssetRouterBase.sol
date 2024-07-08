@@ -11,7 +11,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
 import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
-import {INullifier} from "./interfaces/INullifier.sol";
 
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
@@ -94,7 +93,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
         emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _assetId, _amount);
     }
-    
+
     /// @notice Initiates a deposit transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
     /// @param _chainId The chain ID of the ZK chain to which deposit.
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
@@ -154,7 +153,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) external virtual override returns (address l1Receiver, uint256 amount) {
+    ) public virtual override returns (address l1Receiver, uint256 amount) {
         address assetHandler = assetHandlerAddress[_assetId];
 
         if (assetHandler != address(0)) {
@@ -189,8 +188,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes memory _bridgeMintCalldata,
         bytes32 _txDataHash,
         bool _deposit
-    ) internal virtual view returns (L2TransactionRequestTwoBridgesInner memory request) {
-        bytes memory l2TxCalldata = abi.encodeCall(IAssetRouterBase.finalizeTransfer, (_chainId, _assetId, _bridgeMintCalldata));
+    ) internal view virtual returns (L2TransactionRequestTwoBridgesInner memory request) {
+        bytes memory l2TxCalldata = abi.encodeCall(
+            IAssetRouterBase.finalizeTransfer,
+            (_chainId, _assetId, _bridgeMintCalldata)
+        );
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
@@ -232,7 +234,8 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
     function _transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) internal {
         address tokenAddress = nativeTokenVault.tokenAddress(_assetId);
-        if (tokenAddress == address(0) || tokenAddress == ETH_TOKEN_ADDRESS) { // ToDo: Is it ok to keep the second check in base contract?
+        if (tokenAddress == address(0) || tokenAddress == ETH_TOKEN_ADDRESS) {
+            // ToDo: Is it ok to keep the second check in base contract?
             return;
         }
         IERC20 token = IERC20(tokenAddress);

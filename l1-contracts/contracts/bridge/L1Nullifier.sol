@@ -13,7 +13,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
-import {INullifier, FinalizeWithdrawalParams} from "./interfaces/INullifier.sol";
+import {IL1Nullifier, FinalizeWithdrawalParams} from "./interfaces/IL1Nullifier.sol";
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
@@ -31,7 +31,7 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../commo
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Bridges assets between L1 and ZK chain, supporting both ETH and ERC20 tokens.
 /// @dev Designed for use with a proxy for upgradability.
-contract L1Nullifier is INullifier, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token on L1.
@@ -195,6 +195,7 @@ contract L1Nullifier is INullifier, ReentrancyGuard, Ownable2StepUpgradeable, Pa
     }
 
     /// @notice Sets the L1ERC20Bridge contract address.
+
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
     function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {

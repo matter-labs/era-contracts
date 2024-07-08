@@ -32,7 +32,7 @@ interface IAssetRouterBase {
     );
 
     event TransferFinalizedAssetRouter(uint256 chainId, address receiver, bytes32 indexed assetId, uint256 amount); // why hash? shall we make it similar to WithdrawalFinalizedAssetRouter?
-   
+
     event AssetHandlerRegistered(
         bytes32 indexed assetId,
         address indexed assetHandlerAddress,
@@ -60,7 +60,11 @@ interface IAssetRouterBase {
         bytes calldata _data
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
 
-    function finalizeTransfer(uint256 _chainId, bytes32 _assetId, bytes memory _transferData) external returns (address l1Receiver, uint256 amount);
+    function finalizeTransfer(
+        uint256 _chainId,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) external returns (address l1Receiver, uint256 amount);
 
     function setAssetHandlerAddress(bytes32 _additionalData, address _assetHandlerAddress) external;
 

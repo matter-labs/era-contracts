@@ -25,7 +25,7 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_T
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../../common/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/interfaces/IL1AssetRouter.sol";
-import {INullifier, FinalizeWithdrawalParams} from "../../../bridge/interfaces/INullifier.sol";
+import {IL1Nullifier, FinalizeWithdrawalParams} from "../../../bridge/interfaces/IL1Nullifier.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
@@ -441,7 +441,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
         require(s.chainId == ERA_CHAIN_ID, "Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
-        INullifier(s.baseTokenBridge).finalizeWithdrawal(
+        IL1Nullifier(s.baseTokenBridge).finalizeWithdrawal(
             // solhint-disable-next-line func-named-parameters
             FinalizeWithdrawalParams(
                 ERA_CHAIN_ID,

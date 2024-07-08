@@ -11,6 +11,7 @@ import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol"
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 
 import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "../bridge/interfaces/IAssetRouterBase.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
@@ -49,7 +50,10 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         // solhint-disable-next-line gas-custom-errors
 
         require(BRIDGE_HUB.stateTransitionManagerIsRegistered(_stmAddress), "STMDT: stm not registered");
-        SHARED_BRIDGE.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_stmAddress))), address(BRIDGE_HUB));
+        IAssetRouterBase(address(SHARED_BRIDGE)).setAssetHandlerAddress(
+            bytes32(uint256(uint160(_stmAddress))),
+            address(BRIDGE_HUB)
+        );
         BRIDGE_HUB.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_stmAddress))), _stmAddress);
     }
 

@@ -13,10 +13,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
+import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
-import {INullifier} from "./interfaces/INullifier.sol";
+import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 
-import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 
@@ -31,10 +32,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     address public immutable override L1_WETH_TOKEN;
 
     /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
-    IL1AssetRouter public immutable override L1_SHARED_BRIDGE;
+    IAssetRouterBase public immutable override ASSET_ROUTER;
 
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
-    INullifier public immutable override NULLIFIER;
+    IL1Nullifier public immutable override NULLIFIER;
 
     /// @dev Era's chainID
     uint256 public immutable ERA_CHAIN_ID;
@@ -49,7 +50,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridge() {
-        require(msg.sender == address(L1_SHARED_BRIDGE), "NTV not ShB");
+        require(msg.sender == address(ASSET_ROUTER), "NTV not ShB");
         _;
     }
 
@@ -63,14 +64,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
         address _l1WethAddress,
-        IL1AssetRouter _l1SharedBridge,
+        IAssetRouterBase _l1AssetRouter,
         uint256 _eraChainId,
-        INullifier _l1Nullifier
+        IL1Nullifier _l1Nullifier
     ) {
         _disableInitializers();
         L1_WETH_TOKEN = _l1WethAddress;
         ERA_CHAIN_ID = _eraChainId;
-        L1_SHARED_BRIDGE = _l1SharedBridge;
+        ASSET_ROUTER = _l1AssetRouter;
         NULLIFIER = _l1Nullifier;
     }
 
@@ -84,7 +85,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
 
     /// @dev Accepts ether only from the Shared Bridge.
     receive() external payable {
-        require(address(L1_SHARED_BRIDGE) == msg.sender, "NTV: ETH only accepted from Shared Bridge");
+        require(address(ASSET_ROUTER) == msg.sender, "NTV: ETH only accepted from Shared Bridge");
     }
 
     /// @notice Transfers tokens from shared bridge as part of the migration process.
@@ -99,7 +100,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
             require(balanceAfter > balanceBefore, "NTV: 0 eth transferred");
         } else {
             uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
-            uint256 sharedBridgeChainBalance = IERC20(_token).balanceOf(address(L1_SHARED_BRIDGE));
+            uint256 sharedBridgeChainBalance = IERC20(_token).balanceOf(address(ASSET_ROUTER));
             require(sharedBridgeChainBalance > 0, "NTV: 0 amount to transfer");
             NULLIFIER.transferTokenToNTV(_token);
             uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
@@ -125,11 +126,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         require(_l1Token != L1_WETH_TOKEN, "NTV: WETH deposit not supported");
         require(_l1Token == ETH_TOKEN_ADDRESS || _l1Token.code.length > 0, "NTV: empty token");
         bytes32 assetId = getAssetId(_l1Token);
-        L1_SHARED_BRIDGE.setAssetHandlerAddress(bytes32(uint256(uint160(_l1Token))), address(this));
+        ASSET_ROUTER.setAssetHandlerAddress(bytes32(uint256(uint160(_l1Token))), address(this));
         tokenAddress[assetId] = _l1Token;
     }
 
-    /// @inheritdoc IL1AssetHandler
+    /// @inheritdoc IAssetHandler
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
     /// @dev In case of native token vault _data is the tuple of _depositAmount and _l2Receiver.
     function bridgeBurn(
@@ -181,10 +182,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         address from = _from;
         // in the legacy scenario the SharedBridge was granting the allowance, we have to transfer from them instead of the user
         if (
-            _token.allowance(address(L1_SHARED_BRIDGE), address(this)) >= _amount &&
+            _token.allowance(address(ASSET_ROUTER), address(this)) >= _amount &&
             _token.allowance(_from, address(this)) < _amount
         ) {
-            from = address(L1_SHARED_BRIDGE);
+            from = address(ASSET_ROUTER);
         }
         // slither-disable-next-line arbitrary-send-erc20
         _token.safeTransferFrom(from, address(this), _amount);
@@ -210,7 +211,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         return abi.encode(data1, data2, data3);
     }
 
-    ///  @inheritdoc IL1AssetHandler
+    ///  @inheritdoc IAssetHandler
     function bridgeMint(
         uint256 _chainId,
         bytes32 _assetId,
