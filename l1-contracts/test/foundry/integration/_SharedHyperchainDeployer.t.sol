@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {RegisterHyperchainScript} from "./deploy-scripts/RegisterHyperchain.s.sol";
+import {RegisterHyperchainScript} from "deploy-scripts/RegisterHyperchain.s.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 

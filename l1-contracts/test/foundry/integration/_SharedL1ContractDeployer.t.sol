@@ -21,6 +21,10 @@ contract L1ContractDeployer is Test {
     function _deployL1Contracts() internal {
         vm.setEnv("L1_CONFIG", "/test/foundry/integration/deploy-scripts/script-config/config-deploy-l1.toml");
         vm.setEnv("L1_OUTPUT", "/test/foundry/integration/deploy-scripts/script-out/output-deploy-l1.toml");
+        vm.setEnv(
+            "HYPERCHAIN_OUTPUT",
+            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-hyperchain-era.toml"
+        );
 
         DeployL1Script l1Script = new DeployL1Script();
         l1Script.run();
