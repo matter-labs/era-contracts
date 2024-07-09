@@ -26,9 +26,12 @@ contract DeployPaymaster is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/deploy-script-config-template/config-deploy-paymaster.toml");
         string memory toml = vm.readFile(path);
-        config.bridgehubAddress = toml.readAddress("$.bridgehub");
         config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
-        config.chainId = toml.readUint("$.chain_id");
+
+        path = string.concat(root, "/script-out/output-deploy-l1.toml");
+        toml = vm.readFile(path);
+        config.bridgehubAddress = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
+        config.chainId = toml.readUint("$.era_chain_id");
     }
 
     function saveOutput() internal {
@@ -50,7 +53,6 @@ contract DeployPaymaster is Script {
         bytes memory testnetPaymasterBytecode = Utils.readHardhatBytecode(
             "/../l2-contracts/artifacts-zk/contracts/TestnetPaymaster.sol/TestnetPaymaster.json"
         );
-        console.log("addr", config.bridgehubAddress);
         config.paymaster = Utils.deployThroughL1({
             bytecode: testnetPaymasterBytecode,
             constructorargs: "",
