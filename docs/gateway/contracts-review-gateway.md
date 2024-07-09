@@ -25,6 +25,9 @@ Known issues, and features that still need to be implemented:
 - Chains cannot yet leave the Gateway. Failed migration to the Gateway cannot yet be reclaimed.
 - Upgrade process, how do we upgrade to CAB bridge, to the new system contracts.
 - We had the syncLayer internal name previously for the Gateway. This has not been replaced everywhere yet.
+- permissions for some functions are not properly restricted yet, mostly they are missing a modifier.
+- Bridgehub setAssetHandlerAddressInitial `address sender` might be an issue.
+- MessageRoot should be renamed to MessageRootAggregator
 
 ![Untitled](./Hyperchain-scheme.png)
 
@@ -49,3 +52,17 @@ Known issues, and features that still need to be implemented:
   - L2ContractHelper.sol
 
 ## Later scope
+
+The majority of the rest of the changes. This makes the scope quite big, so please focus on the initial scope in more detail, and if you have time include the later scope.
+
+- MessageRoot.sol
+- STMDeploymentTracker.sol
+- Bridgehub.sol
+- Config.sol
+- L2ContractAddresses.sol
+- StateTransitionManager.sol
+- ValidatorTimelock.sol
+- DiamondInit.sol
+- ZkSyncHyperchainStorage.sol
+- Admin.sol
+- L1GenesisUpgrade.sol
