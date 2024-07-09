@@ -904,14 +904,14 @@ export class Deployer {
 
     this.addresses.Bridgehub.STMDeploymentTrackerProxy = contractAddress;
 
-    const bridgehub = this.bridgehubContract(this.deployWallet);
-    const data0 = bridgehub.interface.encodeFunctionData("setSTMDeployer", [
-      this.addresses.Bridgehub.STMDeploymentTrackerProxy,
-    ]);
-    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, data0);
-    if (this.verbose) {
-      console.log("STM DT registered in Bridgehub");
-    }
+    // const bridgehub = this.bridgehubContract(this.deployWallet);
+    // const data0 = bridgehub.interface.encodeFunctionData("setSTMDeployer", [
+    //   this.addresses.Bridgehub.STMDeploymentTrackerProxy,
+    // ]);
+    // await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, data0);
+    // if (this.verbose) {
+    //   console.log("STM DT registered in Bridgehub");
+    // }
   }
 
   public async sharedBridgeSetEraPostUpgradeFirstBatch() {
@@ -1055,7 +1055,7 @@ export class Deployer {
       if (this.verbose) {
         console.log("STM asset registered in L1 Shared Bridge via STM Deployment Tracker", receipt2.gasUsed.toString());
         console.log(
-          `CONTRACTS_STM_ASSET_INFO=${await bridgehub.stmAssetInfo(this.addresses.StateTransition.StateTransitionProxy)}`
+          `CONTRACTS_STM_ASSET_INFO=${await bridgehub.stmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
         );
       }
     }
@@ -1094,7 +1094,7 @@ export class Deployer {
     let sharedBridgeData = ethers.utils.defaultAbiCoder.encode(
       ["bytes32", "bytes"],
 
-      [await bridgehub.stmAssetInfoFromChainId(this.chainId), bridgehubData]
+      [await bridgehub.stmAssetIdFromChainId(this.chainId), bridgehubData]
     );
     sharedBridgeData = "0x01" + sharedBridgeData.slice(2);
     const receipt = await this.executeDirectOrGovernance(
