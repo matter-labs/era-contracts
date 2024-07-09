@@ -199,6 +199,10 @@ contract DeployL1Script is Script {
         return config.ownerAddress;
     }
 
+    function getSTM() public view returns (address) {
+        return addresses.stateTransition.stateTransitionProxy;
+    }
+
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, vm.envString("L1_CONFIG"));
@@ -736,6 +740,22 @@ contract DeployL1Script is Script {
 
     function saveOutput() internal {
         vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
+        vm.serializeAddress(
+            "bridgehub",
+            "stm_deployment_tracker_proxy_addr",
+            addresses.bridgehub.stmDeploymentTrackerProxy
+        );
+        vm.serializeAddress(
+            "bridgehub",
+            "stm_deployment_tracker_implementation_addr",
+            addresses.bridgehub.stmDeploymentTrackerImplementation
+        );
+        vm.serializeAddress("bridgehub", "message_root_proxy_addr", addresses.bridgehub.messageRootProxy);
+        vm.serializeAddress(
+            "bridgehub",
+            "message_root_implementation_addr",
+            addresses.bridgehub.messageRootImplementation
+        );
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",
             "bridgehub_implementation_addr",

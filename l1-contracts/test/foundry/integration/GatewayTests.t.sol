@@ -70,8 +70,8 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         _initializeGatewayScript();
 
         // console.log("KL todo", Ownable(l1Script.getBridgehubProxyAddress()).owner(), l1Script.getBridgehubProxyAddress());
-        // vm.deal(Ownable(l1Script.getBridgehubProxyAddress()).owner(), 100000000000000000000000000000000000);
-        // vm.deal(l1Script.getOwnerAddress(), 100000000000000000000000000000000000);
+        vm.deal(Ownable(l1Script.getBridgehubProxyAddress()).owner(), 100000000000000000000000000000000000);
+        vm.deal(l1Script.getOwnerAddress(), 100000000000000000000000000000000000);
         IZkSyncHyperchain chain = IZkSyncHyperchain(IBridgehub(l1Script.getBridgehubProxyAddress()).getHyperchain(10));
         IZkSyncHyperchain chain2 = IZkSyncHyperchain(IBridgehub(l1Script.getBridgehubProxyAddress()).getHyperchain(11));
         vm.deal(chain.getAdmin(), 100000000000000000000000000000000000);
@@ -98,7 +98,11 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         // require(bridgehub.settlementLayer())
     }
 
-    function test_l2Registration() public {}
+    function test_l2Registration() public {
+        gatewayScript.registerGateway();
+        gatewayScript.moveChainToGateway();
+        gatewayScript.registerL2Contracts();
+    }
 
     function test_finishMoveChain() public {}
 

@@ -42,6 +42,7 @@ contract GatewayScript is Script {
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
         address bridgehub;
+        address stmDeploymentTracker;
         address nativeTokenVault;
         address stateTransitionProxy;
         address sharedBridgeProxy;
@@ -85,6 +86,9 @@ contract GatewayScript is Script {
         config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
+        config.stmDeploymentTracker = toml.readAddress(
+            "$.deployed_addresses.bridgehub.stm_deployment_tracker_proxy_addr"
+        );
         path = string.concat(root, vm.envString("HYPERCHAIN_CONFIG"));
         toml = vm.readFile(path);
 
@@ -171,5 +175,34 @@ contract GatewayScript is Script {
         console.log("Chain moved to Gateway");
     }
 
-    function registerL2Contracts() public {}
+    function registerL2Contracts() public {
+        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        Ownable ownable = Ownable(config.stmDeploymentTracker);
+        // IStateTransitionManager stm = IStateTransitionManager(config.stateTransitionProxy);
+
+        uint256 gasPrice = 10;
+        uint256 l2GasLimit = 72000000;
+
+        uint256 expectedCost = bridgehub.l2TransactionBaseCost(
+            config.chainChainId,
+            gasPrice,
+            l2GasLimit,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        ) * 2;
+
+        L2TransactionRequestTwoBridgesOuter memory request = L2TransactionRequestTwoBridgesOuter({
+            chainId: config.chainChainId,
+            mintValue: expectedCost,
+            l2Value: 0,
+            l2GasLimit: l2GasLimit,
+            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            refundRecipient: ownable.owner(),
+            secondBridgeAddress: config.stmDeploymentTracker,
+            secondBridgeValue: 0,
+            secondBridgeCalldata: abi.encode(config.stateTransitionProxy, config.stateTransitionProxy)
+        });
+        vm.startBroadcast(ownable.owner());
+        bridgehub.requestL2TransactionTwoBridges{value: expectedCost}(request);
+        vm.stopBroadcast();
+    }
 }
