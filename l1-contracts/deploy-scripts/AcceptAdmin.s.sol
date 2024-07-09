@@ -22,10 +22,10 @@ contract AcceptAdmin is Script {
     }
 
     // This function should be called by the owner to accept the admin role
-    function acceptAdmin(address governor, address target) public {
+    function acceptAdmin(address admin, address target) public {
         IZkSyncHyperchain adminContract = IZkSyncHyperchain(target);
         Utils.executeUpgrade({
-            _governor: governor,
+            _governor: admin,
             _salt: bytes32(0),
             _target: target,
             _data: abi.encodeCall(adminContract.acceptAdmin, ()),
