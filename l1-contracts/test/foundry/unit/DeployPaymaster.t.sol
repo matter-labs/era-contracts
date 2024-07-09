@@ -4,6 +4,10 @@ pragma solidity 0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {DeployPaymaster} from "../../../deploy-scripts/DeployPaymaster.s.sol";
+import {RegisterHyperchainScript} from "../../../deploy-scripts/RegisterHyperchain.s.sol";
+import {DeployL1Script} from "../../../deploy-scripts/DeployL1.s.sol";
+import {_DeployL1Script} from "../../../deploy-scripts/_DeployL1.s.sol";
+import {Bridgehub} from "../../../contracts/bridgehub/Bridgehub.sol";
 
 contract DeployPaymasterTest is Test {
     using stdToml for string;
@@ -16,17 +20,40 @@ contract DeployPaymasterTest is Test {
     }
 
     Config config;
+    address bridgehubProxyAddress;
+    Bridgehub bridgeHub;
 
-    DeployPaymaster private deployScript;
+    DeployPaymaster private deployPaymaster;
+    DeployL1Script private deployL1;
+    _DeployL1Script private _deployL1;
+    RegisterHyperchainScript private deployHyperchain;
+
+    function _acceptOwnership() private {
+            vm.startPrank(bridgeHub.pendingOwner());
+            bridgeHub.acceptOwnership();
+            vm.stopPrank();
+        }
 
     function setUp() public {
+        deployL1 = new DeployL1Script();
+        deployL1.run();
+        
+        _deployL1 = new _DeployL1Script();
+        _deployL1._run();
+        
+        bridgehubProxyAddress = _deployL1._getBridgehubProxyAddress();
+        bridgeHub = Bridgehub(bridgehubProxyAddress);
+        _acceptOwnership();
+
+        vm.warp(100);
+        deployHyperchain = new RegisterHyperchainScript();
+        deployHyperchain.run();
+
         string memory url = getChain(1).rpcUrl;
         vm.createSelectFork({urlOrAlias: url, blockNumber: 16_428_900});
-        vm.allowCheatcodes(0xEA785A9c91A07ED69b83EB165f4Ce2C30ecb4c0b);
         vm.deal(0xEA785A9c91A07ED69b83EB165f4Ce2C30ecb4c0b, 720000000000000);
-        vm.allowCheatcodes(0x51dE418cB7f5b630D5Ca9A49514e34E2420a66b3);
-        deployScript  = new DeployPaymaster();
-        deployScript.run();
+        deployPaymaster  = new DeployPaymaster();
+        deployPaymaster.run();
 
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-paymaster.toml");
@@ -34,8 +61,8 @@ contract DeployPaymasterTest is Test {
         config.paymaster = toml.readAddress("$.paymaster");
     }
 
-    function test() public {
-        address paymasterAddress = deployScript.getPaymasterAddress();
+    function test_checkPaymasterAddress() public {
+        address paymasterAddress = deployPaymaster.getPaymasterAddress();
         address paymasterAddressCheck = config.paymaster;
         assertEq(paymasterAddress, paymasterAddressCheck);
     }
