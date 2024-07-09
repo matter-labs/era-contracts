@@ -203,6 +203,10 @@ contract DeployL1Script is Script {
         return addresses.stateTransition.stateTransitionProxy;
     }
 
+    function getInitialDiamondCutData() public view returns (bytes memory) {
+        return config.contracts.diamondCutData;
+    }
+
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, vm.envString("L1_CONFIG"));

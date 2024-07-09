@@ -26,11 +26,17 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
+import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 
 contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
+
+    uint256 migratingChainId = 10;
+    uint256 gatewayChainId = 11;
+    uint256 mintChainId = 12;
 
     // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
@@ -72,8 +78,12 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         // console.log("KL todo", Ownable(l1Script.getBridgehubProxyAddress()).owner(), l1Script.getBridgehubProxyAddress());
         vm.deal(Ownable(l1Script.getBridgehubProxyAddress()).owner(), 100000000000000000000000000000000000);
         vm.deal(l1Script.getOwnerAddress(), 100000000000000000000000000000000000);
-        IZkSyncHyperchain chain = IZkSyncHyperchain(IBridgehub(l1Script.getBridgehubProxyAddress()).getHyperchain(10));
-        IZkSyncHyperchain chain2 = IZkSyncHyperchain(IBridgehub(l1Script.getBridgehubProxyAddress()).getHyperchain(11));
+        IZkSyncHyperchain chain = IZkSyncHyperchain(
+            IBridgehub(l1Script.getBridgehubProxyAddress()).getHyperchain(migratingChainId)
+        );
+        IZkSyncHyperchain chain2 = IZkSyncHyperchain(
+            IBridgehub(l1Script.getBridgehubProxyAddress()).getHyperchain(gatewayChainId)
+        );
         vm.deal(chain.getAdmin(), 100000000000000000000000000000000000);
         vm.deal(chain2.getAdmin(), 100000000000000000000000000000000000);
 
@@ -104,7 +114,20 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         gatewayScript.registerL2Contracts();
     }
 
-    function test_finishMoveChain() public {}
+    function test_finishMoveChain() public {
+        IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
+        IStateTransitionManager stm = IStateTransitionManager(l1Script.getSTM());
+        IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId));
+        bytes32 assetId = bridgehub.stmAssetIdFromChainId(migratingChainId);
+
+        bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
+        bytes memory chainData = abi.encode(AdminFacet(address(chain))._prepareChainCommitment());
+        bytes memory stmData = abi.encode(address(1), msg.sender, stm.protocolVersion(), initialDiamondCut);
+        bytes memory bridgehubMintData = abi.encode(mintChainId, stmData, chainData);
+        vm.startBroadcast(address(bridgehub.sharedBridge()));
+        bridgehub.bridgeMint(gatewayChainId, assetId, bridgehubMintData);
+        vm.stopBroadcast();
+    }
 
     function test_startMessageToL3() public {}
 
