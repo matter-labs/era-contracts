@@ -38,4 +38,7 @@ contract ExecutorProvingTest is ExecutorFacet {
         s.l2BootloaderBytecodeHash = l2BootloaderBytecodeHash;
         s.zkPorterIsAvailable = false;
     }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }

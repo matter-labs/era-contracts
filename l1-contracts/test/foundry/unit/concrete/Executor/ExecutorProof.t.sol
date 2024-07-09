@@ -126,4 +126,7 @@ contract ExecutorProofTest is Test {
     //     uint256 result = executor.getBatchProofPublicInput(prevCommitment, nextCommitment);
     //     assertEq(result, 0xAC7931F2C11013FC24963E41B86E5325A79F1150350CB41E4F0876A7, "getBatchProofPublicInput");
     // }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }

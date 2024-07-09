@@ -17,4 +17,7 @@ contract DummyStateTransitionManagerWBH is StateTransitionManager {
     function setHyperchain(uint256 _chainId, address _hyperchain) external {
         hyperchainMap.set(_chainId, _hyperchain);
     }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }
