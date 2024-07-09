@@ -115,6 +115,28 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
     }
 
     function test_finishMoveChain() public {
+        finishMoveChain();
+    }
+
+    function test_startMessageToL3() public {
+        finishMoveChain();
+        IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
+        uint256 expectedValue = 1000000000000000000000;
+
+        L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
+            migratingChainId,
+            expectedValue,
+            0,
+            72000000,
+            800,
+            "0x"
+        );
+        bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
+    }
+
+    function test_forwardToL3OnGateway() public {}
+
+    function finishMoveChain() public {
         IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
         IStateTransitionManager stm = IStateTransitionManager(l1Script.getSTM());
         IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId));
@@ -128,10 +150,6 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         bridgehub.bridgeMint(gatewayChainId, assetId, bridgehubMintData);
         vm.stopBroadcast();
     }
-
-    function test_startMessageToL3() public {}
-
-    function test_forwardToL3OnGateway() public {}
 
     // add this to be excluded from coverage report
     function test() internal override {}
