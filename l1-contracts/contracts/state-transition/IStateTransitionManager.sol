@@ -132,7 +132,7 @@ interface IStateTransitionManager {
 
     function unfreezeChain(uint256 _chainId) external;
 
-    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external;
+    function adjustFee(uint256 _chainId, uint128 _nominator, uint128 _denominator, uint64 _minimalL2GasPrice) external;
 
     function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external;
 
