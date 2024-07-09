@@ -86,4 +86,14 @@ contract ConsensusAuthority {
     function changeAttesterPubKey(address nodeOwner, bytes calldata pubKey) external onlyOwnerOrNodeOwner(nodeOwner) {
         attesterRegistry.changePublicKey(nodeOwner, pubKey);
     }
+
+    // Rotates the validator committee list.
+    function setValidatorCommittee() external onlyOwner {
+        validatorRegistry.setCommittee();
+    }
+
+    // Rotates the attester committee list.
+    function setAttesterCommittee() external onlyOwner {
+        attesterRegistry.setCommittee();
+    }
 }
