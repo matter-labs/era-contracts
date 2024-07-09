@@ -5,23 +5,25 @@ pragma solidity 0.8.20;
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
+import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
 import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IL2AssetHandler} from "./interfaces/IL2AssetHandler.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
-import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
+import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
+import {IBridgehub} from "./interfaces/IBridgehub.sol";
 
+import {AssetRouterBase} from "./AssetRouterBase.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, L2_NATIVE_TOKEN_VAULT} from "../L2ContractHelper.sol";
-
 import {EmptyAddress, InvalidCaller} from "../L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
+contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ILegacyL2SharedBridge {
     /// @dev Chain ID of Era for legacy reasons
     uint256 public immutable ERA_CHAIN_ID;
 
@@ -45,9 +47,6 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
     /// This is non-zero only on Era, and should not be renamed for backward compatibility with the SDKs.
     address public override l1Bridge;
 
-    /// @dev A mapping l2 token address => l1 token address.
-    mapping(bytes32 assetId => address assetHandlerAddress) public override assetHandlerAddress;
-
     /// @notice Checks that the message sender is the legacy bridge.
     modifier onlyL1Bridge() {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
@@ -64,7 +63,14 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
     /// @dev Disable the initialization to prevent Parity hack.
     /// @param _l1SharedBridge The address of the L1 Bridge contract.
     /// @param _l1Bridge The address of the legacy L1 Bridge contract.
-    constructor(uint256 _eraChainId, uint256 _l1ChainId, address _l1SharedBridge, address _l1Bridge) {
+    constructor(
+        uint256 _eraChainId,
+        uint256 _l1ChainId,
+        address _l1SharedBridge,
+        address _l1Bridge,
+        IBridgehub _bridgeHub,
+        address _baseTokenAddress
+    ) AssetRouterBase(_bridgeHub, _baseTokenAddress) {
         ERA_CHAIN_ID = _eraChainId;
         L1_CHAIN_ID = _l1ChainId;
         if (_l1SharedBridge == address(0)) {
@@ -81,21 +87,6 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
             }
         }
         _disableInitializers();
-    }
-
-    /// @notice Finalizes the deposit and mint funds.
-    /// @param _assetId The encoding of the asset on L2.
-    /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken).
-    function finalizeDeposit(bytes32 _assetId, bytes memory _transferData) public override onlyL1Bridge {
-        address assetHandler = assetHandlerAddress[_assetId];
-        if (assetHandler != address(0)) {
-            IL2AssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
-        } else {
-            L2_NATIVE_TOKEN_VAULT.bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
-            assetHandlerAddress[_assetId] = address(L2_NATIVE_TOKEN_VAULT);
-        }
-
-        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, keccak256(_transferData));
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -131,15 +122,6 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
         return abi.encodePacked(IL1AssetRouter.finalizeWithdrawal.selector, _assetId, _l1bridgeMintData);
     }
 
-    /// @notice Sets the asset handler address for a given assetId.
-    /// @dev Will be called by ZK Gateway.
-    /// @param _assetId The encoding of the asset on L2.
-    /// @param _assetHandlerAddress The address of the asset handler, which will hold the token of interest.
-    function setAssetHandlerAddress(bytes32 _assetId, address _assetHandlerAddress) external onlyL1Bridge {
-        assetHandlerAddress[_assetId] = _assetHandlerAddress;
-        emit AssetHandlerRegistered(_assetId, _assetHandlerAddress);
-    }
-
     /*//////////////////////////////////////////////////////////////
                             LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -161,7 +143,7 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
         bytes32 assetId = keccak256(abi.encode(L1_CHAIN_ID, address(L2_NATIVE_TOKEN_VAULT), _l1Token));
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encode(_l1Sender, _amount, _l2Receiver, erc20Data, _l1Token);
-        finalizeDeposit(assetId, data);
+        this.finalizeDeposit(L1_CHAIN_ID, assetId, data);
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -181,7 +163,7 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
     /// @param _l2Token The address of token on L2.
     /// @return The address of token on L1.
     function getL1TokenAddress(address _l2Token) public view returns (address) {
-        return IL2StandardToken(_l2Token).l1Address();
+        return IBridgedStandardToken(_l2Token).l1Address();
     }
 
     /// @notice Retrieves L2 wrapped token address corresponding to L1 token counterpart.

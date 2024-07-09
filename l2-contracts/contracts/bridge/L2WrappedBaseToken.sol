@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
 
 import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
-import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
+import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
 
 import {EmptyAddress, Unauthorized, UnimplementedMessage, BRIDGE_MINT_NOT_IMPLEMENTED, WithdrawFailed} from "../L2ContractErrors.sol";
 
@@ -22,7 +22,7 @@ import {EmptyAddress, Unauthorized, UnimplementedMessage, BRIDGE_MINT_NOT_IMPLEM
 ///
 /// Note: This is an upgradeable contract. In the future, we will remove upgradeability to make it trustless.
 /// But for now, when the Rollup has instant upgradability, we leave the possibility of upgrading to improve the contract if needed.
-contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2StandardToken {
+contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBridgedStandardToken {
     /// @dev Address of the L2 WETH Bridge.
     address public override l2Bridge;
 
@@ -75,7 +75,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2S
         _;
     }
 
-    /// @notice Function for minting tokens on L2, implemented only to be compatible with IL2StandardToken interface.
+    /// @notice Function for minting tokens on L2, implemented only to be compatible with IBridgedStandardToken interface.
     /// Always reverts instead of minting anything!
     /// Note: Use `deposit`/`depositTo` methods instead.
     // solhint-disable-next-line no-unused-vars

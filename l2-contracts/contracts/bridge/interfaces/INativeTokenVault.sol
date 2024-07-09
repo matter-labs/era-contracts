@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 
@@ -9,12 +9,15 @@ import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The NTV is an Asset Handler for the L1AssetRouter to handle native tokens
 interface INativeTokenVault {
-    event bridgedTokenBeaconUpdated(address bridgedTokenBeacon, bytes32 bridgedTokenProxyBytecodeHash);
+    event BridgedTokenBeaconUpdated(address bridgedTokenBeacon, bytes32 bridgedTokenProxyBytecodeHash);
 
-    function setWrappedTokenBeacon() external;
+    function setBridgedTokenBeacon() external;
 
     /// @notice The Weth token address
     function WETH_TOKEN() external view returns (address);
+
+    /// @notice The Base token address
+    function BASE_TOKEN_ADDRESS() external view returns (address);
 
     /// @notice The AssetRouter contract
     function ASSET_ROUTER() external view returns (IAssetRouterBase);
@@ -37,6 +40,6 @@ interface INativeTokenVault {
     /// @notice Used to get the token address of an assetId
     function tokenAddress(bytes32 assetId) external view returns (address);
 
-    /// @notice Used to get the expected wrapped token address corresponding to its native counterpart
+    /// @notice Used to get the expected bridged token address corresponding to its native counterpart
     function bridgedTokenAddress(address _nativeToken) external view returns (address);
 }

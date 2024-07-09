@@ -2,30 +2,9 @@
 
 pragma solidity 0.8.20;
 
-// import {IL2AssetRouter} from "./IL2AssetRouter.sol";
-import {IL2AssetHandler} from "./IL2AssetHandler.sol";
+import {INativeTokenVault} from "./INativeTokenVault.sol";
 
 /// @author Matter Labs
-interface IL2NativeTokenVault is IL2AssetHandler {
-    event FinalizeDeposit(
-        address indexed l1Sender,
-        address indexed l2Receiver,
-        address indexed l2Token,
-        uint256 amount
-    );
-
-    event WithdrawalInitiated(
-        address indexed l2Sender,
-        address indexed l1Receiver,
-        address indexed l2Token,
-        uint256 amount
-    );
-
-    event L2TokenBeaconUpdated(address l2TokenBeacon, bytes32 l2TokenProxyBytecodeHash);
-
-    function tokenAddress(bytes32 _assetId) external view returns (address);
-
+interface IL2NativeTokenVault is INativeTokenVault {
     function l2TokenAddress(address _l1Token) external view returns (address);
-
-    function setL2TokenBeacon() external;
 }
