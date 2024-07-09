@@ -393,7 +393,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(2, 1, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWithCustomError(compressor, "ExtraDataInStateDiffs");
+      ).to.be.revertedWithCustomError(compressor, "StateDiffLengthMismatch");
     });
 
     it("successfully verified", async () => {

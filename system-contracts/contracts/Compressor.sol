@@ -8,7 +8,7 @@ import {Utils} from "./libraries/Utils.sol";
 import {UnsafeBytesCalldata} from "./libraries/UnsafeBytesCalldata.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {L1_MESSENGER_CONTRACT, STATE_DIFF_ENTRY_SIZE, KNOWN_CODE_STORAGE_CONTRACT} from "./Constants.sol";
-import {DerivedKeyNotEqualToCompressedValue, EncodedAndRealBytecodeChunkNotEqual, DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo, EncodedLengthNotFourTimesSmallerThanOriginal, IndexOutOfBounds, IndexSizeError, ValuesNotEqual, UnsupportedOperation, CompressorInitialWritesProcessedNotEqual, CompressorEnumIndexNotEqual, ExtraDataInStateDiffs, CompressionValueTransformError, CompressionValueAddError, CompressionValueSubError} from "./SystemContractErrors.sol";
+import {DerivedKeyNotEqualToCompressedValue, EncodedAndRealBytecodeChunkNotEqual, DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo, EncodedLengthNotFourTimesSmallerThanOriginal, IndexOutOfBounds, IndexSizeError, UnsupportedOperation, CompressorInitialWritesProcessedNotEqual, CompressorEnumIndexNotEqual, StateDiffLengthMismatch, CompressionValueTransformError, CompressionValueAddError, CompressionValueSubError} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -198,7 +198,7 @@ contract Compressor is ICompressor, ISystemContract {
         }
 
         if (stateDiffPtr != _compressedStateDiffs.length) {
-            revert ExtraDataInStateDiffs();
+            revert StateDiffLengthMismatch();
         }
 
         stateDiffHash = EfficientCall.keccak(_stateDiffs);

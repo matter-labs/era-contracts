@@ -104,8 +104,8 @@ error ShaInvalidReturnData();
 error CompressorInitialWritesProcessedNotEqual(uint256 expected, uint256 actual);
 // 0x61a6a4b3
 error CompressorEnumIndexNotEqual(uint256 expected, uint256 actual);
-// 0x0e67b36a
-error ExtraDataInStateDiffs();
+// 0xbd8665e2
+error StateDiffLengthMismatch();
 // 0x1e6aff87
 error CompressionValueTransformError(uint256 expected, uint256 actual);
 // 0x4f951510
