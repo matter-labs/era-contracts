@@ -84,7 +84,7 @@ abstract contract CalldataDA {
 
         blobCommitments = new bytes32[](_maxBlobsSupported);
 
-        require(_blobsProvided == 1, "one one blob with calldata");
+        require(_blobsProvided == 1, "only one blob with calldata");
 
         _pubdata = _pubdataInput[:_pubdataInput.length - 32];
 
