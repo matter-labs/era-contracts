@@ -243,7 +243,7 @@ library Utils {
             l2GasLimit,
             REQUIRED_L2_GAS_PRICE_PER_PUBDATA
         ) * 2;
-    
+
         L2TransactionRequestDirect memory l2TransactionRequestDirect = L2TransactionRequestDirect({
             chainId: chainId,
             mintValue: requiredValueToDeploy,

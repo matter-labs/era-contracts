@@ -29,18 +29,18 @@ contract DeployPaymasterTest is Test {
     RegisterHyperchainScript private deployHyperchain;
 
     function _acceptOwnership() private {
-            vm.startPrank(bridgeHub.pendingOwner());
-            bridgeHub.acceptOwnership();
-            vm.stopPrank();
-        }
+        vm.startPrank(bridgeHub.pendingOwner());
+        bridgeHub.acceptOwnership();
+        vm.stopPrank();
+    }
 
     function setUp() public {
         deployL1 = new DeployL1Script();
         deployL1.run();
-        
+
         _deployL1 = new _DeployL1Script();
         _deployL1._run();
-        
+
         bridgehubProxyAddress = _deployL1._getBridgehubProxyAddress();
         bridgeHub = Bridgehub(bridgehubProxyAddress);
         _acceptOwnership();
@@ -52,7 +52,7 @@ contract DeployPaymasterTest is Test {
         string memory url = getChain(1).rpcUrl;
         vm.createSelectFork({urlOrAlias: url, blockNumber: 16_428_900});
         vm.deal(0xEA785A9c91A07ED69b83EB165f4Ce2C30ecb4c0b, 720000000000000);
-        deployPaymaster  = new DeployPaymaster();
+        deployPaymaster = new DeployPaymaster();
         deployPaymaster.run();
 
         string memory root = vm.projectRoot();

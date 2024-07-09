@@ -133,4 +133,3 @@ jobs:
 
       - name: Run tests
         run: yarn l1 test:ffi
-
