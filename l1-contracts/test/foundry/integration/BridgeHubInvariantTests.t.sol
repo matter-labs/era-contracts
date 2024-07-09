@@ -680,7 +680,6 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
             l2ContractAddresses.push(contractAddress);
 
             _addL2ChainContract(hyperchainIds[i], contractAddress);
-            _registerL2SharedBridge(hyperchainIds[i], contractAddress);
         }
     }
 

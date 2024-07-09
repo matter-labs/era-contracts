@@ -5,6 +5,7 @@ import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {RegisterHyperchainScript} from "deploy-scripts/RegisterHyperchain.s.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 
 contract HyperchainDeployer is L1ContractDeployer {
     RegisterHyperchainScript deployScript;
@@ -119,6 +120,15 @@ contract HyperchainDeployer is L1ContractDeployer {
 
     function getHyperchainBaseToken(uint256 _chainId) public view returns (address) {
         return bridgeHub.baseToken(_chainId);
+    }
+
+    function acceptPendingAdmin() public {
+        IZkSyncHyperchain chain = IZkSyncHyperchain(bridgeHub.getHyperchain(currentHyperChainId - 1));
+        address admin = chain.getPendingAdmin();
+        vm.startBroadcast(admin);
+        chain.acceptAdmin();
+        vm.stopBroadcast();
+        vm.deal(admin, 10000000000000000000000000);
     }
 
     // add this to be excluded from coverage report

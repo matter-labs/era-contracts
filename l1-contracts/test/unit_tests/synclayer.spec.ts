@@ -131,7 +131,7 @@ describe("Synclayer", function () {
     // console.log("STM asset registered in L2 Bridgehub on SL");
   });
 
-  it("Check finish move chain to l1", async () => {
+  it("Check finish move chain", async () => {
     const syncLayerChainId = syncLayerDeployer.chainId;
     const assetInfo = await bridgehub.stmAssetInfo(migratingDeployer.addresses.StateTransition.StateTransitionProxy);
     const diamondCutData = await migratingDeployer.initialZkSyncHyperchainDiamondCut();

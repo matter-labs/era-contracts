@@ -904,14 +904,14 @@ export class Deployer {
 
     this.addresses.Bridgehub.STMDeploymentTrackerProxy = contractAddress;
 
-    const bridgehub = this.bridgehubContract(this.deployWallet);
-    const data0 = bridgehub.interface.encodeFunctionData("setSTMDeployer", [
-      this.addresses.Bridgehub.STMDeploymentTrackerProxy,
-    ]);
-    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, data0);
-    if (this.verbose) {
-      console.log("STM DT registered in Bridgehub");
-    }
+    // const bridgehub = this.bridgehubContract(this.deployWallet);
+    // const data0 = bridgehub.interface.encodeFunctionData("setSTMDeployer", [
+    //   this.addresses.Bridgehub.STMDeploymentTrackerProxy,
+    // ]);
+    // await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, data0);
+    // if (this.verbose) {
+    //   console.log("STM DT registered in Bridgehub");
+    // }
   }
 
   public async sharedBridgeSetEraPostUpgradeFirstBatch() {

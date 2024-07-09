@@ -86,7 +86,7 @@ contract RegisterHyperchainScript is Script {
         config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
-        path = string.concat(root, vm.envString("HYPERCHAIN_OUTPUT"));
+        path = string.concat(root, vm.envString("HYPERCHAIN_CONFIG"));
         toml = vm.readFile(path);
 
         config.ownerAddress = toml.readAddress("$.owner_address");
@@ -255,5 +255,6 @@ contract RegisterHyperchainScript is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-register-hyperchain.toml");
         vm.writeToml(toml, path);
+        console.log("Output saved at:", path);
     }
 }

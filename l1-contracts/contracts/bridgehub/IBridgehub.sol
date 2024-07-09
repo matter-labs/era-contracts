@@ -176,15 +176,15 @@ interface IBridgehub is IL1AssetHandler {
         uint64 _expirationTimestamp
     ) external;
 
-    function stmAssetInfoFromChainId(uint256 _chainId) external view returns (bytes32);
+    function stmAssetIdFromChainId(uint256 _chainId) external view returns (bytes32);
 
-    function stmAssetInfo(address _stmAddress) external view returns (bytes32);
+    function stmAssetId(address _stmAddress) external view returns (bytes32);
 
     function stmDeployer() external view returns (ISTMDeploymentTracker);
 
     function setSTMDeployer(ISTMDeploymentTracker _stmDeployer) external;
 
-    function stmAssetInfoToAddress(bytes32 _assetInfo) external view returns (address);
+    function stmAssetIdToAddress(bytes32 _assetInfo) external view returns (address);
 
     function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetAddress) external;
 

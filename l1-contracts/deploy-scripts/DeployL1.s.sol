@@ -195,6 +195,10 @@ contract DeployL1Script is Script {
         return addresses.bridges.sharedBridgeProxy;
     }
 
+    function getOwnerAddress() public view returns (address) {
+        return config.ownerAddress;
+    }
+
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, vm.envString("L1_CONFIG"));
@@ -347,7 +351,7 @@ contract DeployL1Script is Script {
     function deployBridgehubContract() internal {
         bytes memory bridgeHubBytecode = abi.encodePacked(
             type(Bridgehub).creationCode,
-            abi.encode(config.eraChainId, config.ownerAddress)
+            abi.encode(config.l1ChainId, config.ownerAddress)
         );
         address bridgehubImplementation = deployViaCreate2(bridgeHubBytecode);
         console.log("Bridgehub Implementation deployed at:", bridgehubImplementation);
@@ -552,9 +556,24 @@ contract DeployL1Script is Script {
 
     function registerStateTransitionManager() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.broadcast(msg.sender);
+        vm.startBroadcast(msg.sender);
         bridgehub.addStateTransitionManager(addresses.stateTransition.stateTransitionProxy);
         console.log("StateTransitionManager registered");
+
+        STMDeploymentTracker stmDT = STMDeploymentTracker(addresses.bridgehub.stmDeploymentTrackerProxy);
+        // vm.startBroadcast(msg.sender);
+        stmDT.registerSTMAssetOnL1(addresses.stateTransition.stateTransitionProxy);
+        vm.stopBroadcast();
+        console.log("STM registered in STMDeploymentTracker");
+        L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
+        bytes32 assetId = bridgehub.stmAssetId(addresses.stateTransition.stateTransitionProxy);
+        // console.log(address(bridgehub.stmDeployer()), addresses.bridgehub.stmDeploymentTrackerProxy);
+        // console.log(address(bridgehub.stmDeployer().BRIDGE_HUB()), addresses.bridgehub.bridgehubProxy);
+        console.log(
+            "STM in router 1",
+            sharedBridge.assetHandlerAddress(assetId),
+            bridgehub.stmAssetIdToAddress(assetId)
+        );
     }
 
     function setStateTransitionManagerInValidatorTimelock() internal {

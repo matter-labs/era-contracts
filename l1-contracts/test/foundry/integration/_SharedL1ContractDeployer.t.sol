@@ -18,15 +18,17 @@ contract L1ContractDeployer is Test {
     address public sharedBridgeProxyAddress;
     L1AssetRouter public sharedBridge;
 
+    DeployL1Script l1Script;
+
     function _deployL1Contracts() internal {
         vm.setEnv("L1_CONFIG", "/test/foundry/integration/deploy-scripts/script-config/config-deploy-l1.toml");
         vm.setEnv("L1_OUTPUT", "/test/foundry/integration/deploy-scripts/script-out/output-deploy-l1.toml");
         vm.setEnv(
-            "HYPERCHAIN_OUTPUT",
+            "HYPERCHAIN_CONFIG",
             "/test/foundry/integration/deploy-scripts/script-out/output-deploy-hyperchain-era.toml"
         );
 
-        DeployL1Script l1Script = new DeployL1Script();
+        l1Script = new DeployL1Script();
         l1Script.run();
 
         bridgehubProxyAddress = l1Script.getBridgehubProxyAddress();
@@ -66,11 +68,6 @@ contract L1ContractDeployer is Test {
         for (uint256 i = 0; i < _tokens.length; i++) {
             _registerNewToken(_tokens[i]);
         }
-    }
-
-    function _registerL2SharedBridge(uint256 _chainId, address _l2SharedBridge) internal {
-        vm.prank(bridgehubOwnerAddress);
-        // sharedBridge.initializeChainGovernance(_chainId, _l2SharedBridge);
     }
 
     function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
