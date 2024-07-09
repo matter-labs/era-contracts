@@ -133,7 +133,7 @@ describe("Synclayer", function () {
 
   it("Check finish move chain", async () => {
     const syncLayerChainId = syncLayerDeployer.chainId;
-    const assetInfo = await bridgehub.stmAssetInfo(migratingDeployer.addresses.StateTransition.StateTransitionProxy);
+    const assetInfo = await bridgehub.stmAssetId(migratingDeployer.addresses.StateTransition.StateTransitionProxy);
     const diamondCutData = await migratingDeployer.initialZkSyncHyperchainDiamondCut();
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
