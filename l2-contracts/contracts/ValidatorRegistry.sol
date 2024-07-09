@@ -156,4 +156,8 @@ contract ValidatorRegistry {
     function numValidators() public view returns (uint256) {
         return validatorOwners.length;
     }
+
+    function numCommitteeValidators() public view returns (uint256) {
+        return committee.length;
+    }
 }

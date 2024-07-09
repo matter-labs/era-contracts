@@ -147,4 +147,8 @@ contract AttesterRegistry {
     function numAttesters() public view returns (uint256) {
         return attesterOwners.length;
     }
+
+    function numCommitteeAttesters() public view returns (uint256) {
+        return committee.length;
+    }
 }
