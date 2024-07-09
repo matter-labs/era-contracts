@@ -34,7 +34,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     uint256 public immutable L1_CHAIN_ID;
 
     /// @notice all the ether is held by the weth bridge
-    IAssetRouterBase public sharedBridge;
+    address public sharedBridge;
 
     /// @notice we store registered stateTransitionManagers
     mapping(address stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
@@ -136,7 +136,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         ISTMDeploymentTracker _stmDeployer,
         IMessageRoot _messageRoot
     ) external onlyOwner {
-        sharedBridge = IAssetRouterBase(_sharedBridge);
+        sharedBridge = _sharedBridge;
         nullifier = IL1Nullifier(_nullifier);
         stmDeployer = _stmDeployer;
         messageRoot = _messageRoot;
@@ -173,7 +173,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
     function setSharedBridge(address _sharedBridge) external onlyOwner {
-        sharedBridge = IAssetRouterBase(_sharedBridge);
+        sharedBridge = _sharedBridge;
     }
 
     function registerSyncLayer(
@@ -234,7 +234,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
         /// For now all base tokens have to use the NTV.
-        baseTokenAssetId[_chainId] = sharedBridge.nativeTokenVault().getAssetId(_baseToken);
+        baseTokenAssetId[_chainId] = IAssetRouterBase(sharedBridge).nativeTokenVault().getAssetId(_baseToken);
         settlementLayer[_chainId] = block.chainid;
 
         IStateTransitionManager(_stateTransitionManager).createNewChain({
@@ -351,7 +351,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             }
 
             // slither-disable-next-line arbitrary-send-eth
-            sharedBridge.bridgehubDepositBaseToken{value: msg.value}(
+            IAssetRouterBase(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -402,7 +402,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                 baseTokenMsgValue = 0;
             }
             // slither-disable-next-line arbitrary-send-eth
-            sharedBridge.bridgehubDepositBaseToken{value: baseTokenMsgValue}(
+            IAssetRouterBase(sharedBridge).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -474,7 +474,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override returns (bytes memory bridgehubMintData) {
+    ) external payable returns (bytes memory bridgehubMintData) {
         require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
 
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainData) = abi.decode(_data, (uint256, bytes, bytes));
@@ -499,7 +499,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256,
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
-    ) external payable override returns (address l1Receiver) {
+    ) external payable returns (address l1Receiver) {
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainMintData) = abi.decode(
             _bridgehubMintData,
             (uint256, bytes, bytes)
@@ -518,12 +518,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData);
         return address(0);
     }
-
-    function bridgeRecoverFailedTransfer(
-        uint256 _chainId,
-        bytes32 _assetId,
-        bytes calldata _data
-    ) external payable override {}
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE

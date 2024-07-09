@@ -82,7 +82,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes32 _assetId,
         address _prevMsgSender,
         uint256 _amount
-    ) external payable override {
+    ) public payable virtual override onlyBridgehub whenNotPaused {
         address assetHandler = assetHandlerAddress[_assetId];
         _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
         // slither-disable-next-line unused-return

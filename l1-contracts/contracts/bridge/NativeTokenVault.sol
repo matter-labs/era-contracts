@@ -18,7 +18,6 @@ import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
 import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
-import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 
 import {WrappedStandardERC20} from "../common/WrappedStandardERC20.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";

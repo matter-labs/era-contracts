@@ -24,7 +24,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     IBridgehub public immutable override BRIDGE_HUB;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    IL1AssetRouter public immutable override SHARED_BRIDGE;
+    address public immutable override SHARED_BRIDGE;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -35,7 +35,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub, IL1AssetRouter _sharedBridge) reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgehub, address _sharedBridge) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
         SHARED_BRIDGE = _sharedBridge;
@@ -50,7 +50,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         // solhint-disable-next-line gas-custom-errors
 
         require(BRIDGE_HUB.stateTransitionManagerIsRegistered(_stmAddress), "STMDT: stm not registered");
-        IAssetRouterBase(address(SHARED_BRIDGE)).setAssetHandlerAddress(
+        IAssetRouterBase(SHARED_BRIDGE).setAssetHandlerAddress(
             bytes32(uint256(uint160(_stmAddress))),
             address(BRIDGE_HUB)
         );
@@ -99,7 +99,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
             assetId = getAssetId(_stmL1Address);
         }
         // slither-disable-next-line unused-return
-        SHARED_BRIDGE.setAssetHandlerAddressOnCounterPart{value: msg.value}({
+        IL1AssetRouter(SHARED_BRIDGE).setAssetHandlerAddressOnCounterPart{value: msg.value}({
             _chainId: _chainId,
             _mintValue: _mintValue,
             _l2TxGasLimit: _l2TxGasLimit,

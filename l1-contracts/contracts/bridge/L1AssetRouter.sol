@@ -69,7 +69,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         address _bridgehub,
         uint256 _eraChainId,
         address _eraDiamondProxy
-    ) reentrancyGuardInitializer AssetRouterBase(IBridgehub(_bridgehub)) {
+    ) reentrancyGuardInitializer AssetRouterBase(IBridgehub(_bridgehub), ETH_TOKEN_ADDRESS) {
         _disableInitializers();
         ERA_CHAIN_ID = _eraChainId;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;
@@ -143,6 +143,21 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             refundRecipient: _refundRecipient
         });
         l2TxHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
+    }
+
+    /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
+    /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
+    /// @param _chainId The chain ID of the ZK chain to which deposit.
+    /// @param _assetId The deposited asset ID.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @param _amount The total amount of tokens to be bridged.
+    function bridgehubDepositBaseToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _prevMsgSender,
+        uint256 _amount
+    ) public payable virtual override onlyBridgehubOrEra(_chainId) whenNotPaused {
+        super.bridgehubDepositBaseToken(_chainId, _assetId, _prevMsgSender, _amount);
     }
 
     /// @notice Initiates a deposit transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
