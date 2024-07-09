@@ -4,21 +4,21 @@ pragma solidity 0.8.24;
 // solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {Vm} from "forge-std/Vm.sol";
+// import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {Governance} from "contracts/governance/Governance.sol";
-import {Utils} from "./Utils.sol";
-import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
+// import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+// import {Governance} from "contracts/governance/Governance.sol";
+// import {Utils} from "./Utils.sol";
+// import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+// import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 
-import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
+// import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
@@ -130,7 +130,7 @@ contract GatewayScript is Script {
 
     function moveChainToGateway() public {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        IL1AssetRouter router = IL1AssetRouter(config.sharedBridgeProxy);
+        // IL1AssetRouter router = IL1AssetRouter(config.sharedBridgeProxy);
         Ownable ownable = Ownable(config.bridgehub);
 
         uint256 gasPrice = 10; //Utils.bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
