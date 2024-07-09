@@ -45,6 +45,28 @@ contract RelayedSLDAValidatorTest is Test {
         daValidator.checkDA(CHAIN_ID, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
     }
 
+    function test_revertWhen_PubdataInputTooSmall() public {
+        bytes memory pubdata = "verifydont";
+        console.logBytes(pubdata);
+
+        bytes32 stateDiffHash = Utils.randomBytes32("stateDiffHash");
+        uint8 blobsProvided = 1;
+        uint256 maxBlobsSupported = 6;
+        bytes32 blobLinearHash = Utils.randomBytes32("blobLinearHash");
+        uint8 pubdataSource = uint8(PubdataSource.Calldata);
+        bytes memory l1DaInput = "verifydonttrust";
+        bytes32 fullPubdataHash = keccak256(pubdata);
+
+        bytes memory daInput = abi.encodePacked(stateDiffHash, fullPubdataHash, blobsProvided, blobLinearHash);
+
+        bytes32 l2DAValidatorOutputHash = keccak256(daInput);
+
+        bytes memory operatorDAInput = abi.encodePacked(daInput, pubdataSource, l1DaInput);
+
+        vm.expectRevert("pubdata too small");
+        daValidator.checkDA(CHAIN_ID, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
+    }
+
     function test_checkDA() public {
         bytes memory pubdata = "verifydont";
         console.logBytes(pubdata);
