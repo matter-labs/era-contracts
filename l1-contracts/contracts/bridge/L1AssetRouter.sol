@@ -42,6 +42,9 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
+    /// @notice the asset id of Eth
+    bytes32 internal immutable ETH_TOKEN_ASSET_ID;
+
     /// @dev Era's chainID
     uint256 internal immutable ERA_CHAIN_ID;
 
@@ -142,6 +145,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         BRIDGE_HUB = _bridgehub;
         ERA_CHAIN_ID = _eraChainId;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;
+        ETH_TOKEN_ASSET_ID = keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, ETH_TOKEN_ADDRESS));
     }
 
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy.
@@ -161,6 +165,8 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     ) external reentrancyGuardInitializer initializer {
         require(_owner != address(0), "ShB owner 0");
         _transferOwnership(_owner);
+        assetDeploymentTracker[ETH_TOKEN_ASSET_ID] = _owner;
+
         if (eraPostDiamondUpgradeFirstBatch == 0) {
             eraPostDiamondUpgradeFirstBatch = _eraPostDiamondUpgradeFirstBatch;
             eraPostLegacyBridgeUpgradeFirstBatch = _eraPostLegacyBridgeUpgradeFirstBatch;
@@ -237,6 +243,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @param _assetId The encoding of asset ID.
     /// @param _assetAddressOnCounterPart The address of the asset handler, which will hold the token of interest.
     /// @return l2TxHash The L2 transaction hash of setting asset handler on remote chain.
+    /// FIXME: We are making an L2TransactionRequestDirect here for eth this is ok, but what happens for base token. Two birdges is better, but complications.
     function setAssetHandlerAddressOnCounterPart(
         uint256 _chainId,
         uint256 _mintValue,

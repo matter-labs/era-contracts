@@ -12,9 +12,10 @@ import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, INTEROP_OPERATION_TX_TYPE} from "../common/Config.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSENGER} from "../common/L2ContractAddresses.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
@@ -423,19 +424,43 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _request.secondBridgeAddress > BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
             "Bridgehub: second bridge address too low"
         ); // to avoid calls to precompiles
-        canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(
-            BridgehubL2TransactionRequest({
-                sender: _request.secondBridgeAddress,
-                contractL2: outputRequest.l2Contract,
-                mintValue: _request.mintValue,
-                l2Value: _request.l2Value,
-                l2Calldata: outputRequest.l2Calldata,
-                l2GasLimit: _request.l2GasLimit,
-                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                factoryDeps: outputRequest.factoryDeps,
-                refundRecipient: refundRecipient
-            })
-        );
+        if (hyperchain != address(0)) {
+            canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(
+                BridgehubL2TransactionRequest({
+                    sender: _request.secondBridgeAddress,
+                    contractL2: outputRequest.l2Contract,
+                    mintValue: _request.mintValue,
+                    l2Value: _request.l2Value,
+                    l2Calldata: outputRequest.l2Calldata,
+                    l2GasLimit: _request.l2GasLimit,
+                    l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
+                    factoryDeps: outputRequest.factoryDeps,
+                    refundRecipient: refundRecipient
+                })
+            );
+        } else {
+            L2CanonicalTransaction memory transaction = L2CanonicalTransaction({
+                txType: INTEROP_OPERATION_TX_TYPE,
+                from: uint256(uint160(_request.secondBridgeAddress)),
+                to: uint256(uint160(outputRequest.l2Contract)),
+                gasLimit: _request.l2GasLimit,
+                gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
+                maxFeePerGas: uint256(0), // todo change in the bootloader
+                maxPriorityFeePerGas: uint256(0),
+                paymaster: uint256(0),
+                nonce: uint256(0), //todo
+                value: _request.l2Value,
+                reserved: [_request.mintValue, uint256(uint160(refundRecipient)), 0, 0],
+                data: outputRequest.l2Calldata,
+                signature: new bytes(0),
+                factoryDeps: L2ContractHelper.hashFactoryDeps(outputRequest.factoryDeps),
+                paymasterInput: new bytes(0),
+                reservedDynamic: new bytes(0)
+            });
+            /// Fixme this does not have a unique hash atm.
+            canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(transaction));
+            emit NewPriorityRequest(0, canonicalTxHash, 0, transaction, outputRequest.factoryDeps);
+        }
 
         IL1AssetRouter(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
             _request.chainId,

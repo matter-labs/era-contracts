@@ -499,6 +499,10 @@ object "Bootloader" {
                 ret := 0x000000000000000000000000000000000000800e
             }
 
+            function L2_NULLIFER_ADDR() -> ret {
+                ret := 0x000000000000000000000000000000000000800f // todo? 
+            }
+
             function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
                 ret := 0x000000000000000000000000000000000000ffff
             }
@@ -582,6 +586,9 @@ object "Bootloader" {
                 debugLog("gasPerPubdata:", gasPerPubdata)
 
                 switch getTxType(innerTxDataOffset)
+                    case 253 {
+                        processXL2Tx(txDataOffset, resultPtr, transactionIndex, userProvidedPubdataPrice)
+                    }
                     case 254 {
                         // This is an upgrade transaction.
                         // Protocol upgrade transactions are processed totally in the same manner as the normal L1->L2 transactions,
@@ -880,6 +887,38 @@ object "Bootloader" {
                 }
             }
 
+            /// @notice Marks the txs as executed in the L2Nullifier
+            /// @param to -- the address of the recipient
+            /// @param amount -- the amount of ETH to mint
+            /// @param useNearCallPanic -- whether to use nearCallPanic in case of
+            /// the transaction failing to execute. It is desirable in cases
+            /// where we want to allow the method fail without reverting the entire bootloader
+            function markTxAsExecuted(canonicalTxHash, useNearCallPanic) {
+                mstore(0, {{RIGHT_PADDED_MARK_AS_EXECUTED_SELECTOR}})
+                mstore(4, canonicalTxHash)
+                let success := call(
+                    gas(),
+                    L2_NULLIFER_ADDR(),
+                    0,
+                    0,
+                    36,
+                    0,
+                    0
+                )
+                if iszero(success) {
+                    switch useNearCallPanic
+                    case 0 {
+                        revertWithReason(
+                            MARK_AS_EXECUTED_ERR_CODE(),
+                            0
+                        )
+                    }
+                    default {
+                        nearCallPanic()
+                    }
+                }
+            }
+
             /// @dev Saves the paymaster context and checks that the paymaster has returned the correct
             /// magic value.
             /// @dev IMPORTANT: this method should be called right after
@@ -975,13 +1014,15 @@ object "Bootloader" {
             /// @param transactionIndex The index of the transaction
             /// @param gasPerPubdata The price per pubdata to be used
             /// @param isPriorityOp Whether the transaction is a priority one
-            function processL1Tx(
+            /// @param isL2Tx Whether the transaction is an L1->L2 or an L2->L2 tx
+            function processXChainTx(
                 txDataOffset,
                 resultPtr,
                 transactionIndex,
                 gasPerPubdata,
-                isPriorityOp
-            ) {
+                isPriorityOp,
+                isL1Tx
+            ) -> success, canonicalL1TxHash {
                 // For L1->L2 transactions we always use the pubdata price provided by the transaction.
                 // This is needed to ensure DDoS protection. All the excess expenditure
                 // will be refunded to the user.
@@ -1105,6 +1146,29 @@ object "Bootloader" {
                     mstore(32, canonicalL1TxHash)
                     mstore(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), keccak256(0, 64))
                     mstore(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32), add(mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)), 1))
+                }
+            }
+
+            function processL1Tx(
+                txDataOffset,
+                resultPtr,
+                transactionIndex,
+                gasPerPubdata,
+                isPriorityOp
+            ) {
+                processXChainTx(txDataOffset, resultPtr, transactionIndex, gasPerPubdata, isPriorityOp, true)
+            }
+
+            function processXL2Tx(
+                txDataOffset,
+                resultPtr,
+                transactionIndex,
+                gasPerPubdata
+            ) { 
+                // todo check merkle proof here
+                let canonicalTxHash, success := processXChainTx(txDataOffset, resultPtr, transactionIndex, gasPerPubdata, false, false)
+                if success {
+                    markTxAsExecuted(canonicalTxHash, false)
                 }
             }
 
@@ -3789,6 +3853,10 @@ object "Bootloader" {
 
             function FAILED_TO_CALL_SYSTEM_CONTEXT_ERR_CODE() -> ret {
                 ret := 29
+            }
+
+            function MARK_AS_EXECUTED_ERR_CODE() -> ret {
+                ret := 30
             }
 
             /// @dev Accepts a 1-word literal and returns its length in bytes

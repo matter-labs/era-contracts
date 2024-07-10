@@ -2,7 +2,7 @@ import { Command } from "commander";
 import type { BigNumberish } from "ethers";
 import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { provider, publishBytecodeFromL1, priorityTxMaxGasLimit } from "./utils";
+import { provider, publishBytecodeFromL1, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
 
 import { ethTestConfig } from "./deploy-utils";
 
@@ -18,7 +18,8 @@ import {
 } from "../../l1-contracts/src.ts/utils";
 
 import { L2NativeTokenVaultFactory } from "../typechain";
-import { BridgehubFactory } from "../../l1-contracts/typechain";
+import { BridgehubFactory, L1AssetRouterFactory, L1NativeTokenVaultFactory } from "../../l1-contracts/typechain";
+import { ETH_ADDRESS_IN_CONTRACTS, L2_BASE_TOKEN_ADDRESS } from "zksync-ethers/build/utils";
 
 export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2SharedBridge").abi;
 export const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
@@ -83,6 +84,40 @@ async function setL2TokenBeacon(deployer: Deployer, chainId: string, gasPrice: B
   );
   if (deployer.verbose) {
     console.log("Set addresses in BH, upgrade hash", receipt2.transactionHash);
+  }
+  if (deployer.addresses.BaseToken == ETH_ADDRESS_IN_CONTRACTS) {
+    const l1AssetRouter = L1AssetRouterFactory.connect(
+      deployer.addresses.Bridges.SharedBridgeProxy,
+      deployer.deployWallet
+    );
+    const l1Ntv = L1NativeTokenVaultFactory.connect(
+      deployer.addresses.Bridges.NativeTokenVaultProxy,
+      deployer.deployWallet
+    );
+    const ethAssetId = await l1Ntv.getAssetId(ETH_ADDRESS_IN_CONTRACTS);
+    const value = await bridgehub.l2TransactionBaseCost(
+      chainId,
+      gasPrice,
+      priorityTxMaxGasLimit,
+      REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+    );
+    /// Fixme: this only works for eth based chains atm.
+    const receipt3 = await deployer.executeUpgrade(
+      l1AssetRouter.address,
+      value,
+      l1AssetRouter.interface.encodeFunctionData("setAssetHandlerAddressOnCounterPart", [
+        chainId,
+        value,
+        priorityTxMaxGasLimit,
+        REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+        deployer.deployWallet.address,
+        ethAssetId,
+        L2_BASE_TOKEN_ADDRESS,
+      ])
+    );
+    if (deployer.verbose) {
+      console.log("Set baseToken assetId in L2AR, upgrade hash", receipt3.transactionHash);
+    }
   }
 }
 

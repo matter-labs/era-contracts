@@ -47,3 +47,12 @@ address constant L2_ASSET_ROUTER_ADDR = address(0x10003);
 /// This is needed for automatic bridging, i.e. without deploying the AssetHandler contract,
 /// if the assetId can be calculated with this address then it is in fact an NTV asset
 address constant L2_NATIVE_TOKEN_VAULT_ADDRESS = address(0x10004);
+
+interface IL2Messenger {
+    /// @notice Sends an arbitrary length message to L1.
+    /// @param _message The variable length message to be sent to L1.
+    /// @return Returns the keccak256 hashed value of the message.
+    function sendToL1(bytes memory _message) external returns (bytes32);
+}
+
+IL2Messenger constant L2_MESSENGER = IL2Messenger(address(0x8008));

@@ -56,6 +56,21 @@ interface IBridgehub is IL1AssetHandler {
         address sender
     );
 
+    /// @notice New priority request event. Emitted when a transaction is sent L2->L2, same format as in Mailbox
+    /// @param txId Serial number of the priority operation
+    /// @param txHash keccak256 hash of encoded transaction representation
+    /// @param expirationTimestamp Timestamp up to which priority request should be processed
+    /// @param transaction The whole transaction structure that is requested to be executed on L2
+    /// @param factoryDeps An array of bytecodes that were shown in the L1 public data.
+    /// Will be marked as known bytecodes in L2
+    event NewPriorityRequest(
+        uint256 txId,
+        bytes32 txHash,
+        uint64 expirationTimestamp,
+        L2CanonicalTransaction transaction,
+        bytes[] factoryDeps
+    );
+
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin
