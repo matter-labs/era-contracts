@@ -3,7 +3,7 @@ import * as fs from "fs";
 import _ from "lodash";
 import os from "os";
 import { join } from "path";
-import { hashBytecode } from "zksync-web3/build/src/utils";
+import { hashBytecode } from "zksync-ethers/build/utils";
 
 type ContractDetails = {
   contractName: string;

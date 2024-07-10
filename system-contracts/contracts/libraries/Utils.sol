@@ -2,6 +2,7 @@
 pragma solidity 0.8.20;
 
 import {EfficientCall} from "./EfficientCall.sol";
+import {MalformedBytecode, BytecodeError, Overflow} from "../SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -10,27 +11,33 @@ import {EfficientCall} from "./EfficientCall.sol";
  */
 library Utils {
     /// @dev Bit mask of bytecode hash "isConstructor" marker
-    bytes32 constant IS_CONSTRUCTOR_BYTECODE_HASH_BIT_MASK =
+    bytes32 internal constant IS_CONSTRUCTOR_BYTECODE_HASH_BIT_MASK =
         0x00ff000000000000000000000000000000000000000000000000000000000000;
 
     /// @dev Bit mask to set the "isConstructor" marker in the bytecode hash
-    bytes32 constant SET_IS_CONSTRUCTOR_MARKER_BIT_MASK =
+    bytes32 internal constant SET_IS_CONSTRUCTOR_MARKER_BIT_MASK =
         0x0001000000000000000000000000000000000000000000000000000000000000;
 
     function safeCastToU128(uint256 _x) internal pure returns (uint128) {
-        require(_x <= type(uint128).max, "Overflow");
+        if (_x > type(uint128).max) {
+            revert Overflow();
+        }
 
         return uint128(_x);
     }
 
     function safeCastToU32(uint256 _x) internal pure returns (uint32) {
-        require(_x <= type(uint32).max, "Overflow");
+        if (_x > type(uint32).max) {
+            revert Overflow();
+        }
 
         return uint32(_x);
     }
 
     function safeCastToU24(uint256 _x) internal pure returns (uint24) {
-        require(_x <= type(uint24).max, "Overflow");
+        if (_x > type(uint24).max) {
+            revert Overflow();
+        }
 
         return uint24(_x);
     }
@@ -81,11 +88,19 @@ library Utils {
     /// - Bytecode words length is not odd
     function hashL2Bytecode(bytes calldata _bytecode) internal view returns (bytes32 hashedBytecode) {
         // Note that the length of the bytecode must be provided in 32-byte words.
-        require(_bytecode.length % 32 == 0, "po");
+        if (_bytecode.length % 32 != 0) {
+            revert MalformedBytecode(BytecodeError.Length);
+        }
 
         uint256 lengthInWords = _bytecode.length / 32;
-        require(lengthInWords < 2 ** 16, "pp"); // bytecode length must be less than 2^16 words
-        require(lengthInWords % 2 == 1, "pr"); // bytecode length in words must be odd
+        // bytecode length must be less than 2^16 words
+        if (lengthInWords >= 2 ** 16) {
+            revert MalformedBytecode(BytecodeError.NumberOfWords);
+        }
+        // bytecode length in words must be odd
+        if (lengthInWords % 2 == 0) {
+            revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
+        }
         hashedBytecode =
             EfficientCall.sha(_bytecode) &
             0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;

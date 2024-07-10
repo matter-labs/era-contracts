@@ -18,8 +18,9 @@ describe("ComplexUpgrader tests", function () {
 
   describe("upgrade", function () {
     it("non force deployer failed to call", async () => {
-      await expect(complexUpgrader.upgrade(dummyUpgrade.address, "0xdeadbeef")).to.be.revertedWith(
-        "Can only be called by FORCE_DEPLOYER"
+      await expect(complexUpgrader.upgrade(dummyUpgrade.address, "0xdeadbeef")).to.be.revertedWithCustomError(
+        complexUpgrader,
+        "Unauthorized"
       );
     });
 

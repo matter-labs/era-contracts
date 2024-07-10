@@ -2,7 +2,7 @@ import * as hre from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
 import { Wallet, ethers, BigNumber } from "ethers";
-import { Provider } from "zksync-web3";
+import { Provider } from "zksync-ethers";
 import { getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
 import { web3Provider } from "../../l1-contracts/scripts/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";

@@ -68,8 +68,9 @@ describe("ContractDeployer tests", function () {
 
   describe("updateAccountVersion", function () {
     it("non system call failed", async () => {
-      await expect(contractDeployer.updateAccountVersion(AA_VERSION_NONE)).to.be.revertedWith(
-        "This method require system call flag"
+      await expect(contractDeployer.updateAccountVersion(AA_VERSION_NONE)).to.be.revertedWithCustomError(
+        contractDeployer,
+        "SystemCallFlagRequired"
       );
     });
 
@@ -96,8 +97,9 @@ describe("ContractDeployer tests", function () {
 
   describe("updateNonceOrdering", function () {
     it("non system call failed", async () => {
-      await expect(contractDeployer.updateNonceOrdering(NONCE_ORDERING_SEQUENTIAL)).to.be.revertedWith(
-        "This method require system call flag"
+      await expect(contractDeployer.updateNonceOrdering(NONCE_ORDERING_SEQUENTIAL)).to.be.revertedWithCustomError(
+        contractDeployer,
+        "SystemCallFlagRequired"
       );
     });
 
@@ -115,9 +117,9 @@ describe("ContractDeployer tests", function () {
       expect((await contractDeployer.getAccountInfo(contractDeployerSystemCall.address)).nonceOrdering).to.be.eq(
         NONCE_ORDERING_ARBITRARY
       );
-      await expect(contractDeployerSystemCall.updateNonceOrdering(NONCE_ORDERING_SEQUENTIAL)).to.be.revertedWith(
-        "It is only possible to change from sequential to arbitrary ordering"
-      );
+      await expect(
+        contractDeployerSystemCall.updateNonceOrdering(NONCE_ORDERING_SEQUENTIAL)
+      ).to.be.revertedWithCustomError(contractDeployer, "InvalidNonceOrderingChange");
     });
   });
 
@@ -233,7 +235,7 @@ describe("ContractDeployer tests", function () {
           "0x",
           AA_VERSION_NONE
         )
-      ).to.be.revertedWith("This method require system call flag");
+      ).to.be.revertedWithCustomError(contractDeployer, "SystemCallFlagRequired");
     });
 
     it("zero bytecode hash failed", async () => {
@@ -244,7 +246,7 @@ describe("ContractDeployer tests", function () {
           "0x",
           AA_VERSION_NONE
         )
-      ).to.be.revertedWith("BytecodeHash cannot be zero");
+      ).to.be.revertedWithCustomError(contractDeployer, "EmptyBytes32");
     });
 
     it("not known bytecode hash failed", async () => {
@@ -261,7 +263,7 @@ describe("ContractDeployer tests", function () {
           "0x",
           AA_VERSION_NONE
         )
-      ).to.be.revertedWith("The code hash is not known");
+      ).to.be.revertedWithCustomError(contractDeployer, "UnknownCodeHash");
     });
 
     // TODO: other mock events can be checked as well
@@ -344,7 +346,7 @@ describe("ContractDeployer tests", function () {
           "0xdeadbeef",
           AA_VERSION_NONE
         )
-      ).to.be.revertedWith("This method require system call flag");
+      ).to.be.revertedWithCustomError(contractDeployer, "SystemCallFlagRequired");
     });
 
     it("zero bytecode hash failed", async () => {
@@ -355,7 +357,7 @@ describe("ContractDeployer tests", function () {
           "0x",
           AA_VERSION_NONE
         )
-      ).to.be.revertedWith("BytecodeHash cannot be zero");
+      ).to.be.revertedWithCustomError(contractDeployerSystemCall, "EmptyBytes32");
     });
 
     it("not known bytecode hash failed", async () => {
@@ -386,7 +388,7 @@ describe("ContractDeployer tests", function () {
           "0x",
           AA_VERSION_NONE
         )
-      ).to.be.revertedWith("The code hash is not known");
+      ).to.be.revertedWithCustomError(contractDeployerSystemCall, "UnknownCodeHash");
     });
 
     it("successfully deployed", async () => {
@@ -419,7 +421,7 @@ describe("ContractDeployer tests", function () {
           "0xdeadbeef",
           AA_VERSION_NONE
         )
-      ).to.be.revertedWith("Code hash is non-zero");
+      ).to.be.revertedWithCustomError(contractDeployerSystemCall, "HashIsNonZero");
       await setResult("AccountCodeStorage", "getCodeHash", [expectedAddress], {
         failure: false,
         returnData: ethers.constants.HashZero,
@@ -477,7 +479,7 @@ describe("ContractDeployer tests", function () {
     it("non system call failed", async () => {
       await expect(
         contractDeployer.create(ethers.constants.HashZero, utils.hashBytecode(deployableArtifact.bytecode), "0x")
-      ).to.be.revertedWith("This method require system call flag");
+      ).to.be.revertedWithCustomError(contractDeployer, "SystemCallFlagRequired");
     });
 
     it("successfully deployed", async () => {
@@ -534,7 +536,7 @@ describe("ContractDeployer tests", function () {
     it("non system call failed", async () => {
       await expect(
         contractDeployer.create2(ethers.constants.HashZero, utils.hashBytecode(deployableArtifact.bytecode), "0xabcd")
-      ).to.be.revertedWith("This method require system call flag");
+      ).to.be.revertedWithCustomError(contractDeployer, "SystemCallFlagRequired");
     });
 
     it("successfully deployed", async () => {
@@ -564,8 +566,9 @@ describe("ContractDeployer tests", function () {
         value: 0,
         input: "0x",
       };
-      await expect(contractDeployer.forceDeployOnAddress(deploymentData, wallet.address)).to.be.revertedWith(
-        "Callable only by self"
+      await expect(contractDeployer.forceDeployOnAddress(deploymentData, wallet.address)).to.be.revertedWithCustomError(
+        contractDeployer,
+        "Unauthorized"
       );
     });
 
@@ -585,7 +588,7 @@ describe("ContractDeployer tests", function () {
       };
       await expect(
         contractDeployer.connect(deployerAccount).forceDeployOnAddress(deploymentData, wallet.address)
-      ).to.be.revertedWith("The code hash is not known");
+      ).to.be.revertedWithCustomError(contractDeployerSystemCall, "UnknownCodeHash");
     });
 
     it("successfully deployed", async () => {
@@ -628,8 +631,9 @@ describe("ContractDeployer tests", function () {
           input: "0xab",
         },
       ];
-      await expect(contractDeployer.forceDeployOnAddresses(deploymentData)).to.be.revertedWith(
-        "Can only be called by FORCE_DEPLOYER or COMPLEX_UPGRADER_CONTRACT"
+      await expect(contractDeployer.forceDeployOnAddresses(deploymentData)).to.be.revertedWithCustomError(
+        contractDeployer,
+        "Unauthorized"
       );
     });
 

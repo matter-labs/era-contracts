@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+// solhint-disable gas-custom-errors, reason-string
+
 import {Vm} from "forge-std/Vm.sol";
 
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
@@ -10,8 +12,11 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {stdToml} from "forge-std/StdToml.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
 library Utils {
+    using stdToml for string;
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     Vm internal constant vm = Vm(VM_ADDRESS);
@@ -20,8 +25,8 @@ library Utils {
     bytes internal constant CREATE2_FACTORY_BYTECODE =
         hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
 
-    address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    uint256 constant MAX_PRIORITY_TX_GAS = 72000000;
+    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+    uint256 internal constant MAX_PRIORITY_TX_GAS = 72000000;
 
     /**
      * @dev Get all selectors from the bytecode.
@@ -40,12 +45,13 @@ library Utils {
 
         // Extract selectors from the result
         string[] memory parts = vm.split(stringResult, "\n");
-        bytes4[] memory selectors = new bytes4[](parts.length);
-        for (uint256 i = 0; i < parts.length; i++) {
+        uint256 partsLength = parts.length;
+        bytes4[] memory selectors = new bytes4[](partsLength);
+        for (uint256 i = 0; i < partsLength; ++i) {
             bytes memory part = bytes(parts[i]);
             bytes memory extractedSelector = new bytes(10);
             // Selector length 10 is 0x + 4 bytes
-            for (uint256 j = 0; j < 10; j++) {
+            for (uint256 j = 0; j < 10; ++j) {
                 extractedSelector[j] = part[j];
             }
             bytes4 selector = bytes4(vm.parseBytes(string(extractedSelector)));
@@ -54,7 +60,8 @@ library Utils {
 
         // Remove `getName()` selector if existing
         bool hasGetName = false;
-        for (uint256 i = 0; i < selectors.length; i++) {
+        uint256 selectorsLength = selectors.length;
+        for (uint256 i = 0; i < selectorsLength; ++i) {
             if (selectors[i] == bytes4(keccak256("getName()"))) {
                 selectors[i] = selectors[selectors.length - 1];
                 hasGetName = true;
@@ -62,8 +69,8 @@ library Utils {
             }
         }
         if (hasGetName) {
-            bytes4[] memory newSelectors = new bytes4[](selectors.length - 1);
-            for (uint256 i = 0; i < selectors.length - 1; i++) {
+            bytes4[] memory newSelectors = new bytes4[](selectorsLength - 1);
+            for (uint256 i = 0; i < selectorsLength - 1; ++i) {
                 newSelectors[i] = selectors[i];
             }
             return newSelectors;
@@ -86,10 +93,11 @@ library Utils {
      */
     function bytesToUint256(bytes memory bys) internal pure returns (uint256 value) {
         // Add left padding to 32 bytes if needed
-        if (bys.length < 32) {
+        uint256 bysLength = bys.length;
+        if (bysLength < 32) {
             bytes memory padded = new bytes(32);
-            for (uint256 i = 0; i < bys.length; i++) {
-                padded[i + 32 - bys.length] = bys[i];
+            for (uint256 i = 0; i < bysLength; ++i) {
+                padded[i + 32 - bysLength] = bys[i];
             }
             bys = padded;
         }
@@ -177,7 +185,6 @@ library Utils {
         address l1SharedBridgeProxy
     ) internal returns (address) {
         bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(bytecode);
-
         bytes memory deployData = abi.encodeWithSignature(
             "create2(bytes32,bytes32,bytes)",
             create2salt,
@@ -192,12 +199,14 @@ library Utils {
             keccak256(constructorargs)
         );
 
-        bytes[] memory _factoryDeps = new bytes[](factoryDeps.length + 1);
+        uint256 factoryDepsLength = factoryDeps.length;
 
-        for (uint256 i = 0; i < factoryDeps.length; i++) {
+        bytes[] memory _factoryDeps = new bytes[](factoryDepsLength + 1);
+
+        for (uint256 i = 0; i < factoryDepsLength; ++i) {
             _factoryDeps[i] = factoryDeps[i];
         }
-        _factoryDeps[factoryDeps.length] = bytecode;
+        _factoryDeps[factoryDepsLength] = bytecode;
 
         runL1L2Transaction({
             l2Calldata: deployData,
@@ -208,6 +217,7 @@ library Utils {
             bridgehubAddress: bridgehubAddress,
             l1SharedBridgeProxy: l1SharedBridgeProxy
         });
+
         return contractAddress;
     }
 
@@ -296,6 +306,11 @@ library Utils {
         uint256 _value,
         uint256 _delay
     ) internal {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
+        string memory toml = vm.readFile(path);
+        address ownerAddress = toml.readAddress("$.owner_addr");
+
         IGovernance governance = IGovernance(_governor);
 
         IGovernance.Call[] memory calls = new IGovernance.Call[](1);
@@ -307,7 +322,7 @@ library Utils {
             salt: _salt
         });
 
-        vm.startBroadcast();
+        vm.startBroadcast(ownerAddress);
         governance.scheduleTransparent(operation, _delay);
         if (_delay == 0) {
             governance.execute{value: _value}(operation);

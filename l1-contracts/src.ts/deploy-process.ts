@@ -93,6 +93,7 @@ export async function registerHyperchain(
     validiumMode,
     extraFacets,
     gasPrice,
+    false,
     null,
     chainId,
     useGovernance

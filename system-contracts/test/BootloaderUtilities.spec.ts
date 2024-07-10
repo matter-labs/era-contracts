@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Wallet } from "zksync-ethers";
 import * as zksync from "zksync-ethers";
-import { serialize } from "zksync-ethers/build/src/utils";
+import { serialize } from "zksync-ethers/build/utils";
 import type { BootloaderUtilities } from "../typechain";
 import { BootloaderUtilitiesFactory } from "../typechain";
 import { TEST_BOOTLOADER_UTILITIES_ADDRESS } from "./shared/constants";
@@ -84,7 +84,10 @@ describe("BootloaderUtilities tests", function () {
       signature[64] = 29;
       txData.signature = signature;
 
-      await expect(bootloaderUtilities.getTransactionHashes(txData)).to.be.revertedWith("Invalid v value");
+      await expect(bootloaderUtilities.getTransactionHashes(txData)).to.be.revertedWithCustomError(
+        bootloaderUtilities,
+        "InvalidSig"
+      );
     });
   });
 
@@ -130,7 +133,10 @@ describe("BootloaderUtilities tests", function () {
       signature[64] = 0;
       EIP1559TxData.signature = signature;
 
-      await expect(bootloaderUtilities.getTransactionHashes(EIP1559TxData)).to.be.revertedWith("Invalid v value");
+      await expect(bootloaderUtilities.getTransactionHashes(EIP1559TxData)).to.be.revertedWithCustomError(
+        bootloaderUtilities,
+        "InvalidSig"
+      );
     });
   });
 
@@ -176,7 +182,10 @@ describe("BootloaderUtilities tests", function () {
       signature[64] = 100;
       EIP2930TxData.signature = signature;
 
-      await expect(bootloaderUtilities.getTransactionHashes(EIP2930TxData)).to.be.revertedWith("Invalid v value");
+      await expect(bootloaderUtilities.getTransactionHashes(EIP2930TxData)).to.be.revertedWithCustomError(
+        bootloaderUtilities,
+        "InvalidSig"
+      );
     });
   });
 });

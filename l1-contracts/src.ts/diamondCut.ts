@@ -6,9 +6,6 @@ import { ethers } from "ethers";
 import { IZkSyncHyperchainFactory } from "../typechain/IZkSyncHyperchainFactory";
 import { IZkSyncHyperchainBaseFactory } from "../typechain/IZkSyncHyperchainBaseFactory";
 
-// Some of the facets are to be removed with the upcoming upgrade.
-const UNCONDITIONALLY_REMOVED_FACETS = ["DiamondCutFacet", "GovernanceFacet"];
-
 export enum Action {
   Add = 0,
   Replace = 1,
@@ -131,10 +128,7 @@ export async function getFacetCutsForUpgrade(
   namesOfFacetsToBeRemoved?: string[]
 ) {
   const newFacetCuts = await getCurrentFacetCutsForAdd(adminAddress, gettersAddress, mailboxAddress, executorAddress);
-  namesOfFacetsToBeRemoved = namesOfFacetsToBeRemoved || [
-    ...UNCONDITIONALLY_REMOVED_FACETS,
-    ...Object.keys(newFacetCuts),
-  ];
+  namesOfFacetsToBeRemoved = namesOfFacetsToBeRemoved || [...Object.keys(newFacetCuts)];
   const oldFacetCuts = await getDeployedFacetCutsForRemove(wallet, zkSyncAddress, namesOfFacetsToBeRemoved);
   return [...oldFacetCuts, ...Object.values(newFacetCuts)];
 }

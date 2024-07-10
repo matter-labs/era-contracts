@@ -26,6 +26,7 @@ struct StateTransitionManagerInitializeData {
 /// @param genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for the genesis batch
 /// @param genesisBatchCommitment The zk-proof commitment for the genesis batch
 /// @param diamondCut The diamond cut for the first upgrade transaction on the newly deployed chain
+// solhint-disable-next-line gas-struct-packing
 struct ChainCreationParams {
     address genesisUpgrade;
     bytes32 genesisBatchHash;

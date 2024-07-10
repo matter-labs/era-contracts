@@ -44,7 +44,7 @@ describe("AccountCodeStorage tests", function () {
     it("non-deployer failed to call", async () => {
       await expect(
         accountCodeStorage.storeAccountConstructingCodeHash(RANDOM_ADDRESS, CONSTRUCTING_BYTECODE_HASH)
-      ).to.be.revertedWith("Callable only by the deployer system contract");
+      ).to.be.revertedWithCustomError(accountCodeStorage, "Unauthorized");
     });
 
     it("failed to set with constructed bytecode", async () => {
@@ -52,7 +52,7 @@ describe("AccountCodeStorage tests", function () {
         accountCodeStorage
           .connect(deployerAccount)
           .storeAccountConstructingCodeHash(RANDOM_ADDRESS, CONSTRUCTED_BYTECODE_HASH)
-      ).to.be.revertedWith("Code hash is not for a contract on constructor");
+      ).to.be.revertedWithCustomError(accountCodeStorage, "InvalidCodeHash");
     });
 
     it("successfully stored", async () => {
@@ -72,7 +72,7 @@ describe("AccountCodeStorage tests", function () {
     it("non-deployer failed to call", async () => {
       await expect(
         accountCodeStorage.storeAccountConstructedCodeHash(RANDOM_ADDRESS, CONSTRUCTING_BYTECODE_HASH)
-      ).to.be.revertedWith("Callable only by the deployer system contract");
+      ).to.be.revertedWithCustomError(accountCodeStorage, "Unauthorized");
     });
 
     it("failed to set with constructing bytecode", async () => {
@@ -80,7 +80,7 @@ describe("AccountCodeStorage tests", function () {
         accountCodeStorage
           .connect(deployerAccount)
           .storeAccountConstructedCodeHash(RANDOM_ADDRESS, CONSTRUCTING_BYTECODE_HASH)
-      ).to.be.revertedWith("Code hash is not for a constructed contract");
+      ).to.be.revertedWithCustomError(accountCodeStorage, "InvalidCodeHash");
     });
 
     it("successfully stored", async () => {
@@ -96,8 +96,9 @@ describe("AccountCodeStorage tests", function () {
 
   describe("markAccountCodeHashAsConstructed", function () {
     it("non-deployer failed to call", async () => {
-      await expect(accountCodeStorage.markAccountCodeHashAsConstructed(RANDOM_ADDRESS)).to.be.revertedWith(
-        "Callable only by the deployer system contract"
+      await expect(accountCodeStorage.markAccountCodeHashAsConstructed(RANDOM_ADDRESS)).to.be.revertedWithCustomError(
+        accountCodeStorage,
+        "Unauthorized"
       );
     });
 
@@ -108,7 +109,7 @@ describe("AccountCodeStorage tests", function () {
 
       await expect(
         accountCodeStorage.connect(deployerAccount).markAccountCodeHashAsConstructed(RANDOM_ADDRESS)
-      ).to.be.revertedWith("Code hash is not for a contract on constructor");
+      ).to.be.revertedWithCustomError(accountCodeStorage, "InvalidCodeHash");
 
       await unsetCodeHash(accountCodeStorage, RANDOM_ADDRESS);
     });
