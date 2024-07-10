@@ -101,7 +101,7 @@ contract DeployL1Script is _DeployL1Script {
     }
 
     function deployGovernance() internal {
-       _deployGovernance();
+        _deployGovernance();
     }
 
     function deployTransparentProxyAdmin() internal {
