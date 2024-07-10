@@ -86,6 +86,8 @@ abstract contract CalldataDA {
 
         require(_blobsProvided == 1, "only one blob with calldata");
 
+        require(_pubdataInput.length >= 32, "pubdata too small");
+
         _pubdata = _pubdataInput[:_pubdataInput.length - 32];
 
         // FIXME: allow larger lengths for SyncLayer-based chains.

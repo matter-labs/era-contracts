@@ -122,6 +122,16 @@ contract CalldataDATest is Test {
         calldataDA.processCalldataDA(blobsProvided, fullPubdataHash, maxBlobsSupported, pubdataInput);
     }
 
+    function test_RevertWhen_PubdataTooSmall() public {
+        uint256 blobsProvided = 1;
+        uint256 maxBlobsSupported = 6;
+        bytes calldata pubdataInput = makeBytesArrayOfLength(31);
+        bytes32 fullPubdataHash = keccak256(pubdataInput);
+
+        vm.expectRevert(bytes("pubdata too small"));
+        calldataDA.processCalldataDA(blobsProvided, fullPubdataHash, maxBlobsSupported, pubdataInput);
+    }
+
     function test_RevertWhen_PubdataDoesntMatchPubdataHash() public {
         uint256 blobsProvided = 1;
         uint256 maxBlobsSupported = 6;
