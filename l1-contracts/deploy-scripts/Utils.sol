@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
 
+import {stdToml} from "forge-std/StdToml.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
@@ -15,6 +16,7 @@ import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddre
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 
 library Utils {
+    using stdToml for string;
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     Vm internal constant vm = Vm(VM_ADDRESS);
@@ -315,6 +317,11 @@ library Utils {
         uint256 _value,
         uint256 _delay
     ) internal {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
+        string memory toml = vm.readFile(path);
+        address ownerAddress = toml.readAddress("$.owner_addr");
+
         IGovernance governance = IGovernance(_governor);
 
         Call[] memory calls = new Call[](1);
@@ -326,7 +333,7 @@ library Utils {
             salt: _salt
         });
 
-        vm.startBroadcast();
+        vm.startBroadcast(ownerAddress);
         governance.scheduleTransparent(operation, _delay);
         if (_delay == 0) {
             governance.execute{value: _value}(operation);
