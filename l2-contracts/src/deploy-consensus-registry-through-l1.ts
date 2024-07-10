@@ -5,7 +5,7 @@ import { ethTestConfig } from "./deploy-utils";
 
 import * as hre from "hardhat";
 
-// Script to deploy the validator registry contract and output its address.
+// Script to deploy the consensus registry contract and output its address.
 // Note, that this script expects that the L2 contracts have been compiled PRIOR
 // to running this script.
 async function main() {
@@ -13,7 +13,7 @@ async function main() {
 
   program
       .version("0.1.0")
-      .name("deploy-validator-registry")
+      .name("deploy-consensus-registry")
       .option("--chain-id <chain-id>")
       .description("Deploys the validator registry contract to L2");
 
@@ -27,11 +27,11 @@ async function main() {
         ).connect(provider);
     console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-    const forceDeployUpgraderBytecode = hre.artifacts.readArtifactSync("ConsensusAuthority").bytecode;
+    const bytecode = hre.artifacts.readArtifactSync("ConsensusRegistry").bytecode;
     const create2Salt = ethers.constants.HashZero;
-    const forceDeployUpgraderAddress = computeL2Create2Address(
+    const address = computeL2Create2Address(
         deployWallet,
-        forceDeployUpgraderBytecode,
+        bytecode,
         deployWallet.address,
         create2Salt
     );
@@ -40,13 +40,13 @@ async function main() {
     await create2DeployFromL1(
         chainId,
         deployWallet,
-        forceDeployUpgraderBytecode,
+        bytecode,
         deployWallet.address,
         create2Salt,
         priorityTxMaxGasLimit
     );
 
-    console.log(`CONTRACTS_L2_CONSENSUS_AUTHORITY_ADDR=${forceDeployUpgraderAddress}`);
+    console.log(`CONTRACTS_L2_CONSENSUS_REGISTRY_ADDR=${address}`);
   });
 
   await program.parseAsync(process.argv);
