@@ -307,7 +307,7 @@ for { } true { } {
         addr, sp := popStackItem(sp, evmGasLeft)
         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
-        if iszero(warmAddress(addr)) {
+        if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
             evmGasLeft := chargeGas(evmGasLeft, 2500)
         }
 
@@ -422,7 +422,7 @@ for { } true { } {
         addr, sp := popStackItem(sp, evmGasLeft)
 
         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-        if iszero(warmAddress(addr)) {
+        if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
             evmGasLeft := chargeGas(evmGasLeft, 2500)
         }
 
@@ -475,7 +475,7 @@ for { } true { } {
         addr, sp := popStackItem(sp, evmGasLeft)
         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
-        if iszero(warmAddress(addr)) {
+        if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
             evmGasLeft := chargeGas(evmGasLeft, 2500) 
         }
 

@@ -152,7 +152,7 @@ object "EVMInterpreter" {
             // segment of memory.
             getDeployedBytecode()
 
-            pop(warmAddress(address()))
+            pop($llvm_AlwaysInline_llvm$_warmAddress(address()))
 
             let returnOffset, returnLen := $llvm_NoInline_llvm$_simulate(isCallerEVM, evmGasLeft, isStatic)
             return(returnOffset, returnLen)

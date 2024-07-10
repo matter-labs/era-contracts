@@ -744,7 +744,7 @@ object "EVMInterpreter" {
             }
         }
         
-        function warmAddress(addr) -> isWarm {
+        function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
             // TODO: Unhardcode this selector 0x8db2ba78
             mstore8(0, 0x8d)
             mstore8(1, 0xb2)
@@ -951,7 +951,7 @@ object "EVMInterpreter" {
             checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()), evmGasLeft)
         
             extraCost := 0
-            if iszero(warmAddress(addr)) {
+            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                 extraCost := 2500
             }
         
@@ -1075,7 +1075,7 @@ object "EVMInterpreter" {
             // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
         
             extraCost := 0
-            if iszero(warmAddress(addr)) {
+            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                 extraCost := 2500
             }
         
@@ -1145,7 +1145,7 @@ object "EVMInterpreter" {
             }
         
             extraCost := 0
-            if iszero(warmAddress(addr)) {
+            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                 extraCost := 2500
             }
         
@@ -1280,7 +1280,7 @@ object "EVMInterpreter" {
         }
         
         function genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, evmGasLeft {
-            pop(warmAddress(addr))
+            pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
         
             _eraseReturndataPointer()
         
@@ -1355,7 +1355,7 @@ object "EVMInterpreter" {
                 mul(3, shr(5, add(len, 31))),
                 expandMemory(add(dest, len))
             )
-            if iszero(warmAddress(addr)) {
+            if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                 dynamicGas := add(dynamicGas, 2500)
             }
             evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
@@ -1793,7 +1793,7 @@ object "EVMInterpreter" {
                     addr, sp := popStackItem(sp, evmGasLeft)
                     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
-                    if iszero(warmAddress(addr)) {
+                    if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
             
@@ -1908,7 +1908,7 @@ object "EVMInterpreter" {
                     addr, sp := popStackItem(sp, evmGasLeft)
             
                     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-                    if iszero(warmAddress(addr)) {
+                    if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
             
@@ -1961,7 +1961,7 @@ object "EVMInterpreter" {
                     addr, sp := popStackItem(sp, evmGasLeft)
                     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
-                    if iszero(warmAddress(addr)) {
+                    if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500) 
                     }
             
@@ -3495,7 +3495,7 @@ object "EVMInterpreter" {
                 }
             }
             
-            function warmAddress(addr) -> isWarm {
+            function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
                 // TODO: Unhardcode this selector 0x8db2ba78
                 mstore8(0, 0x8d)
                 mstore8(1, 0xb2)
@@ -3702,7 +3702,7 @@ object "EVMInterpreter" {
                 checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()), evmGasLeft)
             
                 extraCost := 0
-                if iszero(warmAddress(addr)) {
+                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                     extraCost := 2500
                 }
             
@@ -3826,7 +3826,7 @@ object "EVMInterpreter" {
                 // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
             
                 extraCost := 0
-                if iszero(warmAddress(addr)) {
+                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                     extraCost := 2500
                 }
             
@@ -3896,7 +3896,7 @@ object "EVMInterpreter" {
                 }
             
                 extraCost := 0
-                if iszero(warmAddress(addr)) {
+                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                     extraCost := 2500
                 }
             
@@ -4031,7 +4031,7 @@ object "EVMInterpreter" {
             }
             
             function genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, evmGasLeft {
-                pop(warmAddress(addr))
+                pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
             
                 _eraseReturndataPointer()
             
@@ -4106,7 +4106,7 @@ object "EVMInterpreter" {
                     mul(3, shr(5, add(len, 31))),
                     expandMemory(add(dest, len))
                 )
-                if iszero(warmAddress(addr)) {
+                if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                     dynamicGas := add(dynamicGas, 2500)
                 }
                 evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
@@ -4544,7 +4544,7 @@ object "EVMInterpreter" {
                         addr, sp := popStackItem(sp, evmGasLeft)
                         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
                 
-                        if iszero(warmAddress(addr)) {
+                        if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
                         }
                 
@@ -4659,7 +4659,7 @@ object "EVMInterpreter" {
                         addr, sp := popStackItem(sp, evmGasLeft)
                 
                         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
-                        if iszero(warmAddress(addr)) {
+                        if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
                         }
                 
@@ -4712,7 +4712,7 @@ object "EVMInterpreter" {
                         addr, sp := popStackItem(sp, evmGasLeft)
                         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
                 
-                        if iszero(warmAddress(addr)) {
+                        if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                             evmGasLeft := chargeGas(evmGasLeft, 2500) 
                         }
                 
@@ -5570,7 +5570,7 @@ object "EVMInterpreter" {
             // segment of memory.
             getDeployedBytecode()
 
-            pop(warmAddress(address()))
+            pop($llvm_AlwaysInline_llvm$_warmAddress(address()))
 
             let returnOffset, returnLen := $llvm_NoInline_llvm$_simulate(isCallerEVM, evmGasLeft, isStatic)
             return(returnOffset, returnLen)
