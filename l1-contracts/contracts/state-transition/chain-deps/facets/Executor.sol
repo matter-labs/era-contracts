@@ -392,13 +392,15 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         PriorityOpsBatchInfo[] calldata _priorityOpsData
     ) internal {
         uint256 nBatches = _batchesData.length;
-        uint256 dataIndex = 0;
+        require(_batchesData.length == _priorityOpsData.length, "bp");
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
             if (s.priorityTree.startIndex <= s.priorityQueue.getFirstUnprocessedPriorityTx()) {
-                // solhint-disable-next-line gas-increment-by-one
-                _executeOneBatch(_batchesData[i], _priorityOpsData[dataIndex++], i);
+                _executeOneBatch(_batchesData[i], _priorityOpsData[i], i);
             } else {
+                require(_priorityOpsData[i].leftPath.length == 0, "le");
+                require(_priorityOpsData[i].rightPath.length == 0, "re");
+                require(_priorityOpsData[i].itemHashes.length == 0, "ih");
                 _executeOneBatch(_batchesData[i], i);
             }
             emit BlockExecution(_batchesData[i].batchNumber, _batchesData[i].batchHash, _batchesData[i].commitment);
