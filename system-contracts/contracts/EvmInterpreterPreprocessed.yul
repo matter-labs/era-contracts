@@ -670,6 +670,19 @@ object "EVMInterpreter" {
             originalValue := mload(32)
         }
         
+        function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
+            ret := 0x000000000000000000000000000000000000ffff
+        }
+        
+        /// @dev Checks whether an address is an EOA (i.e. has not code deployed on it)
+        /// @param addr The address to check
+        function isEOA(addr) -> ret {
+            ret := 0
+            if gt(addr, MAX_SYSTEM_CONTRACT_ADDR()) {
+                ret := iszero(_getRawCodeHash(addr))
+            }
+        }
+        
         function getNewAddress(addr) -> newAddr {
             let digest, nonce, addressEncoded, nonceEncoded, nonceEncodedLength, listLength, listLengthEconded
         
@@ -897,12 +910,13 @@ object "EVMInterpreter" {
             let _gas := gas()
             let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
         
-            if lt(sub(_gas,shl(30,1)), requiredGas) {
-                // This cheks if enough zkevm gas was provided, we are substracting 2^30 since that's the stipend, 
-                // and we need to make sure that the gas provided over that is enough for security reasons
-                revert(0, 0)
+            switch lt(_gas, requiredGas)
+            case 1 {
+                evmGas := 0
             }
-            evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
+            default {
+                evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
+            }
         }
         
         function _getZkEVMGas(_evmGas) -> zkevmGas {
@@ -1353,7 +1367,17 @@ object "EVMInterpreter" {
         
             _popEVMFrame()
         
-            incrementNonce(address())
+            switch result
+            case 1 {
+                incrementNonce(address())
+            }
+            default {
+                switch isEOA(address())
+                case 1 {
+                    incrementNonce(address())
+                }
+                default {}
+            }
         
             let back
         
@@ -3501,6 +3525,19 @@ object "EVMInterpreter" {
                 originalValue := mload(32)
             }
             
+            function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
+                ret := 0x000000000000000000000000000000000000ffff
+            }
+            
+            /// @dev Checks whether an address is an EOA (i.e. has not code deployed on it)
+            /// @param addr The address to check
+            function isEOA(addr) -> ret {
+                ret := 0
+                if gt(addr, MAX_SYSTEM_CONTRACT_ADDR()) {
+                    ret := iszero(_getRawCodeHash(addr))
+                }
+            }
+            
             function getNewAddress(addr) -> newAddr {
                 let digest, nonce, addressEncoded, nonceEncoded, nonceEncodedLength, listLength, listLengthEconded
             
@@ -3728,12 +3765,13 @@ object "EVMInterpreter" {
                 let _gas := gas()
                 let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
             
-                if lt(sub(_gas,shl(30,1)), requiredGas) {
-                    // This cheks if enough zkevm gas was provided, we are substracting 2^30 since that's the stipend, 
-                    // and we need to make sure that the gas provided over that is enough for security reasons
-                    revert(0, 0)
+                switch lt(_gas, requiredGas)
+                case 1 {
+                    evmGas := 0
                 }
-                evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
+                default {
+                    evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
+                }
             }
             
             function _getZkEVMGas(_evmGas) -> zkevmGas {
@@ -4184,7 +4222,17 @@ object "EVMInterpreter" {
             
                 _popEVMFrame()
             
-                incrementNonce(address())
+                switch result
+                case 1 {
+                    incrementNonce(address())
+                }
+                default {
+                    switch isEOA(address())
+                    case 1 {
+                        incrementNonce(address())
+                    }
+                    default {}
+                }
             
                 let back
             
