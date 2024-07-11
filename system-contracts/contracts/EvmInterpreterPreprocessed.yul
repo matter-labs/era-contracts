@@ -670,6 +670,19 @@ object "EVMInterpreter" {
             originalValue := mload(32)
         }
         
+        function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
+            ret := 0x000000000000000000000000000000000000ffff
+        }
+        
+        /// @dev Checks whether an address is an EOA (i.e. has not code deployed on it)
+        /// @param addr The address to check
+        function isEOA(addr) -> ret {
+            ret := 0
+            if gt(addr, MAX_SYSTEM_CONTRACT_ADDR()) {
+                ret := iszero(_getRawCodeHash(addr))
+            }
+        }
+        
         function getNewAddress(addr) -> newAddr {
             let digest, nonce, addressEncoded, nonceEncoded, nonceEncodedLength, listLength, listLengthEconded
         
@@ -1354,7 +1367,17 @@ object "EVMInterpreter" {
         
             _popEVMFrame()
         
-            incrementNonce(address())
+            switch result
+            case 1 {
+                incrementNonce(address())
+            }
+            default {
+                switch isEOA(address())
+                case 1 {
+                    incrementNonce(address())
+                }
+                default {}
+            }
         
             let back
         
@@ -3502,6 +3525,19 @@ object "EVMInterpreter" {
                 originalValue := mload(32)
             }
             
+            function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
+                ret := 0x000000000000000000000000000000000000ffff
+            }
+            
+            /// @dev Checks whether an address is an EOA (i.e. has not code deployed on it)
+            /// @param addr The address to check
+            function isEOA(addr) -> ret {
+                ret := 0
+                if gt(addr, MAX_SYSTEM_CONTRACT_ADDR()) {
+                    ret := iszero(_getRawCodeHash(addr))
+                }
+            }
+            
             function getNewAddress(addr) -> newAddr {
                 let digest, nonce, addressEncoded, nonceEncoded, nonceEncodedLength, listLength, listLengthEconded
             
@@ -4186,7 +4222,17 @@ object "EVMInterpreter" {
             
                 _popEVMFrame()
             
-                incrementNonce(address())
+                switch result
+                case 1 {
+                    incrementNonce(address())
+                }
+                default {
+                    switch isEOA(address())
+                    case 1 {
+                        incrementNonce(address())
+                    }
+                    default {}
+                }
             
                 let back
             
