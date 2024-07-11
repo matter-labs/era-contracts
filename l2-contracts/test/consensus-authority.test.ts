@@ -83,16 +83,13 @@ describe("ConsensusRegistry", function () {
             const nodeOwner = await registry["nodeOwners(uint256)"](i);
             expect(nodeOwner).to.equal(nodeEntries[i].ownerAddr);
 
-            const validator = await registry.validators(nodeOwner);
-            expect(validator.weight).to.equal(nodeEntries[i].validatorWeight);
-            expect(validator.pubKey).to.equal(nodeEntries[i].validatorPubKey);
-            expect(validator[2]).to.equal(nodeEntries[i].validatorPoP);
-            expect(validator.isInactive).to.equal(false);
-
-            const attester = await registry.validators(nodeOwner);
-            expect(attester.weight).to.equal(nodeEntries[i].validatorWeight);
-            expect(attester.pubKey).to.equal(nodeEntries[i].validatorPubKey);
-            expect(attester.isInactive).to.equal(false);
+            const node = await registry.nodes(nodeOwner);
+            expect(node.isInactive).to.equal(false);
+            expect(node.validatorWeight).to.equal(nodeEntries[i].validatorWeight);
+            expect(node.validatorPubKey).to.equal(nodeEntries[i].validatorPubKey);
+            expect(node.validatorPoP).to.equal(nodeEntries[i].validatorPoP);
+            expect(node.attesterWeight).to.equal(nodeEntries[i].attesterWeight);
+            expect(node.attesterPubKey).to.equal(nodeEntries[i].attesterPubKey);
         }
     });
 
@@ -111,13 +108,13 @@ describe("ConsensusRegistry", function () {
 
     it("Should allow owner to inactivate", async function () {
         const nodeOwner = nodeEntries[0].ownerAddr;
-        expect((await registry.validators(nodeOwner)).isInactive).to.equal(false);
+        expect((await registry.nodes(nodeOwner)).isInactive).to.equal(false);
 
         await (await registry.connect(owner).inactivate(
             nodeOwner,
             {gasLimit}
         )).wait();
-        expect((await registry.validators(nodeOwner)).isInactive).to.equal(true);
+        expect((await registry.nodes(nodeOwner)).isInactive).to.equal(true);
 
         // Restore state.
         await (await registry.connect(owner).activate(
@@ -129,13 +126,13 @@ describe("ConsensusRegistry", function () {
     it("Should allow the nodeOwner to inactivate", async function () {
         const nodeOwner = nodeEntries[0].ownerAddr;
         const nodeOwnerKey = nodes[0].ownerKey;
-        expect((await registry.validators(nodeOwner)).isInactive).to.equal(false);
+        expect((await registry.nodes(nodeOwner)).isInactive).to.equal(false);
 
         await (await registry.connect(nodeOwnerKey).inactivate(
             nodeOwner,
             {gasLimit}
         )).wait();
-        expect((await registry.validators(nodeOwner)).isInactive).to.equal(true);
+        expect((await registry.nodes(nodeOwner)).isInactive).to.equal(true);
 
         // Restore state.
         await (await registry.connect(owner).activate(
@@ -155,7 +152,7 @@ describe("ConsensusRegistry", function () {
 
     it("Should change validator weight", async function () {
         const nodeEntry = nodeEntries[0];
-        expect((await registry.validators(nodeEntry.ownerAddr)).weight).to.equal(nodeEntry.validatorWeight);
+        expect((await registry.nodes(nodeEntry.ownerAddr)).validatorWeight).to.equal(nodeEntry.validatorWeight);
 
         const baseWeight = nodeEntry.validatorWeight
         const newWeight = getRandomNumber(100, 1000);
@@ -164,8 +161,8 @@ describe("ConsensusRegistry", function () {
             newWeight,
             {gasLimit}
         )).wait();
-        expect((await registry.validators(nodeEntry.ownerAddr)).weight).to.equal(newWeight);
-        expect((await registry.attesters(nodeEntry.ownerAddr)).weight).to.equal(nodeEntry.attesterWeight);
+        expect((await registry.nodes(nodeEntry.ownerAddr)).validatorWeight).to.equal(newWeight);
+        expect((await registry.nodes(nodeEntry.ownerAddr)).attesterWeight).to.equal(nodeEntry.attesterWeight);
 
         // Restore state.
         await (await registry.changeValidatorWeight(
@@ -173,7 +170,7 @@ describe("ConsensusRegistry", function () {
             baseWeight,
             {gasLimit}
         )).wait();
-        expect((await registry.validators(nodeEntry.ownerAddr)).weight).to.equal(baseWeight);
+        expect((await registry.nodes(nodeEntry.ownerAddr)).validatorWeight).to.equal(baseWeight);
     });
 
     it("Should not allow nodeOwner to change validator weight", async function () {
@@ -198,7 +195,7 @@ describe("ConsensusRegistry", function () {
 
     it("Should change attester weight", async function () {
         const nodeEntry = nodeEntries[0];
-        expect((await registry.attesters(nodeEntry.ownerAddr)).weight).to.equal(nodeEntry.attesterWeight);
+        expect((await registry.nodes(nodeEntry.ownerAddr)).attesterWeight).to.equal(nodeEntry.attesterWeight);
 
         const baseWeight = nodeEntry.attesterWeight
         const newWeight = getRandomNumber(100, 1000);
@@ -207,8 +204,8 @@ describe("ConsensusRegistry", function () {
             newWeight,
             {gasLimit}
         )).wait();
-        expect((await registry.attesters(nodeEntry.ownerAddr)).weight).to.equal(newWeight);
-        expect((await registry.validators(nodeEntry.ownerAddr)).weight).to.equal(nodeEntry.validatorWeight);
+        expect((await registry.nodes(nodeEntry.ownerAddr)).attesterWeight).to.equal(newWeight);
+        expect((await registry.nodes(nodeEntry.ownerAddr)).validatorWeight).to.equal(nodeEntry.validatorWeight);
 
         // Restore state.
         await (await registry.changeAttesterWeight(
@@ -216,7 +213,7 @@ describe("ConsensusRegistry", function () {
             baseWeight,
             {gasLimit}
         )).wait();
-        expect((await registry.attesters(nodeEntry.ownerAddr)).weight).to.equal(baseWeight);
+        expect((await registry.nodes(nodeEntry.ownerAddr)).attesterWeight).to.equal(baseWeight);
     });
 
     it("Should not allow nodeOwner to change attester weight", async function () {

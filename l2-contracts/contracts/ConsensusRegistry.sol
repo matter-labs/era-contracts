@@ -5,36 +5,36 @@ pragma solidity 0.8.20;
 contract ConsensusRegistry {
     // Owner of the contract (i.e., the governance contract).
     address public owner;
-    // An array to keep track of validator node owners (used for iterating validators).
+    // An array to keep track of node owners.
     address[] public nodeOwners;
-    // A map of node owners => validators (used for validator lookups).
-    mapping(address => Validator) public validators;
-    // A map of node owners => attesters (used for attester lookups).
-    mapping(address => Attester) public attesters;
-    // The current committee list. Weight and public key are stored explicitly
-    // since they might change after committee selection.
-    CommitteeValidator[] public validatorsCommittee;
-    // The current committee list. Weight and public key are stored explicitly
-    // since they might change after committee selection.
-    CommitteeAttester[] public attestersCommittee;
+    // A map of node owners => nodes
+    mapping(address => Node) public nodes;
+    // The current validator committee list.
+    CommitteeValidator[] public validatorCommittee;
+    // The current attester committee list.
+    CommitteeAttester[] public attesterCommittee;
 
-    struct Validator {
-        // Voting weight.
-        uint256 weight;
-        // BLS12-381 public key.
-        bytes pubKey;
-        // Proof-of-possession (a signature over the public key).
-        bytes pop;
-        // A flag stating if the validator is inactive. Inactive validators are not
-        // considered when selecting committees. Only inactive validators can
-        // be removed from the registry.
+    struct Node {
+        // A flag stating if the node is inactive.
+        // Inactive nodes are not considered when selecting committees.
         bool isInactive;
+        // Validator's voting weight.
+        uint256 validatorWeight;
+        // Validator's BLS12-381 public key.
+        bytes validatorPubKey;
+        // Validator's Proof-of-possession (a signature over the public key).
+        bytes validatorPoP;
+        // Attester's Voting weight.
+        uint256 attesterWeight;
+        // Attester's ECDSA public key.
+        bytes attesterPubKey;
     }
 
     struct CommitteeValidator {
         address nodeOwner;
         uint256 weight;
         bytes pubKey;
+        bytes pop;
     }
 
     struct CommitteeAttester {
@@ -43,26 +43,13 @@ contract ConsensusRegistry {
         bytes pubKey;
     }
 
-    struct Attester {
-        // Voting weight.
-        uint256 weight;
-        // ECDSA public key.
-        bytes pubKey;
-        // A flag stating if the attester is inactive. Inactive attesters are not
-        // considered when selecting committees. Only inactive attesters can
-        // be removed from the registry.
-        bool isInactive;
-    }
-
     error UnauthorizedOnlyOwner();
     error UnauthorizedOnlyOwnerOrNodeOwner();
     error NodeOwnerAlreadyExists();
     error NodeOwnerDoesNotExist();
     error NodeOwnerNotFound();
     error ValidatorPubKeyAlreadyExists();
-    error ValidatorIsActive();
     error AttesterPubKeyAlreadyExists();
-    error AttesterIsActive();
 
     modifier onlyOwner() {
         if (msg.sender != owner) {
@@ -99,85 +86,87 @@ contract ConsensusRegistry {
             if (nodeOwners[i] == nodeOwner) {
                 revert NodeOwnerAlreadyExists();
             }
-            if (compareBytes(validators[nodeOwners[i]].pubKey, validatorPubKey)) {
+            if (compareBytes(nodes[nodeOwners[i]].validatorPubKey, validatorPubKey)) {
                 revert ValidatorPubKeyAlreadyExists();
             }
-            if (compareBytes(attesters[nodeOwners[i]].pubKey, attesterPubKey)) {
+            if (compareBytes(nodes[nodeOwners[i]].attesterPubKey, attesterPubKey)) {
                 revert AttesterPubKeyAlreadyExists();
             }
         }
 
         nodeOwners.push(nodeOwner);
-        validators[nodeOwner] = Validator(validatorWeight, validatorPubKey, validatorPoP, false);
-        attesters[nodeOwner] = Attester(attesterWeight, attesterPubKey, false);
+        nodes[nodeOwner] = Node(
+            false,
+            validatorWeight,
+            validatorPubKey,
+            validatorPoP,
+            attesterWeight,
+            attesterPubKey
+        );
     }
 
     // Inactivates a node.
     function inactivate(address nodeOwner) external onlyOwnerOrNodeOwner(nodeOwner) {
         verifyNodeOwnerExists(nodeOwner);
-        validators[nodeOwner].isInactive = true;
-        attesters[nodeOwner].isInactive = true;
+        nodes[nodeOwner].isInactive = true;
     }
 
     // Activates a node.
     function activate(address nodeOwner) external onlyOwner {
         verifyNodeOwnerExists(nodeOwner);
-        validators[nodeOwner].isInactive = false;
-        attesters[nodeOwner].isInactive = false;
+        nodes[nodeOwner].isInactive = false;
     }
 
     // Removes a node.
     function remove(address nodeOwner) external onlyOwner {
         verifyNodeOwnerExists(nodeOwner);
-        if (!attesters[nodeOwner].isInactive) {
-            revert AttesterIsActive();
-        }
-        if (!validators[nodeOwner].isInactive) {
-            revert ValidatorIsActive();
-        }
-
         // Remove from array by swapping the last element (gas-efficient, not preserving order).
         nodeOwners[nodeOwnerIdx(nodeOwner)] = nodeOwners[nodeOwners.length - 1];
         nodeOwners.pop();
         // Remove from mapping.
-        delete validators[nodeOwner];
-        delete attesters[nodeOwner];
+        delete nodes[nodeOwner];
     }
 
     // Changes node's validator weight.
     function changeValidatorWeight(address nodeOwner, uint256 weight) external onlyOwner {
         verifyNodeOwnerExists(nodeOwner);
-        validators[nodeOwner].weight = weight;
+        nodes[nodeOwner].validatorWeight = weight;
     }
 
     // Changes node's attester weight.
     function changeAttesterWeight(address nodeOwner, uint256 weight) external onlyOwner {
         verifyNodeOwnerExists(nodeOwner);
-        attesters[nodeOwner].weight = weight;
+        nodes[nodeOwner].attesterWeight = weight;
     }
 
     // Changes node's validator public key and PoP.
-    function changeValidatorPubKey(address nodeOwner, bytes calldata pubKey, bytes calldata pop) external onlyOwnerOrNodeOwner(nodeOwner) {
+    function changeValidatorKey(address nodeOwner, bytes calldata pubKey, bytes calldata pop) external onlyOwnerOrNodeOwner(nodeOwner) {
         verifyNodeOwnerExists(nodeOwner);
-        validators[nodeOwner].pubKey = pubKey;
-        validators[nodeOwner].pop = pop;
+        nodes[nodeOwner].validatorPubKey = pubKey;
+        nodes[nodeOwner].validatorPoP = pop;
     }
 
     // Changes node's attester public key.
     function changeAttesterPubKey(address nodeOwner, bytes calldata pubKey) external onlyOwnerOrNodeOwner(nodeOwner) {
         verifyNodeOwnerExists(nodeOwner);
-        attesters[nodeOwner].pubKey = pubKey;}
+        nodes[nodeOwner].attesterPubKey = pubKey;
+    }
 
     // Rotates the validators committee list.
     function setValidatorCommittee() external onlyOwner {
         // Creates a new committee based on active validators.
-        delete validatorsCommittee;
+        delete validatorCommittee;
         uint256 len = nodeOwners.length;
         for (uint256 i = 0; i < len; ++i) {
             address nodeOwner = nodeOwners[i];
-            Validator memory validator = validators[nodeOwner];
-            if (!validator.isInactive) {
-                validatorsCommittee.push(CommitteeValidator(nodeOwner, validator.weight, validator.pubKey));
+            Node memory node = nodes[nodeOwner];
+            if (!node.isInactive) {
+                validatorCommittee.push(CommitteeValidator(
+                    nodeOwner,
+                    node.validatorWeight,
+                    node.validatorPubKey,
+                    node.validatorPoP
+                ));
             }
         }
     }
@@ -185,13 +174,17 @@ contract ConsensusRegistry {
     // Rotates the attesters committee list.
     function setAttesterCommittee() external onlyOwner {
         // Creates a new committee based on active attesters.
-        delete attestersCommittee;
+        delete attesterCommittee;
         uint256 len = nodeOwners.length;
         for (uint256 i = 0; i < len; ++i) {
             address nodeOwner = nodeOwners[i];
-            Attester memory attester = attesters[nodeOwner];
-            if (!attester.isInactive) {
-                attestersCommittee.push(CommitteeAttester(attester.weight, nodeOwner, attester.pubKey));
+            Node memory node = nodes[nodeOwner];
+            if (!node.isInactive) {
+                attesterCommittee.push(CommitteeAttester(
+                    node.attesterWeight,
+                    nodeOwner,
+                    node.attesterPubKey
+                ));
             }
         }
     }
@@ -202,7 +195,7 @@ contract ConsensusRegistry {
 
     // Verifies that a node owner exists.
     function verifyNodeOwnerExists(address nodeOwner) private view {
-        if (validators[nodeOwner].pubKey.length == 0) {
+        if (nodes[nodeOwner].validatorPubKey.length == 0) {
             revert NodeOwnerDoesNotExist();
         }
     }
@@ -222,11 +215,11 @@ contract ConsensusRegistry {
         return nodeOwners.length;
     }
 
-    function numCommitteeValidators() public view returns (uint256) {
-        return validatorsCommittee.length;
+    function validatorCommitteeSize() public view returns (uint256) {
+        return validatorCommittee.length;
     }
 
-    function numCommitteeAttesters() public view returns (uint256) {
-        return attestersCommittee.length;
+    function attesterCommitteeSize() public view returns (uint256) {
+        return attesterCommittee.length;
     }
 }
