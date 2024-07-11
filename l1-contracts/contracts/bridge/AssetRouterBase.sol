@@ -8,6 +8,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
 import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
 import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
@@ -104,7 +105,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @param _value The `msg.value` on the target chain tx.
     /// @param _data The calldata for the second bridge deposit.
     /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
-    function bridgehubTransfer(
+    function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
         uint256 _value,
@@ -139,7 +140,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             _txDataHash: txDataHash
         });
 
-        emit BridgehubTransferInitiated({
+        emit BridgehubDepositInitiated({
             chainId: _chainId,
             txDataHash: txDataHash,
             from: _prevMsgSender,
@@ -152,7 +153,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _assetId The bridged asset ID.
     /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-    function finalizeTransfer(
+    function finalizeDeposit(
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _transferData
@@ -168,7 +169,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
         (amount, l1Receiver) = abi.decode(_transferData, (uint256, address));
 
-        emit TransferFinalizedAssetRouter(_chainId, l1Receiver, _assetId, amount);
+        emit DepositFinalizedAssetRouter(_chainId, l1Receiver, _assetId, amount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -190,10 +191,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes memory _bridgeMintCalldata,
         bytes32 _txDataHash
     ) internal view virtual returns (L2TransactionRequestTwoBridgesInner memory request) {
-        bytes memory l2TxCalldata = abi.encodeCall(
-            IAssetRouterBase.finalizeTransfer,
-            (_chainId, _assetId, _bridgeMintCalldata)
-        );
+        bytes memory l2TxCalldata = getDepositL2Calldata(_chainId, _prevMsgSender, _assetId, _bridgeMintCalldata);
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
@@ -202,6 +200,35 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             factoryDeps: new bytes[](0),
             txDataHash: _txDataHash
         });
+    }
+
+    /// @notice Generates a calldata for calling the deposit finalization on the L2 native token contract.
+    /// @param _chainId The chain ID of the ZK chain to which deposit.
+    /// @param _l1Sender The address of the deposit initiator.
+    /// @param _assetId The deposited asset ID.
+    /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
+    /// @return Returns calldata used on ZK chain.
+    function getDepositL2Calldata(
+        uint256 _chainId,
+        address _l1Sender,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) public view override returns (bytes memory) {
+        // First branch covers the case when asset is not registered with NTV (custom asset handler)
+        // Second branch handles tokens registered with NTV and uses legacy calldata encoding
+        if (nativeTokenVault.tokenAddress(_assetId) == address(0)) {
+            return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (_chainId, _assetId, _transferData));
+        } else {
+            (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = abi.decode(
+                _transferData,
+                (uint256, address, address, bytes, address)
+            );
+            return
+                abi.encodeCall(
+                    IL2BridgeLegacy.finalizeDeposit,
+                    (_l1Sender, _l2Receiver, _parsedL1Token, _amount, _gettersData)
+                );
+        }
     }
 
     /// @notice Forwards the burn request for specific asset to respective asset handler.
@@ -228,7 +255,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         });
     }
 
-    /// @notice Transfers allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
+    /// @notice Deposits allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
     /// @dev assetId is not the padded address, but the correct encoded ID (NTV stores respective format for IDs).
     /// @param _assetId The encoding of asset ID.
     /// @param _amount The asset amount to be transferred to native token vault.

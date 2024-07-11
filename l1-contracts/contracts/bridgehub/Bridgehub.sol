@@ -34,7 +34,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     uint256 public immutable L1_CHAIN_ID;
 
     /// @notice all the ether is held by the weth bridge
-    address public sharedBridge;
+    IAssetRouterBase public sharedBridge;
 
     /// @notice we store registered stateTransitionManagers
     mapping(address stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
@@ -131,7 +131,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
     function setAddresses(
-        address _sharedBridge,
+        IAssetRouterBase _sharedBridge,
         address _nullifier,
         ISTMDeploymentTracker _stmDeployer,
         IMessageRoot _messageRoot
@@ -172,7 +172,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
-    function setSharedBridge(address _sharedBridge) external onlyOwner {
+    function setSharedBridge(IAssetRouterBase _sharedBridge) external onlyOwner {
         sharedBridge = _sharedBridge;
     }
 
@@ -234,7 +234,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
         /// For now all base tokens have to use the NTV.
-        baseTokenAssetId[_chainId] = IAssetRouterBase(sharedBridge).nativeTokenVault().getAssetId(_baseToken);
+        baseTokenAssetId[_chainId] = sharedBridge.nativeTokenVault().getAssetId(_baseToken);
         settlementLayer[_chainId] = block.chainid;
 
         IStateTransitionManager(_stateTransitionManager).createNewChain({
@@ -351,7 +351,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             }
 
             // slither-disable-next-line arbitrary-send-eth
-            IAssetRouterBase(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
+            sharedBridge.bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -402,7 +402,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                 baseTokenMsgValue = 0;
             }
             // slither-disable-next-line arbitrary-send-eth
-            IAssetRouterBase(sharedBridge).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
+            sharedBridge.bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -414,7 +414,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         // slither-disable-next-line arbitrary-send-eth
         L2TransactionRequestTwoBridgesInner memory outputRequest = IAssetRouterBase(_request.secondBridgeAddress)
-            .bridgehubTransfer{value: _request.secondBridgeValue}(
+            .bridgehubDeposit{value: _request.secondBridgeValue}(
             _request.chainId,
             msg.sender,
             _request.l2Value,

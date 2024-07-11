@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
+import {IAssetRouterBase} from "../bridge/interfaces/IAssetRouterBase.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -73,7 +74,7 @@ interface IBridgehub {
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
-    function sharedBridge() external view returns (address);
+    function sharedBridge() external view returns (IAssetRouterBase);
 
     function getHyperchain(uint256 _chainId) external view returns (address);
 
@@ -139,7 +140,7 @@ interface IBridgehub {
     function addToken(address _token) external;
 
     function setAddresses(
-        address _sharedBridge,
+        IAssetRouterBase _sharedBridge,
         address _l1Nullifier,
         ISTMDeploymentTracker _stmDeployer,
         IMessageRoot _messageRoot

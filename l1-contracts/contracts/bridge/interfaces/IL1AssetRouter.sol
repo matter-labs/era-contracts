@@ -2,13 +2,14 @@
 
 pragma solidity 0.8.24;
 
-import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+import {L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
+import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {IL1Nullifier} from "./IL1Nullifier.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL1AssetRouter {
+interface IL1AssetRouter is IAssetRouterBase {
     event ClaimedFailedDepositSharedBridge(
         uint256 indexed chainId,
         address indexed to,
@@ -51,22 +52,13 @@ interface IL1AssetRouter {
     ) external returns (address l1Receiver, uint256 amount);
 
     function bridgeRecoverFailedTransfer(
-        bool _checkedInLegacyBridge,
         uint256 _chainId,
         address _depositSender,
         bytes32 _assetId,
-        bytes calldata _tokenData,
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
+        bytes calldata _transferData
     ) external;
 
-    function _getDepositL2Calldata(
-        uint256 _chainId,
-        address _l1Sender,
-        bytes32 _assetId,
-        bytes memory _transferData
-    ) external view returns (bytes memory);
+    function depositLegacyErc20Bridge(
+        L2TransactionRequestDirect calldata _request
+    ) external payable returns (bytes32 l2TxHash);
 }

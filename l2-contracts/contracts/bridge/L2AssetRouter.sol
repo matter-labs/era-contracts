@@ -138,7 +138,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ILegacyL2SharedBridge
         address _l1Token,
         uint256 _amount,
         bytes calldata erc20Data
-    ) external override {
+    ) external override onlyL1Bridge {
         // onlyBridge {
         bytes32 assetId = keccak256(abi.encode(L1_CHAIN_ID, address(L2_NATIVE_TOKEN_VAULT), _l1Token));
         // solhint-disable-next-line func-named-parameters

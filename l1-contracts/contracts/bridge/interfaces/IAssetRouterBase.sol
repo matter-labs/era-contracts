@@ -16,7 +16,7 @@ interface IAssetRouterBase {
         uint256 amount
     );
 
-    event BridgehubTransferInitiated(
+    event BridgehubDepositInitiated(
         uint256 indexed chainId,
         bytes32 indexed txDataHash,
         address indexed from,
@@ -31,7 +31,7 @@ interface IAssetRouterBase {
         bytes32 assetDataHash // Todo: What's the point of emitting hash?
     );
 
-    event TransferFinalizedAssetRouter(uint256 chainId, address receiver, bytes32 indexed assetId, uint256 amount); // why hash? shall we make it similar to WithdrawalFinalizedAssetRouter?
+    event DepositFinalizedAssetRouter(uint256 chainId, address receiver, bytes32 indexed assetId, uint256 amount); // why hash? shall we make it similar to WithdrawalFinalizedAssetRouter?
 
     event AssetHandlerRegistered(
         bytes32 indexed assetId,
@@ -54,14 +54,14 @@ interface IAssetRouterBase {
     /// address _l1Token,
     /// uint256 _amount,
     /// address _l2Receiver
-    function bridgehubTransfer(
+    function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
         uint256 _value,
         bytes calldata _data
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
 
-    function finalizeTransfer(
+    function finalizeDeposit(
         uint256 _chainId,
         bytes32 _assetId,
         bytes memory _transferData
@@ -74,4 +74,11 @@ interface IAssetRouterBase {
     function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external;
 
     function nativeTokenVault() external view returns (INativeTokenVault);
+
+    function getDepositL2Calldata(
+        uint256 _chainId,
+        address _l1Sender,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) external view returns (bytes memory);
 }

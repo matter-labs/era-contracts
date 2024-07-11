@@ -11,7 +11,7 @@ import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 interface INativeTokenVault {
     event bridgedTokenBeaconUpdated(address bridgedTokenBeacon, bytes32 bridgedTokenProxyBytecodeHash);
 
-    function setWrappedTokenBeacon() external;
+    function setBridgedTokenBeacon() external;
 
     /// @notice The Weth token address
     function WETH_TOKEN() external view returns (address);
@@ -22,7 +22,7 @@ interface INativeTokenVault {
     /// @notice Returns the total number of specific tokens locked for some chain
     function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
 
-    /// @notice Returns if the wrapped version of bridged token has been deployed
+    /// @notice Returns if the bridged version of bridged token has been deployed
     function isTokenBridged(bytes32 assetId) external view returns (bool);
 
     /// @notice Used to register a token in the vault
@@ -37,6 +37,6 @@ interface INativeTokenVault {
     /// @notice Used to get the token address of an assetId
     function tokenAddress(bytes32 assetId) external view returns (address);
 
-    /// @notice Used to get the expected wrapped token address corresponding to its native counterpart
+    /// @notice Used to get the expected bridged token address corresponding to its native counterpart
     function bridgedTokenAddress(address _nativeToken) external view returns (address);
 }

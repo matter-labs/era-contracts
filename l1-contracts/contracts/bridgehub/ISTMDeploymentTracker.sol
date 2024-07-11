@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {L2TransactionRequestTwoBridgesInner, IBridgehub} from "./IBridgehub.sol";
-
+import {IAssetRouterBase} from "../bridge/interfaces/IAssetRouterBase.sol";
 interface ISTMDeploymentTracker {
     function bridgehubDeposit(
         uint256 _chainId,
@@ -14,7 +14,7 @@ interface ISTMDeploymentTracker {
 
     function BRIDGE_HUB() external view returns (IBridgehub);
 
-    function SHARED_BRIDGE() external view returns (address);
+    function SHARED_BRIDGE() external view returns (IAssetRouterBase);
 
     function registerSTMAssetOnL1(address _stmAddress) external;
 

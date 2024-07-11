@@ -311,7 +311,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes memory transferData;
         (assetId, transferData) = _verifyAndGetWithdrawalData(_finalizeWithdrawalParams);
 
-        (l1Receiver, amount) = IL1AssetRouter(l1AssetRouter).finalizeWithdrawal(
+        (l1Receiver, amount) = l1AssetRouter.finalizeWithdrawal(
             _finalizeWithdrawalParams.chainId,
             assetId,
             transferData
@@ -508,17 +508,24 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     ) external override {
         bytes32 assetId = nativeTokenVault.getAssetId(_l1Token);
         bytes memory transferData = abi.encode(_amount, _depositSender);
-        l1AssetRouter.bridgeRecoverFailedTransfer({
+
+        bridgeVerifyFailedTransfer({
             _checkedInLegacyBridge: false,
             _chainId: _chainId,
-            _depositSender: _depositSender,
             _assetId: assetId,
-            _tokenData: transferData,
+            _transferData: transferData,
             _l2TxHash: _l2TxHash,
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
             _l2TxNumberInBatch: _l2TxNumberInBatch,
             _merkleProof: _merkleProof
+        });
+
+        l1AssetRouter.bridgeRecoverFailedTransfer({
+            _chainId: _chainId,
+            _depositSender: _depositSender,
+            _assetId: assetId,
+            _transferData: transferData
         });
     }
 
@@ -608,7 +615,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         }
 
         {
-            bytes memory l2TxCalldata = l1AssetRouter._getDepositL2Calldata(
+            bytes memory l2TxCalldata = l1AssetRouter.getDepositL2Calldata(
                 ERA_CHAIN_ID,
                 _prevMsgSender,
                 _assetId,
@@ -631,7 +638,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 factoryDeps: new bytes[](0),
                 refundRecipient: refundRecipient
             });
-            l2TxHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
+            l2TxHash = l1AssetRouter.depositLegacyErc20Bridge{value: msg.value}(request);
         }
 
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
@@ -703,17 +710,25 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge {
         bytes memory transferData = abi.encode(_amount, _depositSender);
-        l1AssetRouter.bridgeRecoverFailedTransfer({
-            _checkedInLegacyBridge: true,
+        bytes32 assetId = nativeTokenVault.getAssetId(_l1Asset);
+
+        bridgeVerifyFailedTransfer({
+            _checkedInLegacyBridge: false,
             _chainId: ERA_CHAIN_ID,
-            _depositSender: _depositSender,
-            _assetId: nativeTokenVault.getAssetId(_l1Asset),
-            _tokenData: transferData,
+            _assetId: assetId,
+            _transferData: transferData,
             _l2TxHash: _l2TxHash,
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
             _l2TxNumberInBatch: _l2TxNumberInBatch,
             _merkleProof: _merkleProof
+        });
+
+        l1AssetRouter.bridgeRecoverFailedTransfer({
+            _chainId: ERA_CHAIN_ID,
+            _depositSender: _depositSender,
+            _assetId: assetId,
+            _transferData: transferData
         });
     }
 
