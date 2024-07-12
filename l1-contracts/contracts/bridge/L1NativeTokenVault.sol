@@ -186,8 +186,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     /// @return Returns encoded name, symbol, and decimals for specific token.
     function getERC20Getters(address _token) public view returns (bytes memory) {
         if (_token == ETH_TOKEN_ADDRESS) {
-            bytes memory name = bytes("Ether");
-            bytes memory symbol = bytes("ETH");
+            bytes memory name = abi.encode("Ether");
+            bytes memory symbol = abi.encode("ETH");
             bytes memory decimals = abi.encode(uint8(18));
             return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
         }

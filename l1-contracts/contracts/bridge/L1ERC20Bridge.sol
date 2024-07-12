@@ -155,7 +155,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         address _refundRecipient
     ) public payable nonReentrant returns (bytes32 l2TxHash) {
         require(_amount != 0, "0T"); // empty deposit
-        uint256 amount = _depositFundsToNTV(msg.sender, IERC20(_l1Token), _amount);
+        uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
         require(amount == _amount, "3T"); // The token has non-standard transfer logic
 
         l2TxHash = SHARED_BRIDGE.depositLegacyErc20Bridge{value: msg.value}({
@@ -174,10 +174,10 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev Transfers tokens from the depositor address to the native token vault address.
     /// @return The difference between the contract balance before and after the transferring of funds.
-    function _depositFundsToNTV(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
-        uint256 balanceBefore = _token.balanceOf(address(NATIVE_TOKEN_VAULT));
-        _token.safeTransferFrom(_from, address(NATIVE_TOKEN_VAULT), _amount);
-        uint256 balanceAfter = _token.balanceOf(address(NATIVE_TOKEN_VAULT));
+    function _depositFundsToSharedBridge(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
+        uint256 balanceBefore = _token.balanceOf(address(SHARED_BRIDGE));
+        _token.safeTransferFrom(_from, address(SHARED_BRIDGE), _amount);
+        uint256 balanceAfter = _token.balanceOf(address(SHARED_BRIDGE));
 
         return balanceAfter - balanceBefore;
     }

@@ -289,7 +289,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         // slither-disable-next-line unused-return
         IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
-            _mintValue: _amount,
+            _destinationChainValue: _amount,
             _assetId: _assetId,
             _prevMsgSender: _prevMsgSender,
             _data: abi.encode(_amount, address(0))
@@ -404,14 +404,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _prevMsgSender: _prevMsgSender,
             _transferData: transferData
         });
-        bytes32 txDataHash;
-
-        if (legacyDeposit) {
-            (uint256 _depositAmount, ) = abi.decode(transferData, (uint256, address));
-            txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(assetId), _depositAmount));
-        } else {
-            txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(_prevMsgSender, assetId, transferData)));
-        }
+        bytes32 txDataHash = _encodeTxDataHash(legacyDeposit, _prevMsgSender, assetId, transferData);
 
         request = _requestToBridge({
             _chainId: _chainId,
@@ -445,9 +438,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes memory _transferData
     ) internal returns (bytes memory l2BridgeMintCalldata) {
         address l1AssetHandler = assetHandlerAddress[_assetId];
+        require(l1AssetHandler != address(0), "ShB: asset handler does not exist for assetId");
         l2BridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
-            _mintValue: _l2Value,
+            _destinationChainValue: _l2Value,
             _assetId: _assetId,
             _prevMsgSender: _prevMsgSender,
             _data: _transferData
@@ -541,7 +535,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
+        bytes32[] calldata _merkleProof,
+        bool _isLegacyEncoding
     ) public nonReentrant whenNotPaused {
         {
             bool proofValid = BRIDGE_HUB.proveL1ToL2TransactionStatus({
@@ -559,9 +554,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(!_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch), "ShB: legacy cFD");
         {
             bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
-            address l1Token = nativeTokenVault.tokenAddress(_assetId);
-            (uint256 amount, address prevMsgSender) = abi.decode(_transferData, (uint256, address));
-            bytes32 txDataHash = keccak256(abi.encode(prevMsgSender, l1Token, amount));
+            bytes32 txDataHash = _encodeTxDataHash(_isLegacyEncoding, _depositSender, _assetId, _transferData);
             require(dataHash == txDataHash, "ShB: d.it not hap");
         }
         delete depositHappened[_chainId][_l2TxHash];
@@ -569,6 +562,20 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(_chainId, _assetId, _transferData);
 
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetId, _transferData);
+    }
+
+    function _encodeTxDataHash(
+        bool _isLegacyEncoding,
+        address _prevMsgSender,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal view returns (bytes32 txDataHash) {
+        if (_isLegacyEncoding) {
+            (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
+            txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(_assetId), depositAmount));
+        } else {
+            txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(_prevMsgSender, _assetId, _transferData)));
+        }
     }
 
     /// @dev Determines if an eth withdrawal was initiated on zkSync Era before the upgrade to the Shared Bridge.
@@ -609,7 +616,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         return
             (_chainId == ERA_CHAIN_ID) &&
             (_l2BatchNumber < eraLegacyBridgeLastDepositBatch ||
-                (_l2TxNumberInBatch < eraLegacyBridgeLastDepositTxNumber &&
+                (_l2TxNumberInBatch <= eraLegacyBridgeLastDepositTxNumber &&
                     _l2BatchNumber == eraLegacyBridgeLastDepositBatch));
     }
 
@@ -739,13 +746,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         // 2. The message that is encoded by `getL1WithdrawMessage(bytes32 _assetId, bytes memory _bridgeMintData)`
         // No length is assume. The assetId is decoded and the mintData is passed to respective assetHandler
 
-        // So the data is expected to be at least 56 bytes long.
-        require(_l2ToL1message.length >= 56, "ShB wrong msg len"); // wrong message length
         uint256 amount;
         address l1Receiver;
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {
+            // The data is expected to be at least 56 bytes long.
+            require(_l2ToL1message.length >= 56, "ShB wrong msg len"); // wrong message length
             // this message is a base token withdrawal
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
@@ -767,7 +774,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             assetId = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, l1Token));
             transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
-            //todo
+            // The data is expected to be at least 36 bytes long to contain assetId.
+            require(_l2ToL1message.length >= 36, "ShB wrong msg len"); // wrong message length
             (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
             transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         } else {
@@ -827,7 +835,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
             _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _merkleProof: _merkleProof
+            _merkleProof: _merkleProof,
+            _isLegacyEncoding: true
         });
     }
 
@@ -878,15 +887,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         {
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
+            _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
 
-            // solhint-disable-next-line func-named-parameters
-            l2BridgeMintCalldata = abi.encode(
-                _amount,
-                _prevMsgSender,
-                _l2Receiver,
-                getERC20Getters(_l1Token),
-                _l1Token
-            );
+            l2BridgeMintCalldata = _burn({
+                _chainId: ERA_CHAIN_ID,
+                _l2Value: 0,
+                _assetId: _assetId,
+                _prevMsgSender: _prevMsgSender,
+                _transferData: abi.encode(_amount, _l2Receiver)
+            });
         }
 
         {
@@ -985,7 +994,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
             _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _merkleProof: _merkleProof
+            _merkleProof: _merkleProof,
+            _isLegacyEncoding: true
         });
     }
 
