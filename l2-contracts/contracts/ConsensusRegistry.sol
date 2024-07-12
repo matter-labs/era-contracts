@@ -112,7 +112,7 @@ contract ConsensusRegistry {
     }
 
     // Activates a node.
-    function activate(address nodeOwner) external onlyOwner {
+    function activate(address nodeOwner) external onlyOwnerOrNodeOwner(nodeOwner) {
         verifyNodeOwnerExists(nodeOwner);
         nodes[nodeOwner].isInactive = false;
     }
