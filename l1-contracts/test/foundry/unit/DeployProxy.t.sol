@@ -10,11 +10,13 @@ import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-tra
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
+import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Utils} from "test/foundry/unit/concrete/Utils/Utils.sol";
 import {InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
+import {MockERC20} from "lib/forge-std/src/mocks/MockERC20.sol";
 
 contract ProxyTest is DiamondCutTest {
     DiamondProxy private diamondProxy;
@@ -23,6 +25,7 @@ contract ProxyTest is DiamondCutTest {
     AdminFacet private proxyAsAdmin;
     GettersFacet private proxyAsGetters;
     ExecutorFacet private executorFacet;
+    MailboxFacet private mailboxFacet;
     address private admin;
     address private stateTransitionManager;
     address private randomSigner;
@@ -138,49 +141,80 @@ contract ProxyTest is DiamondCutTest {
     }
 
     function test_rejectNonAddedSelector() public {
-        // vm.expectRevert();
-         //proxyAsERC20.transfer(proxyAsERC20.address, 0);
-     }
+        mailboxFacet = new MailboxFacet(1);
+        bytes4[] memory mailboxSelectors = Utils.getMailboxSelectors();
+        vm.expectRevert(abi.encodePacked("F"));
+        (bool success, ) = address(diamondProxy).call(abi.encode(mailboxSelectors[0]));
+        assertTrue(success);
+    }
 
     function test_rejectDataWithNoSelectors() public {
         string memory dataWithoutSelector = "0x112";
-        //vm.expectRevert();
-        address(diamondProxy).call(abi.encodeWithSignature(dataWithoutSelector));
+        vm.expectRevert(abi.encodePacked("Ut"));
+        (bool success, ) = address(diamondProxy).call("1");
+        assertTrue(success);
     }
 
     function test_freezeDiamondStorage() public {
-        // bytes memory diamondProxyTestCalldata = encodeFunctionData("setFreezability", [true]);
-        // InitializeData memory diamondCutInitData = diamondCut([], diamondProxyTest.address, diamondProxyTestCalldata);
+        vm.startBroadcast(address(stateTransitionManager));
+        proxyAsAdmin.freezeDiamond();
+        vm.stopBroadcast();
 
-        // bytes memory adminFacetExecuteCalldata = adminFacet.encodeFunctionData("executeUpgrade", [diamondCutInitData]);
-        // address(diamondProxy).call(abi.encodeWithSignature(adminFacetExecuteCalldata));
+        bool isFrozen = proxyAsGetters.isDiamondStorageFrozen();
 
-        // assertEq(proxyAsGettersFacet.isDiamondStorageFrozen(), true);
+        assertTrue(isFrozen);
     }
 
     function test_executingProposalWhenStorageIsFrozen() public {
-        // const facetCuts = [
-        //     {
-        //       facet: adminFacet.address,
-        //       selectors: ["0x000000aa"],
-        //       action: Action.Add,
-        //       isFreezable: false,
-        //     },
-        //   ];
-        //   const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, "0x");
-      
-        //   const adminFacetExecuteCalldata = adminFacet.interface.encodeFunctionData("executeUpgrade", [diamondCutData]);
-        //   await proxy.fallback({ data: adminFacetExecuteCalldata });
+        vm.startBroadcast(address(stateTransitionManager));
+        proxyAsAdmin.freezeDiamond();
+        vm.stopBroadcast();
+
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = adminFacet.setTransactionFilterer.selector;
+
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: address(adminFacet),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: selectors
+        });
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: 0x0000000000000000000000000000000000000000,
+            initCalldata: ""
+        });
+
+        bytes4[] memory adminSelectors = Utils.getAdminSelectors();
+        vm.startBroadcast(address(stateTransitionManager));
+        (bool success, ) = address(diamondProxy).call(abi.encodeWithSelector(adminSelectors[8], diamondCutData));
+        vm.stopBroadcast();
+        assertTrue(success);
     }
 
     function test_callFunctionWhenStorageIsFrozen() public {
         bytes4[] memory executorSelectors = Utils.getExecutorSelectors();
-        vm.expectRevert(bytes("q1"));
-        address(diamondProxy).call(abi.encode(executorSelectors[3]));
+
+        vm.startBroadcast(address(stateTransitionManager));
+        proxyAsAdmin.freezeDiamond();
+        vm.stopBroadcast();
+
+        vm.expectRevert(abi.encodePacked("q1"));
+        (bool success, ) = address(diamondProxy).call(abi.encode(executorSelectors[3]));
+
+        assertTrue(success);
     }
 
     function test_callUnfreezableFacetWhenStorageIsFrozen() public {
-        // bytes4[] memory gettersSelectors = Utils.getGettersSelectors();
-        // address(diamondProxy).call(abi.encodeWithSignature(string(gettersSelectors[0])));
+        vm.startBroadcast(address(stateTransitionManager));
+        proxyAsAdmin.freezeDiamond();
+        vm.stopBroadcast();
+
+        bytes4[] memory gettersSelectors = Utils.getGettersSelectors();
+        (bool success, ) = address(diamondProxy).call(abi.encode(gettersSelectors[0]));
+
+        assertTrue(success);
     }
 }
