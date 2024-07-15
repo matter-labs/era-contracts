@@ -333,19 +333,22 @@ export class Deployer {
     this.addresses.ZkSync.DiamondInit = contractAddress;
   }
 
-
   public async deployNHVerifier(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    console.log("DEPLOY NH VERIFIER...")
+    console.log("DEPLOY NH VERIFIER...");
 
-    const NewHorizenProofVerifierFactory = await hardhat.ethers.getContractFactory('NewHorizenProofVerifier', this.deployWallet);
-    let newHorizenProofVerifierContract = await NewHorizenProofVerifierFactory.deploy("0x36615Cf349d7F6344891B1e7CA7C72883F5dc049");
+    const NewHorizenProofVerifierFactory = await hardhat.ethers.getContractFactory(
+      "NewHorizenProofVerifier",
+      this.deployWallet
+    );
+    let newHorizenProofVerifierContract = await NewHorizenProofVerifierFactory.deploy(
+      "0x36615Cf349d7F6344891B1e7CA7C72883F5dc049"
+    );
 
     console.log(`CONTRACTS_NH_VERIFIER_ADDR=${newHorizenProofVerifierContract.address}`);
 
     this.addresses.ZkSync.NHVerifier = newHorizenProofVerifierContract.address;
   }
-
 
   public async deployDiamondUpgradeInit(
     create2Salt: string,
@@ -403,7 +406,7 @@ export class Deployer {
     // deploy zkSync contract
     const independentZkSyncDeployPromises = [
       this.deployNHVerifier(create2Salt, { gasPrice, nonce: nonce }),
-      this.deployMailboxFacet(create2Salt, { gasPrice, nonce: nonce + 1}),
+      this.deployMailboxFacet(create2Salt, { gasPrice, nonce: nonce + 1 }),
       this.deployExecutorFacet(create2Salt, { gasPrice, nonce: nonce + 2 }),
       this.deployAdminFacet(create2Salt, { gasPrice, nonce: nonce + 3 }),
       this.deployGettersFacet(create2Salt, { gasPrice, nonce: nonce + 4 }),
