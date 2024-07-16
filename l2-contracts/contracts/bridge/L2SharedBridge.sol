@@ -15,6 +15,7 @@ import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../L2ContractHelper.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {EmptyAddress, InvalidCaller} from "../L2ContractErrors.sol";
 
@@ -166,18 +167,18 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @param _l2Receiver The address of token receiver on L2.
     /// @param _l1Token The address of the token transferred.
     /// @param _amount The amount of the token transferred.
-    /// @param erc20Data The ERC20 metadata of the token transferred.
+    /// @param _erc20Data The ERC20 metadata of the token transferred.
     function finalizeDeposit(
         address _l1Sender,
         address _l2Receiver,
         address _l1Token,
         uint256 _amount,
-        bytes calldata erc20Data
+        bytes calldata _erc20Data
     ) external override {
         // onlyBridge {
         bytes32 assetId = keccak256(abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _l1Token));
         // solhint-disable-next-line func-named-parameters
-        bytes memory data = abi.encode(_l1Sender, _amount, _l2Receiver, erc20Data, _l1Token);
+        bytes memory data = DataEncoding.encodeBridgeMintData(_amount, _l1Sender, _l2Receiver, _erc20Data, _l1Token);
         finalizeDeposit(assetId, data);
     }
 

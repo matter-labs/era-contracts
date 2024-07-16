@@ -21,6 +21,7 @@ import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {L2Message, TxStatus} from "../common/Messaging.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
@@ -225,7 +226,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _assetHandlerAddress The address of the asset handler, which will hold the token of interest.
     function setAssetHandlerAddressInitial(bytes32 _assetData, address _assetHandlerAddress) external {
         address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
-        bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _assetData));
+        bytes32 assetId = DataEncoding.encodeAssetId(_assetData);
         assetHandlerAddress[assetId] = _assetHandlerAddress;
         assetDeploymentTracker[assetId] = msg.sender;
         emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _assetData, sender);
@@ -448,6 +449,31 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         });
     }
 
+    /// @notice Forwards the burn request for specific asset to respective asset handler without transferring value
+    /// @param _chainId The chain ID of the ZK chain to which deposit.
+    /// @param _l2Value The L2 `msg.value` from the L1 -> L2 deposit transaction.
+    /// @param _assetId The deposited asset ID.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
+    /// @return l2BridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
+    function _burnLegacyErc20(
+        uint256 _chainId,
+        uint256 _l2Value,
+        bytes32 _assetId,
+        address _prevMsgSender,
+        bytes memory _transferData
+    ) internal returns (bytes memory l2BridgeMintCalldata) {
+        address l1AssetHandler = assetHandlerAddress[_assetId];
+        require(l1AssetHandler != address(0), "ShB: asset handler does not exist for assetId");
+        l2BridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn({
+            _chainId: _chainId,
+            _destinationChainValue: _l2Value,
+            _assetId: _assetId,
+            _prevMsgSender: _prevMsgSender,
+            _data: _transferData
+        });
+    }
+
     /// @dev The request data that is passed to the bridgehub.
     /// @param _chainId The chain ID of the ZK chain to which deposit.
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
@@ -504,10 +530,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         if (nativeTokenVault.tokenAddress(_assetId) == address(0)) {
             return abi.encodeCall(IL2Bridge.finalizeDeposit, (_assetId, _transferData));
         } else {
-            (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = abi.decode(
-                _transferData,
-                (uint256, address, address, bytes, address)
-            );
+            (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = DataEncoding
+                .decodeBridgeMintData(_transferData);
             return
                 abi.encodeCall(
                     IL2BridgeLegacy.finalizeDeposit,
@@ -771,7 +795,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
 
-            assetId = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, l1Token));
+            assetId = DataEncoding.encodeAssetId(l1Token);
             transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
             // The data is expected to be at least 36 bytes long to contain assetId.
@@ -887,9 +911,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         {
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-            _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
+            IERC20 l1Token = IERC20(_l1Token);
+            l1Token.safeIncreaseAllowance(address(nativeTokenVault), _amount);
+        }
 
-            l2BridgeMintCalldata = _burn({
+        {
+            l2BridgeMintCalldata = _burnLegacyErc20({
                 _chainId: ERA_CHAIN_ID,
                 _l2Value: 0,
                 _assetId: _assetId,

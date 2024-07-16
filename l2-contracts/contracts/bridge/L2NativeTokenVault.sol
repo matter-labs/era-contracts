@@ -14,6 +14,7 @@ import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 import {L1_CHAIN_ID} from "../common/Config.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../L2ContractErrors.sol";
 
@@ -106,8 +107,14 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         bytes calldata _transferData
     ) external payable override onlyBridge {
         address token = tokenAddress[_assetId];
-        (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken) = abi
-            .decode(_transferData, (address, uint256, address, bytes, address));
+
+        (
+            uint256 _amount,
+            address _l1Sender,
+            address _l2Receiver,
+            bytes memory erc20Data,
+            address originToken
+        ) = DataEncoding.decodeBridgeMintData(_transferData);
 
         if (token == address(0)) {
             address expectedToken = _calculateCreate2TokenAddress(originToken);
