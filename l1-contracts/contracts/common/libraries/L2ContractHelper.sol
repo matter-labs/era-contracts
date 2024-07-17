@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-import {NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../Config.sol";
-
 // solhint-disable gas-custom-errors
 
 /**

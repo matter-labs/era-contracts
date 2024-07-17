@@ -73,6 +73,11 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
+    function getBaseTokenAssetId() external view returns (bytes32) {
+        return s.baseTokenAssetId;
+    }
+
+    /// @inheritdoc IGetters
     function baseTokenGasPriceMultiplierNominator() external view returns (uint128) {
         return s.baseTokenGasPriceMultiplierNominator;
     }

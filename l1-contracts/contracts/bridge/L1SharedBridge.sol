@@ -284,7 +284,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes32 _assetId,
         address _prevMsgSender,
         uint256 _amount
-    ) external payable virtual onlyBridgehubOrEra(_chainId) whenNotPaused {
+    ) external payable onlyBridgehubOrEra(_chainId) whenNotPaused {
         address l1AssetHandler = _getAssetHandler(_assetId);
         _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
         // slither-disable-next-line unused-return
@@ -530,6 +530,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         if (nativeTokenVault.tokenAddress(_assetId) == address(0)) {
             return abi.encodeCall(IL2Bridge.finalizeDeposit, (_assetId, _transferData));
         } else {
+            // slither-disable-next-line unused-return
             (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = DataEncoding
                 .decodeBridgeMintData(_transferData);
             return
@@ -770,11 +771,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         // 2. The message that is encoded by `getL1WithdrawMessage(bytes32 _assetId, bytes memory _bridgeMintData)`
         // No length is assume. The assetId is decoded and the mintData is passed to respective assetHandler
 
-        uint256 amount;
-        address l1Receiver;
-
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {
+            uint256 amount;
+            address l1Receiver;
+
             // The data is expected to be at least 56 bytes long.
             require(_l2ToL1message.length >= 56, "ShB wrong msg len"); // wrong message length
             // this message is a base token withdrawal
@@ -785,6 +786,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) {
             // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
             address l1Token;
+            uint256 amount;
+            address l1Receiver;
             // this message is a token withdrawal
 
             // Check that the message length is correct.
@@ -892,7 +895,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// L2 tx if the L1 msg.sender is a contract. Without address aliasing for L1 contracts as refund recipients they
     /// would not be able to make proper L2 tx requests through the Mailbox to use or withdraw the funds from L2, and
     /// the funds would be lost.
-    /// @return l2TxHash The L2 transaction hash of deposit finalization.
+    /// @return txHash The L2 transaction hash of deposit finalization.
     function depositLegacyErc20Bridge(
         address _prevMsgSender,
         address _l2Receiver,
@@ -901,7 +904,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
-    ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 l2TxHash) {
+    ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 txHash) {
         require(l2BridgeAddress[ERA_CHAIN_ID] != address(0), "ShB b. n dep");
         require(_l1Token != L1_WETH_TOKEN, "ShB: WETH deposit not supported 2");
 
@@ -944,15 +947,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
                 factoryDeps: new bytes[](0),
                 refundRecipient: refundRecipient
             });
-            l2TxHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
+            txHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
         }
 
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-        depositHappened[ERA_CHAIN_ID][l2TxHash] = keccak256(abi.encode(_prevMsgSender, _l1Token, _amount));
+        depositHappened[ERA_CHAIN_ID][txHash] = keccak256(abi.encode(_prevMsgSender, _l1Token, _amount));
 
         emit LegacyDepositInitiated({
             chainId: ERA_CHAIN_ID,
-            l2DepositTxHash: l2TxHash,
+            l2DepositTxHash: txHash,
             from: _prevMsgSender,
             to: _l2Receiver,
             l1Asset: _l1Token,

@@ -39,6 +39,9 @@ interface IGetters is IZkSyncHyperchainBase {
     /// @return The address of the base token bridge
     function getBaseTokenBridge() external view returns (address);
 
+    /// @return The Asset Id of the base token
+    function getBaseTokenAssetId() external view returns (bytes32);
+
     /// @return The total number of batches that were committed
     function getTotalBatchesCommitted() external view returns (uint256);
 

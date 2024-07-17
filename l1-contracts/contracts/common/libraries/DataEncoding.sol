@@ -24,6 +24,7 @@ library DataEncoding {
         bytes memory _erc20Metadata,
         address _l1Token
     ) internal pure returns (bytes memory) {
+        // solhint-disable-next-line func-named-parameters
         return abi.encode(_amount, _prevMsgSender, _l2Receiver, _erc20Metadata, _l1Token);
     }
 

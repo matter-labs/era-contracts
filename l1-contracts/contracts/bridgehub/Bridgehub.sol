@@ -13,7 +13,7 @@ import {IStateTransitionManager} from "../state-transition/IStateTransitionManag
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
@@ -31,8 +31,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice we store registered stateTransitionManagers
     mapping(address stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
+
     /// @notice we store registered tokens (for arbitrary base token)
-    mapping(address token => bool) public tokenIsRegistered;
+    mapping(address baseToken => bool) public tokenIsRegistered;
 
     /// @notice chainID => StateTransitionManager contract address, storing StateTransitionManager
     mapping(uint256 chainId => address) public stateTransitionManager;

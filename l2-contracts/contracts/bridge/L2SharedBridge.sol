@@ -35,7 +35,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     bytes32 internal DEPRECATED_l2TokenProxyBytecodeHash;
 
     /// @dev A mapping l2 token address => l1 token address.
-    mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
+    mapping(address l2Token => address l1Token) public override l1TokenAddress;
 
     /// @dev The address of the legacy L1 erc20 bridge counterpart.
     /// This is non-zero only on Era, and should not be renamed for backward compatibility with the SDKs.
@@ -113,7 +113,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
             assetHandlerAddress[_assetId] = address(nativeTokenVault);
         }
 
-        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, keccak256(_transferData));
+        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, _transferData);
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -133,7 +133,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         bytes memory message = _getL1WithdrawMessage(_assetId, _l1bridgeMintData);
         L2ContractHelper.sendMessageToL1(message);
 
-        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, msg.sender, _assetId, keccak256(_transferData));
+        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, msg.sender, _assetId, _transferData);
     }
 
     /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
@@ -175,7 +175,6 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         uint256 _amount,
         bytes calldata _erc20Data
     ) external override {
-        // onlyBridge {
         bytes32 assetId = keccak256(abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _l1Token));
         // solhint-disable-next-line func-named-parameters
         bytes memory data = DataEncoding.encodeBridgeMintData(_amount, _l1Sender, _l2Receiver, _erc20Data, _l1Token);
