@@ -101,6 +101,15 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         }
     }
 
+    /// @notice Sets the asset handler address for a given assetId.
+    /// @dev Will be called by ZK Gateway.
+    /// @param _assetId The encoding of the asset on L2.
+    /// @param _assetHandlerAddress The address of the asset handler, which will hold the token of interest.
+    function setAssetHandlerAddress(bytes32 _assetId, address _assetHandlerAddress) external onlyL1Bridge {
+        assetHandlerAddress[_assetId] = _assetHandlerAddress;
+        emit AssetHandlerRegistered(_assetId, _assetHandlerAddress);
+    }
+
     /// @notice Finalizes the deposit and mint funds.
     /// @param _assetId The encoding of the asset on L2.
     /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken).
@@ -147,15 +156,6 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         // and we use this interface so that when the switch happened the old messages could be processed
         // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IL1SharedBridge.finalizeWithdrawal.selector, _assetId, _l1bridgeMintData);
-    }
-
-    /// @notice Sets the asset handler address for a given assetId.
-    /// @dev Will be called by ZK Gateway.
-    /// @param _assetId The encoding of the asset on L2.
-    /// @param _assetHandlerAddress The address of the asset handler, which will hold the token of interest.
-    function setAssetHandlerAddress(bytes32 _assetId, address _assetHandlerAddress) external onlyL1Bridge {
-        assetHandlerAddress[_assetId] = _assetHandlerAddress;
-        emit AssetHandlerRegistered(_assetId, _assetHandlerAddress);
     }
 
     /*//////////////////////////////////////////////////////////////

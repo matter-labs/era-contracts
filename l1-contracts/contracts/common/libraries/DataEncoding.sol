@@ -10,6 +10,23 @@ import {NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../Config.sol";
  * @notice Helper library for with transfer data encoding and decoding to reduce possibility of errors.
  */
 library DataEncoding {
+    /// @notice Encodes the asset data by combining chain id, asset deployment tracker and asset data.
+    /// @param _assetData The asset data that has to be encoded.
+    /// @return The encoded asset data.
+    function encodeAssetId(bytes32 _assetData) internal view returns (bytes32) {
+        return keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetData));
+    }
+
+    /// @notice Encodes the asset data by combining chain id, asset deployment tracker and asset data.
+    /// @param _tokenAaddress The address of token that has to be encoded (asset data is the address itself).
+    /// @return The encoded asset data.
+    function encodeAssetId(address _tokenAaddress) internal view returns (bytes32) {
+        return
+            keccak256(
+                abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_tokenAaddress))))
+            );
+    }
+
     /// @notice Abi.encodes the data required for bridgeMint on remote chain.
     /// @param _amount The amount of token to be transferred.
     /// @param _prevMsgSender The address which initiated the transfer.
@@ -52,22 +69,5 @@ library DataEncoding {
             _bridgeMintData,
             (uint256, address, address, bytes, address)
         );
-    }
-
-    /// @notice Encodes the asset data by combining chain id, asset deployment tracker and asset data.
-    /// @param _assetData The asset data that has to be encoded.
-    /// @return The encoded asset data.
-    function encodeAssetId(bytes32 _assetData) internal view returns (bytes32) {
-        return keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetData));
-    }
-
-    /// @notice Encodes the asset data by combining chain id, asset deployment tracker and asset data.
-    /// @param _tokenAaddress The address of token that has to be encoded (asset data is the address itself).
-    /// @return The encoded asset data.
-    function encodeAssetId(address _tokenAaddress) internal view returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_tokenAaddress))))
-            );
     }
 }

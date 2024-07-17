@@ -63,17 +63,31 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         L1_SHARED_BRIDGE = _l1SharedBridge;
     }
 
+    /// @dev Accepts ether only from the Shared Bridge.
+    receive() external payable {
+        require(address(L1_SHARED_BRIDGE) == msg.sender, "NTV: ETH only accepted from Shared Bridge");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            PAUSE
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     /// @dev Initializes a contract for later use. Expected to be used in the proxy.
     /// @param _owner Address which can change pause / unpause the NTV.
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
     function initialize(address _owner) external initializer {
         require(_owner != address(0), "NTV owner 0");
         _transferOwnership(_owner);
-    }
-
-    /// @dev Accepts ether only from the Shared Bridge.
-    receive() external payable {
-        require(address(L1_SHARED_BRIDGE) == msg.sender, "NTV: ETH only accepted from Shared Bridge");
     }
 
     /// @notice Transfers tokens from shared bridge as part of the migration process.
@@ -166,45 +180,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _l2Receiver, amount);
     }
 
-    /// @notice Transfers tokens from the depositor address to the smart contract address.
-    /// @param _from The address of the depositor.
-    /// @param _token The ERC20 token to be transferred.
-    /// @param _amount The amount to be transferred.
-    /// @return The difference between the contract balance before and after the transferring of funds.
-    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
-        uint256 balanceBefore = _token.balanceOf(address(this));
-        address from = _from;
-        // in the legacy scenario the SharedBridge was granting the allowance, we have to transfer from them instead of the user
-        if (
-            _token.allowance(address(L1_SHARED_BRIDGE), address(this)) >= _amount &&
-            _token.allowance(_from, address(this)) < _amount
-        ) {
-            from = address(L1_SHARED_BRIDGE);
-        }
-        // slither-disable-next-line arbitrary-send-erc20
-        _token.safeTransferFrom(from, address(this), _amount);
-        uint256 balanceAfter = _token.balanceOf(address(this));
-
-        return balanceAfter - balanceBefore;
-    }
-
-    /// @notice Receives and parses (name, symbol, decimals) from the token contract.
-    /// @param _token The address of token of interest.
-    /// @return Returns encoded name, symbol, and decimals for specific token.
-    function getERC20Getters(address _token) public view returns (bytes memory) {
-        if (_token == ETH_TOKEN_ADDRESS) {
-            bytes memory name = abi.encode("Ether");
-            bytes memory symbol = abi.encode("ETH");
-            bytes memory decimals = abi.encode(uint8(18));
-            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
-        }
-
-        (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
-        (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
-        (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
-        return abi.encode(data1, data2, data3);
-    }
-
     ///  @inheritdoc IL1AssetHandler
     function bridgeMint(
         uint256 _chainId,
@@ -262,6 +237,23 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         }
     }
 
+    /// @notice Receives and parses (name, symbol, decimals) from the token contract.
+    /// @param _token The address of token of interest.
+    /// @return Returns encoded name, symbol, and decimals for specific token.
+    function getERC20Getters(address _token) public view returns (bytes memory) {
+        if (_token == ETH_TOKEN_ADDRESS) {
+            bytes memory name = abi.encode("Ether");
+            bytes memory symbol = abi.encode("ETH");
+            bytes memory decimals = abi.encode(uint8(18));
+            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
+        }
+
+        (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
+        (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
+        (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
+        return abi.encode(data1, data2, data3);
+    }
+
     /// @notice Returns the parsed assetId.
     /// @param _l1TokenAddress The address of the token to be parsed.
     /// @return The asset ID.
@@ -269,17 +261,25 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         return DataEncoding.encodeAssetId(_l1TokenAddress);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            PAUSE
-    //////////////////////////////////////////////////////////////*/
+    /// @notice Transfers tokens from the depositor address to the smart contract address.
+    /// @param _from The address of the depositor.
+    /// @param _token The ERC20 token to be transferred.
+    /// @param _amount The amount to be transferred.
+    /// @return The difference between the contract balance before and after the transferring of funds.
+    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
+        uint256 balanceBefore = _token.balanceOf(address(this));
+        address from = _from;
+        // in the legacy scenario the SharedBridge was granting the allowance, we have to transfer from them instead of the user
+        if (
+            _token.allowance(address(L1_SHARED_BRIDGE), address(this)) >= _amount &&
+            _token.allowance(_from, address(this)) < _amount
+        ) {
+            from = address(L1_SHARED_BRIDGE);
+        }
+        // slither-disable-next-line arbitrary-send-erc20
+        _token.safeTransferFrom(from, address(this), _amount);
+        uint256 balanceAfter = _token.balanceOf(address(this));
 
-    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
-    function unpause() external onlyOwner {
-        _unpause();
+        return balanceAfter - balanceBefore;
     }
 }

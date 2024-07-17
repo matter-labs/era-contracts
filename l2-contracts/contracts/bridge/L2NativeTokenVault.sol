@@ -171,6 +171,19 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         l1BridgeMintData = _transferData;
     }
 
+    /// @notice Calculates L2 wrapped token address corresponding to L1 token counterpart.
+    /// @param _l1Token The address of token on L1.
+    /// @return expectedToken The address of token on L2.
+    function l2TokenAddress(address _l1Token) public view override returns (address expectedToken) {
+        bytes32 expectedAssetId = keccak256(
+            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
+        );
+        expectedToken = tokenAddress[expectedAssetId];
+        if (expectedToken == address(0)) {
+            expectedToken = _calculateCreate2TokenAddress(_l1Token);
+        }
+    }
+
     /// @notice Deploys and initializes the L2 token for the L1 counterpart.
     /// @param _l1Token The address of token on L1.
     /// @param _erc20Data The ERC20 metadata of the token deployed.
@@ -207,13 +220,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         proxy = BeaconProxy(abi.decode(returndata, (address)));
     }
 
-    /// @notice Converts the L1 token address to the create2 salt of deployed L2 token.
-    /// @param _l1Token The address of token on L1.
-    /// @return salt The salt used to compute address of wrapped token on L2 and for beacon proxy deployment.
-    function _getCreate2Salt(address _l1Token) internal pure returns (bytes32 salt) {
-        salt = bytes32(uint256(uint160(_l1Token)));
-    }
-
     function _calculateCreate2TokenAddress(address _l1Token) internal view returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_l1Token);
@@ -221,16 +227,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
             L2ContractHelper.computeCreate2Address(address(this), salt, l2TokenProxyBytecodeHash, constructorInputHash);
     }
 
-    /// @notice Calculates L2 wrapped token address corresponding to L1 token counterpart.
+    /// @notice Converts the L1 token address to the create2 salt of deployed L2 token.
     /// @param _l1Token The address of token on L1.
-    /// @return expectedToken The address of token on L2.
-    function l2TokenAddress(address _l1Token) public view override returns (address expectedToken) {
-        bytes32 expectedAssetId = keccak256(
-            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
-        );
-        expectedToken = tokenAddress[expectedAssetId];
-        if (expectedToken == address(0)) {
-            expectedToken = _calculateCreate2TokenAddress(_l1Token);
-        }
+    /// @return salt The salt used to compute address of wrapped token on L2 and for beacon proxy deployment.
+    function _getCreate2Salt(address _l1Token) internal pure returns (bytes32 salt) {
+        salt = bytes32(uint256(uint160(_l1Token)));
     }
 }
