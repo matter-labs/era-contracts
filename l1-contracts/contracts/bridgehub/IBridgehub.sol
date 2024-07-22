@@ -131,4 +131,12 @@ interface IBridgehub {
     function setSharedBridge(address _sharedBridge) external;
 
     event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
+
+    event StateTransitionManagerAdded(address stateTransitionManager);
+
+    event StateTransitionManagerRemoved(address stateTransitionManager);
+
+    event TokenRegistered(address token);
+
+    event SharedBridgeUpdated(address sharedBridge);
 }
