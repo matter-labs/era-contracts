@@ -75,5 +75,5 @@ interface IL1ERC20Bridge {
         address _account,
         address _l1Token,
         bytes32 _depositL2TxHash
-    ) external returns (uint256 amount);
+    ) external view returns (uint256 amount);
 }
