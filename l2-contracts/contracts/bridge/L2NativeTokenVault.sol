@@ -11,7 +11,7 @@ import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
-import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
+import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, L1_CHAIN_ID, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
 import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../L2ContractErrors.sol";
@@ -96,8 +96,9 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         address token = tokenAddress[_assetId];
         (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken) = abi
             .decode(_data, (address, uint256, address, bytes, address));
-        address expectedToken = l2TokenAddress(originToken);
+
         if (token == address(0)) {
+            address expectedToken = _calculateCreate2TokenAddress(originToken);
             bytes32 expectedAssetId = keccak256(
                 abi.encode(_chainId, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(originToken))))
             );
@@ -110,11 +111,12 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
                 revert AddressMismatch(expectedToken, deployedToken);
             }
             tokenAddress[_assetId] = expectedToken;
+            token = expectedToken;
         }
 
-        IL2StandardToken(expectedToken).bridgeMint(_l2Receiver, _amount);
+        IL2StandardToken(token).bridgeMint(_l2Receiver, _amount);
         /// backwards compatible event
-        emit FinalizeDeposit(_l1Sender, _l2Receiver, expectedToken, _amount);
+        emit FinalizeDeposit(_l1Sender, _l2Receiver, token, _amount);
         // solhint-disable-next-line func-named-parameters
         emit BridgeMint(_chainId, _assetId, _l1Sender, _l2Receiver, _amount);
     }
@@ -178,11 +180,26 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         salt = bytes32(uint256(uint160(_l1Token)));
     }
 
-    /// @return Address of an L2 token counterpart
-    function l2TokenAddress(address _l1Token) public view override returns (address) {
+    /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
+    /// @param _l1Token The address of token on L1.
+    /// @return Address of an L2 token counterpart.
+    function _calculateCreate2TokenAddress(address _l1Token) internal view returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_l1Token);
         return
             L2ContractHelper.computeCreate2Address(address(this), salt, l2TokenProxyBytecodeHash, constructorInputHash);
+    }
+
+    /// @notice Calculates L2 wrapped token address corresponding to L1 token counterpart.
+    /// @param _l1Token The address of token on L1.
+    /// @return expectedToken The address of token on L2.
+    function l2TokenAddress(address _l1Token) public view override returns (address expectedToken) {
+        bytes32 expectedAssetId = keccak256(
+            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
+        );
+        expectedToken = tokenAddress[expectedAssetId];
+        if (expectedToken == address(0)) {
+            expectedToken = _calculateCreate2TokenAddress(_l1Token);
+        }
     }
 }
