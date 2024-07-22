@@ -20,6 +20,7 @@ contract DeployErc20Script is Script {
     struct Config {
         TokenDescription[] tokens;
         address deployerAddress;
+        address[] additionalAddressesForMinting;
         address create2FactoryAddr;
         bytes32 create2FactorySalt;
     }
@@ -61,6 +62,7 @@ contract DeployErc20Script is Script {
         // Grab config from custom config file
         path = string.concat(root, "/script-config/config-deploy-erc20.toml");
         toml = vm.readFile(path);
+        config.additionalAddressesForMinting = vm.parseTomlAddressArray(toml, "$.additional_addresses_for_minting");
 
         string[] memory tokens = vm.parseTomlKeys(toml, "$.tokens");
 
@@ -72,7 +74,6 @@ contract DeployErc20Script is Script {
             token.decimals = toml.readUint(string.concat(key, ".decimals"));
             token.implementation = toml.readString(string.concat(key, ".implementation"));
             token.mint = toml.readUint(string.concat(key, ".mint"));
-
             config.tokens.push(token);
         }
     }
@@ -86,7 +87,8 @@ contract DeployErc20Script is Script {
                 symbol: token.symbol,
                 decimals: token.decimals,
                 implementation: token.implementation,
-                mint: token.mint
+                mint: token.mint,
+                additionalAddressesForMinting: config.additionalAddressesForMinting
             });
             console.log("Token deployed at:", tokenAddress);
             token.addr = tokenAddress;
@@ -98,7 +100,8 @@ contract DeployErc20Script is Script {
         string memory symbol,
         uint256 decimals,
         string memory implementation,
-        uint256 mint
+        uint256 mint,
+        address[] storage additionalAddressesForMinting
     ) internal returns (address) {
         bytes memory args;
         // WETH9 constructor has no arguments
@@ -112,10 +115,14 @@ contract DeployErc20Script is Script {
 
         if (mint > 0) {
             vm.broadcast();
-            (bool success, ) = tokenAddress.call(
-                abi.encodeWithSignature("mint(address,uint256)", config.deployerAddress, mint)
-            );
-            require(success, "Mint failed");
+            additionalAddressesForMinting.push(config.deployerAddress);
+            for (uint256 i = 0; i < additionalAddressesForMinting.length; i++) {
+                (bool success, ) = tokenAddress.call(
+                    abi.encodeWithSignature("mint(address,uint256)", additionalAddressesForMinting[i], mint)
+                );
+                require(success, "Mint failed");
+                console.log("Minting to:", additionalAddressesForMinting[i]);
+            }
         }
 
         return tokenAddress;
@@ -129,7 +136,7 @@ contract DeployErc20Script is Script {
             vm.serializeString(token.symbol, "symbol", token.symbol);
             vm.serializeUint(token.symbol, "decimals", token.decimals);
             vm.serializeString(token.symbol, "implementation", token.implementation);
-            vm.serializeUint(token.symbol, "mint", token.mint);
+            vm.serializeUintToHex(token.symbol, "mint", token.mint);
             string memory tokenInfo = vm.serializeAddress(token.symbol, "address", token.addr);
 
             tokens = vm.serializeString("tokens", token.symbol, tokenInfo);
