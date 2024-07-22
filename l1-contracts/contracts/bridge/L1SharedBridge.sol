@@ -819,9 +819,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         {
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-
-            // solhint-disable-next-line func-named-parameters
-            bridgeMintCalldata = abi.encode(_amount, _prevMsgSender, _l2Receiver, getERC20Getters(_l1Token), _l1Token);
+            _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
+            bridgeMintCalldata = _burn({
+                _chainId: ERA_CHAIN_ID,
+                _l2Value: 0,
+                _assetId: _assetId,
+                _prevMsgSender: _prevMsgSender,
+                _transferData: abi.encode(_amount, _l2Receiver)
+            });
         }
 
         {
