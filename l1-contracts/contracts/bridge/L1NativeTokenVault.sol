@@ -13,9 +13,9 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
-
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {ETH_TOKEN_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -150,8 +150,13 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         chainBalance[_chainId][l1Token] += amount;
 
         // solhint-disable-next-line func-named-parameters
-        _bridgeMintData = abi.encode(amount, _prevMsgSender, _l2Receiver, getERC20Getters(l1Token), l1Token); // to do add l2Receiver in here
-        // solhint-disable-next-line func-named-parameters
+        _bridgeMintData = DataEncoding.encodeBridgeMintData(
+            amount,
+            _prevMsgSender,
+            _l2Receiver,
+            getERC20Getters(l1Token),
+            l1Token
+        ); // solhint-disable-next-line func-named-parameters
         emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _l2Receiver, amount);
     }
 
@@ -247,7 +252,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     }
 
     function getAssetId(address _l1TokenAddress) public view override returns (bytes32) {
-        return keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _l1TokenAddress));
+        return DataEncoding.encodeAssetId(_l1TokenAddress);
     }
 
     /*//////////////////////////////////////////////////////////////
