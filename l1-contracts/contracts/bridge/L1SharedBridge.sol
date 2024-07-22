@@ -556,7 +556,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
             txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(_assetId), depositAmount));
         } else {
-            txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(_prevMsgSender, _assetId, _transferData)));
+            txDataHash = keccak256(abi.encode(_prevMsgSender, _assetId, _transferData));
         }
     }
 
