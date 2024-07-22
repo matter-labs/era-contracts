@@ -417,7 +417,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes memory _transferData
     ) internal returns (bytes memory bridgeMintCalldata) {
         address l1AssetHandler = assetHandlerAddress[_assetId];
-        bridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
+        // Only pass msg.value if ETH is deposited
+        uint256 msgValue = _l2Value == 0 ? 0 : msg.value;
+        bridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msgValue}({
             _chainId: _chainId,
             _mintValue: _l2Value,
             _assetId: _assetId,
@@ -819,7 +821,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         {
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-            _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
+            IERC20 l1Token = IERC20(_l1Token);
+            l1Token.safeIncreaseAllowance(address(nativeTokenVault), _amount);
+        }
+
+        {
             bridgeMintCalldata = _burn({
                 _chainId: ERA_CHAIN_ID,
                 _l2Value: 0,
