@@ -250,7 +250,7 @@ jobs:
 
       # Add any step generating a gas report to a temporary file named gasreport.ansi. For example:
       - name: Run tests
-        run: yarn l1 test:foundry --gas-report > gasreport.ansi # <- this file name should be unique in your repository!
+        run: yarn l1 test:foundry --gas-report | tee gasreport.ansi # <- this file name should be unique in your repository!
 
       - name: Compare gas reports
         uses: Rubilmax/foundry-gas-diff@v3.18
