@@ -28,6 +28,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @dev The native token vault, which holds deposited tokens.
     IL1NativeTokenVault public immutable override NATIVE_TOKEN_VAULT;
 
+    /// @dev The chainId of Era
+    uint256 public immutable ERA_CHAIN_ID;
+
     /// @dev A mapping L2 batch number => message number => flag.
     /// @dev Used to indicate that L2 -> L1 message was already processed for zkSync Era withdrawals.
     // slither-disable-next-line uninitialized-state
@@ -62,9 +65,14 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IL1SharedBridge _sharedBridge, IL1NativeTokenVault _nativeTokenVault) reentrancyGuardInitializer {
+    constructor(
+        IL1SharedBridge _sharedBridge,
+        IL1NativeTokenVault _nativeTokenVault,
+        uint256 _eraChainId
+    ) reentrancyGuardInitializer {
         SHARED_BRIDGE = _sharedBridge;
         NATIVE_TOKEN_VAULT = _nativeTokenVault;
+        ERA_CHAIN_ID = _eraChainId;
     }
 
     /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
@@ -203,7 +211,8 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         require(amount != 0, "2T"); // empty deposit
         delete depositAmount[_depositSender][_l1Token][_l2TxHash];
 
-        SHARED_BRIDGE.claimFailedDepositLegacyErc20Bridge({
+        SHARED_BRIDGE.claimFailedDeposit({
+            _chainId: ERA_CHAIN_ID,
             _depositSender: _depositSender,
             _l1Token: _l1Token,
             _amount: amount,

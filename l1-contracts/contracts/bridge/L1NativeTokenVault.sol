@@ -7,7 +7,6 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -16,6 +15,8 @@ import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
 
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {ETH_TOKEN_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
+
+import {BridgeHelper} from "./BridgeHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -176,17 +177,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
 
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function getERC20Getters(address _token) public view returns (bytes memory) {
-        if (_token == ETH_TOKEN_ADDRESS) {
-            bytes memory name = bytes("Ether");
-            bytes memory symbol = bytes("ETH");
-            bytes memory decimals = abi.encode(uint8(18));
-            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
-        }
-
-        (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
-        (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
-        (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
-        return abi.encode(data1, data2, data3);
+        return BridgeHelper.getERC20Getters(_token, ETH_TOKEN_ADDRESS);
     }
 
     ///  @inheritdoc IL1AssetHandler
@@ -195,10 +186,33 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         bytes32 _assetId,
         bytes calldata _data
     ) external payable override onlyBridge whenNotPaused returns (address l1Receiver) {
+        uint256 amount;
+        (l1Receiver, amount) = _mintOrRecoverInternal(_chainId, _assetId, _data);
+        // solhint-disable-next-line func-named-parameters
+        emit BridgeMint(_chainId, _assetId, l1Receiver, amount);
+    }
+
+    ///  @inheritdoc IL1AssetHandler
+    function bridgeRecoverFailedTransfer(
+        uint256 _chainId,
+        bytes32 _assetId,
+        bytes calldata _data
+    ) external payable override onlyBridge whenNotPaused {
+        // slither-disable-next-line unused-return
+        _mintOrRecoverInternal(_chainId, _assetId, _data);
+    }
+
+    function _mintOrRecoverInternal(
+        uint256 _chainId,
+        bytes32 _assetId,
+        bytes calldata _data
+    ) internal returns (address l1Receiver, uint256 amount) {
         // here we are minting the tokens after the bridgeBurn has happened on an L2, so we can assume the l1Token is not zero
         address l1Token = tokenAddress[_assetId];
-        uint256 amount;
+        // todo: ideally we would have the receiver and sender both encoded here, that would be parsed in the bridgeBurn/bridgeRecoverFailedTransfer, and passed in here
         (amount, l1Receiver) = abi.decode(_data, (uint256, address));
+
+        require(amount > 0, "y1");
         // Check that the chain has sufficient balance
         require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
         chainBalance[_chainId][l1Token] -= amount;
@@ -213,34 +227,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         } else {
             // Withdraw funds
             IERC20(l1Token).safeTransfer(l1Receiver, amount);
-        }
-        // solhint-disable-next-line func-named-parameters
-        emit BridgeMint(_chainId, _assetId, l1Receiver, amount);
-    }
-
-    ///  @inheritdoc IL1AssetHandler
-    function bridgeRecoverFailedTransfer(
-        uint256 _chainId,
-        bytes32 _assetId,
-        bytes calldata _data
-    ) external payable override onlyBridge whenNotPaused {
-        (uint256 _amount, address _depositSender) = abi.decode(_data, (uint256, address));
-        address l1Token = tokenAddress[_assetId];
-        require(_amount > 0, "y1");
-
-        // check that the chain has sufficient balance
-        require(chainBalance[_chainId][l1Token] >= _amount, "NTV n funds");
-        chainBalance[_chainId][l1Token] -= _amount;
-
-        if (l1Token == ETH_TOKEN_ADDRESS) {
-            bool callSuccess;
-            // Low-level assembly call, to avoid any memory copying (save gas)
-            assembly {
-                callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
-            }
-            require(callSuccess, "NTV: claimFailedDeposit failed, no funds or cannot transfer to receiver");
-        } else {
-            IERC20(l1Token).safeTransfer(_depositSender, _amount);
             // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.
             // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
         }
