@@ -106,32 +106,32 @@ describe("ConsensusRegistry", function () {
     ).to.be.reverted;
   });
 
-  it("Should allow owner to inactivate", async function () {
+  it("Should allow owner to deactivate", async function () {
     const nodeOwner = nodeEntries[0].ownerAddr;
     expect((await registry.nodes(nodeOwner)).isInactive).to.equal(false);
 
-    await (await registry.connect(owner).inactivate(nodeOwner, { gasLimit })).wait();
+    await (await registry.connect(owner).deactivate(nodeOwner, { gasLimit })).wait();
     expect((await registry.nodes(nodeOwner)).isInactive).to.equal(true);
 
     // Restore state.
     await (await registry.connect(owner).activate(nodeOwner, { gasLimit })).wait();
   });
 
-  it("Should allow the nodeOwner to inactivate", async function () {
+  it("Should allow the nodeOwner to deactivate", async function () {
     const nodeOwner = nodeEntries[0].ownerAddr;
     const nodeOwnerKey = nodes[0].ownerKey;
     expect((await registry.nodes(nodeOwner)).isInactive).to.equal(false);
 
-    await (await registry.connect(nodeOwnerKey).inactivate(nodeOwner, { gasLimit })).wait();
+    await (await registry.connect(nodeOwnerKey).deactivate(nodeOwner, { gasLimit })).wait();
     expect((await registry.nodes(nodeOwner)).isInactive).to.equal(true);
 
     // Restore state.
     await (await registry.connect(owner).activate(nodeOwner, { gasLimit })).wait();
   });
 
-  it("Should not allow nonOwner, nonNodeOwner to inactivate", async function () {
+  it("Should not allow nonOwner, nonNodeOwner to deactivate", async function () {
     const nodeOwner = nodeEntries[0].ownerAddr;
-    await expect(registry.connect(nonOwner).inactivate(nodeOwner, { gasLimit })).to.be.reverted;
+    await expect(registry.connect(nonOwner).deactivate(nodeOwner, { gasLimit })).to.be.reverted;
   });
 
   it("Should change validator weight", async function () {

@@ -117,12 +117,12 @@ contract ConsensusRegistry {
         });
     }
 
-/// @notice Inactivates a node, preventing it from participating in committees.
+/// @notice Deactivates a node, preventing it from participating in committees.
 /// @dev Only callable by the contract owner or the node owner.
 /// @dev Verifies that the node owner exists in the registry.
 ///
 /// @param nodeOwner The address of the node's owner to be inactivated.
-    function inactivate(address nodeOwner) external onlyOwnerOrNodeOwner(nodeOwner) {
+    function deactivate(address nodeOwner) external onlyOwnerOrNodeOwner(nodeOwner) {
         verifyNodeOwnerExists(nodeOwner);
         nodes[nodeOwner].isInactive = true;
     }
