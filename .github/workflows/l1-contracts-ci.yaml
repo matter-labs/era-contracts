@@ -215,3 +215,56 @@ jobs:
           coverage-files: ./l1-contracts/lcov.info
           working-directory: l1-contracts
           minimum-coverage: 85 # Set coverage threshold.
+
+  gas-report:
+    needs: [build, lint, test-foundry]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            l1-contracts/artifacts
+            l1-contracts/cache
+            l1-contracts/typechain
+
+      # Add any step generating a gas report to a temporary file named gasreport.ansi. For example:
+      - name: Run tests
+        run: yarn l1 test:foundry --gas-report | tee gasreport.ansi # <- this file name should be unique in your repository!
+
+      - name: Compare gas reports
+        uses: Rubilmax/foundry-gas-diff@v3.18
+        with:
+          summaryQuantile: 0.0 # only display the 10% most significant gas diffs in the summary (defaults to 20%)
+          sortCriteria: avg,max # sort diff rows by criteria
+          sortOrders: desc,asc # and directions
+          ignore: test-foundry/**/* # filter out gas reports from specific paths (test/ is included by default)
+        id: gas_diff
+
+      - name: Add gas diff to sticky comment
+        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          # delete the comment in case changes no longer impact gas costs
+          delete: ${{ !steps.gas_diff.outputs.markdown }}
+          message: ${{ steps.gas_diff.outputs.markdown }}
