@@ -382,14 +382,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _prevMsgSender: _prevMsgSender,
             _transferData: transferData
         });
-        bytes32 txDataHash;
-
-        if (legacyDeposit) {
-            (uint256 _depositAmount, ) = abi.decode(transferData, (uint256, address));
-            txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(assetId), _depositAmount));
-        } else {
-            txDataHash = keccak256(abi.encode(_prevMsgSender, assetId, transferData));
-        }
+        bytes32 txDataHash = _encodeTxDataHash(legacyDeposit, _prevMsgSender, assetId, transferData);
 
         request = _requestToBridge({
             _chainId: _chainId,
@@ -503,7 +496,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
+        bytes32[] calldata _merkleProof,
+        bool _isLegacyEncoding
     ) public nonReentrant whenNotPaused {
         {
             bool proofValid = BRIDGE_HUB.proveL1ToL2TransactionStatus({
@@ -521,9 +515,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(!_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch), "ShB: legacy cFD");
         {
             bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
-            address l1Token = nativeTokenVault.tokenAddress(_assetId);
-            (uint256 amount, address prevMsgSender) = abi.decode(_assetData, (uint256, address));
-            bytes32 txDataHash = keccak256(abi.encode(prevMsgSender, l1Token, amount));
+            bytes32 txDataHash = _encodeTxDataHash(_isLegacyEncoding, _depositSender, _assetId, _assetData);
             require(dataHash == txDataHash, "ShB: d.it not hap");
         }
         delete depositHappened[_chainId][_l2TxHash];
@@ -552,6 +544,20 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             "ShB: LegacyUFB not set for Era"
         );
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostLegacyBridgeUpgradeFirstBatch);
+    }
+
+    function _encodeTxDataHash(
+        bool _isLegacyEncoding,
+        address _prevMsgSender,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal view returns (bytes32 txDataHash) {
+        if (_isLegacyEncoding) {
+            (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
+            txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(_assetId), depositAmount));
+        } else {
+            txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(_prevMsgSender, _assetId, _transferData)));
+        }
     }
 
     /// @dev Determines if a deposit was initiated on zkSync Era before the upgrade to the Shared Bridge.
@@ -768,7 +774,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
             _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _merkleProof: _merkleProof
+            _merkleProof: _merkleProof,
+            _isLegacyEncoding: true
         });
     }
 
@@ -920,7 +927,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
             _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _merkleProof: _merkleProof
+            _merkleProof: _merkleProof,
+            _isLegacyEncoding: true
         });
     }
 
