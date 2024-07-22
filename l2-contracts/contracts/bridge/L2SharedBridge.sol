@@ -5,7 +5,6 @@ pragma solidity 0.8.20;
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
@@ -50,7 +49,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @dev The contract responsible for handling tokens native to a single chain.
     IL2NativeTokenVault public nativeTokenVault;
 
-    /// @dev A mapping l2 token address => l1 token address
+    /// @dev A mapping l2 token address => asset handler address
     mapping(bytes32 assetId => address assetHandlerAddress) public override assetHandlerAddress;
 
     /// @notice Checks that the message sender is the legacy bridge.
@@ -118,7 +117,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked
-    /// @param _assetId The L2 token address which is withdrawn
+    /// @param _assetId The asset id of the withdrawn asset
     /// @param _assetData The data that is passed to the asset handler contract
     function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
         address assetHandler = assetHandlerAddress[_assetId];
@@ -141,7 +140,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         bytes32 _assetId,
         bytes memory _bridgeMintData
     ) internal pure returns (bytes memory) {
-        // note we use the IL1ERC20Bridge.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
+        // note we use the IL1SharedBridge.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
         // and we use this interface so that when the switch happened the old messages could be processed
         // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IL1SharedBridge.finalizeWithdrawal.selector, _assetId, _bridgeMintData);
@@ -158,6 +157,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
                             LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Legacy finalizeDeposit.
     function finalizeDeposit(
         address _l1Sender,
         address _l2Receiver,
@@ -174,6 +174,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         finalizeDeposit(assetId, data);
     }
 
+    /// @notice Legacy withdraw.
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
         bytes32 assetId = keccak256(
             abi.encode(
@@ -186,10 +187,12 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         withdraw(assetId, data);
     }
 
+    /// @notice Legacy getL1TokenAddress.
     function getL1TokenAddress(address _l2Token) public view returns (address) {
         return IL2StandardToken(_l2Token).l1Address();
     }
 
+    /// @notice Legacy l2TokenAddress.
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view returns (address) {
         return nativeTokenVault.l2TokenAddress(_l1Token);

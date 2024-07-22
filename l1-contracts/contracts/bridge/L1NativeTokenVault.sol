@@ -41,13 +41,13 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     /// @dev A mapping assetId => tokenAddress
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
-    /// @notice Checks that the message sender is the bridgehub.
+    /// @notice Checks that the message sender is the bridge.
     modifier onlyBridge() {
         require(msg.sender == address(L1_SHARED_BRIDGE), "NTV not ShB");
         _;
     }
 
-    /// @notice Checks that the message sender is the shared bridge itself.
+    /// @notice Checks that the message sender is the native token vault itself.
     modifier onlySelf() {
         require(msg.sender == address(this), "NTV only");
         _;
@@ -246,6 +246,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         }
     }
 
+    /// @notice Returns the assetId for a token if it is bridged via the NTV.
     function getAssetId(address _l1TokenAddress) public view override returns (bytes32) {
         return keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _l1TokenAddress));
     }

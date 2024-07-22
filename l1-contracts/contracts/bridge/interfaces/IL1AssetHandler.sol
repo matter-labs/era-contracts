@@ -32,7 +32,7 @@ interface IL1AssetHandler {
     ) external payable returns (address l1Receiver);
 
     /// @param _chainId the chainId that the message will be sent to
-    /// param mintValue the amount of base tokens to be minted on L2, will be used by Weth AssetHandler
+    /// @param _mintValue the amount of base tokens to be minted on L2, will be used by Weth AssetHandler
     /// @param _assetId the assetId of the asset being bridged
     /// @param _prevMsgSender the original caller of the Bridgehub,
     /// @param _data the actual data specified for the function
