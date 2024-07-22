@@ -92,7 +92,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         emit L2TokenBeaconUpdated(_l2TokenBeacon, _l2TokenProxyBytecodeHash);
     }
 
-    function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable override {
+    function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable override onlyBridge {
         address token = tokenAddress[_assetId];
         (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken) = abi
             .decode(_data, (address, uint256, address, bytes, address));
