@@ -118,9 +118,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @notice token can be any contract with the appropriate interface/functionality
+    /// @dev ensures that token is registered with native token vault
+    /// @param _token address of base token to be registered
     function addToken(address _token) external onlyOwner {
         require(!tokenIsRegistered[_token], "Bridgehub: token already registered");
         tokenIsRegistered[_token] = true;
+        sharedBridge.nativeTokenVault().registerToken(_token);
     }
 
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
