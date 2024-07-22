@@ -322,7 +322,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             abi.encode(true)
         );
 
-        vm.expectRevert("NTV: claimFailedDeposit failed, no funds or cannot transfer to receiver");
+        vm.expectRevert("NTV: withdrawal failed, no funds or cannot transfer to receiver");
         sharedBridge.bridgeRecoverFailedTransfer({
             _chainId: chainId,
             _depositSender: alice,
@@ -525,7 +525,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             abi.encode(true)
         );
 
-        vm.expectRevert("NTV n funds");
+        vm.expectRevert("NTV not enough funds 2");
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
