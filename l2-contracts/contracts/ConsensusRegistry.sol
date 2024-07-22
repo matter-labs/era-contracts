@@ -74,7 +74,6 @@ contract ConsensusRegistry {
         owner = _owner;
     }
 
-
 /// @notice Adds a new node to the registry.
 /// @dev Fails if node owner already exists.
 /// @dev Fails if a validator with the same public key already exists.
@@ -108,14 +107,14 @@ contract ConsensusRegistry {
         }
 
         nodeOwners.push(nodeOwner);
-        nodes[nodeOwner] = Node(
-            false,
-            validatorWeight,
-            validatorPubKey,
-            validatorPoP,
-            attesterWeight,
-            attesterPubKey
-        );
+        nodes[nodeOwner] = Node({
+            isInactive: false,
+            validatorWeight: validatorWeight,
+            validatorPubKey: validatorPubKey,
+            validatorPoP: validatorPoP,
+            attesterWeight: attesterWeight,
+            attesterPubKey: attesterPubKey
+        });
     }
 
 /// @notice Inactivates a node, preventing it from participating in committees.
