@@ -471,6 +471,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         if (nativeTokenVault.tokenAddress(_assetId) == address(0)) {
             return abi.encodeCall(IL2Bridge.finalizeDeposit, (_assetId, _assetData));
         } else {
+            // slither-disable-next-line unused-return
             (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = DataEncoding
                 .decodeBridgeMintData(_assetData);
             return
