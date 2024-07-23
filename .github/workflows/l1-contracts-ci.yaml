@@ -217,7 +217,7 @@ jobs:
           minimum-coverage: 85 # Set coverage threshold.
 
   gas-report:
-    needs: [build, lint, test-foundry]
+    needs: [build, lint]
     runs-on: ubuntu-latest
 
     steps:

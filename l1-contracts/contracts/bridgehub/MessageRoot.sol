@@ -157,15 +157,15 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
 
     // It is expected that the root is present
     // `_updateTree` should be false only if the caller ensures that it is followed by updating the entire tree.
-    function _unsafeResetChainRoot(uint256 _index, bool _updateTree) internal {
-        uint256 chainId = chainIndexToId[_index];
-        bytes32 initialRoot = chainTree[chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
+    // function _unsafeResetChainRoot(uint256 _index, bool _updateTree) internal {
+    //     uint256 chainId = chainIndexToId[_index];
+    //     bytes32 initialRoot = chainTree[chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
 
-        if (_updateTree) {
-            // slither-disable-next-line unused-return
-            sharedTree.updateLeaf(_index, Messaging.chainIdLeafHash(initialRoot, chainId));
-        }
-    }
+    //     if (_updateTree) {
+    //         // slither-disable-next-line unused-return
+    //         sharedTree.updateLeaf(_index, Messaging.chainIdLeafHash(initialRoot, chainId));
+    //     }
+    // }
 
     /// IMPORTANT FIXME!!!: split into two: provide pubdata and clear state. The "provide pubdata" part should be used by SL.
     /// NO DA is provided here ATM !!!
