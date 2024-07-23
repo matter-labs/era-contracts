@@ -6,7 +6,6 @@ import {Test} from "forge-std/Test.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
-
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
     0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
@@ -33,7 +32,7 @@ contract MessageRootTest is Test {
     function test_RevertWhen_addChainNotBridgeHub() public {
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         uint256 betaChainId = uint256(uint160(makeAddr("betaChainId")));
-        
+
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 1");
 
         vm.expectRevert("MR: only bridgehub");
@@ -45,7 +44,7 @@ contract MessageRootTest is Test {
     function test_addNewChain() public {
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         uint256 betaChainId = uint256(uint160(makeAddr("betaChainId")));
-        
+
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 1");
         assertFalse(messageRoot.chainRegistered(betaChainId), "beta chain 1");
 
@@ -64,11 +63,10 @@ contract MessageRootTest is Test {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
-            bridgeHub, 
-            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, alphaChainId), 
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
-        
 
         vm.prank(alphaChainSender);
         vm.expectRevert("MR: not registered");
@@ -79,14 +77,13 @@ contract MessageRootTest is Test {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
-            bridgeHub, 
-            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, alphaChainId), 
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
-        
+
         vm.prank(bridgeHub);
         messageRoot.addNewChain(alphaChainId);
-
 
         vm.prank(alphaChainSender);
         vm.expectEmit(true, false, false, false);
@@ -100,11 +97,11 @@ contract MessageRootTest is Test {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
-            bridgeHub, 
-            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, alphaChainId), 
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
-        
+
         vm.prank(bridgeHub);
         messageRoot.addNewChain(alphaChainId);
 
