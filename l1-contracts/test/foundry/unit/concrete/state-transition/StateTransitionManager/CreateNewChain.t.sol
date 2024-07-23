@@ -36,5 +36,16 @@ contract createNewChainTest is StateTransitionManagerTest {
 
         assertEq(newChainAdmin, admin);
         assertNotEq(newChainAddress, address(0));
+
+        address[] memory chainAddresses = chainContractAddress.getAllHyperchains();
+        assertEq(chainAddresses.length, 1);
+        assertEq(chainAddresses[0], newChainAddress);
+
+        uint256[] memory chainIds = chainContractAddress.getAllHyperchainChainIDs();
+        assertEq(chainIds.length, 1);
+        assertEq(chainIds[0], chainId);
+
+        uint256 protocolVersion = chainContractAddress.getProtocolVersion(chainId);
+        assertEq(protocolVersion, 0);
     }
 }
