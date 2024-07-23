@@ -6,6 +6,7 @@ import {IL2SharedBridge} from "./IL2SharedBridge.sol";
 import {IL2AssetHandler} from "./IL2AssetHandler.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IL2NativeTokenVault is IL2AssetHandler {
     event FinalizeDeposit(
         address indexed l1Sender,

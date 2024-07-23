@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.20;
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IL2AssetHandler {
     event BridgeMint(
         uint256 indexed _chainId,

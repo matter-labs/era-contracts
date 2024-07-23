@@ -3,6 +3,7 @@
 pragma solidity 0.8.20;
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IL2SharedBridgeLegacy {
     function l1TokenAddress(address _l2Token) external view returns (address);
 
