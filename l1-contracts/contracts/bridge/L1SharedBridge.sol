@@ -112,12 +112,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyThis() {
-        require(msg.sender == address(this), "ShB: only self");
-        _;
-    }
-
     /// @notice Checks that the message sender is the bridgehub or zkSync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
@@ -262,7 +256,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes32 _assetId,
         address _prevMsgSender,
         uint256 _amount
-    ) external payable virtual onlyBridgehubOrEra(_chainId) whenNotPaused {
+    ) external payable onlyBridgehubOrEra(_chainId) whenNotPaused {
         (address l1AssetHandler, bytes32 assetId) = _getAssetProperties(_assetId);
         _transferAllowanceToNTV(assetId, _amount, _prevMsgSender);
         // slither-disable-next-line unused-return
@@ -276,69 +270,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
         emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _assetId, _amount);
-    }
-
-    /// @notice Returns the address of asset handler and parsed assetId, if padded token address was passed
-    /// @dev For backwards compatibility we pad the l1Token to become a bytes32 assetId.
-    /// @dev We deal with this case here. We also register the asset.
-    /// @param _assetId bytes32 encoding of asset Id or padded address of the token
-    function _getAssetProperties(bytes32 _assetId) internal returns (address l1AssetHandler, bytes32 assetId) {
-        // Check if the passed id is the address and assume NTV for the case
-        assetId = uint256(_assetId) <= type(uint160).max
-            ? keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetId))
-            : _assetId;
-        l1AssetHandler = assetHandlerAddress[_assetId];
-        // Check if no asset handler is set
-        if (l1AssetHandler == address(0)) {
-            require(uint256(_assetId) <= type(uint160).max, "ShB: only address can be registered");
-            l1AssetHandler = address(nativeTokenVault);
-            nativeTokenVault.registerToken(address(uint160(uint256(_assetId))));
-        }
-    }
-
-    /// @notice Decodes the transfer input for legacy data and transfers allowance to NTV
-    /// @dev Is not applicable for custom asset handlers
-    /// @param _data encoded transfer data (address _l1Token, uint256 _depositAmount, address _l2Receiver)
-    /// @param _prevMsgSender address of the deposit initiator
-    function handleLegacyData(
-        bytes calldata _data,
-        address _prevMsgSender
-    ) external onlyThis returns (bytes32, bytes memory) {
-        (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
-            _data,
-            (address, uint256, address)
-        );
-        bytes32 assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-        _transferAllowanceToNTV(assetId, _depositAmount, _prevMsgSender);
-        return (assetId, abi.encode(_depositAmount, _l2Receiver));
-    }
-
-    function _ensureTokenRegisteredWithNTV(address _l1Token) internal returns (bytes32 assetId) {
-        assetId = nativeTokenVault.getAssetId(_l1Token);
-        if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
-            nativeTokenVault.registerToken(_l1Token);
-        }
-    }
-
-    /// @notice Transfers allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
-    /// @dev assetId is not the padded address, but the correct encoded id (NTV stores respective format for IDs)
-    function _transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) internal {
-        address l1TokenAddress = nativeTokenVault.tokenAddress(_assetId);
-        if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
-            return;
-        }
-        IERC20 l1Token = IERC20(l1TokenAddress);
-
-        // Do the transfer if allowance to Shared bridge is bigger than amount
-        // And if there is not enough allowance for the NTV
-        if (
-            l1Token.allowance(_prevMsgSender, address(this)) >= _amount &&
-            l1Token.allowance(_prevMsgSender, address(nativeTokenVault)) < _amount
-        ) {
-            // slither-disable-next-line arbitrary-send-erc20
-            l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
-            l1Token.safeIncreaseAllowance(address(nativeTokenVault), _amount);
-        }
     }
 
     /// @notice Initiates a deposit transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
@@ -363,16 +294,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes32 assetId;
         bytes memory transferData;
         bool legacyDeposit = false;
-        try this.handleLegacyData(_data, _prevMsgSender) returns (
-            bytes32 assetIdDecoded,
-            bytes memory transferDataDecoded
-        ) {
-            (assetId, transferData) = (assetIdDecoded, transferDataDecoded);
-            legacyDeposit = true;
-        } catch {
-            (assetId, transferData) = abi.decode(_data, (bytes32, bytes));
-        }
+        bytes1 encodingVersion = _data[0];
 
+        if (encodingVersion == 0x01) {
+            (assetId, transferData) = abi.decode(_data[1:], (bytes32, bytes));
+        } else {
+            (assetId, transferData) = _handleLegacyData(_data, _prevMsgSender);
+            legacyDeposit = true;
+        }
         require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, "ShB: baseToken deposit not supported");
 
         bytes memory bridgeMintCalldata = _burn({
@@ -388,7 +317,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             (uint256 _depositAmount, ) = abi.decode(transferData, (uint256, address));
             txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(assetId), _depositAmount));
         } else {
-            txDataHash = keccak256(abi.encode(_prevMsgSender, assetId, transferData));
+            txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(_prevMsgSender, assetId, transferData)));
         }
 
         request = _requestToBridge({
@@ -408,44 +337,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         });
     }
 
-    /// @dev send the burn message to the asset
-    function _burn(
-        uint256 _chainId,
-        uint256 _l2Value,
-        bytes32 _assetId,
-        address _prevMsgSender,
-        bytes memory _transferData
-    ) internal returns (bytes memory bridgeMintCalldata) {
-        address l1AssetHandler = assetHandlerAddress[_assetId];
-        bridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
-            _chainId: _chainId,
-            _mintValue: _l2Value,
-            _assetId: _assetId,
-            _prevMsgSender: _prevMsgSender,
-            _data: _transferData
-        });
-    }
-
-    /// @dev The request data that is passed to the bridgehub
-    function _requestToBridge(
-        uint256 _chainId,
-        address _prevMsgSender,
-        bytes32 _assetId,
-        bytes memory _bridgeMintCalldata,
-        bytes32 _txDataHash
-    ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
-        // Request the finalization of the deposit on the L2 side
-        bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _assetId, _bridgeMintCalldata);
-
-        request = L2TransactionRequestTwoBridgesInner({
-            magicValue: TWO_BRIDGES_MAGIC_VALUE,
-            l2Contract: l2BridgeAddress[_chainId],
-            l2Calldata: l2TxCalldata,
-            factoryDeps: new bytes[](0),
-            txDataHash: _txDataHash
-        });
-    }
-
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
     /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
     /// @param _chainId The chain ID of the ZK chain to which confirm the deposit.
@@ -461,27 +352,35 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
-    /// @dev Generate a calldata for calling the deposit finalization on the L2 bridge contract
-    function _getDepositL2Calldata(
-        address _l1Sender,
-        bytes32 _assetId,
-        bytes memory _assetData
-    ) internal view returns (bytes memory) {
-        // First branch covers the case when asset is not registered with NTV (custom asset handler)
-        // Second branch handles tokens registered with NTV and uses legacy calldata encoding
-        if (nativeTokenVault.tokenAddress(_assetId) == address(0)) {
-            return abi.encodeCall(IL2Bridge.finalizeDeposit, (_assetId, _assetData));
-        } else {
-            (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = abi.decode(
-                _assetData,
-                (uint256, address, address, bytes, address)
-            );
-            return
-                abi.encodeCall(
-                    IL2BridgeLegacy.finalizeDeposit,
-                    (_l1Sender, _l2Receiver, _parsedL1Token, _amount, _gettersData)
-                );
-        }
+    /// @notice Finalize the withdrawal and release funds
+    /// @param _chainId The chain ID of the transaction to check
+    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
+    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
+    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
+    function finalizeWithdrawal(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external override {
+        _finalizeWithdrawal({
+            _chainId: _chainId,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
+        });
+    }
+
+    struct MessageParams {
+        uint256 l2BatchNumber;
+        uint256 l2MessageIndex;
+        uint16 l2TxNumberInBatch;
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2
@@ -523,7 +422,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
             address l1Token = nativeTokenVault.tokenAddress(_assetId);
             (uint256 amount, address prevMsgSender) = abi.decode(_assetData, (uint256, address));
-            bytes32 txDataHash = keccak256(abi.encode(prevMsgSender, l1Token, amount));
+            bytes32 txDataHash = keccak256(abi.encode(prevMsgSender, l1Token, amount)); // This is fixed in a different PR
             require(dataHash == txDataHash, "ShB: d.it not hap");
         }
         delete depositHappened[_chainId][_l2TxHash];
@@ -531,6 +430,175 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(_chainId, _assetId, _assetData);
 
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetId, _assetData);
+    }
+
+    /// @dev Receives and parses (name, symbol, decimals) from the token contract
+    function getERC20Getters(address _token) public view returns (bytes memory) {
+        if (_token == ETH_TOKEN_ADDRESS) {
+            bytes memory name = bytes("Ether");
+            bytes memory symbol = bytes("ETH");
+            bytes memory decimals = abi.encode(uint8(18));
+            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
+        }
+
+        (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
+        (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
+        (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
+        return abi.encode(data1, data2, data3);
+    }
+
+    /// @dev send the burn message to the asset
+    function _burn(
+        uint256 _chainId,
+        uint256 _l2Value,
+        bytes32 _assetId,
+        address _prevMsgSender,
+        bytes memory _transferData
+    ) internal returns (bytes memory bridgeMintCalldata) {
+        address l1AssetHandler = assetHandlerAddress[_assetId];
+        bridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
+            _chainId: _chainId,
+            _mintValue: _l2Value,
+            _assetId: _assetId,
+            _prevMsgSender: _prevMsgSender,
+            _data: _transferData
+        });
+    }
+
+    /// @dev Internal function that handles the logic for finalizing withdrawals,
+    /// serving both the current bridge system and the legacy ERC20 bridge.
+    function _finalizeWithdrawal(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) internal nonReentrant whenNotPaused returns (address l1Receiver, bytes32 assetId, uint256 amount) {
+        require(!isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");
+        isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
+
+        // Handling special case for withdrawal from zkSync Era initiated before Shared Bridge.
+        require(!_isEraLegacyEthWithdrawal(_chainId, _l2BatchNumber), "ShB: legacy eth withdrawal");
+        require(!_isEraLegacyTokenWithdrawal(_chainId, _l2BatchNumber), "ShB: legacy token withdrawal");
+        bytes memory transferData;
+        {
+            MessageParams memory messageParams = MessageParams({
+                l2BatchNumber: _l2BatchNumber,
+                l2MessageIndex: _l2MessageIndex,
+                l2TxNumberInBatch: _l2TxNumberInBatch
+            });
+            (assetId, transferData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
+        }
+        address l1AssetHandler = assetHandlerAddress[assetId];
+        // slither-disable-next-line unused-return
+        IL1AssetHandler(l1AssetHandler).bridgeMint(_chainId, assetId, transferData);
+        (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
+
+        emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetId, amount);
+    }
+
+    /// @dev Generate a calldata for calling the deposit finalization on the L2 bridge contract
+    function _getDepositL2Calldata(
+        address _l1Sender,
+        bytes32 _assetId,
+        bytes memory _assetData
+    ) internal view returns (bytes memory) {
+        // First branch covers the case when asset is not registered with NTV (custom asset handler)
+        // Second branch handles tokens registered with NTV and uses legacy calldata encoding
+        if (nativeTokenVault.tokenAddress(_assetId) == address(0)) {
+            return abi.encodeCall(IL2Bridge.finalizeDeposit, (_assetId, _assetData));
+        } else {
+            (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = abi.decode(
+                _assetData,
+                (uint256, address, address, bytes, address)
+            );
+            return
+                abi.encodeCall(
+                    IL2BridgeLegacy.finalizeDeposit,
+                    (_l1Sender, _l2Receiver, _parsedL1Token, _amount, _gettersData)
+                );
+        }
+    }
+
+    /// @notice Returns the address of asset handler and parsed assetId, if padded token address was passed
+    /// @dev For backwards compatibility we pad the l1Token to become a bytes32 assetId.
+    /// @dev We deal with this case here. We also register the asset.
+    /// @param _assetId bytes32 encoding of asset Id or padded address of the token
+    function _getAssetProperties(bytes32 _assetId) internal returns (address l1AssetHandler, bytes32 assetId) {
+        // Check if the passed id is the address and assume NTV for the case
+        assetId = uint256(_assetId) <= type(uint160).max
+            ? keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetId))
+            : _assetId;
+        l1AssetHandler = assetHandlerAddress[_assetId];
+        // Check if no asset handler is set
+        if (l1AssetHandler == address(0)) {
+            require(uint256(_assetId) <= type(uint160).max, "ShB: only address can be registered");
+            l1AssetHandler = address(nativeTokenVault);
+            nativeTokenVault.registerToken(address(uint160(uint256(_assetId))));
+        }
+    }
+
+    /// @notice Decodes the transfer input for legacy data and transfers allowance to NTV
+    /// @dev Is not applicable for custom asset handlers
+    /// @param _data encoded transfer data (address _l1Token, uint256 _depositAmount, address _l2Receiver)
+    /// @param _prevMsgSender address of the deposit initiator
+    function _handleLegacyData(bytes calldata _data, address _prevMsgSender) internal returns (bytes32, bytes memory) {
+        (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
+            _data,
+            (address, uint256, address)
+        );
+        bytes32 assetId = _ensureTokenRegisteredWithNTV(_l1Token);
+        _transferAllowanceToNTV(assetId, _depositAmount, _prevMsgSender);
+        return (assetId, abi.encode(_depositAmount, _l2Receiver));
+    }
+
+    function _ensureTokenRegisteredWithNTV(address _l1Token) internal returns (bytes32 assetId) {
+        assetId = nativeTokenVault.getAssetId(_l1Token);
+        if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
+            nativeTokenVault.registerToken(_l1Token);
+        }
+    }
+
+    /// @notice Transfers allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
+    /// @dev assetId is not the padded address, but the correct encoded id (NTV stores respective format for IDs)
+    function _transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) internal {
+        address l1TokenAddress = nativeTokenVault.tokenAddress(_assetId);
+        if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
+            return;
+        }
+        IERC20 l1Token = IERC20(l1TokenAddress);
+
+        // Do the transfer if allowance to Shared bridge is bigger than amount
+        // And if there is not enough allowance for the NTV
+        if (
+            l1Token.allowance(_prevMsgSender, address(this)) >= _amount &&
+            l1Token.allowance(_prevMsgSender, address(nativeTokenVault)) < _amount
+        ) {
+            // slither-disable-next-line arbitrary-send-erc20
+            l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
+            l1Token.safeIncreaseAllowance(address(nativeTokenVault), _amount);
+        }
+    }
+
+    /// @dev The request data that is passed to the bridgehub
+    function _requestToBridge(
+        uint256 _chainId,
+        address _prevMsgSender,
+        bytes32 _assetId,
+        bytes memory _bridgeMintCalldata,
+        bytes32 _txDataHash
+    ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
+        // Request the finalization of the deposit on the L2 side
+        bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _assetId, _bridgeMintCalldata);
+
+        request = L2TransactionRequestTwoBridgesInner({
+            magicValue: TWO_BRIDGES_MAGIC_VALUE,
+            l2Contract: l2BridgeAddress[_chainId],
+            l2Calldata: l2TxCalldata,
+            factoryDeps: new bytes[](0),
+            txDataHash: _txDataHash
+        });
     }
 
     /// @dev Determines if an eth withdrawal was initiated on zkSync Era before the upgrade to the Shared Bridge.
@@ -573,70 +641,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             (_l2BatchNumber < eraLegacyBridgeLastDepositBatch ||
                 (_l2TxNumberInBatch < eraLegacyBridgeLastDepositTxNumber &&
                     _l2BatchNumber == eraLegacyBridgeLastDepositBatch));
-    }
-
-    /// @notice Finalize the withdrawal and release funds
-    /// @param _chainId The chain ID of the transaction to check
-    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
-    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
-    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
-    function finalizeWithdrawal(
-        uint256 _chainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external override {
-        _finalizeWithdrawal({
-            _chainId: _chainId,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _message: _message,
-            _merkleProof: _merkleProof
-        });
-    }
-
-    struct MessageParams {
-        uint256 l2BatchNumber;
-        uint256 l2MessageIndex;
-        uint16 l2TxNumberInBatch;
-    }
-
-    /// @dev Internal function that handles the logic for finalizing withdrawals,
-    /// serving both the current bridge system and the legacy ERC20 bridge.
-    function _finalizeWithdrawal(
-        uint256 _chainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) internal nonReentrant whenNotPaused returns (address l1Receiver, bytes32 assetId, uint256 amount) {
-        require(!isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");
-        isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
-
-        // Handling special case for withdrawal from zkSync Era initiated before Shared Bridge.
-        require(!_isEraLegacyEthWithdrawal(_chainId, _l2BatchNumber), "ShB: legacy eth withdrawal");
-        require(!_isEraLegacyTokenWithdrawal(_chainId, _l2BatchNumber), "ShB: legacy token withdrawal");
-        bytes memory transferData;
-        {
-            MessageParams memory messageParams = MessageParams({
-                l2BatchNumber: _l2BatchNumber,
-                l2MessageIndex: _l2MessageIndex,
-                l2TxNumberInBatch: _l2TxNumberInBatch
-            });
-            (assetId, transferData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
-        }
-        address l1AssetHandler = assetHandlerAddress[assetId];
-        // slither-disable-next-line unused-return
-        IL1AssetHandler(l1AssetHandler).bridgeMint(_chainId, assetId, transferData);
-        (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
-
-        emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetId, amount);
     }
 
     /// @dev Verifies the validity of a withdrawal message from L2 and returns details of the withdrawal.
@@ -682,13 +686,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
         // So the data is expected to be at least 56 bytes long.
         require(_l2ToL1message.length >= 56, "ShB wrong msg len"); // wrong message length
-        uint256 amount;
-        address l1Receiver;
-        // uint256 l1ReceiverBytes;
-        // address parsedL1Receiver;
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {
+            uint256 amount;
+            address l1Receiver;
             // this message is a base token withdrawal
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
@@ -697,6 +699,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) {
             // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
             address l1Token;
+            uint256 amount;
+            address l1Receiver;
             // this message is a token withdrawal
 
             // Check that the message length is correct.
@@ -710,27 +714,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             assetId = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, l1Token));
             transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
-            //todo
             (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
             transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         } else {
             revert("ShB Incorrect message function selector");
         }
-    }
-
-    /// @dev Receives and parses (name, symbol, decimals) from the token contract
-    function getERC20Getters(address _token) public view returns (bytes memory) {
-        if (_token == ETH_TOKEN_ADDRESS) {
-            bytes memory name = bytes("Ether");
-            bytes memory symbol = bytes("ETH");
-            bytes memory decimals = abi.encode(uint8(18));
-            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
-        }
-
-        (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
-        (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
-        (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
-        return abi.encode(data1, data2, data3);
     }
 
     /*//////////////////////////////////////////////////////////////
