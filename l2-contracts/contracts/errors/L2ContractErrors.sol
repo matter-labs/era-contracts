@@ -2,8 +2,6 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-// 0xcbd9d2e0
-error InvalidCaller(address);
 // 0xb4fa3fb3
 error InvalidInput();
 // 0x2a1b2dd8
@@ -12,8 +10,8 @@ error InsufficientAllowance(uint256 providedAllowance, uint256 requiredAmount);
 error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
 // 0xff15b069
 error UnsupportedPaymasterFlow();
-// 0x7138356f
-error EmptyAddress();
+// 0xd92e233d
+error ZeroAddress();
 // 0x1c25715b
 error EmptyBytes32();
 // 0x1f73225f
@@ -22,8 +20,8 @@ error AddressMismatch(address expected, address supplied);
 error AmountMustBeGreaterThanZero();
 // 0xb4f54111
 error DeployFailed();
-// 0x82b42900
-error Unauthorized();
+// 0x8e4a23d6
+error Unauthorized(address);
 // 0x0ac76f01
 error NonSequentialVersion();
 // 0x6e128399
