@@ -37,8 +37,8 @@ error DepositDoesNotExist();
 error InsufficientFunds();
 // 0x79cacff1
 error DepositFailed();
-// 0xfc1a3c3a
-error ShareadBridgeValueNotSet(SharedBridgeKey);
+// 0x7774d2f9
+error SharedBridgeValueNotSet(SharedBridgeKey);
 // 0x750b219c
 error WithdrawFailed();
 // 0x16509b9a
@@ -195,8 +195,6 @@ error PreviousUpgradeNotFinalized(bytes32 txHash);
 error PreviousUpgradeNotCleaned();
 // 0x826fb11e
 error InsufficientChainBalance();
-// 0x27fcd9d1
-error WithdrawalFailed();
 // 0x97e1359e
 error L2WithdrawalMessageWrongLength(uint256 messageLen);
 // 0xff8811ff
@@ -247,8 +245,6 @@ error PubdataCommitmentsEmpty();
 error PubdataCommitmentsTooBig();
 // 0x53e6d04d
 error InvalidPubdataCommitmentsSize();
-// 0x32eb8b2f
-error LegacyMethodIsSupportedOnlyForEra();
 // 0x3580370c
 error ReplaceFunctionFacetAddressZero();
 // 0x667d17de
@@ -295,6 +291,10 @@ error GenesisIndexStorageZero();
 error GenesisBatchCommitmentZero();
 // 0xa2d4b16c
 error RemoveFunctionFacetAddressZero();
+// 0x23830e28
+error TokensWithFeesNotSupported();
+// 0xa7151b9a
+error DiamondNotFrozen();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

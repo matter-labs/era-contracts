@@ -39,6 +39,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @param _admin The address to be assigned as the admin of the contract.
     /// @param _securityCouncil The address to be assigned as the security council of the contract.
     /// @param _minDelay The initial minimum delay (in seconds) to be set for operations.
+    /// @dev We allow for a zero address for _securityCouncil because it can be set later
     constructor(address _admin, address _securityCouncil, uint256 _minDelay) {
         if (_admin == address(0)) {
             revert ZeroAddress();

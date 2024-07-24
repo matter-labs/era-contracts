@@ -118,7 +118,7 @@ interface IStateTransitionManager {
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
-        uint256 _oldprotocolVersionDeadline,
+        uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external;
 

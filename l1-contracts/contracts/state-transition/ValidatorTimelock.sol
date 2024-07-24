@@ -6,7 +6,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager} from "./IStateTransitionManager.sol";
-import {Unauthorized, TimeNotReached} from "../common/L1ContractErrors.sol";
+import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -79,6 +79,9 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @dev Sets a new state transition manager.
     function setStateTransitionManager(IStateTransitionManager _stateTransitionManager) external onlyOwner {
+        if (address(_stateTransitionManager) == address(0)) {
+            revert ZeroAddress();
+        }
         stateTransitionManager = _stateTransitionManager;
     }
 
