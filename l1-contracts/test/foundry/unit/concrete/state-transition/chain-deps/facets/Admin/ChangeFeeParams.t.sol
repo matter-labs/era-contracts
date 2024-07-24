@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {AdminTest} from "./_Admin_Shared.t.sol";
 
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {Unauthorized, PubdataPerBatchIsLessThanTxn} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, PriorityTxPubdataExceedsMaxPubDataPerBatch} from "contracts/common/L1ContractErrors.sol";
 
 contract ChangeFeeParamsTest is AdminTest {
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
@@ -55,7 +55,7 @@ contract ChangeFeeParamsTest is AdminTest {
             minimalL2GasPrice: 250_000_000
         });
 
-        vm.expectRevert(PubdataPerBatchIsLessThanTxn.selector);
+        vm.expectRevert(PriorityTxPubdataExceedsMaxPubDataPerBatch.selector);
 
         vm.startPrank(stateTransitionManager);
         adminFacet.changeFeeParams(newFeeParams);

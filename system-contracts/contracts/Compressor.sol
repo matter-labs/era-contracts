@@ -3,12 +3,12 @@
 pragma solidity 0.8.20;
 
 import {ICompressor, OPERATION_BITMASK, LENGTH_BITS_OFFSET, MAX_ENUMERATION_INDEX_SIZE} from "./interfaces/ICompressor.sol";
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {UnsafeBytesCalldata} from "./libraries/UnsafeBytesCalldata.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {L1_MESSENGER_CONTRACT, STATE_DIFF_ENTRY_SIZE, KNOWN_CODE_STORAGE_CONTRACT} from "./Constants.sol";
-import {DerivedKeyNotEqualToCompressedValue, EncodedAndRealBytecodeChunkNotEqual, DictionaryLengthNotFourTimesSmallerThanEncoded, EncodedLengthNotFourTimesSmallerThanOriginal, IndexOutOfBounds, IndexSizeError, ValuesNotEqual, UnsupportedOperation} from "./SystemContractErrors.sol";
+import {DerivedKeyNotEqualToCompressedValue, EncodedAndRealBytecodeChunkNotEqual, DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo, EncodedLengthNotFourTimesSmallerThanOriginal, IndexOutOfBounds, IndexSizeError, UnsupportedOperation, CompressorInitialWritesProcessedNotEqual, CompressorEnumIndexNotEqual, StateDiffLengthMismatch, CompressionValueTransformError, CompressionValueAddError, CompressionValueSubError} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -20,7 +20,7 @@ import {DerivedKeyNotEqualToCompressedValue, EncodedAndRealBytecodeChunkNotEqual
  * Or the user may compress the bytecode and publish it instead (fewer data onchain!). At the end of every L1 Batch
  * we publish pubdata, part of which contains the state diffs that occurred within the batch.
  */
-contract Compressor is ICompressor, ISystemContract {
+contract Compressor is ICompressor, SystemContractBase {
     using UnsafeBytesCalldata for bytes;
 
     /// @notice Verify the compressed bytecode and publish it on the L1.
@@ -54,7 +54,7 @@ contract Compressor is ICompressor, ISystemContract {
             }
 
             if (dictionary.length / 8 > encodedData.length / 2) {
-                revert DictionaryLengthNotFourTimesSmallerThanEncoded();
+                revert DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo();
             }
 
             // We disable this check because calldata array length is cheap.
@@ -164,7 +164,7 @@ contract Compressor is ICompressor, ISystemContract {
         }
 
         if (numInitialWritesProcessed != numberOfInitialWrites) {
-            revert ValuesNotEqual(numberOfInitialWrites, numInitialWritesProcessed);
+            revert CompressorInitialWritesProcessedNotEqual(numberOfInitialWrites, numInitialWritesProcessed);
         }
 
         // Process repeated writes
@@ -181,7 +181,7 @@ contract Compressor is ICompressor, ISystemContract {
                 _compressedStateDiffs[stateDiffPtr:stateDiffPtr + _enumerationIndexSize]
             );
             if (enumIndex != compressedEnumIndex) {
-                revert ValuesNotEqual(enumIndex, compressedEnumIndex);
+                revert CompressorEnumIndexNotEqual(enumIndex, compressedEnumIndex);
             }
             stateDiffPtr += _enumerationIndexSize;
 
@@ -199,7 +199,7 @@ contract Compressor is ICompressor, ISystemContract {
         }
 
         if (stateDiffPtr != _compressedStateDiffs.length) {
-            revert ValuesNotEqual(stateDiffPtr, _compressedStateDiffs.length);
+            revert StateDiffLengthMismatch();
         }
 
         stateDiffHash = EfficientCall.keccak(_stateDiffs);
@@ -244,15 +244,15 @@ contract Compressor is ICompressor, ISystemContract {
         unchecked {
             if (_operation == 0 || _operation == 3) {
                 if (convertedValue != _finalValue) {
-                    revert ValuesNotEqual(_finalValue, convertedValue);
+                    revert CompressionValueTransformError(_finalValue, convertedValue);
                 }
             } else if (_operation == 1) {
                 if (_initialValue + convertedValue != _finalValue) {
-                    revert ValuesNotEqual(_finalValue, _initialValue + convertedValue);
+                    revert CompressionValueAddError(_finalValue, _initialValue + convertedValue);
                 }
             } else if (_operation == 2) {
                 if (_initialValue - convertedValue != _finalValue) {
-                    revert ValuesNotEqual(_finalValue, _initialValue - convertedValue);
+                    revert CompressionValueSubError(_finalValue, _initialValue - convertedValue);
                 }
             } else {
                 revert UnsupportedOperation();
