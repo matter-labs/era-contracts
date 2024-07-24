@@ -27,7 +27,7 @@ error Unauthorized(address);
 // 0x6e128399
 error Unimplemented();
 // 0xa4dde386
-error UnimplementedMessage(string);
+error UnimplementedMessage(string message);
 // 0xff15b069
 error UnsupportedPaymasterFlow();
 // 0x750b219c
