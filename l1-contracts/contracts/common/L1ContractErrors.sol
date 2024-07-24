@@ -291,6 +291,10 @@ error GenesisIndexStorageZero();
 error GenesisBatchCommitmentZero();
 // 0xa2d4b16c
 error RemoveFunctionFacetAddressZero();
+// 0x23830e28
+error TokensWithFeesNotSupported();
+// 0xa7151b9a
+error DiamondNotFrozen();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

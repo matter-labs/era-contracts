@@ -102,7 +102,7 @@ describe("Compressor tests", function () {
       // The dictionary should have at most encode data length entries
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWithCustomError(compressor, "DictionaryLengthNotFourTimesSmallerThanEncoded");
+      ).to.be.revertedWithCustomError(compressor, "DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo");
     });
 
     it("should revert when the encoded data has chunks where index is out of bounds", async () => {
@@ -238,7 +238,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(8, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(1, 8, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWithCustomError(compressor, "ValueMismatch");
+      ).to.be.revertedWithCustomError(compressor, "CompressorEnumIndexNotEqual");
     });
 
     it("no compression value mismatch", async () => {
@@ -261,7 +261,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(3, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(2, 3, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWithCustomError(compressor, "ValueMismatch");
+      ).to.be.revertedWithCustomError(compressor, "CompressionValueTransformError");
     });
 
     it("transform value mismatch", async () => {
@@ -284,7 +284,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(2, 1, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWithCustomError(compressor, "ValueMismatch");
+      ).to.be.revertedWithCustomError(compressor, "CompressionValueTransformError");
     });
 
     it("add value mismatch", async () => {
@@ -301,7 +301,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(1, 1, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWithCustomError(compressor, "ValueMismatch");
+      ).to.be.revertedWithCustomError(compressor, "CompressionValueAddError");
     });
 
     it("sub value mismatch", async () => {
@@ -318,7 +318,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(1, 1, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWithCustomError(compressor, "ValueMismatch");
+      ).to.be.revertedWithCustomError(compressor, "CompressionValueSubError");
     });
 
     it("invalid operation", async () => {
@@ -365,7 +365,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(2, 1, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWithCustomError(compressor, "ValueMismatch");
+      ).to.be.revertedWithCustomError(compressor, "CompressorInitialWritesProcessedNotEqual");
     });
 
     it("Extra data in compressed state diffs", async () => {
@@ -393,7 +393,7 @@ describe("Compressor tests", function () {
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(2, 1, encodedStateDiffs, compressedStateDiffs)
-      ).to.be.revertedWithCustomError(compressor, "ValueMismatch");
+      ).to.be.revertedWithCustomError(compressor, "StateDiffLengthMismatch");
     });
 
     it("successfully verified", async () => {
