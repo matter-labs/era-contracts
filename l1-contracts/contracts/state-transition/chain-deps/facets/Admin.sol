@@ -8,7 +8,7 @@ import {MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
-import {Unauthorized, TooMuchGas, PubdataPerBatchIsLessThanTxn, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, PubdataPerBatchIsLessThanTxn, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -77,7 +77,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         // Double checking that the new fee params are valid, i.e.
         // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
         if (_newFeeParams.maxPubdataPerBatch < _newFeeParams.priorityTxMaxPubdata) {
-            revert PubdataPerBatchIsLessThanTxn();
+            revert PriorityTxPubdataExceedsMaxPubDataPerBatch();
         }
 
         FeeParams memory oldFeeParams = s.feeParams;

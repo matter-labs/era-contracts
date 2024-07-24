@@ -7,7 +7,7 @@ import {Utils} from "../Utils/Utils.sol";
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
 
 import {IGovernance} from "contracts/governance/IGovernance.sol";
-import {OperationShouldBeReady, OperationShouldBePending, OperationExists, PreviousOperationNotExecuted, InvalidDelay} from "contracts/common/L1ContractErrors.sol";
+import {OperationMustBeReady, OperationMustBePending, OperationExists, PreviousOperationNotExecuted, InvalidDelay} from "contracts/common/L1ContractErrors.sol";
 
 contract ExecutingTest is GovernanceTest {
     using stdStorage for StdStorage;
@@ -52,7 +52,7 @@ contract ExecutingTest is GovernanceTest {
         vm.startPrank(owner);
         IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(address(eventOnFallback), 0, "");
         governance.scheduleTransparent(op, 10000);
-        vm.expectRevert(OperationShouldBeReady.selector);
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(op);
     }
 
@@ -66,7 +66,7 @@ contract ExecutingTest is GovernanceTest {
         governance.scheduleTransparent(validOp, 0);
 
         IGovernance.Operation memory invalidOp = operationWithOneCallZeroSaltAndPredecessor(address(0), 0, "");
-        vm.expectRevert(OperationShouldBeReady.selector);
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(invalidOp);
     }
 
@@ -84,7 +84,7 @@ contract ExecutingTest is GovernanceTest {
             1,
             ""
         );
-        vm.expectRevert(OperationShouldBeReady.selector);
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(invalidOp);
     }
 
@@ -102,7 +102,7 @@ contract ExecutingTest is GovernanceTest {
             0,
             "00"
         );
-        vm.expectRevert(OperationShouldBeReady.selector);
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(invalidOp);
     }
 
@@ -134,7 +134,7 @@ contract ExecutingTest is GovernanceTest {
         invalidOp.predecessor = governance.hashOperation(executedOp);
 
         // Failed to execute operation that wasn't scheduled
-        vm.expectRevert(OperationShouldBeReady.selector);
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(invalidOp);
     }
 
@@ -153,7 +153,7 @@ contract ExecutingTest is GovernanceTest {
             ""
         );
         invalidOp.salt = Utils.randomBytes32("wrongSalt");
-        vm.expectRevert(OperationShouldBeReady.selector);
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(invalidOp);
     }
 
@@ -182,7 +182,7 @@ contract ExecutingTest is GovernanceTest {
         governance.scheduleTransparent(op, 0);
         executeOpAndCheck(op);
 
-        vm.expectRevert(OperationShouldBeReady.selector);
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(op);
     }
 
@@ -194,7 +194,7 @@ contract ExecutingTest is GovernanceTest {
             0,
             "1122"
         );
-        vm.expectRevert(OperationShouldBeReady.selector);
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(op);
     }
 
@@ -206,7 +206,7 @@ contract ExecutingTest is GovernanceTest {
             0,
             "1122"
         );
-        vm.expectRevert(OperationShouldBePending.selector);
+        vm.expectRevert(OperationMustBePending.selector);
         governance.executeInstant(op);
     }
 
@@ -220,7 +220,7 @@ contract ExecutingTest is GovernanceTest {
         );
         governance.scheduleTransparent(op, 0);
         governance.cancel(governance.hashOperation(op));
-        vm.expectRevert(OperationShouldBeReady.selector);
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(op);
     }
 
@@ -271,7 +271,7 @@ contract ExecutingTest is GovernanceTest {
     function test_RevertWhen_CancelNonExistingOperation() public {
         vm.startPrank(owner);
 
-        vm.expectRevert(OperationShouldBePending.selector);
+        vm.expectRevert(OperationMustBePending.selector);
         governance.cancel(bytes32(0));
     }
 

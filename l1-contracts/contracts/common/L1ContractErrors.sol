@@ -171,10 +171,10 @@ error NotInitializedReentrancyGuard();
 error OnlyEraSupported();
 // 0x1a21feed
 error OperationExists();
-// 0xee454a75
-error OperationShouldBePending();
-// 0x72afcbf4
-error OperationShouldBeReady();
+// 0xeda2fbb1
+error OperationMustBePending();
+// 0xe1c1ff37
+error OperationMustBeReady();
 // 0xd7f50a9d
 error PatchCantSetUpgradeTxn();
 // 0x962fd7d0
@@ -195,6 +195,8 @@ error PreviousUpgradeNotCleaned();
 error PreviousUpgradeNotFinalized(bytes32 txHash);
 // 0xd5a99014
 error PriorityOperationsRollingHashMismatch();
+// 0x1a4d284a
+error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 // 0xa461f651
 error ProtocolIdMismatch(uint256 expectedProtocolVersion, uint256 providedProtocolId);
 // 0x64f94ec2
@@ -223,6 +225,8 @@ error RemoveFunctionFacetAddressZero();
 error ReplaceFunctionFacetAddressZero();
 // 0xdab52f4b
 error RevertedBatchBeforeNewBatch();
+// 0x9a67c1cb
+error RevertedBatchNotAfterNewLastBatch();
 // 0xd3b6535b
 error SelectorsMustAllHaveSameFreezability();
 // 0x7774d2f9
@@ -279,6 +283,8 @@ error UpgradeBatchNumberIsNotZero();
 error ValidateTxnNotEnoughGas();
 // 0x626ade30
 error ValueMismatch(uint256 expected, uint256 actual);
+// 0xe1022469
+error VerifiedBatchesExceedsCommittedBatches();
 // 0x2dbdba00
 error VerifyProofCommittedVerifiedMismatch();
 // 0xae899454
