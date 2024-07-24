@@ -10,7 +10,7 @@ import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {Unauthorized, InvalidNonceOrderingChange, ValuesNotEqual, EmptyBytes32, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue} from "./SystemContractErrors.sol";
+import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -253,7 +253,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             sumOfValues += _deployments[i].value;
         }
         if (msg.value != sumOfValues) {
-            revert ValuesNotEqual(sumOfValues, msg.value);
+            revert ValueMismatch(sumOfValues, msg.value);
         }
 
         for (uint256 i = 0; i < deploymentsLength; ++i) {
