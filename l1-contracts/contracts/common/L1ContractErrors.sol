@@ -195,8 +195,6 @@ error PreviousUpgradeNotFinalized(bytes32 txHash);
 error PreviousUpgradeNotCleaned();
 // 0x826fb11e
 error InsufficientChainBalance();
-// 0x27fcd9d1
-error WithdrawalFailed();
 // 0x97e1359e
 error L2WithdrawalMessageWrongLength(uint256 messageLen);
 // 0xff8811ff
@@ -247,8 +245,6 @@ error PubdataCommitmentsEmpty();
 error PubdataCommitmentsTooBig();
 // 0x53e6d04d
 error InvalidPubdataCommitmentsSize();
-// 0x32eb8b2f
-error LegacyMethodIsSupportedOnlyForEra();
 // 0x3580370c
 error ReplaceFunctionFacetAddressZero();
 // 0x667d17de

@@ -22,7 +22,7 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
-import {Unauthorized, ZeroAddress, SharedBridgeValueAlreadySet, SharedBridgeKey, NoFundsTransferred, ZeroBalance, ValueMismatch, TokensWithFeesNotSupported, NonEmptyMsgValue, L2BridgeNotSet, TokenNotSupported, WithdrawIncorrectAmount, EmptyDeposit, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, InsufficientChainBalance, WithdrawalFailed, ShareadBridgeValueNotSet, WithdrawalAlreadyFinalized, WithdrawalFailed, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeBalanceMismatch} from "../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress, SharedBridgeValueAlreadySet, SharedBridgeKey, NoFundsTransferred, ZeroBalance, ValueMismatch, TokensWithFeesNotSupported, NonEmptyMsgValue, L2BridgeNotSet, TokenNotSupported, WithdrawIncorrectAmount, EmptyDeposit, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, InsufficientChainBalance, ShareadBridgeValueNotSet, WithdrawalAlreadyFinalized, WithdrawFailed, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeBalanceMismatch} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -510,7 +510,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
                 callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
             }
             if (!callSuccess) {
-                revert WithdrawalFailed();
+                revert WithdrawFailed();
             }
         } else {
             IERC20(_l1Token).safeTransfer(_depositSender, _amount);
@@ -651,7 +651,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
                 callSuccess := call(gas(), l1Receiver, amount, 0, 0, 0, 0)
             }
             if (!callSuccess) {
-                revert WithdrawalFailed();
+                revert WithdrawFailed();
             }
         } else {
             // Withdraw funds

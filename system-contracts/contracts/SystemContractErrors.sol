@@ -14,8 +14,8 @@ error AddressHasNoCode(address);
 error EncodingLengthMismatch();
 // 0x4e23d035
 error IndexOutOfBounds();
-// 0x460b9939
-error ValuesNotEqual(uint256 expected, uint256 actual);
+// 0x626ade30
+error ValueMismatch(uint256 expected, uint256 actual);
 // 0x86302004
 error HashMismatch(bytes32 expected, uint256 actual);
 // 0x122e73e9
