@@ -80,7 +80,7 @@ library SystemContractsCaller {
         assembly {
             dataStart := add(data, 0x20)
         }
-        uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
+        uint32 dataLength = Utils.safeCastToU32(data.length);
 
         uint256 farCallAbi = SystemContractsCaller.getFarCallABI({
             dataOffset: 0,
