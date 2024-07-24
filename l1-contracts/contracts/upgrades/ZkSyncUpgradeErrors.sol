@@ -1,17 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.21;
 
-// 0x6d172ab2
-error ProtocolVersionShouldBeGreater(uint256 _oldProtocolVersion, uint256 _newProtocolVersion);
-// 0xe1a9736b
-error ProtocolVersionDeltaTooLarge(uint256 _proposedDelta, uint256 _maxDelta);
-// 0xd7f8c13e
-error PreviousUpgradeBatchNotCleared();
 // 0x7a47c9a2
 error InvalidChainId();
-// 0xd92e233d
-error ZeroAddress();
+// 0xd7f8c13e
+error PreviousUpgradeBatchNotCleared();
 // 0x3c43ccce
 error ProtocolMajorVersionNotZero();
 // 0xd7f50a9d
@@ -30,6 +24,10 @@ error PreviousProtocolMajorVersionNotZero();
 error NewProtocolMajorVersionNotZero();
 // 0xd328c12a
 error ProtocolVersionMinorDeltaTooBig(uint256 limit, uint256 proposed);
+// 0xe1a9736b
+error ProtocolVersionDeltaTooLarge(uint256 _proposedDelta, uint256 _maxDelta);
+// 0x6d172ab2
+error ProtocolVersionShouldBeGreater(uint256 _oldProtocolVersion, uint256 _newProtocolVersion);
 // 0x559cc34e
 error PatchUpgradeCantSetDefaultAccount();
 // 0x962fd7d0
@@ -46,3 +44,5 @@ error TooManyFactoryDeps();
 error InvalidTxType(uint256 txType);
 // 0x08753982
 error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
+// 0xd92e233d
+error ZeroAddress();

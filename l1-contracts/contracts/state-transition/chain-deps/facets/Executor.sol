@@ -11,7 +11,7 @@ import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "../../../common/L2ContractAddresses.sol";
 import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
-import {BatchNumberMismatch, TimeNotReached, TooManyBlobs, ValueMismatch, InvalidPubdataMode, InvalidPubdataLength, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, MissingSystemLogs, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifyProofCommittedVerifiedMismatch, InvalidProof, RevertedBatchBeforeNewBatch, CantRevertExecutedBatch, PointEvalFailed, EmptyBlobVersionHash, NonEmptyBlobVersionHash, BlobHashCommitmentError, CalldataLengthTooBig, InvalidPubdataHash, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, PubdataCommitmentsEmpty, PointEvalCallFailed, PubdataCommitmentsTooBig, InvalidPubdataCommitmentsSize} from "../../../common/L1ContractErrors.sol";
+import {BatchNumberMismatch, TimeNotReached, TooManyBlobs, ValueMismatch, InvalidPubdataMode, InvalidPubdataLength, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, MissingSystemLogs, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, PointEvalFailed, EmptyBlobVersionHash, NonEmptyBlobVersionHash, BlobHashCommitmentError, CalldataLengthTooBig, InvalidPubdataHash, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, PubdataCommitmentsEmpty, PointEvalCallFailed, PubdataCommitmentsTooBig, InvalidPubdataCommitmentsSize} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -361,7 +361,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // carried out within the first batch committed after the upgrade.
 
         // While the logic of the contract ensures that the s.l2SystemContractsUpgradeBatchNumber is 0 when this function is called,
-        // this check is added just in case. Since it is a hot read, it does not encure noticeable gas cost.
+        // this check is added just in case. Since it is a hot read, it does not incur noticeable gas cost.
         if (s.l2SystemContractsUpgradeBatchNumber != 0) {
             revert UpgradeBatchNumberIsNotZero();
         }
@@ -508,7 +508,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             prevBatchCommitment = currentBatchCommitment;
         }
         if (currentTotalBatchesVerified > s.totalBatchesCommitted) {
-            revert VerifyProofCommittedVerifiedMismatch();
+            revert VerifiedBatchesExceedsCommittedBatches();
         }
 
         _verifyProof(proofPublicInput, _proof);
@@ -554,7 +554,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
     function _revertBatches(uint256 _newLastBatch) internal {
         if (s.totalBatchesCommitted <= _newLastBatch) {
-            revert RevertedBatchBeforeNewBatch();
+            revert RevertedBatchNotAfterNewLastBatch();
         }
         if (_newLastBatch < s.totalBatchesExecuted) {
             revert CantRevertExecutedBatch();
