@@ -51,6 +51,8 @@ interface IL1AssetRouter is IAssetRouterBase {
         bytes calldata _transferData
     ) external returns (address l1Receiver, uint256 amount);
 
+    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
+
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         address _depositSender,

@@ -105,12 +105,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridgehub() {
-        require(msg.sender == address(BRIDGE_HUB), "ShB not BH");
-        _;
-    }
-
     /// @notice Checks that the message sender is the bridgehub or zkSync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
@@ -231,7 +225,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash
-    ) external override onlyBridgehub whenNotPaused {
+    ) external override onlyAssetRouter whenNotPaused {
         require(depositHappened[_chainId][_txHash] == 0x00, "ShB tx hap");
         depositHappened[_chainId][_txHash] = _txDataHash;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);

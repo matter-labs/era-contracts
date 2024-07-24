@@ -263,6 +263,18 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         emit BridgehubWithdrawalInitiated(_chainId, msg.sender, _assetId, keccak256(_transferData));
     }
 
+    /// @notice Routes the confirmation to nullifier for backward compatibility.
+    /// @param _chainId The chain ID of the ZK chain to which confirm the deposit.
+    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
+    /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
+    function bridgehubConfirmL2Transaction(
+        uint256 _chainId,
+        bytes32 _txDataHash,
+        bytes32 _txHash
+    ) external override onlyBridgehub whenNotPaused {
+        nullifierStorage.bridgehubConfirmL2Transaction(_chainId, _txDataHash, _txHash);
+    }
+
     /// @notice Ensures that token is registered with native token vault.
     /// @dev Only used when deposit is made with legacy data encoding format.
     /// @param _l1Token The L1 token address which should be registered with native token vault.
