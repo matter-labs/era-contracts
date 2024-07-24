@@ -6,7 +6,7 @@ import {INonceHolder} from "./interfaces/INonceHolder.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
-import {NonceIncreaseError, ZeroNonceError, NonceJumpError, ValuesNotEqual, NonceAlreadyUsed, NonceNotUsed, Unauthorized} from "./SystemContractErrors.sol";
+import {NonceIncreaseError, ZeroNonceError, NonceJumpError, ValueMismatch, NonceAlreadyUsed, NonceNotUsed, Unauthorized} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -120,7 +120,7 @@ contract NonceHolder is INonceHolder, ISystemContract {
 
         (, uint256 oldMinNonce) = _splitRawNonce(oldRawNonce);
         if (oldMinNonce != _expectedNonce) {
-            revert ValuesNotEqual(_expectedNonce, oldMinNonce);
+            revert ValueMismatch(_expectedNonce, oldMinNonce);
         }
 
         unchecked {

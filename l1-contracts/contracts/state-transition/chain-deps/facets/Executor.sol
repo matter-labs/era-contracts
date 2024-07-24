@@ -361,7 +361,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // carried out within the first batch committed after the upgrade.
 
         // While the logic of the contract ensures that the s.l2SystemContractsUpgradeBatchNumber is 0 when this function is called,
-        // this check is added just in case. Since it is a hot read, it does not encure noticeable gas cost.
+        // this check is added just in case. Since it is a hot read, it does not incur noticeable gas cost.
         if (s.l2SystemContractsUpgradeBatchNumber != 0) {
             revert UpgradeBatchNumberIsNotZero();
         }
