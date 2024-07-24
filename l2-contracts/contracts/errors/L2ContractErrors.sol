@@ -22,8 +22,8 @@ error InvalidCaller(address);
 error InvalidInput();
 // 0x0ac76f01
 error NonSequentialVersion();
-// 0x82b42900
-error Unauthorized();
+// 0x8e4a23d6
+error Unauthorized(address);
 // 0x6e128399
 error Unimplemented();
 // 0xa4dde386
@@ -32,5 +32,7 @@ error UnimplementedMessage(string);
 error UnsupportedPaymasterFlow();
 // 0x750b219c
 error WithdrawFailed();
+// 0xd92e233d
+error ZeroAddress();
 
 string constant BRIDGE_MINT_NOT_IMPLEMENTED = "bridgeMint is not implemented! Use deposit/depositTo methods instead.";

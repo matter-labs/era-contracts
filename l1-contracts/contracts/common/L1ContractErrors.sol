@@ -47,6 +47,8 @@ error DepositFailed();
 error DiamondAlreadyFrozen();
 // 0x682dabb4
 error DiamondFreezeIncorrectState();
+// 0xa7151b9a
+error DiamondNotFrozen();
 // 0xfc7ab1d3
 error EmptyBlobVersionHash(uint256 index);
 // 0x95b66fe9
@@ -223,8 +225,8 @@ error ReplaceFunctionFacetAddressZero();
 error RevertedBatchBeforeNewBatch();
 // 0xd3b6535b
 error SelectorsMustAllHaveSameFreezability();
-// 0xfc1a3c3a
-error ShareadBridgeValueNotSet(SharedBridgeKey);
+// 0x7774d2f9
+error SharedBridgeValueNotSet(SharedBridgeKey);
 // 0xc1d9246c
 error SharedBridgeBalanceMismatch();
 // 0x856d5b77
@@ -249,6 +251,8 @@ error TokenAlreadyRegistered(address token);
 error TokenNotRegistered(address token);
 // 0x06439c6b
 error TokenNotSupported(address token);
+// 0x23830e28
+error TokensWithFeesNotSupported();
 // 0xf640f0e5
 error TooManyBlobs();
 // 0x76da24b9

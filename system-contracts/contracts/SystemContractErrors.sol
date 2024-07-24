@@ -10,10 +10,20 @@ error CallerMustBeBootloader();
 error CallerMustBeForceDeployer();
 // 0x9eedbd2b
 error CallerMustBeSystemContract();
+// 0x4f951510
+error CompressionValueAddError(uint256 expected, uint256 actual);
+// 0x1e6aff87
+error CompressionValueTransformError(uint256 expected, uint256 actual);
+// 0xc2ea251e
+error CompressionValueSubError(uint256 expected, uint256 actual);
+// 0x849acb7f
+error CompressorInitialWritesProcessedNotEqual(uint256 expected, uint256 actual);
+// 0x61a6a4b3
+error CompressorEnumIndexNotEqual(uint256 expected, uint256 actual);
 // 0x9be48d8d
 error DerivedKeyNotEqualToCompressedValue(bytes32 expected, bytes32 provided);
-// 0xdb02de6c
-error DictionaryLengthNotFourTimesSmallerThanEncoded();
+// 0xe223db5e
+error DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo();
 // 0x1c25715b
 error EmptyBytes32();
 // 0x92bf3cf8
@@ -78,6 +88,8 @@ error Overflow();
 error ReconstructionMismatch(PubdataField, bytes32 expected, bytes32 actual);
 // 0x3adb5f1d
 error ShaInvalidReturnData();
+// 0xbd8665e2
+error StateDiffLengthMismatch();
 // 0x71c3da01
 error SystemCallFlagRequired();
 // 0xe0456dfe
@@ -94,6 +106,8 @@ error UnsupportedPaymasterFlow();
 error UnsupportedTxType(uint256);
 // 0x5708aead
 error UpgradeMustBeFirstTxn();
+// 0x626ade30
+error ValueMismatch(uint256 expected, uint256 actual);
 // 0x460b9939
 error ValuesNotEqual(uint256 expected, uint256 actual);
 // 0x6818f3f9

@@ -13,7 +13,7 @@ import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyp
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {Unauthorized, STMAlreadyRegistered, STMNotRegistered, TokenAlreadyRegistered, TokenNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue} from "../common/L1ContractErrors.sol";
+import {Unauthorized, STMAlreadyRegistered, STMNotRegistered, TokenAlreadyRegistered, TokenNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice all the ether is held by the weth bridge
@@ -55,6 +55,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev Please note, if the owner wants to enforce the admin change it must execute both `setPendingAdmin` and
     /// `acceptAdmin` atomically. Otherwise `admin` can set different pending admin and so fail to accept the admin rights.
     function setPendingAdmin(address _newPendingAdmin) external onlyOwnerOrAdmin {
+        if (_newPendingAdmin == address(0)) {
+            revert ZeroAddress();
+        }
         // Save previous value into the stack to put it into the event later
         address oldPendingAdmin = pendingAdmin;
         // Change pending admin
@@ -89,6 +92,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
     function addStateTransitionManager(address _stateTransitionManager) external onlyOwner {
+        if (_stateTransitionManager == address(0)) {
+            revert ZeroAddress();
+        }
         if (stateTransitionManagerIsRegistered[_stateTransitionManager]) {
             revert STMAlreadyRegistered();
         }
@@ -98,6 +104,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice State Transition can be any contract with the appropriate interface/functionality
     /// @notice this stops new Chains from using the STF, old chains are not affected
     function removeStateTransitionManager(address _stateTransitionManager) external onlyOwner {
+        if (_stateTransitionManager == address(0)) {
+            revert ZeroAddress();
+        }
         if (!stateTransitionManagerIsRegistered[_stateTransitionManager]) {
             revert STMNotRegistered();
         }
@@ -115,6 +124,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
     function setSharedBridge(address _sharedBridge) external onlyOwner {
+        if (_sharedBridge == address(0)) {
+            revert ZeroAddress();
+        }
         sharedBridge = IL1SharedBridge(_sharedBridge);
     }
 
@@ -134,6 +146,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         }
         if (_chainId > type(uint48).max) {
             revert ChainIdTooBig();
+        }
+        if (_stateTransitionManager == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_baseToken == address(0)) {
+            revert ZeroAddress();
         }
 
         if (!stateTransitionManagerIsRegistered[_stateTransitionManager]) {
