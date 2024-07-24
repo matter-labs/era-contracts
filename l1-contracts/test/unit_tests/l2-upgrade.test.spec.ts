@@ -22,7 +22,8 @@ import { L2_BOOTLOADER_BYTECODE_HASH, L2_DEFAULT_ACCOUNT_BYTECODE_HASH } from ".
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
 import type { ProposedUpgrade, VerifierParams } from "../../src.ts/utils";
-import { ethTestConfig, EMPTY_STRING_KECCAK } from "../../src.ts/utils";
+import { ethTestConfig, EMPTY_STRING_KECCAK } from "../../src.ts/constants";
+
 import { diamondCut, Action, facetCut } from "../../src.ts/diamondCut";
 
 import type { CommitBatchInfo, StoredBatchInfo, CommitBatchInfoWithTimestamp } from "./utils";

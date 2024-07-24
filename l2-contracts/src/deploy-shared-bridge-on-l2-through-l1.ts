@@ -15,7 +15,7 @@ import {
   L2_BRIDGEHUB_ADDRESS,
   L2_MESSAGE_ROOT_ADDRESS,
   L2_NATIVE_TOKEN_VAULT_ADDRESS,
-} from "../../l1-contracts/src.ts/utils";
+} from "../../l1-contracts/src.ts/constants";
 
 import { L2NativeTokenVaultFactory } from "../typechain";
 import { BridgehubFactory, L1AssetRouterFactory, L1NativeTokenVaultFactory } from "../../l1-contracts/typechain";
@@ -95,7 +95,8 @@ async function setL2TokenBeacon(deployer: Deployer, chainId: string, gasPrice: B
       deployer.deployWallet
     );
     const ethAssetId = await l1Ntv.getAssetId(ETH_ADDRESS_IN_CONTRACTS);
-    const value = await bridgehub.l2TransactionBaseCost(
+    const l1Bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployer.deployWallet);
+    const value = await l1Bridgehub.l2TransactionBaseCost(
       chainId,
       gasPrice,
       priorityTxMaxGasLimit,

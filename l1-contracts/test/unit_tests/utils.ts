@@ -10,7 +10,9 @@ import type { IMailbox } from "../../typechain/IMailbox";
 import type { ExecutorFacet } from "../../typechain";
 
 import type { FeeParams, L2CanonicalTransaction } from "../../src.ts/utils";
-import { ADDRESS_ONE, PubdataPricingMode, EMPTY_STRING_KECCAK } from "../../src.ts/utils";
+import { PubdataPricingMode } from "../../src.ts/utils";
+import { ADDRESS_ONE, EMPTY_STRING_KECCAK } from "../../src.ts/constants";
+
 import { packSemver } from "../../scripts/utils";
 import { keccak256 } from "ethers/lib/utils";
 

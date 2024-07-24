@@ -8,14 +8,9 @@ import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, GAS_MULTIPLIER, SYSTEM_CONFIG } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import { initialBridgehubDeployment } from "../src.ts/deploy-process";
-import {
-  ethTestConfig,
-  getAddressFromEnv,
-  getNumberFromEnv,
-  ADDRESS_ONE,
-  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-  priorityTxMaxGasLimit,
-} from "../src.ts/utils";
+import { getAddressFromEnv, getNumberFromEnv, priorityTxMaxGasLimit } from "../src.ts/utils";
+
+import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA, ADDRESS_ONE, ethTestConfig } from "../src.ts/constants";
 
 import { Wallet as ZkWallet, Provider as ZkProvider, utils as zkUtils } from "zksync-ethers";
 import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";

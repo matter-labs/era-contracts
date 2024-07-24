@@ -22,6 +22,7 @@ contract L2Nullifier is IL2Nullifier {
         if (msg.sender != BOOTLOADER_FORMAL_ADDRESS) {
             revert Unauthorized(msg.sender);
         }
+        // solhint-disable-next-line gas-custom-errors
         require(!alreadyExecuted[txHash], "L2N: Already executed");
         alreadyExecuted[txHash] = true;
     }

@@ -6,7 +6,7 @@ import { Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { GAS_MULTIPLIER, web3Provider } from "./utils";
-import { ethTestConfig } from "../src.ts/utils";
+import { ethTestConfig } from "../src.ts/constants";
 
 const provider = web3Provider();
 

@@ -459,6 +459,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             });
             /// Fixme this does not have a unique hash atm.
             canonicalTxHash = L2_MESSENGER.sendToL1(abi.encode(transaction));
+            // solhint-disable-next-line func-named-parameters
             emit NewPriorityRequest(0, canonicalTxHash, 0, transaction, outputRequest.factoryDeps);
         }
 

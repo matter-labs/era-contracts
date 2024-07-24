@@ -3,7 +3,8 @@ import { artifacts } from "hardhat";
 import { Interface } from "ethers/lib/utils";
 import { deployedAddressesFromEnv } from "../../l1-contracts/src.ts/deploy-utils";
 import type { Deployer } from "../../l1-contracts/src.ts/deploy";
-import { ADDRESS_ONE, getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
+import { ADDRESS_ONE } from "../../l1-contracts/src.ts/constants";
+import { getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
 import { IBridgehubFactory } from "../../l1-contracts/typechain/IBridgehubFactory";
 import { web3Provider } from "../../l1-contracts/scripts/utils";
 
