@@ -6,7 +6,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager} from "./IStateTransitionManager.sol";
-import {Unauthorized, TimeNotReached} from "../common/L1ContractErrors.sol";
+import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -79,6 +79,9 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @dev Sets a new state transition manager.
     function setStateTransitionManager(IStateTransitionManager _stateTransitionManager) external onlyOwner {
+        if (address(_stateTransitionManager) == address(0)) {
+            revert ZeroAddress();
+        }
         stateTransitionManager = _stateTransitionManager;
     }
 
@@ -135,6 +138,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
             uint32 timestamp = uint32(block.timestamp);
+            // We disable this check because calldata array length is cheap.
             // solhint-disable-next-line gas-length-in-loops
             for (uint256 i = 0; i < _newBatchesData.length; ++i) {
                 committedBatchTimestamp[_chainId].set(_newBatchesData[i].batchNumber, timestamp);
@@ -199,6 +203,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     function _executeBatchesInner(uint256 _chainId, StoredBatchInfo[] calldata _newBatchesData) internal {
         uint256 delay = executionDelay; // uint32
         unchecked {
+            // We disable this check because calldata array length is cheap.
             // solhint-disable-next-line gas-length-in-loops
             for (uint256 i = 0; i < _newBatchesData.length; ++i) {
                 uint256 commitBatchTimestamp = committedBatchTimestamp[_chainId].get(_newBatchesData[i].batchNumber);

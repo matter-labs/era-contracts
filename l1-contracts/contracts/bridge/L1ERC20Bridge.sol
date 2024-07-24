@@ -11,7 +11,7 @@ import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
-import {Unauthorized, EmptyDeposit, ValueMismatch, WithdrawalAlreadyFinalized} from "../common/L1ContractErrors.sol";
+import {Unauthorized, EmptyDeposit, TokensWithFeesNotSupported, WithdrawalAlreadyFinalized} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -159,7 +159,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
         // The token has non-standard transfer logic
         if (amount != _amount) {
-            revert ValueMismatch(_amount, amount);
+            revert TokensWithFeesNotSupported();
         }
 
         l2TxHash = SHARED_BRIDGE.depositLegacyErc20Bridge{value: msg.value}({
