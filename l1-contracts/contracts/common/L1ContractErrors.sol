@@ -267,8 +267,6 @@ error L2UpgradeNonceNotEqualToNewProtocolVersion(uint256 nonce, uint256 protocol
 error L2BytecodeHashMismatch(bytes32 expected, bytes32 provided);
 // 0x88d7b498
 error ProtocolVersionTooSmall();
-// 0x56d45b12
-error ProtocolVersionTooBig();
 // 0x5c598b60
 error PreviousProtocolMajorVersionNotZero();
 // 0x72ea85ad

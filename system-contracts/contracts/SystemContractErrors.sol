@@ -10,8 +10,6 @@ error InvalidCodeHash(CodeHashReason);
 error UnsupportedTxType(uint256);
 // 0x86bb51b8
 error AddressHasNoCode(address);
-// 0x608aa3da
-error EncodingLengthMismatch();
 // 0x4e23d035
 error IndexOutOfBounds();
 // 0x626ade30
@@ -80,8 +78,6 @@ error CallerMustBeSystemContract();
 error CallerMustBeBootloader();
 // 0xb7549616
 error CallerMustBeForceDeployer();
-// 0x5cb045db
-error InvalidData();
 // 0xe95a1fbe
 error FailedToChargeGas();
 // 0x35278d12
