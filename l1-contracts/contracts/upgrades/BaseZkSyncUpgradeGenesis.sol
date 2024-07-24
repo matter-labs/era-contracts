@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
-import {ProtocolVersionShouldBeGreater, ProtocolVersionDeltaTooLarge, PreviousUpgradeNotFinalized, PreviousUpgradeBatchNotCleared, ProtocolMajorVersionNotZero} from "./ZkSyncUpgradeErrors.sol";
+import {ProtocolVersionTooSmall, ProtocolVersionDeltaTooLarge, PreviousUpgradeNotFinalized, PreviousUpgradeBatchNotCleared, ProtocolMajorVersionNotZero} from "./ZkSyncUpgradeErrors.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
@@ -23,7 +23,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
             // IMPORTANT Genesis Upgrade difference: Note this is the only thing change > to >=
             _newProtocolVersion < previousProtocolVersion
         ) {
-            revert ProtocolVersionShouldBeGreater(previousProtocolVersion, _newProtocolVersion);
+            revert ProtocolVersionTooSmall();
         }
         // slither-disable-next-line unused-return
         (uint32 previousMajorVersion, uint32 previousMinorVersion, ) = SemVer.unpackSemVer(
