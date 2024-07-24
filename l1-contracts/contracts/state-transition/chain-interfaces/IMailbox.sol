@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.21;
 
 import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
 import {L2CanonicalTransaction, L2Log, L2Message, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
@@ -121,8 +121,8 @@ interface IMailbox is IZkSyncHyperchainBase {
     /// @param factoryDeps An array of bytecodes that were shown in the L1 public data.
     /// Will be marked as known bytecodes in L2
     event NewPriorityRequest(
-        uint256 txId,
-        bytes32 txHash,
+        uint256 indexed txId,
+        bytes32 indexed txHash,
         uint64 expirationTimestamp,
         L2CanonicalTransaction transaction,
         bytes[] factoryDeps

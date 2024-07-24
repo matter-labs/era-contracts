@@ -15,7 +15,7 @@ import {SystemCallFlagRequired, Unauthorized, CallerMustBeSystemContract, Caller
  * @dev Never add storage variables into this contract as some
  * system contracts rely on this abstract contract as on interface!
  */
-abstract contract ISystemContract {
+abstract contract SystemContractBase {
     /// @notice Modifier that makes sure that the method
     /// can only be called via a system call.
     modifier onlySystemCall() {
