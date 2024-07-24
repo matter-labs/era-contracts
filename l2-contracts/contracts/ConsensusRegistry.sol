@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.20;
 
+import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
+
 /// @title ConsensusRegistry
 /// @dev A contract to manage consensus nodes and committees.
 contract ConsensusRegistry {
@@ -270,7 +272,7 @@ contract ConsensusRegistry {
         return attesterCommittee.length;
     }
 
-    function compareBytes(bytes storage a, bytes calldata b) private pure returns (bool) {
-        return keccak256(a) == keccak256(b);
+    function compareBytes(bytes storage a, bytes calldata b) private view returns (bool) {
+        return keccak256(a) == EfficientCall.keccak(b);
     }
 }
