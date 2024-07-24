@@ -75,10 +75,10 @@ abstract contract ReentrancyGuard {
             _status := sload(LOCK_FLAG_ADDRESS)
         }
 
-        // On the first call to nonReentrant, _notEntered will be true
         if (_status == 0) {
             revert NotInitializedReentrancyGuard();
         }
+        // On the first call to nonReentrant, _NOT_ENTERED will be true
         if (_status != _NOT_ENTERED) {
             revert Reentrancy();
         }

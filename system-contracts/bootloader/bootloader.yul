@@ -11,13 +11,14 @@ object "Bootloader" {
 
             // While we definitely cannot control the pubdata price on L1,
             // we need to check the operator does not provide any absurd numbers there
+            // These number were chosen to allow for base tokens with low token/eth conversion.
             function MAX_ALLOWED_FAIR_PUBDATA_PRICE() -> ret {
-                // 2^64 - 1 gwei
+                // 2^64 - 1 wei
                 ret := 18446744073709551615
             }
 
             function MAX_ALLOWED_FAIR_L2_GAS_PRICE() -> ret {
-                // 2^64 - 1 gwei
+                // 2^64 - 1 wei
                 ret := 18446744073709551615
             }
 
