@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import type { Wallet } from "zksync-web3";
+import type { Wallet } from "zksync-ethers";
 import type { L2BaseToken } from "../typechain";
 import { L2BaseTokenFactory } from "../typechain";
 import { deployContractOnAddress, getWallets, loadArtifact, provider } from "./shared/utils";

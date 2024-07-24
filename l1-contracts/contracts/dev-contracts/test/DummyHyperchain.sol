@@ -9,6 +9,10 @@ contract DummyHyperchain is MailboxFacet {
         s.bridgehub = bridgeHubAddress;
     }
 
+    function getEraChainId() public view returns (uint256) {
+        return ERA_CHAIN_ID;
+    }
+
     function setBridgeHubAddress(address bridgeHubAddress) public {
         s.bridgehub = bridgeHubAddress;
     }
