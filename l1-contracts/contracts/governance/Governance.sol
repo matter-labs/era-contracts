@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IGovernance} from "./IGovernance.sol";
-import {ZeroAddress, Unauthorized, OperationShouldBeReady, OperationShouldBePending, OperationExists, InvalidDelay, PreviousOperationNotExecuted} from "../common/L1ContractErrors.sol";
+import {ZeroAddress, Unauthorized, OperationMustBeReady, OperationMustBePending, OperationExists, InvalidDelay, PreviousOperationNotExecuted} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -39,6 +39,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @param _admin The address to be assigned as the admin of the contract.
     /// @param _securityCouncil The address to be assigned as the security council of the contract.
     /// @param _minDelay The initial minimum delay (in seconds) to be set for operations.
+    /// @dev We allow for a zero address for _securityCouncil because it can be set later
     constructor(address _admin, address _securityCouncil, uint256 _minDelay) {
         if (_admin == address(0)) {
             revert ZeroAddress();
@@ -159,7 +160,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @param _id Proposal id value (see `hashOperation`)
     function cancel(bytes32 _id) external onlyOwner {
         if (!isOperationPending(_id)) {
-            revert OperationShouldBePending();
+            revert OperationMustBePending();
         }
         delete timestamps[_id];
         emit OperationCancelled(_id);
@@ -179,7 +180,7 @@ contract Governance is IGovernance, Ownable2Step {
         _checkPredecessorDone(_operation.predecessor);
         // Ensure that the operation is ready to proceed.
         if (!isOperationReady(id)) {
-            revert OperationShouldBeReady();
+            revert OperationMustBeReady();
         }
         // Execute operation.
         // slither-disable-next-line reentrancy-eth
@@ -187,7 +188,7 @@ contract Governance is IGovernance, Ownable2Step {
         // Reconfirming that the operation is still ready after execution.
         // This is needed to avoid unexpected reentrancy attacks of re-executing the same operation.
         if (!isOperationReady(id)) {
-            revert OperationShouldBeReady();
+            revert OperationMustBeReady();
         }
         // Set operation to be done
         timestamps[id] = EXECUTED_PROPOSAL_TIMESTAMP;
@@ -204,7 +205,7 @@ contract Governance is IGovernance, Ownable2Step {
         _checkPredecessorDone(_operation.predecessor);
         // Ensure that the operation is in a pending state before proceeding.
         if (!isOperationPending(id)) {
-            revert OperationShouldBePending();
+            revert OperationMustBePending();
         }
         // Execute operation.
         // slither-disable-next-line reentrancy-eth
@@ -212,7 +213,7 @@ contract Governance is IGovernance, Ownable2Step {
         // Reconfirming that the operation is still pending before execution.
         // This is needed to avoid unexpected reentrancy attacks of re-executing the same operation.
         if (!isOperationPending(id)) {
-            revert OperationShouldBePending();
+            revert OperationMustBePending();
         }
         // Set operation to be done
         timestamps[id] = EXECUTED_PROPOSAL_TIMESTAMP;
@@ -246,6 +247,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @dev Execute an operation's calls.
     /// @param _calls The array of calls to be executed.
     function _execute(Call[] calldata _calls) internal {
+        // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _calls.length; ++i) {
             // slither-disable-next-line arbitrary-send-eth

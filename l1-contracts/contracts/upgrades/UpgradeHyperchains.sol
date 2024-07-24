@@ -34,6 +34,12 @@ contract UpgradeHyperchains is BaseZkSyncUpgrade {
         if (sharedBridgeAddress == address(0)) {
             revert ZeroAddress();
         }
+        if (chainAdmin == address(0)) {
+            revert ZeroAddress();
+        }
+        if (validatorTimelock == address(0)) {
+            revert ZeroAddress();
+        }
 
         s.chainId = chainId;
         s.bridgehub = bridgehubAddress;
