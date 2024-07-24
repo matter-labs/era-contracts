@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {ICompressor, OPERATION_BITMASK, LENGTH_BITS_OFFSET, MAX_ENUMERATION_INDEX_SIZE} from "./interfaces/ICompressor.sol";
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {UnsafeBytesCalldata} from "./libraries/UnsafeBytesCalldata.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
@@ -20,7 +20,7 @@ import {DerivedKeyNotEqualToCompressedValue, EncodedAndRealBytecodeChunkNotEqual
  * Or the user may compress the bytecode and publish it instead (fewer data onchain!). At the end of every L1 Batch
  * we publish pubdata, part of which contains the state diffs that occurred within the batch.
  */
-contract Compressor is ICompressor, ISystemContract {
+contract Compressor is ICompressor, SystemContractBase {
     using UnsafeBytesCalldata for bytes;
 
     /// @notice Verify the compressed bytecode and publish it on the L1.
