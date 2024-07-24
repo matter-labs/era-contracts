@@ -92,8 +92,6 @@ error InvalidInput();
 error UnsupportedPaymasterFlow();
 // 0x2bfbfc11
 error EncodedLengthNotFourTimesSmallerThanOriginal();
-// 0xdb02de6c
-error DictionaryLengthNotFourTimesSmallerThanEncoded();
 // 0xc06d5cb2
 error EncodedAndRealBytecodeChunkNotEqual(uint64 expected, uint64 provided);
 // 0x9be48d8d
@@ -102,6 +100,20 @@ error DerivedKeyNotEqualToCompressedValue(bytes32 expected, bytes32 provided);
 error Keccak256InvalidReturnData();
 // 0x3adb5f1d
 error ShaInvalidReturnData();
+// 0x849acb7f
+error CompressorInitialWritesProcessedNotEqual(uint256 expected, uint256 actual);
+// 0x61a6a4b3
+error CompressorEnumIndexNotEqual(uint256 expected, uint256 actual);
+// 0xbd8665e2
+error StateDiffLengthMismatch();
+// 0x1e6aff87
+error CompressionValueTransformError(uint256 expected, uint256 actual);
+// 0x4f951510
+error CompressionValueAddError(uint256 expected, uint256 actual);
+// 0xc2ea251e
+error CompressionValueSubError(uint256 expected, uint256 actual);
+// 0xe223db5e
+error DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo();
 
 enum CodeHashReason {
     NotContractOnConstructor,
