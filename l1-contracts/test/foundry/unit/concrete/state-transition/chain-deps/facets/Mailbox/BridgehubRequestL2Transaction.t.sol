@@ -7,7 +7,7 @@ import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS} from "contracts/common/Config.sol";
 import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransactionFiltererTrue.sol";
 import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
-import {TransactionNotAllowed} from "contracts/common/L1ContractErrors.sol";
+import {TransactionNotAllowed, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
     function setUp() public virtual {
@@ -69,7 +69,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
         vm.deal(bridgehub, 100 ether);
         vm.prank(address(sender));
-        vm.expectRevert("Hyperchain: not bridgehub");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, sender));
         mailboxFacet.bridgehubRequestL2Transaction(req);
     }
 

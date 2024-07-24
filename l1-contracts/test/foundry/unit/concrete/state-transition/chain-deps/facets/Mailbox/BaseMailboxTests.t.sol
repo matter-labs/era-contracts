@@ -6,6 +6,7 @@ import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {DummyHyperchain} from "contracts/dev-contracts/test/DummyHyperchain.sol";
+import {BaseTokenGasPriceDenominatorNotSet} from "contracts/common/L1ContractErrors.sol";
 
 contract MailboxBaseTests is MailboxTest {
     function setUp() public virtual {
@@ -21,7 +22,7 @@ contract MailboxBaseTests is MailboxTest {
 
     function test_RevertWhen_badDenominatorInL2TransactionBaseCost() public {
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(0);
-        vm.expectRevert("Mailbox: baseTokenGasPriceDenominator not set");
+        vm.expectRevert(BaseTokenGasPriceDenominatorNotSet.selector);
         mailboxFacet.l2TransactionBaseCost(100, 10000, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
     }
 

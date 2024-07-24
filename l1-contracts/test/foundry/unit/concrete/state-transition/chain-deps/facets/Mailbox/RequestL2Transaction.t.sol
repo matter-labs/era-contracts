@@ -10,6 +10,7 @@ import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransa
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
+import {OnlyEraSupported, TooManyFactoryDeps, MsgValueTooLow, GasPerPubdataMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract MailboxRequestL2TransactionTest is MailboxTest {
     address tempAddress;
@@ -35,7 +36,7 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
 
         utilsFacet.util_setChainId(randomChainId);
 
-        vm.expectRevert("Mailbox: legacy interface only available for Era");
+        vm.expectRevert(OnlyEraSupported.selector);
         mailboxFacet.requestL2Transaction({
             _contractL2: tempAddress,
             _l2Value: 0,
@@ -48,7 +49,7 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
     }
 
     function test_RevertWhen_wrongL2GasPerPubdataByteLimit() public {
-        vm.expectRevert(bytes("qp"));
+        vm.expectRevert(GasPerPubdataMismatch.selector);
         mailboxFacet.requestL2Transaction({
             _contractL2: tempAddress,
             _l2Value: 0,
@@ -68,7 +69,7 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
         uint256 l2Value = 1 ether;
         uint256 mintValue = baseCost + l2Value;
 
-        vm.expectRevert(bytes("mv"));
+        vm.expectRevert(abi.encodeWithSelector(MsgValueTooLow.selector, mintValue, mintValue - 1));
         mailboxFacet.requestL2Transaction{value: mintValue - 1}({
             _contractL2: tempAddress,
             _l2Value: l2Value,
@@ -83,7 +84,7 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
     function test_RevertWhen_factoryDepsLengthExceeded() public {
         tempBytesArr = new bytes[](MAX_NEW_FACTORY_DEPS + 1);
 
-        vm.expectRevert(bytes("uj"));
+        vm.expectRevert(TooManyFactoryDeps.selector);
         mailboxFacet.requestL2Transaction({
             _contractL2: tempAddress,
             _l2Value: 0,
