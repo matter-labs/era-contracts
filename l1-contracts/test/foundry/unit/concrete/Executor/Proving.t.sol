@@ -8,7 +8,7 @@ import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {VerifyProofCommittedVerifiedMismatch, BatchHashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {VerifiedBatchesExceedsCommittedBatches, BatchHashMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract ProvingTest is ExecutorTest {
     function setUp() public {
@@ -95,7 +95,7 @@ contract ProvingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(VerifyProofCommittedVerifiedMismatch.selector);
+        vm.expectRevert(VerifiedBatchesExceedsCommittedBatches.selector);
         executor.proveBatches(genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
     }
 
