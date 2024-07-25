@@ -7,13 +7,17 @@ import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/li
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @title ConsensusRegistry
-/// @dev A contract to manage consensus nodes and committees.
+/// @dev Manages consensus nodes and committees for the L2 consensus protocol,
+/// owned by a governance protocol. Nodes act as both validators and attesters,
+/// each playing a distinct role in the consensus process. This contract facilitates
+/// the rotation of validator and attester committees, which represent a subset of nodes
+/// expected to actively participate in the consensus process during a specific time window.
 contract ConsensusRegistry {
-    // Owner of the contract (i.e., the governance contract).
+    // Owner of the contract (i.e., the governance protocol).
     address public owner;
     // An array to keep track of node owners.
     address[] public nodeOwners;
-    // A map of node owners => nodes
+    // A map of node owners => nodes.
     mapping(address => Node) public nodes;
     // The current validator committee list.
     CommitteeValidator[] public validatorCommittee;
@@ -82,7 +86,6 @@ contract ConsensusRegistry {
     /// @dev Fails if node owner already exists.
     /// @dev Fails if a validator with the same public key already exists.
     /// @dev Fails if an attester with the same public key already exists.
-
     /// @param _nodeOwner The address of the new node's owner.
     /// @param _validatorWeight The voting weight of the validator.
     /// @param _validatorPubKey The BLS12-381 public key of the validator.
@@ -124,7 +127,6 @@ contract ConsensusRegistry {
     /// @notice Deactivates a node, preventing it from participating in committees.
     /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
-    ///
     /// @param _nodeOwner The address of the node's owner to be inactivated.
     function deactivate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         verifyNodeOwnerExists(_nodeOwner);
@@ -134,7 +136,6 @@ contract ConsensusRegistry {
     /// @notice Activates a previously inactive node, allowing it to participate in committees.
     /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
-    ///
     /// @param _nodeOwner The address of the node's owner to be activated.
     function activate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         verifyNodeOwnerExists(_nodeOwner);
@@ -144,7 +145,6 @@ contract ConsensusRegistry {
     /// @notice Removes a node from the registry.
     /// @dev Only callable by the contract owner.
     /// @dev Verifies that the node owner exists in the registry.
-    ///
     /// @param _nodeOwner The address of the node's owner to be removed.
     function remove(address _nodeOwner) external onlyOwner {
         verifyNodeOwnerExists(_nodeOwner);
@@ -158,7 +158,6 @@ contract ConsensusRegistry {
     /// @notice Changes the validator weight of a node in the registry.
     /// @dev Only callable by the contract owner.
     /// @dev Verifies that the node owner exists in the registry.
-    ///
     /// @param _nodeOwner The address of the node's owner whose validator weight will be changed.
     /// @param _weight The new validator weight to assign to the node.
     function changeValidatorWeight(address _nodeOwner, uint256 _weight) external onlyOwner {
@@ -169,7 +168,6 @@ contract ConsensusRegistry {
     /// @notice Changes the attester weight of a node in the registry.
     /// @dev Only callable by the contract owner.
     /// @dev Verifies that the node owner exists in the registry.
-    ///
     /// @param _nodeOwner The address of the node's owner whose attester weight will be changed.
     /// @param _weight The new attester weight to assign to the node.
     function changeAttesterWeight(address _nodeOwner, uint256 _weight) external onlyOwner {
@@ -180,7 +178,6 @@ contract ConsensusRegistry {
     /// @notice Changes the validator's public key and proof-of-possession (PoP) in the registry.
     /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
-    ///
     /// @param _nodeOwner The address of the node's owner whose validator key and PoP will be changed.
     /// @param _pubKey The new BLS12-381 public key to assign to the node's validator.
     /// @param _pop The new proof-of-possession (PoP) to assign to the node's validator.
@@ -197,7 +194,6 @@ contract ConsensusRegistry {
     /// @notice Changes the attester's public key of a node in the registry.
     /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
-    ///
     /// @param _nodeOwner The address of the node's owner whose attester public key will be changed.
     /// @param _pubKey The new ECDSA public key to assign to the node's attester.
     function changeAttesterPubKey(address _nodeOwner, bytes calldata _pubKey) external onlyOwnerOrNodeOwner(_nodeOwner) {
@@ -205,7 +201,7 @@ contract ConsensusRegistry {
         nodes[_nodeOwner].attesterPubKey = _pubKey;
     }
 
-    /// @notice Rotates the validator committee list based on active validators in the registry.
+    /// @notice Rotates the validator committee list based on active nodes in the registry.
     /// @dev Only callable by the contract owner.
     function setValidatorCommittee() external onlyOwner {
         // Creates a new committee based on active validators.
@@ -222,7 +218,7 @@ contract ConsensusRegistry {
         }
     }
 
-    /// @notice Rotates the attester committee list based on active attesters in the registry.
+    /// @notice Rotates the attester committee list based on active nodes in the registry.
     /// @dev Only callable by the contract owner.
     function setAttesterCommittee() external onlyOwner {
         // Creates a new committee based on active attesters.
@@ -239,7 +235,6 @@ contract ConsensusRegistry {
 
     /// @notice Verifies that a node owner exists in the registry.
     /// @dev Throws an error if the node owner does not exist.
-    ///
     /// @param _nodeOwner The address of the node's owner to verify.
     function verifyNodeOwnerExists(address _nodeOwner) private view {
         if (nodes[_nodeOwner].validatorPubKey.length == 0) {
@@ -249,7 +244,6 @@ contract ConsensusRegistry {
 
     /// @notice Finds the index of a node owner in the `nodeOwners` array.
     /// @dev Throws an error if the node owner is not found in the array.
-    ///
     /// @param _nodeOwner The address of the node's owner to find in the `nodeOwners` array.
     /// @return The index of the node owner in the `nodeOwners` array.
     function nodeOwnerIdx(address _nodeOwner) private view returns (uint256) {
