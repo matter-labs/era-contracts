@@ -71,7 +71,7 @@ contract ConsensusRegistry is Ownable2Step {
     }
 
     constructor(address _initialOwner) {
-        require(_initialOwner != address(0), "Initial owner should be non zero address");
+        require(_initialOwner != address(0), "_initialOwner should be non zero address");
         _transferOwnership(_initialOwner);
     }
 
@@ -93,6 +93,11 @@ contract ConsensusRegistry is Ownable2Step {
         uint256 _attesterWeight,
         bytes calldata _attesterPubKey
     ) external onlyOwner {
+        require(_nodeOwner != address(0), "_nodeOwner address cannot be empty");
+        require(_validatorPubKey.length > 0, "_validatorPubKey cannot be empty");
+        require(_validatorPoP.length > 0, "_validatorPoP cannot be empty");
+        require(_attesterPubKey.length > 0, "_attesterPubKey cannot be empty");
+
         uint256 len = nodeOwners.length;
         for (uint256 i = 0; i < len; ++i) {
             if (nodeOwners[i] == _nodeOwner) {
@@ -179,6 +184,8 @@ contract ConsensusRegistry is Ownable2Step {
         bytes calldata _pubKey,
         bytes calldata _pop
     ) external onlyOwnerOrNodeOwner(_nodeOwner) {
+        require(_pubKey.length > 0, "_pubKey cannot be empty");
+        require(_pop.length > 0, "_pop cannot be empty");
         verifyNodeOwnerExists(_nodeOwner);
         nodes[_nodeOwner].validatorPubKey = _pubKey;
         nodes[_nodeOwner].validatorPoP = _pop;
@@ -190,6 +197,7 @@ contract ConsensusRegistry is Ownable2Step {
     /// @param _nodeOwner The address of the node's owner whose attester public key will be changed.
     /// @param _pubKey The new ECDSA public key to assign to the node's attester.
     function changeAttesterPubKey(address _nodeOwner, bytes calldata _pubKey) external onlyOwnerOrNodeOwner(_nodeOwner) {
+        require(_pubKey.length > 0, "_pubKey cannot be empty");
         verifyNodeOwnerExists(_nodeOwner);
         nodes[_nodeOwner].attesterPubKey = _pubKey;
     }
