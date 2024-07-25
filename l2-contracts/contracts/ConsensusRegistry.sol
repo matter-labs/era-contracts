@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.20;
 
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
 
 /// @author Matter Labs
@@ -12,9 +13,7 @@ import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/li
 /// each playing a distinct role in the consensus process. This contract facilitates
 /// the rotation of validator and attester committees, which represent a subset of nodes
 /// expected to actively participate in the consensus process during a specific time window.
-contract ConsensusRegistry {
-    // Owner of the contract (i.e., the governance protocol).
-    address public owner;
+contract ConsensusRegistry is Ownable2Step {
     // An array to keep track of node owners.
     address[] public nodeOwners;
     // A map of node owners => nodes.
@@ -56,7 +55,6 @@ contract ConsensusRegistry {
         bytes pubKey;
     }
 
-    error UnauthorizedOnlyOwner();
     error UnauthorizedOnlyOwnerOrNodeOwner();
     error NodeOwnerAlreadyExists();
     error NodeOwnerDoesNotExist();
@@ -64,22 +62,17 @@ contract ConsensusRegistry {
     error ValidatorPubKeyAlreadyExists();
     error AttesterPubKeyAlreadyExists();
 
-    modifier onlyOwner() {
-        if (msg.sender != owner) {
-            revert UnauthorizedOnlyOwner();
-        }
-        _;
-    }
-
     modifier onlyOwnerOrNodeOwner(address _nodeOwner) {
-        if (msg.sender != owner && msg.sender != _nodeOwner) {
+        address sender = _msgSender();
+        if (owner() != sender && _nodeOwner != sender) {
             revert UnauthorizedOnlyOwnerOrNodeOwner();
         }
         _;
     }
 
-    constructor(address _owner) {
-        owner = _owner;
+    constructor(address _initialOwner) {
+        require(_initialOwner != address(0), "Initial owner should be non zero address");
+        _transferOwnership(_initialOwner);
     }
 
     /// @notice Adds a new node to the registry.
