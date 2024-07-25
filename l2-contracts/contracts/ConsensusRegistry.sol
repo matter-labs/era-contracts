@@ -26,9 +26,9 @@ contract ConsensusRegistry {
 
     /// @dev Represents a consensus node.
     struct Node {
-        // A flag stating if the node is inactive.
+        // A flag stating if the node is active.
         // Inactive nodes are not considered when selecting committees.
-        bool isInactive;
+        bool active;
         // Validator's voting weight.
         uint256 validatorWeight;
         // Validator's BLS12-381 public key.
@@ -115,7 +115,7 @@ contract ConsensusRegistry {
 
         nodeOwners.push(_nodeOwner);
         nodes[_nodeOwner] = Node({
-            isInactive: false,
+            active: true,
             validatorWeight: _validatorWeight,
             validatorPubKey: _validatorPubKey,
             validatorPoP: _validatorPoP,
@@ -130,7 +130,7 @@ contract ConsensusRegistry {
     /// @param _nodeOwner The address of the node's owner to be inactivated.
     function deactivate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         verifyNodeOwnerExists(_nodeOwner);
-        nodes[_nodeOwner].isInactive = true;
+        nodes[_nodeOwner].active = false;
     }
 
     /// @notice Activates a previously inactive node, allowing it to participate in committees.
@@ -139,7 +139,7 @@ contract ConsensusRegistry {
     /// @param _nodeOwner The address of the node's owner to be activated.
     function activate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         verifyNodeOwnerExists(_nodeOwner);
-        nodes[_nodeOwner].isInactive = false;
+        nodes[_nodeOwner].active = true;
     }
 
     /// @notice Removes a node from the registry.
@@ -210,7 +210,7 @@ contract ConsensusRegistry {
         for (uint256 i = 0; i < len; ++i) {
             address nodeOwner = nodeOwners[i];
             Node memory node = nodes[nodeOwner];
-            if (!node.isInactive) {
+            if (node.active) {
                 validatorCommittee.push(
                     CommitteeValidator(nodeOwner, node.validatorWeight, node.validatorPubKey, node.validatorPoP)
                 );
@@ -227,7 +227,7 @@ contract ConsensusRegistry {
         for (uint256 i = 0; i < len; ++i) {
             address nodeOwner = nodeOwners[i];
             Node memory node = nodes[nodeOwner];
-            if (!node.isInactive) {
+            if (node.active) {
                 attesterCommittee.push(CommitteeAttester(node.attesterWeight, nodeOwner, node.attesterPubKey));
             }
         }
