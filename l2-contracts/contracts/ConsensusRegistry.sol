@@ -65,8 +65,8 @@ contract ConsensusRegistry {
         _;
     }
 
-    modifier onlyOwnerOrNodeOwner(address nodeOwner) {
-        if (msg.sender != owner && msg.sender != nodeOwner) {
+    modifier onlyOwnerOrNodeOwner(address _nodeOwner) {
+        if (msg.sender != owner && msg.sender != _nodeOwner) {
             revert UnauthorizedOnlyOwnerOrNodeOwner();
         }
         _;
@@ -81,41 +81,41 @@ contract ConsensusRegistry {
     /// @dev Fails if a validator with the same public key already exists.
     /// @dev Fails if an attester with the same public key already exists.
 
-    /// @param nodeOwner The address of the new node's owner.
-    /// @param validatorWeight The voting weight of the validator.
-    /// @param validatorPubKey The BLS12-381 public key of the validator.
-    /// @param validatorPoP The proof-of-possession (PoP) of the validator's public key.
-    /// @param attesterWeight The voting weight of the attester.
-    /// @param attesterPubKey The ECDSA public key of the attester.
+    /// @param _nodeOwner The address of the new node's owner.
+    /// @param _validatorWeight The voting weight of the validator.
+    /// @param _validatorPubKey The BLS12-381 public key of the validator.
+    /// @param _validatorPoP The proof-of-possession (PoP) of the validator's public key.
+    /// @param _attesterWeight The voting weight of the attester.
+    /// @param _attesterPubKey The ECDSA public key of the attester.
     function add(
-        address nodeOwner,
-        uint256 validatorWeight,
-        bytes calldata validatorPubKey,
-        bytes calldata validatorPoP,
-        uint256 attesterWeight,
-        bytes calldata attesterPubKey
+        address _nodeOwner,
+        uint256 _validatorWeight,
+        bytes calldata _validatorPubKey,
+        bytes calldata _validatorPoP,
+        uint256 _attesterWeight,
+        bytes calldata _attesterPubKey
     ) external onlyOwner {
         uint256 len = nodeOwners.length;
         for (uint256 i = 0; i < len; ++i) {
-            if (nodeOwners[i] == nodeOwner) {
+            if (nodeOwners[i] == _nodeOwner) {
                 revert NodeOwnerAlreadyExists();
             }
-            if (compareBytes(nodes[nodeOwners[i]].validatorPubKey, validatorPubKey)) {
+            if (compareBytes(nodes[nodeOwners[i]].validatorPubKey, _validatorPubKey)) {
                 revert ValidatorPubKeyAlreadyExists();
             }
-            if (compareBytes(nodes[nodeOwners[i]].attesterPubKey, attesterPubKey)) {
+            if (compareBytes(nodes[nodeOwners[i]].attesterPubKey, _attesterPubKey)) {
                 revert AttesterPubKeyAlreadyExists();
             }
         }
 
-        nodeOwners.push(nodeOwner);
-        nodes[nodeOwner] = Node({
+        nodeOwners.push(_nodeOwner);
+        nodes[_nodeOwner] = Node({
             isInactive: false,
-            validatorWeight: validatorWeight,
-            validatorPubKey: validatorPubKey,
-            validatorPoP: validatorPoP,
-            attesterWeight: attesterWeight,
-            attesterPubKey: attesterPubKey
+            validatorWeight: _validatorWeight,
+            validatorPubKey: _validatorPubKey,
+            validatorPoP: _validatorPoP,
+            attesterWeight: _attesterWeight,
+            attesterPubKey: _attesterPubKey
         });
     }
 
@@ -123,84 +123,84 @@ contract ConsensusRegistry {
     /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
     ///
-    /// @param nodeOwner The address of the node's owner to be inactivated.
-    function deactivate(address nodeOwner) external onlyOwnerOrNodeOwner(nodeOwner) {
-        verifyNodeOwnerExists(nodeOwner);
-        nodes[nodeOwner].isInactive = true;
+    /// @param _nodeOwner The address of the node's owner to be inactivated.
+    function deactivate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
+        verifyNodeOwnerExists(_nodeOwner);
+        nodes[_nodeOwner].isInactive = true;
     }
 
     /// @notice Activates a previously inactive node, allowing it to participate in committees.
     /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
     ///
-    /// @param nodeOwner The address of the node's owner to be activated.
-    function activate(address nodeOwner) external onlyOwnerOrNodeOwner(nodeOwner) {
-        verifyNodeOwnerExists(nodeOwner);
-        nodes[nodeOwner].isInactive = false;
+    /// @param _nodeOwner The address of the node's owner to be activated.
+    function activate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
+        verifyNodeOwnerExists(_nodeOwner);
+        nodes[_nodeOwner].isInactive = false;
     }
 
     /// @notice Removes a node from the registry.
     /// @dev Only callable by the contract owner.
     /// @dev Verifies that the node owner exists in the registry.
     ///
-    /// @param nodeOwner The address of the node's owner to be removed.
-    function remove(address nodeOwner) external onlyOwner {
-        verifyNodeOwnerExists(nodeOwner);
+    /// @param _nodeOwner The address of the node's owner to be removed.
+    function remove(address _nodeOwner) external onlyOwner {
+        verifyNodeOwnerExists(_nodeOwner);
         // Remove from array by swapping the last element (gas-efficient, not preserving order).
-        nodeOwners[nodeOwnerIdx(nodeOwner)] = nodeOwners[nodeOwners.length - 1];
+        nodeOwners[nodeOwnerIdx(_nodeOwner)] = nodeOwners[nodeOwners.length - 1];
         nodeOwners.pop();
         // Remove from mapping.
-        delete nodes[nodeOwner];
+        delete nodes[_nodeOwner];
     }
 
     /// @notice Changes the validator weight of a node in the registry.
     /// @dev Only callable by the contract owner.
     /// @dev Verifies that the node owner exists in the registry.
     ///
-    /// @param nodeOwner The address of the node's owner whose validator weight will be changed.
-    /// @param weight The new validator weight to assign to the node.
-    function changeValidatorWeight(address nodeOwner, uint256 weight) external onlyOwner {
-        verifyNodeOwnerExists(nodeOwner);
-        nodes[nodeOwner].validatorWeight = weight;
+    /// @param _nodeOwner The address of the node's owner whose validator weight will be changed.
+    /// @param _weight The new validator weight to assign to the node.
+    function changeValidatorWeight(address _nodeOwner, uint256 _weight) external onlyOwner {
+        verifyNodeOwnerExists(_nodeOwner);
+        nodes[_nodeOwner].validatorWeight = _weight;
     }
 
     /// @notice Changes the attester weight of a node in the registry.
     /// @dev Only callable by the contract owner.
     /// @dev Verifies that the node owner exists in the registry.
     ///
-    /// @param nodeOwner The address of the node's owner whose attester weight will be changed.
-    /// @param weight The new attester weight to assign to the node.
-    function changeAttesterWeight(address nodeOwner, uint256 weight) external onlyOwner {
-        verifyNodeOwnerExists(nodeOwner);
-        nodes[nodeOwner].attesterWeight = weight;
+    /// @param _nodeOwner The address of the node's owner whose attester weight will be changed.
+    /// @param _weight The new attester weight to assign to the node.
+    function changeAttesterWeight(address _nodeOwner, uint256 _weight) external onlyOwner {
+        verifyNodeOwnerExists(_nodeOwner);
+        nodes[_nodeOwner].attesterWeight = _weight;
     }
 
     /// @notice Changes the validator's public key and proof-of-possession (PoP) in the registry.
     /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
     ///
-    /// @param nodeOwner The address of the node's owner whose validator key and PoP will be changed.
-    /// @param pubKey The new BLS12-381 public key to assign to the node's validator.
-    /// @param pop The new proof-of-possession (PoP) to assign to the node's validator.
+    /// @param _nodeOwner The address of the node's owner whose validator key and PoP will be changed.
+    /// @param _pubKey The new BLS12-381 public key to assign to the node's validator.
+    /// @param _pop The new proof-of-possession (PoP) to assign to the node's validator.
     function changeValidatorKey(
-        address nodeOwner,
-        bytes calldata pubKey,
-        bytes calldata pop
-    ) external onlyOwnerOrNodeOwner(nodeOwner) {
-        verifyNodeOwnerExists(nodeOwner);
-        nodes[nodeOwner].validatorPubKey = pubKey;
-        nodes[nodeOwner].validatorPoP = pop;
+        address _nodeOwner,
+        bytes calldata _pubKey,
+        bytes calldata _pop
+    ) external onlyOwnerOrNodeOwner(_nodeOwner) {
+        verifyNodeOwnerExists(_nodeOwner);
+        nodes[_nodeOwner].validatorPubKey = _pubKey;
+        nodes[_nodeOwner].validatorPoP = _pop;
     }
 
     /// @notice Changes the attester's public key of a node in the registry.
     /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
     ///
-    /// @param nodeOwner The address of the node's owner whose attester public key will be changed.
-    /// @param pubKey The new ECDSA public key to assign to the node's attester.
-    function changeAttesterPubKey(address nodeOwner, bytes calldata pubKey) external onlyOwnerOrNodeOwner(nodeOwner) {
-        verifyNodeOwnerExists(nodeOwner);
-        nodes[nodeOwner].attesterPubKey = pubKey;
+    /// @param _nodeOwner The address of the node's owner whose attester public key will be changed.
+    /// @param _pubKey The new ECDSA public key to assign to the node's attester.
+    function changeAttesterPubKey(address _nodeOwner, bytes calldata _pubKey) external onlyOwnerOrNodeOwner(_nodeOwner) {
+        verifyNodeOwnerExists(_nodeOwner);
+        nodes[_nodeOwner].attesterPubKey = _pubKey;
     }
 
     /// @notice Rotates the validator committee list based on active validators in the registry.
@@ -238,9 +238,9 @@ contract ConsensusRegistry {
     /// @notice Verifies that a node owner exists in the registry.
     /// @dev Throws an error if the node owner does not exist.
     ///
-    /// @param nodeOwner The address of the node's owner to verify.
-    function verifyNodeOwnerExists(address nodeOwner) private view {
-        if (nodes[nodeOwner].validatorPubKey.length == 0) {
+    /// @param _nodeOwner The address of the node's owner to verify.
+    function verifyNodeOwnerExists(address _nodeOwner) private view {
+        if (nodes[_nodeOwner].validatorPubKey.length == 0) {
             revert NodeOwnerDoesNotExist();
         }
     }
@@ -248,12 +248,12 @@ contract ConsensusRegistry {
     /// @notice Finds the index of a node owner in the `nodeOwners` array.
     /// @dev Throws an error if the node owner is not found in the array.
     ///
-    /// @param nodeOwner The address of the node's owner to find in the `nodeOwners` array.
+    /// @param _nodeOwner The address of the node's owner to find in the `nodeOwners` array.
     /// @return The index of the node owner in the `nodeOwners` array.
-    function nodeOwnerIdx(address nodeOwner) private view returns (uint256) {
+    function nodeOwnerIdx(address _nodeOwner) private view returns (uint256) {
         uint256 len = nodeOwners.length;
         for (uint256 i = 0; i < len; ++i) {
-            if (nodeOwners[i] == nodeOwner) {
+            if (nodeOwners[i] == _nodeOwner) {
                 return i;
             }
         }
