@@ -4,6 +4,8 @@ pragma solidity 0.8.20;
 
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @title ConsensusRegistry
 /// @dev A contract to manage consensus nodes and committees.
 contract ConsensusRegistry {
