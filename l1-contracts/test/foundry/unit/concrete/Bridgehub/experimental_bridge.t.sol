@@ -117,7 +117,6 @@ contract ExperimentalBridgeTest is Test {
         address randomCaller,
         address randomAddressWithoutTheCorrectInterface
     ) public {
-        vm.assume(randomCaller != address(0));
         bool isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(!isSTMRegistered);
 
@@ -299,7 +298,6 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function test_setSharedBridge_cannotBeCalledByRandomAddress(address randomCaller, address randomAddress) public {
-        vm.assume(randomCaller != address(0));
         if (randomCaller != bridgeOwner) {
             vm.prank(randomCaller);
             vm.expectRevert(bytes("Ownable: caller is not the owner"));
