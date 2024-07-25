@@ -7,7 +7,8 @@ import type { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import type { BigNumberish, BytesLike } from "ethers";
 import { BigNumber, ethers } from "ethers";
 import * as fs from "fs";
-import { hashBytecode } from "zksync-web3/build/src/utils";
+import * as fsPr from "fs/promises";
+import { hashBytecode } from "zksync-ethers/build/utils";
 import type { YulContractDescription, ZasmContractDescription } from "./constants";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
 import { getCompilersDir } from "hardhat/internal/util/global-dir";
@@ -15,9 +16,6 @@ import path from "path";
 import { spawn as _spawn } from "child_process";
 import { createHash } from "crypto";
 import { CompilerDownloader } from "hardhat/internal/solidity/compiler/downloader";
-import fetch from "node-fetch";
-
-export type HttpMethod = "POST" | "GET";
 
 export interface Dependency {
   name: string;
@@ -257,46 +255,74 @@ export function prepareCompilerPaths(path: string): CompilerPaths {
   return new CompilerPaths(absolutePathSources, absolutePathArtifacts);
 }
 
-/**
- * Performs an API call to the Contract verification API.
- *
- * @param endpoint API endpoint to call.
- * @param queryParams Parameters for a query string.
- * @param requestBody Request body. If provided, a POST request would be met and body would be encoded to JSON.
- * @returns API response parsed as a JSON.
- */
-export async function query(
-  method: HttpMethod,
-  endpoint: string,
-  queryParams?: { [key: string]: string },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  requestBody?: any
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any> {
-  const url = new URL(endpoint);
-  // Iterate through query params and add them to URL.
-  if (queryParams) {
-    Object.entries(queryParams).forEach(([key, value]) => url.searchParams.set(key, value));
-  }
+// Get the latest file modification time in the watched folder
+function getLatestModificationTime(folder: string): Date | null {
+  const files = fs.readdirSync(folder);
+  let latestTime: Date | null = null; // Initialize to null to avoid uninitialized variable
 
-  const init = {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(requestBody),
-  };
-  if (requestBody) {
-    init.body = JSON.stringify(requestBody);
-  }
+  files.forEach((file) => {
+    const filePath = path.join(folder, file);
+    const stats = fs.statSync(filePath);
+    if (stats.isDirectory()) {
+      const dirLatestTime = getLatestModificationTime(filePath);
+      if (dirLatestTime && (!latestTime || dirLatestTime > latestTime)) {
+        latestTime = dirLatestTime;
+      }
+    } else if (stats.isFile()) {
+      if (!latestTime || stats.mtime > latestTime) {
+        latestTime = stats.mtime;
+      }
+    }
+  });
 
-  const response = await fetch(url, init);
+  return latestTime;
+}
+
+// Read the last compilation timestamp from the file
+export function getLastCompilationTime(timestampFile: string): Date | null {
   try {
-    return await response.json();
-  } catch (e) {
-    throw {
-      error: "Could not decode JSON in response",
-      status: `${response.status} ${response.statusText}`,
-    };
+    if (fs.existsSync(timestampFile)) {
+      const timestamp = fs.readFileSync(timestampFile, "utf-8");
+      return new Date(parseInt(timestamp, 10));
+    }
+  } catch (error) {
+    const err = error as Error; // Cast `error` to `Error`
+    console.error(`Error reading timestamp: ${err.message}`);
+  }
+  return null;
+}
+
+// Write the current time to the timestamp file
+export function setCompilationTime(timestampFile: string) {
+  fs.writeFileSync(timestampFile, Date.now().toString());
+}
+
+// Determine if recompilation is needed
+export function needsRecompilation(folder: string, timestampFile: string): boolean {
+  const lastCompilationTime = getLastCompilationTime(timestampFile);
+  const latestModificationTime = getLatestModificationTime(folder);
+  if (!lastCompilationTime) {
+    return true; // If there's no history, always recompile
+  }
+
+  return latestModificationTime! > lastCompilationTime;
+}
+
+export function deleteDir(path: string): void {
+  try {
+    fs.rmSync(path, { recursive: true, force: true }); // 'recursive: true' deletes all contents, 'force: true' prevents errors if the directory doesn't exist
+    console.log(`Directory '${path}' deleted successfully.`);
+  } catch (error) {
+    console.error(`Error deleting directory '${path}':`, error);
+  }
+}
+
+export async function isFolderEmpty(folderPath: string): Promise<boolean> {
+  try {
+    const files = await fsPr.readdir(folderPath); // Get a list of files in the folder
+    return files.length === 0; // If there are no files, the folder is empty
+  } catch (error) {
+    console.error("No target folder with artifacts.");
+    return true; // Return true if an error, as folder doesn't exist.
   }
 }

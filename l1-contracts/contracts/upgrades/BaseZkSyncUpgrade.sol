@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable reason-string, gas-custom-errors
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {ZkSyncHyperchainBase} from "../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
@@ -239,8 +240,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
     function _verifyFactoryDeps(bytes[] calldata _factoryDeps, uint256[] calldata _expectedHashes) private pure {
         require(_factoryDeps.length == _expectedHashes.length, "Wrong number of factory deps");
         require(_factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "Factory deps can be at most 32");
+        uint256 length = _factoryDeps.length;
 
-        for (uint256 i = 0; i < _factoryDeps.length; ++i) {
+        for (uint256 i = 0; i < length; ++i) {
             require(
                 L2ContractHelper.hashL2Bytecode(_factoryDeps[i]) == bytes32(_expectedHashes[i]),
                 "Wrong factory dep hash"

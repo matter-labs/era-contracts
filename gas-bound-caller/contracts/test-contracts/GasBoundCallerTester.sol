@@ -57,9 +57,9 @@ contract GasBoundCallerTester is GasBoundCaller {
         }
     }
 
-    function testReturndataOverhead(uint256 len) external {
+    function testReturndataOverhead(uint256 _len, uint256 _gasForInner) external {
         uint256 gasbefore = gasleft();
-        this.testReturndataOverheadInner(false, len);
+        this.testReturndataOverheadInner{gas: _gasForInner}(false, _len);
         lastRecordedGasLeft = gasbefore - gasleft();
     }
 
