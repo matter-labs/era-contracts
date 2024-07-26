@@ -132,11 +132,11 @@ interface IBridgehub {
 
     event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
 
-    event StateTransitionManagerAdded(address stateTransitionManager);
+    event StateTransitionManagerAdded(address indexed stateTransitionManager);
 
-    event StateTransitionManagerRemoved(address stateTransitionManager);
+    event StateTransitionManagerRemoved(address indexed stateTransitionManager);
 
-    event TokenRegistered(address token);
+    event TokenRegistered(address indexed token);
 
-    event SharedBridgeUpdated(address sharedBridge);
+    event SharedBridgeUpdated(address indexed sharedBridge);
 }
