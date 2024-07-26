@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import {IAssetRouterBase} from "./IAssetRouterBase.sol";
+import {IAssetRouterBase} from "l1-contracts-imported/contracts/bridge/interfaces/IAssetRouterBase.sol";
 
 /// @author Matter Labs
 interface IL2AssetRouter is IAssetRouterBase {

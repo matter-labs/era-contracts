@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import {INativeTokenVault} from "./INativeTokenVault.sol";
+import {INativeTokenVault} from "l1-contracts-imported/contracts/bridge/interfaces/INativeTokenVault.sol";
 
 /// @author Matter Labs
 interface IL2NativeTokenVault is INativeTokenVault {

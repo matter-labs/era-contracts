@@ -42,6 +42,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
     IAssetRouterBase public immutable override ASSET_ROUTER;
 
+    /// @dev The address of the WETH token.
+    address public immutable override BASE_TOKEN_ADDRESS; // ToDo: would this work in terms of storage layout?
+
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
@@ -62,11 +65,12 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
     /// @param _wethToken Address of WETH on deployed chain
-    /// @param _assetRouter Address of Asset Router contract on deployed chain
-    constructor(address _wethToken, IAssetRouterBase _assetRouter) {
+    /// @param _baseTokenAddress Address of Base token
+    constructor(address _wethToken, address _assetRouter, address _baseTokenAddress) {
         _disableInitializers();
-        ASSET_ROUTER = _assetRouter;
+        ASSET_ROUTER = IAssetRouterBase(_assetRouter);
         WETH_TOKEN = _wethToken;
+        BASE_TOKEN_ADDRESS = _baseTokenAddress;
     }
 
     /// @notice Sets token beacon used by bridged ERC20 tokens deployed by NTV.
@@ -99,7 +103,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
     function registerToken(address _nativeToken) external {
         require(_nativeToken != WETH_TOKEN, "NTV: WETH deposit not supported");
-        require(_nativeToken == ETH_TOKEN_ADDRESS || _nativeToken.code.length > 0, "NTV: empty token");
+        require(_nativeToken == BASE_TOKEN_ADDRESS || _nativeToken.code.length > 0, "NTV: empty token");
         bytes32 assetId = getAssetId(_nativeToken);
         ASSET_ROUTER.setAssetHandlerAddress(bytes32(uint256(uint160(_nativeToken))), address(this));
         tokenAddress[assetId] = _nativeToken;
@@ -121,7 +125,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             require(chainBalance[_chainId][token] >= amount, "NTV not enough funds 2"); // not enough funds
             chainBalance[_chainId][token] -= amount;
 
-            if (token == ETH_TOKEN_ADDRESS) {
+            if (token == BASE_TOKEN_ADDRESS) {
                 bool callSuccess;
                 // Low-level assembly call, to avoid any memory copying (save gas)
                 assembly {
@@ -179,7 +183,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
             uint256 amount;
             address nativeToken = tokenAddress[_assetId];
-            if (nativeToken == ETH_TOKEN_ADDRESS) {
+            if (nativeToken == BASE_TOKEN_ADDRESS) {
                 amount = msg.value;
 
                 // In the old SDK/contracts the user had to always provide `0` as the deposit amount for ETH token, while

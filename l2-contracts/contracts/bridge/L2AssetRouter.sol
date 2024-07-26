@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
@@ -12,9 +12,9 @@ import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IL2AssetHandler} from "./interfaces/IL2AssetHandler.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
-import {IBridgehub} from "./interfaces/IBridgehub.sol";
 
-import {AssetRouterBase} from "./AssetRouterBase.sol";
+import {IBridgehub} from "l1-contracts-imported/contracts/bridgehub/IBridgehub.sol";
+import {AssetRouterBase} from "l1-contracts-imported/contracts/bridge/AssetRouterBase.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, L2_NATIVE_TOKEN_VAULT} from "../L2ContractHelper.sol";
 import {EmptyAddress, InvalidCaller} from "../L2ContractErrors.sol";
