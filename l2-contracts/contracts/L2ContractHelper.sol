@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
 import {IL2AssetRouter} from "./bridge/interfaces/IL2AssetRouter.sol";
@@ -122,6 +122,10 @@ ICompressor constant COMPRESSOR_CONTRACT = ICompressor(address(SYSTEM_CONTRACTS_
 IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher(
     address(SYSTEM_CONTRACTS_OFFSET + 0x11)
 );
+
+address constant ETH_TOKEN_ADDRESS = address(1);
+address constant NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS = address(2);
+bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
 
 /**
  * @author Matter Labs

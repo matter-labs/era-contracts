@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
+
+import {IAssetRouterBase} from "l1-contracts-imported/contracts/bridge/interfaces/IAssetRouterBase.sol";
 
 /// @author Matter Labs
-interface IL2AssetRouter {
-    event FinalizeDepositSharedBridge(uint256 chainId, bytes32 indexed assetId, bytes32 assetDataHash);
-
+interface IL2AssetRouter is IAssetRouterBase {
     event WithdrawalInitiatedSharedBridge(
         uint256 chainId,
         address indexed l2Sender,
@@ -13,22 +13,11 @@ interface IL2AssetRouter {
         bytes32 assetDataHash
     );
 
-    event AssetHandlerRegisteredInitial(
-        bytes32 indexed assetId,
-        address indexed _assetAddress,
-        bytes32 indexed additionalData,
-        address sender
-    );
-
     event AssetHandlerRegistered(bytes32 indexed assetId, address indexed _assetAddress);
-
-    function finalizeDeposit(bytes32 _assetId, bytes calldata _data) external;
 
     function withdraw(bytes32 _assetId, bytes calldata _data) external;
 
     function l1Bridge() external view returns (address);
-
-    function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 
     function l1SharedBridge() external view returns (address);
 

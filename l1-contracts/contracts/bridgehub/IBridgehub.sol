@@ -2,11 +2,10 @@
 
 pragma solidity 0.8.24;
 
-import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
+import {IAssetRouterBase} from "../bridge/interfaces/IAssetRouterBase.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -40,7 +39,7 @@ struct L2TransactionRequestTwoBridgesInner {
     bytes32 txDataHash;
 }
 
-interface IBridgehub is IL1AssetHandler {
+interface IBridgehub {
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
@@ -75,7 +74,7 @@ interface IBridgehub is IL1AssetHandler {
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
-    function sharedBridge() external view returns (IL1AssetRouter);
+    function sharedBridge() external view returns (IAssetRouterBase);
 
     function messageRoot() external view returns (IMessageRoot);
 
@@ -143,7 +142,8 @@ interface IBridgehub is IL1AssetHandler {
     function addToken(address _token) external;
 
     function setAddresses(
-        address _sharedBridge,
+        IAssetRouterBase _sharedBridge,
+        address _l1Nullifier,
         ISTMDeploymentTracker _stmDeployer,
         IMessageRoot _messageRoot
     ) external;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 /// @author Matter Labs
 // note we use the IL1ERC20Bridge only to send L1<>L2 messages,

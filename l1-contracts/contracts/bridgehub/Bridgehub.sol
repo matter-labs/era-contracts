@@ -8,7 +8,8 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/acces
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
-import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "../bridge/interfaces/IAssetRouterBase.sol";
+import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
@@ -33,7 +34,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     uint256 public immutable L1_CHAIN_ID;
 
     /// @notice all the ether is held by the weth bridge
-    IL1AssetRouter public sharedBridge;
+    IAssetRouterBase public sharedBridge;
 
     /// @notice we store registered stateTransitionManagers
     mapping(address stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
@@ -70,6 +71,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @dev Sync layer chain is expected to have .. as the base token.
     mapping(uint256 chainId => bool isWhitelistedSyncLayer) public whitelistedSettlementLayers;
+
+    /// @dev The contract responsible for confirming l2 tx, and is withdrawal finalized mapping.
+    IL1Nullifier public nullifier;
 
     /// @notice to avoid parity hack
     constructor(uint256 _l1ChainId, address _owner) reentrancyGuardInitializer {
@@ -130,11 +134,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
     function setAddresses(
-        address _sharedBridge,
+        IAssetRouterBase _sharedBridge,
+        address _nullifier,
         ISTMDeploymentTracker _stmDeployer,
         IMessageRoot _messageRoot
     ) external onlyOwner {
-        sharedBridge = IL1AssetRouter(_sharedBridge);
+        sharedBridge = _sharedBridge;
+        nullifier = IL1Nullifier(_nullifier);
         stmDeployer = _stmDeployer;
         messageRoot = _messageRoot;
     }
@@ -168,8 +174,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
-    function setSharedBridge(address _sharedBridge) external onlyOwner {
-        sharedBridge = IL1AssetRouter(_sharedBridge);
+    function setSharedBridge(IAssetRouterBase _sharedBridge) external onlyOwner {
+        sharedBridge = _sharedBridge;
     }
 
     function registerSyncLayer(
@@ -409,7 +415,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address hyperchain = getHyperchain(_request.chainId);
 
         // slither-disable-next-line arbitrary-send-eth
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1AssetRouter(_request.secondBridgeAddress)
+        L2TransactionRequestTwoBridgesInner memory outputRequest = IAssetRouterBase(_request.secondBridgeAddress)
             .bridgehubDeposit{value: _request.secondBridgeValue}(
             _request.chainId,
             msg.sender,
@@ -439,11 +445,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             })
         );
 
-        IL1AssetRouter(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
-            _request.chainId,
-            outputRequest.txDataHash,
-            canonicalTxHash
-        );
+        nullifier.bridgehubConfirmL2Transaction(_request.chainId, outputRequest.txDataHash, canonicalTxHash);
     }
 
     function forwardTransactionOnSyncLayer(
@@ -474,7 +476,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override returns (bytes memory bridgehubMintData) {
+    ) external payable returns (bytes memory bridgehubMintData) {
         require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
 
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainData) = abi.decode(_data, (uint256, bytes, bytes));
@@ -499,7 +501,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256,
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
-    ) external payable override returns (address l1Receiver) {
+    ) external payable returns (address l1Receiver) {
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainMintData) = abi.decode(
             _bridgehubMintData,
             (uint256, bytes, bytes)
@@ -519,12 +521,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData);
         return address(0);
     }
-
-    function bridgeRecoverFailedTransfer(
-        uint256 _chainId,
-        bytes32 _assetId,
-        bytes calldata _data
-    ) external payable override {}
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE
