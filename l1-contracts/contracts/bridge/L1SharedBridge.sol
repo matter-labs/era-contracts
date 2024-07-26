@@ -268,7 +268,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         // slither-disable-next-line unused-return
         IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
-            _destinationChainValue: _amount,
+            _mintOrL2Value: _amount,
             _assetId: assetId,
             _prevMsgSender: _prevMsgSender,
             _data: abi.encode(_amount, address(0))
@@ -377,7 +377,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
-            _l2Value: _l2Value,
+            _mintOrL2Value: _l2Value,
             _assetId: assetId,
             _prevMsgSender: _prevMsgSender,
             _transferData: transferData
@@ -411,7 +411,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev send the burn message to the asset
     function _burn(
         uint256 _chainId,
-        uint256 _l2Value,
+        uint256 _mintOrL2Value,
         bytes32 _assetId,
         address _prevMsgSender,
         bytes memory _transferData
@@ -419,7 +419,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         address l1AssetHandler = assetHandlerAddress[_assetId];
         bridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
-            _destinationChainValue: _l2Value,
+            _mintOrL2Value: _mintOrL2Value,
             _assetId: _assetId,
             _prevMsgSender: _prevMsgSender,
             _data: _transferData
