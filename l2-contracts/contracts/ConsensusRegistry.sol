@@ -196,7 +196,10 @@ contract ConsensusRegistry is Ownable2Step {
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner whose attester public key will be changed.
     /// @param _pubKey The new ECDSA public key to assign to the node's attester.
-    function changeAttesterPubKey(address _nodeOwner, bytes calldata _pubKey) external onlyOwnerOrNodeOwner(_nodeOwner) {
+    function changeAttesterPubKey(
+        address _nodeOwner,
+        bytes calldata _pubKey
+    ) external onlyOwnerOrNodeOwner(_nodeOwner) {
         require(_pubKey.length > 0, "_pubKey cannot be empty");
         verifyNodeOwnerExists(_nodeOwner);
         nodes[_nodeOwner].attesterPubKey = _pubKey;
