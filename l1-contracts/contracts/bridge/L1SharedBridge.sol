@@ -215,7 +215,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev Used to set the assedAddress for a given assetId.
     function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external {
         address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
-        bytes32 assetId = DataEncoding.encodeAssetId(_additionalData);
+        bytes32 assetId = DataEncoding.encodeAssetId(_additionalData, sender);
         assetHandlerAddress[assetId] = _assetHandlerAddress;
         assetDeploymentTracker[assetId] = msg.sender;
         emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _additionalData, sender);
@@ -285,7 +285,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _assetId bytes32 encoding of asset Id or padded address of the token
     function _getAssetProperties(bytes32 _assetId) internal returns (address l1AssetHandler, bytes32 assetId) {
         // Check if the passed id is the address and assume NTV for the case
-        assetId = uint256(_assetId) <= type(uint160).max ? DataEncoding.encodeAssetId(_assetId) : _assetId;
+        assetId = uint256(_assetId) <= type(uint160).max ? DataEncoding.encodeNTVAssetId(_assetId) : _assetId;
         l1AssetHandler = assetHandlerAddress[_assetId];
         // Check if no asset handler is set
         if (l1AssetHandler == address(0)) {
@@ -313,7 +313,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     function _ensureTokenRegisteredWithNTV(address _l1Token) internal returns (bytes32 assetId) {
-        assetId = nativeTokenVault.getAssetId(_l1Token);
+        assetId = DataEncoding.encodeNTVAssetId(_l1Token);
         if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
             nativeTokenVault.registerToken(_l1Token);
         }
@@ -705,7 +705,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
 
-            assetId = DataEncoding.encodeAssetId(l1Token);
+            assetId = DataEncoding.encodeNTVAssetId(l1Token);
             transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
             //todo
@@ -755,7 +755,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        bytes32 assetId = nativeTokenVault.getAssetId(_l1Asset);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(_l1Asset);
         bytes memory transferData = abi.encode(_amount, _depositSender);
         bridgeRecoverFailedTransfer({
             _chainId: _chainId,
@@ -912,7 +912,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bridgeRecoverFailedTransfer({
             _chainId: ERA_CHAIN_ID,
             _depositSender: _depositSender,
-            _assetId: nativeTokenVault.getAssetId(_l1Asset),
+            _assetId: DataEncoding.encodeNTVAssetId(_l1Asset),
             _assetData: transferData,
             _l2TxHash: _l2TxHash,
             _l2BatchNumber: _l2BatchNumber,

@@ -51,7 +51,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeAssetId(ETH_TOKEN_ADDRESS);
+        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(ETH_TOKEN_ADDRESS);
     }
 
     /// @notice used to initialize the contract
