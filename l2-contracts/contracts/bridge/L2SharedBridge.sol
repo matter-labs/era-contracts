@@ -32,9 +32,11 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal DEPRECATED_l2TokenProxyBytecodeHash;
 
+    /// @notice Deprecated. Kept for backwards compatibility.
     /// @dev A mapping l2 token address => l1 token address
     mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
 
+    /// @notice Obsolete, as all calls are performed via L1 Shared Bridge. Kept for backwards compatibility.
     /// @dev The address of the legacy L1 erc20 bridge counterpart.
     /// This is non-zero only on Era, and should not be renamed for backward compatibility with the SDKs.
     address public override l1Bridge;
