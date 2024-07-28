@@ -73,7 +73,7 @@ address constant DEPLOYER_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x
 
 address constant NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS = address(2);
 
-uint256 constant L1_CHAIN_ID = 9;
+uint256 constant L1_CHAIN_ID = 1;
 
 IL2Messenger constant L2_MESSENGER = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
 
