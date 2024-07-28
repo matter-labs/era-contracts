@@ -691,6 +691,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {
             // this message is a base token withdrawal
             (address l1Receiver, uint256 updatedOffset1) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+            // slither-disable-next-line unused-return
             (uint256 amount, ) = UnsafeBytes.readUint256(_l2ToL1message, updatedOffset1);
             assetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
             transferData = abi.encode(amount, l1Receiver);
@@ -704,6 +705,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             require(_l2ToL1message.length == 76, "ShB wrong msg len 2");
             (address l1Receiver, uint256 updatedOffset1) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (address l1Token, uint256 updatedOffset2) = UnsafeBytes.readAddress(_l2ToL1message, updatedOffset1);
+            // slither-disable-next-line unused-return
             (uint256 amount, ) = UnsafeBytes.readUint256(_l2ToL1message, updatedOffset2);
 
             assetId = keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, l1Token));
