@@ -260,8 +260,8 @@ contract ExperimentalBridgeTest is Test {
         if (randomAddress != address(testTokenAddress)) {
             // Testing to see if a random address can also be added or not
             vm.prank(bridgeOwner);
-            vm.expectRevert("NTV: empty token");
             bridgeHub.addToken(address(randomAddress));
+            assertTrue(bridgeHub.tokenIsRegistered(randomAddress));
         }
 
         // An already registered token cannot be registered again
