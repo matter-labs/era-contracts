@@ -687,7 +687,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {
-            // So the data is expected to be at least 56 bytes long.
+            // The data is expected to be at least 56 bytes long.
             require(_l2ToL1message.length >= 56, "ShB wrong msg len"); // wrong message length
             // this message is a base token withdrawal
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
