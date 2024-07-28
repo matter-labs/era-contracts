@@ -134,6 +134,8 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         return IGovernance.Call({target: config.bridgehub, value: 0, data: data});
     }
 
+    // NOTE: This function assumes that msg.sender is an EOA, so its address is not aliased, but the governance
+    // that is assumed to be a contract is using the alias.
     function computeL2BridgeAddress() internal returns (address) {
         bytes32 salt = "";
         bytes32 bridgeBytecodeHash = L2ContractHelper.hashL2Bytecode(bytecodes.l2SharedBridgeBytecode);
