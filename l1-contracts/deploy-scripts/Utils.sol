@@ -116,7 +116,7 @@ library Utils {
      */
     function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
         string memory file = vm.readFile(
-            // solhint-disable-next-line func-named-parameters
+        // solhint-disable-next-line func-named-parameters
             string.concat(
                 "../system-contracts/artifacts-zk/contracts-preprocessed/",
                 filename,
@@ -216,6 +216,92 @@ library Utils {
             l1SharedBridgeProxy: l1SharedBridgeProxy
         });
         return contractAddress;
+    }
+
+    function getDeployThroughL1Calldata(
+        bytes memory bytecode,
+        bytes memory constructorargs,
+        uint256 l2GasLimit,
+        bytes[] memory factoryDeps,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy,
+        address baseToken
+    ) internal returns (IGovernance.Call[] memory) {
+        IGovernance.Call[] memory calls;
+
+        bytes[] memory _factoryDeps = new bytes[](factoryDeps.length + 1);
+
+        for (uint256 i = 0; i < factoryDeps.length; ++i) {
+            _factoryDeps[i] = factoryDeps[i];
+        }
+
+        bytes memory deployData = abi.encodeWithSignature(
+            "create2(bytes32,bytes32,bytes)",
+            "", // salt
+            L2ContractHelper.hashL2Bytecode(bytecode),
+            constructorargs
+        );
+
+        _factoryDeps[factoryDeps.length] = bytecode;
+        calls = getRunL1L2TransactionCalls({
+            l2Calldata: deployData,
+            l2GasLimit: l2GasLimit,
+            factoryDeps: _factoryDeps,
+            dstAddress: L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+            chainId: chainId,
+            bridgehubAddress: bridgehubAddress,
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            baseTokenAddr: baseToken
+        });
+
+
+        return calls;
+    }
+
+    function getRunL1L2TransactionCalls(
+        bytes memory l2Calldata,
+        uint256 l2GasLimit,
+        bytes[] memory factoryDeps,
+        address dstAddress,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy,
+        address baseTokenAddr
+    ) internal view returns (IGovernance.Call[] memory) {
+        Bridgehub bridgehub = Bridgehub(bridgehubAddress);
+
+        uint256 requiredValueToDeploy = 43702139520000000; // hardcoded value, impossible to call the Mailbox not yet deployed contract
+
+        L2TransactionRequestDirect memory l2TransactionRequestDirect = L2TransactionRequestDirect({
+            chainId: chainId,
+            mintValue: requiredValueToDeploy,
+            l2Contract: dstAddress,
+            l2Value: 0,
+            l2Calldata: l2Calldata,
+            l2GasLimit: l2GasLimit,
+            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            factoryDeps: factoryDeps,
+            refundRecipient: msg.sender
+        });
+
+        IGovernance.Call[] memory calls;
+        if (baseTokenAddr == ADDRESS_ONE) {
+            calls = new IGovernance.Call[](1);
+            bytes memory _data = abi.encodeCall(bridgehub.requestL2TransactionDirect, (l2TransactionRequestDirect));
+            calls[0] = IGovernance.Call({target: baseTokenAddr, value: requiredValueToDeploy, data: _data});
+            return calls;
+        }
+
+        calls = new IGovernance.Call[](2);
+        IERC20 baseToken = IERC20(baseTokenAddr);
+        bytes memory _approvalData = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, requiredValueToDeploy));
+        calls[0] = IGovernance.Call({target: baseTokenAddr, value: 0, data: _approvalData});
+
+        bytes memory _txData = abi.encodeCall(bridgehub.requestL2TransactionDirect, (l2TransactionRequestDirect));
+        calls[1] = IGovernance.Call({target: bridgehubAddress, value: 0, data: _txData});
+
+        return calls;
     }
 
     /**

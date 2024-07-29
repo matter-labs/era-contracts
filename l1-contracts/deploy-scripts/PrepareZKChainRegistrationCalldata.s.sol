@@ -13,7 +13,7 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {IStateTransitionManager,ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
+import {IStateTransitionManager, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
@@ -53,31 +53,32 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         console.log("Preparing ZK chain registration calldata");
 
         initializeConfig();
-
         checkBaseTokenAddress();
 
-        IGovernance.Call[] memory calls;
-        uint256 cnt = 0;
+        IGovernance.Call memory baseTokenRegistrationCall;
         if (!IBridgehub(config.bridgehub).tokenIsRegistered(config.baseToken)) {
-            calls = new IGovernance.Call[](4);
-            IGovernance.Call memory baseTokenRegistrationCall = prepareRegisterBaseTokenCall();
-            calls[cnt] = baseTokenRegistrationCall;
-            cnt++;
-        } else {
-            calls = new IGovernance.Call[](3);
+            baseTokenRegistrationCall = prepareRegisterBaseTokenCall();
         }
 
-        IGovernance.Call memory setChainCreationParamsCall = prepareSetChainCreationParamsCall();
-        calls[cnt] = setChainCreationParamsCall;
-        cnt++;
+        (IGovernance.Call[] memory deployL2Calls, address l2SharedBridgeProxy) = prepareDeployL2BridgeCalls();
 
-        IGovernance.Call memory registerChainCall = prepareRegisterHyperchainCall();
-        calls[cnt] = registerChainCall;
-        cnt++;
+        uint256 counter = 0;
+        uint256 callsSize = 3 + deployL2Calls.length;
+        if (baseTokenRegistrationCall.target != address(0)) {
+            callsSize++;
+        }
 
-        address l2SharedBridgeProxy = computeL2BridgeAddress();
-        IGovernance.Call memory initChainCall = prepareInitializeChainGovernanceCall(l2SharedBridgeProxy);
-        calls[cnt] = initChainCall;
+        IGovernance.Call[] memory calls = new IGovernance.Call[](callsSize);
+        if (baseTokenRegistrationCall.target != address(0)) {
+            calls[counter++] = baseTokenRegistrationCall;
+        }
+
+        calls[counter++] = prepareSetChainCreationParamsCall();
+        calls[counter++] = prepareRegisterHyperchainCall();
+        for (uint256 i = 0; i < deployL2Calls.length; i++) {
+            calls[counter++] = deployL2Calls[i];
+        }
+        calls[counter] = prepareInitializeChainGovernanceCall(l2SharedBridgeProxy);
 
         scheduleTransparentCalldata(calls);
     }
@@ -133,7 +134,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         console.log("Using base token address:", config.baseToken);
     }
 
-    function prepareRegisterBaseTokenCall() internal returns (IGovernance.Call memory) {
+    function prepareRegisterBaseTokenCall() internal view returns (IGovernance.Call memory) {
         Bridgehub bridgehub = Bridgehub(config.bridgehub);
 
         bytes memory data = abi.encodeCall(bridgehub.addToken, (config.baseToken));
@@ -141,77 +142,81 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         return IGovernance.Call({target: config.bridgehub, value: 0, data: data});
     }
 
-    // NOTE: This function assumes that msg.sender is an EOA, so its address is not aliased, but the governance
-    // that is assumed to be a contract is using the alias.
-    function computeL2BridgeAddress() internal returns (address) {
-        bytes32 salt = "";
-        bytes32 bridgeBytecodeHash = L2ContractHelper.hashL2Bytecode(bytecodes.l2SharedBridgeBytecode);
-        bytes memory bridgeConstructorData = abi.encode(config.eraChainId);
+    function prepareDeployL2BridgeCalls() internal returns (IGovernance.Call[] memory, address) {
+        bytes[] memory factoryDeps = new bytes[](1);
+        factoryDeps[0] = bytecodes.beaconProxy;
 
-        address deployer;
-        address l2GovernorAddress;
+        address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
+        bytes memory constructorArgs = abi.encode(config.eraChainId);
 
-        if (isEOA(msg.sender)) {
-            deployer = msg.sender;
-        } else {
-            deployer = AddressAliasHelper.applyL1ToL2Alias(msg.sender);
-        }
+        IGovernance.Call[] memory callsImpl = Utils.getDeployThroughL1Calldata({
+            bytecode: bytecodes.l2SharedBridgeBytecode,
+            constructorargs: constructorArgs,
+            l2GasLimit: 1000000,
+            factoryDeps: factoryDeps,
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy,
+            baseToken: config.baseToken
+        });
 
-        if (isEOA(config.governance)) {
-            l2GovernorAddress = config.governance;
-        } else {
-            l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
-        }
-
-        address implContractAddress = L2ContractHelper.computeCreate2Address(
-            msg.sender,
-            salt,
-            bridgeBytecodeHash,
-            keccak256(bridgeConstructorData)
+        address implAddress = L2ContractHelper.computeCreate2Address(
+            l2GovernorAddress,
+            "", // salt
+            L2ContractHelper.hashL2Bytecode(bytecodes.l2SharedBridgeBytecode),
+            keccak256(constructorArgs)
         );
 
-        console.log("Computed L2 bridge impl address:", implContractAddress);
-        console.log("Bridge bytecode hash:");
-        console.logBytes32(bridgeBytecodeHash);
-        console.log("Bridge constructor data:");
-        console.logBytes(bridgeConstructorData);
-        console.log("Sender:", msg.sender);
-
-        bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(bytecodes.beaconProxy);
+        console.log("Computed L2 bridge impl address:", implAddress);
 
         // solhint-disable-next-line func-named-parameters
         bytes memory proxyInitializationParams = abi.encodeWithSignature(
             "initialize(address,address,bytes32,address)",
             config.l1SharedBridgeProxy,
             config.erc20BridgeProxy,
-            l2StandardErc20BytecodeHash,
+            L2ContractHelper.hashL2Bytecode(bytecodes.beaconProxy),
             l2GovernorAddress
         );
 
-        bytes memory l2SharedBridgeProxyConstructorData = abi.encode(
-            implContractAddress,
+        constructorArgs = abi.encode(
+            implAddress,
             l2GovernorAddress,
             proxyInitializationParams
         );
 
-        address proxyContractAddress = L2ContractHelper.computeCreate2Address(
-            msg.sender,
-            salt,
+        IGovernance.Call[] memory callsProxy = Utils.getDeployThroughL1Calldata({
+            bytecode: bytecodes.l2SharedBridgeProxyBytecode,
+            constructorargs: constructorArgs,
+            l2GasLimit: 1000000,
+            factoryDeps: new bytes[](0),
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy,
+            baseToken: config.baseToken
+        });
+
+        address proxyAddr = L2ContractHelper.computeCreate2Address(
+            l2GovernorAddress,
+            "", // salt
             L2ContractHelper.hashL2Bytecode(bytecodes.l2SharedBridgeProxyBytecode),
-            keccak256(l2SharedBridgeProxyConstructorData)
+            keccak256(constructorArgs)
         );
 
-        console.log("Computed L2 bridge proxy address:", proxyContractAddress);
-        console.log("L1 shared bridge proxy:", config.l1SharedBridgeProxy);
-        console.log("L1 ERC20 bridge proxy:", config.erc20BridgeProxy);
-        console.log("L2 governor addr:", l2GovernorAddress);
+        console.log("Computed L2 bridge proxy address:", proxyAddr);
 
-        return proxyContractAddress;
+        IGovernance.Call[] memory calls = new IGovernance.Call[](callsImpl.length + callsProxy.length);
+        for (uint256 i = 0; i < calls.length; i++) {
+            if (i < callsImpl.length) {
+                calls[i] = callsImpl[i];
+            } else {
+                calls[i] = callsProxy[i - callsImpl.length];
+            }
+        }
+
+        return (calls, proxyAddr);
     }
 
-    function prepareSetChainCreationParamsCall() internal returns (IGovernance.Call memory) {
-
-
+    function prepareSetChainCreationParamsCall() internal view returns (IGovernance.Call memory) {
         ChainCreationParams memory params = ChainCreationParams({
             genesisUpgrade: 0x3dDD7ED2AeC0758310A4C6596522FCAeD108DdA2,
             genesisBatchHash: bytes32(0xabdb766b18a479a5c783a4b80e12686bc8ea3cc2d8a3050491b701d72370ebb5),
@@ -225,7 +230,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         return IGovernance.Call({target: config.stateTransitionProxy, value: 0, data: data});
     }
 
-    function prepareRegisterHyperchainCall() internal returns (IGovernance.Call memory) {
+    function prepareRegisterHyperchainCall() internal view returns (IGovernance.Call memory) {
         Bridgehub bridgehub = Bridgehub(config.bridgehub);
 
         bytes memory data = abi.encodeCall(
@@ -243,7 +248,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         return IGovernance.Call({target: config.bridgehub, value: 0, data: data});
     }
 
-    function prepareInitializeChainGovernanceCall(address l2SharedBridgeProxy) internal returns (IGovernance.Call memory) {
+    function prepareInitializeChainGovernanceCall(address l2SharedBridgeProxy) internal view returns (IGovernance.Call memory) {
         L1SharedBridge bridge = L1SharedBridge(config.l1SharedBridgeProxy);
 
         bytes memory data = abi.encodeCall(bridge.initializeChainGovernance, (config.chainId, l2SharedBridgeProxy));
@@ -275,7 +280,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         vm.writeToml(toml, path);
     }
 
-    function isEOA(address _addr) private returns (bool) {
+    function isEOA(address _addr) private view returns (bool) {
         uint32 size;
         assembly {
             size := extcodesize(_addr)
@@ -287,6 +292,5 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
 
 // Done by the chain admin:
 // - add validators
-// - deploy L2 contracts
 // - set pubdata sending mode
 // - set base token gas price multiplier
