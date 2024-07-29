@@ -95,6 +95,16 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
+    modifier onlyAliasedZero() {
+        require(msg.sender == AddressAliasHelper.applyL1ToL2Alias(address(0)), "BH: not aliased zero");
+        _;
+    }
+
+    modifier onlyAssetRouter() {
+        require(msg.sender == address(sharedBridge), "BH: not asset router");
+        _;
+    }
+
     //// Initialization and registration
 
     /// @inheritdoc IBridgehub
@@ -452,7 +462,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external override {
+    ) external override onlyAliasedZero {
         require(L1_CHAIN_ID != block.chainid, "BH: not in sync layer mode");
         address hyperchain = getHyperchain(_chainId);
         IZkSyncHyperchain(hyperchain).bridgehubRequestL2TransactionOnSyncLayer(
@@ -474,7 +484,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override returns (bytes memory bridgehubMintData) {
+    ) external payable override onlyAssetRouter returns (bytes memory bridgehubMintData) {
         require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
 
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainData) = abi.decode(_data, (uint256, bytes, bytes));
@@ -499,7 +509,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256,
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
-    ) external payable override returns (address l1Receiver) {
+    ) external payable override onlyAssetRouter returns (address l1Receiver) {
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainMintData) = abi.decode(
             _bridgehubMintData,
             (uint256, bytes, bytes)
@@ -524,7 +534,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
-    ) external payable override {}
+    ) external payable override onlyAssetRouter {}
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE

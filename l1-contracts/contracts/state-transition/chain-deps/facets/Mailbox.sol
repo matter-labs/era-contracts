@@ -323,7 +323,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external {
+    ) external onlyBridgehub {
         _writePriorityOp(_transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp);
     }
 
@@ -345,7 +345,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         );
         return
             BridgehubL2TransactionRequest({
-                sender: s.bridgehub,
+                sender: AddressAliasHelper.applyL1ToL2Alias(address(0)),
                 contractL2: L2_BRIDGEHUB_ADDR,
                 mintValue: 0,
                 l2Value: 0,
