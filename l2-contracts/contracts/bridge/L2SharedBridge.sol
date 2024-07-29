@@ -33,7 +33,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal DEPRECATED_l2TokenProxyBytecodeHash;
 
-    /// @dev A mapping l2 token address => l1 token address
+    /// @dev A mapping of l2 token address to l1 token address
     mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
 
     /// @dev The address of the legacy L1 erc20 bridge counterpart.
@@ -49,7 +49,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @dev The contract responsible for handling tokens native to a single chain.
     IL2NativeTokenVault public nativeTokenVault;
 
-    /// @dev A mapping l2 token address => asset handler address
+    /// @dev A mapping asset of ID to asset handler address
     mapping(bytes32 assetId => address assetHandlerAddress) public override assetHandlerAddress;
 
     /// @notice Checks that the message sender is the legacy bridge.

@@ -213,7 +213,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
     }
 
-    /// @dev Used to set the assetHandlerAddress for a given assetId on the chain of the assetDeploymentTracker.
+    /// @notice Sets the asset handler address for a specified asset ID on the chain of the asset deployment tracker.
+    /// @dev The caller of this function is encoded within the `assetId`, therefore, it should be invoked by the asset deployment tracker contract.
+    /// @dev Typically, for most tokens, ADT is the native token vault. However, custom tokens may have their own specific asset deployment trackers.
+    /// @dev `setAssetHandlerAddressOnCounterPart` should be called on L1 to set asset handlers on L2 chains for a specific asset ID.
+    /// @param _additionalData The asset data which may include the asset address and any additional required data or encodings.
+    /// @param _assetHandlerAddress The address of the asset handler to be set for the provided asset.
     function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external {
         address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
         bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData));
@@ -223,6 +228,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev Used to set the assetHandlerAddress for a given assetId on chains different from the assetDeploymentTrackers chain.
+    /// @dev This function should typically be called by the respective asset deployment tracker, or alternatively by the owner.
     function setAssetHandlerAddressOnCounterPart(
         uint256 _chainId,
         uint256 _mintValue,
