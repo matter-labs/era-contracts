@@ -21,7 +21,6 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
     using stdToml for string;
 
     address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    bytes32 constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
 
     struct Config {
         address chainAdmin;
@@ -30,6 +29,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         address stateTransitionProxy;
 
         uint256 chainId;
+        uint256 eraChainId;
         uint256 bridgehubCreateNewChainSalt;
         address baseToken;
         bytes diamondCutData;
@@ -91,6 +91,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         config.erc20BridgeProxy = toml.readAddress("$.deployed_addresses.erc20_bridge_proxy_addr");
 
         config.chainId = toml.readUint("$.chain.chain_id");
+        config.eraChainId = toml.readUint("$.chain.era_chain_id");
         config.chainAdmin = toml.readAddress("$.chain.admin");
         config.diamondCutData = toml.readBytes("$.chain.diamond_cut_data");
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
@@ -139,7 +140,22 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
     function computeL2BridgeAddress() internal returns (address) {
         bytes32 salt = "";
         bytes32 bridgeBytecodeHash = L2ContractHelper.hashL2Bytecode(bytecodes.l2SharedBridgeBytecode);
-        bytes memory bridgeConstructorData = abi.encode(config.chainId);
+        bytes memory bridgeConstructorData = abi.encode(config.eraChainId);
+
+        address deployer;
+        address l2GovernorAddress;
+
+        if (isEOA(msg.sender)) {
+            deployer = msg.sender;
+        } else {
+            deployer = AddressAliasHelper.applyL1ToL2Alias(msg.sender);
+        }
+
+        if (isEOA(config.governance)) {
+            l2GovernorAddress = config.governance;
+        } else {
+            l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
+        }
 
         address implContractAddress = L2ContractHelper.computeCreate2Address(
             msg.sender,
@@ -155,7 +171,6 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         console.logBytes(bridgeConstructorData);
         console.log("Sender:", msg.sender);
 
-        address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
         bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(bytecodes.beaconProxy);
 
         // solhint-disable-next-line func-named-parameters
@@ -236,6 +251,15 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-prepare-registration-calldata.toml");
         vm.writeToml(toml, path);
+    }
+
+    function isEOA(address _addr) private returns (bool) {
+        uint32 size;
+        assembly {
+            size := extcodesize(_addr)
+        }
+
+        return (size == 0);
     }
 }
 
