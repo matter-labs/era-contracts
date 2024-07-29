@@ -187,7 +187,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         bytes calldata _data
     ) external payable override onlyBridge whenNotPaused returns (address l1Receiver) {
         uint256 amount;
-        (l1Receiver, amount) = _mintOrRecoverInternal(_chainId, _assetId, _data);
+        (l1Receiver, amount) = _mintOrRecover(_chainId, _assetId, _data);
         // solhint-disable-next-line func-named-parameters
         emit BridgeMint(_chainId, _assetId, l1Receiver, amount);
     }
@@ -199,17 +199,16 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         bytes calldata _data
     ) external payable override onlyBridge whenNotPaused {
         // slither-disable-next-line unused-return
-        _mintOrRecoverInternal(_chainId, _assetId, _data);
+        _mintOrRecover(_chainId, _assetId, _data);
     }
 
-    function _mintOrRecoverInternal(
+    function _mintOrRecover(
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
     ) internal returns (address l1Receiver, uint256 amount) {
         // here we are minting the tokens after the bridgeBurn has happened on an L2, so we can assume the l1Token is not zero
         address l1Token = tokenAddress[_assetId];
-        // todo: ideally we would have the receiver and sender both encoded here, that would be parsed in the bridgeBurn/bridgeRecoverFailedTransfer, and passed in here
         (amount, l1Receiver) = abi.decode(_data, (uint256, address));
 
         require(amount > 0, "y1");
