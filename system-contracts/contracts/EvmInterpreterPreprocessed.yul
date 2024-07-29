@@ -1326,7 +1326,7 @@ object "EVMInterpreter" {
             gasLeft := mload(0)
         }
         
-        function genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, evmGasLeft {
+        function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, evmGasLeft {
             pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
         
             _eraseReturndataPointer()
@@ -1475,7 +1475,7 @@ object "EVMInterpreter" {
             let addr := getNewAddress(address())
         
             let result
-            result, evmGasLeft := genericCreate(addr, offset, size, sp, value, evmGasLeft)
+            result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
         
             switch result
                 case 0 { sp := pushStackItem(sp, 0, evmGasLeft) }
@@ -1532,7 +1532,7 @@ object "EVMInterpreter" {
                 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
             )
         
-            result, evmGasLeft := genericCreate(addr, offset, size, sp, value, evmGasLeft) 
+            result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
         }
         
 
@@ -4186,7 +4186,7 @@ object "EVMInterpreter" {
                 gasLeft := mload(0)
             }
             
-            function genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, evmGasLeft {
+            function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, evmGasLeft {
                 pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
             
                 _eraseReturndataPointer()
@@ -4335,7 +4335,7 @@ object "EVMInterpreter" {
                 let addr := getNewAddress(address())
             
                 let result
-                result, evmGasLeft := genericCreate(addr, offset, size, sp, value, evmGasLeft)
+                result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
             
                 switch result
                     case 0 { sp := pushStackItem(sp, 0, evmGasLeft) }
@@ -4392,7 +4392,7 @@ object "EVMInterpreter" {
                     0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
                 )
             
-                result, evmGasLeft := genericCreate(addr, offset, size, sp, value, evmGasLeft) 
+                result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
             }
             
 
