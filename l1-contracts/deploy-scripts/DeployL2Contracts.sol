@@ -60,8 +60,7 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
-
-    function runDeployForceDeployer() public {
+    function runDefaultUpgrader() public {
         initializeConfig();
         loadContracts();
 
