@@ -43,20 +43,20 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev Era's chainID
     uint256 internal immutable ERA_CHAIN_ID;
 
-    /// @dev The address of ZKSync Era diamond proxy contract.
+    /// @dev The address of ZKsync Era diamond proxy contract.
     address internal immutable ERA_DIAMOND_PROXY;
 
-    /// @dev Stores the first batch number on the ZKSync Era Diamond Proxy that was settled after Diamond proxy upgrade.
+    /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after Diamond proxy upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade Eth withdrawals. Withdrawals from batches older
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
     uint256 internal eraPostDiamondUpgradeFirstBatch;
 
-    /// @dev Stores the first batch number on the ZKSync Era Diamond Proxy that was settled after L1ERC20 Bridge upgrade.
+    /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after L1ERC20 Bridge upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade ERC20 withdrawals. Withdrawals from batches older
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
     uint256 internal eraPostLegacyBridgeUpgradeFirstBatch;
 
-    /// @dev Stores the ZKSync Era batch number that processes the last deposit tx initiated by the legacy bridge
+    /// @dev Stores the ZKsync Era batch number that processes the last deposit tx initiated by the legacy bridge
     /// This variable (together with eraLegacyBridgeLastDepositTxNumber) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older batches
     /// than this value are considered to have been processed prior to the upgrade and handled separately.
     /// We use this both for Eth and erc20 token deposits, so we need to update the diamond and bridge simultaneously.
@@ -120,7 +120,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub or ZKSync Era Diamond Proxy.
+    /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
             msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY),
@@ -542,19 +542,19 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetId, _assetData);
     }
 
-    /// @dev Determines if an eth withdrawal was initiated on ZKSync Era before the upgrade to the Shared Bridge.
+    /// @dev Determines if an eth withdrawal was initiated on ZKsync Era before the upgrade to the Shared Bridge.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
-    /// @return Whether withdrawal was initiated on ZKSync Era before diamond proxy upgrade.
+    /// @return Whether withdrawal was initiated on ZKsync Era before diamond proxy upgrade.
     function _isEraLegacyEthWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
         require((_chainId != ERA_CHAIN_ID) || eraPostDiamondUpgradeFirstBatch != 0, "ShB: diamondUFB not set for Era");
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostDiamondUpgradeFirstBatch);
     }
 
-    /// @dev Determines if a token withdrawal was initiated on ZKSync Era before the upgrade to the Shared Bridge.
+    /// @dev Determines if a token withdrawal was initiated on ZKsync Era before the upgrade to the Shared Bridge.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
-    /// @return Whether withdrawal was initiated on ZKSync Era before Legacy Bridge upgrade.
+    /// @return Whether withdrawal was initiated on ZKsync Era before Legacy Bridge upgrade.
     function _isEraLegacyTokenWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
         require(
             (_chainId != ERA_CHAIN_ID) || eraPostLegacyBridgeUpgradeFirstBatch != 0,
@@ -563,11 +563,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostLegacyBridgeUpgradeFirstBatch);
     }
 
-    /// @dev Determines if a deposit was initiated on ZKSync Era before the upgrade to the Shared Bridge.
+    /// @dev Determines if a deposit was initiated on ZKsync Era before the upgrade to the Shared Bridge.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _l2BatchNumber The L2 batch number for the deposit where it was processed.
     /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the deposit was processed.
-    /// @return Whether deposit was initiated on ZKSync Era before Shared Bridge upgrade.
+    /// @return Whether deposit was initiated on ZKsync Era before Shared Bridge upgrade.
     function _isEraLegacyDeposit(
         uint256 _chainId,
         uint256 _l2BatchNumber,
@@ -628,7 +628,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(!isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");
         isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
-        // Handling special case for withdrawal from ZKSync Era initiated before Shared Bridge.
+        // Handling special case for withdrawal from ZKsync Era initiated before Shared Bridge.
         require(!_isEraLegacyEthWithdrawal(_chainId, _l2BatchNumber), "ShB: legacy eth withdrawal");
         require(!_isEraLegacyTokenWithdrawal(_chainId, _l2BatchNumber), "ShB: legacy token withdrawal");
         bytes memory transferData;
@@ -898,7 +898,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         l1Asset = nativeTokenVault.tokenAddress(assetId);
     }
 
-    /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on ZKSync Era chain.
+    /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on ZKsync Era chain.
     /// This function is specifically designed for maintaining backward-compatibility with legacy `claimFailedDeposit`
     /// method in `L1ERC20Bridge`.
     ///
