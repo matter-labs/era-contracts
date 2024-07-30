@@ -7,10 +7,7 @@ import {PriorityOperation} from "contracts/state-transition/libraries/PriorityQu
 
 contract GetPriorityQueueFrontOperationTest is GettersFacetTest {
     function test_empty() public {
+        vm.expectRevert("PQFront for PriorityTree");
         PriorityOperation memory received = gettersFacet.priorityQueueFrontOperation();
-
-        assertEq(received.canonicalTxHash, bytes32(0), "Priority queue front operation is incorrect");
-        assertEq(received.layer2Tip, 0, "Priority queue front operation is incorrect");
-        assertEq(received.expirationTimestamp, 0, "Priority queue front operation is incorrect");
     }
 }
