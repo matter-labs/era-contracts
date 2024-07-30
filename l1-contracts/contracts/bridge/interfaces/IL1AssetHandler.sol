@@ -32,7 +32,7 @@ interface IL1AssetHandler {
     ) external payable returns (address l1Receiver);
 
     /// @param _chainId the chainId that the message will be sent to
-    /// @param _l2Value thee msg.value of the L2 transaction
+    /// @param _l2Value the msg.value of the L2 transaction
     /// @param _assetId the assetId of the asset being bridged
     /// @param _prevMsgSender the original caller of the Bridgehub,
     /// @param _data the actual data specified for the function
