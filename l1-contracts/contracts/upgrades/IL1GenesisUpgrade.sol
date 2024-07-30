@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.24;
 
-import {ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
 interface IL1GenesisUpgrade {
