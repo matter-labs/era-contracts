@@ -50,9 +50,6 @@ abstract contract StateDiffL2DAValidator {
             calldataPtr += L2_TO_L1_LOG_SERIALIZE_SIZE;
             reconstructedChainedLogsHash = keccak256(abi.encode(reconstructedChainedLogsHash, hashedLog));
         }
-        if (reconstructedChainedLogsHash != _chainedLogsHash) {
-            revert ReconstructionMismatch(PubdataField.LogsHash, _chainedLogsHash, reconstructedChainedLogsHash);
-        }
 
         /// Check messages
         uint32 numberOfMessages = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
