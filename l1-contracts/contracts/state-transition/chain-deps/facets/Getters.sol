@@ -132,7 +132,13 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function priorityQueueFrontOperation() external view returns (PriorityOperation memory op) {}
+    function priorityQueueFrontOperation() external view returns (PriorityOperation memory op) {
+        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
+            revert("PQFront for PriorityTree");
+        } else {
+            return s.priorityQueue.front();
+        }
+    }
 
     /// @inheritdoc IGetters
     function isValidator(address _address) external view returns (bool) {
