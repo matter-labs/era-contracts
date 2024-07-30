@@ -1105,25 +1105,27 @@ export class Deployer {
       [await bridgehub.stmAssetIdFromChainId(this.chainId), bridgehubData]
     );
     sharedBridgeData = "0x01" + sharedBridgeData.slice(2);
-    const receipt = await this.executeDirectOrGovernance(
-      useGovernance,
-      bridgehub,
-      "requestL2TransactionTwoBridges",
-      [
-        {
-          chainId: syncLayerChainId,
-          mintValue: expectedCost,
-          l2Value: 0,
-          l2GasLimit: l2GasLimit,
-          l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-          refundRecipient: await this.deployWallet.getAddress(),
-          secondBridgeAddress: this.addresses.Bridges.SharedBridgeProxy,
-          secondBridgeValue: 0,
-          secondBridgeCalldata: sharedBridgeData,
-        },
-      ],
-      expectedCost
-    );
+
+    const receipt = await this.executeChainAdminMulticall([
+      {
+        target: bridgehub.address,
+        data: bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
+          {
+            chainId: syncLayerChainId,
+            mintValue: expectedCost,
+            l2Value: 0,
+            l2GasLimit: l2GasLimit,
+            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            refundRecipient: await this.deployWallet.getAddress(),
+            secondBridgeAddress: this.addresses.Bridges.SharedBridgeProxy,
+            secondBridgeValue: 0,
+            secondBridgeCalldata: sharedBridgeData,
+          },
+        ]),
+        value: expectedCost,
+      },
+    ]);
+
     return receipt;
   }
 
@@ -1293,8 +1295,10 @@ export class Deployer {
   public async executeChainAdminMulticall(calls: ChainAdminCall[], requireSuccess: boolean = true) {
     const chainAdmin = ChainAdminFactory.connect(this.addresses.ChainAdmin, this.deployWallet);
 
-    const multicallTx = await chainAdmin.multicall(calls, requireSuccess);
-    console.log(await multicallTx.wait());
+    const totalValue = calls.reduce((acc, call) => acc.add(call.value), ethers.BigNumber.from(0));
+
+    const multicallTx = await chainAdmin.multicall(calls, requireSuccess, { value: totalValue });
+    return await multicallTx.wait();
   }
 
   public async transferAdminFromDeployerToChainAdmin() {
