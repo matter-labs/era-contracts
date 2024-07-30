@@ -40,7 +40,7 @@ library PriorityTree {
 
     /// @return The total number of unprocessed priority operations in a priority queue
     function getSize(Tree storage _tree) internal view returns (uint256) {
-        return uint256(_tree.tree._nextLeafIndex - _tree.unprocessedIndex);
+        return _tree.tree._nextLeafIndex - _tree.unprocessedIndex;
     }
 
     /// @notice Add the priority operation to the end of the priority queue
