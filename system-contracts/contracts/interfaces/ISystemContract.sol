@@ -51,13 +51,4 @@ abstract contract ISystemContract {
         }
         _;
     }
-
-    /// @notice Modifier that makes sure that the method
-    /// can only be called from the L1 force deployer.
-    modifier onlyCallFromForceDeployer() {
-        if (msg.sender != FORCE_DEPLOYER) {
-            revert CallerMustBeForceDeployer();
-        }
-        _;
-    }
 }

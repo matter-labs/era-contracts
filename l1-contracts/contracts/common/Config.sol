@@ -111,13 +111,6 @@ address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint
 
 uint256 constant MAX_NUMBER_OF_HYPERCHAINS = 100;
 
-/// FIXME: move to a different file
-
-struct StoredBatchHashInfo {
-    uint256 number;
-    bytes32 hash;
-}
-
 struct PriorityTreeCommitment {
     uint256 nextLeafIndex;
     uint256 startIndex;
