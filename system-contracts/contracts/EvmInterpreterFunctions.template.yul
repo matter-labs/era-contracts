@@ -1252,7 +1252,7 @@ function _fetchConstructorReturnGas() -> gasLeft {
     gasLeft := mload(0)
 }
 
-function genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, evmGasLeft {
+function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, evmGasLeft {
     pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
 
     _eraseReturndataPointer()
@@ -1265,10 +1265,10 @@ function genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, 
 
     offset := add(MEM_OFFSET_INNER(), offset)
 
-    sp := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeft)
-    sp := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeft)
-    sp := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeft)
-    sp := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeft)
+    sp := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeftOld)
+    sp := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeftOld)
+    sp := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeftOld)
+    sp := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeftOld)
 
     // Selector
     mstore(sub(offset, 0x80), 0x5b16a23c)
@@ -1401,7 +1401,7 @@ function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
     let addr := getNewAddress(address())
 
     let result
-    result, evmGasLeft := genericCreate(addr, offset, size, sp, value, evmGasLeft)
+    result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
 
     switch result
         case 0 { sp := pushStackItem(sp, 0, evmGasLeft) }
@@ -1458,5 +1458,5 @@ function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp, result, addr
         0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
     )
 
-    result, evmGasLeft := genericCreate(addr, offset, size, sp, value, evmGasLeft) 
+    result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
 }
