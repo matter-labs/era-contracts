@@ -1339,10 +1339,10 @@ object "EVMInterpreter" {
         
             offset := add(MEM_OFFSET_INNER(), offset)
         
-            sp := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeft)
-            sp := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeft)
-            sp := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeft)
-            sp := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeft)
+            sp := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeftOld)
+            sp := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeftOld)
+            sp := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeftOld)
+            sp := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeftOld)
         
             // Selector
             mstore(sub(offset, 0x80), 0x5b16a23c)
@@ -4334,10 +4334,10 @@ object "EVMInterpreter" {
             
                 offset := add(MEM_OFFSET_INNER(), offset)
             
-                sp := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeft)
-                sp := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeft)
-                sp := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeft)
-                sp := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeft)
+                sp := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeftOld)
+                sp := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeftOld)
+                sp := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeftOld)
+                sp := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeftOld)
             
                 // Selector
                 mstore(sub(offset, 0x80), 0x5b16a23c)
