@@ -29,7 +29,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice the asset id of Eth
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
-    /// @dev The chain id of L1, this contract will be deployed on multiple layers.
+    /// @notice The chain id of L1, this contract will be deployed on multiple layers.
     uint256 public immutable L1_CHAIN_ID;
 
     /// @notice all the ether is held by the weth bridge
@@ -55,11 +55,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     // FIXME: `messageRoot` DOES NOT contain messages that come from the current layer and go to the settlement layer.
     // it may make sense to store the final root somewhere for interop purposes.
     // THough maybe it can be postponed.
+    /// @notice The contract that stores the cross-chain message root for each chain and the aggregated root.
     IMessageRoot public override messageRoot;
 
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
     mapping(uint256 chainId => bytes32 baseTokenAssetId) public baseTokenAssetId;
 
+    /// @notice The deployment tracker for the state transition managers.
     ISTMDeploymentTracker public stmDeployer;
 
     /// @dev asset info used to identify chains in the Shared Bridge
@@ -172,6 +174,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         sharedBridge = IL1AssetRouter(_sharedBridge);
     }
 
+    /// @notice Used to register a chain as a settlement layer.
     function registerSyncLayer(
         uint256 _newSyncLayerChainId,
         bool _isWhitelisted
@@ -196,10 +199,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return IStateTransitionManager(stateTransitionManager[_chainId]).getHyperchain(_chainId);
     }
 
+    /// @notice return the stm asset id of a chain.
     function stmAssetIdFromChainId(uint256 _chainId) public view override returns (bytes32) {
         return stmAssetId(stateTransitionManager[_chainId]);
     }
 
+    /// @notice return the stm asset id of an stm.
     function stmAssetId(address _stmAddress) public view override returns (bytes32) {
         return keccak256(abi.encode(L1_CHAIN_ID, address(stmDeployer), bytes32(uint256(uint160(_stmAddress)))));
     }
@@ -446,6 +451,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         );
     }
 
+    /// @notice Used to forward a transaction on a settlement layer to the chains mailbox (from L1).
     function forwardTransactionOnSyncLayer(
         uint256 _chainId,
         L2CanonicalTransaction calldata _transaction,
@@ -467,7 +473,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                         Chain migration
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev we can move assets using these
+    /// @notice IL1AssetHandler interface, used to send a chain to the settlement layer.
     function bridgeBurn(
         uint256 _settlementChainId,
         uint256,
@@ -495,6 +501,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // TODO: double check that get only returns when chain id is there.
     }
 
+    /// @dev IL1AssetHandler interface, used to receive a chain on the settlment layer.
     function bridgeMint(
         uint256,
         bytes32 _assetId,
@@ -520,6 +527,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return address(0);
     }
 
+    /// @dev IL1AssetHandler interface, used to undo a failed transfer of a chain.
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,

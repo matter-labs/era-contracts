@@ -36,21 +36,26 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
+    /// @notice The number of chains that are registered.
     uint256 public chainCount;
 
+    /// @notice The mapping from chainId to chainIndex.
     mapping(uint256 chainId => uint256 chainIndex) public chainIndex;
 
+    /// @notice The mapping from chainIndex to chainId.
     mapping(uint256 chainIndex => uint256 chainId) public chainIndexToId;
 
     // There are two ways to distinguish chains:
     // - Either by reserving the index 0 as a special value which denotes an unregistede chain
     // - Use a separate mapping
     // The second approach is used due to explicitness.
+    /// @notice The mapping from chainId to whether the chain is registered. Used because the chainIndex can be 0.
     mapping(uint256 chainId => bool isRegistered) public chainRegistered;
 
+    /// @notice The shared full merkle tree storing the aggregate hash.
     FullMerkle.FullTree public sharedTree;
 
-    /// @dev the incremental merkle tree storing the chain message roots
+    /// @dev The incremental merkle tree storing the chain message roots.
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
 
     /// @notice only the bridgehub can call
@@ -65,7 +70,8 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         _;
     }
 
-    /// @dev Contract is expected to be used as proxy implementation.
+    /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
+    /// This means we call the _initialize in both the constructor and the initialize functions.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(IBridgehub _bridgehub) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
@@ -77,30 +83,36 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         _initialize();
     }
 
+    /// @dev internal initialize.
     function _initialize() internal {
         // slither-disable-next-line unused-return
         sharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
     }
 
+    /// @dev Adds a new chain to the message root.
     function addNewChain(uint256 _chainId) external onlyBridgehub {
         require(!chainRegistered[_chainId], "MR: chain exists");
         _addNewChain(_chainId);
     }
 
+    /// @dev Adds a new chain to the message root if it has not been added yet.
     function addNewChainIfNeeded(uint256 _chainId) external onlyBridgehub {
         if (!chainRegistered[_chainId]) {
             _addNewChain(_chainId);
         }
     }
 
+    /// @dev Gets the aggregated root of all chains.
     function getAggregatedRoot() external view returns (bytes32) {
         return sharedTree.root();
     }
 
+    /// @dev Gets the message root of a single chain.
     function getChainRoot(uint256 _chainId) external view returns (bytes32) {
         return chainTree[_chainId].root();
     }
 
+    /// @dev Adds a single chain to the message root.
     function _addNewChain(uint256 _chainId) internal {
         // The chain itself can not be the part of the message root.
         // The message root will only aggregate chains that settle on it.
@@ -145,6 +157,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
     }
 
+    /// @dev Updates the full merkle tree with the current roots of the chains.
     function updateFullTree() public {
         uint256 cachedChainCount = chainCount;
         bytes32[] memory newLeaves = new bytes32[](cachedChainCount);
@@ -157,6 +170,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
 
     // It is expected that the root is present
     // `_updateTree` should be false only if the caller ensures that it is followed by updating the entire tree.
+    /// @dev used to reset a chain root.
     function _unsafeResetChainRoot(uint256 _index, bool _updateTree) internal {
         uint256 chainId = chainIndexToId[_index];
         bytes32 initialRoot = chainTree[chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);

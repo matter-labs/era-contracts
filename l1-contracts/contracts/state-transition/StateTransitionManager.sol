@@ -322,7 +322,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         _registerNewHyperchain(_chainId, _hyperchain);
     }
 
-    /// deploys a full set of chains contracts
+    /// @dev deploys a full set of chains contracts
     function _deployNewChain(
         uint256 _chainId,
         address _baseToken,
@@ -457,6 +457,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         });
     }
 
+    /// @notice Called by the bridgehub during the failed migration of a chain.
     function bridgeClaimFailedBurn(
         uint256 _chainId,
         bytes32 _assetInfo,

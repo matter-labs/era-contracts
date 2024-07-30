@@ -32,7 +32,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         _;
     }
 
-    /// @dev Contract is expected to be used as proxy implementation.
+    /// @dev Contract is expected to be used as proxy implementation on L1.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(IBridgehub _bridgehub, IL1AssetRouter _sharedBridge) reentrancyGuardInitializer {
         _disableInitializers();
@@ -45,6 +45,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         _transferOwnership(_owner);
     }
 
+    /// @notice Used to register the stm asset in L1 contracts, AssetRouter and Bridgehub.
     function registerSTMAssetOnL1(address _stmAddress) external onlyOwner {
         // solhint-disable-next-line gas-custom-errors
 
@@ -81,7 +82,8 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         request = _registerSTMAssetOnL2Bridgehub(_chainId, _stmL1Address, _stmL2Address);
     }
 
-    // todo this has to be put in L1AssetRouter via TwoBridges. Hard, because we have to have multiple msg types
+    // todo this has to be put in L1AssetRouter via TwoBridges for custom base tokens. Hard, because we have to have multiple msg types in bridgehubDeposit in the AssetRouter.
+    /// @notice Used to register the stm asset in L2 AssetRouter.
     function registerSTMAssetOnL2SharedBridge(
         uint256 _chainId,
         address _stmL1Address,
@@ -105,7 +107,9 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
             _assetAddressOnCounterPart: L2_BRIDGEHUB_ADDR
         });
     }
+
     // Todo this works for now, but it will not work in the future if we want to change STM DTs. Probably ok.
+    /// @notice Used to register the stm asset in L2 Bridgehub.
     function _registerSTMAssetOnL2Bridgehub(
         // solhint-disable-next-line no-unused-vars
         uint256 _chainId,
@@ -133,6 +137,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         // This function is typically used on bridges for e.g.
     }
 
+    /// @notice Return the assetId of the STM.
     function getAssetId(address _l1STM) public view override returns (bytes32) {
         return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1STM)))));
     }

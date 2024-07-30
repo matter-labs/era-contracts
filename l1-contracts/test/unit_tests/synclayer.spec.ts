@@ -14,7 +14,6 @@ import {
 import {
   ethTestConfig,
   DIAMOND_CUT_DATA_ABI_STRING,
-  HYPERCHAIN_COMMITMENT_ABI_STRING,
   ADDRESS_ONE,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   priorityTxMaxGasLimit,
@@ -156,10 +155,11 @@ describe("Synclayer", function () {
     //   l2SystemContractsUpgradeTxHash: ethers.constants.HashZero,
     //   l2SystemContractsUpgradeBatchNumber:0 ,
     //   batchHashes: ['0xcd4e278573a3b2076a81f91b97e2dd0c85882d9f735ad81dc34b509033671e7b']}
-    const chainData = ethers.utils.defaultAbiCoder.encode(
-      [HYPERCHAIN_COMMITMENT_ABI_STRING],
-      [await adminFacet._prepareChainCommitment()]
-    );
+    const chainData = await adminFacet.readChainCommitment();
+    // ethers.utils.defaultAbiCoder.encode(
+    //   [HYPERCHAIN_COMMITMENT_ABI_STRING],
+    //   [await adminFacet._prepareChainCommitment()]
+    // );
     // const chainData = await adminFacet.readChainCommitment();
     const stmData = ethers.utils.defaultAbiCoder.encode(
       ["address", "address", "uint256", "bytes"],

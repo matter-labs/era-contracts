@@ -6,10 +6,12 @@ bytes32 constant BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf");
 bytes32 constant CHAIN_ID_LEAF_PADDING = keccak256("zkSync:ChainIdLeaf");
 
 library Messaging {
+    /// @dev Returns the leaf hash for a chain with batch number and batch root.
     function batchLeafHash(bytes32 batchRoot, uint256 batchNumber) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber));
     }
 
+    /// @dev Returns the leaf hash for a chain with chain root and chain id.
     function chainIdLeafHash(bytes32 chainIdRoot, uint256 chainId) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(CHAIN_ID_LEAF_PADDING, chainIdRoot, chainId));
     }
