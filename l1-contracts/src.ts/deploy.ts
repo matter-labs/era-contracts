@@ -1106,7 +1106,6 @@ export class Deployer {
     );
     sharedBridgeData = "0x01" + sharedBridgeData.slice(2);
 
-
     const receipt = await this.executeChainAdminMulticall([
       {
         target: bridgehub.address,
@@ -1123,8 +1122,8 @@ export class Deployer {
             secondBridgeCalldata: sharedBridgeData,
           },
         ]),
-        value: expectedCost
-      }
+        value: expectedCost,
+      },
     ]);
 
     return receipt;
