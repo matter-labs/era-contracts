@@ -13,7 +13,7 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {IStateTransitionManager,ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
+import {IStateTransitionManager, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
@@ -59,12 +59,12 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         IGovernance.Call[] memory calls;
         uint256 cnt = 0;
         if (!IBridgehub(config.bridgehub).tokenIsRegistered(config.baseToken)) {
-            calls = new IGovernance.Call[](4);
+            calls = new IGovernance.Call[](3);
             IGovernance.Call memory baseTokenRegistrationCall = prepareRegisterBaseTokenCall();
             calls[cnt] = baseTokenRegistrationCall;
             cnt++;
         } else {
-            calls = new IGovernance.Call[](3);
+            calls = new IGovernance.Call[](2);
         }
 
         IGovernance.Call memory setChainCreationParamsCall = prepareSetChainCreationParamsCall();
@@ -77,9 +77,8 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
 
         address l2SharedBridgeProxy = computeL2BridgeAddress();
         IGovernance.Call memory initChainCall = prepareInitializeChainGovernanceCall(l2SharedBridgeProxy);
-        calls[cnt] = initChainCall;
 
-        scheduleTransparentCalldata(calls);
+        scheduleTransparentCalldata(calls, initChainCall);
     }
 
     function initializeConfig() internal {
@@ -251,7 +250,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         return IGovernance.Call({target: config.l1SharedBridgeProxy, value: 0, data: data});
     }
 
-    function scheduleTransparentCalldata(IGovernance.Call[] memory calls) internal {
+    function scheduleTransparentCalldata(IGovernance.Call[] memory calls, IGovernance.Call memory initChainGovCall) internal {
         IGovernance governance = IGovernance(config.governance);
 
         IGovernance.Operation memory operation = IGovernance.Operation({
@@ -264,12 +263,26 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         bytes memory executeCalldata = abi.encodeCall(governance.execute, (operation));
         console.log("Completed");
 
-        saveOutput(scheduleCalldata, executeCalldata);
+        IGovernance.Call[] memory initChainGovArray = new IGovernance.Call[](1);
+        initChainGovArray[0] = initChainGovCall;
+
+        IGovernance.Operation memory operation2 = IGovernance.Operation({
+            calls: initChainGovArray,
+            predecessor: bytes32(0),
+            salt: bytes32(config.bridgehubCreateNewChainSalt)
+        });
+
+        bytes memory scheduleCalldata2 = abi.encodeCall(governance.scheduleTransparent, (operation2, 0));
+        bytes memory executeCalldata2 = abi.encodeCall(governance.execute, (operation2));
+
+        saveOutput(scheduleCalldata, executeCalldata, scheduleCalldata2, executeCalldata2);
     }
 
-    function saveOutput(bytes memory schedule, bytes memory execute) internal {
-        vm.serializeBytes("root", "scheduleCalldata", schedule);
-        string memory toml = vm.serializeBytes("root", "executeCalldata", execute);
+    function saveOutput(bytes memory schedule, bytes memory execute, bytes memory schedule2, bytes memory execute2) internal {
+        vm.serializeBytes("root", "scheduleCalldataStageOne", schedule);
+        vm.serializeBytes("root", "executeCalldataStageOne", execute);
+        vm.serializeBytes("root", "scheduleCalldataStageTwo", schedule2);
+        string memory toml = vm.serializeBytes("root", "executeCalldataStageTwo", execute2);
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-prepare-registration-calldata.toml");
         vm.writeToml(toml, path);
