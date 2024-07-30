@@ -43,7 +43,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     mapping(uint256 chainIndex => uint256 chainId) public chainIndexToId;
 
     // There are two ways to distinguish chains:
-    // - Either by reserving the index 0 as a special value which denotes an unregistede chain
+    // - Either by reserving the index 0 as a special value which denotes an unregistered chain
     // - Use a separate mapping
     // The second approach is used due to explicitness.
     mapping(uint256 chainId => bool isRegistered) public chainRegistered;

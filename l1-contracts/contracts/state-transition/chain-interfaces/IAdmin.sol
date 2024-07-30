@@ -74,7 +74,7 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice Set the L1 DA validator address as well as the L2 DA validator address.
     /// @dev While in principle it is possible that updating only one of the addresses is needed,
     /// usually these should work in pair and L1 validator typically expects a specific input from the L2 Validator.
-    /// That's why we change those together to prevent shooting admins of chains from shooting themselves in the foot.
+    /// That's why we change those together to prevent admins of chains from shooting themselves in the foot.
     /// @param _l1DAValidator The address of the L1 DA validator
     /// @param _l2DAValidator The address of the L2 DA validator
     function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external;
@@ -127,7 +127,7 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice New pair of DA validators set
     event NewL2DAValidator(address indexed oldL2DAValidator, address indexed newL2DAValidator);
     event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
-    /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
+    /// @dev emitted when a chain registers and a SetChainIdUpgrade happens
     event SetChainIdUpgrade(
         address indexed _hyperchain,
         L2CanonicalTransaction _l2Transaction,

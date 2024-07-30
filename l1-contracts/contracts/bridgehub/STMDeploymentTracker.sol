@@ -58,7 +58,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     /// @dev Since the L2 settlement layers `_chainId` might potentially have ERC20 tokens as native assets,
     /// there are two ways to perform the L1->L2 transaction:
     /// - via the `Bridgehub.requestL2TransactionDirect`. However, this would require the STMDeploymentTracker to
-    /// hahndle the ERC20 balances to be used in the transaction.
+    /// handle the ERC20 balances to be used in the transaction.
     /// - via the `Bridgehub.requestL2TransactionTwoBridges`. This way it will be the sender that provides the funds
     /// for the L2 transaction.
     /// The second approach is used due to its simplicity even though it gives the sender slightly more control over the call:

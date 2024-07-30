@@ -20,7 +20,7 @@ uint256 constant STATE_DIFF_ENTRY_SIZE = 272;
 /// A library that could be used by any L2 DA validator to produce standard state-diff-based
 /// DA output.
 abstract contract StateDiffL2DAValidator {
-    /// @notice Validates, that the operator provided the correct preimages for los, messages, and bytecodes.
+    /// @notice Validates, that the operator provided the correct preimages for logs, messages, and bytecodes.
     /// @return uncompressedStateDiffHash the hash of the uncompressed state diffs
     /// @return totalL2Pubdata total pubdata that should be sent to L1.
     /// @return leftoverSuffix the suffix left after pubdata and uncompressed state diffs.

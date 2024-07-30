@@ -6,7 +6,7 @@ import {ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
 interface IL1GenesisUpgrade {
-    /// @dev emitted when an chain registers and a GenesisUpgrade happens
+    /// @dev emitted when a chain registers and a GenesisUpgrade happens
     event GenesisUpgrade(
         address indexed _hyperchain,
         L2CanonicalTransaction _l2Transaction,
