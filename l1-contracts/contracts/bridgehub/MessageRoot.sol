@@ -104,7 +104,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     function _addNewChain(uint256 _chainId) internal {
         // The chain itself can not be the part of the message root.
         // The message root will only aggregate chains that settle on it.
-        require(_chainId != block.chainid);
+        require(_chainId != block.chainid, "MR: chainId is this chain");
 
         chainRegistered[_chainId] = true;
 
