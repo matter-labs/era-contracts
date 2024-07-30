@@ -36,11 +36,7 @@ contract RollupL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
 
         /// Check for calldata strict format
         if (leftover.length != 0) {
-            revert ReconstructionMismatch(
-                PubdataField.ExtraData,
-                bytes32(leftover.length + _totalL2ToL1PubdataAndStateDiffs.length),
-                bytes32(_totalL2ToL1PubdataAndStateDiffs.length)
-            );
+            revert ReconstructionMismatch(PubdataField.ExtraData, bytes32(0), bytes32(leftover.length));
         }
 
         // The preimage under the hash `outputHash` is expected to be in the following format:
