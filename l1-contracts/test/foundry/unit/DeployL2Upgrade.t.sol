@@ -281,7 +281,7 @@ contract L2UpgradeTest is Test {
             L2_SYSTEM_CONTEXT_ADDRESS,
             uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32(storedBatch1InfoChainIdUpgrade[0].batchHash)
-        );    
+        );
         bytes memory l2Logs2 = Utils.encodePacked(newL2Logs);
 
         IExecutor.CommitBatchInfo[] memory batch2Info = new IExecutor.CommitBatchInfo[](1);
@@ -291,7 +291,7 @@ contract L2UpgradeTest is Test {
             indexRepeatedStorageChanges: 0,
             newStateRoot: Utils.randomBytes32(""),
             numberOfLayer1Txs: 0,
-            priorityOperationsHash:0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
+            priorityOperationsHash: 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
             bootloaderHeapInitialContentsHash: Utils.randomBytes32(""),
             eventsQueueStateHash: Utils.randomBytes32(""),
             systemLogs: l2Logs2,
@@ -301,7 +301,10 @@ contract L2UpgradeTest is Test {
         executorFacet.commitBatches(storedBatch1InfoChainIdUpgrade[0], batch2Info);
 
         assertEq(gettersFacet.getProtocolVersion(), initialProtocolVersion);
-        assertEq(gettersFacet.getL2SystemContractsUpgradeTxHash(), 0x0000000000000000000000000000000000000000000000000000000000000000);
+        assertEq(
+            gettersFacet.getL2SystemContractsUpgradeTxHash(),
+            0x0000000000000000000000000000000000000000000000000000000000000000
+        );
 
         uint256 oldProtocolVersion = gettersFacet.getProtocolVersion();
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
@@ -368,7 +371,7 @@ contract L2UpgradeTest is Test {
         L2CanonicalTransaction memory l2ProtocolUpgradeTx = Utils.makeEmptyL2CanonicalTransaction();
         l2ProtocolUpgradeTx.txType = 254;
         l2ProtocolUpgradeTx.nonce = 0;
-        
+
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
             factoryDeps: new bytes[](1),
@@ -391,7 +394,7 @@ contract L2UpgradeTest is Test {
         L2CanonicalTransaction memory l2ProtocolUpgradeTx = Utils.makeEmptyL2CanonicalTransaction();
         l2ProtocolUpgradeTx.txType = 254;
         l2ProtocolUpgradeTx.nonce = 0;
-        
+
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
             factoryDeps: new bytes[](1),
@@ -408,7 +411,7 @@ contract L2UpgradeTest is Test {
         executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
     }
 
-    function test_futureTimestamp() public {    
+    function test_futureTimestamp() public {
         (major, minor, patch) = gettersFacet.getSemverProtocolVersion();
         uint256 protocolVersion = packSemver(major, minor, patch);
 
@@ -428,7 +431,7 @@ contract L2UpgradeTest is Test {
         executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
     }
 
-    function test_incorrectTxType() public {    
+    function test_incorrectTxType() public {
         (major, minor, patch) = gettersFacet.getSemverProtocolVersion();
         uint256 protocolVersion = packSemver(major, minor + 1, patch);
 
@@ -477,7 +480,7 @@ contract L2UpgradeTest is Test {
             L2_SYSTEM_CONTEXT_ADDRESS,
             uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32(storedBatch1InfoChainIdUpgrade[0].batchHash)
-        );    
+        );
         bytes memory l2Logs2 = Utils.encodePacked(newL2Logs);
 
         IExecutor.CommitBatchInfo[] memory batch2Info = new IExecutor.CommitBatchInfo[](1);
@@ -487,7 +490,7 @@ contract L2UpgradeTest is Test {
             indexRepeatedStorageChanges: 0,
             newStateRoot: Utils.randomBytes32(""),
             numberOfLayer1Txs: 0,
-            priorityOperationsHash:0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
+            priorityOperationsHash: 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
             bootloaderHeapInitialContentsHash: Utils.randomBytes32(""),
             eventsQueueStateHash: Utils.randomBytes32(""),
             systemLogs: l2Logs2,
@@ -594,7 +597,7 @@ contract L2UpgradeTest is Test {
         l2ProtocolUpgradeTx.txType = 254;
         l2ProtocolUpgradeTx.nonce = 0;
         l2ProtocolUpgradeTx.gasLimit = 0;
-        
+
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
             factoryDeps: new bytes[](1),
@@ -619,7 +622,7 @@ contract L2UpgradeTest is Test {
         l2ProtocolUpgradeTx.txType = 254;
         l2ProtocolUpgradeTx.nonce = 0;
         l2ProtocolUpgradeTx.gasLimit = 1000000000;
-        
+
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
             factoryDeps: new bytes[](1),
@@ -645,7 +648,7 @@ contract L2UpgradeTest is Test {
         l2ProtocolUpgradeTx.nonce = 0;
         l2ProtocolUpgradeTx.gasLimit = 1000000;
         l2ProtocolUpgradeTx.gasPerPubdataByteLimit = 2;
-        
+
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
             factoryDeps: new bytes[](1),
@@ -676,7 +679,7 @@ contract L2UpgradeTest is Test {
 
         bytes[] memory factoryDeps = new bytes[](1);
         factoryDeps[0] = abi.encode(Utils.randomBytes32("FactoryDeps"));
-        
+
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
             factoryDeps: factoryDeps,
@@ -706,7 +709,7 @@ contract L2UpgradeTest is Test {
 
         bytes[] memory factoryDeps = new bytes[](1);
         factoryDeps[0] = abi.encode(Utils.randomBytes32("FactoryDeps"));
-        
+
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
             factoryDeps: factoryDeps,
@@ -785,7 +788,7 @@ contract L2UpgradeTest is Test {
         });
 
         executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
-        
+
         assertEq(gettersFacet.getL2BootloaderBytecodeHash(), bootloaderHash);
         assertEq(gettersFacet.getL2DefaultAccountBytecodeHash(), defaultAccountHash);
         assertEq(gettersFacet.getVerifier(), verifier);
@@ -823,7 +826,7 @@ contract L2UpgradeTest is Test {
             L2_SYSTEM_CONTEXT_ADDRESS,
             uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32(storedBatch1InfoChainIdUpgrade[0].batchHash)
-        );    
+        );
         bytes memory l2Logs2 = Utils.encodePacked(newL2Logs);
 
         IExecutor.CommitBatchInfo[] memory batch2Info = new IExecutor.CommitBatchInfo[](1);
@@ -833,7 +836,7 @@ contract L2UpgradeTest is Test {
             indexRepeatedStorageChanges: 0,
             newStateRoot: Utils.randomBytes32(""),
             numberOfLayer1Txs: 0,
-            priorityOperationsHash:0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
+            priorityOperationsHash: 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
             bootloaderHeapInitialContentsHash: Utils.randomBytes32(""),
             eventsQueueStateHash: Utils.randomBytes32(""),
             systemLogs: l2Logs2,
@@ -888,9 +891,9 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: newProtocolVersion
         });
-  
+
         executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
-    
+
         ProposedUpgrade memory newProposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: upgradeTx,
             factoryDeps: new bytes[](1),
@@ -934,7 +937,7 @@ contract L2UpgradeTest is Test {
             L2_SYSTEM_CONTEXT_ADDRESS,
             uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32(storedBatch1InfoChainIdUpgrade[0].batchHash)
-        );    
+        );
         bytes memory l2Logs2 = Utils.encodePacked(newL2Logs);
 
         IExecutor.CommitBatchInfo[] memory batch2Info = new IExecutor.CommitBatchInfo[](1);
@@ -944,7 +947,7 @@ contract L2UpgradeTest is Test {
             indexRepeatedStorageChanges: 0,
             newStateRoot: Utils.randomBytes32(""),
             numberOfLayer1Txs: 0,
-            priorityOperationsHash:0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
+            priorityOperationsHash: 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
             bootloaderHeapInitialContentsHash: Utils.randomBytes32(""),
             eventsQueueStateHash: Utils.randomBytes32(""),
             systemLogs: l2Logs2,
@@ -982,12 +985,12 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: newProtocolVersion
         });
-        
+
         executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
-       
+
         adminFacet.setValidator(msg.sender, true);
         vm.startPrank(msg.sender);
-        vm.expectRevert(bytes("b8")); 
+        vm.expectRevert(bytes("b8"));
         executorFacet.commitBatches(storedBatch1InfoChainIdUpgrade[0], batch2Info);
     }
 
@@ -1033,14 +1036,14 @@ contract L2UpgradeTest is Test {
             indexRepeatedStorageChanges: 0,
             newStateRoot: Utils.randomBytes32(""),
             numberOfLayer1Txs: 0,
-            priorityOperationsHash:0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
+            priorityOperationsHash: 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
             bootloaderHeapInitialContentsHash: Utils.randomBytes32(""),
             eventsQueueStateHash: Utils.randomBytes32(""),
             systemLogs: l2Logs2,
             pubdataCommitments: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
         vm.expectRevert(bytes("kp"));
-        executorFacet.commitBatches(storedBatch1InfoChainIdUpgrade[0], batch2Info);   
+        executorFacet.commitBatches(storedBatch1InfoChainIdUpgrade[0], batch2Info);
     }
 
     function test_commitWhenUpgradeTxHashDoesNotMatch() public {
@@ -1067,14 +1070,14 @@ contract L2UpgradeTest is Test {
             indexRepeatedStorageChanges: 0,
             newStateRoot: Utils.randomBytes32(""),
             numberOfLayer1Txs: 0,
-            priorityOperationsHash:0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
+            priorityOperationsHash: 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
             bootloaderHeapInitialContentsHash: Utils.randomBytes32(""),
             eventsQueueStateHash: Utils.randomBytes32(""),
             systemLogs: l2Logs2,
             pubdataCommitments: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
         vm.expectRevert(bytes("ut"));
-        executorFacet.commitBatches(storedBatch1InfoChainIdUpgrade[0], batch2Info);  
+        executorFacet.commitBatches(storedBatch1InfoChainIdUpgrade[0], batch2Info);
     }
 
     function test_commitSuccessfullyWhenTheUpgradeTxIsPresent() public {
@@ -1091,7 +1094,9 @@ contract L2UpgradeTest is Test {
             commitment: commitment
         });
 
-        bytes[] memory newL2Logs = Utils.createSystemLogsWithUpgradeTransaction(0xee387289bd047dcc33d311532916a53f1d8a998c9c9d523441893b277878499e);
+        bytes[] memory newL2Logs = Utils.createSystemLogsWithUpgradeTransaction(
+            0xee387289bd047dcc33d311532916a53f1d8a998c9c9d523441893b277878499e
+        );
         newL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
@@ -1103,7 +1108,7 @@ contract L2UpgradeTest is Test {
             L2_SYSTEM_CONTEXT_ADDRESS,
             uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32(storedBatch1InfoChainIdUpgrade[0].batchHash)
-        );    
+        );
         bytes memory l2Logs2 = Utils.encodePacked(newL2Logs);
 
         IExecutor.CommitBatchInfo[] memory batch2Info = new IExecutor.CommitBatchInfo[](1);
@@ -1113,7 +1118,7 @@ contract L2UpgradeTest is Test {
             indexRepeatedStorageChanges: 0,
             newStateRoot: Utils.randomBytes32(""),
             numberOfLayer1Txs: 0,
-            priorityOperationsHash:0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
+            priorityOperationsHash: 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
             bootloaderHeapInitialContentsHash: Utils.randomBytes32(""),
             eventsQueueStateHash: Utils.randomBytes32(""),
             systemLogs: l2Logs2,
@@ -1186,11 +1191,12 @@ contract L2UpgradeTest is Test {
             L2_SYSTEM_CONTEXT_ADDRESS,
             uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32(storedBatch1InfoChainIdUpgrade[0].batchHash)
-        );    
+        );
         bytes memory l2Logs2 = Utils.encodePacked(newL2Logs);
 
-
-        bytes[] memory newL2LogsUpgrade = Utils.createSystemLogsWithUpgradeTransaction(0xee387289bd047dcc33d311532916a53f1d8a998c9c9d523441893b277878499e);
+        bytes[] memory newL2LogsUpgrade = Utils.createSystemLogsWithUpgradeTransaction(
+            0xee387289bd047dcc33d311532916a53f1d8a998c9c9d523441893b277878499e
+        );
         newL2LogsUpgrade[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
@@ -1202,7 +1208,7 @@ contract L2UpgradeTest is Test {
             L2_SYSTEM_CONTEXT_ADDRESS,
             uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32(storedBatch1InfoChainIdUpgrade[0].batchHash)
-        );    
+        );
         bytes memory l2Logs2Upgrade = Utils.encodePacked(newL2LogsUpgrade);
 
         IExecutor.CommitBatchInfo[] memory batch2Info = new IExecutor.CommitBatchInfo[](1);
@@ -1212,7 +1218,7 @@ contract L2UpgradeTest is Test {
             indexRepeatedStorageChanges: 0,
             newStateRoot: Utils.randomBytes32(""),
             numberOfLayer1Txs: 0,
-            priorityOperationsHash:0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
+            priorityOperationsHash: 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
             bootloaderHeapInitialContentsHash: Utils.randomBytes32(""),
             eventsQueueStateHash: Utils.randomBytes32(""),
             systemLogs: l2Logs2,
@@ -1292,7 +1298,7 @@ contract L2UpgradeTest is Test {
             L2_SYSTEM_CONTEXT_ADDRESS,
             uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32(storedBatch1InfoChainIdUpgrade[0].batchHash)
-        );    
+        );
         bytes memory l2Logs2 = Utils.encodePacked(newL2Logs);
 
         IExecutor.CommitBatchInfo[] memory batch2Info = new IExecutor.CommitBatchInfo[](1);
@@ -1302,7 +1308,7 @@ contract L2UpgradeTest is Test {
             indexRepeatedStorageChanges: 0,
             newStateRoot: Utils.randomBytes32(""),
             numberOfLayer1Txs: 0,
-            priorityOperationsHash:0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
+            priorityOperationsHash: 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
             bootloaderHeapInitialContentsHash: Utils.randomBytes32(""),
             eventsQueueStateHash: Utils.randomBytes32(""),
             systemLogs: l2Logs2,
@@ -1346,14 +1352,17 @@ contract L2UpgradeTest is Test {
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
             uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(newStoredBatch1InfoChainIdUpgrade[0].timestamp + 1, newStoredBatch1InfoChainIdUpgrade[0].timestamp + 1)
+            Utils.packBatchTimestampAndBlockTimestamp(
+                newStoredBatch1InfoChainIdUpgrade[0].timestamp + 1,
+                newStoredBatch1InfoChainIdUpgrade[0].timestamp + 1
+            )
         );
         newL2Logs[uint256(uint256(SystemLogKey.PREV_BATCH_HASH_KEY))] = Utils.constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
             uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32(newStoredBatch1InfoChainIdUpgrade[0].batchHash)
-        );    
+        );
         l2Logs2 = Utils.encodePacked(newL2Logs);
 
         IExecutor.CommitBatchInfo[] memory batch3Info = new IExecutor.CommitBatchInfo[](1);
@@ -1363,7 +1372,7 @@ contract L2UpgradeTest is Test {
             indexRepeatedStorageChanges: 0,
             newStateRoot: Utils.randomBytes32(""),
             numberOfLayer1Txs: 0,
-            priorityOperationsHash:0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
+            priorityOperationsHash: 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470,
             bootloaderHeapInitialContentsHash: Utils.randomBytes32(""),
             eventsQueueStateHash: Utils.randomBytes32(""),
             systemLogs: l2Logs2,
@@ -1439,9 +1448,9 @@ contract L2UpgradeTest is Test {
     function packSemver(uint32 major, uint32 minor, uint32 patch) public returns (uint256) {
         uint256 SEMVER_MINOR_VERSION_MULTIPLIER = 4294967296;
         if (major != 0) {
-          revert("Major version must be 0");
+            revert("Major version must be 0");
         }
-      
+
         return minor * SEMVER_MINOR_VERSION_MULTIPLIER + patch;
     }
 
