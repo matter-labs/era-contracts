@@ -382,7 +382,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _prevMsgSender: _prevMsgSender,
             _transferData: transferData
         });
-        bytes32 txDataHash = _encodeTxDataHash(legacyDeposit, _prevMsgSender, assetId, transferData);
+        bytes32 txDataHash = this._encodeTxDataHash(legacyDeposit, _prevMsgSender, assetId, transferData);
 
         request = _requestToBridge({
             _chainId: _chainId,
@@ -477,15 +477,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
     }
 
-    /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2
-    /// @param _depositSender The address of the deposit initiator
-    /// @param _assetId The address of the deposited L1 ERC20 token
-    /// @param _assetData The amount of the deposit that failed.
-    /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization
-    /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent
-    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization
+    /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
+    /// @param _depositSender The address of the entity that initiated the deposit.
+    /// @param _assetId The unique identifier of the deposited L1 token.
+    /// @param _assetData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
+    /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization.
+    /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed.
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+    /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent.
+    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
@@ -496,8 +496,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof,
-        bool _isLegacyEncoding
+        bytes32[] calldata _merkleProof
     ) public nonReentrant whenNotPaused {
         {
             bool proofValid = BRIDGE_HUB.proveL1ToL2TransactionStatus({
@@ -515,8 +514,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(!_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch), "ShB: legacy cFD");
         {
             bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
-            bytes32 txDataHash = _encodeTxDataHash(_isLegacyEncoding, _depositSender, _assetId, _assetData);
-            require(dataHash == txDataHash, "ShB: d.it not hap");
+            // Checking, if it was the legacy deposit, check new encoding otherwise
+            bool isLegacyTxDataHash = _isLegacyTxDataHash(_depositSender, _assetId, _assetData, dataHash);
+            if (!isLegacyTxDataHash) {
+                bytes32 txDataHash = this._encodeTxDataHash(false, _depositSender, _assetId, _assetData);
+                require(dataHash == txDataHash, "ShB: d.it not hap");
+            }
         }
         delete depositHappened[_chainId][_l2TxHash];
 
@@ -546,12 +549,37 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostLegacyBridgeUpgradeFirstBatch);
     }
 
+    /// @dev Determines if the provided data for a failed deposit corresponds to a legacy failed deposit.
+    /// @param _prevMsgSender The address of the entity that initiated the deposit.
+    /// @param _assetId The unique identifier of the deposited L1 token.
+    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
+    /// @param _expectedTxDataHash The nullifier data hash stored for the failed deposit.
+    /// @return isLegacyTxDataHash True if the transaction is legacy, false otherwise.
+    function _isLegacyTxDataHash(
+        address _prevMsgSender,
+        bytes32 _assetId,
+        bytes memory _transferData,
+        bytes32 _expectedTxDataHash
+    ) internal view returns (bool isLegacyTxDataHash) {
+        try this._encodeTxDataHash(true, _prevMsgSender, _assetId, _transferData) returns (bytes32 txDataHash) {
+            return txDataHash == _expectedTxDataHash;
+        } catch {
+            return false;
+        }
+    }
+
+    /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
+    /// @param _isLegacyEncoding Boolean flag indicating whether to use the legacy encoding standard (true) or the latest encoding standard (false).
+    /// @param _prevMsgSender The address of the entity that initiated the deposit.
+    /// @param _assetId The unique identifier of the deposited L1 token.
+    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
+    /// @return txDataHash The resulting encoded transaction data hash.
     function _encodeTxDataHash(
         bool _isLegacyEncoding,
         address _prevMsgSender,
         bytes32 _assetId,
         bytes memory _transferData
-    ) internal view returns (bytes32 txDataHash) {
+    ) external view onlyThis returns (bytes32 txDataHash) {
         if (_isLegacyEncoding) {
             (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
             txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(_assetId), depositAmount));
@@ -774,8 +802,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
             _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _merkleProof: _merkleProof,
-            _isLegacyEncoding: true
+            _merkleProof: _merkleProof
         });
     }
 
@@ -927,8 +954,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
             _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _merkleProof: _merkleProof,
-            _isLegacyEncoding: true
+            _merkleProof: _merkleProof
         });
     }
 

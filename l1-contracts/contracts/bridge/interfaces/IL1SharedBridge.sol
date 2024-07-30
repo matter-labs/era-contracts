@@ -171,8 +171,7 @@ interface IL1SharedBridge {
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof,
-        bool _isLegacyEncoding
+        bytes32[] calldata _merkleProof
     ) external;
 
     function chainBalance(uint256 _chainId, address _token) external view returns (uint256);

@@ -332,8 +332,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,
-            _merkleProof: merkleProof,
-            _isLegacyEncoding: true
+            _merkleProof: merkleProof
         });
     }
 
@@ -371,8 +370,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,
-            _merkleProof: merkleProof,
-            _isLegacyEncoding: true
+            _merkleProof: merkleProof
         });
     }
 
@@ -411,8 +409,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,
-            _merkleProof: merkleProof,
-            _isLegacyEncoding: true
+            _merkleProof: merkleProof
         });
     }
 
