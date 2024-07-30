@@ -17,7 +17,7 @@ import {ReconstructionMismatch, PubdataField} from "./DAErrors.sol";
 contract RollupL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
     function validatePubdata(
         // The rolling hash of the user L2->L1 logs.
-        bytes32 _chainedLogsHash,
+        bytes32,
         // The root hash of the user L2->L1 logs.
         bytes32,
         // The chained hash of the L2->L1 messages
@@ -28,7 +28,6 @@ contract RollupL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
     ) external returns (bytes32 outputHash) {
         (bytes32 stateDiffHash, bytes calldata _totalPubdata, bytes calldata leftover) = _produceStateDiffPubdata(
-            _chainedLogsHash,
             _chainedMessagesHash,
             _chainedBytescodesHash,
             _totalL2ToL1PubdataAndStateDiffs

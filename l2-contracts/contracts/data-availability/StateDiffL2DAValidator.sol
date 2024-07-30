@@ -27,7 +27,6 @@ abstract contract StateDiffL2DAValidator {
     /// On Era or other "vanilla" rollups it is empty, but it can be used for providing additional data by the operator,
     /// e.g. DA committee signatures, etc.
     function _produceStateDiffPubdata(
-        bytes32 _chainedLogsHash,
         bytes32 _chainedMessagesHash,
         bytes32 _chainedBytescodesHash,
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
