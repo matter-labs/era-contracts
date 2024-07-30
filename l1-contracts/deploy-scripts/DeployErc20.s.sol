@@ -128,7 +128,8 @@ contract DeployErc20Script is Script {
         if (mint > 0) {
             vm.broadcast();
             additionalAddressesForMinting.push(config.deployerAddress);
-            for (uint256 i = 0; i < additionalAddressesForMinting.length; i++) {
+            // solhint-disable-next-line gas-length-in-loops
+            for (uint256 i = 0; i < additionalAddressesForMinting.length; ++i) {
                 (bool success, ) = tokenAddress.call(
                     abi.encodeWithSignature("mint(address,uint256)", additionalAddressesForMinting[i], mint)
                 );

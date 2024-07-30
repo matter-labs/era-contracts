@@ -12,6 +12,7 @@ import {IChainAdmin} from "./IChainAdmin.sol";
 /// the blockchain node to accept the protocol upgrade.
 contract ChainAdmin is IChainAdmin, Ownable2Step {
     constructor(address _initialOwner) {
+        // solhint-disable-next-line gas-custom-errors reason-string
         require(_initialOwner != address(0), "Initial owner should be non zero address");
         _transferOwnership(_initialOwner);
     }
@@ -33,7 +34,9 @@ contract ChainAdmin is IChainAdmin, Ownable2Step {
     /// @param _requireSuccess If true, reverts transaction on any call failure.
     /// @dev Intended for batch processing of contract interactions, managing gas efficiency and atomicity of operations.
     function multicall(Call[] calldata _calls, bool _requireSuccess) external payable onlyOwner {
+        // solhint-disable-next-line gas-custom-errors
         require(_calls.length > 0, "No calls provided");
+        // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _calls.length; ++i) {
             // slither-disable-next-line arbitrary-send-eth
             (bool success, bytes memory returnData) = _calls[i].target.call{value: _calls[i].value}(_calls[i].data);

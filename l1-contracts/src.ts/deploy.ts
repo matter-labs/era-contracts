@@ -46,9 +46,9 @@ import {
   compileInitialCutHash,
   readBytecode,
   applyL1ToL2Alias,
-  ChainAdminCall,
   // priorityTxMaxGasLimit,
 } from "./utils";
+import type { ChainAdminCall } from "./utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
