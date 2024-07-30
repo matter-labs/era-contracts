@@ -24,6 +24,9 @@ contract ValidiumL1DAValidator is IL1DAValidator {
     }
 
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        if (interfaceId == this.supportsInterface.selector) {
+            return true;
+        }
         return interfaceId == type(IL1DAValidator).interfaceId;
     }
 }
