@@ -4,6 +4,8 @@ pragma solidity 0.8.24;
 
 import {IBridgehub} from "./IBridgehub.sol";
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IMessageRoot {
     function BRIDGE_HUB() external view returns (IBridgehub);
 

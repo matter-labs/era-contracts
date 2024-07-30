@@ -15,6 +15,8 @@ struct ForceDeployment {
     bytes input;
 }
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IL2GenesisUpgrade {
     function genesisUpgrade(uint256 _chainId, bytes calldata _forceDeploymentsData) external payable;
 }

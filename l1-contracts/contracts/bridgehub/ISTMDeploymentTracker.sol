@@ -5,6 +5,8 @@ pragma solidity 0.8.24;
 import {L2TransactionRequestTwoBridgesInner, IBridgehub} from "./IBridgehub.sol";
 import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface ISTMDeploymentTracker {
     function bridgehubDeposit(
         uint256 _chainId,
