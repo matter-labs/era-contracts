@@ -21,6 +21,4 @@ interface IL1GenesisUpgrade {
         bytes calldata _forceDeployments,
         bytes[] calldata _factoryDeps
     ) external returns (bytes32);
-
-    function upgradeInner(ProposedUpgrade calldata _proposedUpgrade) external returns (bytes32);
 }
