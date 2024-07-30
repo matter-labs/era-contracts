@@ -74,7 +74,7 @@ library PriorityTree {
         }
     }
 
-    /// @notice Initialize a chain from a committment.
+    /// @notice Initialize a chain from a commitment.
     function initFromCommitment(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal {
         uint256 height = _commitment.sides.length; // Height, including the root node.
         require(height > 0, "PT: invalid commitment");

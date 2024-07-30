@@ -501,7 +501,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // TODO: double check that get only returns when chain id is there.
     }
 
-    /// @dev IL1AssetHandler interface, used to receive a chain on the settlment layer.
+    /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
     function bridgeMint(
         uint256,
         bytes32 _assetId,
