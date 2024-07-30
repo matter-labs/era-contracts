@@ -108,8 +108,8 @@
     "contractName": "PubdataChunkPublisher",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/PubdataChunkPublisher.sol/PubdataChunkPublisher.json",
     "sourceCodePath": "contracts-preprocessed/PubdataChunkPublisher.sol",
-    "bytecodeHash": "0x0100004bb2b5083d5de7af7f05491bbd733d3b90917168c461f25dd0e0eda0c0",
-    "sourceCodeHash": "0xc442fd1abb821c95e8229f4ef1575f789e89d60d1001489f5ac9250155cd11dc"
+    "bytecodeHash": "0x0100004bb2a91bb93813bd88adcf685ab81707ff165b30f0e4f76f41be49dab7",
+    "sourceCodeHash": "0xa7abd409ecfc75097a9be0bc318655ac53a1a3f0eadf030307016d7c8594b269"
   },
   {
     "contractName": "SystemContext",
