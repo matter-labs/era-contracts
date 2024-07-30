@@ -25,9 +25,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @dev The shared bridge that is now used for all bridging, replacing the legacy contract.
     IL1SharedBridge public immutable override SHARED_BRIDGE;
 
-    /// @dev The native token vault, which holds deposited tokens.
-    IL1NativeTokenVault public immutable __DEPRECATED_NATIVE_TOKEN_VAULT;
-
     /// @dev A mapping L2 batch number => message number => flag.
     /// @dev Used to indicate that L2 -> L1 message was already processed for zkSync Era withdrawals.
     // slither-disable-next-line uninitialized-state
@@ -62,9 +59,8 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IL1SharedBridge _sharedBridge, IL1NativeTokenVault _nativeTokenVault) reentrancyGuardInitializer {
+    constructor(IL1SharedBridge _sharedBridge) reentrancyGuardInitializer {
         SHARED_BRIDGE = _sharedBridge;
-        __DEPRECATED_NATIVE_TOKEN_VAULT = _nativeTokenVault;
     }
 
     /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
