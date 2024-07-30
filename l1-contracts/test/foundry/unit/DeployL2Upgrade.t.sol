@@ -108,7 +108,7 @@ contract L2UpgradeTest is Test {
                 facet: address(new GettersFacet()),
                 action: Diamond.Action.Add,
                 isFreezable: true,
-                selectors: Utils.getGettersSelectors()
+                selectors: gettersSelectors()
             })
         );
 
@@ -160,6 +160,7 @@ contract L2UpgradeTest is Test {
         adminFacet = AdminFacet(address(newChainAddress));
 
         (major, minor, patch) = gettersFacet.getSemverProtocolVersion();
+
         initialProtocolVersion = packSemver(major, minor, patch);
 
         // Initial setup for logs & commits
@@ -178,7 +179,7 @@ contract L2UpgradeTest is Test {
         });
 
         adminFacet.setTokenMultiplier(1, 1);
-
+ 
         uint256[] memory recursiveAggregationInput;
         uint256[] memory serializedProof;
         proofInput = IExecutor.ProofInput(recursiveAggregationInput, serializedProof);
@@ -297,15 +298,16 @@ contract L2UpgradeTest is Test {
             systemLogs: l2Logs2,
             pubdataCommitments: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
-
+        console.log("1");
         executorFacet.commitBatches(storedBatch1InfoChainIdUpgrade[0], batch2Info);
-
+        console.log("2");
         assertEq(gettersFacet.getProtocolVersion(), initialProtocolVersion);
+        console.log("3");
         assertEq(
             gettersFacet.getL2SystemContractsUpgradeTxHash(),
             0x0000000000000000000000000000000000000000000000000000000000000000
         );
-
+      
         uint256 oldProtocolVersion = gettersFacet.getProtocolVersion();
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: Utils.makeEmptyL2CanonicalTransaction(),
@@ -1473,5 +1475,39 @@ contract L2UpgradeTest is Test {
             _admin: newChainAdmin,
             _diamondCut: abi.encode(_diamondCut)
         });
+    }
+
+    function gettersSelectors() public pure returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](29);
+        selectors[0] = GettersFacet.getVerifier.selector;
+        selectors[1] = GettersFacet.getAdmin.selector;
+        selectors[2] = GettersFacet.getPendingAdmin.selector;
+        selectors[3] = GettersFacet.getTotalBlocksCommitted.selector;
+        selectors[4] = GettersFacet.getTotalBlocksVerified.selector;
+        selectors[5] = GettersFacet.getTotalBlocksExecuted.selector;
+        selectors[6] = GettersFacet.getTotalPriorityTxs.selector;
+        selectors[7] = GettersFacet.getFirstUnprocessedPriorityTx.selector;
+        selectors[8] = GettersFacet.getPriorityQueueSize.selector;
+        selectors[9] = GettersFacet.priorityQueueFrontOperation.selector;
+        selectors[10] = GettersFacet.isValidator.selector;
+        selectors[11] = GettersFacet.l2LogsRootHash.selector;
+        selectors[12] = GettersFacet.storedBatchHash.selector;
+        selectors[13] = GettersFacet.getL2BootloaderBytecodeHash.selector;
+        selectors[14] = GettersFacet.getL2DefaultAccountBytecodeHash.selector;
+        selectors[15] = GettersFacet.getVerifierParams.selector;
+        selectors[16] = GettersFacet.getL2SystemContractsUpgradeBatchNumber.selector;
+        selectors[17] = GettersFacet.getPriorityTxMaxGasLimit.selector;
+        selectors[18] = GettersFacet.isEthWithdrawalFinalized.selector;
+        selectors[19] = GettersFacet.facets.selector;
+        selectors[20] = GettersFacet.facetFunctionSelectors.selector;
+        selectors[21] = GettersFacet.facetAddresses.selector;
+        selectors[22] = GettersFacet.facetAddress.selector;
+        selectors[23] = GettersFacet.getSemverProtocolVersion.selector;
+        selectors[24] = GettersFacet.getProtocolVersion.selector;
+        selectors[25] = GettersFacet.getTotalBatchesCommitted.selector;
+        selectors[26] = GettersFacet.getTotalBatchesVerified.selector;
+        selectors[27] = GettersFacet.getTotalBatchesExecuted.selector;
+        selectors[28] = GettersFacet.getL2SystemContractsUpgradeTxHash.selector;
+        return selectors;
     }
 }
