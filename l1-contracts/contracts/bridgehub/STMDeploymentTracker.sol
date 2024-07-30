@@ -112,11 +112,10 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         address _stmL1Address,
         address _stmL2Address
     ) internal pure returns (L2TransactionRequestTwoBridgesInner memory request) {
-        bytes memory l2TxCalldata = abi.encodeWithSelector(
+        bytes memory l2TxCalldata = abi.encodeCall(
             /// todo it should not be initial in setAssetHandlerAddressInitial
-            IBridgehub.setAssetHandlerAddressInitial.selector,
-            bytes32(uint256(uint160(_stmL1Address))),
-            _stmL2Address
+            IBridgehub.setAssetHandlerAddressInitial,
+            (bytes32(uint256(uint160(_stmL1Address))), _stmL2Address)
         );
 
         request = L2TransactionRequestTwoBridgesInner({
