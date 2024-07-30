@@ -25,7 +25,7 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
 
         blobLinearHashes = new bytes32[](blobCount);
 
-        // We allocate to the full size of blobLinearHashes * BLOB_SIZE_BYTES because we need to pad
+        // We allocate to the full size of blobCount * BLOB_SIZE_BYTES because we need to pad
         // the data on the right with 0s if it doesn't take up the full blob
         bytes memory totalBlobs = new bytes(BLOB_SIZE_BYTES * blobCount);
 

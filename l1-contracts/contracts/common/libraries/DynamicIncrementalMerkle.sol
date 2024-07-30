@@ -60,6 +60,24 @@ library DynamicIncrementalMerkle {
     }
 
     /**
+     * @dev Resets the tree to a blank state.
+     * Calling this function on MerkleTree that was already setup and used will reset it to a blank state.
+     */
+    function reset(Bytes32PushTree storage self, bytes32 zero) internal returns (bytes32 initialRoot) {
+        self._nextLeafIndex = 0;
+        for (uint256 i = self._zeros.length; 0 < i; --i) {
+            self._zeros.pop();
+        }
+        for (uint256 i = self._sides.length; 0 < i; --i) {
+            self._zeros.pop();
+        }
+        self._zeros.push(zero);
+        self._zeros.pop();
+        self._sides.pop();
+        return bytes32(0);
+    }
+
+    /**
      * @dev Insert a new leaf in the tree, and compute the new root. Returns the position of the inserted leaf in the
      * tree, and the resulting root.
      *

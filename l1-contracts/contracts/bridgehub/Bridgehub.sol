@@ -123,12 +123,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice To set stmDeploymetTracker, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
-    function setSTMDeployer(ISTMDeploymentTracker _stmDeployer) external onlyOwner {
-        stmDeployer = _stmDeployer;
-    }
+    // function setSTMDeployer(ISTMDeploymentTracker _stmDeployer) external onlyOwner {
+    //     stmDeployer = _stmDeployer;
+    // }
 
-    /// @notice To set shared bridge, only Owner. Not done in initialize, as
-    /// the order of deployment is Bridgehub, Shared bridge, and then we call this
+    /// @notice To set addresses, only Owner. Not done in initialize, as
+    /// the order of deployment is Bridgehub, other contracts, and then we call this.
     function setAddresses(
         address _sharedBridge,
         ISTMDeploymentTracker _stmDeployer,
@@ -168,9 +168,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
-    function setSharedBridge(address _sharedBridge) external onlyOwner {
-        sharedBridge = IL1AssetRouter(_sharedBridge);
-    }
+    // function setSharedBridge(address _sharedBridge) external onlyOwner {
+    //     sharedBridge = IL1AssetRouter(_sharedBridge);
+    // }
 
     function registerSyncLayer(
         uint256 _newSyncLayerChainId,
