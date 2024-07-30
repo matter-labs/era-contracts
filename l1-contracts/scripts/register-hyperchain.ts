@@ -111,7 +111,7 @@ async function main() {
         null,
         cmd.useGovernance
       );
-      await deployer.transferAdminFromDeployerToGovernance();
+      await deployer.transferAdminFromDeployerToChainAdmin();
     });
 
   await program.parseAsync(process.argv);

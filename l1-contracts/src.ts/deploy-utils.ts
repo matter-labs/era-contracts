@@ -137,6 +137,7 @@ export interface DeployedAddresses {
   TransparentProxyAdmin: string;
   L2ProxyAdmin: string;
   Governance: string;
+  ChainAdmin: string;
   BlobVersionedHashRetriever: string;
   ValidatorTimeLock: string;
   RollupL1DAValidator: string;
@@ -191,5 +192,6 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     BlobVersionedHashRetriever: getAddressFromEnv("CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR"),
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
     Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
+    ChainAdmin: getAddressFromEnv("CONTRACTS_CHAIN_ADMIN_ADDR"),
   };
 }
