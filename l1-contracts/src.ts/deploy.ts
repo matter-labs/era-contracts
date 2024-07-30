@@ -46,6 +46,7 @@ import {
   compileInitialCutHash,
   readBytecode,
   applyL1ToL2Alias,
+  ChainAdminCall,
   // priorityTxMaxGasLimit,
 } from "./utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
@@ -1289,6 +1290,13 @@ export class Deployer {
     }
   }
 
+  public async executeChainAdminMulticall(calls: ChainAdminCall[], requireSuccess: boolean = true) {
+    const chainAdmin = ChainAdminFactory.connect(this.addresses.ChainAdmin, this.deployWallet);
+
+    const multicallTx = await chainAdmin.multicall(calls, requireSuccess);
+    console.log(await multicallTx.wait());
+  }
+
   public async transferAdminFromDeployerToChainAdmin() {
     const stm = this.stateTransitionManagerContract(this.deployWallet);
     const diamondProxyAddress = await stm.getHyperchain(this.chainId);
@@ -1307,18 +1315,13 @@ export class Deployer {
     //   false
     // );
     const acceptAdminData = hyperchain.interface.encodeFunctionData("acceptAdmin");
-    const chainAdmin = ChainAdminFactory.connect(this.addresses.ChainAdmin, this.deployWallet);
-    const multicallTx = await chainAdmin.multicall(
-      [
-        {
-          target: hyperchain.address,
-          value: 0,
-          data: acceptAdminData,
-        },
-      ],
-      true
-    );
-    await multicallTx.wait();
+    await this.executeChainAdminMulticall([
+      {
+        target: hyperchain.address,
+        value: 0,
+        data: acceptAdminData,
+      },
+    ]);
 
     if (this.verbose) {
       console.log("Pending admin successfully accepted");

@@ -58,8 +58,8 @@ export async function initialBridgehubDeployment(
   await deployer.deployDAValidators(create2Salt, { gasPrice });
   // Governance will be L1 governance, but we want to deploy it here for the init process.
   await deployer.deployGovernance(create2Salt, { gasPrice });
+  await deployer.deployChainAdmin(create2Salt, { gasPrice });
   await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
-  await deployer.deployGovernance(create2Salt, { gasPrice });
 
   if (!deployer.isZkMode()) {
     // proxy admin is already deployed when SL's L2SharedBridge is registered
