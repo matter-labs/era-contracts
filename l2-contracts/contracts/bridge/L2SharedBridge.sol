@@ -49,7 +49,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @dev The contract responsible for handling tokens native to a single chain.
     IL2NativeTokenVault public nativeTokenVault;
 
-    /// @dev A mapping asset of ID to asset handler address
+    /// @dev A mapping of asset ID to asset handler address
     mapping(bytes32 assetId => address assetHandlerAddress) public override assetHandlerAddress;
 
     /// @notice Checks that the message sender is the legacy bridge.

@@ -121,7 +121,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         emit BridgeMint(_chainId, _assetId, _l1Sender, _l2Receiver, _amount);
     }
 
-    /// @notice Used when the chain starts to send a tx and needs to burn the asset (or lock it for this contract)
+    /// @notice Used when the chain starts to send a tx and needs to burn the asset.
     function bridgeBurn(
         uint256 _chainId,
         uint256 _mintValue,
