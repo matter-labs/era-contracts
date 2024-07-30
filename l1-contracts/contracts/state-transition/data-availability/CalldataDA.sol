@@ -88,7 +88,7 @@ abstract contract CalldataDA {
 
         _pubdata = _pubdataInput[:_pubdataInput.length - 32];
 
-        // FIXME: allow larger lengths for SyncLayer-based chains.
+        // FIXME: allow larger lengths for Gateway-based chains.
         require(_pubdata.length <= BLOB_SIZE_BYTES, "cz");
         require(_fullPubdataHash == keccak256(_pubdata), "wp");
         blobCommitments[0] = bytes32(_pubdataInput[_pubdataInput.length - 32:_pubdataInput.length]);

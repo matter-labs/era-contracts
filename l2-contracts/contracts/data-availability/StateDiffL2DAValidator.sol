@@ -29,7 +29,7 @@ abstract contract StateDiffL2DAValidator {
     function _produceStateDiffPubdata(
         bytes32 _chainedLogsHash,
         bytes32 _chainedMessagesHash,
-        bytes32 _chainedBytescodesHash,
+        bytes32 _chainedBytecodesHash,
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
     )
         internal
@@ -90,10 +90,10 @@ abstract contract StateDiffL2DAValidator {
             );
             calldataPtr += currentBytecodeLength;
         }
-        if (reconstructedChainedL1BytecodesRevealDataHash != _chainedBytescodesHash) {
+        if (reconstructedChainedL1BytecodesRevealDataHash != _chainedBytecodesHash) {
             revert ReconstructionMismatch(
                 PubdataField.Bytecode,
-                _chainedBytescodesHash,
+                _chainedBytecodesHash,
                 reconstructedChainedL1BytecodesRevealDataHash
             );
         }

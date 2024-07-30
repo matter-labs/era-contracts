@@ -1061,21 +1061,21 @@ export class Deployer {
     }
   }
 
-  public async registerSyncLayer() {
+  public async registerSettlementLayer() {
     const stm = this.stateTransitionManagerContract(this.deployWallet);
-    const calldata = await stm.interface.encodeFunctionData("registerSyncLayer", [this.chainId, true]);
+    const calldata = await stm.interface.encodeFunctionData("registerSettlementLayer", [this.chainId, true]);
     await this.executeUpgrade(this.addresses.StateTransition.StateTransitionProxy, 0, calldata);
     if (this.verbose) {
-      console.log("SyncLayer registered");
+      console.log("Gateway registered");
     }
   }
 
-  public async moveChainToSyncLayer(syncLayerChainId: string, gasPrice: BigNumberish, useGovernance: boolean = false) {
+  public async moveChainToGateway(gatewayChainId: string, gasPrice: BigNumberish, useGovernance: boolean = false) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     // Just some large gas limit that should always be enough
     const l2GasLimit = ethers.BigNumber.from(72_000_000);
     const expectedCost = (
-      await bridgehub.l2TransactionBaseCost(syncLayerChainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
+      await bridgehub.l2TransactionBaseCost(gatewayChainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
     ).mul(5);
 
     const newAdmin = this.deployWallet.address;
@@ -1103,7 +1103,7 @@ export class Deployer {
       "requestL2TransactionTwoBridges",
       [
         {
-          chainId: syncLayerChainId,
+          chainId: gatewayChainId,
           mintValue: expectedCost,
           l2Value: 0,
           l2GasLimit: l2GasLimit,

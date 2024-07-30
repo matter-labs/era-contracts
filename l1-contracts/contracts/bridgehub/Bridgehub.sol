@@ -69,7 +69,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     mapping(uint256 chainId => uint256 activeSettlementLayerChainId) public settlementLayer;
 
     /// @dev Sync layer chain is expected to have .. as the base token.
-    mapping(uint256 chainId => bool isWhitelistedSyncLayer) public whitelistedSettlementLayers;
+    mapping(uint256 chainId => bool isWhitelistedSettlementLayer) public whitelistedSettlementLayers;
 
     /// @notice to avoid parity hack
     constructor(uint256 _l1ChainId, address _owner) reentrancyGuardInitializer {
@@ -172,11 +172,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         sharedBridge = IL1AssetRouter(_sharedBridge);
     }
 
-    function registerSyncLayer(
-        uint256 _newSyncLayerChainId,
+    function registerSettlementLayer(
+        uint256 _newSettlementLayerChainId,
         bool _isWhitelisted
-    ) external onlyChainSTM(_newSyncLayerChainId) {
-        whitelistedSettlementLayers[_newSyncLayerChainId] = _isWhitelisted;
+    ) external onlyChainSTM(_newSettlementLayerChainId) {
+        whitelistedSettlementLayers[_newSettlementLayerChainId] = _isWhitelisted;
 
         // TODO: emit event
     }
@@ -446,7 +446,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         );
     }
 
-    function forwardTransactionOnSyncLayer(
+    function forwardTransactionOnGateway(
         uint256 _chainId,
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
@@ -455,7 +455,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) external override {
         require(L1_CHAIN_ID != block.chainid, "BH: not in sync layer mode");
         address hyperchain = getHyperchain(_chainId);
-        IZkSyncHyperchain(hyperchain).bridgehubRequestL2TransactionOnSyncLayer(
+        IZkSyncHyperchain(hyperchain).bridgehubRequestL2TransactionOnGateway(
             _transaction,
             _factoryDeps,
             _canonicalTxHash,

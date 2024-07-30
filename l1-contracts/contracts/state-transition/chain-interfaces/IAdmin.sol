@@ -139,7 +139,7 @@ interface IAdmin is IZkSyncHyperchainBase {
     event BridgeMint(address indexed _account, uint256 _amount);
 
     function forwardedBridgeBurn(
-        address _syncLayer,
+        address _settlementLayer,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);

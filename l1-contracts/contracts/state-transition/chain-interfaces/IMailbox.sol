@@ -99,14 +99,14 @@ interface IMailbox is IZkSyncHyperchainBase {
         BridgehubL2TransactionRequest calldata _request
     ) external returns (bytes32 canonicalTxHash);
 
-    function bridgehubRequestL2TransactionOnSyncLayer(
+    function bridgehubRequestL2TransactionOnGateway(
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external;
 
-    function requestL2TransactionToSyncLayerMailbox(
+    function requestL2TransactionToGatewayMailbox(
         uint256 _chainId,
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,

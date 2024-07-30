@@ -227,9 +227,9 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getSyncLayer() external view returns (address) {
+    function getSettlementLayer() external view returns (address) {
         // TODO: consider making private so that no one relies on it
-        return s.syncLayer;
+        return s.settlementLayer;
     }
 
     /*//////////////////////////////////////////////////////////////
