@@ -1290,14 +1290,10 @@ export class Deployer {
     }
   }
 
-
   public async executeChainAdminMulticall(calls: ChainAdminCall[], requireSuccess: boolean = true) {
     const chainAdmin = ChainAdminFactory.connect(this.addresses.ChainAdmin, this.deployWallet);
 
-    const multicallTx = await chainAdmin.multicall(
-      calls,
-      requireSuccess
-    );
+    const multicallTx = await chainAdmin.multicall(calls, requireSuccess);
     console.log(await multicallTx.wait());
   }
 
@@ -1325,7 +1321,7 @@ export class Deployer {
         value: 0,
         data: acceptAdminData,
       },
-    ])
+    ]);
 
     if (this.verbose) {
       console.log("Pending admin successfully accepted");

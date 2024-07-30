@@ -94,13 +94,16 @@ async function main() {
       const adminFacetInterface = new AdminFacetFactory().interface;
 
       console.log("Setting the DA Validator pair on diamond proxy");
-      console.log('Who is called: ', deployer.addresses.StateTransition.DiamondProxy);
+      console.log("Who is called: ", deployer.addresses.StateTransition.DiamondProxy);
       await deployer.executeChainAdminMulticall([
         {
           target: deployer.addresses.StateTransition.DiamondProxy,
-          data: adminFacetInterface.encodeFunctionData("setDAValidatorPair", [l1DaValidatorAddress, l2DaValidatorAddress]),
-          value: 0
-        }
+          data: adminFacetInterface.encodeFunctionData("setDAValidatorPair", [
+            l1DaValidatorAddress,
+            l2DaValidatorAddress,
+          ]),
+          value: 0,
+        },
       ]);
     });
 
