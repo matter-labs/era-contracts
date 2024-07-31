@@ -1071,14 +1071,14 @@ export class Deployer {
 
   public async registerSyncLayer() {
     const stm = this.stateTransitionManagerContract(this.deployWallet);
-    const calldata = await stm.interface.encodeFunctionData("registerSyncLayer", [this.chainId, true]);
+    const calldata = stm.interface.encodeFunctionData("registerSyncLayer", [this.chainId, true]);
     await this.executeUpgrade(this.addresses.StateTransition.StateTransitionProxy, 0, calldata);
     if (this.verbose) {
       console.log("SyncLayer registered");
     }
   }
 
-  public async moveChainToSyncLayer(syncLayerChainId: string, gasPrice: BigNumberish, useGovernance: boolean = false) {
+  public async moveChainToSyncLayer(syncLayerChainId: string, gasPrice: BigNumberish, _useGovernance: boolean = false) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     // Just some large gas limit that should always be enough
     const l2GasLimit = ethers.BigNumber.from(72_000_000);

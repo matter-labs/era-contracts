@@ -12,7 +12,7 @@ import {IChainAdmin} from "./IChainAdmin.sol";
 /// the blockchain node to accept the protocol upgrade.
 contract ChainAdmin is IChainAdmin, Ownable2Step {
     constructor(address _initialOwner) {
-        // solhint-disable-next-line gas-custom-errors reason-string
+        // solhint-disable-next-line gas-custom-errors, reason-string
         require(_initialOwner != address(0), "Initial owner should be non zero address");
         _transferOwnership(_initialOwner);
     }
