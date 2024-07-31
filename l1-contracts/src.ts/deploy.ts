@@ -1078,7 +1078,7 @@ export class Deployer {
     }
   }
 
-  public async moveChainToSyncLayer(syncLayerChainId: string, gasPrice: BigNumberish, _useGovernance: boolean = false) {
+  public async moveChainToSyncLayer(syncLayerChainId: string, gasPrice: BigNumberish) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     // Just some large gas limit that should always be enough
     const l2GasLimit = ethers.BigNumber.from(72_000_000);
