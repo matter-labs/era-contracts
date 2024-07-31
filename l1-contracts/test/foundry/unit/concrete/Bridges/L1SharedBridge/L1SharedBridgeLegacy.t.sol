@@ -155,7 +155,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
 
         // Bridgehub bridgehub = new Bridgehub();
         // vm.store(address(bridgehub),  bytes32(uint256(5 +2)), bytes32(uint256(31337)));
-        // require(address(bridgehub.deployer()) == address(31337), "Bridgehub: deployer wrong");
+        // require(address(bridgehub.deployer()) == address(31337), "BH: deployer wrong");
         vm.store(
             address(sharedBridge),
             keccak256(abi.encode(tokenAssetId, isWithdrawalFinalizedStorageLocation + 2)),
