@@ -401,6 +401,26 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         });
     }
 
+    /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
+    /// @param _isLegacyEncoding Boolean flag indicating whether to use the legacy encoding standard (true) or the latest encoding standard (false).
+    /// @param _prevMsgSender The address of the entity that initiated the deposit.
+    /// @param _assetId The unique identifier of the deposited L1 token.
+    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
+    /// @return txDataHash The resulting encoded transaction data hash.
+    function _encodeTxDataHash(
+        bool _isLegacyEncoding,
+        address _prevMsgSender,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) external view returns (bytes32 txDataHash) {
+        if (_isLegacyEncoding) {
+            (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
+            txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(_assetId), depositAmount));
+        } else {
+            txDataHash = keccak256(abi.encode(_prevMsgSender, _assetId, _transferData));
+        }
+    }
+
     /// @dev send the burn message to the asset
     function _burn(
         uint256 _chainId,
@@ -514,8 +534,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(!_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch), "ShB: legacy cFD");
         {
             bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
-            // Checking, if it was the legacy deposit, check new encoding otherwise
+            // Determine if the given dataHash matches the calculated legacy transaction hash.
             bool isLegacyTxDataHash = _isLegacyTxDataHash(_depositSender, _assetId, _assetData, dataHash);
+            // If the dataHash matches the legacy transaction hash, skip the next step.
+            // Otherwise, perform the check using the new transaction data hash encoding.
             if (!isLegacyTxDataHash) {
                 bytes32 txDataHash = this._encodeTxDataHash(false, _depositSender, _assetId, _assetData);
                 require(dataHash == txDataHash, "ShB: d.it not hap");
@@ -565,26 +587,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             return txDataHash == _expectedTxDataHash;
         } catch {
             return false;
-        }
-    }
-
-    /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
-    /// @param _isLegacyEncoding Boolean flag indicating whether to use the legacy encoding standard (true) or the latest encoding standard (false).
-    /// @param _prevMsgSender The address of the entity that initiated the deposit.
-    /// @param _assetId The unique identifier of the deposited L1 token.
-    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
-    /// @return txDataHash The resulting encoded transaction data hash.
-    function _encodeTxDataHash(
-        bool _isLegacyEncoding,
-        address _prevMsgSender,
-        bytes32 _assetId,
-        bytes memory _transferData
-    ) external view onlyThis returns (bytes32 txDataHash) {
-        if (_isLegacyEncoding) {
-            (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
-            txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(_assetId), depositAmount));
-        } else {
-            txDataHash = keccak256(abi.encode(_prevMsgSender, _assetId, _transferData));
         }
     }
 
