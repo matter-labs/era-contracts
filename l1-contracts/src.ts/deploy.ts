@@ -175,13 +175,11 @@ export class Deployer {
 
   public async genesisForceDeploymentsData() {
     let bridgehubZKBytecode = ethers.constants.HashZero;
-    let messageRootZKBytecode = ethers.constants.HashZero;
     let assetRouterZKBytecode = ethers.constants.HashZero;
     let nativeTokenVaultZKBytecode = ethers.constants.HashZero;
     let l2TokenProxyBytecodeHash = ethers.constants.HashZero;
     if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
       bridgehubZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "Bridgehub");
-      messageRootZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "MessageRoot");
       assetRouterZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2AssetRouter");
       nativeTokenVaultZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2NativeTokenVault");
       const l2TokenProxyBytecode = readBytecode(
@@ -200,13 +198,6 @@ export class Deployer {
         ["uint256", "address"],
         [getNumberFromEnv("ETH_CLIENT_CHAIN_ID"), applyL1ToL2Alias(this.addresses.Governance)]
       ),
-    };
-    const messageRootDeployment = {
-      bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(messageRootZKBytecode)),
-      newAddress: L2_MESSAGE_ROOT_ADDRESS,
-      callConstructor: true,
-      value: 0,
-      input: ethers.utils.defaultAbiCoder.encode(["address"], [L2_BRIDGEHUB_ADDRESS]),
     };
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const assetRouterDeployment = {
@@ -230,7 +221,7 @@ export class Deployer {
       ),
     };
 
-    const forceDeployments = [bridgehubDeployment, assetRouterDeployment, ntvDeployment, messageRootDeployment];
+    const forceDeployments = [bridgehubDeployment, assetRouterDeployment, ntvDeployment];
     return ethers.utils.defaultAbiCoder.encode([FORCE_DEPLOYMENT_ABI_STRING], [forceDeployments]);
   }
 
