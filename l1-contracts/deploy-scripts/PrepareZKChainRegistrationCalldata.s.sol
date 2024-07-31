@@ -17,7 +17,7 @@ import {Utils} from "./Utils.sol";
 contract PrepareZKChainRegistrationCalldataScript is Script {
     using stdToml for string;
 
-    address constant internal ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
 
     struct Config {
         address chainAdmin;
