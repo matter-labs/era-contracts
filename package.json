@@ -6,6 +6,7 @@
     "packages": [
       "l1-contracts",
       "l2-contracts",
+      "da-contracts",
       "system-contracts",
       "gas-bound-caller"
     ],
@@ -38,6 +39,7 @@
     "l1": "yarn workspace l1-contracts",
     "l2": "yarn workspace l2-contracts",
     "sc": "yarn workspace system-contracts",
+    "da": "yarn workspace da-contracts",
     "gas-bound-caller": "yarn workspace gas-bound-caller"
   }
 }

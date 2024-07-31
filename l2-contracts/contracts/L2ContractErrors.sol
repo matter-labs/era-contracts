@@ -17,5 +17,14 @@ error NonSequentialVersion();
 error Unimplemented();
 error UnimplementedMessage(string);
 error WithdrawFailed();
+error MalformedBytecode(BytecodeError);
+
+enum BytecodeError {
+    Version,
+    NumberOfWords,
+    Length,
+    WordsMustBeOdd,
+    DictionaryLength
+}
 
 string constant BRIDGE_MINT_NOT_IMPLEMENTED = "bridgeMint is not implemented! Use deposit/depositTo methods instead.";

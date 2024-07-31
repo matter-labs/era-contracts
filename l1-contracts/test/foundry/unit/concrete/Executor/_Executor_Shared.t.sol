@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "../Utils/Utils.sol";
+import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_VALIDATOR_ADDRESS} from "../Utils/Utils.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
 import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
@@ -12,22 +12,32 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {TestExecutor} from "contracts/dev-contracts/test/TestExecutor.sol";
+import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IL1DAValidator} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
+import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+
+import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
+import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
+
+bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
+bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
 
 contract ExecutorTest is Test {
     address internal owner;
     address internal validator;
     address internal randomSigner;
     address internal blobVersionedHashRetriever;
+    address internal l1DAValidator;
     AdminFacet internal admin;
     TestExecutor internal executor;
     GettersFacet internal getters;
@@ -38,6 +48,8 @@ contract ExecutorTest is Test {
     IExecutor.CommitBatchInfo internal newCommitBatchInfo;
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
     DummyEraBaseTokenBridge internal sharedBridge;
+    RollupL1DAValidator internal rollupL1DAValidator;
+    MessageRoot internal messageRoot;
 
     uint256 eraChainId;
 
@@ -45,7 +57,7 @@ contract ExecutorTest is Test {
     IExecutor.ProofInput internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](11);
+        bytes4[] memory selectors = new bytes4[](12);
         selectors[0] = admin.setPendingAdmin.selector;
         selectors[1] = admin.acceptAdmin.selector;
         selectors[2] = admin.setValidator.selector;
@@ -57,15 +69,17 @@ contract ExecutorTest is Test {
         selectors[8] = admin.executeUpgrade.selector;
         selectors[9] = admin.freezeDiamond.selector;
         selectors[10] = admin.unfreezeDiamond.selector;
+        selectors[11] = admin.setDAValidatorPair.selector;
         return selectors;
     }
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](4);
+        bytes4[] memory selectors = new bytes4[](5);
         selectors[0] = executor.commitBatches.selector;
         selectors[1] = executor.proveBatches.selector;
         selectors[2] = executor.executeBatches.selector;
         selectors[3] = executor.revertBatches.selector;
+        selectors[4] = executor.setPriorityTreeStartIndex.selector;
         return selectors;
     }
 
@@ -130,13 +144,23 @@ contract ExecutorTest is Test {
         randomSigner = makeAddr("randomSigner");
         blobVersionedHashRetriever = makeAddr("blobVersionedHashRetriever");
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
+        messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)));
+        dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
+
+        vm.mockCall(
+            address(messageRoot),
+            abi.encodeWithSelector(MessageRoot.addChainBatchRoot.selector, 9, 1, bytes32(0)),
+            abi.encode()
+        );
 
         eraChainId = 9;
 
-        executor = new TestExecutor();
+        rollupL1DAValidator = new RollupL1DAValidator();
+
         admin = new AdminFacet();
         getters = new GettersFacet();
+        executor = new TestExecutor();
         mailbox = new MailboxFacet(eraChainId);
 
         DummyStateTransitionManager stateTransitionManager = new DummyStateTransitionManager();
@@ -231,6 +255,8 @@ contract ExecutorTest is Test {
         // Initiate the token multiplier to enable L1 -> L2 transactions.
         vm.prank(address(stateTransitionManager));
         admin.setTokenMultiplier(1, 1);
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_VALIDATOR_ADDRESS);
 
         uint256[] memory recursiveAggregationInput;
         uint256[] memory serializedProof;
@@ -241,7 +267,7 @@ contract ExecutorTest is Test {
         vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
 
-        bytes memory l2Logs = Utils.encodePacked(Utils.createSystemLogs());
+        bytes memory l2Logs = Utils.encodePacked(Utils.createSystemLogs(bytes32(0)));
         newCommitBatchInfo = IExecutor.CommitBatchInfo({
             batchNumber: 1,
             timestamp: uint64(currentTimestamp),
@@ -252,12 +278,12 @@ contract ExecutorTest is Test {
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
             systemLogs: l2Logs,
-            pubdataCommitments: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+            operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
 
         vm.mockCall(
             address(sharedBridge),
-            abi.encodeWithSelector(IL1SharedBridge.bridgehubDepositBaseToken.selector),
+            abi.encodeWithSelector(IL1AssetRouter.bridgehubDepositBaseToken.selector),
             abi.encode(true)
         );
     }

@@ -6,6 +6,8 @@ import {Diamond} from "./libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 
+// import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+
 /// @notice Struct that holds all data needed for initializing STM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
 /// @param owner The address who can manage non-critical updates in the contract
@@ -33,14 +35,15 @@ struct ChainCreationParams {
     uint64 genesisIndexRepeatedStorageChanges;
     bytes32 genesisBatchCommitment;
     Diamond.DiamondCutData diamondCut;
+    bytes forceDeploymentsData;
 }
 
 interface IStateTransitionManager {
     /// @dev Emitted when a new Hyperchain is added
     event NewHyperchain(uint256 indexed _chainId, address indexed _hyperchainContract);
 
-    /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
-    event SetChainIdUpgrade(
+    /// @dev emitted when an chain registers and a GenesisUpgrade happens
+    event GenesisUpgrade(
         address indexed _hyperchain,
         L2CanonicalTransaction _l2Transaction,
         uint256 indexed _protocolVersion
@@ -62,13 +65,17 @@ interface IStateTransitionManager {
         bytes32 genesisBatchHash,
         uint64 genesisIndexRepeatedStorageChanges,
         bytes32 genesisBatchCommitment,
-        bytes32 newInitialCutHash
+        bytes32 newInitialCutHash,
+        bytes32 forceDeploymentHash
     );
 
-    /// @notice new UpgradeCutHash
+    /// @notice New UpgradeCutHash
     event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
 
-    /// @notice new ProtocolVersion
+    /// @notice New UpgradeCutData
+    event NewUpgradeCutData(uint256 indexed protocolVersion, Diamond.DiamondCutData diamondCutData);
+
+    /// @notice New ProtocolVersion
     event NewProtocolVersion(uint256 indexed oldProtocolVersion, uint256 indexed newProtocolVersion);
 
     function BRIDGE_HUB() external view returns (address);
@@ -87,7 +94,7 @@ interface IStateTransitionManager {
 
     function initialCutHash() external view returns (bytes32);
 
-    function genesisUpgrade() external view returns (address);
+    function l1GenesisUpgrade() external view returns (address);
 
     function upgradeCutHash(uint256 _protocolVersion) external view returns (bytes32);
 
@@ -110,7 +117,8 @@ interface IStateTransitionManager {
         address _baseToken,
         address _sharedBridge,
         address _admin,
-        bytes calldata _diamondCut
+        bytes calldata _initData,
+        bytes[] calldata _factoryDeps
     ) external;
 
     function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external;
@@ -147,4 +155,22 @@ interface IStateTransitionManager {
     ) external;
 
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32);
+
+    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
+
+    event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
+
+    function forwardedBridgeBurn(
+        uint256 _chainId,
+        bytes calldata _data
+    ) external returns (bytes memory _bridgeMintData);
+
+    function forwardedBridgeMint(uint256 _chainId, bytes calldata _data) external returns (address);
+
+    function bridgeClaimFailedBurn(
+        uint256 _chainId,
+        bytes32 _assetInfo,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external;
 }

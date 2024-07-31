@@ -39,6 +39,8 @@ import {
   buildCommitBatchInfoWithUpgrade,
   makeExecutedEqualCommitted,
   getBatchStoredInfo,
+  buildL2DARollupPubdataCommitment,
+  L2_TO_L1_MESSENGER,
 } from "./utils";
 import { packSemver, unpackStringSemVer, addToProtocolVersion } from "../../scripts/utils";
 
@@ -120,7 +122,7 @@ describe("L2 upgrade test", function () {
 
     await (await dummyAdminFacet.dummySetValidator(await deployWallet.getAddress())).wait();
 
-    // do initial setChainIdUpgrade
+    // do initial GenesisUpgrade
     const upgradeTxHash = await proxyGetters.getL2SystemContractsUpgradeTxHash();
     batch1InfoChainIdUpgrade = await buildCommitBatchInfoWithUpgrade(
       genesisStoredBatchInfo(),
@@ -135,6 +137,7 @@ describe("L2 upgrade test", function () {
     const commitReceipt = await (
       await proxyExecutor.commitBatches(genesisStoredBatchInfo(), [batch1InfoChainIdUpgrade])
     ).wait();
+
     const commitment = commitReceipt.events[0].args.commitment;
     storedBatch1InfoChainIdUpgrade = getBatchStoredInfo(batch1InfoChainIdUpgrade, commitment);
     await makeExecutedEqualCommitted(proxyExecutor, genesisStoredBatchInfo(), [storedBatch1InfoChainIdUpgrade], []);
@@ -639,6 +642,7 @@ describe("L2 upgrade test", function () {
     }
 
     const systemLogs = createSystemLogs();
+
     systemLogs.push(
       constructL2Log(
         true,
@@ -876,7 +880,14 @@ async function buildCommitBatchInfo(
   info: CommitBatchInfoWithTimestamp
 ): Promise<CommitBatchInfo> {
   const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
-  const systemLogs = createSystemLogs(info.priorityOperationsHash, info.numberOfLayer1Txs, prevInfo.batchHash);
+  const [fullPubdataCommitment, l1DAOutputHash] = buildL2DARollupPubdataCommitment(ethers.constants.HashZero, "0x");
+
+  const systemLogs = createSystemLogs(
+    info.priorityOperationsHash,
+    info.numberOfLayer1Txs,
+    prevInfo.batchHash,
+    l1DAOutputHash
+  );
   systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
     true,
     L2_SYSTEM_CONTEXT_ADDRESS,
@@ -891,7 +902,7 @@ async function buildCommitBatchInfo(
     numberOfLayer1Txs: 0,
     priorityOperationsHash: EMPTY_STRING_KECCAK,
     systemLogs: ethers.utils.hexConcat(systemLogs),
-    pubdataCommitments: `0x${"0".repeat(130)}`,
+    operatorDAInput: fullPubdataCommitment,
     bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
     eventsQueueStateHash: ethers.utils.randomBytes(32),
     ...info,
@@ -904,11 +915,19 @@ async function buildCommitBatchInfoWithCustomLogs(
   systemLogs: string[]
 ): Promise<CommitBatchInfo> {
   const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
+  const [fullPubdataCommitment, l1DAOutputHash] = buildL2DARollupPubdataCommitment(ethers.constants.HashZero, "0x");
+
   systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
     true,
     L2_SYSTEM_CONTEXT_ADDRESS,
     SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
     packBatchTimestampAndBatchTimestamp(timestamp, timestamp)
+  );
+  systemLogs[SYSTEM_LOG_KEYS.L2_DA_VALIDATOR_OUTPUT_HASH_KEY] = constructL2Log(
+    true,
+    L2_TO_L1_MESSENGER,
+    SYSTEM_LOG_KEYS.L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+    l1DAOutputHash
   );
 
   return {
@@ -918,7 +937,7 @@ async function buildCommitBatchInfoWithCustomLogs(
     numberOfLayer1Txs: 0,
     priorityOperationsHash: EMPTY_STRING_KECCAK,
     systemLogs: ethers.utils.hexConcat(systemLogs),
-    pubdataCommitments: `0x${"0".repeat(130)}`,
+    operatorDAInput: fullPubdataCommitment,
     bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
     eventsQueueStateHash: ethers.utils.randomBytes(32),
     ...info,

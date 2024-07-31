@@ -7,7 +7,6 @@ import * as ethers from "ethers";
 import type { BigNumberish, Wallet } from "ethers";
 import { Interface } from "ethers/lib/utils";
 import * as zkethers from "zksync-ethers";
-import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/utils";
 import * as fs from "fs";
 
 import type { FacetCut } from "./diamondCut";
@@ -29,6 +28,7 @@ import {
   ADDRESS_ONE,
   EMPTY_STRING_KECCAK,
   isCurrentNetworkLocal,
+  ETH_ADDRESS_IN_CONTRACTS,
 } from "./utils";
 import { diamondCut, getCurrentFacetCutsForAdd, facetCut, Action } from "./diamondCut";
 import { CONTRACTS_GENESIS_PROTOCOL_VERSION } from "../test/unit_tests/utils";
@@ -56,6 +56,7 @@ export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
   process.env.CONTRACTS_L2_SHARED_BRIDGE_IMPL_ADDR = ADDRESS_ONE;
   process.env.CONTRACTS_L2_ERC20_BRIDGE_ADDR = ADDRESS_ONE;
   process.env.CONTRACTS_BRIDGEHUB_PROXY_ADDR = ADDRESS_ONE;
+  process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR = ADDRESS_ONE;
 }
 
 export async function defaultDeployerForTests(deployWallet: Wallet, ownerAddress: string): Promise<Deployer> {
@@ -106,6 +107,7 @@ export async function initialTestnetDeploymentProcess(
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true);
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false);
   await registerHyperchainWithBridgeRegistration(deployer, false, extraFacets, gasPrice, baseTokenName);
+  await registerTestDAValidators(deployer);
   return deployer;
 }
 
@@ -119,9 +121,18 @@ export async function registerHyperchainWithBridgeRegistration(
 ) {
   chainId = chainId ?? deployer.chainId.toString();
   await registerHyperchain(deployer, onlyVerifier, extraFacets, gasPrice, baseTokenName, chainId, true);
-  const l1SharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
-  const upgradeCall = l1SharedBridge.interface.encodeFunctionData("initializeChainGovernance", [chainId, ADDRESS_ONE]);
-  await deployer.executeUpgrade(l1SharedBridge.address, 0, upgradeCall);
+  await registerTestDAValidators(deployer);
+}
+
+async function registerTestDAValidators(deployer: Deployer) {
+  const contract = await deployer.stateTransitionContract(deployer.deployWallet);
+  // The L2 DA validator must not be zero, but it can be any other value. It is not relevant for the tests.
+  await (
+    await contract.setDAValidatorPair(
+      deployer.addresses.RollupL1DAValidator,
+      process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR
+    )
+  ).wait();
 }
 
 // This is used to deploy the diamond and bridge such that they can be upgraded using UpgradeHyperchain.sol
@@ -161,6 +172,9 @@ export async function initialPreUpgradeContractsDeployment(
   nonce++;
 
   await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
+  nonce++;
+
+  await deployer.deployChainAdmin(create2Salt, { gasPrice, nonce });
   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
 

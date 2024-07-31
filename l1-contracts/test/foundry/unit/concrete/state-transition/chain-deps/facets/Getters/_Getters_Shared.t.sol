@@ -53,21 +53,18 @@ contract GettersFacetWrapper is GettersFacet {
     }
 
     function util_setTotalPriorityTxs(uint256 _totalPriorityTxs) external {
-        s.priorityQueue.tail = _totalPriorityTxs;
+        s.priorityTree.startIndex = 0;
+        s.priorityTree.tree._nextLeafIndex = _totalPriorityTxs;
     }
 
     function util_setFirstUnprocessedPriorityTx(uint256 _firstUnprocessedPriorityTx) external {
-        s.priorityQueue.head = _firstUnprocessedPriorityTx;
+        s.priorityTree.startIndex = 0;
+        s.priorityTree.unprocessedIndex = _firstUnprocessedPriorityTx;
     }
 
     function util_setPriorityQueueSize(uint256 _priorityQueueSize) external {
-        s.priorityQueue.head = 0;
-        s.priorityQueue.tail = _priorityQueueSize;
-    }
-
-    function util_setPriorityQueueFrontOperation(PriorityOperation memory _priorityQueueFrontOperation) external {
-        s.priorityQueue.data[s.priorityQueue.head] = _priorityQueueFrontOperation;
-        s.priorityQueue.tail = s.priorityQueue.head + 1;
+        s.priorityTree.unprocessedIndex = 1;
+        s.priorityTree.tree._nextLeafIndex = _priorityQueueSize + 1;
     }
 
     function util_setValidator(address _validator, bool _status) external {

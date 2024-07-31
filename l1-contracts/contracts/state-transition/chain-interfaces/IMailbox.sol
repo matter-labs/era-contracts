@@ -99,6 +99,21 @@ interface IMailbox is IZkSyncHyperchainBase {
         BridgehubL2TransactionRequest calldata _request
     ) external returns (bytes32 canonicalTxHash);
 
+    function bridgehubRequestL2TransactionOnSyncLayer(
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external;
+
+    function requestL2TransactionToSyncLayerMailbox(
+        uint256 _chainId,
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external returns (bytes32 canonicalTxHash);
+
     /// @notice Estimates the cost in Ether of requesting execution of an L2 transaction from L1
     /// @param _gasPrice expected L1 gas price at which the user requests the transaction execution
     /// @param _l2GasLimit Maximum amount of L2 gas that transaction can consume during execution on L2
@@ -109,6 +124,33 @@ interface IMailbox is IZkSyncHyperchainBase {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
+
+    function proveL2LeafInclusion(
+        uint256 _batchNumber,
+        uint256 _batchRootMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) external view returns (bool);
+
+    /// @notice transfer Eth to shared bridge as part of migration process
+    // function transferEthToSharedBridge() external;
+
+    // function relayTxSL(
+    //     address _to,
+    //     L2CanonicalTransaction memory _transaction,
+    //     bytes[] memory _factoryDeps,
+    //     bytes32 _canonicalTxHash,
+    //     uint64 _expirationTimestamp
+    // ) external;
+
+    // function freeAcceptTx(
+    //     L2CanonicalTransaction memory _transaction,
+    //     bytes[] memory _factoryDeps,
+    //     bytes32 _canonicalTxHash,
+    //     uint64 _expirationTimestamp
+    // ) external;
+
+    // function acceptFreeRequestFromBridgehub(BridgehubL2TransactionRequest calldata _request) external;
 
     /// @notice New priority request event. Emitted when a request is placed into the priority queue
     /// @param txId Serial number of the priority operation

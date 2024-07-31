@@ -6,6 +6,12 @@ pragma solidity 0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
+// It's required to disable lints to force the compiler to compile the contracts
+// solhint-disable no-unused-import
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+// solhint-disable no-unused-import
+import {WETH9} from "contracts/dev-contracts/WETH9.sol";
+
 import {Utils} from "./Utils.sol";
 import {MintFailed} from "./ZkSyncScriptErrors.sol";
 
@@ -15,6 +21,7 @@ contract DeployErc20Script is Script {
     struct Config {
         TokenDescription[] tokens;
         address deployerAddress;
+        address[] additionalAddressesForMinting;
         address create2FactoryAddr;
         bytes32 create2FactorySalt;
     }
@@ -38,13 +45,22 @@ contract DeployErc20Script is Script {
         saveOutput();
     }
 
+    function getTokensAddresses() public view returns (address[] memory) {
+        uint256 tokensLength = config.tokens.length;
+        address[] memory addresses = new address[](tokensLength);
+        for (uint256 i = 0; i < tokensLength; ++i) {
+            addresses[i] = config.tokens[i].addr;
+        }
+        return addresses;
+    }
+
     function initializeConfig() internal {
         config.deployerAddress = msg.sender;
 
         string memory root = vm.projectRoot();
 
         // Grab config from output of l1 deployment
-        string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
+        string memory path = string.concat(root, vm.envString("L1_OUTPUT"));
         string memory toml = vm.readFile(path);
 
         // Config file must be parsed key by key, otherwise values returned
@@ -54,8 +70,9 @@ contract DeployErc20Script is Script {
         config.create2FactorySalt = vm.parseTomlBytes32(toml, "$.create2_factory_salt");
 
         // Grab config from custom config file
-        path = string.concat(root, "/script-config/config-deploy-erc20.toml");
+        path = string.concat(root, vm.envString("TOKENS_CONFIG"));
         toml = vm.readFile(path);
+        config.additionalAddressesForMinting = vm.parseTomlAddressArray(toml, "$.additional_addresses_for_minting");
 
         string[] memory tokens = vm.parseTomlKeys(toml, "$.tokens");
 
@@ -68,7 +85,6 @@ contract DeployErc20Script is Script {
             token.decimals = toml.readUint(string.concat(key, ".decimals"));
             token.implementation = toml.readString(string.concat(key, ".implementation"));
             token.mint = toml.readUint(string.concat(key, ".mint"));
-
             config.tokens.push(token);
         }
     }
@@ -76,14 +92,15 @@ contract DeployErc20Script is Script {
     function deployTokens() internal {
         uint256 tokensLength = config.tokens.length;
         for (uint256 i = 0; i < tokensLength; ++i) {
-            TokenDescription memory token = config.tokens[i];
+            TokenDescription storage token = config.tokens[i];
             console.log("Deploying token:", token.name);
             address tokenAddress = deployErc20({
                 name: token.name,
                 symbol: token.symbol,
                 decimals: token.decimals,
                 implementation: token.implementation,
-                mint: token.mint
+                mint: token.mint,
+                additionalAddressesForMinting: config.additionalAddressesForMinting
             });
             console.log("Token deployed at:", tokenAddress);
             token.addr = tokenAddress;
@@ -95,7 +112,8 @@ contract DeployErc20Script is Script {
         string memory symbol,
         uint256 decimals,
         string memory implementation,
-        uint256 mint
+        uint256 mint,
+        address[] storage additionalAddressesForMinting
     ) internal returns (address) {
         bytes memory args;
         // WETH9 constructor has no arguments
@@ -109,11 +127,16 @@ contract DeployErc20Script is Script {
 
         if (mint > 0) {
             vm.broadcast();
-            (bool success, ) = tokenAddress.call(
-                abi.encodeWithSignature("mint(address,uint256)", config.deployerAddress, mint)
-            );
-            if (!success) {
-                revert MintFailed();
+            additionalAddressesForMinting.push(config.deployerAddress);
+            // solhint-disable-next-line gas-length-in-loops
+            for (uint256 i = 0; i < additionalAddressesForMinting.length; ++i) {
+                (bool success, ) = tokenAddress.call(
+                    abi.encodeWithSignature("mint(address,uint256)", additionalAddressesForMinting[i], mint)
+                );
+                console.log("Minting to:", additionalAddressesForMinting[i]);
+                if (!success) {
+                    revert MintFailed();
+                }
             }
         }
 
@@ -129,7 +152,7 @@ contract DeployErc20Script is Script {
             vm.serializeString(token.symbol, "symbol", token.symbol);
             vm.serializeUint(token.symbol, "decimals", token.decimals);
             vm.serializeString(token.symbol, "implementation", token.implementation);
-            vm.serializeUint(token.symbol, "mint", token.mint);
+            vm.serializeUintToHex(token.symbol, "mint", token.mint);
             string memory tokenInfo = vm.serializeAddress(token.symbol, "address", token.addr);
 
             tokens = vm.serializeString("tokens", token.symbol, tokenInfo);
@@ -144,4 +167,7 @@ contract DeployErc20Script is Script {
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
         return Utils.deployViaCreate2(_bytecode, config.create2FactorySalt, config.create2FactoryAddr);
     }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }

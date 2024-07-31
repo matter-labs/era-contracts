@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
+import {PriorityOpsBatchInfo} from "../libraries/PriorityTree.sol";
 
 /// @dev Enum used by L2 System Contracts to differentiate logs.
 enum SystemLogKey {
@@ -13,19 +14,9 @@ enum SystemLogKey {
     PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,
     NUMBER_OF_LAYER_1_TXS_KEY,
-    BLOB_ONE_HASH_KEY,
-    BLOB_TWO_HASH_KEY,
-    BLOB_THREE_HASH_KEY,
-    BLOB_FOUR_HASH_KEY,
-    BLOB_FIVE_HASH_KEY,
-    BLOB_SIX_HASH_KEY,
+    L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+    USED_L2_DA_VALIDATOR_ADDRESS_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
-}
-
-/// @dev Enum used to determine the source of pubdata. At first we will support calldata and blobs but this can be extended.
-enum PubdataSource {
-    Calldata,
-    Blob
 }
 
 struct LogProcessingOutput {
@@ -36,13 +27,8 @@ struct LogProcessingOutput {
     bytes32 stateDiffHash;
     bytes32 l2LogsTreeRoot;
     uint256 packedBatchAndL2BlockTimestamp;
-    bytes32[] blobHashes;
+    bytes32 l2DAValidatorOutputHash;
 }
-
-/// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
-/// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
-/// @dev Our circuits will prove that a EIP-4844 blob and our internal blob are the same.
-uint256 constant BLOB_SIZE_BYTES = 126_976;
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
 uint256 constant L2_LOG_ADDRESS_OFFSET = 4;
@@ -52,20 +38,6 @@ uint256 constant L2_LOG_KEY_OFFSET = 24;
 
 /// @dev Offset used to pull Value From Log. Equal to 4 (bytes for isService) + 20 (bytes for address) + 32 (bytes for key)
 uint256 constant L2_LOG_VALUE_OFFSET = 56;
-
-/// @dev BLS Modulus value defined in EIP-4844 and the magic value returned from a successful call to the
-/// point evaluation precompile
-uint256 constant BLS_MODULUS = 52435875175126190479447740508185965837690552500527637822603658699938581184513;
-
-/// @dev Packed pubdata commitments.
-/// @dev Format: list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
-uint256 constant PUBDATA_COMMITMENT_SIZE = 144;
-
-/// @dev Offset in pubdata commitment of blobs for claimed value
-uint256 constant PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET = 16;
-
-/// @dev Offset in pubdata commitment of blobs for kzg commitment
-uint256 constant PUBDATA_COMMITMENT_COMMITMENT_OFFSET = 48;
 
 /// @dev Max number of blobs currently supported
 uint256 constant MAX_NUMBER_OF_BLOBS = 6;
@@ -110,7 +82,7 @@ interface IExecutor is IZkSyncHyperchainBase {
     /// @param bootloaderHeapInitialContentsHash Hash of the initial contents of the bootloader heap. In practice it serves as the commitment to the transactions in the batch.
     /// @param eventsQueueStateHash Hash of the events queue state. In practice it serves as the commitment to the events in the batch.
     /// @param systemLogs concatenation of all L2 -> L1 system logs in the batch
-    /// @param pubdataCommitments Packed pubdata commitments/data.
+    /// @param operatorDAInput Packed pubdata commitments/data.
     /// @dev pubdataCommitments format: This will always start with a 1 byte pubdataSource flag. Current allowed values are 0 (calldata) or 1 (blobs)
     ///                             kzg: list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes) = 144 bytes
     ///                             calldata: pubdataCommitments.length - 1 - 32 bytes of pubdata
@@ -128,7 +100,7 @@ interface IExecutor is IZkSyncHyperchainBase {
         bytes32 bootloaderHeapInitialContentsHash;
         bytes32 eventsQueueStateHash;
         bytes systemLogs;
-        bytes pubdataCommitments;
+        bytes operatorDAInput;
     }
 
     /// @notice Recursive proof input data (individual commitments are constructed onchain)
@@ -178,10 +150,18 @@ interface IExecutor is IZkSyncHyperchainBase {
     /// - Processing all pending operations (commpleting priority requests).
     /// - Finalizing this batch (i.e. allowing to withdraw funds from the system)
     /// @param _batchesData Data of the batches to be executed.
-    function executeBatches(StoredBatchInfo[] calldata _batchesData) external;
+    /// @param _priorityOpsData Merkle proofs of the priority operations for each batch.
+    function executeBatches(
+        StoredBatchInfo[] calldata _batchesData,
+        PriorityOpsBatchInfo[] calldata _priorityOpsData
+    ) external;
 
     /// @notice same as `executeBatches` but with the chainId so ValidatorTimelock can sort the inputs.
-    function executeBatchesSharedBridge(uint256 _chainId, StoredBatchInfo[] calldata _batchesData) external;
+    function executeBatchesSharedBridge(
+        uint256 _chainId,
+        StoredBatchInfo[] calldata _batchesData,
+        PriorityOpsBatchInfo[] calldata _priorityOpsData
+    ) external;
 
     /// @notice Reverts unexecuted batches
     /// @param _newLastBatch batch number after which batches should be reverted

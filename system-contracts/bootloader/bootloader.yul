@@ -2730,15 +2730,23 @@ object "Bootloader" {
             function l1MessengerPublishingCall() {
                 let ptr := OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_BEGIN_BYTE()
                 debugLog("Publishing batch data to L1", 0)
+                
+                setHook(VM_HOOK_PUBDATA_REQUESTED())
+
                 // First slot (only last 4 bytes) -- selector
                 mstore(ptr, {{PUBLISH_PUBDATA_SELECTOR}})
-                // Second slot -- offset
-                mstore(add(ptr, 32), 32)
-                setHook(VM_HOOK_PUBDATA_REQUESTED())
+                // Second slot is occupied by the address of the L2 DA validator.
+                // The operator can provide any one it wants. It will be the responsibility of the 
+                // L1Messenger system contract to send the corresponding log to L1.
+                // 
+                // Third slot -- offset. The correct value must be equal to 64
+                assertEq(mload(add(ptr, 64)), 64, "offset for L1Messenger is not 64")
+
                 // Third slot -- length of pubdata
-                let len := mload(add(ptr, 64))
-                // 4 bytes for selector, 32 bytes for array offset and 32 bytes for array length
-                let fullLen := add(len, 68)
+                let len := mload(add(ptr, 96))
+                // 4 bytes for selector, 32 bytes for ABI-encoded l2 DA validator address,
+                // 32 bytes for array offset and 32 bytes for array length
+                let fullLen := add(len, 100)
 
                 // ptr + 28 because the function selector only takes up the last 4 bytes in the first slot.
                 let success := call(
@@ -3956,7 +3964,7 @@ object "Bootloader" {
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function protocolUpgradeTxHashKey() -> ret {
-                ret := 13
+                ret := 9
             }
 
             ////////////////////////////////////////////////////////////////////////////

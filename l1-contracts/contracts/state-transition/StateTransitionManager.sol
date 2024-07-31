@@ -10,21 +10,16 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
 import {IAdmin} from "./chain-interfaces/IAdmin.sol";
-import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager, StateTransitionManagerInitializeData, ChainCreationParams} from "./IStateTransitionManager.sol";
-import {ISystemContext} from "./l2-deps/ISystemContext.sol";
 import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
-import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
-import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
+import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 /// @title State Transition Manager contract
 /// @author Matter Labs
@@ -48,8 +43,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The stored cutData for diamond cut
     bytes32 public initialCutHash;
 
-    /// @dev The genesisUpgrade contract address, used to setChainId
-    address public genesisUpgrade;
+    /// @dev The l1GenesisUpgrade contract address, used to set chainId
+    address public l1GenesisUpgrade;
 
     /// @dev The current packed protocolVersion. To access human-readable version, use `getSemverProtocolVersion` function.
     uint256 public protocolVersion;
@@ -57,7 +52,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The timestamp when protocolVersion can be last used
     mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
 
-    /// @dev The validatorTimelock contract address, used to setChainId
+    /// @dev The validatorTimelock contract address
     address public validatorTimelock;
 
     /// @dev The stored cutData for upgrade diamond cut. protocolVersion => cutHash
@@ -68,6 +63,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev The address to accept the admin role
     address private pendingAdmin;
+
+    /// @dev The initial force deployment hash
+    bytes32 public initialForceDeploymentHash;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -149,7 +147,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         );
         require(_chainCreationParams.genesisBatchCommitment != bytes32(0), "STM: genesisBatchCommitment zero");
 
-        genesisUpgrade = _chainCreationParams.genesisUpgrade;
+        l1GenesisUpgrade = _chainCreationParams.genesisUpgrade;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
         IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
@@ -165,13 +163,16 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         storedBatchZero = keccak256(abi.encode(batchZero));
         bytes32 newInitialCutHash = keccak256(abi.encode(_chainCreationParams.diamondCut));
         initialCutHash = newInitialCutHash;
+        bytes32 forceDeploymentHash = keccak256(abi.encode(_chainCreationParams.forceDeploymentsData));
+        initialForceDeploymentHash = forceDeploymentHash;
 
         emit NewChainCreationParams({
             genesisUpgrade: _chainCreationParams.genesisUpgrade,
             genesisBatchHash: _chainCreationParams.genesisBatchHash,
             genesisIndexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
             genesisBatchCommitment: _chainCreationParams.genesisBatchCommitment,
-            newInitialCutHash: newInitialCutHash
+            newInitialCutHash: newInitialCutHash,
+            forceDeploymentHash: forceDeploymentHash
         });
     }
 
@@ -229,6 +230,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
+        emit NewUpgradeCutData(_newProtocolVersion, _cutData);
     }
 
     /// @dev check that the protocolVersion is active
@@ -281,89 +283,36 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev setPriorityTxMaxGasLimit for the specified chain
-    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external {
+        // onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// @dev setTokenMultiplier for the specified chain
-    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
+    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external {
+        // onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).setTokenMultiplier(_nominator, _denominator);
     }
 
     /// @dev changeFeeParams for the specified chain
-    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external onlyOwner {
+    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external {
+        // onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).changeFeeParams(_newFeeParams);
     }
 
     /// @dev setValidator for the specified chain
-    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwnerOrAdmin {
+    function setValidator(uint256 _chainId, address _validator, bool _active) external {
+        // onlyOwnerOrAdmin {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).setValidator(_validator, _active);
     }
 
     /// @dev setPorterAvailability for the specified chain
     function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
+        // onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPorterAvailability(_zkPorterIsAvailable);
     }
 
     /// registration
-
-    /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
-    function _setChainIdUpgrade(uint256 _chainId, address _chainContract) internal {
-        bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (_chainId));
-        uint256[] memory uintEmptyArray;
-        bytes[] memory bytesEmptyArray;
-
-        uint256 cachedProtocolVersion = protocolVersion;
-        // slither-disable-next-line unused-return
-        (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(cachedProtocolVersion));
-
-        L2CanonicalTransaction memory l2ProtocolUpgradeTx = L2CanonicalTransaction({
-            txType: SYSTEM_UPGRADE_L2_TX_TYPE,
-            from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
-            to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)),
-            gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
-            gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            maxFeePerGas: uint256(0),
-            maxPriorityFeePerGas: uint256(0),
-            paymaster: uint256(0),
-            // Note, that the `minor` of the protocol version is used as "nonce" for system upgrade transactions
-            nonce: uint256(minorVersion),
-            value: 0,
-            reserved: [uint256(0), 0, 0, 0],
-            data: systemContextCalldata,
-            signature: new bytes(0),
-            factoryDeps: uintEmptyArray,
-            paymasterInput: new bytes(0),
-            reservedDynamic: new bytes(0)
-        });
-
-        ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,
-            factoryDeps: bytesEmptyArray,
-            bootloaderHash: bytes32(0),
-            defaultAccountHash: bytes32(0),
-            verifier: address(0),
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: new bytes(0),
-            upgradeTimestamp: 0,
-            newProtocolVersion: cachedProtocolVersion
-        });
-
-        Diamond.FacetCut[] memory emptyArray;
-        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
-            facetCuts: emptyArray,
-            initAddress: genesisUpgrade,
-            initCalldata: abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
-        });
-
-        IAdmin(_chainContract).executeUpgrade(cutData);
-        emit SetChainIdUpgrade(_chainContract, l2ProtocolUpgradeTx, cachedProtocolVersion);
-    }
 
     /// @dev used to register already deployed hyperchain contracts
     /// @param _chainId the chain's id
@@ -374,60 +323,148 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         _registerNewHyperchain(_chainId, _hyperchain);
     }
 
-    /// @notice called by Bridgehub when a chain registers
-    /// @param _chainId the chain's id
-    /// @param _baseToken the base token address used to pay for gas fees
-    /// @param _sharedBridge the shared bridge address, used as base token bridge
-    /// @param _admin the chain's admin address
-    /// @param _diamondCut the diamond cut data that initializes the chains Diamond Proxy
-    function createNewChain(
+    /// deploys a full set of chains contracts
+    function _deployNewChain(
         uint256 _chainId,
         address _baseToken,
         address _sharedBridge,
         address _admin,
-        bytes calldata _diamondCut
-    ) external onlyBridgehub {
+        bytes memory _diamondCut
+    ) internal returns (address hyperchainAddress) {
         if (getHyperchain(_chainId) != address(0)) {
             // Hyperchain already registered
-            return;
+            return getHyperchain(_chainId);
         }
 
         // check not registered
         Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));
 
-        // check input
-        bytes32 cutHashInput = keccak256(_diamondCut);
-        require(cutHashInput == initialCutHash, "STM: initial cutHash mismatch");
+        {
+            // check input
+            bytes32 cutHashInput = keccak256(_diamondCut);
+            require(cutHashInput == initialCutHash, "STM: initial cutHash mismatch");
+        }
+        bytes memory mandatoryInitData;
+        {
+            // solhint-disable-next-line func-named-parameters
+            mandatoryInitData = bytes.concat(
+                bytes32(_chainId),
+                bytes32(uint256(uint160(address(BRIDGE_HUB)))),
+                bytes32(uint256(uint160(address(this)))),
+                bytes32(uint256(protocolVersion)),
+                bytes32(uint256(uint160(_admin))),
+                bytes32(uint256(uint160(validatorTimelock))),
+                bytes32(uint256(uint160(_baseToken))),
+                bytes32(uint256(uint160(_sharedBridge))),
+                bytes32(storedBatchZero)
+            );
+        }
 
         // construct init data
         bytes memory initData;
         /// all together 4+9*32=292 bytes
         // solhint-disable-next-line func-named-parameters
-        initData = bytes.concat(
-            IDiamondInit.initialize.selector,
-            bytes32(_chainId),
-            bytes32(uint256(uint160(BRIDGE_HUB))),
-            bytes32(uint256(uint160(address(this)))),
-            bytes32(uint256(protocolVersion)),
-            bytes32(uint256(uint160(_admin))),
-            bytes32(uint256(uint160(validatorTimelock))),
-            bytes32(uint256(uint160(_baseToken))),
-            bytes32(uint256(uint160(_sharedBridge))),
-            bytes32(storedBatchZero),
-            diamondCut.initCalldata
-        );
+        initData = bytes.concat(IDiamondInit.initialize.selector, mandatoryInitData, diamondCut.initCalldata);
 
         diamondCut.initCalldata = initData;
         // deploy hyperchainContract
         // slither-disable-next-line reentrancy-no-eth
         DiamondProxy hyperchainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
         // save data
-        address hyperchainAddress = address(hyperchainContract);
+        hyperchainAddress = address(hyperchainContract);
 
         _registerNewHyperchain(_chainId, hyperchainAddress);
+    }
 
-        // set chainId in VM
-        _setChainIdUpgrade(_chainId, hyperchainAddress);
+    /// @notice called by Bridgehub when a chain registers
+    /// @param _chainId the chain's id
+    /// @param _baseToken the base token address used to pay for gas fees
+    /// @param _sharedBridge the shared bridge address, used as base token bridge
+    /// @param _admin the chain's admin address
+    /// @param _initData the diamond cut data, force deployments and factoryDeps encoded
+    /// that initializes the chains Diamond Proxy
+    function createNewChain(
+        uint256 _chainId,
+        address _baseToken,
+        address _sharedBridge,
+        address _admin,
+        bytes calldata _initData,
+        bytes[] calldata _factoryDeps
+    ) external onlyBridgehub {
+        (bytes memory _diamondCut, bytes memory _forceDeploymentData) = abi.decode(_initData, (bytes, bytes));
+        // TODO: only allow on L1.
+        // solhint-disable-next-line func-named-parameters
+        address hyperchainAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut);
+
+        {
+            // check input
+            bytes32 forceDeploymentHash = keccak256(abi.encode(_forceDeploymentData));
+            require(forceDeploymentHash == initialForceDeploymentHash, "STM: initial force deployment mismatch");
+        }
+        // genesis upgrade, deploys some contracts, sets chainId
+        IAdmin(hyperchainAddress).genesisUpgrade(l1GenesisUpgrade, _forceDeploymentData, _factoryDeps);
+    }
+
+    function getProtocolVersion(uint256 _chainId) public view returns (uint256) {
+        return IZkSyncHyperchain(hyperchainMap.get(_chainId)).getProtocolVersion();
+    }
+
+    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external onlyOwner {
+        require(_newSyncLayerChainId != 0, "Bad chain id");
+
+        // Currently, we require that the sync layer is deployed by the same STM.
+        address syncLayerAddress = hyperchainMap.get(_newSyncLayerChainId);
+
+        // TODO: Maybe `get` already ensured its existence.
+        require(syncLayerAddress != address(0), "STM: sync layer not registered");
+
+        IBridgehub(BRIDGE_HUB).registerSyncLayer(_newSyncLayerChainId, _isWhitelisted);
+
+        // TODO: emit event
+    }
+
+    /// @notice Called by the bridgehub during the migration of a chain to another settlement layer.
+    /// @param _chainId The chain id of the chain to be migrated.
+    /// @param _data The data needed to perform the migration.
+    function forwardedBridgeBurn(
+        uint256 _chainId,
+        bytes calldata _data
+    ) external view override onlyBridgehub returns (bytes memory stmForwardedBridgeMintData) {
+        (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
+        require(_newSyncLayerAdmin != address(0), "STM: admin zero");
+        // todo check protocol version
+        return abi.encode(IBridgehub(BRIDGE_HUB).baseToken(_chainId), _newSyncLayerAdmin, protocolVersion, _diamondCut);
+    }
+
+    /// @notice Called by the bridgehub during the migration of a chain to the current settlement layer.
+    /// @param _chainId The chain id of the chain to be migrated.
+    /// @param _stmData The data returned from `forwardedBridgeBurn` for the chain.
+    function forwardedBridgeMint(
+        uint256 _chainId,
+        bytes calldata _stmData
+    ) external override onlyBridgehub returns (address chainAddress) {
+        (address _baseToken, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
+            _stmData,
+            (address, address, uint256, bytes)
+        );
+        require(_protocolVersion == protocolVersion, "STM, outdated pv");
+        // todo porotocl version check
+        chainAddress = _deployNewChain({
+            _chainId: _chainId,
+            _baseToken: _baseToken,
+            _sharedBridge: address(IBridgehub(BRIDGE_HUB).sharedBridge()),
+            _admin: _admin,
+            _diamondCut: _diamondCut
+        });
+    }
+
+    function bridgeClaimFailedBurn(
+        uint256 _chainId,
+        bytes32 _assetInfo,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external {
+        // todo
     }
 
     /// @dev This internal function is used to register a new hyperchain in the system.

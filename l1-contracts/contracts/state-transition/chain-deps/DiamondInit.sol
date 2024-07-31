@@ -9,11 +9,16 @@ import {ZkSyncHyperchainBase} from "./facets/ZkSyncHyperchainBase.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
 import {InitializeData, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {PriorityQueue} from "../libraries/PriorityQueue.sol";
+import {PriorityTree} from "../libraries/PriorityTree.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
 /// @dev The deployment process takes care of this contract's initialization.
 contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
+    using PriorityQueue for PriorityQueue.Queue;
+    using PriorityTree for PriorityTree.Tree;
+
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
     constructor() reentrancyGuardInitializer {}
 
@@ -49,6 +54,7 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
         s.priorityTxMaxGasLimit = _initializeData.priorityTxMaxGasLimit;
         s.feeParams = _initializeData.feeParams;
         s.blobVersionedHashRetriever = _initializeData.blobVersionedHashRetriever;
+        s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
 
         s.baseTokenAssetId = IBridgehub(_initializeData.bridgehub).baseTokenAssetId(_initializeData.chainId);
 

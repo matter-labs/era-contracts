@@ -15,15 +15,18 @@ export async function deployViaCreate2(
   create2FactoryAddress: string,
   verbose: boolean = true,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  libraries?: any
+  libraries?: any,
+  bytecode?: ethers.utils.BytesLike
 ): Promise<[string, string]> {
   // [address, txHash]
 
-  const contractFactory = await hardhat.ethers.getContractFactory(contractName, {
-    signer: deployWallet,
-    libraries,
-  });
-  const bytecode = contractFactory.getDeployTransaction(...args, ethTxOptions).data;
+  if (!bytecode) {
+    const contractFactory = await hardhat.ethers.getContractFactory(contractName, {
+      signer: deployWallet,
+      libraries,
+    });
+    bytecode = contractFactory.getDeployTransaction(...args, ethTxOptions).data;
+  }
 
   return await deployBytecodeViaCreate2(
     deployWallet,
@@ -99,6 +102,10 @@ export interface DeployedAddresses {
   Bridgehub: {
     BridgehubProxy: string;
     BridgehubImplementation: string;
+    STMDeploymentTrackerImplementation: string;
+    STMDeploymentTrackerProxy: string;
+    MessageRootImplementation: string;
+    MessageRootProxy: string;
   };
   StateTransition: {
     StateTransitionProxy: string;
@@ -130,8 +137,12 @@ export interface DeployedAddresses {
   TransparentProxyAdmin: string;
   L2ProxyAdmin: string;
   Governance: string;
+  ChainAdmin: string;
   BlobVersionedHashRetriever: string;
   ValidatorTimeLock: string;
+  RollupL1DAValidator: string;
+  ValidiumL1DAValidator: string;
+  RelayedSLDAValidator: string;
   Create2Factory: string;
 }
 
@@ -140,6 +151,10 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     Bridgehub: {
       BridgehubProxy: getAddressFromEnv("CONTRACTS_BRIDGEHUB_PROXY_ADDR"),
       BridgehubImplementation: getAddressFromEnv("CONTRACTS_BRIDGEHUB_IMPL_ADDR"),
+      STMDeploymentTrackerImplementation: getAddressFromEnv("CONTRACTS_STM_DEPLOYMENT_TRACKER_IMPL_ADDR"),
+      STMDeploymentTrackerProxy: getAddressFromEnv("CONTRACTS_STM_DEPLOYMENT_TRACKER_PROXY_ADDR"),
+      MessageRootImplementation: getAddressFromEnv("CONTRACTS_MESSAGE_ROOT_IMPL_ADDR"),
+      MessageRootProxy: getAddressFromEnv("CONTRACTS_MESSAGE_ROOT_PROXY_ADDR"),
     },
     StateTransition: {
       StateTransitionProxy: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_PROXY_ADDR"),
@@ -167,6 +182,9 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       NativeTokenVaultImplementation: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_IMPL_ADDR"),
       NativeTokenVaultProxy: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_PROXY_ADDR"),
     },
+    RollupL1DAValidator: getAddressFromEnv("CONTRACTS_L1_ROLLUP_DA_VALIDATOR"),
+    ValidiumL1DAValidator: getAddressFromEnv("CONTRACTS_L1_VALIDIUM_DA_VALIDATOR"),
+    RelayedSLDAValidator: getAddressFromEnv("CONTRACTS_L1_RELAYED_SL_DA_VALIDATOR"),
     BaseToken: getAddressFromEnv("CONTRACTS_BASE_TOKEN_ADDR"),
     TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),
     L2ProxyAdmin: getAddressFromEnv("CONTRACTS_L2_PROXY_ADMIN_ADDR"),
@@ -174,5 +192,6 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     BlobVersionedHashRetriever: getAddressFromEnv("CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR"),
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
     Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
+    ChainAdmin: getAddressFromEnv("CONTRACTS_CHAIN_ADMIN_ADDR"),
   };
 }

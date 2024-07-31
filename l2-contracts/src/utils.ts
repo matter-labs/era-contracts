@@ -102,7 +102,9 @@ export async function create2DeployFromL1(
   gasPrice?: ethers.BigNumberish,
   extraFactoryDeps?: ethers.BytesLike[]
 ) {
-  const deployerSystemContracts = new Interface(artifacts.readArtifactSync("IContractDeployer").abi);
+  const deployerSystemContracts = new Interface(
+    artifacts.readArtifactSync("contracts/L2ContractHelper.sol:IContractDeployer").abi
+  );
   const bytecodeHash = hashL2Bytecode(bytecode);
   const calldata = deployerSystemContracts.encodeFunctionData("create2", [create2Salt, bytecodeHash, constructor]);
 

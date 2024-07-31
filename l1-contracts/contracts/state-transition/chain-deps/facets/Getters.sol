@@ -10,6 +10,7 @@ import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
+import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
@@ -24,6 +25,7 @@ import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBas
 contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
+    using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "GettersFacet";
@@ -99,23 +101,38 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getTotalPriorityTxs() external view returns (uint256) {
-        return s.priorityQueue.getTotalPriorityTxs();
+        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
+            return s.priorityTree.getTotalPriorityTxs();
+        } else {
+            return s.priorityQueue.getTotalPriorityTxs();
+        }
     }
 
     /// @inheritdoc IGetters
     function getFirstUnprocessedPriorityTx() external view returns (uint256) {
-        return s.priorityQueue.getFirstUnprocessedPriorityTx();
+        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
+            return s.priorityTree.getFirstUnprocessedPriorityTx();
+        } else {
+            return s.priorityQueue.getFirstUnprocessedPriorityTx();
+        }
+    }
+
+    /// @inheritdoc IGetters
+    function getPriorityTreeRoot() external view returns (bytes32) {
+        return s.priorityTree.getRoot();
     }
 
     /// @inheritdoc IGetters
     function getPriorityQueueSize() external view returns (uint256) {
-        return s.priorityQueue.getSize();
+        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
+            return s.priorityTree.getSize();
+        } else {
+            return s.priorityQueue.getSize();
+        }
     }
 
     /// @inheritdoc IGetters
-    function priorityQueueFrontOperation() external view returns (PriorityOperation memory) {
-        return s.priorityQueue.front();
-    }
+    function priorityQueueFrontOperation() external view returns (PriorityOperation memory op) {}
 
     /// @inheritdoc IGetters
     function isValidator(address _address) external view returns (bool) {
@@ -207,6 +224,16 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     /// @inheritdoc IGetters
     function getPubdataPricingMode() external view returns (PubdataPricingMode) {
         return s.feeParams.pubdataPricingMode;
+    }
+
+    /// @inheritdoc IGetters
+    function getSyncLayer() external view returns (address) {
+        // TODO: consider making private so that no one relies on it
+        return s.syncLayer;
+    }
+
+    function getDAValidatorPair() external view returns (address, address) {
+        return (s.l1DAValidator, s.l2DAValidator);
     }
 
     /*//////////////////////////////////////////////////////////////

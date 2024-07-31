@@ -96,7 +96,7 @@ async function main() {
       const baseTokenAddress = await chooseBaseTokenAddress(cmd.baseTokenName, cmd.baseTokenAddress);
       await checkTokenAddress(baseTokenAddress);
       console.log(`Using base token address: ${baseTokenAddress}`);
-
+      console.log(deployer.addresses.Bridgehub.BridgehubProxy);
       if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
         await deployer.registerTokenBridgehub(baseTokenAddress, cmd.useGovernance);
       }
@@ -111,7 +111,7 @@ async function main() {
         null,
         cmd.useGovernance
       );
-      await deployer.transferAdminFromDeployerToGovernance();
+      await deployer.transferAdminFromDeployerToChainAdmin();
     });
 
   await program.parseAsync(process.argv);

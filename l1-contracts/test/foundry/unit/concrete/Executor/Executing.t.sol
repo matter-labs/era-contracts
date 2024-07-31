@@ -4,18 +4,56 @@ pragma solidity 0.8.24;
 import {Vm} from "forge-std/Test.sol";
 import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 
-import {ExecutorTest} from "./_Executor_Shared.t.sol";
+import {ExecutorTest, EMPTY_PREPUBLISHED_COMMITMENT, POINT_EVALUATION_PRECOMPILE_RESULT} from "./_Executor_Shared.t.sol";
 
+import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 contract ExecutingTest is ExecutorTest {
+    bytes32 l2DAValidatorOutputHash;
+    bytes32[] blobVersionedHashes;
+
     function setUp() public {
+        bytes1 source = bytes1(0x01);
+        bytes memory defaultBlobCommitment = Utils.getDefaultBlobCommitment();
+
+        bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
+        bytes32 totalL2PubdataHash = Utils.randomBytes32("totalL2PubdataHash");
+        uint8 numberOfBlobs = 1;
+        bytes32[] memory blobsLinearHashes = new bytes32[](1);
+        blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes");
+
+        bytes memory operatorDAInput = abi.encodePacked(
+            uncompressedStateDiffHash,
+            totalL2PubdataHash,
+            numberOfBlobs,
+            blobsLinearHashes,
+            source,
+            defaultBlobCommitment,
+            EMPTY_PREPUBLISHED_COMMITMENT
+        );
+
+        l2DAValidatorOutputHash = Utils.constructRollupL2DAValidatorOutputHash(
+            uncompressedStateDiffHash,
+            totalL2PubdataHash,
+            uint8(numberOfBlobs),
+            blobsLinearHashes
+        );
+
+        blobVersionedHashes = new bytes32[](1);
+        blobVersionedHashes[0] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5;
+
+        bytes memory precompileInput = Utils.defaultPointEvaluationPrecompileInput(blobVersionedHashes[0]);
+        vm.mockCall(POINT_EVALUATION_PRECOMPILE_ADDR, precompileInput, POINT_EVALUATION_PRECOMPILE_RESULT);
+
+        // This currently only uses the legacy priority queue, not the priority tree.
+        executor.setPriorityTreeStartIndex(100);
         vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
         currentTimestamp = block.timestamp;
 
-        bytes[] memory correctL2Logs = Utils.createSystemLogs();
+        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
         correctL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
@@ -27,11 +65,13 @@ contract ExecutingTest is ExecutorTest {
 
         newCommitBatchInfo.systemLogs = l2Logs;
         newCommitBatchInfo.timestamp = uint64(currentTimestamp);
+        newCommitBatchInfo.operatorDAInput = operatorDAInput;
 
         IExecutor.CommitBatchInfo[] memory commitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         commitBatchInfoArray[0] = newCommitBatchInfo;
 
         vm.prank(validator);
+        vm.blobhashes(blobVersionedHashes);
         vm.recordLogs();
         executor.commitBatches(genesisStoredBatchInfo, commitBatchInfoArray);
         Vm.Log[] memory entries = vm.getRecordedLogs();
@@ -63,7 +103,7 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("k"));
-        executor.executeBatches(storedBatchInfoArray);
+        executor.executeBatches(storedBatchInfoArray, Utils.generatePriorityOps(storedBatchInfoArray.length));
     }
 
     function test_RevertWhen_ExecutingBlockWithWrongData() public {
@@ -75,7 +115,7 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("exe10"));
-        executor.executeBatches(storedBatchInfoArray);
+        executor.executeBatches(storedBatchInfoArray, Utils.generatePriorityOps(storedBatchInfoArray.length));
     }
 
     function test_RevertWhen_ExecutingRevertedBlockWithoutCommittingAndProvingAgain() public {
@@ -87,7 +127,7 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("n"));
-        executor.executeBatches(storedBatchInfoArray);
+        executor.executeBatches(storedBatchInfoArray, Utils.generatePriorityOps(storedBatchInfoArray.length));
     }
 
     function test_RevertWhen_ExecutingUnavailablePriorityOperationHash() public {
@@ -97,7 +137,7 @@ contract ExecutingTest is ExecutorTest {
         bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32("arbitraryCanonicalTxHash");
         bytes32 chainedPriorityTxHash = keccak256(bytes.concat(keccak256(""), arbitraryCanonicalTxHash));
 
-        bytes[] memory correctL2Logs = Utils.createSystemLogs();
+        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
         correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
@@ -126,6 +166,7 @@ contract ExecutingTest is ExecutorTest {
         correctNewCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
 
         vm.prank(validator);
+        vm.blobhashes(blobVersionedHashes);
         vm.recordLogs();
         executor.commitBatches(genesisStoredBatchInfo, correctNewCommitBatchInfoArray);
         Vm.Log[] memory entries = vm.getRecordedLogs();
@@ -144,7 +185,10 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("s"));
-        executor.executeBatches(correctNewStoredBatchInfoArray);
+        executor.executeBatches(
+            correctNewStoredBatchInfoArray,
+            Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length)
+        );
     }
 
     function test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash() public {
@@ -154,7 +198,7 @@ contract ExecutingTest is ExecutorTest {
         bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32("arbitraryCanonicalTxHash");
         bytes32 chainedPriorityTxHash = keccak256(bytes.concat(keccak256(""), arbitraryCanonicalTxHash));
 
-        bytes[] memory correctL2Logs = Utils.createSystemLogs();
+        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
         correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
@@ -182,6 +226,7 @@ contract ExecutingTest is ExecutorTest {
         correctNewCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
 
         vm.prank(validator);
+        vm.blobhashes(blobVersionedHashes);
         vm.recordLogs();
         executor.commitBatches(genesisStoredBatchInfo, correctNewCommitBatchInfoArray);
         Vm.Log[] memory entries = vm.getRecordedLogs();
@@ -221,7 +266,10 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("x"));
-        executor.executeBatches(correctNewStoredBatchInfoArray);
+        executor.executeBatches(
+            correctNewStoredBatchInfoArray,
+            Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length)
+        );
     }
 
     function test_RevertWhen_CommittingBlockWithWrongPreviousBatchHash() public {
@@ -255,7 +303,7 @@ contract ExecutingTest is ExecutorTest {
         storedBatchInfoArray[0] = newStoredBatchInfo;
 
         vm.prank(validator);
-        executor.executeBatches(storedBatchInfoArray);
+        executor.executeBatches(storedBatchInfoArray, Utils.generatePriorityOps(storedBatchInfoArray.length));
 
         uint256 totalBlocksExecuted = getters.getTotalBlocksExecuted();
         assertEq(totalBlocksExecuted, 1);

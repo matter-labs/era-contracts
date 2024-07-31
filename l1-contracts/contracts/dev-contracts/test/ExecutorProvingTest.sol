@@ -28,7 +28,7 @@ contract ExecutorProvingTest is ExecutorFacet {
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash,
         PubdataPricingMode
-    ) external pure returns (LogProcessingOutput memory logOutput) {
+    ) external view returns (LogProcessingOutput memory logOutput) {
         return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
     }
 
@@ -38,4 +38,7 @@ contract ExecutorProvingTest is ExecutorFacet {
         s.l2BootloaderBytecodeHash = l2BootloaderBytecodeHash;
         s.zkPorterIsAvailable = false;
     }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }
