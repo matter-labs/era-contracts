@@ -337,7 +337,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         ) {
             // slither-disable-next-line arbitrary-send-erc20
             l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
-            l1Token.safeIncreaseAllowance(address(nativeTokenVault), _amount);
+            l1Token.forceApprove(address(nativeTokenVault), _amount);
         }
     }
 
@@ -831,7 +831,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         {
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-            IERC20(_l1Token).safeIncreaseAllowance(address(nativeTokenVault), _amount);
+            IERC20(_l1Token).forceApprove(address(nativeTokenVault), _amount);
         }
 
         {
