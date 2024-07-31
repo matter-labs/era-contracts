@@ -4,17 +4,12 @@ pragma solidity 0.8.24;
 // solhint-disable no-console
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {IStateTransitionManager, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Utils} from "./Utils.sol";
@@ -22,7 +17,7 @@ import {Utils} from "./Utils.sol";
 contract PrepareZKChainRegistrationCalldataScript is Script {
     using stdToml for string;
 
-    address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+    address constant internal ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
 
     struct Config {
         address chainAdmin;
@@ -44,8 +39,8 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         bytes l2SharedBridgeProxyBytecode;
     }
 
-    Config config;
-    ContractsBytecodes bytecodes;
+    Config internal config;
+    ContractsBytecodes internal bytecodes;
 
     function run() public {
         console.log("Preparing ZK chain registration calldata");
@@ -120,13 +115,13 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         }
 
         if (config.baseToken.code.length == 0) {
-            revert("Token address is not a contract address");
+            revert("Token address is an EOA");
         }
 
         console.log("Using base token address:", config.baseToken);
     }
 
-    function prepareRegisterBaseTokenCall() internal returns (IGovernance.Call memory) {
+    function prepareRegisterBaseTokenCall() internal view returns (IGovernance.Call memory) {
         Bridgehub bridgehub = Bridgehub(config.bridgehub);
 
         bytes memory data = abi.encodeCall(bridgehub.addToken, (config.baseToken));
@@ -134,7 +129,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         return IGovernance.Call({target: config.bridgehub, value: 0, data: data});
     }
 
-    function computeL2BridgeAddress() internal returns (address) {
+    function computeL2BridgeAddress() internal view returns (address) {
         bytes32 salt = "";
         bytes32 bridgeBytecodeHash = L2ContractHelper.hashL2Bytecode(bytecodes.l2SharedBridgeBytecode);
         bytes memory bridgeConstructorData = abi.encode(config.eraChainId);
@@ -200,7 +195,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         return proxyContractAddress;
     }
 
-    function prepareRegisterHyperchainCall() internal returns (IGovernance.Call memory) {
+    function prepareRegisterHyperchainCall() internal view returns (IGovernance.Call memory) {
         Bridgehub bridgehub = Bridgehub(config.bridgehub);
 
         bytes memory data = abi.encodeCall(
@@ -220,7 +215,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
 
     function prepareInitializeChainGovernanceCall(
         address l2SharedBridgeProxy
-    ) internal returns (IGovernance.Call memory) {
+    ) internal view returns (IGovernance.Call memory) {
         L1SharedBridge bridge = L1SharedBridge(config.l1SharedBridgeProxy);
 
         bytes memory data = abi.encodeCall(bridge.initializeChainGovernance, (config.chainId, l2SharedBridgeProxy));
@@ -274,7 +269,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         vm.writeToml(toml, path);
     }
 
-    function isEOA(address _addr) private returns (bool) {
+    function isEOA(address _addr) private view returns (bool) {
         uint32 size;
         assembly {
             size := extcodesize(_addr)
