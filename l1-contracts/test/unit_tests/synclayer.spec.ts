@@ -3,8 +3,8 @@ import * as ethers from "ethers";
 import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
-import type { Bridgehub, StateTransitionManager } from "../../typechain";
-import { AdminFacetFactory, BridgehubFactory, StateTransitionManagerFactory } from "../../typechain";
+import type { Bridgehub } from "../../typechain";
+import { BridgehubFactory } from "../../typechain";
 
 import {
   initialTestnetDeploymentProcess,
@@ -13,9 +13,9 @@ import {
 } from "../../src.ts/deploy-test-process";
 import {
   ethTestConfig,
-  DIAMOND_CUT_DATA_ABI_STRING,
-  HYPERCHAIN_COMMITMENT_ABI_STRING,
-  ADDRESS_ONE,
+  // DIAMOND_CUT_DATA_ABI_STRING,
+  // HYPERCHAIN_COMMITMENT_ABI_STRING,
+  // ADDRESS_ONE,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   priorityTxMaxGasLimit,
 } from "../../src.ts/utils";
@@ -25,7 +25,7 @@ import type { Deployer } from "../../src.ts/deploy";
 
 describe("Synclayer", function () {
   let bridgehub: Bridgehub;
-  let stateTransition: StateTransitionManager;
+  // let stateTransition: StateTransitionManager;
   let owner: ethers.Signer;
   let migratingDeployer: Deployer;
   let syncLayerDeployer: Deployer;
@@ -59,10 +59,10 @@ describe("Synclayer", function () {
     chainId = migratingDeployer.chainId;
 
     bridgehub = BridgehubFactory.connect(migratingDeployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
-    stateTransition = StateTransitionManagerFactory.connect(
-      migratingDeployer.addresses.StateTransition.StateTransitionProxy,
-      deployWallet
-    );
+    // stateTransition = StateTransitionManagerFactory.connect(
+    //   migratingDeployer.addresses.StateTransition.StateTransitionProxy,
+    //   deployWallet
+    // );
 
     syncLayerDeployer = await defaultDeployerForTests(deployWallet, ownerAddress);
     syncLayerDeployer.chainId = 10;
