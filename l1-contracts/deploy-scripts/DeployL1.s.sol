@@ -15,6 +15,7 @@ import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
+import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {GenesisUpgrade} from "contracts/upgrades/GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
@@ -45,6 +46,7 @@ contract DeployL1Script is Script {
         BridgesDeployedAddresses bridges;
         address transparentProxyAdmin;
         address governance;
+        address chainAdmin;
         address blobVersionedHashRetriever;
         address validatorTimelock;
         address create2Factory;
@@ -135,6 +137,7 @@ contract DeployL1Script is Script {
         deployValidatorTimelock();
 
         deployGovernance();
+        deployChainAdmin();
         deployTransparentProxyAdmin();
         deployBridgehubContract();
         deployBlobVersionedHashRetriever();
@@ -291,6 +294,13 @@ contract DeployL1Script is Script {
         addresses.governance = contractAddress;
     }
 
+    function deployChainAdmin() internal {
+        bytes memory bytecode = abi.encodePacked(type(ChainAdmin).creationCode, abi.encode(config.ownerAddress));
+        address contractAddress = deployViaCreate2(bytecode);
+        console.log("ChainAdmin deployed at:", contractAddress);
+        addresses.chainAdmin = contractAddress;
+    }
+
     function deployTransparentProxyAdmin() internal {
         vm.startBroadcast();
         ProxyAdmin proxyAdmin = new ProxyAdmin();
@@ -437,7 +447,7 @@ contract DeployL1Script is Script {
         });
 
         StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
-            owner: config.ownerAddress,
+            owner: msg.sender,
             validatorTimelock: addresses.validatorTimelock,
             chainCreationParams: chainCreationParams,
             protocolVersion: config.contracts.latestProtocolVersion
@@ -577,8 +587,10 @@ contract DeployL1Script is Script {
         L1SharedBridge sharedBridge = L1SharedBridge(addresses.bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses.governance);
 
-        vm.stopBroadcast();
+        StateTransitionManager stm = StateTransitionManager(addresses.stateTransition.stateTransitionProxy);
+        stm.transferOwnership(addresses.governance);
 
+        vm.stopBroadcast();
         console.log("Owners updated");
     }
 
