@@ -57,17 +57,13 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         IGovernance.Call[] memory calls;
         uint256 cnt = 0;
         if (!IBridgehub(config.bridgehub).tokenIsRegistered(config.baseToken)) {
-            calls = new IGovernance.Call[](3);
+            calls = new IGovernance.Call[](2);
             IGovernance.Call memory baseTokenRegistrationCall = prepareRegisterBaseTokenCall();
             calls[cnt] = baseTokenRegistrationCall;
             cnt++;
         } else {
-            calls = new IGovernance.Call[](2);
+            calls = new IGovernance.Call[](1);
         }
-
-        IGovernance.Call memory setChainCreationParamsCall = prepareSetChainCreationParamsCall();
-        calls[cnt] = setChainCreationParamsCall;
-        cnt++;
 
         IGovernance.Call memory registerChainCall = prepareRegisterHyperchainCall();
         calls[cnt] = registerChainCall;
@@ -202,20 +198,6 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         console.log("L2 governor addr:", l2GovernorAddress);
 
         return proxyContractAddress;
-    }
-
-    function prepareSetChainCreationParamsCall() internal returns (IGovernance.Call memory) {
-        ChainCreationParams memory params = ChainCreationParams({
-            genesisUpgrade: 0x3dDD7ED2AeC0758310A4C6596522FCAeD108DdA2,
-            genesisBatchHash: bytes32(0xabdb766b18a479a5c783a4b80e12686bc8ea3cc2d8a3050491b701d72370ebb5),
-            genesisIndexRepeatedStorageChanges: 54,
-            genesisBatchCommitment: bytes32(0x2d00e5f8d77afcebf58a6b82ae56ba967566fe7dfbcb6760319fb0d215d18ffd),
-            diamondCut: abi.decode(config.diamondCutData, (Diamond.DiamondCutData))
-        });
-
-        bytes memory data = abi.encodeCall(IStateTransitionManager.setChainCreationParams, (params));
-
-        return IGovernance.Call({target: config.stateTransitionProxy, value: 0, data: data});
     }
 
     function prepareRegisterHyperchainCall() internal returns (IGovernance.Call memory) {
