@@ -338,9 +338,8 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         uint256 firstUnprocessed = s.priorityQueue.getFirstUnprocessedPriorityTx();
         uint256 treeStartIndex = s.priorityTree.startIndex;
-        if (firstUnprocessed > treeStartIndex) {
-            s.priorityTree.unprocessedIndex = firstUnprocessed - treeStartIndex;
-        }
+        s.priorityTree.unprocessedIndex = firstUnprocessed - treeStartIndex;
+
         uint256 currentBatchNumber = _storedBatch.batchNumber;
 
         // Save root hash of L2 -> L1 logs tree

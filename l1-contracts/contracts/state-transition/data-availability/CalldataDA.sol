@@ -79,12 +79,11 @@ abstract contract CalldataDA {
         uint256 _maxBlobsSupported,
         bytes calldata _pubdataInput
     ) internal pure returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
+        require(_blobsProvided == 1, "one one blob with calldata");
+
         // We typically do not know whether we'll use calldata or blobs at the time when
         // we start proving the batch. That's why the blob commitment for a single blob is still present in the case of calldata.
-
         blobCommitments = new bytes32[](_maxBlobsSupported);
-
-        require(_blobsProvided == 1, "one one blob with calldata");
 
         _pubdata = _pubdataInput[:_pubdataInput.length - 32];
 

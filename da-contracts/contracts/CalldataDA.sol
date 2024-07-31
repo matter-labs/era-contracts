@@ -8,6 +8,8 @@ import {BLOB_SIZE_BYTES} from "./DAUtils.sol";
 
 uint256 constant BLOBS_SUPPORTED = 6;
 
+uint256 constant BLOB_DATA_OFFSET = 65;
+
 /// @notice Contract that contains the functionality for process the calldata DA.
 /// @dev The expected l2DAValidator that should be used with it `RollupL2DAValidator`.
 abstract contract CalldataDA {
@@ -49,15 +51,16 @@ abstract contract CalldataDA {
         // the `_maxBlobsSupported`
         blobsLinearHashes = new bytes32[](_maxBlobsSupported);
 
-        require(_operatorDAInput.length >= 65 + 32 * blobsProvided, "invalid blobs hashes");
+        require(_operatorDAInput.length >= BLOB_DATA_OFFSET + 32 * blobsProvided, "invalid blobs hashes");
 
-        uint256 ptr = 65;
-
-        for (uint256 i = 0; i < blobsProvided; ++i) {
-            // Take the 32 bytes of the blob linear hash
-            blobsLinearHashes[i] = bytes32(_operatorDAInput[ptr:ptr + 32]);
-            ptr += 32;
+        assembly {
+            // The pointer to the allocated memory above. We skip 32 bytes to avoid overwriting the length.
+            let blobsPtr := add(blobsLinearHashes, 0x20)
+            let inputPtr := add(_operatorDAInput.offset, BLOB_DATA_OFFSET)
+            calldatacopy(blobsPtr, inputPtr, mul(blobsProvided, 32))
         }
+
+        uint256 ptr = BLOB_DATA_OFFSET + 32 * blobsProvided;
 
         // Now, we need to double check that the provided input was indeed retutned by the L2 DA validator.
         require(keccak256(_operatorDAInput[:ptr]) == _l2DAValidatorOutputHash, "invalid l2 DA output hash");
@@ -83,7 +86,7 @@ abstract contract CalldataDA {
 
         _pubdata = _pubdataInput[:_pubdataInput.length - 32];
 
-        // FIXME: allow larger lengths for SyncLayer-based chains.
+        // FIXME: allow larger lengths for Ga-based chains.
         require(_pubdata.length <= BLOB_SIZE_BYTES, "cz");
         require(_fullPubdataHash == keccak256(_pubdata), "wp");
         blobCommitments[0] = bytes32(_pubdataInput[_pubdataInput.length - 32:_pubdataInput.length]);
