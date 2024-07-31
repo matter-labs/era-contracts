@@ -26,10 +26,8 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
 
     struct Config {
         address chainAdmin;
-
         address bridgehub;
         address stateTransitionProxy;
-
         uint256 chainId;
         uint256 eraChainId;
         uint256 bridgehubCreateNewChainSalt;
@@ -140,8 +138,6 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         return IGovernance.Call({target: config.bridgehub, value: 0, data: data});
     }
 
-    // NOTE: This function assumes that msg.sender is an EOA, so its address is not aliased, but the governance
-    // that is assumed to be a contract is using the alias.
     function computeL2BridgeAddress() internal returns (address) {
         bytes32 salt = "";
         bytes32 bridgeBytecodeHash = L2ContractHelper.hashL2Bytecode(bytecodes.l2SharedBridgeBytecode);
@@ -209,8 +205,6 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
     }
 
     function prepareSetChainCreationParamsCall() internal returns (IGovernance.Call memory) {
-
-
         ChainCreationParams memory params = ChainCreationParams({
             genesisUpgrade: 0x3dDD7ED2AeC0758310A4C6596522FCAeD108DdA2,
             genesisBatchHash: bytes32(0xabdb766b18a479a5c783a4b80e12686bc8ea3cc2d8a3050491b701d72370ebb5),
@@ -242,7 +236,9 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         return IGovernance.Call({target: config.bridgehub, value: 0, data: data});
     }
 
-    function prepareInitializeChainGovernanceCall(address l2SharedBridgeProxy) internal returns (IGovernance.Call memory) {
+    function prepareInitializeChainGovernanceCall(
+        address l2SharedBridgeProxy
+    ) internal returns (IGovernance.Call memory) {
         L1SharedBridge bridge = L1SharedBridge(config.l1SharedBridgeProxy);
 
         bytes memory data = abi.encodeCall(bridge.initializeChainGovernance, (config.chainId, l2SharedBridgeProxy));
@@ -250,7 +246,10 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         return IGovernance.Call({target: config.l1SharedBridgeProxy, value: 0, data: data});
     }
 
-    function scheduleTransparentCalldata(IGovernance.Call[] memory calls, IGovernance.Call memory initChainGovCall) internal {
+    function scheduleTransparentCalldata(
+        IGovernance.Call[] memory calls,
+        IGovernance.Call memory initChainGovCall
+    ) internal {
         IGovernance governance = IGovernance(config.governance);
 
         IGovernance.Operation memory operation = IGovernance.Operation({
@@ -278,7 +277,12 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         saveOutput(scheduleCalldata, executeCalldata, scheduleCalldata2, executeCalldata2);
     }
 
-    function saveOutput(bytes memory schedule, bytes memory execute, bytes memory schedule2, bytes memory execute2) internal {
+    function saveOutput(
+        bytes memory schedule,
+        bytes memory execute,
+        bytes memory schedule2,
+        bytes memory execute2
+    ) internal {
         vm.serializeBytes("root", "scheduleCalldataStageOne", schedule);
         vm.serializeBytes("root", "executeCalldataStageOne", execute);
         vm.serializeBytes("root", "scheduleCalldataStageTwo", schedule2);
@@ -298,7 +302,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
     }
 }
 
-// Done by the chain admin:
+// Done by the chain admin separately from this script:
 // - add validators
 // - deploy L2 contracts
 // - set pubdata sending mode
