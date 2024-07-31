@@ -89,6 +89,9 @@ contract DeployL2Script is Script {
         contracts.forceDeployUpgrader = Utils.readHardhatBytecode(
             "/../l2-contracts/artifacts-zk/contracts/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
         );
+        contracts.forceDeployUpgrader = Utils.readHardhatBytecode(
+            "/../l2-contracts/artifacts-zk/contracts/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
+        );
     }
 
     function initializeConfig() internal {
