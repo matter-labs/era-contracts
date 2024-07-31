@@ -28,7 +28,7 @@ interface IChainAdmin {
     event NewTokenMultiplierSetter(address _oldTokenMultiplierSetter, address _newTokenMultiplierSetter);
 
     function setTokenMultiplierSetter(address _tokenMultiplierSetter) external;
-    
+
     function setUpgradeTimestamp(uint256 _protocolVersion, uint256 _upgradeTimestamp) external;
 
     function multicall(Call[] calldata _calls, bool _requireSuccess) external payable;

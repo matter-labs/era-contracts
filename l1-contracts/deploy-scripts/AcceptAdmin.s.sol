@@ -38,7 +38,7 @@ contract AcceptAdmin is Script {
     // This function should be called by the owner to accept the admin role
     function chainAdminAcceptAdmin(ChainAdmin chainAdmin, address target) public {
         IZkSyncHyperchain adminContract = IZkSyncHyperchain(target);
-        
+
         IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](1);
         calls[0] = IChainAdmin.Call({target: target, value: 0, data: abi.encodeCall(adminContract.acceptAdmin, ())});
 
