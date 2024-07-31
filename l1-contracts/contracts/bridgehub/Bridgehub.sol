@@ -153,10 +153,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice State Transition can be any contract with the appropriate interface/functionality
     /// @notice this stops new Chains from using the STF, old chains are not affected
     function removeStateTransitionManager(address _stateTransitionManager) external onlyOwner {
-        require(
-            stateTransitionManagerIsRegistered[_stateTransitionManager],
-            "BH: state transition not registered yet"
-        );
+        require(stateTransitionManagerIsRegistered[_stateTransitionManager], "BH: state transition not registered yet");
         stateTransitionManagerIsRegistered[_stateTransitionManager] = false;
     }
 
@@ -388,10 +385,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
             uint256 baseTokenMsgValue;
             if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
-                require(
-                    msg.value == _request.mintValue + _request.secondBridgeValue,
-                    "BH: msg.value mismatch 2"
-                );
+                require(msg.value == _request.mintValue + _request.secondBridgeValue, "BH: msg.value mismatch 2");
                 baseTokenMsgValue = _request.mintValue;
             } else {
                 require(msg.value == _request.secondBridgeValue, "BH: msg.value mismatch 3");

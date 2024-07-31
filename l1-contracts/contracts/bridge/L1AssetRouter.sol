@@ -657,7 +657,10 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) internal nonReentrant whenNotPaused returns (address l1Receiver, bytes32 assetId, uint256 amount) {
-        require(!isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex], "L1AR: Withdrawal is already finalized");
+        require(
+            !isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex],
+            "L1AR: Withdrawal is already finalized"
+        );
         isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
         // Handling special case for withdrawal from zkSync Era initiated before Shared Bridge.
