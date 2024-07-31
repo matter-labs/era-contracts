@@ -106,7 +106,7 @@ export async function initialTestnetDeploymentProcess(
   // deploy the verifier first
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true);
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false);
-  await registerHyperchainWithBridgeRegistration(deployer, false, extraFacets, gasPrice, baseTokenName);
+  await registerHyperchainWithBridgeRegistration(deployer, false, extraFacets, gasPrice, baseTokenName);  
   await registerTestDAValidators(deployer);
   return deployer;
 }
