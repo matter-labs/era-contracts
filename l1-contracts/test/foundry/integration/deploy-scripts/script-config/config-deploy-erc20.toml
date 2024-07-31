@@ -1,3 +1,5 @@
+additional_addresses_for_minting = []
+
 [tokens.DAI]
 name = "DAI"
 symbol = "DAI"

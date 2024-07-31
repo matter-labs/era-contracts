@@ -73,8 +73,8 @@
     "contractName": "L1Messenger",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/L1Messenger.sol/L1Messenger.json",
     "sourceCodePath": "contracts-preprocessed/L1Messenger.sol",
-    "bytecodeHash": "0x010001e7bdcf36d7fd4cbb1eb1c27a709d5c27fd346d282df7d3d5293435ff52",
-    "sourceCodeHash": "0xa208b9cc261e873a7902a2e7c388d252f8d46f965562052a1544c354c3d6f096"
+    "bytecodeHash": "0x010001e9ec59f6aad98b91b7853b805e6c5b935112247cf5267094d0d1785067",
+    "sourceCodeHash": "0x2bc0dd1f7c3a9e1c8b7f2045e4be3cbec84079b5ec3863a90f71741f30ea1a6c"
   },
   {
     "contractName": "L2BaseToken",
