@@ -86,11 +86,8 @@ contract DeployL2Script is Script {
         contracts.l2SharedBridgeProxyBytecode = Utils.readFoundryBytecode(
             "/../l2-contracts/zkout/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
         );
-        contracts.forceDeployUpgrader = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
-        );
-        contracts.forceDeployUpgrader = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
+        contracts.forceDeployUpgrader = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
         );
     }
 
