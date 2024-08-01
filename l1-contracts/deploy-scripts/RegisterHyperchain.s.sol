@@ -12,6 +12,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
+import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Utils} from "./Utils.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 
@@ -40,6 +41,7 @@ contract RegisterHyperchainScript is Script {
         uint256 governanceMinDelay;
         address newDiamondProxy;
         address governance;
+        address chainAdmin;
     }
 
     Config config;
@@ -50,6 +52,7 @@ contract RegisterHyperchainScript is Script {
         initializeConfig();
 
         deployGovernance();
+        deployChainAdmin();
         checkTokenAddress();
         registerTokenOnBridgehub();
         registerHyperchain();
@@ -145,6 +148,13 @@ contract RegisterHyperchainScript is Script {
         config.governance = address(governance);
     }
 
+    function deployChainAdmin() internal {
+        vm.broadcast();
+        ChainAdmin chainAdmin = new ChainAdmin(config.ownerAddress);
+        console.log("ChainAdmin deployed at:", address(chainAdmin));
+        config.chainAdmin = address(chainAdmin);
+    }
+
     function registerHyperchain() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         Ownable ownable = Ownable(config.bridgehub);
@@ -220,12 +230,13 @@ contract RegisterHyperchainScript is Script {
         IZkSyncHyperchain hyperchain = IZkSyncHyperchain(config.newDiamondProxy);
 
         vm.broadcast();
-        hyperchain.setPendingAdmin(config.governance);
-        console.log("Owner for ", config.newDiamondProxy, "set to", config.governance);
+        hyperchain.setPendingAdmin(config.chainAdmin);
+        console.log("Owner for ", config.newDiamondProxy, "set to", config.chainAdmin);
     }
 
     function saveOutput() internal {
         vm.serializeAddress("root", "diamond_proxy_addr", config.newDiamondProxy);
+        vm.serializeAddress("root", "chain_admin_addr", config.chainAdmin);
         string memory toml = vm.serializeAddress("root", "governance_addr", config.governance);
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-register-hyperchain.toml");
