@@ -382,7 +382,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _prevMsgSender: _prevMsgSender,
             _transferData: transferData
         });
-        bytes32 txDataHash = this._encodeTxDataHash(legacyDeposit, _prevMsgSender, assetId, transferData);
+        bytes32 txDataHash = this.encodeTxDataHash(legacyDeposit, _prevMsgSender, assetId, transferData);
 
         request = _requestToBridge({
             _chainId: _chainId,
@@ -407,7 +407,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _assetId The unique identifier of the deposited L1 token.
     /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
     /// @return txDataHash The resulting encoded transaction data hash.
-    function _encodeTxDataHash(
+    function encodeTxDataHash(
         bool _isLegacyEncoding,
         address _prevMsgSender,
         bytes32 _assetId,
@@ -539,13 +539,18 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             // If the dataHash matches the legacy transaction hash, skip the next step.
             // Otherwise, perform the check using the new transaction data hash encoding.
             if (!isLegacyTxDataHash) {
-                bytes32 txDataHash = this._encodeTxDataHash(false, _depositSender, _assetId, _assetData);
+                bytes32 txDataHash = this.encodeTxDataHash(false, _depositSender, _assetId, _assetData);
                 require(dataHash == txDataHash, "ShB: d.it not hap");
             }
         }
         delete depositHappened[_chainId][_l2TxHash];
 
-        IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(_chainId, _assetId, _assetData);
+        IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(
+            _depositSender,
+            _chainId,
+            _assetId,
+            _assetData
+        );
 
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetId, _assetData);
     }
@@ -583,7 +588,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes memory _transferData,
         bytes32 _expectedTxDataHash
     ) internal view returns (bool isLegacyTxDataHash) {
-        try this._encodeTxDataHash(true, _prevMsgSender, _assetId, _transferData) returns (bytes32 txDataHash) {
+        try this.encodeTxDataHash(true, _prevMsgSender, _assetId, _transferData) returns (bytes32 txDataHash) {
             return txDataHash == _expectedTxDataHash;
         } catch {
             return false;
@@ -773,7 +778,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             SHARED BRIDGE TOKEN BRIDGING LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2
+    /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on L2
+    /// @dev Cannot be used to claim deposits made with new encoding
     /// @param _depositSender The address of the deposit initiator
     /// @param _l1Asset The address of the deposited L1 ERC20 token
     /// @param _amount The amount of the deposit that failed.
@@ -794,7 +800,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes32[] calldata _merkleProof
     ) external override {
         bytes32 assetId = nativeTokenVault.getAssetId(_l1Asset);
-        bytes memory transferData = abi.encode(_amount, _depositSender);
+        // For legacy deposits, the l2 receiver is not required to check tx data hash
+        bytes memory transferData = abi.encode(_amount, address(0));
         bridgeRecoverFailedTransfer({
             _chainId: _chainId,
             _depositSender: _depositSender,
@@ -946,7 +953,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge {
-        bytes memory transferData = abi.encode(_amount, _depositSender);
+        // For legacy deposits, the l2 receiver is not required to check tx data hash
+        bytes memory transferData = abi.encode(_amount, address(0));
         bridgeRecoverFailedTransfer({
             _chainId: ERA_CHAIN_ID,
             _depositSender: _depositSender,

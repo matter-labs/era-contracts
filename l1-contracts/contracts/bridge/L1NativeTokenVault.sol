@@ -220,11 +220,12 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
 
     ///  @inheritdoc IL1AssetHandler
     function bridgeRecoverFailedTransfer(
+        address _depositSender,
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
     ) external payable override onlyBridge whenNotPaused {
-        (uint256 _amount, address _depositSender) = abi.decode(_data, (uint256, address));
+        (uint256 _amount, ) = abi.decode(_data, (uint256, address));
         address l1Token = tokenAddress[_assetId];
         require(_amount > 0, "y1");
 
