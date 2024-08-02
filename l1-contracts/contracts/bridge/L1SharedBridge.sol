@@ -317,7 +317,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _data,
             (address, uint256, address)
         );
-        bytes32 assetId = nativeTokenVault.getAssetId(_l1Token);
+        bytes32 assetId = _ensureTokenRegisteredWithNTV(_l1Token);
         _transferAllowanceToNTV(assetId, _depositAmount, _prevMsgSender);
         return (assetId, abi.encode(_depositAmount, _l2Receiver));
     }
