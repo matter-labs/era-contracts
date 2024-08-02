@@ -133,6 +133,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         _;
     }
 
+    /// @notice Checks that the message sender is the owner or NTV.
+    modifier onlyOwnerOrNTV() {
+        require((msg.sender == address(nativeTokenVault) || msg.sender == owner()), "ShB not owner or NTV");
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
@@ -212,7 +218,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev Used to set the assedAddress for a given assetId.
-    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external {
+    function setAssetHandlerAddressInitial(
+        bytes32 _additionalData,
+        address _assetHandlerAddress
+    ) external onlyOwnerOrNTV {
         address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
         bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData));
         assetHandlerAddress[assetId] = _assetHandlerAddress;
