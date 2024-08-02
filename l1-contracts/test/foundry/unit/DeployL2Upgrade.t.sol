@@ -320,7 +320,7 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: oldProtocolVersion + 1
         });
 
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        executeUpgrade(false, "", proposedUpgrade);
         assertEq(gettersFacet.getProtocolVersion(), initialProtocolVersion + 1);
     }
 
@@ -340,8 +340,8 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        vm.expectRevert("Patch only upgrade can not set new default account");
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        bytes memory revertMsg = bytes("Patch only upgrade can not set new default account");
+        executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
     function test_patchOnlyUpgradeCannotSetBootloader() public {
@@ -360,8 +360,8 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        vm.expectRevert("Patch only upgrade can not set new bootloader");
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        bytes memory revertMsg = bytes("Patch only upgrade can not set new bootloader");
+        executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
     function test_patchOnlyUpgradeCannotUpgradeTransaction() public {
@@ -384,8 +384,8 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        vm.expectRevert("Patch only upgrade can not set upgrade transaction");
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        bytes memory revertMsg = bytes("Patch only upgrade can not set upgrade transaction");
+        executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
     function test_majorVersionChange() public {
@@ -407,8 +407,8 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        vm.expectRevert("Major must always be 0");
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        bytes memory revertMsg = bytes("Major must always be 0");
+        executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
     function test_futureTimestamp() public {
@@ -427,8 +427,8 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: COMMIT_TIMESTAMP_NOT_OLDER + 10,
             newProtocolVersion: protocolVersion
         });
-        vm.expectRevert("Upgrade is not ready yet");
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        bytes memory revertMsg = bytes("Upgrade is not ready yet");
+        executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
     function test_incorrectTxType() public {
@@ -450,8 +450,8 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        vm.expectRevert("L2 system upgrade tx type is wrong");
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        bytes memory revertMsg = bytes("L2 system upgrade tx type is wrong");
+        executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
     function test_newProtocolVersionAsPartOfNonce() public {
@@ -545,8 +545,8 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: newProtocolVersion
         });
 
-        vm.expectRevert("The new protocol version should be included in the L2 system upgrade tx");
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        bytes memory revertMsg = bytes("The new protocol version should be included in the L2 system upgrade tx");
+        executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
     function test_monotonicProtocolVersion() public {
@@ -565,8 +565,8 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        vm.expectRevert("New protocol version is not greater than the current one");
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        bytes memory revertMsg = bytes("New protocol version is not greater than the current one");
+        executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
     function test_protocolVersionIncreasingTooMuch() public {
@@ -585,8 +585,8 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        vm.expectRevert("Too big protocol version difference");
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        bytes memory revertMsg = bytes("Too big protocol version difference");
+        executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
     function test_notEnoughGas() public {
@@ -610,8 +610,8 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        vm.expectRevert(bytes("my"));
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        bytes memory revertMsg = bytes("my");
+        executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
     function test_tooBigGasLimit() public {
@@ -635,8 +635,8 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        vm.expectRevert(bytes("ui"));
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        bytes memory revertMsg = bytes("ui");
+        executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
     function test_cannotOutputMorePubdataThanProcessable() public {
@@ -661,8 +661,8 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        vm.expectRevert(bytes("uk"));
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        bytes memory revertMsg = bytes("uk");
+        executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
     function test_incorrectFactoryDepsHash() public {
@@ -693,8 +693,8 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        vm.expectRevert("Wrong factory dep hash");
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        bytes memory revertMsg = bytes("Wrong factory dep hash");
+        executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
     function test_tooShortFactoryDeps() public {
@@ -726,8 +726,8 @@ contract L2UpgradeTest is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-        vm.expectRevert("Wrong number of factory deps");
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        bytes memory revertMsg = bytes("Wrong number of factory deps");
+        executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
     function test_tooLongFactoryDepsArray() public {
@@ -757,8 +757,8 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: protocolVersion
         });
 
-        vm.expectRevert("Factory deps can be at most 32");
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        bytes memory revertMsg = bytes("Factory deps can be at most 32");
+        executeUpgrade(true, revertMsg, proposedUpgrade);
     }
 
     function test_executeSuccessfulUpgrade() public {
@@ -794,7 +794,7 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: newProtocolVersion
         });
 
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        executeUpgrade(false, "",  proposedUpgrade);
 
         assertEq(gettersFacet.getL2BootloaderBytecodeHash(), bootloaderHash);
         assertEq(gettersFacet.getL2DefaultAccountBytecodeHash(), defaultAccountHash);
@@ -840,7 +840,7 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: newProtocolVersion
         });
 
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        executeUpgrade(false, "", proposedUpgrade);
 
         upgradeTx.txType = 0;
         newProtocolVersion = packSemver(major, minor + 1, patch + 1);
@@ -857,7 +857,7 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: newProtocolVersion
         });
 
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, newProposedUpgrade);
+        executeUpgrade(false, "", newProposedUpgrade);
     }
 
     function test_upgradeWhenThereIsAlreadyPendingUpgrade() public {
@@ -952,7 +952,7 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: newProtocolVersion
         });
 
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        executeUpgrade(false, "", proposedUpgrade);
         newProtocolVersion = packSemver(major, minor + 2, patch);
 
         ProposedUpgrade memory newProposedUpgrade = ProposedUpgrade({
@@ -968,8 +968,8 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: newProtocolVersion
         });
 
-        vm.expectRevert("Previous upgrade has not been finalized");
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, newProposedUpgrade);
+        bytes memory revertMsg = bytes("Previous upgrade has not been finalized");
+        executeUpgrade(true, revertMsg, newProposedUpgrade);
     }
 
     function test_nextCommitBatchesContainsNoUpgradeTx() public {
@@ -1047,7 +1047,7 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: newProtocolVersion
         });
 
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        executeUpgrade(false, "", proposedUpgrade);
 
         adminFacet.setValidator(msg.sender, true);
         vm.startPrank(0x0000000000000000000000000000000001010101);
@@ -1216,7 +1216,7 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: newProtocolVersion 
         });
 
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        executeUpgrade(false, "", proposedUpgrade);
 
         vm.startPrank(0x9c9f0C42Cb0d4280f51E2BD76687a6c5292aFA6C);
         adminFacet.setValidator(msg.sender, true);
@@ -1331,7 +1331,7 @@ contract L2UpgradeTest is Test {
         executorFacet.revertBatches(1);
         vm.stopPrank();
 
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        executeUpgrade(false, "", proposedUpgrade);
 
         vm.startPrank(msg.sender);
         executorFacet.commitBatches(storedBatch1InfoChainIdUpgrade[0], batch2Info);
@@ -1413,7 +1413,7 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: oldProtocolVersion + 1
         });
 
-        executeUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        executeUpgrade(false, "", proposedUpgrade);
 
         newL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
             true,
@@ -1473,13 +1473,12 @@ contract L2UpgradeTest is Test {
             newProtocolVersion: oldProtocolVersion + 1
         });
 
-        executeCustomUpgrade(gettersFacet, stateTransitionManager, adminFacet, proposedUpgrade);
+        executeCustomUpgrade(false, "", proposedUpgrade);
     }
 
     function executeCustomUpgrade(
-        GettersFacet gettersFacet,
-        StateTransitionManager stateTransitionManager,
-        AdminFacet adminFacet,
+        bool shouldRevert,
+        bytes memory revertMsg,
         ProposedUpgrade memory proposedUpgrade
     ) public {
         uint256 oldProtocolVersion = gettersFacet.getProtocolVersion();
@@ -1491,13 +1490,15 @@ contract L2UpgradeTest is Test {
         });
 
         vm.startPrank(0x9c9f0C42Cb0d4280f51E2BD76687a6c5292aFA6C);
+        if (shouldRevert) {
+            vm.expectRevert(revertMsg);
+        }
         IAdmin(newChainAddress).executeUpgrade(newDiamondCutData);
     }
 
     function executeUpgrade(
-        GettersFacet gettersFacet,
-        StateTransitionManager stateTransitionManager,
-        AdminFacet adminFacet,
+        bool shouldRevert,
+        bytes memory revertMsg,
         ProposedUpgrade memory proposedUpgrade
     ) public {
         uint256 oldProtocolVersion = gettersFacet.getProtocolVersion();
@@ -1511,6 +1512,9 @@ contract L2UpgradeTest is Test {
         });
 
         vm.startPrank(0x9c9f0C42Cb0d4280f51E2BD76687a6c5292aFA6C);
+        if (shouldRevert) {
+            vm.expectRevert(revertMsg);
+        }
         IAdmin(newChainAddress).executeUpgrade(newDiamondCutData);
     }
 
