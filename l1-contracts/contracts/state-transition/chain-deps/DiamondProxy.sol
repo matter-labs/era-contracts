@@ -21,7 +21,6 @@ contract DiamondProxy {
     /// @dev 1. Find the facet for the function that is called.
     /// @dev 2. Delegate the execution to the found facet via `delegatecall`.
     fallback() external payable {
-        console.log("Message", msg.data.length);
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
         // Check whether the data contains a "full" selector or it is empty.
         // Required because Diamond proxy finds a facet by function signature,
