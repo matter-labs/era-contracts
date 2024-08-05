@@ -95,10 +95,10 @@ contract ValidatorTest is Test {
     function test_nonValidatorCommitsBatches() public {
         IExecutor.StoredBatchInfo[] memory storedBatch = getMockStoredBatchInfo(0, 0);
 
-        // vm.expectRevert("ValidatorTimelock: only validator");
-
+        IExecutor.CommitBatchInfo[] memory batch = getMockCommitBatchInfo(1);
         vm.startBroadcast(makeAddr("random address"));
-        validatorTimelock.commitBatches(storedBatch[0], getMockCommitBatchInfo(1));
+        vm.expectRevert("ValidatorTimelock: only validator");
+        validatorTimelock.commitBatches(storedBatch[0], batch);
         vm.stopBroadcast();
     }
 
@@ -260,10 +260,10 @@ contract ValidatorTest is Test {
         validatorTimelock.addValidator(chainId, newValidator);
         vm.stopBroadcast();
 
-        //vm.expectRevert("DummyExecutor: Invalid last committed batch number");
-
+        IExecutor.CommitBatchInfo[] memory batch = getMockCommitBatchInfo(1);
         vm.startBroadcast(newValidator);
-        validatorTimelock.commitBatchesSharedBridge(chainId, storedBatch[0], getMockCommitBatchInfo(1));
+        vm.expectRevert("DummyExecutor: Invalid last committed batch number");
+        validatorTimelock.commitBatchesSharedBridge(chainId, storedBatch[0], batch);
         vm.stopBroadcast();
     }
 
@@ -275,10 +275,11 @@ contract ValidatorTest is Test {
         validatorTimelock.addValidator(chainId, newValidator);
         vm.stopBroadcast();
 
-        //vm.expectRevert("DummyExecutor 1: Can't prove batch out of order");
-
+        
+        IExecutor.CommitBatchInfo[] memory batch = getMockCommitBatchInfo(1);
         vm.startBroadcast(newValidator);
-        validatorTimelock.commitBatchesSharedBridge(chainId, storedBatch[0], getMockCommitBatchInfo(1));
+        validatorTimelock.commitBatchesSharedBridge(chainId, storedBatch[0], batch);
+        vm.expectRevert("DummyExecutor 1: Can't prove batch out of order");
         validatorTimelock.proveBatchesSharedBridge(chainId, storedBatch[0], storedBatch1, proofInput);
         vm.stopBroadcast();
     }
