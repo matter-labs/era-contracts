@@ -59,7 +59,7 @@ export default {
     compilerSource: "binary",
     settings: {
       compilerPath: getZksolcUrl(),
-      isSystem: true,
+      enableEraVMExtensions: true,
     },
   },
   contractSizer: {
