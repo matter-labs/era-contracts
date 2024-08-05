@@ -384,6 +384,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             legacyDeposit = true;
         } catch {
             (assetId, transferData) = abi.decode(_data, (bytes32, bytes));
+            require(
+                assetHandlerAddress[assetId] != address(nativeTokenVault),
+                "ShB: new encoding format not yet supported for NTV"
+            );
         }
 
         require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, "ShB: baseToken deposit not supported");

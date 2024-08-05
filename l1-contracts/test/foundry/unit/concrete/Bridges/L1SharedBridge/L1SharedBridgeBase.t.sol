@@ -131,15 +131,17 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             address(ETH_TOKEN_ADDRESS)
         );
         // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, true, address(sharedBridge));
+        // vm.expectEmit(true, true, true, true, address(sharedBridge));
         vm.prank(bridgehubAddress);
-        emit BridgehubDepositInitiated({
-            chainId: chainId,
-            txDataHash: txDataHash,
-            from: alice,
-            assetId: ETH_TOKEN_ASSET_ID,
-            bridgeMintCalldata: mintCalldata
-        });
+        // emit BridgehubDepositInitiated({
+        //     chainId: chainId,
+        //     txDataHash: txDataHash,
+        //     from: alice,
+        //     assetId: ETH_TOKEN_ASSET_ID,
+        //     bridgeMintCalldata: mintCalldata
+        // });
+        // New encoding temporarily blocked for NTV.
+        vm.expectRevert("ShB: new encoding format not yet supported for NTV");
         sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ASSET_ID, transferData));
     }
 
