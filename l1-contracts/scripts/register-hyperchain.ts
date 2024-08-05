@@ -109,10 +109,8 @@ async function main() {
 
       const baseTokenAdjusterAddress =
         cmd.baseTokenAdjusterAddress ||
-        Wallet.fromMnemonic(
-          process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-          "m/44'/60'/0'/0/2"
-        ).connect(provider);
+        Wallet.fromMnemonic(process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic, "m/44'/60'/0'/0/2")
+          .address;
 
       console.log(`Using base token adjuster address: ${baseTokenAdjusterAddress}`);
 
