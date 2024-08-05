@@ -133,12 +133,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         _;
     }
 
-    /// @notice Checks that the message sender is the owner or NTV.
-    modifier onlyOwnerOrNTV() {
-        require((msg.sender == address(nativeTokenVault) || msg.sender == owner()), "ShB not owner or NTV");
-        _;
-    }
-
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
@@ -217,15 +211,25 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
     }
 
+    /// @notice Used to Sets the assed deployment tracker address for given asset data.
+    /// @param _additionalData The asset data which may include the asset address and any additional required data or encodings.
+    /// @param _assetDeploymentTracker The whitelisted address of asset deployment tracker for provided asset.
+    function setAssetDeploymentTracker(bytes32 _additionalData, address _assetDeploymentTracker) external onlyOwner {
+        bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), _assetDeploymentTracker, _additionalData));
+        assetDeploymentTracker[assetId] = _assetDeploymentTracker;
+        emit AssetDeploymentTrackerSet(assetId, _assetDeploymentTracker, _additionalData);
+    }
+
     /// @dev Used to set the assedAddress for a given assetId.
-    function setAssetHandlerAddressInitial(
-        bytes32 _additionalData,
-        address _assetHandlerAddress
-    ) external onlyOwnerOrNTV {
-        address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
+    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external {
+        bool senderIsNTV = msg.sender == address(nativeTokenVault);
+        address sender = senderIsNTV ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
         bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData));
+        require(senderIsNTV || msg.sender == assetDeploymentTracker[assetId], "ShB: not NTV or ADT");
         assetHandlerAddress[assetId] = _assetHandlerAddress;
-        assetDeploymentTracker[assetId] = msg.sender;
+        if (senderIsNTV) {
+            assetDeploymentTracker[assetId] = msg.sender;
+        }
         emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _additionalData, sender);
     }
 

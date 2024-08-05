@@ -55,6 +55,12 @@ interface IL1SharedBridge {
         bytes assetData
     );
 
+    event AssetDeploymentTrackerSet(
+        bytes32 indexed assetId,
+        address indexed assetDeploymentTracker,
+        bytes32 indexed additionalData
+    );
+
     event AssetHandlerRegisteredInitial(
         bytes32 indexed assetId,
         address indexed assetHandlerAddress,
