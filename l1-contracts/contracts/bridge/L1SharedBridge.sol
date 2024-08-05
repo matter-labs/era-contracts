@@ -546,9 +546,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         delete depositHappened[_chainId][_l2TxHash];
 
         IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(
-            _depositSender,
             _chainId,
             _assetId,
+            _depositSender,
             _assetData
         );
 
