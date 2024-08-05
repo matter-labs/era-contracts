@@ -772,10 +772,30 @@
     sinon-chai "^3.7.0"
     undici "^5.14.0"
 
-"@matterlabs/hardhat-zksync-verify@^0.4.0":
-  version "0.4.0"
-  resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-verify/-/hardhat-zksync-verify-0.4.0.tgz#f812c19950022fc36728f3796f6bdae5633e2fcd"
-  integrity sha512-GPZmAumFl3ZMPKbECX7Qw8CriwZKWd1DlCRhoG/6YYc6mFy4+MXkF1XsHLMs5r34N+GDOfbVZVMeftIlJC96Kg==
+"@matterlabs/hardhat-zksync-verify@0.6.1":
+  version "0.6.1"
+  resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-verify/-/hardhat-zksync-verify-0.6.1.tgz#3fd83f4177ac0b138656ed93d4756ec27f1d329d"
+  integrity sha512-W9gI4k1UnuQ2MaBnK1f7E8Z2C4uHxpeDkzmB/ZCKClai2A3vK2jAbfqiQbX0HvuLq2OOq4dbx83KehAXjXoHlw==
+  dependencies:
+    "@ethersproject/abi" "^5.1.2"
+    "@ethersproject/address" "5.7.0"
+    "@matterlabs/hardhat-zksync-solc" "^1.1.4"
+    "@nomicfoundation/hardhat-verify" "^2.0.0"
+    "@openzeppelin/contracts" "^4.9.2"
+    axios "^1.6.2"
+    cbor "^8.1.0"
+    chai "^4.3.6"
+    chalk "4.1.2"
+    debug "^4.1.1"
+    hardhat "^2.14.0"
+    sinon "^17.0.1"
+    sinon-chai "^3.7.0"
+    zksync-ethers "^5.0.0"
+
+"@matterlabs/hardhat-zksync-verify@^0.2.0":
+  version "0.2.2"
+  resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-verify/-/hardhat-zksync-verify-0.2.2.tgz#daa34bc4404096ed0f44461ee366c1cb0e5a4f2f"
+  integrity sha512-WgcItoZGY702oJ708uCP5uLvmwzDLBfhMqq2D0Kh1U/3fCTlPza9zMGUFHxKMQYsITKTeQ5zKOjKoi8MXOeUdQ==
   dependencies:
     "@matterlabs/hardhat-zksync-solc" "^1.0.5"
     "@nomicfoundation/hardhat-verify" "^1.0.2"
@@ -783,6 +803,25 @@
     chalk "4.1.2"
     dockerode "^3.3.4"
     zksync-ethers "^5.0.0"
+
+"@matterlabs/hardhat-zksync-verify@^1.4.3":
+  version "1.4.3"
+  resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-verify/-/hardhat-zksync-verify-1.4.3.tgz#fc36d2ea385eab553ce0b3c3fbc9e216c607873f"
+  integrity sha512-TONID/+mG8KngZ9iI8yiOgC8VD+cus7M+ejCjF4bGNzsmmzsklGJwzry6bQpk8BXqzsMgbuV+4KjDT4JXiS/QA==
+  dependencies:
+    "@ethersproject/abi" "^5.1.2"
+    "@ethersproject/address" "5.7.0"
+    "@matterlabs/hardhat-zksync-solc" "^1.1.4"
+    "@nomicfoundation/hardhat-verify" "^2.0.0"
+    "@openzeppelin/contracts" "^4.9.2"
+    axios "^1.6.2"
+    cbor "^8.1.0"
+    chai "^4.3.6"
+    chalk "4.1.2"
+    debug "^4.1.1"
+    hardhat "^2.19.4"
+    sinon "^17.0.1"
+    sinon-chai "^3.7.0"
 
 "@matterlabs/prettier-config@^1.0.3":
   version "1.0.3"
@@ -1013,6 +1052,21 @@
     table "^6.8.0"
     undici "^5.14.0"
 
+"@nomicfoundation/hardhat-verify@^2.0.0":
+  version "2.0.8"
+  resolved "https://registry.yarnpkg.com/@nomicfoundation/hardhat-verify/-/hardhat-verify-2.0.8.tgz#6a77dc03de990a1a3aa8e6dc073c393263dbf258"
+  integrity sha512-x/OYya7A2Kcz+3W/J78dyDHxr0ezU23DKTrRKfy5wDPCnePqnr79vm8EXqX3gYps6IjPBYyGPZ9K6E5BnrWx5Q==
+  dependencies:
+    "@ethersproject/abi" "^5.1.2"
+    "@ethersproject/address" "^5.0.2"
+    cbor "^8.1.0"
+    chalk "^2.4.2"
+    debug "^4.1.1"
+    lodash.clonedeep "^4.5.0"
+    semver "^6.3.0"
+    table "^6.8.0"
+    undici "^5.14.0"
+
 "@nomicfoundation/solidity-analyzer-darwin-arm64@0.1.1":
   version "0.1.1"
   resolved "https://registry.yarnpkg.com/@nomicfoundation/solidity-analyzer-darwin-arm64/-/solidity-analyzer-darwin-arm64-0.1.1.tgz#4c858096b1c17fe58a474fe81b46815f93645c15"
@@ -1123,6 +1177,11 @@
   version "4.9.5"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.9.5.tgz#1eed23d4844c861a1835b5d33507c1017fa98de8"
   integrity sha512-ZK+W5mVhRppff9BE6YdR8CC52C8zAvsVAiWhEtQ5+oNxFE6h1WdeWo+FJSF8KKvtxxVYZ7MTP/5KoVpAU3aSWg==
+
+"@openzeppelin/contracts@^4.9.2":
+  version "4.9.6"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.9.6.tgz#2a880a24eb19b4f8b25adc2a5095f2aa27f39677"
+  integrity sha512-xSmezSupL+y9VkHZJGDoCBpmnB2ogM13ccaYDWqJTfS3dbuHkgjuwDFUmaFauBCboQMGB/S5UqUl2y54X99BmA==
 
 "@pkgr/core@^0.1.0":
   version "0.1.1"
@@ -2106,6 +2165,15 @@ axios@^1.4.0, axios@^1.5.1:
   version "1.6.8"
   resolved "https://registry.yarnpkg.com/axios/-/axios-1.6.8.tgz#66d294951f5d988a00e87a0ffb955316a619ea66"
   integrity sha512-v/ZHtJDU39mDpyBoFVkETcd/uNdxrWRrg3bKpOKzXFA6Bvqopts6ALSMU3y6ijYxbw2B+wPrIv46egTzJXCLGQ==
+  dependencies:
+    follow-redirects "^1.15.6"
+    form-data "^4.0.0"
+    proxy-from-env "^1.1.0"
+
+axios@^1.6.2:
+  version "1.7.2"
+  resolved "https://registry.yarnpkg.com/axios/-/axios-1.7.2.tgz#b625db8a7051fbea61c35a3cbb3a1daa7b9c7621"
+  integrity sha512-2A8QhOMrbomlDuiLeK9XibIBzuHeRcqqNOHp0Cyp5EoJ1IFDh+XZH3A6BkXtv0K4gFGCI0Y4BM7B1wOEi0Rmgw==
   dependencies:
     follow-redirects "^1.15.6"
     form-data "^4.0.0"
@@ -4325,7 +4393,7 @@ hardhat@=2.22.2:
     uuid "^8.3.2"
     ws "^7.4.6"
 
-hardhat@^2.14.0:
+hardhat@^2.18.3, hardhat@^2.19.4:
   version "2.22.5"
   resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.22.5.tgz#7e1a4311fa9e34a1cfe337784eae06706f6469a5"
   integrity sha512-9Zq+HonbXCSy6/a13GY1cgHglQRfh4qkzmj1tpPlhxJDwNVnhxlReV6K7hCWFKlOrV13EQwsdcD0rjcaQKWRZw==
@@ -7741,9 +7809,21 @@ yocto-queue@^1.0.0:
   integrity sha512-9bnSc/HEW2uRy67wc+T8UwauLuPJVn28jb+GtJY16iiKWyvmYJRXVT4UamsAEGQfPohgr2q4Tq0sQbQlxTfi1g==
 
 zksync-ethers@^5.0.0:
+<<<<<<< HEAD
   version "5.7.2"
   resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.7.2.tgz#e965a9926e6f8168963ab565dd6ad0d38c4f7f18"
   integrity sha512-D+wn4nkGixUOek9ZsVvIZ/MHponQ5xvw74FSbDJDv6SLCI4LZALOAc8lF3b1ml8nOkpeE2pGV0VKmHTSquRNJg==
+=======
+  version "5.8.0"
+  resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.8.0.tgz#ff054345048f851c33cb6efcf2094f40d4da6063"
+  integrity sha512-/4qI5UElh0lspu0ew2IXBCO+O9kXEzZOM7JqvlfRWWGIUKZ+EDXnjIPgkH0y5/MnMT3FDq9koAAUCyZVWqHUJg==
+  dependencies:
+    ethers "~5.7.0"
+
+"zksync-ethers@https://github.com/zksync-sdk/zksync-ethers#ethers-v5-feat/bridgehub":
+  version "5.1.0"
+  resolved "https://github.com/zksync-sdk/zksync-ethers#28ccbe7d67b170c202b17475e06a82002e6e3acc"
+>>>>>>> main
   dependencies:
     ethers "~5.7.0"
 
