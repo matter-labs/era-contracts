@@ -3,11 +3,12 @@
 pragma solidity 0.8.20;
 
 import {IL1Messenger, L2ToL1Log, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE} from "./interfaces/IL1Messenger.sol";
+
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, COMPUTATIONAL_PRICE_FOR_PUBDATA} from "./Constants.sol";
+import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, COMPUTATIONAL_PRICE_FOR_PUBDATA, L2_MESSAGE_ROOT} from "./Constants.sol";
 import {ReconstructionMismatch, PubdataField} from "./SystemContractErrors.sol";
 import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
 
@@ -285,24 +286,30 @@ contract L1Messenger is IL1Messenger, ISystemContract {
                 );
             }
         }
-        bytes32 l2ToL1LogsTreeRoot = l2ToL1LogsTreeArray[0];
+        bytes32 localLogsRootHash = l2ToL1LogsTreeArray[0];
 
-        if (inputChainedLogsRootHash != l2ToL1LogsTreeRoot) {
-            revert ReconstructionMismatch(PubdataField.InputLogsRootHash, l2ToL1LogsTreeRoot, inputChainedLogsRootHash);
+        bytes32 aggregatedRootHash = L2_MESSAGE_ROOT.getAggregatedRoot();
+        bytes32 fullRootHash = keccak256(bytes.concat(localLogsRootHash, aggregatedRootHash));
+
+        if (inputChainedLogsRootHash != localLogsRootHash) {
+            revert ReconstructionMismatch(PubdataField.InputLogsRootHash, localLogsRootHash, inputChainedLogsRootHash);
         }
 
-        bytes memory returnData = EfficientCall.call({
-            _gas: gasleft(),
-            _address: _l2DAValidator,
-            _value: 0,
-            _data: _totalL2ToL1PubdataAndStateDiffs,
-            _isSystem: false
-        });
+        bytes32 l2DAValidatorOutputhash = bytes32(0);
+        if (_l2DAValidator != address(0)) {
+            bytes memory returnData = EfficientCall.call({
+                _gas: gasleft(),
+                _address: _l2DAValidator,
+                _value: 0,
+                _data: _totalL2ToL1PubdataAndStateDiffs,
+                _isSystem: false
+            });
 
-        bytes32 l2DAValidatorOutputhash = abi.decode(returnData, (bytes32));
+            l2DAValidatorOutputhash = abi.decode(returnData, (bytes32));
+        }
 
         /// Native (VM) L2 to L1 log
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), l2ToL1LogsTreeRoot);
+        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), fullRootHash);
         SystemContractHelper.toL1(
             true,
             bytes32(uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)),

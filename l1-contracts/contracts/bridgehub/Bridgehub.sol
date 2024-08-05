@@ -53,6 +53,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev used to accept the admin role
     address private pendingAdmin;
 
+    // FIXME: `messageRoot` DOES NOT contain messages that come from the current layer and go to the settlement layer.
+    // it may make sense to store the final root somewhere for interop purposes.
+    // THough maybe it can be postponed.
     IMessageRoot public override messageRoot;
 
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
@@ -61,7 +64,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ISTMDeploymentTracker public stmDeployer;
 
     /// @dev asset info used to identify chains in the Shared Bridge
-    mapping(bytes32 stmAssetInfo => address stmAddress) public stmAssetInfoToAddress;
+    mapping(bytes32 stmAssetId => address stmAddress) public stmAssetIdToAddress;
 
     /// @dev used to indicate the currently active settlement layer for a given chainId
     mapping(uint256 chainId => uint256 activeSettlementLayerChainId) public settlementLayer;
@@ -135,7 +138,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         sharedBridge = IL1AssetRouter(_sharedBridge);
         stmDeployer = _stmDeployer;
         messageRoot = _messageRoot;
-        _messageRoot.addNewChain(block.chainid);
     }
 
     //// Registry
@@ -184,7 +186,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetAddress) external {
         address sender = L1_CHAIN_ID == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender); // Todo: this might be dangerous. We should decide based on the tx type.
         bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData)); /// todo make other asse
-        stmAssetInfoToAddress[assetInfo] = _assetAddress;
+        stmAssetIdToAddress[assetInfo] = _assetAddress;
         emit AssetRegistered(assetInfo, _assetAddress, _additionalData, msg.sender);
     }
 
@@ -195,11 +197,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return IStateTransitionManager(stateTransitionManager[_chainId]).getHyperchain(_chainId);
     }
 
-    function stmAssetInfoFromChainId(uint256 _chainId) public view override returns (bytes32) {
-        return stmAssetInfo(stateTransitionManager[_chainId]);
+    function stmAssetIdFromChainId(uint256 _chainId) public view override returns (bytes32) {
+        return stmAssetId(stateTransitionManager[_chainId]);
     }
 
-    function stmAssetInfo(address _stmAddress) public view override returns (bytes32) {
+    function stmAssetId(address _stmAddress) public view override returns (bytes32) {
         return keccak256(abi.encode(L1_CHAIN_ID, address(stmDeployer), bytes32(uint256(uint160(_stmAddress)))));
     }
 
@@ -502,7 +504,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
 
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainData) = abi.decode(_data, (uint256, bytes, bytes));
-        require(_assetId == stmAssetInfoFromChainId(_chainId), "BH: assetInfo 1");
+        require(_assetId == stmAssetIdFromChainId(_chainId), "BH: assetInfo 1");
         require(settlementLayer[_chainId] == block.chainid, "BH: not current SL");
         settlementLayer[_chainId] = _settlementChainId;
 
@@ -528,7 +530,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _bridgehubMintData,
             (uint256, bytes, bytes)
         );
-        address stm = stmAssetInfoToAddress[_assetId];
+        address stm = stmAssetIdToAddress[_assetId];
         require(stm != address(0), "BH: assetInfo 2");
         require(settlementLayer[_chainId] != block.chainid, "BH: already current SL");
 
@@ -539,6 +541,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(_chainId, _stmData);
         }
 
+        IMessageRoot(messageRoot).addNewChainIfNeeded(_chainId);
         IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData);
         return address(0);
     }

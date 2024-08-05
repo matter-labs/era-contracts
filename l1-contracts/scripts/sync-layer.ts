@@ -155,7 +155,7 @@ async function main() {
       );
       deployer.addresses.StateTransition.DiamondInit = getAddressFromEnv("SYNC_LAYER_DIAMOND_INIT_ADDR");
 
-      const receipt = await deployer.moveChainToSyncLayer(syncLayerChainId, gasPrice, true);
+      const receipt = await deployer.moveChainToSyncLayer(syncLayerChainId, gasPrice);
 
       const syncLayerAddress = await stm.getHyperchain(syncLayerChainId);
 

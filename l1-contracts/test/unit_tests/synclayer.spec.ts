@@ -56,6 +56,8 @@ describe("Synclayer", function () {
     await owner.sendTransaction(tx);
 
     migratingDeployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, []);
+    // We will use the chain admin as the admin to be closer to the production environment
+    await migratingDeployer.transferAdminFromDeployerToChainAdmin();
 
     chainId = migratingDeployer.chainId;
 
@@ -132,9 +134,9 @@ describe("Synclayer", function () {
     // console.log("STM asset registered in L2 Bridgehub on SL");
   });
 
-  it("Check finish move chain to l1", async () => {
+  it("Check finish move chain", async () => {
     const syncLayerChainId = syncLayerDeployer.chainId;
-    const assetInfo = await bridgehub.stmAssetInfo(migratingDeployer.addresses.StateTransition.StateTransitionProxy);
+    const assetInfo = await bridgehub.stmAssetId(migratingDeployer.addresses.StateTransition.StateTransitionProxy);
     const diamondCutData = await migratingDeployer.initialZkSyncHyperchainDiamondCut();
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 

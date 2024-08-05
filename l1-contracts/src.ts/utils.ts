@@ -296,3 +296,9 @@ export enum PubdataSource {
   Rollup,
   Validium,
 }
+
+export interface ChainAdminCall {
+  target: string;
+  value: BigNumberish;
+  data: BytesLike;
+}

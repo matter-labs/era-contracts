@@ -16,6 +16,7 @@ import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.so
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
+import {Messaging} from "../../../common/libraries/Messaging.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
@@ -117,6 +118,105 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         TxStatus _status
     ) public view returns (bool) {}
 
+    function _parseProofMetadata(
+        bytes32 _proofMetadata
+    ) internal view returns (uint256 logLeafProofLen, uint256 batchLeafProofLen) {
+        bytes1 metadataVersion = bytes1(_proofMetadata[0]);
+        require(metadataVersion == 0x01, "Mailbox: unsupported proof metadata version");
+
+        logLeafProofLen = uint256(uint8(_proofMetadata[1]));
+        batchLeafProofLen = uint256(uint8(_proofMetadata[2]));
+    }
+
+    function extractSlice(
+        bytes32[] calldata _proof,
+        uint256 _left,
+        uint256 _right
+    ) internal pure returns (bytes32[] memory slice) {
+        slice = new bytes32[](_right - _left);
+        for (uint256 i = _left; i < _right; i = i.uncheckedInc()) {
+            slice[i - _left] = _proof[i];
+        }
+    }
+
+    function proveL2LeafInclusion(
+        uint256 _batchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) external view returns (bool) {
+        return _proveL2LeafInclusion(_batchNumber, _leafProofMask, _leaf, _proof);
+    }
+
+    /// Proves that a certain leaf was included as part of the log merkle tree.
+    function _proveL2LeafInclusion(
+        uint256 _batchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) internal view returns (bool) {
+        // FIXME: maybe support legacy interface
+
+        uint256 ptr = 0;
+        bytes32 chainIdLeaf;
+        {
+            (uint256 logLeafProofLen, uint256 batchLeafProofLen) = _parseProofMetadata(_proof[ptr]);
+            ++ptr;
+
+            bytes32 batchSettlementRoot = Merkle.calculateRootMemory(
+                extractSlice(_proof, ptr, ptr + logLeafProofLen),
+                _leafProofMask,
+                _leaf
+            );
+            ptr += logLeafProofLen;
+
+            // Note that this logic works only for chains that do not migrate away from the synclayer back to L1.
+            // Support for chains that migrate back to L1 will be added in the future.
+            if (s.syncLayer == address(0)) {
+                bytes32 correctBatchRoot = s.l2LogsRootHashes[_batchNumber];
+                require(correctBatchRoot != bytes32(0), "local root is 0");
+                return correctBatchRoot == batchSettlementRoot;
+            } else {
+                require(s.l2LogsRootHashes[_batchNumber] == bytes32(0), "local root must be 0");
+            }
+
+            // Now, we'll have to check that the SyncLayer included the message.
+            bytes32 batchLeafHash = Messaging.batchLeafHash(batchSettlementRoot, _batchNumber);
+
+            uint256 batchLeafProofMask = uint256(bytes32(_proof[ptr]));
+            ++ptr;
+
+            bytes32 chainIdRoot = Merkle.calculateRootMemory(
+                extractSlice(_proof, ptr, ptr + batchLeafProofLen),
+                batchLeafProofMask,
+                batchLeafHash
+            );
+            ptr += batchLeafProofLen;
+
+            chainIdLeaf = Messaging.chainIdLeafHash(chainIdRoot, s.chainId);
+        }
+
+        uint256 syncLayerBatchNumber;
+        uint256 syncLayerBatchRootMask;
+
+        // Preventing stack too deep error
+        {
+            // Now, we just need to double check whether this chainId leaf was present in the tree.
+            uint256 syncLayerPackedBatchInfo = uint256(_proof[ptr]);
+            ++ptr;
+            syncLayerBatchNumber = uint256(syncLayerPackedBatchInfo >> 128);
+            syncLayerBatchRootMask = uint256(syncLayerPackedBatchInfo & ((1 << 128) - 1));
+        }
+
+        return
+            IMailbox(s.syncLayer).proveL2LeafInclusion(
+                syncLayerBatchNumber,
+                syncLayerBatchRootMask,
+                chainIdLeaf,
+                extractSlice(_proof, ptr, _proof.length)
+            );
+    }
+
     /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
     function _proveL2LogInclusion(
         uint256 _batchNumber,
@@ -124,7 +224,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         L2Log memory _log,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        require(_batchNumber <= s.totalBatchesExecuted, "xx");
+        // require(_batchNumber <= s.totalBatchesExecuted, "xx");
 
         bytes32 hashedLog = keccak256(
             // solhint-disable-next-line func-named-parameters
@@ -138,10 +238,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         // of leaf preimage (which is `L2_TO_L1_LOG_SERIALIZE_SIZE`) is not
         // equal to the length of other nodes preimages (which are `2 * 32`)
 
-        bytes32 calculatedRootHash = Merkle.calculateRoot(_proof, _index, hashedLog);
-        bytes32 actualRootHash = s.l2LogsRootHashes[_batchNumber];
+        // We can use `index` as a mask, since the `localMessageRoot` is on the left part of the tree.
 
-        return actualRootHash == calculatedRootHash;
+        return _proveL2LeafInclusion(_batchNumber, _index, hashedLog, _proof);
     }
 
     /// @dev Convert arbitrary-length message to the raw l2 log
@@ -318,14 +417,14 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
         if (s.syncLayer != address(0)) {
-            canonicalTxHash = IMailbox(s.syncLayer).requestL2TransactionToSyncLayerMailbox({
+            // slither-disable-next-line unused-return
+            IMailbox(s.syncLayer).requestL2TransactionToSyncLayerMailbox({
                 _chainId: s.chainId,
                 _transaction: transaction,
                 _factoryDeps: _params.request.factoryDeps,
                 _canonicalTxHash: canonicalTxHash,
                 _expirationTimestamp: _params.expirationTimestamp
             });
-            return canonicalTxHash;
         }
     }
 

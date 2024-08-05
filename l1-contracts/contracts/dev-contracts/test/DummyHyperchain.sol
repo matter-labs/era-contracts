@@ -45,4 +45,7 @@ contract DummyHyperchain is MailboxFacet {
         bytes calldata _forceDeploymentData,
         bytes[] calldata _factoryDeps
     ) external {}
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }

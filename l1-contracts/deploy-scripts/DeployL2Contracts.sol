@@ -24,6 +24,7 @@ contract DeployL2Script is Script {
         uint256 eraChainId;
         address l2SharedBridgeImplementation;
         address l2SharedBridgeProxy;
+        address forceDeployUpgraderAddress;
     }
 
     struct ContractsBytecodes {
@@ -32,6 +33,7 @@ contract DeployL2Script is Script {
         bytes l2StandardErc20Bytecode;
         bytes l2SharedBridgeBytecode;
         bytes l2SharedBridgeProxyBytecode;
+        bytes forceDeployUpgrader;
     }
 
     function run() public {
@@ -41,6 +43,27 @@ contract DeployL2Script is Script {
         deployFactoryDeps();
         deploySharedBridge();
         deploySharedBridgeProxy();
+        deployForceDeployer();
+
+        saveOutput();
+    }
+
+    function runDeploySharedBridge() public {
+        initializeConfig();
+        loadContracts();
+
+        deployFactoryDeps();
+        deploySharedBridge();
+        deploySharedBridgeProxy();
+
+        saveOutput();
+    }
+
+    function runDefaultUpgrader() public {
+        initializeConfig();
+        loadContracts();
+
+        deployForceDeployer();
 
         saveOutput();
     }
@@ -64,11 +87,14 @@ contract DeployL2Script is Script {
         contracts.l2SharedBridgeProxyBytecode = Utils.readHardhatBytecode(
             "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
         );
+        contracts.forceDeployUpgrader = Utils.readHardhatBytecode(
+            "/../l2-contracts/artifacts-zk/contracts/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
+        );
     }
 
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/config-initialize-shared-bridges.toml");
+        string memory path = string.concat(root, "/script-config/config-deploy-l2-contracts.toml");
         string memory toml = vm.readFile(path);
         config.bridgehubAddress = toml.readAddress("$.bridgehub");
         config.governance = toml.readAddress("$.governance");
@@ -80,13 +106,14 @@ contract DeployL2Script is Script {
 
     function saveOutput() internal {
         vm.serializeAddress("root", "l2_shared_bridge_implementation", config.l2SharedBridgeImplementation);
-        string memory toml = vm.serializeAddress("root", "l2_shared_bridge_proxy", config.l2SharedBridgeProxy);
+        vm.serializeAddress("root", "l2_shared_bridge_proxy", config.l2SharedBridgeProxy);
+        string memory toml = vm.serializeAddress("root", "l2_default_upgrader", config.forceDeployUpgraderAddress);
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-out/output-initialize-shared-bridges.toml");
+        string memory path = string.concat(root, "/script-out/output-deploy-l2-contracts.toml");
         vm.writeToml(toml, path);
     }
 
-    function deployFactoryDeps() public {
+    function deployFactoryDeps() internal {
         bytes[] memory factoryDeps = new bytes[](3);
         factoryDeps[0] = contracts.l2StandardErc20FactoryBytecode;
         factoryDeps[1] = contracts.l2StandardErc20Bytecode;
@@ -94,7 +121,7 @@ contract DeployL2Script is Script {
         Utils.publishBytecodes(factoryDeps, config.chainId, config.bridgehubAddress, config.l1SharedBridgeProxy);
     }
 
-    function deploySharedBridge() public {
+    function deploySharedBridge() internal {
         bytes[] memory factoryDeps = new bytes[](1);
         factoryDeps[0] = contracts.beaconProxy;
 
@@ -112,7 +139,21 @@ contract DeployL2Script is Script {
         });
     }
 
-    function deploySharedBridgeProxy() public {
+    function deployForceDeployer() internal {
+        bytes[] memory factoryDeps = new bytes[](0);
+        config.forceDeployUpgraderAddress = Utils.deployThroughL1({
+            bytecode: contracts.forceDeployUpgrader,
+            constructorargs: "",
+            create2salt: "",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: factoryDeps,
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
+    }
+
+    function deploySharedBridgeProxy() internal {
         address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
         bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(contracts.beaconProxy);
 

@@ -5,7 +5,8 @@ pragma solidity 0.8.24;
 // solhint-disable gas-custom-errors, reason-string
 
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-// import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
@@ -340,9 +341,15 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         if (firstUnprocessed > treeStartIndex) {
             s.priorityTree.unprocessedIndex = firstUnprocessed - treeStartIndex;
         }
+        uint256 currentBatchNumber = _storedBatch.batchNumber;
 
         // Save root hash of L2 -> L1 logs tree
-        s.l2LogsRootHashes[_storedBatch.batchNumber] = _storedBatch.l2LogsTreeRoot;
+        s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
+
+        // Once the batch is executed, we include its message to the message root.
+        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+        messageRootContract.addChainBatchRoot(s.chainId, currentBatchNumber, _storedBatch.l2LogsTreeRoot);
+
         // IBridgehub bridgehub = IBridgehub(s.bridgehub);
         // bridgehub.messageRoot().addChainBatchRoot(
         //     s.chainId,
@@ -361,8 +368,14 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash);
         s.priorityTree.processBatch(_priorityOpsData);
 
+        uint256 currentBatchNumber = _storedBatch.batchNumber;
+
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[_storedBatch.batchNumber] = _storedBatch.l2LogsTreeRoot;
+
+        // Once the batch is executed, we include its message to the message root.
+        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+        messageRootContract.addChainBatchRoot(s.chainId, currentBatchNumber, _storedBatch.l2LogsTreeRoot);
     }
 
     function executeBatchesSharedBridge(
@@ -385,13 +398,15 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         PriorityOpsBatchInfo[] calldata _priorityOpsData
     ) internal {
         uint256 nBatches = _batchesData.length;
-        uint256 dataIndex = 0;
+        require(_batchesData.length == _priorityOpsData.length, "bp");
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
             if (s.priorityTree.startIndex <= s.priorityQueue.getFirstUnprocessedPriorityTx()) {
-                // solhint-disable-next-line gas-increment-by-one
-                _executeOneBatch(_batchesData[i], _priorityOpsData[dataIndex++], i);
+                _executeOneBatch(_batchesData[i], _priorityOpsData[i], i);
             } else {
+                require(_priorityOpsData[i].leftPath.length == 0, "le");
+                require(_priorityOpsData[i].rightPath.length == 0, "re");
+                require(_priorityOpsData[i].itemHashes.length == 0, "ih");
                 _executeOneBatch(_batchesData[i], i);
             }
             emit BlockExecution(_batchesData[i].batchNumber, _batchesData[i].batchHash, _batchesData[i].commitment);

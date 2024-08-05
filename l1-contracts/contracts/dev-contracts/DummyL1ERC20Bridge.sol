@@ -21,4 +21,7 @@ contract DummyL1ERC20Bridge is L1ERC20Bridge {
         l2TokenBeacon = _l2TokenBeacon;
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }
