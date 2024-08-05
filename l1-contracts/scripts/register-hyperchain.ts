@@ -70,6 +70,7 @@ async function main() {
     .option("--base-token-name <base-token-name>")
     .option("--base-token-address <base-token-address>")
     .option("--use-governance <use-governance>")
+    .option("--base-token-adjuster-address <base-token-adjuster-address>")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -106,7 +107,17 @@ async function main() {
         await deployer.registerToken(baseTokenAddress, useGovernance);
       }
 
+      const baseTokenAdjusterAddress =
+        cmd.baseTokenAdjusterAddress ||
+        Wallet.fromMnemonic(
+          process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+          "m/44'/60'/0'/0/2"
+        ).connect(provider);
+
+      console.log(`Using base token adjuster address: ${baseTokenAdjusterAddress}`);
+
       await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice, useGovernance);
+      await deployer.setBaseTokenAdjusterAddress(baseTokenAdjusterAddress);
       await deployer.transferAdminFromDeployerToChainAdmin();
     });
 
