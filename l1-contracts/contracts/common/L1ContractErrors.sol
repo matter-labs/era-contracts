@@ -43,6 +43,8 @@ error DepositDoesNotExist();
 error DepositExists();
 // 0x79cacff1
 error DepositFailed();
+// 0xae08e4af
+error DepositIncorrectAmount(uint256 expectedAmt, uint256 providedAmt);
 // 0x0e7ee319
 error DiamondAlreadyFrozen();
 // 0x682dabb4
@@ -293,8 +295,6 @@ error WithdrawalAlreadyFinalized();
 error WithdrawalFailed();
 // 0x750b219c
 error WithdrawFailed();
-// 0xd769f0a3
-error WithdrawIncorrectAmount(uint256 expectedAmt, uint256 providedAmt);
 // 0x15e8e429
 error WrongMagicValue(uint256 expectedMagicValue, uint256 providedMagicValue);
 // 0xd92e233d

@@ -14,7 +14,7 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {L2BridgeNotSet, L2WithdrawalMessageWrongLength, InsufficientChainBalance, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, WithdrawIncorrectAmount, EmptyDeposit, L2BridgeNotDeployed, WithdrawIncorrectAmount, InvalidProof, NoFundsTransferred, InsufficientFunds, DepositDoesNotExist, WithdrawalAlreadyFinalized, InsufficientFunds, MalformedMessage, InvalidSelector, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
+import {L2BridgeNotSet, L2WithdrawalMessageWrongLength, InsufficientChainBalance, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, L2BridgeNotDeployed, DepositIncorrectAmount, InvalidProof, NoFundsTransferred, InsufficientFunds, DepositDoesNotExist, WithdrawalAlreadyFinalized, InsufficientFunds, MalformedMessage, InvalidSelector, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
 
 /// We are testing all the specified revert and require cases.
 contract L1SharedBridgeFailTest is L1SharedBridgeTest {
@@ -101,7 +101,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
             abi.encode(address(token))
         );
-        vm.expectRevert(abi.encodeWithSelector(WithdrawIncorrectAmount.selector, 0, amount));
+        vm.expectRevert(abi.encodeWithSelector(DepositIncorrectAmount.selector, 0, amount));
         // solhint-disable-next-line func-named-parameters
         sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, amount, bob));
     }
@@ -133,7 +133,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             abi.encode(ETH_TOKEN_ADDRESS)
         );
         vm.mockCall(address(token), abi.encodeWithSelector(IERC20.balanceOf.selector), abi.encode(10));
-        vm.expectRevert(abi.encodeWithSelector(WithdrawIncorrectAmount.selector, 0, amount));
+        vm.expectRevert(abi.encodeWithSelector(DepositIncorrectAmount.selector, 0, amount));
         // solhint-disable-next-line func-named-parameters
         sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(address(token), amount, bob));
     }
