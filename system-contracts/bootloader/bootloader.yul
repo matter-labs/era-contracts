@@ -3325,6 +3325,11 @@ object "Bootloader" {
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                     }
+                    case 253 {
+                        // Double-check that the operator doesn't try to do an upgrade transaction via L1 -> L2 transaction.
+                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        // todo validate here
+                    }
                     case 254 {
                         // Upgrade transaction, no need to validate as it is validated on L1.
                     }
