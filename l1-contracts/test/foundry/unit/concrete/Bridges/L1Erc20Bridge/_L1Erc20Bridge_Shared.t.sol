@@ -37,7 +37,7 @@ contract L1Erc20BridgeTest is Test {
         bridge = new L1ERC20Bridge(IL1SharedBridge(address(dummySharedBridge)));
         uint256 eraChainId = 1;
         address weth = makeAddr("weth");
-        L1NativeTokenVault ntv = new L1NativeTokenVault(weth, IL1SharedBridge(address(dummySharedBridge)), eraChainId);
+        L1NativeTokenVault ntv = new L1NativeTokenVault(weth, IL1SharedBridge(address(dummySharedBridge)));
 
         vm.store(address(bridge), bytes32(uint256(212)), bytes32(0));
 

@@ -14,13 +14,6 @@ interface IL2SharedBridge {
         bytes32 assetDataHash
     );
 
-    event AssetHandlerRegisteredInitial(
-        bytes32 indexed assetId,
-        address indexed _assetAddress,
-        bytes32 indexed additionalData,
-        address sender
-    );
-
     event AssetHandlerRegistered(bytes32 indexed assetId, address indexed _assetAddress);
 
     function finalizeDeposit(bytes32 _assetId, bytes calldata _data) external;

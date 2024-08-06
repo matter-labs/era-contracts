@@ -30,9 +30,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
     IL1SharedBridge public immutable override L1_SHARED_BRIDGE;
 
-    /// @dev Era's chainID
-    uint256 public immutable ERA_CHAIN_ID;
-
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
@@ -47,18 +44,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         _;
     }
 
-    /// @notice Checks that the message sender is the shared bridge itself.
-    modifier onlySelf() {
-        require(msg.sender == address(this), "NTV only");
-        _;
-    }
-
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(address _l1WethAddress, IL1SharedBridge _l1SharedBridge, uint256 _eraChainId) {
+    constructor(address _l1WethAddress, IL1SharedBridge _l1SharedBridge) {
         _disableInitializers();
         L1_WETH_TOKEN = _l1WethAddress;
-        ERA_CHAIN_ID = _eraChainId;
         L1_SHARED_BRIDGE = _l1SharedBridge;
     }
 
