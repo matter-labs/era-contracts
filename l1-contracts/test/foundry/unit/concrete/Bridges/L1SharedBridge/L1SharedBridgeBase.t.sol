@@ -256,7 +256,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             _chainId: chainId,
             _depositSender: alice,
             _assetId: ETH_TOKEN_ASSET_ID,
-            _transferData: transferData,
+            _assetData: transferData,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
