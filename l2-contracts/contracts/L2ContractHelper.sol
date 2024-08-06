@@ -73,6 +73,8 @@ address constant DEPLOYER_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x
 
 address constant NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS = address(2);
 
+uint256 constant L1_CHAIN_ID = 1;
+
 IL2Messenger constant L2_MESSENGER = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
 
 IBaseToken constant L2_BASE_TOKEN_ADDRESS = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
@@ -116,7 +118,7 @@ library L2ContractHelper {
     }
 }
 
-/// @notice Structure used to represent a zkSync transaction.
+/// @notice Structure used to represent a ZKsync transaction.
 struct Transaction {
     // The type of the transaction.
     uint256 txType;
