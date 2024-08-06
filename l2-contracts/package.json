@@ -28,7 +28,8 @@
     "ts-node": "^10.1.0",
     "typechain": "^4.0.0",
     "typescript": "^5.2.2",
-    "zksync-ethers": "^5.9.0"
+    "zksync-ethers": "^5.9.0",
+    "zksync-web3": "^0.15.4"
   },
   "scripts": {
     "build": "hardhat compile",

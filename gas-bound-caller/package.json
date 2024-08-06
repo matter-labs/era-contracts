@@ -19,6 +19,7 @@
   "devDependencies": {
     "@matterlabs/hardhat-zksync-chai-matchers": "^0.2.0",
     "@matterlabs/hardhat-zksync-node": "^0.0.1-beta.7",
+    "@matterlabs/hardhat-zksync-verify": "0.6.1",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@typechain/ethers-v5": "^2.0.0",
@@ -53,6 +54,8 @@
     "clean": "yarn clean:bootloader && yarn clean:system-contracts",
     "test": "yarn build && hardhat test --network zkSyncTestNode",
     "test-node": "hardhat node-zksync --tag v0.0.1-vm1.5.0",
+    "check-canonical-bytecode": "ts-node ./scripts/check-canonical-bytecode.ts",
+    "verify": "hardhat run scripts/verify.ts",
     "deploy-on-hyperchain": "ts-node ./scripts/deploy-on-hyperchain.ts",
     "deploy-on-localhost": "hardhat deploy --network localhost"
   }
