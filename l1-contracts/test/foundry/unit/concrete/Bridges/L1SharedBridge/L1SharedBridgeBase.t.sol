@@ -518,7 +518,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         vm.expectEmit(true, true, false, true, address(token));
         emit IERC20.Transfer(address(sharedBridge), address(nativeTokenVault), amount);
         nativeTokenVault.transferFundsFromSharedBridge(address(token));
-        nativeTokenVault.transferBalancesFromSharedBridge(address(token), chainId);
+        nativeTokenVault.updateChainBalancesFromSharedBridge(address(token), chainId);
         uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, address(token));
         assertEq(endBalanceNtv - startBalanceNtv, amount);
     }
@@ -527,7 +527,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         uint256 startEthBalanceNtv = address(nativeTokenVault).balance;
         uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ADDRESS);
         nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
-        nativeTokenVault.transferBalancesFromSharedBridge(ETH_TOKEN_ADDRESS, chainId);
+        nativeTokenVault.updateChainBalancesFromSharedBridge(ETH_TOKEN_ADDRESS, chainId);
         uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ADDRESS);
         uint256 endEthBalanceNtv = address(nativeTokenVault).balance;
         assertEq(endBalanceNtv - startBalanceNtv, amount);
