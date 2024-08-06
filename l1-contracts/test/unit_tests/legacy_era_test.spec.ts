@@ -172,8 +172,11 @@ describe("Legacy Era tests", function () {
   });
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
+    const mailboxFunctionSignature = "0x6c0960f9";
     const revertReason = await getCallRevertReason(
-      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(1, 0, 0, "0x", [ethers.constants.HashZero])
+      l1ERC20Bridge
+        .connect(randomSigner)
+        .finalizeWithdrawal(1, 0, 0, mailboxFunctionSignature, [ethers.constants.HashZero])
     );
     expect(revertReason).equal("ShB wrong msg len");
   });

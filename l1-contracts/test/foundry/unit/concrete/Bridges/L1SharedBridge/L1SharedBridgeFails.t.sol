@@ -57,9 +57,9 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         sharedBridge.transferTokenToNTV(address(token));
     }
 
-    function test_transferBalanceToNTV_wrongCaller() public {
+    function test_nullifyChainBalanceByNTV_wrongCaller() public {
         vm.expectRevert("ShB: not NTV");
-        sharedBridge.transferBalanceToNTV(chainId, address(token));
+        sharedBridge.nullifyChainBalanceByNTV(chainId, address(token));
     }
 
     function test_registerToken_noCode() public {
@@ -525,7 +525,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             abi.encode(true)
         );
 
-        vm.expectRevert("NTV n funds");
+        vm.expectRevert("NTV: not enough funds 2");
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
@@ -722,7 +722,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         );
         _setNativeTokenVaultChainBalance(chainId, ETH_TOKEN_ADDRESS, 0);
 
-        vm.expectRevert("NTV not enough funds 2");
+        vm.expectRevert("NTV: not enough funds");
 
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
