@@ -7,7 +7,6 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -27,6 +26,8 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
+
+import {BridgeHelper} from "./BridgeHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -783,17 +784,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function getERC20Getters(address _token) public view returns (bytes memory) {
-        if (_token == ETH_TOKEN_ADDRESS) {
-            bytes memory name = bytes("Ether");
-            bytes memory symbol = bytes("ETH");
-            bytes memory decimals = abi.encode(uint8(18));
-            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
-        }
-
-        (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
-        (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
-        (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
-        return abi.encode(data1, data2, data3);
+        return BridgeHelper.getERC20Getters(_token, ETH_TOKEN_ADDRESS);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -960,43 +951,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _merkleProof: _merkleProof
         });
         l1Asset = nativeTokenVault.tokenAddress(assetId);
-    }
-
-    /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on ZKsync Era chain.
-    /// This function is specifically designed for maintaining backward-compatibility with legacy `claimFailedDeposit`
-    /// method in `L1ERC20Bridge`.
-    ///
-    /// @param _depositSender The address of the deposit initiator
-    /// @param _l1Asset The address of the deposited L1 ERC20 token
-    /// @param _amount The amount of the deposit that failed.
-    /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization
-    /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent
-    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization
-    function claimFailedDepositLegacyErc20Bridge(
-        address _depositSender,
-        address _l1Asset,
-        uint256 _amount,
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
-    ) external override onlyLegacyBridge {
-        // For legacy deposits, the l2 receiver is not required to check tx data hash
-        bytes memory transferData = abi.encode(_amount, address(0));
-        bridgeRecoverFailedTransfer({
-            _chainId: ERA_CHAIN_ID,
-            _depositSender: _depositSender,
-            _assetId: DataEncoding.encodeNTVAssetId(_l1Asset),
-            _assetData: transferData,
-            _l2TxHash: _l2TxHash,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _merkleProof: _merkleProof
-        });
     }
 
     /*//////////////////////////////////////////////////////////////

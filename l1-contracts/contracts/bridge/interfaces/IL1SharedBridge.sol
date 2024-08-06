@@ -78,17 +78,6 @@ interface IL1SharedBridge {
         address _refundRecipient
     ) external payable returns (bytes32 txHash);
 
-    function claimFailedDepositLegacyErc20Bridge(
-        address _depositSender,
-        address _l1Token,
-        uint256 _amount,
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
-    ) external;
-
     function claimFailedDeposit(
         uint256 _chainId,
         address _depositSender,
