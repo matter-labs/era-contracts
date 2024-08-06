@@ -104,6 +104,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             "Bridgehub: state transition already registered"
         );
         stateTransitionManagerIsRegistered[_stateTransitionManager] = true;
+
+        emit StateTransitionManagerAdded(_stateTransitionManager);
     }
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
@@ -114,18 +116,24 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             "Bridgehub: state transition not registered yet"
         );
         stateTransitionManagerIsRegistered[_stateTransitionManager] = false;
+
+        emit StateTransitionManagerRemoved(_stateTransitionManager);
     }
 
     /// @notice token can be any contract with the appropriate interface/functionality
     function addToken(address _token) external onlyOwner {
         require(!tokenIsRegistered[_token], "Bridgehub: token already registered");
         tokenIsRegistered[_token] = true;
+
+        emit TokenRegistered(_token);
     }
 
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
     function setSharedBridge(address _sharedBridge) external onlyOwner {
         sharedBridge = IL1SharedBridge(_sharedBridge);
+
+        emit SharedBridgeUpdated(_sharedBridge);
     }
 
     /// @notice register new chain
