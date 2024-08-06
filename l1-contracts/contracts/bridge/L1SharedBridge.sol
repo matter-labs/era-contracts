@@ -176,9 +176,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev transfer token to shared bridge as part of upgrade
     function transferTokenToNTV(address _token) external {
-        require(msg.sender == address(nativeTokenVault), "ShB: not NTV");
+        address ntvAddress = address(nativeTokenVault);
+        require(msg.sender == ntvAddress, "ShB: not NTV");
         if (ETH_TOKEN_ADDRESS == _token) {
-            address ntvAddress = address(nativeTokenVault);
             uint256 amount = address(this).balance;
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
@@ -187,7 +187,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             }
             require(callSuccess, "ShB: eth transfer failed");
         } else {
-            IERC20(_token).safeTransfer(address(nativeTokenVault), IERC20(_token).balanceOf(address(this)));
+            IERC20(_token).safeTransfer(ntvAddress, IERC20(_token).balanceOf(address(this)));
         }
     }
 
