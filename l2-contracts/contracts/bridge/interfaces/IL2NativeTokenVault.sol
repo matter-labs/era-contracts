@@ -6,6 +6,7 @@ import {IL2SharedBridge} from "./IL2SharedBridge.sol";
 import {IL2AssetHandler} from "./IL2AssetHandler.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IL2NativeTokenVault is IL2AssetHandler {
     event FinalizeDeposit(
         address indexed l1Sender,
@@ -25,7 +26,7 @@ interface IL2NativeTokenVault is IL2AssetHandler {
 
     function l2Bridge() external view returns (IL2SharedBridge);
 
-    function tokenAddress(bytes32 _assetId) external view returns (address);
+    function tokenAddress(bytes32 assetId) external view returns (address);
 
     function l2TokenAddress(address _l1Token) external view returns (address);
 

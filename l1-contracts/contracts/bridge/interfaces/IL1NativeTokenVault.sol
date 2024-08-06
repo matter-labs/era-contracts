@@ -18,11 +18,11 @@ interface IL1NativeTokenVault {
     /// @notice Used to register a token in the vault
     function registerToken(address _l1Token) external;
 
-    /// @notice Used to get the assetId of a token
-    function getAssetId(address l1TokenAddress) external view returns (bytes32);
-
-    /// @notice Used to get the the ERC20 data for a token
+    /// @notice Used to get the ERC20 data for a token
     function getERC20Getters(address _token) external view returns (bytes memory);
+
+    /// @notice Used the get token balance for specific ZK chain in shared bridge
+    function chainBalance(uint256 chainId, address l1Token) external view returns (uint256);
 
     /// @notice Used to get the token address of an assetId
     function tokenAddress(bytes32 assetId) external view returns (address);
