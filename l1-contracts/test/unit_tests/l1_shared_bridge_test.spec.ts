@@ -22,7 +22,7 @@ describe("Shared Bridge tests", () => {
   let l1NativeTokenVault: L1NativeTokenVault;
   let l1SharedBridge: L1SharedBridge;
   let erc20TestToken: ethers.Contract;
-  const functionSignature = "0x6c0960f9";
+  const mailboxFunctionSignature = "0x6c0960f9";
   const ERC20functionSignature = "0x11a2ccc1";
 
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
@@ -191,7 +191,9 @@ describe("Shared Bridge tests", () => {
 
   it("Should revert on finalizing a withdrawal with short message length", async () => {
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [ethers.constants.HashZero])
+      l1SharedBridge
+        .connect(randomSigner)
+        .finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [ethers.constants.HashZero])
     );
     expect(revertReason).equal("ShB wrong msg len");
   });
@@ -205,7 +207,7 @@ describe("Shared Bridge tests", () => {
           0,
           0,
           0,
-          ethers.utils.hexConcat([ERC20functionSignature, l1SharedBridge.address, ethers.utils.randomBytes(72)]),
+          ethers.utils.hexConcat([ERC20functionSignature, l1SharedBridge.address, mailboxFunctionSignature]),
           [ethers.constants.HashZero]
         )
     );
@@ -221,7 +223,9 @@ describe("Shared Bridge tests", () => {
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [ethers.constants.HashZero])
+      l1SharedBridge
+        .connect(randomSigner)
+        .finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [ethers.constants.HashZero])
     );
     expect(revertReason).equal("ShB wrong msg len");
   });
@@ -238,7 +242,7 @@ describe("Shared Bridge tests", () => {
   it("Should revert on finalizing a withdrawal with wrong batch number", async () => {
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
-      functionSignature,
+      mailboxFunctionSignature,
       l1Receiver,
       erc20TestToken.address,
       ethers.constants.HashZero,
@@ -252,7 +256,7 @@ describe("Shared Bridge tests", () => {
   it("Should revert on finalizing a withdrawal with wrong length of proof", async () => {
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
-      functionSignature,
+      mailboxFunctionSignature,
       l1Receiver,
       erc20TestToken.address,
       ethers.constants.HashZero,
@@ -266,7 +270,7 @@ describe("Shared Bridge tests", () => {
   it("Should revert on finalizing a withdrawal with wrong proof", async () => {
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
-      functionSignature,
+      mailboxFunctionSignature,
       l1Receiver,
       erc20TestToken.address,
       ethers.constants.HashZero,
