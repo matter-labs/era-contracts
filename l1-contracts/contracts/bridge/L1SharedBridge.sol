@@ -212,25 +212,30 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @notice Used to Sets the assed deployment tracker address for given asset data.
-    /// @param _additionalData The asset data which may include the asset address and any additional required data or encodings.
+    /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
     /// @param _assetDeploymentTracker The whitelisted address of asset deployment tracker for provided asset.
-    function setAssetDeploymentTracker(bytes32 _additionalData, address _assetDeploymentTracker) external onlyOwner {
-        bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), _assetDeploymentTracker, _additionalData));
+    function setAssetDeploymentTracker(
+        bytes32 _assetRegistrationData,
+        address _assetDeploymentTracker
+    ) external onlyOwner {
+        bytes32 assetId = keccak256(
+            abi.encode(uint256(block.chainid), _assetDeploymentTracker, _assetRegistrationData)
+        );
         assetDeploymentTracker[assetId] = _assetDeploymentTracker;
-        emit AssetDeploymentTrackerSet(assetId, _assetDeploymentTracker, _additionalData);
+        emit AssetDeploymentTrackerSet(assetId, _assetDeploymentTracker, _assetRegistrationData);
     }
 
     /// @dev Used to set the assedAddress for a given assetId.
-    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external {
+    function setAssetHandlerAddressInitial(bytes32 _assetRegistrationData, address _assetHandlerAddress) external {
         bool senderIsNTV = msg.sender == address(nativeTokenVault);
         address sender = senderIsNTV ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
-        bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData));
+        bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _assetRegistrationData));
         require(senderIsNTV || msg.sender == assetDeploymentTracker[assetId], "ShB: not NTV or ADT");
         assetHandlerAddress[assetId] = _assetHandlerAddress;
         if (senderIsNTV) {
             assetDeploymentTracker[assetId] = msg.sender;
         }
-        emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _additionalData, sender);
+        emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _assetRegistrationData, sender);
     }
 
     function setAssetHandlerAddressOnCounterPart(
