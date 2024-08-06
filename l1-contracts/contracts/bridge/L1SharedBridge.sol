@@ -216,18 +216,36 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
     }
 
+    /// @notice Used to Sets the assed deployment tracker address for given asset data.
+    /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
+    /// @param _assetDeploymentTracker The whitelisted address of asset deployment tracker for provided asset.
+    function setAssetDeploymentTracker(
+        bytes32 _assetRegistrationData,
+        address _assetDeploymentTracker
+    ) external onlyOwner {
+        bytes32 assetId = keccak256(
+            abi.encode(uint256(block.chainid), _assetDeploymentTracker, _assetRegistrationData)
+        );
+        assetDeploymentTracker[assetId] = _assetDeploymentTracker;
+        emit AssetDeploymentTrackerSet(assetId, _assetDeploymentTracker, _assetRegistrationData);
+    }
+
     /// @notice Sets the asset handler address for a specified asset ID on the chain of the asset deployment tracker.
     /// @dev The caller of this function is encoded within the `assetId`, therefore, it should be invoked by the asset deployment tracker contract.
     /// @dev Typically, for most tokens, ADT is the native token vault. However, custom tokens may have their own specific asset deployment trackers.
     /// @dev `setAssetHandlerAddressOnCounterPart` should be called on L1 to set asset handlers on L2 chains for a specific asset ID.
-    /// @param _additionalData The asset data which may include the asset address and any additional required data or encodings.
+    /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
     /// @param _assetHandlerAddress The address of the asset handler to be set for the provided asset.
-    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external {
-        address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
-        bytes32 assetId = DataEncoding.encodeAssetId(_additionalData, sender);
+    function setAssetHandlerAddressInitial(bytes32 _assetRegistrationData, address _assetHandlerAddress) external {
+        bool senderIsNTV = msg.sender == address(nativeTokenVault);
+        address sender = senderIsNTV ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
+        bytes32 assetId = DataEncoding.encodeAssetId(_assetRegistrationData, sender);
+        require(senderIsNTV || msg.sender == assetDeploymentTracker[assetId], "ShB: not NTV or ADT");
         assetHandlerAddress[assetId] = _assetHandlerAddress;
-        assetDeploymentTracker[assetId] = msg.sender;
-        emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _additionalData, sender);
+        if (senderIsNTV) {
+            assetDeploymentTracker[assetId] = msg.sender;
+        }
+        emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _assetRegistrationData, sender);
     }
 
     /// @dev Used to set the assetHandlerAddress for a given assetId on chains different from the assetDeploymentTrackers chain.
@@ -367,6 +385,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             legacyDeposit = true;
         } catch {
             (assetId, transferData) = abi.decode(_data, (bytes32, bytes));
+            require(
+                assetHandlerAddress[assetId] != address(nativeTokenVault),
+                "ShB: new encoding format not yet supported for NTV"
+            );
         }
 
         require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, "ShB: baseToken deposit not supported");
@@ -408,7 +430,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bool _isLegacyEncoding,
         address _prevMsgSender,
         bytes32 _assetId,
-        bytes memory _transferData
+        bytes calldata _transferData
     ) external view returns (bytes32 txDataHash) {
         if (_isLegacyEncoding) {
             (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));

@@ -7,7 +7,7 @@ import { L1NativeTokenVaultFactory } from "../../typechain/L1NativeTokenVaultFac
 
 import { getTokens } from "../../src.ts/deploy-token";
 import { Action, facetCut } from "../../src.ts/diamondCut";
-import { ethTestConfig, encodeNTVAssetId } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/utils";
 import type { Deployer } from "../../src.ts/deploy";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
@@ -26,7 +26,6 @@ describe("Shared Bridge tests", () => {
   const ERC20functionSignature = "0x11a2ccc1";
 
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
-  let testChainId;
 
   before(async () => {
     [owner, randomSigner] = await hardhat.ethers.getSigners();
@@ -35,8 +34,6 @@ describe("Shared Bridge tests", () => {
     const ownerAddress = await deployWallet.getAddress();
 
     const gasPrice = await owner.provider.getGasPrice();
-    const networkData = await owner.provider.getNetwork();
-    testChainId = networkData.chainId;
 
     const tx = {
       from: owner.getAddress(),
@@ -83,17 +80,6 @@ describe("Shared Bridge tests", () => {
     const mintValue = ethers.utils.parseEther("0.01");
     await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, mintValue.mul(10))).wait();
 
-    // const correctEncoding = await l1NativeTokenVault.getAssetId(erc20TestToken.address);
-    // const ntvAddress = await l1NativeTokenVault.ntvAddressVirtual();
-    // const chainIdFetched = await l1NativeTokenVault.chainId();
-    // console.log(ntvAddress, chainId);
-
-    // console.log(chainIdFetched.toNumber())
-    // const wrongEncoding1 = encodeNTVAssetId(Number(9), ethers.utils.hexZeroPad(erc20TestToken.address, 32));
-    // const wrongEncoding2 = encodeNTVAssetId(Number(1), ethers.utils.hexZeroPad(erc20TestToken.address, 32));
-    // const wrongEncoding3 = encodeNTVAssetId(Number(chainId), ethers.utils.hexZeroPad(erc20TestToken.address, 32));
-    // const wrongEncoding4 = encodeNTVAssetId(Number(chainIdFetched), ethers.utils.hexZeroPad(erc20TestToken.address, 32));
-    // console.log(correctEncoding, wrongEncoding1, wrongEncoding2, wrongEncoding3, wrongEncoding4);
     const revertReason = await getCallRevertReason(
       bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
         {
@@ -106,54 +92,14 @@ describe("Shared Bridge tests", () => {
           secondBridgeAddress: l1SharedBridge.address,
           secondBridgeValue: 0,
           secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
-            ["bytes32", "bytes"],
-            [
-              encodeNTVAssetId(testChainId, ethers.utils.hexZeroPad(erc20TestToken.address, 32)),
-              new ethers.utils.AbiCoder().encode(["uint256", "address"], [0, await randomSigner.getAddress()]),
-            ]
+            ["address", "uint256", "address"],
+            [erc20TestToken.address, 0, await randomSigner.getAddress()]
           ),
         },
         { value: mintValue }
       )
     );
     expect(revertReason).equal("6T");
-  });
-
-  it("Should deposit successfully", async () => {
-    const amount = ethers.utils.parseEther("1");
-    const mintValue = ethers.utils.parseEther("2");
-
-    await erc20TestToken.connect(randomSigner).mint(await randomSigner.getAddress(), amount.mul(10));
-
-    const balanceBefore = await erc20TestToken.balanceOf(await randomSigner.getAddress());
-    const balanceNTVBefore = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
-
-    const assetId = encodeNTVAssetId(testChainId, ethers.utils.hexZeroPad(erc20TestToken.address, 32));
-    await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, amount.mul(10))).wait();
-    await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
-      {
-        chainId,
-        mintValue,
-        l2Value: amount,
-        l2GasLimit: 1000000,
-        l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-        refundRecipient: ethers.constants.AddressZero,
-        secondBridgeAddress: l1SharedBridge.address,
-        secondBridgeValue: 0,
-        secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
-          ["bytes32", "bytes"],
-          [
-            assetId,
-            new ethers.utils.AbiCoder().encode(["uint256", "address"], [amount, await randomSigner.getAddress()]),
-          ]
-        ),
-      },
-      { value: mintValue }
-    );
-    const balanceAfter = await erc20TestToken.balanceOf(await randomSigner.getAddress());
-    expect(balanceAfter).equal(balanceBefore.sub(amount));
-    const balanceNTVAfter = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
-    expect(balanceNTVAfter).equal(balanceNTVBefore.add(amount));
   });
 
   it("Should deposit successfully legacy encoding", async () => {
