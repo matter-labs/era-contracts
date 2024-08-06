@@ -112,7 +112,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
             );
             if (_assetId != expectedAssetId) {
                 // Make sure that a NativeTokenVault sent the message
-                revert AssetIdMismatch(_assetId, expectedAssetId);
+                revert AssetIdMismatch(expectedAssetId, _assetId);
             }
             address deployedToken = _deployL2Token(originToken, erc20Data);
             if (deployedToken != expectedToken) {
