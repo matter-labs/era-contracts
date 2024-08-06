@@ -18,6 +18,7 @@ import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 
 import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -55,7 +56,7 @@ contract ExperimentalBridgeTest is Test {
         vm.prank(address(ntv));
         ntv.registerToken(ETH_TOKEN_ADDRESS);
         ntv.registerToken(address(testToken));
-        tokenAssetId = ntv.getAssetId(address(testToken));
+        tokenAssetId = DataEncoding.encodeNTVAssetId(address(testToken));
 
         // test if the ownership of the bridgeHub is set correctly or not
         address defaultOwner = bridgeHub.owner();

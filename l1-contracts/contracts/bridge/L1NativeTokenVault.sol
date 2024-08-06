@@ -13,9 +13,9 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
-
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
-import {ETH_TOKEN_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -108,7 +108,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     function registerToken(address _l1Token) external {
         require(_l1Token != L1_WETH_TOKEN, "NTV: WETH deposit not supported");
         require(_l1Token == ETH_TOKEN_ADDRESS || _l1Token.code.length > 0, "NTV: empty token");
-        bytes32 assetId = getAssetId(_l1Token);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(_l1Token);
         L1_SHARED_BRIDGE.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_l1Token))), address(this));
         tokenAddress[assetId] = _l1Token;
     }
@@ -150,8 +150,13 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         chainBalance[_chainId][l1Token] += amount;
 
         // solhint-disable-next-line func-named-parameters
-        _bridgeMintData = abi.encode(amount, _prevMsgSender, _l2Receiver, getERC20Getters(l1Token), l1Token); // to do add l2Receiver in here
-        // solhint-disable-next-line func-named-parameters
+        _bridgeMintData = DataEncoding.encodeBridgeMintData(
+            amount,
+            _prevMsgSender,
+            _l2Receiver,
+            getERC20Getters(l1Token),
+            l1Token
+        ); // solhint-disable-next-line func-named-parameters
         emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _l2Receiver, amount);
     }
 
@@ -245,10 +250,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
             // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.
             // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
         }
-    }
-
-    function getAssetId(address _l1TokenAddress) public view override returns (bytes32) {
-        return keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _l1TokenAddress));
     }
 
     /*//////////////////////////////////////////////////////////////

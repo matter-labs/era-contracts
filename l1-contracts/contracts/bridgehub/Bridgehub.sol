@@ -11,8 +11,9 @@ import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOu
 import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
@@ -50,9 +51,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {
-        ETH_TOKEN_ASSET_ID = keccak256(
-            abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
-        );
+        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(ETH_TOKEN_ADDRESS);
     }
 
     /// @notice used to initialize the contract
@@ -163,7 +162,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
         /// For now all base tokens have to use the NTV.
-        baseTokenAssetId[_chainId] = sharedBridge.nativeTokenVault().getAssetId(_baseToken);
+        baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(_baseToken);
 
         IStateTransitionManager(_stateTransitionManager).createNewChain({
             _chainId: _chainId,

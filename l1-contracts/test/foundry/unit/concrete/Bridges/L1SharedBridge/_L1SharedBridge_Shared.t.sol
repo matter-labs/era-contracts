@@ -14,6 +14,7 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract L1SharedBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -152,7 +153,7 @@ contract L1SharedBridgeTest is Test {
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
         vm.prank(owner);
         sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
-        tokenAssetId = nativeTokenVault.getAssetId(address(token));
+        tokenAssetId = DataEncoding.encodeNTVAssetId(address(token));
         vm.prank(owner);
         sharedBridge.setNativeTokenVault(IL1NativeTokenVault(address(nativeTokenVault)));
         vm.prank(address(nativeTokenVault));
