@@ -4451,56 +4451,7 @@ hardhat@=2.22.2:
     uuid "^8.3.2"
     ws "^7.4.6"
 
-hardhat@^2.14.0:
-  version "2.22.7"
-  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.22.7.tgz#3de0ce5074063cf468876c5e62f84c66d2408e8e"
-  integrity sha512-nrXQAl+qUr75TsCLDo8P41YXLc+5U7qQMMCIrbbmy1/uQaVPncdjDrD5BR0CENvHRj7EBqO+JkofpozXoIfJKg==
-  dependencies:
-    "@ethersproject/abi" "^5.1.2"
-    "@metamask/eth-sig-util" "^4.0.0"
-    "@nomicfoundation/edr" "^0.5.0"
-    "@nomicfoundation/ethereumjs-common" "4.0.4"
-    "@nomicfoundation/ethereumjs-tx" "5.0.4"
-    "@nomicfoundation/ethereumjs-util" "9.0.4"
-    "@nomicfoundation/solidity-analyzer" "^0.1.0"
-    "@sentry/node" "^5.18.1"
-    "@types/bn.js" "^5.1.0"
-    "@types/lru-cache" "^5.1.0"
-    adm-zip "^0.4.16"
-    aggregate-error "^3.0.0"
-    ansi-escapes "^4.3.0"
-    boxen "^5.1.2"
-    chalk "^2.4.2"
-    chokidar "^3.4.0"
-    ci-info "^2.0.0"
-    debug "^4.1.1"
-    enquirer "^2.3.0"
-    env-paths "^2.2.0"
-    ethereum-cryptography "^1.0.3"
-    ethereumjs-abi "^0.6.8"
-    find-up "^2.1.0"
-    fp-ts "1.19.3"
-    fs-extra "^7.0.1"
-    glob "7.2.0"
-    immutable "^4.0.0-rc.12"
-    io-ts "1.10.4"
-    keccak "^3.0.2"
-    lodash "^4.17.11"
-    mnemonist "^0.38.0"
-    mocha "^10.0.0"
-    p-map "^4.0.0"
-    raw-body "^2.4.1"
-    resolve "1.17.0"
-    semver "^6.3.0"
-    solc "0.8.26"
-    source-map-support "^0.5.13"
-    stacktrace-parser "^0.1.10"
-    tsort "0.0.1"
-    undici "^5.14.0"
-    uuid "^8.3.2"
-    ws "^7.4.6"
-
-hardhat@^2.19.4:
+hardhat@^2.18.3, hardhat@^2.19.4:
   version "2.22.5"
   resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.22.5.tgz#7e1a4311fa9e34a1cfe337784eae06706f6469a5"
   integrity sha512-9Zq+HonbXCSy6/a13GY1cgHglQRfh4qkzmj1tpPlhxJDwNVnhxlReV6K7hCWFKlOrV13EQwsdcD0rjcaQKWRZw==
@@ -7929,12 +7880,30 @@ yocto-queue@^1.0.0:
   integrity sha512-9bnSc/HEW2uRy67wc+T8UwauLuPJVn28jb+GtJY16iiKWyvmYJRXVT4UamsAEGQfPohgr2q4Tq0sQbQlxTfi1g==
 
 zksync-ethers@^5.0.0:
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+  version "5.7.2"
+  resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.7.2.tgz#e965a9926e6f8168963ab565dd6ad0d38c4f7f18"
+  integrity sha512-D+wn4nkGixUOek9ZsVvIZ/MHponQ5xvw74FSbDJDv6SLCI4LZALOAc8lF3b1ml8nOkpeE2pGV0VKmHTSquRNJg==
+=======
+>>>>>>> dev
   version "5.8.0"
   resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.8.0.tgz#ff054345048f851c33cb6efcf2094f40d4da6063"
   integrity sha512-/4qI5UElh0lspu0ew2IXBCO+O9kXEzZOM7JqvlfRWWGIUKZ+EDXnjIPgkH0y5/MnMT3FDq9koAAUCyZVWqHUJg==
   dependencies:
     ethers "~5.7.0"
 
+<<<<<<< HEAD
+=======
+"zksync-ethers@https://github.com/zksync-sdk/zksync-ethers#ethers-v5-feat/bridgehub":
+  version "5.1.0"
+  resolved "https://github.com/zksync-sdk/zksync-ethers#28ccbe7d67b170c202b17475e06a82002e6e3acc"
+>>>>>>> main
+  dependencies:
+    ethers "~5.7.0"
+
+>>>>>>> dev
 zksync-ethers@^5.9.0:
   version "5.9.0"
   resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.9.0.tgz#96dc29e4eaaf0aa70d927886fd6e1e4c545786e3"
