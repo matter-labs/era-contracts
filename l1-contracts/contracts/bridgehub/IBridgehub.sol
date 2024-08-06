@@ -37,6 +37,8 @@ struct L2TransactionRequestTwoBridgesInner {
     bytes32 txDataHash;
 }
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IBridgehub {
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
@@ -45,7 +47,7 @@ interface IBridgehub {
     /// @notice Admin changed
     event NewAdmin(address indexed oldAdmin, address indexed newAdmin);
 
-    /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
+    /// @notice Starts the transfer of admin rights. Only the current admin or owner can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin
     function setPendingAdmin(address _newPendingAdmin) external;
@@ -131,4 +133,12 @@ interface IBridgehub {
     function setSharedBridge(address _sharedBridge) external;
 
     event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
+
+    event StateTransitionManagerAdded(address indexed stateTransitionManager);
+
+    event StateTransitionManagerRemoved(address indexed stateTransitionManager);
+
+    event TokenRegistered(address indexed token);
+
+    event SharedBridgeUpdated(address indexed sharedBridge);
 }

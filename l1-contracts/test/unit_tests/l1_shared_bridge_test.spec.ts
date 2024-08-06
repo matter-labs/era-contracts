@@ -7,7 +7,7 @@ import { L1NativeTokenVaultFactory } from "../../typechain/L1NativeTokenVaultFac
 
 import { getTokens } from "../../src.ts/deploy-token";
 import { Action, facetCut } from "../../src.ts/diamondCut";
-import { ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig, encodeNTVAssetId } from "../../src.ts/utils";
 import type { Deployer } from "../../src.ts/deploy";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
@@ -22,10 +22,11 @@ describe("Shared Bridge tests", () => {
   let l1NativeTokenVault: L1NativeTokenVault;
   let l1SharedBridge: L1SharedBridge;
   let erc20TestToken: ethers.Contract;
-  const functionSignature = "0x6c0960f9";
+  const mailboxFunctionSignature = "0x6c0960f9";
   const ERC20functionSignature = "0x11a2ccc1";
 
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
+  let testChainId;
 
   before(async () => {
     [owner, randomSigner] = await hardhat.ethers.getSigners();
@@ -34,6 +35,8 @@ describe("Shared Bridge tests", () => {
     const ownerAddress = await deployWallet.getAddress();
 
     const gasPrice = await owner.provider.getGasPrice();
+    const networkData = await owner.provider.getNetwork();
+    testChainId = networkData.chainId;
 
     const tx = {
       from: owner.getAddress(),
@@ -80,6 +83,17 @@ describe("Shared Bridge tests", () => {
     const mintValue = ethers.utils.parseEther("0.01");
     await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, mintValue.mul(10))).wait();
 
+    // const correctEncoding = await l1NativeTokenVault.getAssetId(erc20TestToken.address);
+    // const ntvAddress = await l1NativeTokenVault.ntvAddressVirtual();
+    // const chainIdFetched = await l1NativeTokenVault.chainId();
+    // console.log(ntvAddress, chainId);
+
+    // console.log(chainIdFetched.toNumber())
+    // const wrongEncoding1 = encodeNTVAssetId(Number(9), ethers.utils.hexZeroPad(erc20TestToken.address, 32));
+    // const wrongEncoding2 = encodeNTVAssetId(Number(1), ethers.utils.hexZeroPad(erc20TestToken.address, 32));
+    // const wrongEncoding3 = encodeNTVAssetId(Number(chainId), ethers.utils.hexZeroPad(erc20TestToken.address, 32));
+    // const wrongEncoding4 = encodeNTVAssetId(Number(chainIdFetched), ethers.utils.hexZeroPad(erc20TestToken.address, 32));
+    // console.log(correctEncoding, wrongEncoding1, wrongEncoding2, wrongEncoding3, wrongEncoding4);
     const revertReason = await getCallRevertReason(
       bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
         {
@@ -94,7 +108,7 @@ describe("Shared Bridge tests", () => {
           secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
             ["bytes32", "bytes"],
             [
-              await l1NativeTokenVault.getAssetId(erc20TestToken.address),
+              encodeNTVAssetId(testChainId, ethers.utils.hexZeroPad(erc20TestToken.address, 32)),
               new ethers.utils.AbiCoder().encode(["uint256", "address"], [0, await randomSigner.getAddress()]),
             ]
           ),
@@ -114,7 +128,7 @@ describe("Shared Bridge tests", () => {
     const balanceBefore = await erc20TestToken.balanceOf(await randomSigner.getAddress());
     const balanceNTVBefore = await erc20TestToken.balanceOf(l1NativeTokenVault.address);
 
-    const assetId = await l1NativeTokenVault.getAssetId(erc20TestToken.address);
+    const assetId = encodeNTVAssetId(testChainId, ethers.utils.hexZeroPad(erc20TestToken.address, 32));
     await (await erc20TestToken.connect(randomSigner).approve(l1NativeTokenVault.address, amount.mul(10))).wait();
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
       {
@@ -177,7 +191,9 @@ describe("Shared Bridge tests", () => {
 
   it("Should revert on finalizing a withdrawal with short message length", async () => {
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [ethers.constants.HashZero])
+      l1SharedBridge
+        .connect(randomSigner)
+        .finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [ethers.constants.HashZero])
     );
     expect(revertReason).equal("ShB wrong msg len");
   });
@@ -191,7 +207,7 @@ describe("Shared Bridge tests", () => {
           0,
           0,
           0,
-          ethers.utils.hexConcat([ERC20functionSignature, l1SharedBridge.address, ethers.utils.randomBytes(72)]),
+          ethers.utils.hexConcat([ERC20functionSignature, l1SharedBridge.address, mailboxFunctionSignature]),
           [ethers.constants.HashZero]
         )
     );
@@ -207,7 +223,9 @@ describe("Shared Bridge tests", () => {
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [ethers.constants.HashZero])
+      l1SharedBridge
+        .connect(randomSigner)
+        .finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [ethers.constants.HashZero])
     );
     expect(revertReason).equal("ShB wrong msg len");
   });
@@ -224,7 +242,7 @@ describe("Shared Bridge tests", () => {
   it("Should revert on finalizing a withdrawal with wrong batch number", async () => {
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
-      functionSignature,
+      mailboxFunctionSignature,
       l1Receiver,
       erc20TestToken.address,
       ethers.constants.HashZero,
@@ -238,7 +256,7 @@ describe("Shared Bridge tests", () => {
   it("Should revert on finalizing a withdrawal with wrong length of proof", async () => {
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
-      functionSignature,
+      mailboxFunctionSignature,
       l1Receiver,
       erc20TestToken.address,
       ethers.constants.HashZero,
@@ -252,7 +270,7 @@ describe("Shared Bridge tests", () => {
   it("Should revert on finalizing a withdrawal with wrong proof", async () => {
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
-      functionSignature,
+      mailboxFunctionSignature,
       l1Receiver,
       erc20TestToken.address,
       ethers.constants.HashZero,
