@@ -55,12 +55,17 @@ contract ConsensusRegistry is Ownable2Step {
         bytes pubKey;
     }
 
+
     error UnauthorizedOnlyOwnerOrNodeOwner();
     error NodeOwnerAlreadyExists();
     error NodeOwnerDoesNotExist();
     error NodeOwnerNotFound();
     error ValidatorPubKeyAlreadyExists();
     error AttesterPubKeyAlreadyExists();
+    error InvalidInputNodeOwnerAddress();
+    error InvalidInputValidatorPubKey();
+    error InvalidInputValidatorPoP();
+    error InvalidInputAttesterPubKey();
 
     modifier onlyOwnerOrNodeOwner(address _nodeOwner) {
         if (owner() != msg.sender && _nodeOwner != msg.sender) {
@@ -70,7 +75,9 @@ contract ConsensusRegistry is Ownable2Step {
     }
 
     constructor(address _initialOwner) {
-        require(_initialOwner != address(0), "_initialOwner should be non zero address");
+        if (_initialOwner == address(0)) {
+            revert InvalidInputNodeOwnerAddress();
+        }
         _transferOwnership(_initialOwner);
     }
 
@@ -92,10 +99,18 @@ contract ConsensusRegistry is Ownable2Step {
         uint256 _attesterWeight,
         bytes calldata _attesterPubKey
     ) external onlyOwner {
-        require(_nodeOwner != address(0), "_nodeOwner address cannot be empty");
-        require(_validatorPubKey.length > 0, "_validatorPubKey cannot be empty");
-        require(_validatorPoP.length > 0, "_validatorPoP cannot be empty");
-        require(_attesterPubKey.length > 0, "_attesterPubKey cannot be empty");
+        if(_nodeOwner == address(0)) {
+            revert InvalidInputNodeOwnerAddress();
+        }
+        if(_validatorPubKey.length == 0) {
+            revert InvalidInputValidatorPubKey();
+        }
+        if(_validatorPoP.length == 0) {
+            revert InvalidInputValidatorPoP();
+        }
+        if(_attesterPubKey.length == 0) {
+            revert InvalidInputAttesterPubKey();
+        }
 
         uint256 len = nodeOwners.length;
         for (uint256 i = 0; i < len; ++i) {
@@ -127,6 +142,7 @@ contract ConsensusRegistry is Ownable2Step {
     /// @param _nodeOwner The address of the node's owner to be inactivated.
     function deactivate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         verifyNodeOwnerExists(_nodeOwner);
+
         nodes[_nodeOwner].active = false;
     }
 
@@ -136,6 +152,7 @@ contract ConsensusRegistry is Ownable2Step {
     /// @param _nodeOwner The address of the node's owner to be activated.
     function activate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         verifyNodeOwnerExists(_nodeOwner);
+
         nodes[_nodeOwner].active = true;
     }
 
@@ -145,6 +162,7 @@ contract ConsensusRegistry is Ownable2Step {
     /// @param _nodeOwner The address of the node's owner to be removed.
     function remove(address _nodeOwner) external onlyOwner {
         verifyNodeOwnerExists(_nodeOwner);
+
         // Remove from array by swapping the last element (gas-efficient, not preserving order).
         nodeOwners[nodeOwnerIdx(_nodeOwner)] = nodeOwners[nodeOwners.length - 1];
         nodeOwners.pop();
@@ -159,6 +177,7 @@ contract ConsensusRegistry is Ownable2Step {
     /// @param _weight The new validator weight to assign to the node.
     function changeValidatorWeight(address _nodeOwner, uint256 _weight) external onlyOwner {
         verifyNodeOwnerExists(_nodeOwner);
+
         nodes[_nodeOwner].validatorWeight = _weight;
     }
 
@@ -169,6 +188,7 @@ contract ConsensusRegistry is Ownable2Step {
     /// @param _weight The new attester weight to assign to the node.
     function changeAttesterWeight(address _nodeOwner, uint256 _weight) external onlyOwner {
         verifyNodeOwnerExists(_nodeOwner);
+
         nodes[_nodeOwner].attesterWeight = _weight;
     }
 
@@ -183,9 +203,14 @@ contract ConsensusRegistry is Ownable2Step {
         bytes calldata _pubKey,
         bytes calldata _pop
     ) external onlyOwnerOrNodeOwner(_nodeOwner) {
-        require(_pubKey.length > 0, "_pubKey cannot be empty");
-        require(_pop.length > 0, "_pop cannot be empty");
+        if(_pubKey.length == 0) {
+            revert InvalidInputValidatorPubKey();
+        }
+        if(_pop.length == 0) {
+            revert InvalidInputValidatorPoP();
+        }
         verifyNodeOwnerExists(_nodeOwner);
+
         nodes[_nodeOwner].validatorPubKey = _pubKey;
         nodes[_nodeOwner].validatorPoP = _pop;
     }
@@ -199,8 +224,11 @@ contract ConsensusRegistry is Ownable2Step {
         address _nodeOwner,
         bytes calldata _pubKey
     ) external onlyOwnerOrNodeOwner(_nodeOwner) {
-        require(_pubKey.length > 0, "_pubKey cannot be empty");
+        if(_pubKey.length == 0) {
+            revert InvalidInputAttesterPubKey();
+        }
         verifyNodeOwnerExists(_nodeOwner);
+
         nodes[_nodeOwner].attesterPubKey = _pubKey;
     }
 
