@@ -35,7 +35,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
 
     /// @notice Deprecated. Kept for backwards compatibility.
     /// @dev A mapping l2 token address => l1 token address
-    mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
+    mapping(address l2Token => address l1Token) public override l1TokenAddress;
 
     /// @notice Obsolete, as all calls are performed via L1 Shared Bridge. Kept for backwards compatibility.
     /// @dev The address of the legacy L1 erc20 bridge counterpart.

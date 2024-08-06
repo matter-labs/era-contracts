@@ -240,7 +240,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         address _refundRecipient,
         bytes32 _assetId,
         address _assetHandlerAddressOnCounterPart
-    ) external payable returns (bytes32 l2TxHash) {
+    ) external payable returns (bytes32 txHash) {
         require(msg.sender == assetDeploymentTracker[_assetId] || msg.sender == owner(), "ShB: only ADT or owner");
         require(l2BridgeAddress[_chainId] != address(0), "ShB: chain governance not initialized");
 
@@ -260,7 +260,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             factoryDeps: new bytes[](0),
             refundRecipient: _refundRecipient
         });
-        l2TxHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
+        txHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
     }
 
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
@@ -842,7 +842,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// L2 tx if the L1 msg.sender is a contract. Without address aliasing for L1 contracts as refund recipients they
     /// would not be able to make proper L2 tx requests through the Mailbox to use or withdraw the funds from L2, and
     /// the funds would be lost.
-    /// @return l2TxHash The L2 transaction hash of deposit finalization.
+    /// @return txHash The L2 transaction hash of deposit finalization.
     function depositLegacyErc20Bridge(
         address _prevMsgSender,
         address _l2Receiver,
@@ -851,7 +851,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
-    ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 l2TxHash) {
+    ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 txHash) {
         require(l2BridgeAddress[ERA_CHAIN_ID] != address(0), "ShB b. n dep");
         require(_l1Token != L1_WETH_TOKEN, "ShB: WETH deposit not supported 2");
 
@@ -894,15 +894,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
                 factoryDeps: new bytes[](0),
                 refundRecipient: refundRecipient
             });
-            l2TxHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
+            txHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
         }
 
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-        depositHappened[ERA_CHAIN_ID][l2TxHash] = keccak256(abi.encode(_prevMsgSender, _l1Token, _amount));
+        depositHappened[ERA_CHAIN_ID][txHash] = keccak256(abi.encode(_prevMsgSender, _l1Token, _amount));
 
         emit LegacyDepositInitiated({
             chainId: ERA_CHAIN_ID,
-            l2DepositTxHash: l2TxHash,
+            l2DepositTxHash: txHash,
             from: _prevMsgSender,
             to: _l2Receiver,
             l1Asset: _l1Token,

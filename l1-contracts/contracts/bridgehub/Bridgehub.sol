@@ -30,15 +30,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     IL1SharedBridge public sharedBridge;
 
     /// @notice we store registered stateTransitionManagers
-    mapping(address _stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
+    mapping(address stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
     /// @notice we store registered tokens (for arbitrary base token)
-    mapping(address _token => bool) public tokenIsRegistered;
+    mapping(address baseToken => bool) public tokenIsRegistered;
 
     /// @notice chainID => StateTransitionManager contract address, storing StateTransitionManager
-    mapping(uint256 _chainId => address) public stateTransitionManager;
+    mapping(uint256 chainId => address) public stateTransitionManager;
 
     /// @notice chainID => baseToken contract address, storing baseToken
-    mapping(uint256 _chainId => address) public baseToken;
+    mapping(uint256 chainId => address) public baseToken;
 
     /// @dev used to manage non critical updates
     address public admin;
@@ -47,7 +47,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     address private pendingAdmin;
 
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
-    mapping(uint256 _chainId => bytes32 _baseTokenAssetId) public baseTokenAssetId;
+    mapping(uint256 chainId => bytes32) public baseTokenAssetId;
 
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {

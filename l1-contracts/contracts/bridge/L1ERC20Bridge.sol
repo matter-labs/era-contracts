@@ -110,7 +110,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @param _amount The total amount of tokens to be bridged
     /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
-    /// @return l2TxHash The L2 transaction hash of deposit finalization
+    /// @return txHash The L2 transaction hash of deposit finalization
     /// NOTE: the function doesn't use `nonreentrant` modifier, because the inner method does.
     function deposit(
         address _l2Receiver,
@@ -118,8 +118,8 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 _amount,
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte
-    ) external payable returns (bytes32 l2TxHash) {
-        l2TxHash = deposit({
+    ) external payable returns (bytes32 txHash) {
+        txHash = deposit({
             _l2Receiver: _l2Receiver,
             _l1Token: _l1Token,
             _amount: _amount,
@@ -153,7 +153,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// L2 tx if the L1 msg.sender is a contract. Without address aliasing for L1 contracts as refund recipients they
     /// would not be able to make proper L2 tx requests through the Mailbox to use or withdraw the funds from L2, and
     /// the funds would be lost.
-    /// @return l2TxHash The L2 transaction hash of deposit finalization
+    /// @return txHash The L2 transaction hash of deposit finalization
     function deposit(
         address _l2Receiver,
         address _l1Token,
@@ -161,13 +161,13 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
-    ) public payable nonReentrant returns (bytes32 l2TxHash) {
+    ) public payable nonReentrant returns (bytes32 txHash) {
         require(_amount != 0, "0T"); // empty deposit
         uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
         require(amount == _amount, "3T"); // The token has non-standard transfer logic
 
-        l2TxHash = SHARED_BRIDGE.depositLegacyErc20Bridge{value: msg.value}({
-            _msgSender: msg.sender,
+        txHash = SHARED_BRIDGE.depositLegacyErc20Bridge{value: msg.value}({
+            _prevMsgSender: msg.sender,
             _l2Receiver: _l2Receiver,
             _l1Token: _l1Token,
             _amount: _amount,
@@ -175,9 +175,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
             _refundRecipient: _refundRecipient
         });
-        depositAmount[msg.sender][_l1Token][l2TxHash] = _amount;
+        depositAmount[msg.sender][_l1Token][txHash] = _amount;
         // solhint-disable-next-line func-named-parameters
-        emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, _amount);
+        emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, _amount);
     }
 
     /// @dev Transfers tokens from the depositor address to the shared bridge address.

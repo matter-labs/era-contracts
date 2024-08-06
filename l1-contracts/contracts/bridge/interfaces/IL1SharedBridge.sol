@@ -63,13 +63,13 @@ interface IL1SharedBridge {
     );
 
     function isWithdrawalFinalized(
-        uint256 _chainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex
+        uint256 chainId,
+        uint256 l2BatchNumber,
+        uint256 l2ToL1MessageNumber
     ) external view returns (bool);
 
     function depositLegacyErc20Bridge(
-        address _msgSender,
+        address _prevMsgSender,
         address _l2Receiver,
         address _l1Token,
         uint256 _amount,
@@ -96,7 +96,7 @@ interface IL1SharedBridge {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external returns (address l1Receiver, address l1Token, uint256 amount);
+    ) external returns (address l1Receiver, address l1Asset, uint256 amount);
 
     function finalizeWithdrawal(
         uint256 _chainId,
@@ -113,9 +113,9 @@ interface IL1SharedBridge {
 
     function legacyBridge() external view returns (IL1ERC20Bridge);
 
-    function l2BridgeAddress(uint256 _chainId) external view returns (address);
+    function l2BridgeAddress(uint256 chainId) external view returns (address);
 
-    function depositHappened(uint256 _chainId, bytes32 _l2TxHash) external view returns (bytes32);
+    function depositHappened(uint256 chainId, bytes32 l2DepositTxHash) external view returns (bytes32);
 
     /// @dev Data has the following abi encoding for legacy deposits:
     /// address _l1Token,
@@ -142,11 +142,11 @@ interface IL1SharedBridge {
 
     function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external;
 
-    function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
+    function hyperbridgingEnabled(uint256 chainId) external view returns (bool);
 
     function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external;
 
-    function assetHandlerAddress(bytes32 _assetId) external view returns (address);
+    function assetHandlerAddress(bytes32 assetId) external view returns (address);
 
     function nativeTokenVault() external view returns (IL1NativeTokenVault);
 
@@ -156,7 +156,7 @@ interface IL1SharedBridge {
         uint256 _chainId,
         address _depositSender,
         bytes32 _assetId,
-        bytes calldata _tokenData,
+        bytes calldata _assetData,
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
@@ -164,7 +164,7 @@ interface IL1SharedBridge {
         bytes32[] calldata _merkleProof
     ) external;
 
-    function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
+    function chainBalance(uint256 chainId, address l1Token) external view returns (uint256);
 
     function transferTokenToNTV(address _token) external;
 

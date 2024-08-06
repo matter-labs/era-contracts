@@ -15,5 +15,7 @@ interface ILegacyL2SharedBridge {
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external;
 
+    function getL1TokenAddress(address _l2Token) external view returns (address);
+
     function l2TokenAddress(address _l1Token) external view returns (address);
 }
