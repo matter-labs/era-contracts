@@ -63,8 +63,7 @@ contract ConsensusRegistry is Ownable2Step {
     error AttesterPubKeyAlreadyExists();
 
     modifier onlyOwnerOrNodeOwner(address _nodeOwner) {
-        address sender = _msgSender();
-        if (owner() != sender && _nodeOwner != sender) {
+        if (owner() != msg.sender && _nodeOwner != msg.sender) {
             revert UnauthorizedOnlyOwnerOrNodeOwner();
         }
         _;
