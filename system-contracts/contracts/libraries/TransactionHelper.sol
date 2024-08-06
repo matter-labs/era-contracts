@@ -11,7 +11,7 @@ import {RLPEncoder} from "./RLPEncoder.sol";
 import {EfficientCall} from "./EfficientCall.sol";
 import {UnsupportedTxType, InvalidInput, UnsupportedPaymasterFlow} from "../SystemContractErrors.sol";
 
-/// @dev The type id of zkSync's EIP-712-signed transaction.
+/// @dev The type id of ZKsync's EIP-712-signed transaction.
 uint8 constant EIP_712_TX_TYPE = 0x71;
 
 /// @dev The type id of legacy transactions.
@@ -21,7 +21,7 @@ uint8 constant EIP_2930_TX_TYPE = 0x01;
 /// @dev The type id of EIP1559 transactions.
 uint8 constant EIP_1559_TX_TYPE = 0x02;
 
-/// @notice Structure used to represent a zkSync transaction.
+/// @notice Structure used to represent a ZKsync transaction.
 struct Transaction {
     // The type of the transaction.
     uint256 txType;
@@ -114,7 +114,7 @@ library TransactionHelper {
         }
     }
 
-    /// @notice Encode hash of the zkSync native transaction type.
+    /// @notice Encode hash of the ZKsync native transaction type.
     /// @return keccak256 hash of the EIP-712 encoded representation of transaction
     function _encodeHashEIP712Transaction(Transaction calldata _transaction) private view returns (bytes32) {
         bytes32 structHash = keccak256(
@@ -223,7 +223,7 @@ library TransactionHelper {
         // Hash of EIP2930 transactions is encoded the following way:
         // H(0x01 || RLP(chain_id, nonce, gas_price, gas_limit, destination, amount, data, access_list))
         //
-        // Note, that on zkSync access lists are not supported and should always be empty.
+        // Note, that on ZKsync access lists are not supported and should always be empty.
 
         // Encode all fixed-length params to avoid "stack too deep error"
         bytes memory encodedFixedLengthParams;
@@ -261,7 +261,7 @@ library TransactionHelper {
             // Otherwise the length is not encoded at all.
         }
 
-        // On zkSync, access lists are always zero length (at least for now).
+        // On ZKsync, access lists are always zero length (at least for now).
         bytes memory encodedAccessListLength = RLPEncoder.encodeListLen(0);
 
         bytes memory encodedListLength;
@@ -295,7 +295,7 @@ library TransactionHelper {
         // Hash of EIP1559 transactions is encoded the following way:
         // H(0x02 || RLP(chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, destination, amount, data, access_list))
         //
-        // Note, that on zkSync access lists are not supported and should always be empty.
+        // Note, that on ZKsync access lists are not supported and should always be empty.
 
         // Encode all fixed-length params to avoid "stack too deep error"
         bytes memory encodedFixedLengthParams;
@@ -335,7 +335,7 @@ library TransactionHelper {
             // Otherwise the length is not encoded at all.
         }
 
-        // On zkSync, access lists are always zero length (at least for now).
+        // On ZKsync, access lists are always zero length (at least for now).
         bytes memory encodedAccessListLength = RLPEncoder.encodeListLen(0);
 
         bytes memory encodedListLength;

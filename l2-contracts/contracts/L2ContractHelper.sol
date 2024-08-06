@@ -118,7 +118,7 @@ library L2ContractHelper {
     }
 }
 
-/// @notice Structure used to represent a zkSync transaction.
+/// @notice Structure used to represent a ZKsync transaction.
 struct Transaction {
     // The type of the transaction.
     uint256 txType;
