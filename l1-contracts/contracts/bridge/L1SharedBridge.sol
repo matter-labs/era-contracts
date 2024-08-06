@@ -430,7 +430,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bool _isLegacyEncoding,
         address _prevMsgSender,
         bytes32 _assetId,
-        bytes memory _transferData
+        bytes calldata _transferData
     ) external view returns (bytes32 txDataHash) {
         if (_isLegacyEncoding) {
             (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
