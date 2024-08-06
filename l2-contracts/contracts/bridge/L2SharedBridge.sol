@@ -102,6 +102,13 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         }
     }
 
+    /// @dev Used to set the assedAddress for a given assetId.
+    /// @dev Will be used by ZK Gateway
+    function setAssetHandlerAddress(bytes32 _assetId, address _assetAddress) external onlyL1Bridge {
+        assetHandlerAddress[_assetId] = _assetAddress;
+        emit AssetHandlerRegistered(_assetId, _assetAddress);
+    }
+
     /// @notice Finalize the deposit and mint funds
     /// @param _assetId The encoding of the asset on L2
     /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken)
@@ -114,7 +121,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
             assetHandlerAddress[_assetId] = address(nativeTokenVault);
         }
 
-        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, keccak256(_transferData));
+        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, _transferData);
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -134,7 +141,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         bytes memory message = _getL1WithdrawMessage(_assetId, _bridgeMintData);
         L2ContractHelper.sendMessageToL1(message);
 
-        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, msg.sender, _assetId, keccak256(_assetData));
+        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, msg.sender, _assetId, _assetData);
     }
 
     /// @dev Encode the message for l2ToL1log sent with withdraw initialization
@@ -146,13 +153,6 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         // and we use this interface so that when the switch happened the old messages could be processed
         // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IL1SharedBridge.finalizeWithdrawal.selector, _assetId, _bridgeMintData);
-    }
-
-    /// @dev Used to set the assedAddress for a given assetId.
-    /// @dev Will be used by ZK Gateway
-    function setAssetHandlerAddress(bytes32 _assetId, address _assetAddress) external onlyL1Bridge {
-        assetHandlerAddress[_assetId] = _assetAddress;
-        emit AssetHandlerRegistered(_assetId, _assetAddress);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -167,7 +167,6 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         uint256 _amount,
         bytes calldata _data
     ) external override {
-        // onlyBridge {
         bytes32 assetId = keccak256(
             abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
         );

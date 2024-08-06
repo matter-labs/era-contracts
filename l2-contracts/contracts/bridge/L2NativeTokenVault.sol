@@ -47,20 +47,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         _disableInitializers();
     }
 
-    /// @dev Sets the Shared Bridge contract address. Should be called only once.
-    function setSharedBridge(IL2SharedBridge _sharedBridge) external onlyOwner {
-        if (address(l2Bridge) != address(0)) {
-            // "SD: shared bridge already set";
-            revert AddressMismatch(address(0), address(l2Bridge));
-        }
-        if (address(_sharedBridge) == address(0)) {
-            // "SD: shared bridge 0");
-            revert EmptyAddress();
-        }
-
-        l2Bridge = _sharedBridge;
-    }
-
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
@@ -85,6 +71,20 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         }
 
         _transferOwnership(_aliasedOwner);
+    }
+
+    /// @dev Sets the Shared Bridge contract address. Should be called only once.
+    function setSharedBridge(IL2SharedBridge _sharedBridge) external onlyOwner {
+        if (address(l2Bridge) != address(0)) {
+            // "SD: shared bridge already set";
+            revert AddressMismatch(address(0), address(l2Bridge));
+        }
+        if (address(_sharedBridge) == address(0)) {
+            // "SD: shared bridge 0");
+            revert EmptyAddress();
+        }
+
+        l2Bridge = _sharedBridge;
     }
 
     /// @notice Sets the l2TokenBeacon, called after initialize.
@@ -153,6 +153,19 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         _bridgeMintData = _data;
     }
 
+    /// @notice Calculates L2 wrapped token address corresponding to L1 token counterpart.
+    /// @param _l1Token The address of token on L1.
+    /// @return expectedToken The address of token on L2.
+    function l2TokenAddress(address _l1Token) public view override returns (address expectedToken) {
+        bytes32 expectedAssetId = keccak256(
+            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
+        );
+        expectedToken = tokenAddress[expectedAssetId];
+        if (expectedToken == address(0)) {
+            expectedToken = _calculateCreate2TokenAddress(_l1Token);
+        }
+    }
+
     /// @dev Deploy and initialize the L2 token for the L1 counterpart
     function _deployL2Token(address _l1Token, bytes memory _data) internal returns (address) {
         bytes32 salt = _getCreate2Salt(_l1Token);
@@ -197,18 +210,5 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         bytes32 salt = _getCreate2Salt(_l1Token);
         return
             L2ContractHelper.computeCreate2Address(address(this), salt, l2TokenProxyBytecodeHash, constructorInputHash);
-    }
-
-    /// @notice Calculates L2 wrapped token address corresponding to L1 token counterpart.
-    /// @param _l1Token The address of token on L1.
-    /// @return expectedToken The address of token on L2.
-    function l2TokenAddress(address _l1Token) public view override returns (address expectedToken) {
-        bytes32 expectedAssetId = keccak256(
-            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
-        );
-        expectedToken = tokenAddress[expectedAssetId];
-        if (expectedToken == address(0)) {
-            expectedToken = _calculateCreate2TokenAddress(_l1Token);
-        }
     }
 }

@@ -53,17 +53,17 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         L1_SHARED_BRIDGE = _l1SharedBridge;
     }
 
+    /// @dev Accepts ether only from the Shared Bridge.
+    receive() external payable {
+        require(address(L1_SHARED_BRIDGE) == msg.sender, "NTV: ETH only accepted from Shared Bridge");
+    }
+
     /// @dev Initializes a contract for later use. Expected to be used in the proxy
     /// @param _owner Address which can change pause / unpause the NTV
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
     function initialize(address _owner) external initializer {
         require(_owner != address(0), "NTV owner 0");
         _transferOwnership(_owner);
-    }
-
-    /// @dev Accepts ether only from the Shared Bridge.
-    receive() external payable {
-        require(address(L1_SHARED_BRIDGE) == msg.sender, "NTV: ETH only accepted from Shared Bridge");
     }
 
     /// @dev Transfer tokens from shared bridge as part of migration process.
@@ -102,6 +102,35 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         bytes32 assetId = DataEncoding.encodeNTVAssetId(_l1Token);
         L1_SHARED_BRIDGE.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_l1Token))), address(this));
         tokenAddress[assetId] = _l1Token;
+    }
+
+    ///  @inheritdoc IL1AssetHandler
+    function bridgeMint(
+        uint256 _chainId,
+        bytes32 _assetId,
+        bytes calldata _data
+    ) external payable override onlyBridge whenNotPaused returns (address l1Receiver) {
+        // here we are minting the tokens after the bridgeBurn has happened on an L2, so we can assume the l1Token is not zero
+        address l1Token = tokenAddress[_assetId];
+        uint256 amount;
+        (amount, l1Receiver) = abi.decode(_data, (uint256, address));
+        // Check that the chain has sufficient balance
+        require(chainBalance[_chainId][l1Token] >= amount, "NTV: not enough funds"); // not enough funds
+        chainBalance[_chainId][l1Token] -= amount;
+
+        if (l1Token == ETH_TOKEN_ADDRESS) {
+            bool callSuccess;
+            // Low-level assembly call, to avoid any memory copying (save gas)
+            assembly {
+                callSuccess := call(gas(), l1Receiver, amount, 0, 0, 0, 0)
+            }
+            require(callSuccess, "NTV: withdrawal failed, no funds or cannot transfer to receiver");
+        } else {
+            // Withdraw funds
+            IERC20(l1Token).safeTransfer(l1Receiver, amount);
+        }
+        // solhint-disable-next-line func-named-parameters
+        emit BridgeMint(_chainId, _assetId, l1Receiver, amount);
     }
 
     /// @inheritdoc IL1AssetHandler
@@ -151,59 +180,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _l2Receiver, amount);
     }
 
-    /// @dev Transfers tokens from the depositor address to the smart contract address.
-    /// @return The difference between the contract balance before and after the transferring of funds.
-    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
-        uint256 balanceBefore = _token.balanceOf(address(this));
-        address from = _from;
-        // in the legacy scenario the SharedBridge was granting the allowance, we have to transfer from them instead of the user
-        if (
-            _token.allowance(address(L1_SHARED_BRIDGE), address(this)) >= _amount &&
-            _token.allowance(_from, address(this)) < _amount
-        ) {
-            from = address(L1_SHARED_BRIDGE);
-        }
-        // slither-disable-next-line arbitrary-send-erc20
-        _token.safeTransferFrom(from, address(this), _amount);
-        uint256 balanceAfter = _token.balanceOf(address(this));
-
-        return balanceAfter - balanceBefore;
-    }
-
-    /// @dev Receives and parses (name, symbol, decimals) from the token contract
-    function getERC20Getters(address _token) public view returns (bytes memory) {
-        return BridgeHelper.getERC20Getters(_token, ETH_TOKEN_ADDRESS);
-    }
-
-    ///  @inheritdoc IL1AssetHandler
-    function bridgeMint(
-        uint256 _chainId,
-        bytes32 _assetId,
-        bytes calldata _data
-    ) external payable override onlyBridge whenNotPaused returns (address l1Receiver) {
-        // here we are minting the tokens after the bridgeBurn has happened on an L2, so we can assume the l1Token is not zero
-        address l1Token = tokenAddress[_assetId];
-        uint256 amount;
-        (amount, l1Receiver) = abi.decode(_data, (uint256, address));
-        // Check that the chain has sufficient balance
-        require(chainBalance[_chainId][l1Token] >= amount, "NTV: not enough funds"); // not enough funds
-        chainBalance[_chainId][l1Token] -= amount;
-
-        if (l1Token == ETH_TOKEN_ADDRESS) {
-            bool callSuccess;
-            // Low-level assembly call, to avoid any memory copying (save gas)
-            assembly {
-                callSuccess := call(gas(), l1Receiver, amount, 0, 0, 0, 0)
-            }
-            require(callSuccess, "NTV: withdrawal failed, no funds or cannot transfer to receiver");
-        } else {
-            // Withdraw funds
-            IERC20(l1Token).safeTransfer(l1Receiver, amount);
-        }
-        // solhint-disable-next-line func-named-parameters
-        emit BridgeMint(_chainId, _assetId, l1Receiver, amount);
-    }
-
     ///  @inheritdoc IL1AssetHandler
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
@@ -231,6 +207,30 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
             // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.
             // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
         }
+    }
+
+    /// @dev Receives and parses (name, symbol, decimals) from the token contract
+    function getERC20Getters(address _token) public view returns (bytes memory) {
+        return BridgeHelper.getERC20Getters(_token, ETH_TOKEN_ADDRESS);
+    }
+
+    /// @dev Transfers tokens from the depositor address to the smart contract address.
+    /// @return The difference between the contract balance before and after the transferring of funds.
+    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
+        uint256 balanceBefore = _token.balanceOf(address(this));
+        address from = _from;
+        // in the legacy scenario the SharedBridge was granting the allowance, we have to transfer from them instead of the user
+        if (
+            _token.allowance(address(L1_SHARED_BRIDGE), address(this)) >= _amount &&
+            _token.allowance(_from, address(this)) < _amount
+        ) {
+            from = address(L1_SHARED_BRIDGE);
+        }
+        // slither-disable-next-line arbitrary-send-erc20
+        _token.safeTransferFrom(from, address(this), _amount);
+        uint256 balanceAfter = _token.balanceOf(address(this));
+
+        return balanceAfter - balanceBefore;
     }
 
     /*//////////////////////////////////////////////////////////////

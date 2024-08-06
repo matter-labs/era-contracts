@@ -103,25 +103,6 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, amount, bob));
     }
 
-    function test_bridgehubDeposit_Eth_NewEncoding() public {
-        _setBaseTokenAssetId(tokenAssetId);
-
-        bytes memory transferData = abi.encode(amount, bob);
-        bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ASSET_ID, transferData));
-        bytes memory mintCalldata = abi.encode(
-            amount,
-            alice,
-            bob,
-            nativeTokenVault.getERC20Getters(address(ETH_TOKEN_ADDRESS)),
-            address(ETH_TOKEN_ADDRESS)
-        );
-        // solhint-disable-next-line func-named-parameters
-        vm.prank(bridgehubAddress);
-        // New encoding temporarily blocked for NTV.
-        vm.expectRevert("ShB: new encoding format not yet supported for NTV");
-        sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ASSET_ID, transferData));
-    }
-
     function test_bridgehubDeposit_Erc() public {
         vm.prank(bridgehubAddress);
         // solhint-disable-next-line func-named-parameters

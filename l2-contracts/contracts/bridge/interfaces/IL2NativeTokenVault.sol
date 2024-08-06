@@ -22,7 +22,7 @@ interface IL2NativeTokenVault is IL2AssetHandler {
         uint256 amount
     );
 
-    event L2TokenBeaconUpdated(address l2TokenBeacon, bytes32 l2TokenProxyBytecodeHash);
+    event L2TokenBeaconUpdated(address indexed l2TokenBeacon, bytes32 indexed l2TokenProxyBytecodeHash);
 
     function l2Bridge() external view returns (IL2SharedBridge);
 
