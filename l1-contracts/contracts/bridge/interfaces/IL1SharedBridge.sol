@@ -168,5 +168,5 @@ interface IL1SharedBridge {
 
     function transferTokenToNTV(address _token) external;
 
-    function transferBalanceToNTV(uint256 _chainId, address _token) external;
+    function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external;
 }

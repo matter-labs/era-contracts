@@ -87,10 +87,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     /// @dev Set chain token balance as part of migration process.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     /// @param _targetChainId The chain ID of the corresponding ZK chain.
-    function transferBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
+    function updateChainBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
         uint256 sharedBridgeChainBalance = L1_SHARED_BRIDGE.chainBalance(_targetChainId, _token);
         chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + sharedBridgeChainBalance;
-        L1_SHARED_BRIDGE.transferBalanceToNTV(_targetChainId, _token);
+        L1_SHARED_BRIDGE.nullifyChainBalanceByNTV(_targetChainId, _token);
     }
 
     /// @dev We want to be able to bridge native tokens automatically, this means registering them on the fly

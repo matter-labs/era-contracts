@@ -192,7 +192,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev transfer balance to native token vault as part of upgrade
-    function transferBalanceToNTV(uint256 _chainId, address _token) external {
+    function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external {
         require(msg.sender == address(nativeTokenVault), "ShB: not NTV");
         chainBalance[_chainId][_token] = 0;
     }
@@ -239,14 +239,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient,
         bytes32 _assetId,
-        address _assetAddressOnCounterPart
+        address _assetHandlerAddressOnCounterPart
     ) external payable returns (bytes32 l2TxHash) {
         require(msg.sender == assetDeploymentTracker[_assetId] || msg.sender == owner(), "ShB: only ADT or owner");
         require(l2BridgeAddress[_chainId] != address(0), "ShB: chain governance not initialized");
 
         bytes memory l2Calldata = abi.encodeCall(
             IL2Bridge.setAssetHandlerAddress,
-            (_assetId, _assetAddressOnCounterPart)
+            (_assetId, _assetHandlerAddressOnCounterPart)
         );
 
         L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
