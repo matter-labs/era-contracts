@@ -49,6 +49,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
     mapping(uint256 chainId => bytes32) public baseTokenAssetId;
 
+    modifier onlyOwnerOrAdmin() {
+        require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
+        _;
+    }
+
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(ETH_TOKEN_ADDRESS);
@@ -57,11 +62,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice used to initialize the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
-    }
-
-    modifier onlyOwnerOrAdmin() {
-        require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
-        _;
     }
 
     /// @inheritdoc IBridgehub
@@ -87,14 +87,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         emit NewPendingAdmin(currentPendingAdmin, address(0));
         emit NewAdmin(previousAdmin, currentPendingAdmin);
     }
-
-    ///// Getters
-
-    /// @notice return the state transition chain contract for a chainId
-    function getHyperchain(uint256 _chainId) public view returns (address) {
-        return IStateTransitionManager(stateTransitionManager[_chainId]).getHyperchain(_chainId);
-    }
-
     //// Registry
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
@@ -179,84 +171,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     //// Mailbox forwarder
-
-    /// @notice forwards function call to Mailbox based on ChainId
-    /// @param _chainId The chain ID of the hyperchain where to prove L2 message inclusion.
-    /// @param _batchNumber The executed L2 batch number in which the message appeared
-    /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _message Information about the sent message: sender address, the message itself, tx index in the L2 batch where the message was sent
-    /// @param _proof Merkle proof for inclusion of L2 log that was sent with the message
-    /// @return Whether the proof is valid
-    function proveL2MessageInclusion(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        uint256 _index,
-        L2Message calldata _message,
-        bytes32[] calldata _proof
-    ) external view override returns (bool) {
-        address hyperchain = getHyperchain(_chainId);
-        return IZkSyncHyperchain(hyperchain).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
-    }
-
-    /// @notice forwards function call to Mailbox based on ChainId
-    /// @param _chainId The chain ID of the hyperchain where to prove L2 log inclusion.
-    /// @param _batchNumber The executed L2 batch number in which the log appeared
-    /// @param _index The position of the l2log in the L2 logs Merkle tree
-    /// @param _log Information about the sent log
-    /// @param _proof Merkle proof for inclusion of the L2 log
-    /// @return Whether the proof is correct and L2 log is included in batch
-    function proveL2LogInclusion(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        uint256 _index,
-        L2Log calldata _log,
-        bytes32[] calldata _proof
-    ) external view override returns (bool) {
-        address hyperchain = getHyperchain(_chainId);
-        return IZkSyncHyperchain(hyperchain).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
-    }
-
-    /// @notice forwards function call to Mailbox based on ChainId
-    /// @param _chainId The chain ID of the hyperchain where to prove L1->L2 tx status.
-    /// @param _l2TxHash The L2 canonical transaction hash
-    /// @param _l2BatchNumber The L2 batch number where the transaction was processed
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
-    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction
-    /// @param _status The execution status of the L1 -> L2 transaction (true - success & 0 - fail)
-    /// @return Whether the proof is correct and the transaction was actually executed with provided status
-    /// NOTE: It may return `false` for incorrect proof, but it doesn't mean that the L1 -> L2 transaction has an opposite status!
-    function proveL1ToL2TransactionStatus(
-        uint256 _chainId,
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof,
-        TxStatus _status
-    ) external view override returns (bool) {
-        address hyperchain = getHyperchain(_chainId);
-        return
-            IZkSyncHyperchain(hyperchain).proveL1ToL2TransactionStatus({
-                _l2TxHash: _l2TxHash,
-                _l2BatchNumber: _l2BatchNumber,
-                _l2MessageIndex: _l2MessageIndex,
-                _l2TxNumberInBatch: _l2TxNumberInBatch,
-                _merkleProof: _merkleProof,
-                _status: _status
-            });
-    }
-
-    /// @notice forwards function call to Mailbox based on ChainId
-    function l2TransactionBaseCost(
-        uint256 _chainId,
-        uint256 _gasPrice,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit
-    ) external view returns (uint256) {
-        address hyperchain = getHyperchain(_chainId);
-        return IZkSyncHyperchain(hyperchain).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
-    }
 
     /// @notice the mailbox is called directly after the sharedBridge received the deposit
     /// this assumes that either ether is the base token or
@@ -374,6 +288,91 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             outputRequest.txDataHash,
             canonicalTxHash
         );
+    }
+
+    /// @notice forwards function call to Mailbox based on ChainId
+    /// @param _chainId The chain ID of the hyperchain where to prove L2 message inclusion.
+    /// @param _batchNumber The executed L2 batch number in which the message appeared
+    /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _message Information about the sent message: sender address, the message itself, tx index in the L2 batch where the message was sent
+    /// @param _proof Merkle proof for inclusion of L2 log that was sent with the message
+    /// @return Whether the proof is valid
+    function proveL2MessageInclusion(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        uint256 _index,
+        L2Message calldata _message,
+        bytes32[] calldata _proof
+    ) external view override returns (bool) {
+        address hyperchain = getHyperchain(_chainId);
+        return IZkSyncHyperchain(hyperchain).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
+    }
+
+    /// @notice forwards function call to Mailbox based on ChainId
+    /// @param _chainId The chain ID of the hyperchain where to prove L2 log inclusion.
+    /// @param _batchNumber The executed L2 batch number in which the log appeared
+    /// @param _index The position of the l2log in the L2 logs Merkle tree
+    /// @param _log Information about the sent log
+    /// @param _proof Merkle proof for inclusion of the L2 log
+    /// @return Whether the proof is correct and L2 log is included in batch
+    function proveL2LogInclusion(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        uint256 _index,
+        L2Log calldata _log,
+        bytes32[] calldata _proof
+    ) external view override returns (bool) {
+        address hyperchain = getHyperchain(_chainId);
+        return IZkSyncHyperchain(hyperchain).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
+    }
+
+    /// @notice forwards function call to Mailbox based on ChainId
+    /// @param _chainId The chain ID of the hyperchain where to prove L1->L2 tx status.
+    /// @param _l2TxHash The L2 canonical transaction hash
+    /// @param _l2BatchNumber The L2 batch number where the transaction was processed
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
+    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction
+    /// @param _status The execution status of the L1 -> L2 transaction (true - success & 0 - fail)
+    /// @return Whether the proof is correct and the transaction was actually executed with provided status
+    /// NOTE: It may return `false` for incorrect proof, but it doesn't mean that the L1 -> L2 transaction has an opposite status!
+    function proveL1ToL2TransactionStatus(
+        uint256 _chainId,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof,
+        TxStatus _status
+    ) external view override returns (bool) {
+        address hyperchain = getHyperchain(_chainId);
+        return
+            IZkSyncHyperchain(hyperchain).proveL1ToL2TransactionStatus({
+                _l2TxHash: _l2TxHash,
+                _l2BatchNumber: _l2BatchNumber,
+                _l2MessageIndex: _l2MessageIndex,
+                _l2TxNumberInBatch: _l2TxNumberInBatch,
+                _merkleProof: _merkleProof,
+                _status: _status
+            });
+    }
+
+    /// @notice forwards function call to Mailbox based on ChainId
+    function l2TransactionBaseCost(
+        uint256 _chainId,
+        uint256 _gasPrice,
+        uint256 _l2GasLimit,
+        uint256 _l2GasPerPubdataByteLimit
+    ) external view returns (uint256) {
+        address hyperchain = getHyperchain(_chainId);
+        return IZkSyncHyperchain(hyperchain).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
+    }
+
+    ///// Getters
+
+    /// @notice return the state transition chain contract for a chainId
+    function getHyperchain(uint256 _chainId) public view returns (address) {
+        return IStateTransitionManager(stateTransitionManager[_chainId]).getHyperchain(_chainId);
     }
 
     /*//////////////////////////////////////////////////////////////
