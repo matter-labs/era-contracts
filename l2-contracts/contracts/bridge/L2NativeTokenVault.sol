@@ -153,12 +153,17 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         _bridgeMintData = _data;
     }
 
-    /// @return Address of an L2 token counterpart
-    function l2TokenAddress(address _l1Token) public view override returns (address) {
-        bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
-        bytes32 salt = _getCreate2Salt(_l1Token);
-        return
-            L2ContractHelper.computeCreate2Address(address(this), salt, l2TokenProxyBytecodeHash, constructorInputHash);
+    /// @notice Calculates L2 wrapped token address corresponding to L1 token counterpart.
+    /// @param _l1Token The address of token on L1.
+    /// @return expectedToken The address of token on L2.
+    function l2TokenAddress(address _l1Token) public view override returns (address expectedToken) {
+        bytes32 expectedAssetId = keccak256(
+            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
+        );
+        expectedToken = tokenAddress[expectedAssetId];
+        if (expectedToken == address(0)) {
+            expectedToken = _calculateCreate2TokenAddress(_l1Token);
+        }
     }
 
     /// @dev Deploy and initialize the L2 token for the L1 counterpart
@@ -205,18 +210,5 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         bytes32 salt = _getCreate2Salt(_l1Token);
         return
             L2ContractHelper.computeCreate2Address(address(this), salt, l2TokenProxyBytecodeHash, constructorInputHash);
-    }
-
-    /// @notice Calculates L2 wrapped token address corresponding to L1 token counterpart.
-    /// @param _l1Token The address of token on L1.
-    /// @return expectedToken The address of token on L2.
-    function l2TokenAddress(address _l1Token) public view override returns (address expectedToken) {
-        bytes32 expectedAssetId = keccak256(
-            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
-        );
-        expectedToken = tokenAddress[expectedAssetId];
-        if (expectedToken == address(0)) {
-            expectedToken = _calculateCreate2TokenAddress(_l1Token);
-        }
     }
 }
