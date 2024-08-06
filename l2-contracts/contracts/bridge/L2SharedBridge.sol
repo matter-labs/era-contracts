@@ -135,7 +135,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
             _mintValue: 0,
             _assetId: _assetId,
             _prevMsgSender: msg.sender,
-            _transferData: _transferData
+            _data: _assetData
         });
 
         bytes memory message = _getL1WithdrawMessage(_assetId, _l1bridgeMintData);
@@ -167,13 +167,13 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @param _l2Receiver The address of token receiver on L2.
     /// @param _l1Token The address of the token transferred.
     /// @param _amount The amount of the token transferred.
-    /// @param erc20Data The ERC20 metadata of the token transferred.
+    /// @param _data The metadata of the token transferred.
     function finalizeDeposit(
         address _l1Sender,
         address _l2Receiver,
         address _l1Token,
         uint256 _amount,
-        bytes calldata erc20Data
+        bytes calldata _data
     ) external override {
         bytes32 assetId = keccak256(
             abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))

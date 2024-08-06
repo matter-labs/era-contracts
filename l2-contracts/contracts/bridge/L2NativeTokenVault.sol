@@ -100,7 +100,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @notice Used when the chain receives a transfer from L1 Shared Bridge and correspondingly mints the asset.
     /// @param _chainId The chainId that the message is from.
     /// @param _assetId The assetId of the asset being bridged.
-    /// @param _transferData The abi.encoded transfer data.
+    /// @param _data The abi.encoded transfer data.
     function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable override onlyBridge {
         address token = tokenAddress[_assetId];
         (
@@ -136,21 +136,21 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     }
 
     /// @notice Burns wrapped tokens and returns the calldata for L2 -> L1 message.
-    /// @dev In case of native token vault _transferData is the tuple of _depositAmount and _l2Receiver.
+    /// @dev In case of native token vault _data is the tuple of _depositAmount and _l2Receiver.
     /// @param _chainId The chainId that the message will be sent to.
     /// @param _mintValue The L1 base token value bridged.
     /// @param _assetId The L2 assetId of the asset being bridged.
     /// @param _prevMsgSender The original caller of the shared bridge.
-    /// @param _transferData The abi.encoded transfer data.
+    /// @param _data The abi.encoded transfer data.
     /// @return l1BridgeMintData The calldata used by l1 asset handler to unlock tokens for recipient.
     function bridgeBurn(
         uint256 _chainId,
         uint256 _mintValue,
         bytes32 _assetId,
         address _prevMsgSender,
-        bytes calldata _transferData
+        bytes calldata _data
     ) external payable override onlyBridge returns (bytes memory l1BridgeMintData) {
-        (uint256 _amount, address _l1Receiver) = abi.decode(_transferData, (uint256, address));
+        (uint256 _amount, address _l1Receiver) = abi.decode(_data, (uint256, address));
         if (_amount == 0) {
             // "Amount cannot be zero");
             revert AmountMustBeGreaterThanZero();
@@ -163,7 +163,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         emit WithdrawalInitiated(_prevMsgSender, _l1Receiver, l2Token, _amount);
         // solhint-disable-next-line func-named-parameters
         emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _l1Receiver, _mintValue, _amount);
-        l1BridgeMintData = _transferData;
+        l1BridgeMintData = _data;
     }
 
     /// @notice Calculates L2 wrapped token address corresponding to L1 token counterpart.

@@ -29,6 +29,6 @@ interface IL2AssetHandler {
         uint256 _mintValue,
         bytes32 _assetId,
         address _prevMsgSender,
-        bytes calldata _transferData
+        bytes calldata _data
     ) external payable returns (bytes memory _l1BridgeMintData);
 }
