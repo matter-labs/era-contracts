@@ -264,8 +264,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction.
     /// @param _refundRecipient The address on L2 that will receive the refund for the transaction.
     /// @param _assetId The encoding of asset ID.
-    /// @param _assetAddressOnCounterPart The address of the asset handler, which will hold the token of interest.
-    /// @return l2TxHash The L2 transaction hash of setting asset handler on remote chain.
+    /// @param _assetHandlerAddressOnCounterPart The address of the asset handler, which will hold the token of interest.
+    /// @return txHash The L2 transaction hash of setting asset handler on remote chain.
     function setAssetHandlerAddressOnCounterPart(
         uint256 _chainId,
         uint256 _mintValue,
@@ -363,7 +363,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
         require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, "ShB: baseToken deposit not supported");
 
-        bytes memory l2BridgeMintCalldata = _burn({
+        bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
             _l2Value: _l2Value,
             _assetId: assetId,
@@ -377,7 +377,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _chainId: _chainId,
             _prevMsgSender: _prevMsgSender,
             _assetId: assetId,
-            _l2BridgeMintCalldata: l2BridgeMintCalldata,
+            _bridgeMintCalldata: bridgeMintCalldata,
             _txDataHash: txDataHash
         });
 
@@ -386,7 +386,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             txDataHash: txDataHash,
             from: _prevMsgSender,
             assetId: assetId,
-            l2BridgeMintCalldata: l2BridgeMintCalldata
+            bridgeMintCalldata: bridgeMintCalldata
         });
     }
 
@@ -464,7 +464,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _chainId,
         address _depositSender,
         bytes32 _assetId,
-        bytes memory _transferData,
+        bytes memory _assetData,
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
@@ -505,7 +505,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _assetData
         );
 
-        emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetId, _transferData);
+        emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetId, _assetData);
     }
 
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
@@ -863,7 +863,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _chainId: _chainId,
             _depositSender: _depositSender,
             _assetId: assetId,
-            _transferData: transferData,
+            _assetData: transferData,
             _l2TxHash: _l2TxHash,
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
@@ -914,7 +914,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(_l1Token != L1_WETH_TOKEN, "ShB: WETH deposit not supported 2");
 
         bytes32 _assetId;
-        bytes memory l2BridgeMintCalldata;
+        bytes memory bridgeMintCalldata;
 
         {
             // Inner call to encode data to decrease local var numbers
@@ -934,7 +934,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
 
         {
-            bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _assetId, l2BridgeMintCalldata);
+            bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _assetId, bridgeMintCalldata);
 
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
             // Otherwise, the refund will be sent to the specified address.
