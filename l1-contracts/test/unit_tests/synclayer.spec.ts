@@ -55,6 +55,8 @@ describe("Synclayer", function () {
     await owner.sendTransaction(tx);
 
     migratingDeployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, []);
+    // We will use the chain admin as the admin to be closer to the production environment
+    await migratingDeployer.transferAdminFromDeployerToChainAdmin();
 
     chainId = migratingDeployer.chainId;
 
