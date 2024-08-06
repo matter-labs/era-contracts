@@ -275,8 +275,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         address _prevMsgSender,
         uint256 _amount
     ) external payable virtual onlyBridgehubOrEra(_chainId) whenNotPaused {
-        (address l1AssetHandler, bytes32 assetId) = _getAssetProperties(_assetId);
-        _transferAllowanceToNTV(assetId, _amount, _prevMsgSender);
+        address l1AssetHandler = assetHandlerAddress[_assetId];
+        require(l1AssetHandler != address(0), "ShB: asset handler not set");
+
+        _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
         // slither-disable-next-line unused-return
         IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
@@ -288,22 +290,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
         emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _assetId, _amount);
-    }
-
-    /// @notice Returns the address of asset handler and parsed assetId, if padded token address was passed
-    /// @dev For backwards compatibility we pad the l1Token to become a bytes32 assetId.
-    /// @dev We deal with this case here. We also register the asset.
-    /// @param _assetId bytes32 encoding of asset Id or padded address of the token
-    function _getAssetProperties(bytes32 _assetId) internal returns (address l1AssetHandler, bytes32 assetId) {
-        // Check if the passed id is the address and assume NTV for the case
-        assetId = uint256(_assetId) <= type(uint160).max ? DataEncoding.encodeNTVAssetId(_assetId) : _assetId;
-        l1AssetHandler = assetHandlerAddress[_assetId];
-        // Check if no asset handler is set
-        if (l1AssetHandler == address(0)) {
-            require(uint256(_assetId) <= type(uint160).max, "ShB: only address can be registered");
-            l1AssetHandler = address(nativeTokenVault);
-            nativeTokenVault.registerToken(address(uint160(uint256(_assetId))));
-        }
     }
 
     /// @notice Decodes the transfer input for legacy data and transfers allowance to NTV
