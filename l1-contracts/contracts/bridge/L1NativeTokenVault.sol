@@ -66,7 +66,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         _transferOwnership(_owner);
     }
 
-    /// @dev Transfer tokens from shared bridge as part of migration process.
+    /// @notice Transfers tokens from shared bridge as part of the migration process.
+    /// @dev Both ETH and ERC20 tokens can be transferred. Exhausts balance of shared bridge after the first call.
+    /// @dev Calling second time for the same token will revert.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     function transferFundsFromSharedBridge(address _token) external {
         if (_token == ETH_TOKEN_ADDRESS) {
@@ -84,7 +86,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         }
     }
 
-    /// @dev Set chain token balance as part of migration process.
+    /// @notice Updates chain token balance within NTV to account for tokens transferred from the shared bridge (part of the migration process).
+    /// @dev Clears chain balance on the shared bridge after the first call. Subsequent calls will not affect the state.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     /// @param _targetChainId The chain ID of the corresponding ZK chain.
     function updateChainBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
@@ -93,7 +96,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         L1_SHARED_BRIDGE.nullifyChainBalanceByNTV(_targetChainId, _token);
     }
 
-    /// @dev We want to be able to bridge native tokens automatically, this means registering them on the fly
+    /// @notice Registers tokens within the NTV.
+    /// @dev The goal was to allow bridging L1 native tokens automatically, by registering them on the fly.
     /// @notice Allows the bridge to register a token address for the vault.
     /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
     function registerToken(address _l1Token) external {
@@ -135,7 +139,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
 
     /// @inheritdoc IL1AssetHandler
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
-    /// @dev here _data is the _depositAmount and the _l2Receiver
+    /// @dev In case of native token vault _data is the tuple of _depositAmount and _l2Receiver.
     function bridgeBurn(
         uint256 _chainId,
         uint256,

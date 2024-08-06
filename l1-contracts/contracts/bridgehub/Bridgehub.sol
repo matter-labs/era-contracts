@@ -180,6 +180,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+        // Note: If the hyperchain with corresponding `chainId` is not yet created,
+        // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
         {
             bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
             if (tokenAssetId == ETH_TOKEN_ASSET_ID) {

@@ -42,10 +42,10 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// This is non-zero only on Era, and should not be renamed for backward compatibility with the SDKs.
     address public override l1Bridge;
 
-    /// @dev Chain ID of Era for legacy reasons
+    /// @dev Chain ID of Era for legacy reasons.
     uint256 public immutable ERA_CHAIN_ID;
 
-    /// @dev Chain ID of L1 for bridging reasons
+    /// @dev Chain ID of L1 for bridging reasons.
     uint256 public immutable L1_CHAIN_ID;
 
     /// @dev The contract responsible for handling tokens native to a single chain.
@@ -130,29 +130,31 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @param _assetData The data that is passed to the asset handler contract
     function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
         address assetHandler = assetHandlerAddress[_assetId];
-        bytes memory _bridgeMintData = IL2AssetHandler(assetHandler).bridgeBurn({
+        bytes memory _l1bridgeMintData = IL2AssetHandler(assetHandler).bridgeBurn({
             _chainId: L1_CHAIN_ID,
             _mintValue: 0,
             _assetId: _assetId,
             _prevMsgSender: msg.sender,
-            _data: _assetData
+            _transferData: _transferData
         });
 
-        bytes memory message = _getL1WithdrawMessage(_assetId, _bridgeMintData);
+        bytes memory message = _getL1WithdrawMessage(_assetId, _l1bridgeMintData);
         L2ContractHelper.sendMessageToL1(message);
 
         emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, msg.sender, _assetId, _assetData);
     }
 
-    /// @dev Encode the message for l2ToL1log sent with withdraw initialization
+    /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
+    /// @param _assetId The encoding of the asset on L2 which is withdrawn.
+    /// @param _l1bridgeMintData The calldata used by l1 asset handler to unlock tokens for recipient.
     function _getL1WithdrawMessage(
         bytes32 _assetId,
-        bytes memory _bridgeMintData
+        bytes memory _l1bridgeMintData
     ) internal pure returns (bytes memory) {
         // note we use the IL1SharedBridge.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
         // and we use this interface so that when the switch happened the old messages could be processed
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IL1SharedBridge.finalizeWithdrawal.selector, _assetId, _bridgeMintData);
+        return abi.encodePacked(IL1SharedBridge.finalizeWithdrawal.selector, _assetId, _l1bridgeMintData);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -160,12 +162,18 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Legacy finalizeDeposit.
+    /// @dev Finalizes the deposit and mint funds.
+    /// @param _l1Sender The address of token sender on L1.
+    /// @param _l2Receiver The address of token receiver on L2.
+    /// @param _l1Token The address of the token transferred.
+    /// @param _amount The amount of the token transferred.
+    /// @param erc20Data The ERC20 metadata of the token transferred.
     function finalizeDeposit(
         address _l1Sender,
         address _l2Receiver,
         address _l1Token,
         uint256 _amount,
-        bytes calldata _data
+        bytes calldata erc20Data
     ) external override {
         bytes32 assetId = keccak256(
             abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
@@ -175,20 +183,22 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         finalizeDeposit(assetId, data);
     }
 
-    /// @notice Legacy withdraw.
+    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
+    /// where tokens would be unlocked.
+    /// @param _l1Receiver The address of token receiver on L1.
+    /// @param _l2Token The address of the token transferred.
+    /// @param _amount The amount of the token transferred.
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
         bytes32 assetId = keccak256(
-            abi.encode(
-                L1_CHAIN_ID,
-                NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS,
-                bytes32(uint256(uint160(getL1TokenAddress(_l2Token))))
-            )
+            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, getL1TokenAddress(_l2Token))
         );
         bytes memory data = abi.encode(_amount, _l1Receiver);
         withdraw(assetId, data);
     }
 
     /// @notice Legacy getL1TokenAddress.
+    /// @param _l2Token The address of token on L2.
+    /// @return The address of token on L1.
     function getL1TokenAddress(address _l2Token) public view returns (address) {
         return IL2StandardToken(_l2Token).l1Address();
     }
@@ -197,6 +207,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @notice address corresponding to provided L1 token address and deployed through NTV.
     /// @dev However, the shared bridge can use custom asset handlers such that L2 addresses differ,
     /// @dev or an L1 token may not have an L2 counterpart.
+    /// @param _l1Token The address of token on L1.
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view returns (address) {
         return nativeTokenVault.l2TokenAddress(_l1Token);

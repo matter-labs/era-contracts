@@ -9,7 +9,7 @@ For clarity, we only developed a framework, the exact logic for custom tokens an
 
 ### Major changes
 
-In order to achieve it, we separated the liquidity managing logic from the Shared Bridges to `Asset Handlers`. The basic cases will be handled by `Native Token Vaults`, which are handling all of the standard `ERC20 tokens`, as well as `ETH`.
+In order to achieve it, we separated the liquidity managing logic from the Shared Bridge to `Asset Handlers`. The basic cases will be handled by `Native Token Vaults`, which are handling all of the standard `ERC20 tokens`, as well as `ETH`.
 
 ### New concepts
 
