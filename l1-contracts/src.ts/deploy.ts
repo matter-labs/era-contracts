@@ -37,7 +37,7 @@ import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory"
 import type { FacetCut } from "./diamondCut";
 import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
-import { ERC20Factory } from "../typechain";
+import { ChainAdminFactory, ERC20Factory } from "../typechain";
 import type { Contract, Overrides } from "@ethersproject/contracts";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
@@ -188,6 +188,20 @@ export class Deployer {
     }
 
     this.addresses.Governance = contractAddress;
+  }
+
+  public async deployChainAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2(
+      "ChainAdmin",
+      [this.ownerAddress, ethers.constants.AddressZero],
+      create2Salt,
+      ethTxOptions
+    );
+    if (this.verbose) {
+      console.log(`CONTRACTS_CHAIN_ADMIN_ADDR=${contractAddress}`);
+    }
+    this.addresses.ChainAdmin = contractAddress;
   }
 
   public async deployBridgehubImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -798,17 +812,29 @@ export class Deployer {
     }
   }
 
-  public async transferAdminFromDeployerToGovernance() {
+  public async transferAdminFromDeployerToChainAdmin() {
     const stm = this.stateTransitionManagerContract(this.deployWallet);
     const diamondProxyAddress = await stm.getHyperchain(this.chainId);
     const hyperchain = IZkSyncHyperchainFactory.connect(diamondProxyAddress, this.deployWallet);
 
-    const receipt = await (await hyperchain.setPendingAdmin(this.addresses.Governance)).wait();
+    const receipt = await (await hyperchain.setPendingAdmin(this.addresses.ChainAdmin)).wait();
     if (this.verbose) {
-      console.log(`Governance set as pending admin, gas used: ${receipt.gasUsed.toString()}`);
+      console.log(`ChainAdmin set as pending admin, gas used: ${receipt.gasUsed.toString()}`);
     }
 
-    await this.executeUpgrade(hyperchain.address, 0, hyperchain.interface.encodeFunctionData("acceptAdmin"), false);
+    const acceptAdminData = hyperchain.interface.encodeFunctionData("acceptAdmin");
+    const chainAdmin = ChainAdminFactory.connect(this.addresses.ChainAdmin, this.deployWallet);
+    const multicallTx = await chainAdmin.multicall(
+      [
+        {
+          target: hyperchain.address,
+          value: 0,
+          data: acceptAdminData,
+        },
+      ],
+      true
+    );
+    await multicallTx.wait();
 
     if (this.verbose) {
       console.log("Pending admin successfully accepted");
