@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Contracts v4.4.1 (token/ERC20/extensions/IERC20Permit.sol)
 // We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.0;
 
 /**
  * @dev Interface of the ERC20 Permit extension allowing approvals to be made via signatures, as defined in

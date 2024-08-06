@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Contracts (last updated v4.8.0) (utils/Address.sol)
 // We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.1;
 
 /**
  * @dev Collection of functions related to the address type

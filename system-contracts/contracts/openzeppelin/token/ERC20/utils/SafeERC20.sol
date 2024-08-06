@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Contracts (last updated v4.8.0) (token/ERC20/utils/SafeERC20.sol)
 // We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.0;
 
 import {IERC20} from "../IERC20.sol";
 import {IERC20Permit} from "../extensions/IERC20Permit.sol";
