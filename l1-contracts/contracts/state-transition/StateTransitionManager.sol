@@ -242,6 +242,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
+        emit NewUpgradeCutData(_newProtocolVersion, _cutData);
     }
 
     /// @dev check that the protocolVersion is active

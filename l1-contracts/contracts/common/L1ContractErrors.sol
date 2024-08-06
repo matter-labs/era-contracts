@@ -149,6 +149,8 @@ error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 error MsgValueTooLow(uint256 required, uint256 provided);
 // 0x72ea85ad
 error NewProtocolMajorVersionNotZero();
+// 0x79cc2d22
+error NoCallsProvided();
 // 0xa6fef710
 error NoFunctionsForDiamondCut();
 // 0xcab098d8
