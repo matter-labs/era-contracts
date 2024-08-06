@@ -241,7 +241,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             chainId: _chainId,
             l2Contract: l2BridgeAddress[_chainId],
             mintValue: _mintValue, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
-            l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
+            l2Value: 0, // For base token deposits, there is no msg.value during the call, as the base token is minted to the recipient address
             l2Calldata: l2Calldata,
             l2GasLimit: _l2TxGasLimit,
             l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
@@ -268,7 +268,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         // slither-disable-next-line unused-return
         IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
-            _mintValue: _amount,
+            _l2Value: 0,
             _assetId: assetId,
             _prevMsgSender: _prevMsgSender,
             _data: abi.encode(_amount, address(0))
@@ -444,7 +444,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 msgValue = _passValue ? msg.value : 0;
         bridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msgValue}({
             _chainId: _chainId,
-            _mintValue: _l2Value,
+            _l2Value: _l2Value,
             _assetId: _assetId,
             _prevMsgSender: _prevMsgSender,
             _data: _transferData
