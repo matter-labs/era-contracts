@@ -771,6 +771,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             require(_l2ToL1message.length == 76, "ShB wrong msg len 2");
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+            // slither-disable-next-line unused-return
             (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
 
             assetId = DataEncoding.encodeNTVAssetId(l1Token);
