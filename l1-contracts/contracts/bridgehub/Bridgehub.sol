@@ -162,7 +162,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
         /// For now all base tokens have to use the NTV.
-        baseTokenAssetId[_chainId] = sharedBridge.nativeTokenVault().getAssetId(_baseToken);
+        baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(_baseToken);
 
         IStateTransitionManager(_stateTransitionManager).createNewChain({
             _chainId: _chainId,
