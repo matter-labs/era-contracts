@@ -61,8 +61,12 @@ interface IAdmin is IZkSyncHyperchainBase {
     function freezeDiamond() external;
 
     /// @notice Unpause the functionality of all freezable facets & their selectors
-    /// @dev Both the admin and the STM can unfreeze Diamond Proxy
+    /// @dev Only the STM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
+
+    /// @notice Allow to call unfreeze diamond if it was previously frozen by admin
+    /// @dev Only the current admin can use this function
+    function allowUnfreezeDiamond() external;
 
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);

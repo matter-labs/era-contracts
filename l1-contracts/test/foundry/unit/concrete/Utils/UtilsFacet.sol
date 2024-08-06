@@ -174,6 +174,14 @@ contract UtilsFacet is ZkSyncHyperchainBase {
         s.baseTokenGasPriceMultiplierNominator = _nominator;
     }
 
+    function util_setFrozenByAdmin(bool _frozenByAdmin) external {
+        s.frozenByAdmin = _frozenByAdmin;
+    }
+
+    function util_getFrozenByAdmin() external view returns (bool) {
+        return s.frozenByAdmin;
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }

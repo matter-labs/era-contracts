@@ -8,7 +8,7 @@ import {MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
-import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
+import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, DiamondFrozenByAdmin, DiamondNotFrozenByAdmin} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -164,19 +164,35 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         }
         diamondStorage.isFrozen = true;
 
+        if (msg.sender == s.admin) {
+            s.frozenByAdmin = true;
+        }
+
         emit Freeze();
     }
 
     /// @inheritdoc IAdmin
     function unfreezeDiamond() external onlyStateTransitionManager {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
-
         // diamond proxy is not frozen
         if (!diamondStorage.isFrozen) {
             revert DiamondNotFrozen();
         }
+        // diamond proxy is frozen by admin
+        if (s.frozenByAdmin) {
+            revert DiamondFrozenByAdmin();
+        }
         diamondStorage.isFrozen = false;
 
         emit Unfreeze();
+    }
+
+    /// @inheritdoc IAdmin
+    function allowUnfreezeDiamond() external onlyAdmin {
+        if (!s.frozenByAdmin) {
+            // diamond proxy needs to be previously frozen by admin
+            revert DiamondNotFrozenByAdmin();
+        }
+        s.frozenByAdmin = false;
     }
 }

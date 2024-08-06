@@ -51,6 +51,10 @@ error DiamondAlreadyFrozen();
 error DiamondFreezeIncorrectState();
 // 0xa7151b9a
 error DiamondNotFrozen();
+//
+error DiamondFrozenByAdmin();
+//
+error DiamondNotFrozenByAdmin();
 // 0xfc7ab1d3
 error EmptyBlobVersionHash(uint256 index);
 // 0x95b66fe9
