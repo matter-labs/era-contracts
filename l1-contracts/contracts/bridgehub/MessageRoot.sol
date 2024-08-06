@@ -154,46 +154,4 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         // slither-disable-next-line unused-return
         sharedTree.updateAllLeaves(newLeaves);
     }
-
-    // It is expected that the root is present
-    // `_updateTree` should be false only if the caller ensures that it is followed by updating the entire tree.
-    // function _unsafeResetChainRoot(uint256 _index, bool _updateTree) internal {
-    //     uint256 chainId = chainIndexToId[_index];
-    //     bytes32 initialRoot = chainTree[chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
-
-    //     if (_updateTree) {
-    //         // slither-disable-next-line unused-return
-    //         sharedTree.updateLeaf(_index, Messaging.chainIdLeafHash(initialRoot, chainId));
-    //     }
-    // }
-
-    /// IMPORTANT FIXME!!!: split into two: provide pubdata and clear state. The "provide pubdata" part should be used by SL.
-    /// NO DA is provided here ATM !!!
-    /// @notice To be called by the bootloader by the L1Messenger at the end of the batch to produce the final root and send it to the underlying layer.
-    /// @return pubdata The pubdata to be relayed to the DA layer.
-    function clearTreeAndProvidePubdata() external returns (bytes memory) {
-        // FIXME: access control: only to be called by the l1 messenger.
-        // uint256 cachedChainCount = chainCount;
-        // // We will send the updated roots for all chains.
-        // // While it will mean that we'll pay even for unchanged roots:
-        // // - It is the simplest approach
-        // // - The alternative is to send pairs of (chainId, root), which is less efficient if at least half of the chains are active.
-        // //
-        // // There are of course ways to optimize it further, but it will be done in the future.
-        // bytes memory pubdata = new bytes(cachedChainCount * 32);
-        // for (uint256 i = 0; i < cachedChainCount; i++) {
-        //     // It is the responsibility of each chain to provide the roots of its L2->L1 messages if it wants to see those.
-        //     // However, for the security of the system as a whole, the chain roots need to be provided for all chains.
-        //     bytes32 chainRoot = chainTree[chainIndexToId[i]].root();
-        //     assembly {
-        //         mstore(add(pubdata, add(32, mul(i, 32))), chainRoot)
-        //     }
-        //     // Clearing up the state.
-        //     // Note that it *does not* delete any storage slots, so in terms of pubdata savings, it is useless.
-        //     // However, the chains paid for these changes anyway, so it is considered acceptable.
-        //     // In the future, further optimizations will be available.
-        //     _unsafeResetChainRoot(i, false);
-        // }
-        // updateFullTree();
-    }
 }
