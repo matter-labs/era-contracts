@@ -812,13 +812,13 @@ export class Deployer {
     }
   }
 
-  public async setBaseTokenAdjusterAddress(baseTokenAdjusterAddress: string) {
+  public async setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress: string) {
     const chainAdmin = ChainAdminFactory.connect(this.addresses.ChainAdmin, this.deployWallet);
 
-    const receipt = await (await chainAdmin.setTokenMultiplierSetter(baseTokenAdjusterAddress)).wait();
+    const receipt = await (await chainAdmin.setTokenMultiplierSetter(tokenMultiplierSetterAddress)).wait();
     if (this.verbose) {
       console.log(
-        `Token multiplier setter set as ${baseTokenAdjusterAddress}, gas used: ${receipt.gasUsed.toString()}`
+        `Token multiplier setter set as ${tokenMultiplierSetterAddress}, gas used: ${receipt.gasUsed.toString()}`
       );
     }
   }

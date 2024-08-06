@@ -70,7 +70,7 @@ async function main() {
     .option("--base-token-name <base-token-name>")
     .option("--base-token-address <base-token-address>")
     .option("--use-governance <use-governance>")
-    .option("--base-token-adjuster-address <base-token-adjuster-address>")
+    .option("--token-multiplier-setter-address <token-multiplier-setter-address>")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -107,15 +107,15 @@ async function main() {
         await deployer.registerToken(baseTokenAddress, useGovernance);
       }
 
-      const baseTokenAdjusterAddress =
-        cmd.baseTokenAdjusterAddress ||
+      const tokenMultiplierSetterAddress =
+        cmd.tokenMultiplierSetterAddress ||
         Wallet.fromMnemonic(process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic, "m/44'/60'/0'/0/2")
           .address;
 
-      console.log(`Using base token adjuster address: ${baseTokenAdjusterAddress}`);
+      console.log(`Using token multiplier setter address: ${tokenMultiplierSetterAddress}`);
 
       await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice, useGovernance);
-      await deployer.setBaseTokenAdjusterAddress(baseTokenAdjusterAddress);
+      await deployer.setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress);
       await deployer.transferAdminFromDeployerToChainAdmin();
     });
 
