@@ -25,6 +25,7 @@ contract ExperimentalBridgeTest is Test {
 
     Bridgehub bridgeHub;
     address public bridgeOwner;
+    address public testTokenAddress;
     DummyStateTransitionManagerWBH mockSTM;
     DummyHyperchain mockChainContract;
     DummySharedBridge mockSharedBridge;
@@ -53,6 +54,7 @@ contract ExperimentalBridgeTest is Test {
         mockSharedBridge.setNativeTokenVault(ntv);
         mockSecondSharedBridge.setNativeTokenVault(ntv);
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
+        testTokenAddress = address(testToken);
         vm.prank(address(ntv));
         ntv.registerToken(ETH_TOKEN_ADDRESS);
         ntv.registerToken(address(testToken));
@@ -241,61 +243,60 @@ contract ExperimentalBridgeTest is Test {
         }
     }
 
-    function test_addToken(address, address randomAddress) public {
-        assertTrue(!bridgeHub.tokenIsRegistered(randomAddress), "This random address is not registered as a token");
+    function test_addToken(address randomAddress) public {
+        vm.startPrank(bridgeOwner);
+        bridgeHub.setSharedBridge(address(mockSharedBridge));
+        vm.stopPrank();
+
+        assertTrue(!bridgeHub.tokenIsRegistered(testTokenAddress), "This random address is not registered as a token");
 
         vm.prank(bridgeOwner);
-        bridgeHub.addToken(randomAddress);
+        bridgeHub.addToken(testTokenAddress);
 
         assertTrue(
-            bridgeHub.tokenIsRegistered(randomAddress),
+            bridgeHub.tokenIsRegistered(testTokenAddress),
             "after call from the bridgeowner, this randomAddress should be a registered token"
         );
 
-        if (randomAddress != address(testToken)) {
-            // Testing to see if an actual ERC20 implementation can also be added or not
+        if (randomAddress != address(testTokenAddress)) {
+            // Testing to see if a random address can also be added or not
             vm.prank(bridgeOwner);
-            bridgeHub.addToken(address(testToken));
-
-            assertTrue(bridgeHub.tokenIsRegistered(address(testToken)));
+            bridgeHub.addToken(address(randomAddress));
+            assertTrue(bridgeHub.tokenIsRegistered(randomAddress));
         }
 
         // An already registered token cannot be registered again
         vm.prank(bridgeOwner);
         vm.expectRevert("Bridgehub: token already registered");
-        bridgeHub.addToken(randomAddress);
+        bridgeHub.addToken(testTokenAddress);
     }
 
     function test_addToken_cannotBeCalledByRandomAddress(address randomAddress, address randomCaller) public {
+        vm.startPrank(bridgeOwner);
+        bridgeHub.setSharedBridge(address(mockSharedBridge));
+        vm.stopPrank();
+
         if (randomCaller != bridgeOwner) {
             vm.prank(randomCaller);
             vm.expectRevert(bytes("Ownable: caller is not the owner"));
-            bridgeHub.addToken(randomAddress);
+            bridgeHub.addToken(testTokenAddress);
         }
 
-        assertTrue(!bridgeHub.tokenIsRegistered(randomAddress), "This random address is not registered as a token");
+        assertTrue(!bridgeHub.tokenIsRegistered(testTokenAddress), "This random address is not registered as a token");
 
         vm.prank(bridgeOwner);
-        bridgeHub.addToken(randomAddress);
+        bridgeHub.addToken(testTokenAddress);
 
         assertTrue(
-            bridgeHub.tokenIsRegistered(randomAddress),
-            "after call from the bridgeowner, this randomAddress should be a registered token"
+            bridgeHub.tokenIsRegistered(testTokenAddress),
+            "after call from the bridgeowner, this testTokenAddress should be a registered token"
         );
-
-        if (randomAddress != address(testToken)) {
-            // Testing to see if an actual ERC20 implementation can also be added or not
-            vm.prank(bridgeOwner);
-            bridgeHub.addToken(address(testToken));
-
-            assertTrue(bridgeHub.tokenIsRegistered(address(testToken)));
-        }
 
         // An already registered token cannot be registered again by randomCaller
         if (randomCaller != bridgeOwner) {
             vm.prank(bridgeOwner);
             vm.expectRevert("Bridgehub: token already registered");
-            bridgeHub.addToken(randomAddress);
+            bridgeHub.addToken(testTokenAddress);
         }
     }
 
@@ -355,8 +356,9 @@ contract ExperimentalBridgeTest is Test {
         vm.prank(deployerAddress);
         bridgeHub.acceptAdmin();
         vm.startPrank(bridgeOwner);
+        bridgeHub.setSharedBridge(address(mockSharedBridge));
         bridgeHub.addStateTransitionManager(address(mockSTM));
-        bridgeHub.addToken(address(testToken));
+        bridgeHub.addToken(testTokenAddress);
         bridgeHub.setSharedBridge(address(mockSharedBridge));
         vm.stopPrank();
 
@@ -366,7 +368,7 @@ contract ExperimentalBridgeTest is Test {
             bridgeHub.createNewChain({
                 _chainId: chainId,
                 _stateTransitionManager: address(mockSTM),
-                _baseToken: address(testToken),
+                _baseToken: testTokenAddress,
                 _salt: uint256(123),
                 _admin: admin,
                 _initData: bytes("")
@@ -394,7 +396,7 @@ contract ExperimentalBridgeTest is Test {
             abi.encodeWithSelector(
                 mockSTM.createNewChain.selector,
                 chainId,
-                address(testToken),
+                testTokenAddress,
                 address(mockSharedBridge),
                 admin,
                 _newChainInitData
@@ -405,7 +407,7 @@ contract ExperimentalBridgeTest is Test {
         newChainId = bridgeHub.createNewChain({
             _chainId: chainId,
             _stateTransitionManager: address(mockSTM),
-            _baseToken: address(testToken),
+            _baseToken: testTokenAddress,
             _salt: uint256(chainId * 2),
             _admin: admin,
             _initData: _newChainInitData
@@ -415,7 +417,7 @@ contract ExperimentalBridgeTest is Test {
         vm.clearMockedCalls();
 
         assertTrue(bridgeHub.stateTransitionManager(newChainId) == address(mockSTM));
-        assertTrue(bridgeHub.baseToken(newChainId) == address(testToken));
+        assertTrue(bridgeHub.baseToken(newChainId) == testTokenAddress);
     }
 
     function test_getHyperchain(uint256 mockChainId) public {

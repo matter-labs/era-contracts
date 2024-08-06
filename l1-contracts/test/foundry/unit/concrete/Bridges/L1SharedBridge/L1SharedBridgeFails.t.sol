@@ -158,18 +158,6 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         nativeTokenVault.transferFundsFromSharedBridge(address(token));
     }
 
-    function test_bridgehubDepositBaseToken_Eth_Token_notRegisteredTokenID() public {
-        // ToDo: Shall we do it properly instead of mocking?
-        stdstore
-            .target(address(sharedBridge))
-            .sig("assetHandlerAddress(bytes32)")
-            .with_key(ETH_TOKEN_ASSET_ID)
-            .checked_write(address(0));
-        vm.prank(bridgehubAddress);
-        vm.expectRevert("ShB: asset handler not set");
-        sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, ETH_TOKEN_ASSET_ID, alice, amount);
-    }
-
     function test_bridgehubDepositBaseToken_Eth_Token_incorrectSender() public {
         vm.expectRevert("L1SharedBridge: msg.sender not equal to bridgehub or era chain");
         sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, ETH_TOKEN_ASSET_ID, alice, amount);

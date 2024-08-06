@@ -437,6 +437,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     ) internal returns (bytes memory bridgeMintCalldata) {
         address l1AssetHandler = assetHandlerAddress[_assetId];
         require(l1AssetHandler != address(0), "ShB: asset handler does not exist for assetId");
+
         uint256 msgValue = _passValue ? msg.value : 0;
         bridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msgValue}({
             _chainId: _chainId,

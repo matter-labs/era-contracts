@@ -679,19 +679,19 @@ export class Deployer {
   public async registerSharedBridge() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
-    /// registering ETH as a valid token, with address 1.
-    const upgradeData1 = bridgehub.interface.encodeFunctionData("addToken", [ADDRESS_ONE]);
-    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData1);
-    if (this.verbose) {
-      console.log("ETH token registered in Bridgehub");
-    }
-
-    const upgradeData2 = await bridgehub.interface.encodeFunctionData("setSharedBridge", [
+    const upgradeData1 = await bridgehub.interface.encodeFunctionData("setSharedBridge", [
       this.addresses.Bridges.SharedBridgeProxy,
     ]);
-    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
+    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData1);
     if (this.verbose) {
       console.log("Shared bridge was registered in Bridgehub");
+    }
+
+    /// registering ETH as a valid token, with address 1.
+    const upgradeData2 = bridgehub.interface.encodeFunctionData("addToken", [ADDRESS_ONE]);
+    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
+    if (this.verbose) {
+      console.log("ETH token registered in Bridgehub");
     }
   }
 
@@ -949,7 +949,6 @@ export class Deployer {
 
   public async registerTokenBridgehub(tokenAddress: string, useGovernance: boolean = false) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
-
     const receipt = await this.executeDirectOrGovernance(useGovernance, bridgehub, "addToken", [tokenAddress], 0);
 
     if (this.verbose) {
