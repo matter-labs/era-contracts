@@ -87,12 +87,14 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         _transferOwnership(_aliasedOwner);
     }
 
+    /// @notice Sets the l2TokenBeacon, called after initialize.
     function setL2TokenBeacon(address _l2TokenBeacon, bytes32 _l2TokenProxyBytecodeHash) external onlyOwner {
         l2TokenBeacon = UpgradeableBeacon(_l2TokenBeacon);
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
         emit L2TokenBeaconUpdated(_l2TokenBeacon, _l2TokenProxyBytecodeHash);
     }
 
+    /// @notice Used when the chain receives a transfer from L1 Shared Bridge and correspondingly mints the asset.
     function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable override onlyBridge {
         address token = tokenAddress[_assetId];
         (
@@ -127,6 +129,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         emit BridgeMint(_chainId, _assetId, _l1Sender, _l2Receiver, _amount);
     }
 
+    /// @notice Used when the chain starts to send a tx and needs to burn the asset.
     function bridgeBurn(
         uint256 _chainId,
         uint256 _mintValue,

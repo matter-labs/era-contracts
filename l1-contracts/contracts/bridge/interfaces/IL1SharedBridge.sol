@@ -128,10 +128,13 @@ interface IL1SharedBridge {
 
     function depositHappened(uint256 _chainId, bytes32 _l2TxHash) external view returns (bytes32);
 
-    /// data is abi encoded :
+    /// @dev Data has the following abi encoding for legacy deposits:
     /// address _l1Token,
     /// uint256 _amount,
     /// address _l2Receiver
+    /// for new deposits:
+    /// bytes32 _assetId,
+    /// bytes _transferData
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,

@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
 import {L2CanonicalTransaction, L2Log, L2Message, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 
-/// @title The interface of the zkSync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
+/// @title The interface of the ZKsync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IMailbox is IZkSyncHyperchainBase {

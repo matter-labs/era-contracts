@@ -26,7 +26,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice the asset id of Eth
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
-    /// @notice all the ether is held by the weth bridge
+    /// @notice all the ether is held by the shared bridge
     IL1SharedBridge public sharedBridge;
 
     /// @notice we store registered stateTransitionManagers
@@ -155,12 +155,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             "Bridgehub: state transition not registered"
         );
         require(tokenIsRegistered[_baseToken], "Bridgehub: token not registered");
-        require(address(sharedBridge) != address(0), "Bridgehub: weth bridge not set");
+        require(address(sharedBridge) != address(0), "Bridgehub: shared bridge not set");
 
         require(stateTransitionManager[_chainId] == address(0), "Bridgehub: chainId already registered");
 
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
+
         /// For now all base tokens have to use the NTV.
         baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(_baseToken);
 
@@ -258,8 +259,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice the mailbox is called directly after the sharedBridge received the deposit
     /// this assumes that either ether is the base token or
-    /// the msg.sender has approved mintValue allowance for the sharedBridge.
-    /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token
+    /// the msg.sender has approved mintValue allowance for the nativeTokenVault.
+    /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token.
+    /// In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
@@ -300,8 +302,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice After depositing funds to the sharedBridge, the secondBridge is called
     ///  to return the actual L2 message which is sent to the Mailbox.
     ///  This assumes that either ether is the base token or
-    ///  the msg.sender has approved the sharedBridge with the mintValue,
+    ///  the msg.sender has approved the nativeTokenVault with the mintValue,
     ///  and also the necessary approvals are given for the second bridge.
+    ///  In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
     /// @notice The logic of this bridge is to allow easy depositing for bridges.
     /// Each contract that handles the users ERC20 tokens needs approvals from the user, this contract allows
     /// the user to approve for each token only its respective bridge

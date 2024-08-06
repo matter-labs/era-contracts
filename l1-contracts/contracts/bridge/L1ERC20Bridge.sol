@@ -17,7 +17,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to ZK chains
-/// @dev It is a legacy bridge from zkSync Era, that was deprecated in favour of shared bridge.
+/// @dev It is a legacy bridge from ZKsync Era, that was deprecated in favour of shared bridge.
 /// It is needed for backward compatibility with already integrated projects.
 contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -26,25 +26,25 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     IL1SharedBridge public immutable override SHARED_BRIDGE;
 
     /// @dev A mapping L2 batch number => message number => flag.
-    /// @dev Used to indicate that L2 -> L1 message was already processed for zkSync Era withdrawals.
+    /// @dev Used to indicate that L2 -> L1 message was already processed for ZKsync Era withdrawals.
     // slither-disable-next-line uninitialized-state
     mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized))
         public isWithdrawalFinalized;
 
     /// @dev A mapping account => L1 token address => L2 deposit transaction hash => amount.
-    /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail in zkSync Era.
+    /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail in ZKsync Era.
     mapping(address account => mapping(address l1Token => mapping(bytes32 depositL2TxHash => uint256 amount)))
         public depositAmount;
 
-    /// @dev The address that is used as a L2 native token vault in zkSync Era.
+    /// @dev The address that is used as a L2 native token vault in ZKsync Era.
     // slither-disable-next-line uninitialized-state
     address public l2NativeTokenVault;
 
-    /// @dev The address that is used as a beacon for L2 tokens in zkSync Era.
+    /// @dev The address that is used as a beacon for L2 tokens in ZKsync Era.
     // slither-disable-next-line uninitialized-state
     address public l2TokenBeacon;
 
-    /// @dev Stores the hash of the L2 token proxy contract's bytecode on zkSync Era.
+    /// @dev Stores the hash of the L2 token proxy contract's bytecode on ZKsync Era.
     // slither-disable-next-line uninitialized-state
     bytes32 public l2TokenProxyBytecodeHash;
 
@@ -70,7 +70,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
                             ERA LEGACY GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @return The L2 token address that would be minted for deposit of the given L1 token on zkSync Era.
+    /// @return The L2 token address that would be minted for deposit of the given L1 token on ZKsync Era.
     function l2TokenAddress(address _l1Token) external view returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(l2TokenBeacon, ""));
         bytes32 salt = bytes32(uint256(uint160(_l1Token)));
