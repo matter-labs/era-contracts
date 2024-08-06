@@ -421,9 +421,10 @@ export class Deployer {
     ethTxOptions: ethers.providers.TransactionRequest,
     dummy: boolean = false
   ) {
+    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const contractAddress = await this.deployViaCreate2(
       dummy ? "DummyL1ERC20Bridge" : "L1ERC20Bridge",
-      [this.addresses.Bridges.SharedBridgeProxy],
+      [this.addresses.Bridges.SharedBridgeProxy, this.addresses.Bridges.NativeTokenVaultProxy, eraChainId],
       create2Salt,
       ethTxOptions
     );

@@ -7,7 +7,6 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -16,6 +15,8 @@ import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+
+import {BridgeHelper} from "./BridgeHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -171,17 +172,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
 
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function getERC20Getters(address _token) public view returns (bytes memory) {
-        if (_token == ETH_TOKEN_ADDRESS) {
-            bytes memory name = abi.encode("Ether");
-            bytes memory symbol = abi.encode("ETH");
-            bytes memory decimals = abi.encode(uint8(18));
-            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
-        }
-
-        (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
-        (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
-        (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
-        return abi.encode(data1, data2, data3);
+        return BridgeHelper.getERC20Getters(_token, ETH_TOKEN_ADDRESS);
     }
 
     ///  @inheritdoc IL1AssetHandler
@@ -195,7 +186,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         uint256 amount;
         (amount, l1Receiver) = abi.decode(_data, (uint256, address));
         // Check that the chain has sufficient balance
-        require(chainBalance[_chainId][l1Token] >= amount, "NTV not enough funds 2"); // not enough funds
+        require(chainBalance[_chainId][l1Token] >= amount, "NTV: not enough funds"); // not enough funds
         chainBalance[_chainId][l1Token] -= amount;
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
@@ -225,7 +216,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
         require(_amount > 0, "y1");
 
         // check that the chain has sufficient balance
-        require(chainBalance[_chainId][l1Token] >= _amount, "NTV n funds");
+        require(chainBalance[_chainId][l1Token] >= _amount, "NTV: not enough funds 2");
         chainBalance[_chainId][l1Token] -= _amount;
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
