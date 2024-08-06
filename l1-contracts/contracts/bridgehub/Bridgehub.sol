@@ -54,11 +54,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
-    modifier onlyOwnerOrAdmin() {
-        require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
-        _;
-    }
-
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(ETH_TOKEN_ADDRESS);
