@@ -9,12 +9,12 @@ import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IL2AssetHandler} from "./interfaces/IL2AssetHandler.sol";
-import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../L2ContractHelper.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {EmptyAddress, InvalidCaller} from "../L2ContractErrors.sol";
 
@@ -33,9 +33,11 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal DEPRECATED_l2TokenProxyBytecodeHash;
 
-    /// @dev A mapping of l2 token address to l1 token address
+    /// @notice Deprecated. Kept for backwards compatibility.
+    /// @dev A mapping l2 token address => l1 token address
     mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
 
+    /// @notice Obsolete, as all calls are performed via L1 Shared Bridge. Kept for backwards compatibility.
     /// @dev The address of the legacy L1 erc20 bridge counterpart.
     /// This is non-zero only on Era, and should not be renamed for backward compatibility with the SDKs.
     address public override l1Bridge;
@@ -170,7 +172,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
             abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
         );
         // solhint-disable-next-line func-named-parameters
-        bytes memory data = abi.encode(_l1Sender, _amount, _l2Receiver, _data, _l1Token);
+        bytes memory data = DataEncoding.encodeBridgeMintData(_amount, _l1Sender, _l2Receiver, _data, _l1Token);
         finalizeDeposit(assetId, data);
     }
 

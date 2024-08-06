@@ -423,7 +423,7 @@ export class Deployer {
   ) {
     const contractAddress = await this.deployViaCreate2(
       dummy ? "DummyL1ERC20Bridge" : "L1ERC20Bridge",
-      [this.addresses.Bridges.SharedBridgeProxy, this.addresses.Bridges.NativeTokenVaultProxy],
+      [this.addresses.Bridges.SharedBridgeProxy],
       create2Salt,
       ethTxOptions
     );
@@ -628,19 +628,19 @@ export class Deployer {
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
-    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
+    // const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const tokens = getTokens();
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
 
     const contractAddress = await this.deployViaCreate2(
       "L1NativeTokenVault",
-      [l1WethToken, this.addresses.Bridges.SharedBridgeProxy, eraChainId],
+      [l1WethToken, this.addresses.Bridges.SharedBridgeProxy],
       create2Salt,
       ethTxOptions
     );
 
     if (this.verbose) {
-      console.log(`With era chain id ${eraChainId}`);
+      // console.log(`With era chain id ${eraChainId}`);
       console.log(`CONTRACTS_L1_NATIVE_TOKEN_VAULT_IMPL_ADDR=${contractAddress}`);
     }
 

@@ -62,8 +62,6 @@ interface IL1SharedBridge {
         address sender
     );
 
-    event AssetHandlerRegistered(bytes32 indexed assetId, address indexed assetHandlerAddress);
-
     function isWithdrawalFinalized(
         uint256 _chainId,
         uint256 _l2BatchNumber,

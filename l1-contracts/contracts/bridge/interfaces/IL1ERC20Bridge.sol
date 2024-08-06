@@ -63,8 +63,6 @@ interface IL1ERC20Bridge {
 
     function SHARED_BRIDGE() external view returns (IL1SharedBridge);
 
-    function NATIVE_TOKEN_VAULT() external view returns (IL1NativeTokenVault);
-
     function l2TokenBeacon() external view returns (address);
 
     function l2NativeTokenVault() external view returns (address);
