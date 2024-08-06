@@ -337,7 +337,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         ) {
             // slither-disable-next-line arbitrary-send-erc20
             l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
-            l1Token.safeIncreaseAllowance(address(nativeTokenVault), _amount);
+            l1Token.forceApprove(address(nativeTokenVault), _amount);
         }
     }
 
@@ -380,7 +380,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             _l2Value: _l2Value,
             _assetId: assetId,
             _prevMsgSender: _prevMsgSender,
-            _transferData: transferData
+            _transferData: transferData,
+            _passValue: true
         });
         bytes32 txDataHash = this.encodeTxDataHash(legacyDeposit, _prevMsgSender, assetId, transferData);
 
@@ -422,15 +423,26 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev send the burn message to the asset
+    /// @notice Forwards the burn request for specific asset to respective asset handler
+    /// @param _chainId The chain ID of the ZK chain to which deposit.
+    /// @param _l2Value The L2 `msg.value` from the L1 -> L2 deposit transaction.
+    /// @param _assetId The deposited asset ID.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
+    /// @param _passValue Boolean indicating whether to pass msg.value in the call.
+    /// @return bridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
     function _burn(
         uint256 _chainId,
         uint256 _l2Value,
         bytes32 _assetId,
         address _prevMsgSender,
-        bytes memory _transferData
+        bytes memory _transferData,
+        bool _passValue
     ) internal returns (bytes memory bridgeMintCalldata) {
         address l1AssetHandler = assetHandlerAddress[_assetId];
-        bridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
+        require(l1AssetHandler != address(0), "ShB: asset handler does not exist for assetId");
+        uint256 msgValue = _passValue ? msg.value : 0;
+        bridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msgValue}({
             _chainId: _chainId,
             _mintValue: _l2Value,
             _assetId: _assetId,
@@ -862,9 +874,18 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         {
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
+            IERC20(_l1Token).forceApprove(address(nativeTokenVault), _amount);
+        }
 
-            // solhint-disable-next-line func-named-parameters
-            bridgeMintCalldata = abi.encode(_amount, _prevMsgSender, _l2Receiver, getERC20Getters(_l1Token), _l1Token);
+        {
+            bridgeMintCalldata = _burn({
+                _chainId: ERA_CHAIN_ID,
+                _l2Value: 0,
+                _assetId: _assetId,
+                _prevMsgSender: _prevMsgSender,
+                _transferData: abi.encode(_amount, _l2Receiver),
+                _passValue: false
+            });
         }
 
         {

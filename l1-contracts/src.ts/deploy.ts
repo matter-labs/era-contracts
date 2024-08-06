@@ -423,7 +423,7 @@ export class Deployer {
   ) {
     const contractAddress = await this.deployViaCreate2(
       dummy ? "DummyL1ERC20Bridge" : "L1ERC20Bridge",
-      [this.addresses.Bridges.SharedBridgeProxy, this.addresses.Bridges.NativeTokenVaultProxy],
+      [this.addresses.Bridges.SharedBridgeProxy],
       create2Salt,
       ethTxOptions
     );
