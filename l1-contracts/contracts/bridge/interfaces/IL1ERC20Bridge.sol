@@ -8,7 +8,7 @@ import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
 /// @title L1 Bridge contract legacy interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Legacy Bridge interface before ZK chain migration, used for backward compatibility with zkSync Era
+/// @notice Legacy Bridge interface before ZK chain migration, used for backward compatibility with ZKsync Era
 interface IL1ERC20Bridge {
     event DepositInitiated(
         bytes32 indexed l2DepositTxHash,
@@ -62,8 +62,6 @@ interface IL1ERC20Bridge {
     function l2TokenAddress(address _l1Token) external view returns (address);
 
     function SHARED_BRIDGE() external view returns (IL1SharedBridge);
-
-    function NATIVE_TOKEN_VAULT() external view returns (IL1NativeTokenVault);
 
     function l2TokenBeacon() external view returns (address);
 
