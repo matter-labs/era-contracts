@@ -755,15 +755,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             require(_l2ToL1message.length >= 56, "ShB wrong msg len"); // wrong message length
             // this message is a base token withdrawal
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-            (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+            (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
             assetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
             transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) {
-            // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
             address l1Token;
             uint256 amount;
             address l1Receiver;
-            // this message is a token withdrawal
+            // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
+            // This message is a token withdrawal
 
             // Check that the message length is correct.
             // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
@@ -771,7 +771,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             require(_l2ToL1message.length == 76, "ShB wrong msg len 2");
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-            (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+            (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
 
             assetId = DataEncoding.encodeNTVAssetId(l1Token);
             transferData = abi.encode(amount, l1Receiver);
