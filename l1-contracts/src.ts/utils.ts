@@ -21,6 +21,7 @@ export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.jso
 
 export const SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 export const ADDRESS_ONE = "0x0000000000000000000000000000000000000001";
+export const ADDRESS_TWO_NTV = "0x0000000000000000000000000000000000000002";
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 export const EMPTY_STRING_KECCAK = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
@@ -90,6 +91,12 @@ export function computeL2Create2Address(
   );
 
   return ethers.utils.hexDataSlice(data, 12);
+}
+
+export function encodeNTVAssetId(chainId: number, assetData: BytesLike) {
+  return ethers.utils.keccak256(
+    ethers.utils.defaultAbiCoder.encode(["uint256", "address", "bytes32"], [chainId, ADDRESS_TWO_NTV, assetData])
+  );
 }
 
 export function getAddressFromEnv(envName: string): string {

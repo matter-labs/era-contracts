@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IL2BridgeLegacy {
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external;
 
