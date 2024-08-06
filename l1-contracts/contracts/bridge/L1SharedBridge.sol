@@ -283,7 +283,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
             _l2Value: 0,
-            _assetId: assetId,
+            _assetId: _assetId,
             _prevMsgSender: _prevMsgSender,
             _data: abi.encode(_amount, address(0))
         });

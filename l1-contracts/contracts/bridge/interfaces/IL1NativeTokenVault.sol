@@ -18,7 +18,7 @@ interface IL1NativeTokenVault {
     /// @notice Used to register a token in the vault
     function registerToken(address _l1Token) external;
 
-    /// @notice Used to get the the ERC20 data for a token
+    /// @notice Used to get the ERC20 data for a token
     function getERC20Getters(address _token) external view returns (bytes memory);
 
     /// @notice Used to get the token address of an assetId
