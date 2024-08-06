@@ -3,6 +3,7 @@
 pragma solidity 0.8.20;
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface ILegacyL2SharedBridge {
     function finalizeDeposit(
         address _l1Sender,
