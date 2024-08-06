@@ -194,7 +194,10 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         return IL2StandardToken(_l2Token).l1Address();
     }
 
-    /// @notice Legacy l2TokenAddress.
+    /// @notice Legacy function used for backward compatibility to return L2 wrapped token
+    /// @notice address corresponding to provided L1 token address and deployed through NTV.
+    /// @dev However, the shared bridge can use custom asset handlers such that L2 addresses differ,
+    /// @dev or an L1 token may not have an L2 counterpart.
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view returns (address) {
         return nativeTokenVault.l2TokenAddress(_l1Token);
