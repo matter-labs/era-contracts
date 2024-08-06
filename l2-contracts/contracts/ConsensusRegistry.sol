@@ -67,6 +67,18 @@ contract ConsensusRegistry is Ownable2Step {
     error InvalidInputValidatorPoP();
     error InvalidInputAttesterPubKey();
 
+    event NodeAdded(address indexed nodeOwner, uint256 validatorWeight, bytes validatorPubKey, bytes validatorPoP, uint256 attesterWeight, bytes attesterPubKey);
+    event NodeDeactivated(address indexed nodeOwner);
+    event NodeActivated(address indexed nodeOwner);
+    event NodeRemoved(address indexed nodeOwner);
+    event NodeValidatorWeightChanged(address indexed nodeOwner, uint256 newWeight);
+    event NodeAttesterWeightChanged(address indexed nodeOwner, uint256 newWeight);
+    event NodeValidatorPubKeyChanged(address indexed nodeOwner, bytes newPubKey);
+    event NodeValidatorPoPChanged(address indexed nodeOwner, bytes newPoP);
+    event NodeAttesterPubKeyChanged(address indexed nodeOwner, bytes newPubKey);
+    event ValidatorCommitteeSet();
+    event AttesterCommitteeSet();
+
     modifier onlyOwnerOrNodeOwner(address _nodeOwner) {
         if (owner() != msg.sender && _nodeOwner != msg.sender) {
             revert UnauthorizedOnlyOwnerOrNodeOwner();
@@ -99,16 +111,16 @@ contract ConsensusRegistry is Ownable2Step {
         uint256 _attesterWeight,
         bytes calldata _attesterPubKey
     ) external onlyOwner {
-        if(_nodeOwner == address(0)) {
+        if (_nodeOwner == address(0)) {
             revert InvalidInputNodeOwnerAddress();
         }
-        if(_validatorPubKey.length == 0) {
+        if (_validatorPubKey.length == 0) {
             revert InvalidInputValidatorPubKey();
         }
-        if(_validatorPoP.length == 0) {
+        if (_validatorPoP.length == 0) {
             revert InvalidInputValidatorPoP();
         }
-        if(_attesterPubKey.length == 0) {
+        if (_attesterPubKey.length == 0) {
             revert InvalidInputAttesterPubKey();
         }
 
@@ -134,6 +146,15 @@ contract ConsensusRegistry is Ownable2Step {
             attesterWeight: _attesterWeight,
             attesterPubKey: _attesterPubKey
         });
+
+        emit NodeAdded(
+            _nodeOwner,
+            _validatorWeight,
+            _validatorPubKey,
+            _validatorPoP,
+            _attesterWeight,
+            _attesterPubKey
+        );
     }
 
     /// @notice Deactivates a node, preventing it from participating in committees.
@@ -144,6 +165,8 @@ contract ConsensusRegistry is Ownable2Step {
         verifyNodeOwnerExists(_nodeOwner);
 
         nodes[_nodeOwner].active = false;
+
+        emit NodeDeactivated(_nodeOwner);
     }
 
     /// @notice Activates a previously inactive node, allowing it to participate in committees.
@@ -154,6 +177,8 @@ contract ConsensusRegistry is Ownable2Step {
         verifyNodeOwnerExists(_nodeOwner);
 
         nodes[_nodeOwner].active = true;
+
+        emit NodeActivated(_nodeOwner);
     }
 
     /// @notice Removes a node from the registry.
@@ -168,6 +193,8 @@ contract ConsensusRegistry is Ownable2Step {
         nodeOwners.pop();
         // Remove from mapping.
         delete nodes[_nodeOwner];
+
+        emit NodeRemoved(_nodeOwner);
     }
 
     /// @notice Changes the validator weight of a node in the registry.
@@ -179,6 +206,8 @@ contract ConsensusRegistry is Ownable2Step {
         verifyNodeOwnerExists(_nodeOwner);
 
         nodes[_nodeOwner].validatorWeight = _weight;
+
+        emit NodeValidatorWeightChanged(_nodeOwner, _weight);
     }
 
     /// @notice Changes the attester weight of a node in the registry.
@@ -190,6 +219,8 @@ contract ConsensusRegistry is Ownable2Step {
         verifyNodeOwnerExists(_nodeOwner);
 
         nodes[_nodeOwner].attesterWeight = _weight;
+
+        emit NodeAttesterWeightChanged(_nodeOwner, _weight);
     }
 
     /// @notice Changes the validator's public key and proof-of-possession (PoP) in the registry.
@@ -203,16 +234,19 @@ contract ConsensusRegistry is Ownable2Step {
         bytes calldata _pubKey,
         bytes calldata _pop
     ) external onlyOwnerOrNodeOwner(_nodeOwner) {
-        if(_pubKey.length == 0) {
+        if (_pubKey.length == 0) {
             revert InvalidInputValidatorPubKey();
         }
-        if(_pop.length == 0) {
+        if (_pop.length == 0) {
             revert InvalidInputValidatorPoP();
         }
         verifyNodeOwnerExists(_nodeOwner);
 
         nodes[_nodeOwner].validatorPubKey = _pubKey;
         nodes[_nodeOwner].validatorPoP = _pop;
+
+        emit NodeValidatorPubKeyChanged(_nodeOwner, _pubKey);
+        emit NodeValidatorPoPChanged(_nodeOwner, _pop);
     }
 
     /// @notice Changes the attester's public key of a node in the registry.
@@ -224,12 +258,14 @@ contract ConsensusRegistry is Ownable2Step {
         address _nodeOwner,
         bytes calldata _pubKey
     ) external onlyOwnerOrNodeOwner(_nodeOwner) {
-        if(_pubKey.length == 0) {
+        if (_pubKey.length == 0) {
             revert InvalidInputAttesterPubKey();
         }
         verifyNodeOwnerExists(_nodeOwner);
 
         nodes[_nodeOwner].attesterPubKey = _pubKey;
+
+        emit NodeAttesterPubKeyChanged(_nodeOwner, _pubKey);
     }
 
     /// @notice Rotates the validator committee list based on active nodes in the registry.
@@ -247,6 +283,8 @@ contract ConsensusRegistry is Ownable2Step {
                 );
             }
         }
+
+        emit ValidatorCommitteeSet();
     }
 
     /// @notice Rotates the attester committee list based on active nodes in the registry.
@@ -262,6 +300,8 @@ contract ConsensusRegistry is Ownable2Step {
                 attesterCommittee.push(CommitteeAttester(node.attesterWeight, nodeOwner, node.attesterPubKey));
             }
         }
+
+        emit AttesterCommitteeSet();
     }
 
     /// @notice Verifies that a node owner exists in the registry.
