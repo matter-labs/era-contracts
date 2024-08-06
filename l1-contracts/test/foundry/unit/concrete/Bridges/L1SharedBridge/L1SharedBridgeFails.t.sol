@@ -166,7 +166,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             .with_key(ETH_TOKEN_ASSET_ID)
             .checked_write(address(0));
         vm.prank(bridgehubAddress);
-        vm.expectRevert("ShB: only address can be registered");
+        vm.expectRevert("ShB: asset handler not set");
         sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, ETH_TOKEN_ASSET_ID, alice, amount);
     }
 
