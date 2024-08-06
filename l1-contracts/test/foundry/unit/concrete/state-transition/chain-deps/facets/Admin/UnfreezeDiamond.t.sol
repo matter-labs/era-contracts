@@ -27,4 +27,15 @@ contract UnfreezeDiamondTest is AdminTest {
         vm.startPrank(admin);
         adminFacet.unfreezeDiamond();
     }
+
+    function test_revertWhen_diamondIsNotAllowedTobeUnfrozen() public {
+        address admin = utilsFacet.util_getStateTransitionManager();
+        utilsFacet.util_setIsFrozen(true);
+        utilsFacet.util_setFrozenByAdmin(true);
+
+        vm.expectRevert(bytes.concat("a5"));
+
+        vm.startPrank(admin);
+        adminFacet.unfreezeDiamond();
+    }
 }
