@@ -142,8 +142,7 @@ contract L1SharedBridgeTest is Test {
         sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
         nativeTokenVaultImpl = new L1NativeTokenVault({
             _l1WethAddress: l1WethAddress,
-            _l1SharedBridge: IL1SharedBridge(address(sharedBridge)),
-            _eraChainId: eraChainId
+            _l1SharedBridge: IL1SharedBridge(address(sharedBridge))
         });
         TransparentUpgradeableProxy nativeTokenVaultProxy = new TransparentUpgradeableProxy(
             address(nativeTokenVaultImpl),

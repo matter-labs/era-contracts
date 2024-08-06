@@ -85,6 +85,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     mapping(uint256 chainId => mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized)))
         public isWithdrawalFinalized;
 
+    /// @notice Deprecated. Kept for backwards compatibility.
     /// @dev Indicates whether the hyperbridging is enabled for a given chain.
     // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => bool enabled) public hyperbridgingEnabled;

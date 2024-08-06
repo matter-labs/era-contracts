@@ -49,7 +49,7 @@ contract ExperimentalBridgeTest is Test {
         mockChainContract = new DummyHyperchain(address(bridgeHub), eraChainId);
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
-        ntv = new L1NativeTokenVault(weth, IL1SharedBridge(address(mockSharedBridge)), eraChainId);
+        ntv = new L1NativeTokenVault(weth, IL1SharedBridge(address(mockSharedBridge)));
         mockSharedBridge.setNativeTokenVault(ntv);
         mockSecondSharedBridge.setNativeTokenVault(ntv);
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
