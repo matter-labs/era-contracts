@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {Ownable2Step, Ownable} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
 import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 import {NoCallsProvided, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
@@ -56,6 +56,7 @@ contract ChainAdmin is IChainAdmin, Ownable2Step {
         if (_calls.length == 0) {
             revert NoCallsProvided();
         }
+        // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _calls.length; ++i) {
             // slither-disable-next-line arbitrary-send-eth
             (bool success, bytes memory returnData) = _calls[i].target.call{value: _calls[i].value}(_calls[i].data);
