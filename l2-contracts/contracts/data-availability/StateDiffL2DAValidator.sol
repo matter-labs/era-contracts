@@ -35,20 +35,7 @@ abstract contract StateDiffL2DAValidator {
         virtual
         returns (bytes32 uncompressedStateDiffHash, bytes calldata totalL2Pubdata, bytes calldata leftoverSuffix)
     {
-        uint256 calldataPtr = 0;
-
-        /// Check logs
-        uint32 numberOfL2ToL1Logs = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-        calldataPtr += 4;
-
-        bytes32 reconstructedChainedLogsHash;
-        for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
-            bytes32 hashedLog = EfficientCall.keccak(
-                _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + L2_TO_L1_LOG_SERIALIZE_SIZE]
-            );
-            calldataPtr += L2_TO_L1_LOG_SERIALIZE_SIZE;
-            reconstructedChainedLogsHash = keccak256(abi.encode(reconstructedChainedLogsHash, hashedLog));
-        }
+        uint256 calldataPtr = 4;
 
         /// Check messages
         uint32 numberOfMessages = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
