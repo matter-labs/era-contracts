@@ -444,7 +444,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         return IZkSyncHyperchain(hyperchainMap.get(_chainId)).getProtocolVersion();
     }
 
-    /// @param _newSyncLayerChainId newGatewayChainId newSettlmentLayerChainId the chainId of the chain
+    /// @param _newSyncLayerChainId newGatewayChainId newSettlementLayerChainId the chainId of the chain
     function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external onlyOwner {
         require(_newSyncLayerChainId != 0, "Bad chain id");
 
