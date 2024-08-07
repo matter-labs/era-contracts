@@ -130,7 +130,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         /// backwards compatible event
         emit FinalizeDeposit(_l1Sender, _l2Receiver, token, _amount);
         emit BridgeMint({
-            chainId: _chainId, 
+            chainId: _chainId,
             assetId: _assetId,
             sender: _l1Sender,
             l2Receiver: _l2Receiver,
@@ -164,11 +164,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
 
         /// backwards compatible event
         emit WithdrawalInitiated(_prevMsgSender, _l1Receiver, l2Token, _amount);
-        chainId: _chainId, 
-            assetId: _assetId,
-            sender: _l1Sender,
-            l2Receiver: _l2Receiver,
-            amount: _amount
         emit BridgeBurn({
             chainId: _chainId,
             assetId: _assetId,
