@@ -29,32 +29,50 @@ contract ConsensusRegistry is Ownable2Step {
         // Inactive nodes are not considered when selecting committees.
         bool active;
         // Validator's voting weight.
-        uint256 validatorWeight;
+        uint32 validatorWeight;
         // Validator's BLS12-381 public key.
-        bytes validatorPubKey;
+        BLS12_381PublicKey validatorPubKey;
         // Validator's Proof-of-possession (a signature over the public key).
-        bytes validatorPoP;
+        BLS12_381Signature validatorPoP;
         // Attester's Voting weight.
-        uint256 attesterWeight;
-        // Attester's ECDSA public key.
-        bytes attesterPubKey;
+        uint32 attesterWeight;
+        // Attester's Secp256k1 public key.
+        Secp256k1PublicKey attesterPubKey;
+    }
+
+    /// @dev Represents BLS12_381 public key.
+    struct BLS12_381PublicKey {
+        bytes32 a;
+        bytes32 b;
+        bytes32 c;
+    }
+
+    /// @dev Represents BLS12_381 signature.
+    struct BLS12_381Signature {
+        bytes32 a;
+        bytes16 b;
+    }
+
+    /// @dev Represents Secp256k1 public key.
+    struct Secp256k1PublicKey {
+        bytes1 a;
+        bytes32 b;
     }
 
     /// @dev Represents a validator committee member.
     struct CommitteeValidator {
         address nodeOwner;
-        uint256 weight;
-        bytes pubKey;
-        bytes pop;
+        uint32 weight;
+        BLS12_381PublicKey pubKey;
+        BLS12_381Signature pop;
     }
 
     /// @dev Represents an attester committee member.
     struct CommitteeAttester {
-        uint256 weight;
+        uint32 weight;
         address nodeOwner;
-        bytes pubKey;
+        Secp256k1PublicKey pubKey;
     }
-
 
     error UnauthorizedOnlyOwnerOrNodeOwner();
     error NodeOwnerAlreadyExists();
@@ -63,19 +81,19 @@ contract ConsensusRegistry is Ownable2Step {
     error ValidatorPubKeyAlreadyExists();
     error AttesterPubKeyAlreadyExists();
     error InvalidInputNodeOwnerAddress();
-    error InvalidInputValidatorPubKey();
-    error InvalidInputValidatorPoP();
-    error InvalidInputAttesterPubKey();
+    error InvalidInputBLS12_381PublicKey();
+    error InvalidInputBLS12_381Signature();
+    error InvalidInputSecp256k1PublicKey();
 
-    event NodeAdded(address indexed nodeOwner, uint256 validatorWeight, bytes validatorPubKey, bytes validatorPoP, uint256 attesterWeight, bytes attesterPubKey);
+    event NodeAdded(address indexed nodeOwner, uint32 validatorWeight, BLS12_381PublicKey validatorPubKey, BLS12_381Signature validatorPoP, uint32 attesterWeight, Secp256k1PublicKey attesterPubKey);
     event NodeDeactivated(address indexed nodeOwner);
     event NodeActivated(address indexed nodeOwner);
     event NodeRemoved(address indexed nodeOwner);
-    event NodeValidatorWeightChanged(address indexed nodeOwner, uint256 newWeight);
-    event NodeAttesterWeightChanged(address indexed nodeOwner, uint256 newWeight);
-    event NodeValidatorPubKeyChanged(address indexed nodeOwner, bytes newPubKey);
-    event NodeValidatorPoPChanged(address indexed nodeOwner, bytes newPoP);
-    event NodeAttesterPubKeyChanged(address indexed nodeOwner, bytes newPubKey);
+    event NodeValidatorWeightChanged(address indexed nodeOwner, uint32 newWeight);
+    event NodeAttesterWeightChanged(address indexed nodeOwner, uint32 newWeight);
+    event NodeValidatorPubKeyChanged(address indexed nodeOwner, BLS12_381PublicKey newPubKey);
+    event NodeValidatorPoPChanged(address indexed nodeOwner, BLS12_381Signature newPoP);
+    event NodeAttesterPubKeyChanged(address indexed nodeOwner, Secp256k1PublicKey newPubKey);
     event ValidatorCommitteeSet();
     event AttesterCommitteeSet();
 
@@ -105,34 +123,26 @@ contract ConsensusRegistry is Ownable2Step {
     /// @param _attesterPubKey The ECDSA public key of the attester.
     function add(
         address _nodeOwner,
-        uint256 _validatorWeight,
-        bytes calldata _validatorPubKey,
-        bytes calldata _validatorPoP,
-        uint256 _attesterWeight,
-        bytes calldata _attesterPubKey
+        uint32 _validatorWeight,
+        BLS12_381PublicKey calldata _validatorPubKey,
+        BLS12_381Signature calldata _validatorPoP,
+        uint32 _attesterWeight,
+        Secp256k1PublicKey calldata _attesterPubKey
     ) external onlyOwner {
-        if (_nodeOwner == address(0)) {
-            revert InvalidInputNodeOwnerAddress();
-        }
-        if (_validatorPubKey.length == 0) {
-            revert InvalidInputValidatorPubKey();
-        }
-        if (_validatorPoP.length == 0) {
-            revert InvalidInputValidatorPoP();
-        }
-        if (_attesterPubKey.length == 0) {
-            revert InvalidInputAttesterPubKey();
-        }
+        verifyInputAddress(_nodeOwner);
+        verifyInputBLS12_381PublicKey(_validatorPubKey);
+        verifyInputBLS12_381Signature(_validatorPoP);
+        verifyInputSecp256k1PublicKey(_attesterPubKey);
 
         uint256 len = nodeOwners.length;
         for (uint256 i = 0; i < len; ++i) {
             if (nodeOwners[i] == _nodeOwner) {
                 revert NodeOwnerAlreadyExists();
             }
-            if (compareBytes(nodes[nodeOwners[i]].validatorPubKey, _validatorPubKey)) {
+            if (compareBLS12_381PublicKey(nodes[nodeOwners[i]].validatorPubKey, _validatorPubKey)) {
                 revert ValidatorPubKeyAlreadyExists();
             }
-            if (compareBytes(nodes[nodeOwners[i]].attesterPubKey, _attesterPubKey)) {
+            if (compareSecp256k1PublicKey(nodes[nodeOwners[i]].attesterPubKey, _attesterPubKey)) {
                 revert AttesterPubKeyAlreadyExists();
             }
         }
@@ -202,7 +212,7 @@ contract ConsensusRegistry is Ownable2Step {
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner whose validator weight will be changed.
     /// @param _weight The new validator weight to assign to the node.
-    function changeValidatorWeight(address _nodeOwner, uint256 _weight) external onlyOwner {
+    function changeValidatorWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
         verifyNodeOwnerExists(_nodeOwner);
 
         nodes[_nodeOwner].validatorWeight = _weight;
@@ -215,7 +225,7 @@ contract ConsensusRegistry is Ownable2Step {
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner whose attester weight will be changed.
     /// @param _weight The new attester weight to assign to the node.
-    function changeAttesterWeight(address _nodeOwner, uint256 _weight) external onlyOwner {
+    function changeAttesterWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
         verifyNodeOwnerExists(_nodeOwner);
 
         nodes[_nodeOwner].attesterWeight = _weight;
@@ -231,15 +241,11 @@ contract ConsensusRegistry is Ownable2Step {
     /// @param _pop The new proof-of-possession (PoP) to assign to the node's validator.
     function changeValidatorKey(
         address _nodeOwner,
-        bytes calldata _pubKey,
-        bytes calldata _pop
+        BLS12_381PublicKey calldata _pubKey,
+        BLS12_381Signature calldata _pop
     ) external onlyOwnerOrNodeOwner(_nodeOwner) {
-        if (_pubKey.length == 0) {
-            revert InvalidInputValidatorPubKey();
-        }
-        if (_pop.length == 0) {
-            revert InvalidInputValidatorPoP();
-        }
+        verifyInputBLS12_381PublicKey(_pubKey);
+        verifyInputBLS12_381Signature(_pop);
         verifyNodeOwnerExists(_nodeOwner);
 
         nodes[_nodeOwner].validatorPubKey = _pubKey;
@@ -256,11 +262,9 @@ contract ConsensusRegistry is Ownable2Step {
     /// @param _pubKey The new ECDSA public key to assign to the node's attester.
     function changeAttesterPubKey(
         address _nodeOwner,
-        bytes calldata _pubKey
+        Secp256k1PublicKey calldata _pubKey
     ) external onlyOwnerOrNodeOwner(_nodeOwner) {
-        if (_pubKey.length == 0) {
-            revert InvalidInputAttesterPubKey();
-        }
+        verifyInputSecp256k1PublicKey(_pubKey);
         verifyNodeOwnerExists(_nodeOwner);
 
         nodes[_nodeOwner].attesterPubKey = _pubKey;
@@ -304,15 +308,6 @@ contract ConsensusRegistry is Ownable2Step {
         emit AttesterCommitteeSet();
     }
 
-    /// @notice Verifies that a node owner exists in the registry.
-    /// @dev Throws an error if the node owner does not exist.
-    /// @param _nodeOwner The address of the node's owner to verify.
-    function verifyNodeOwnerExists(address _nodeOwner) private view {
-        if (nodes[_nodeOwner].validatorPubKey.length == 0) {
-            revert NodeOwnerDoesNotExist();
-        }
-    }
-
     /// @notice Finds the index of a node owner in the `nodeOwners` array.
     /// @dev Throws an error if the node owner is not found in the array.
     /// @param _nodeOwner The address of the node's owner to find in the `nodeOwners` array.
@@ -327,6 +322,76 @@ contract ConsensusRegistry is Ownable2Step {
         revert NodeOwnerNotFound();
     }
 
+    /// @notice Verifies that a node owner exists in the registry.
+    /// @dev Throws an error if the node owner does not exist.
+    /// @param _nodeOwner The address of the node's owner to verify.
+    function verifyNodeOwnerExists(address _nodeOwner) private view {
+        BLS12_381PublicKey storage pubKey = nodes[_nodeOwner].validatorPubKey;
+        if (
+            pubKey.a == bytes32(0) &&
+            pubKey.b == bytes32(0) &&
+            pubKey.c == bytes32(0)
+        ) {
+            revert NodeOwnerDoesNotExist();
+        }
+    }
+
+    function verifyInputAddress(address _nodeOwner) private pure {
+        if (_nodeOwner == address(0)) {
+            revert InvalidInputNodeOwnerAddress();
+        }
+    }
+
+    function verifyInputBLS12_381PublicKey(BLS12_381PublicKey calldata _pubKey) private pure {
+        if (isEmptyBLS12_381PublicKey(_pubKey)) {
+            revert InvalidInputBLS12_381PublicKey();
+        }
+    }
+
+    function verifyInputBLS12_381Signature(BLS12_381Signature calldata _pop) private pure {
+        if (isEmptyBLS12_381Signature(_pop)) {
+            revert InvalidInputBLS12_381Signature();
+        }
+    }
+
+    function verifyInputSecp256k1PublicKey(Secp256k1PublicKey calldata _pubKey) private pure {
+        if (isEmptySecp256k1PublicKey(_pubKey)) {
+            revert InvalidInputSecp256k1PublicKey();
+        }
+    }
+
+    function compareSecp256k1PublicKey(Secp256k1PublicKey storage x, Secp256k1PublicKey calldata y) private view returns (bool) {
+        return
+            x.a == y.a &&
+            x.b == y.b;
+    }
+
+    function compareBLS12_381PublicKey(BLS12_381PublicKey storage x, BLS12_381PublicKey calldata y) private view returns (bool) {
+        return
+            x.a == y.a &&
+            x.b == y.b &&
+            x.c == y.c;
+    }
+
+    function isEmptyBLS12_381PublicKey(BLS12_381PublicKey calldata _pubKey) private pure returns (bool) {
+        return
+            _pubKey.a == bytes32(0) &&
+            _pubKey.b == bytes32(0) &&
+            _pubKey.c == bytes32(0);
+    }
+
+    function isEmptyBLS12_381Signature(BLS12_381Signature calldata _pop) private pure returns (bool) {
+        return
+            _pop.a == bytes32(0) &&
+            _pop.b == bytes16(0);
+    }
+
+    function isEmptySecp256k1PublicKey(Secp256k1PublicKey calldata _pubKey) private pure returns (bool) {
+        return
+            _pubKey.a == bytes1(0) &&
+            _pubKey.b == bytes32(0);
+    }
+
     function numNodes() public view returns (uint256) {
         return nodeOwners.length;
     }
@@ -337,9 +402,5 @@ contract ConsensusRegistry is Ownable2Step {
 
     function attesterCommitteeSize() public view returns (uint256) {
         return attesterCommittee.length;
-    }
-
-    function compareBytes(bytes storage a, bytes calldata b) private view returns (bool) {
-        return keccak256(a) == EfficientCall.keccak(b);
     }
 }
