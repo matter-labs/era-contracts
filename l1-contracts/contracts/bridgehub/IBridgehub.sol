@@ -148,10 +148,6 @@ interface IBridgehub is IL1AssetHandler {
         IMessageRoot _messageRoot
     ) external;
 
-    // function relayTxThroughBH(uint256 _baseDestChainId, uint256 _destChainId, bytes calldata _dataToRelay) external;
-
-    // function registerCounterpart(uint256 chainid, address _counterpart) external;
-
     event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
 
     function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
@@ -181,8 +177,6 @@ interface IBridgehub is IL1AssetHandler {
     function stmAssetId(address _stmAddress) external view returns (bytes32);
 
     function stmDeployer() external view returns (ISTMDeploymentTracker);
-
-    // function setSTMDeployer(ISTMDeploymentTracker _stmDeployer) external;
 
     function stmAssetIdToAddress(bytes32 _assetInfo) external view returns (address);
 

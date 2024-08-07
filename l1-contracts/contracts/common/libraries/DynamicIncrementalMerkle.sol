@@ -47,8 +47,6 @@ library DynamicIncrementalMerkle {
      * @dev Initialize a {Bytes32PushTree} using {Hashes-Keccak256} to hash internal nodes.
      * The capacity of the tree (i.e. number of leaves) is set to `2**levels`.
      *
-     * Calling this function on MerkleTree that was already setup and used will reset it to a blank state.
-     *
      * IMPORTANT: The zero value should be carefully chosen since it will be stored in the tree representing
      * empty leaves. It should be a value that is not expected to be part of the tree.
      */
@@ -62,18 +60,21 @@ library DynamicIncrementalMerkle {
     /**
      * @dev Resets the tree to a blank state.
      * Calling this function on MerkleTree that was already setup and used will reset it to a blank state.
+     * @param zero The value that represents an empty leaf.
+     * @return initialRoot The initial root of the tree.
      */
     function reset(Bytes32PushTree storage self, bytes32 zero) internal returns (bytes32 initialRoot) {
         self._nextLeafIndex = 0;
-        for (uint256 i = self._zeros.length; 0 < i; --i) {
+        uint256 length = self._zeros.length;
+        for (uint256 i = length; 0 < i; --i) {
             self._zeros.pop();
         }
-        for (uint256 i = self._sides.length; 0 < i; --i) {
-            self._zeros.pop();
+        length = self._sides.length;
+        for (uint256 i = length; 0 < i; --i) {
+            self._sides.pop();
         }
         self._zeros.push(zero);
-        self._zeros.pop();
-        self._sides.pop();
+        self._sides.push(bytes32(0));
         return bytes32(0);
     }
 
