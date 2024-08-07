@@ -11,7 +11,7 @@ import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
-import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, L1_CHAIN_ID, IContractDeployer} from "../L2ContractHelper.sol";
+import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
@@ -31,7 +31,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
 
-    mapping(bytes32 _assetId => address tokenAddress) public override tokenAddress;
+    mapping(bytes32 assetId => address tokenAddress) public override tokenAddress;
 
     modifier onlyBridge() {
         if (msg.sender != address(l2Bridge)) {
@@ -179,7 +179,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @param _l1Token The address of token on L1.
     /// @return expectedToken The address of token on L2.
     function l2TokenAddress(address _l1Token) public view override returns (address expectedToken) {
-        bytes32 expectedAssetId = keccak256(abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _l1Token));
+        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_l1Token);
         expectedToken = tokenAddress[expectedAssetId];
         if (expectedToken == address(0)) {
             expectedToken = _calculateCreate2TokenAddress(_l1Token);

@@ -35,7 +35,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
 
     /// @notice Deprecated. Kept for backwards compatibility.
     /// @dev A mapping l2 token address => l1 token address
-    mapping(address _l2Token => address l1Token) public override l1TokenAddress;
+    mapping(address l2Token => address l1Token) public override l1TokenAddress;
 
     /// @notice Obsolete, as all calls are performed via L1 Shared Bridge. Kept for backwards compatibility.
     /// @dev The address of the legacy L1 erc20 bridge counterpart.
@@ -52,7 +52,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     IL2NativeTokenVault public nativeTokenVault;
 
     /// @dev A mapping of asset ID to asset handler address
-    mapping(bytes32 _assetId => address assetHandlerAddress) public override assetHandlerAddress;
+    mapping(bytes32 assetId => address assetHandlerAddress) public override assetHandlerAddress;
 
     /// @notice Checks that the message sender is the legacy bridge.
     modifier onlyL1Bridge() {
@@ -175,7 +175,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         uint256 _amount,
         bytes calldata _data
     ) external override {
-        bytes32 assetId = keccak256(abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _l1Token));
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(_l1Token);
         // solhint-disable-next-line func-named-parameters
         bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);
         finalizeDeposit(assetId, data);
@@ -187,9 +187,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @param _l2Token The address of the token transferred.
     /// @param _amount The amount of the token transferred.
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
-        bytes32 assetId = keccak256(
-            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, getL1TokenAddress(_l2Token))
-        );
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(getL1TokenAddress(_l2Token));
         bytes memory data = abi.encode(_amount, _l1Receiver);
         withdraw(assetId, data);
     }

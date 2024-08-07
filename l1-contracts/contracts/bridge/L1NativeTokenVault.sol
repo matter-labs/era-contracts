@@ -34,10 +34,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
-    mapping(uint256 _chainId => mapping(address _l1Token => uint256 balance)) public chainBalance;
+    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 
     /// @dev A mapping assetId => tokenAddress
-    mapping(bytes32 _assetId => address tokenAddress) public tokenAddress;
+    mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
     /// @notice Checks that the message sender is the bridge.
     modifier onlyBridge() {

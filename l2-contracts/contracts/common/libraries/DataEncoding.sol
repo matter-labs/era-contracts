@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../../L2ContractHelper.sol";
+import {NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, L1_CHAIN_ID} from "../../L2ContractHelper.sol";
 
 /**
  * @author Matter Labs
@@ -67,20 +67,20 @@ library DataEncoding {
     /// @param _sender The asset deployment tracker address.
     /// @return The encoded asset data.
     function encodeAssetId(address _tokenAaddress, address _sender) internal view returns (bytes32) {
-        return keccak256(abi.encode(block.chainid, _sender, _tokenAaddress));
+        return keccak256(abi.encode(L1_CHAIN_ID, _sender, _tokenAaddress));
     }
 
     /// @notice Encodes the asset data by combining chain id, NTV as asset deployment tracker and asset data.
     /// @param _assetData The asset data that has to be encoded.
     /// @return The encoded asset data.
     function encodeNTVAssetId(bytes32 _assetData) internal view returns (bytes32) {
-        return keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetData));
+        return keccak256(abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetData));
     }
 
     /// @notice Encodes the asset data by combining chain id, NTV as asset deployment tracker and asset data.
     /// @param _tokenAddress The address of token that has to be encoded (asset data is the address itself).
     /// @return The encoded asset data.
     function encodeNTVAssetId(address _tokenAddress) internal view returns (bytes32) {
-        return keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _tokenAddress));
+        return keccak256(abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _tokenAddress));
     }
 }
