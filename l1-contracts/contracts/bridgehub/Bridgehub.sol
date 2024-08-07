@@ -527,7 +527,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return address(0);
     }
 
-    /// @dev IL1AssetHandler interface, used to undo a failed transfer of a chain.
+    /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
