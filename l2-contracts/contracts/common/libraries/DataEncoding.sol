@@ -55,11 +55,12 @@ library DataEncoding {
     }
 
     /// @notice Encodes the asset data by combining chain id, asset deployment tracker and asset data.
+    /// @param _chainId The id of the chain token is native to.
     /// @param _assetData The asset data that has to be encoded.
     /// @param _sender The asset deployment tracker address.
     /// @return The encoded asset data.
-    function encodeAssetId(bytes32 _assetData, address _sender) internal view returns (bytes32) {
-        return keccak256(abi.encode(block.chainid, _sender, _assetData));
+    function encodeAssetId(uint256 _chainId, bytes32 _assetData, address _sender) internal pure returns (bytes32) {
+        return keccak256(abi.encode(_chainId, _sender, _assetData));
     }
 
     /// @notice Encodes the asset data by combining chain id, asset deployment tracker and asset data.
@@ -67,7 +68,7 @@ library DataEncoding {
     /// @param _tokenAaddress The address of token that has to be encoded (asset data is the address itself).
     /// @param _sender The asset deployment tracker address.
     /// @return The encoded asset data.
-    function encodeAssetId(uint256 _chainId, address _tokenAaddress, address _sender) internal view returns (bytes32) {
+    function encodeAssetId(uint256 _chainId, address _tokenAaddress, address _sender) internal pure returns (bytes32) {
         return keccak256(abi.encode(_chainId, _sender, _tokenAaddress));
     }
 
@@ -75,7 +76,7 @@ library DataEncoding {
     /// @param _chainId The id of the chain token is native to.
     /// @param _assetData The asset data that has to be encoded.
     /// @return The encoded asset data.
-    function encodeNTVAssetId(uint256 _chainId, bytes32 _assetData) internal view returns (bytes32) {
+    function encodeNTVAssetId(uint256 _chainId, bytes32 _assetData) internal pure returns (bytes32) {
         return keccak256(abi.encode(_chainId, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _assetData));
     }
 
@@ -83,7 +84,7 @@ library DataEncoding {
     /// @param _chainId The id of the chain token is native to.
     /// @param _tokenAddress The address of token that has to be encoded (asset data is the address itself).
     /// @return The encoded asset data.
-    function encodeNTVAssetId(uint256 _chainId, address _tokenAddress) internal view returns (bytes32) {
+    function encodeNTVAssetId(uint256 _chainId, address _tokenAddress) internal pure returns (bytes32) {
         return keccak256(abi.encode(_chainId, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _tokenAddress));
     }
 }

@@ -103,7 +103,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     function registerToken(address _l1Token) external {
         require(_l1Token != L1_WETH_TOKEN, "NTV: WETH deposit not supported");
         require(_l1Token == ETH_TOKEN_ADDRESS || _l1Token.code.length > 0, "NTV: empty token");
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(_l1Token);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
         L1_SHARED_BRIDGE.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_l1Token))), address(this));
         tokenAddress[assetId] = _l1Token;
     }

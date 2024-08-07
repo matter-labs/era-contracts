@@ -247,7 +247,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     function setAssetHandlerAddressInitial(bytes32 _assetRegistrationData, address _assetHandlerAddress) external {
         bool senderIsNTV = msg.sender == address(nativeTokenVault);
         address sender = senderIsNTV ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
-        bytes32 assetId = DataEncoding.encodeAssetId(_assetRegistrationData, sender);
+        bytes32 assetId = DataEncoding.encodeAssetId(block.chainid, _assetRegistrationData, sender);
         require(senderIsNTV || msg.sender == assetDeploymentTracker[assetId], "ShB: not NTV or ADT");
         assetHandlerAddress[assetId] = _assetHandlerAddress;
         if (senderIsNTV) {
@@ -602,7 +602,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     function _ensureTokenRegisteredWithNTV(address _l1Token) internal returns (bytes32 assetId) {
-        assetId = DataEncoding.encodeNTVAssetId(_l1Token);
+        assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
         if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
             nativeTokenVault.registerToken(_l1Token);
         }
@@ -838,7 +838,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             // slither-disable-next-line unused-return
             (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
 
-            assetId = DataEncoding.encodeNTVAssetId(l1Token);
+            assetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);
             transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
             // The data is expected to be at least 36 bytes long to contain assetId.
@@ -875,7 +875,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(_l1Asset);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Asset);
         // For legacy deposits, the l2 receiver is not required to check tx data hash
         bytes memory transferData = abi.encode(_amount, address(0));
         bridgeRecoverFailedTransfer({

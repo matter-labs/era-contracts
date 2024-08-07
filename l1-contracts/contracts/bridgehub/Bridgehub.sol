@@ -56,7 +56,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(ETH_TOKEN_ADDRESS);
+        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
     }
 
     /// @notice used to initialize the contract
@@ -156,7 +156,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         baseToken[_chainId] = _baseToken;
 
         /// For now all base tokens have to use the NTV.
-        baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(_baseToken);
+        baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(block.chainid, _baseToken);
 
         IStateTransitionManager(_stateTransitionManager).createNewChain({
             _chainId: _chainId,
