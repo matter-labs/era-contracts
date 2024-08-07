@@ -58,9 +58,7 @@ describe("ERC20Bridge", function () {
     await deployer.deploy(await deployer.loadArtifact("BeaconProxy"), [l2Erc20TokenBeacon.address, "0x"]);
     const beaconProxyBytecodeHash = hashBytecode((await deployer.loadArtifact("BeaconProxy")).bytecode);
     const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [testChainId, 1]);
-    const erc20NativeTokenVaultImpl = await deployer.deploy(await deployer.loadArtifact("L2NativeTokenVault"), [
-      testChainId,
-    ]);
+    const erc20NativeTokenVaultImpl = await deployer.deploy(await deployer.loadArtifact("L2NativeTokenVault"), [1]);
     const assetHandlerInitializeData = erc20NativeTokenVaultImpl.interface.encodeFunctionData("initialize", [
       beaconProxyBytecodeHash,
       governorWallet.address, // Note on real deployment this will be the deployerWallet
