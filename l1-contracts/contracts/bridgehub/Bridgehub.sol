@@ -473,7 +473,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                         Chain migration
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice IL1AssetHandler interface, used to send a chain to the settlement layer.
+    /// @notice IL1AssetHandler interface, used to migrate (transfer) a chain to the settlement layer.
     function bridgeBurn(
         uint256 _settlementChainId,
         uint256,
