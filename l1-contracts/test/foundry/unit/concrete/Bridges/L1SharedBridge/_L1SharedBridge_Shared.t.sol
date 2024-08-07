@@ -99,9 +99,7 @@ contract L1SharedBridgeTest is Test {
 
     uint256 isWithdrawalFinalizedStorageLocation = uint256(8 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1 + 50);
     bytes32 ETH_TOKEN_ASSET_ID =
-        keccak256(
-            abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
-        );
+        keccak256(abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, ETH_TOKEN_ADDRESS));
 
     function setUp() public {
         owner = makeAddr("owner");

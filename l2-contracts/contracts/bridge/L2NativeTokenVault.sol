@@ -113,9 +113,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
 
         if (token == address(0)) {
             address expectedToken = _calculateCreate2TokenAddress(originToken);
-            bytes32 expectedAssetId = keccak256(
-                abi.encode(_chainId, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(originToken))))
-            );
+            bytes32 expectedAssetId = keccak256(abi.encode(_chainId, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, originToken));
             if (_assetId != expectedAssetId) {
                 // Make sure that a NativeTokenVault sent the message
                 revert AssetIdMismatch(expectedAssetId, _assetId);
@@ -170,9 +168,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @param _l1Token The address of token on L1.
     /// @return expectedToken The address of token on L2.
     function l2TokenAddress(address _l1Token) public view override returns (address expectedToken) {
-        bytes32 expectedAssetId = keccak256(
-            abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
-        );
+        bytes32 expectedAssetId = keccak256(abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, _l1Token));
         expectedToken = tokenAddress[expectedAssetId];
         if (expectedToken == address(0)) {
             expectedToken = _calculateCreate2TokenAddress(_l1Token);
