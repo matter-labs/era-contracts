@@ -8,6 +8,7 @@ import {BLOB_SIZE_BYTES} from "./DAUtils.sol";
 
 uint256 constant BLOBS_SUPPORTED = 6;
 
+// the state diff hash, hash of pubdata + the number of blobs.
 uint256 constant BLOB_DATA_OFFSET = 65;
 
 /// @notice Contract that contains the functionality for process the calldata DA.
@@ -39,7 +40,7 @@ abstract contract CalldataDA {
         // - Then, there are linear hashes of the published blobs, 32 bytes each.
 
         // Check that it accommodates enough pubdata for the state diff hash, hash of pubdata + the number of blobs.
-        require(_operatorDAInput.length >= 32 + 32 + 1, "too small");
+        require(_operatorDAInput.length >= BLOB_DATA_OFFSET, "too small");
 
         stateDiffHash = bytes32(_operatorDAInput[:32]);
         fullPubdataHash = bytes32(_operatorDAInput[32:64]);
@@ -70,23 +71,27 @@ abstract contract CalldataDA {
     }
 
     /// @notice Verify that the calldata DA was correctly provided.
-    /// todo: better doc comments
+    /// @param _blobsProvided The number of blobs provided.
+    /// @param _fullPubdataHash Hash of the pubdata preimage.
+    /// @param _maxBlobsSupported Maximum number of blobs supported.
+    /// @param _pubdataInput Full pubdata + an additional 32 bytes containing the blob commitment for the pubdata.
+    /// @dev We supply the blob commitment as part of the pubdata because even with calldata the prover will check these values.
     function _processCalldataDA(
         uint256 _blobsProvided,
         bytes32 _fullPubdataHash,
         uint256 _maxBlobsSupported,
         bytes calldata _pubdataInput
     ) internal pure returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
+        require(_blobsProvided == 1, "one one blob with calldata");
+
         // We typically do not know whether we'll use calldata or blobs at the time when
         // we start proving the batch. That's why the blob commitment for a single blob is still present in the case of calldata.
 
         blobCommitments = new bytes32[](_maxBlobsSupported);
 
-        require(_blobsProvided == 1, "one one blob with calldata");
-
         _pubdata = _pubdataInput[:_pubdataInput.length - 32];
 
-        // FIXME: allow larger lengths for Ga-based chains.
+        // FIXME: allow larger lengths for Gateway-based chains.
         require(_pubdata.length <= BLOB_SIZE_BYTES, "cz");
         require(_fullPubdataHash == keccak256(_pubdata), "wp");
         blobCommitments[0] = bytes32(_pubdataInput[_pubdataInput.length - 32:_pubdataInput.length]);
