@@ -78,9 +78,9 @@ library DataEncoding {
     }
 
     /// @notice Encodes the asset data by combining chain id, NTV as asset deployment tracker and asset data.
-    /// @param _tokenAaddress The address of token that has to be encoded (asset data is the address itself).
+    /// @param _tokenAddress The address of token that has to be encoded (asset data is the address itself).
     /// @return The encoded asset data.
-    function encodeNTVAssetId(address _tokenAaddress) internal view returns (bytes32) {
+    function encodeNTVAssetId(address _tokenAddress) internal view returns (bytes32) {
         return
             keccak256(
                 abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_tokenAaddress))))

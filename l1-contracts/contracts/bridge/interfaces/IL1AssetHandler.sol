@@ -17,7 +17,7 @@ interface IL1AssetHandler {
     event BridgeBurn(
         uint256 indexed _chainId,
         bytes32 indexed _assetId,
-        address indexed l1Sender,
+        address indexed _l1Sender,
         address _l2receiver,
         uint256 _amount
     );

@@ -179,7 +179,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
             abi.encode(L1_CHAIN_ID, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_l1Token))))
         );
         // solhint-disable-next-line func-named-parameters
-        bytes memory data = DataEncoding.encodeBridgeMintData(_amount, _l1Sender, _l2Receiver, _data, _l1Token);
+        bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);
         finalizeDeposit(assetId, data);
     }
 

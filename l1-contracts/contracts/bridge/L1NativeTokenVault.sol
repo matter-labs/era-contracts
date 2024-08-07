@@ -173,15 +173,21 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
 
         chainBalance[_chainId][l1Token] += amount;
 
-        // solhint-disable-next-line func-named-parameters
-        _bridgeMintData = DataEncoding.encodeBridgeMintData(
-            amount,
-            _prevMsgSender,
-            _l2Receiver,
-            getERC20Getters(l1Token),
-            l1Token
-        ); // solhint-disable-next-line func-named-parameters
-        emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _l2Receiver, amount);
+        _bridgeMintData = DataEncoding.encodeBridgeMintData({
+            _prevMsgSender: _prevMsgSender,
+            _l2Receiver: _l2Receiver,
+            _l1Token: l1Token,
+            _amount: amount,
+            _erc20Metadata: getERC20Getters(l1Token)
+        });
+
+        emit BridgeBurn({
+            _chainId: _chainId,
+            _assetId: _assetId,
+            _l1Sender: _prevMsgSender,
+            _l2receiver: _l2Receiver,
+            _amount: amount
+        });
     }
 
     ///  @inheritdoc IL1AssetHandler

@@ -224,7 +224,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
     }
 
-    /// @notice Used to Sets the assed deployment tracker address for given asset data.
+    /// @notice Used to set the assed deployment tracker address for given asset data.
     /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
     /// @param _assetDeploymentTracker The whitelisted address of asset deployment tracker for provided asset.
     function setAssetDeploymentTracker(
@@ -286,7 +286,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
             chainId: _chainId,
             l2Contract: l2BridgeAddress[_chainId],
-            mintValue: _mintValue, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
+            mintValue: _mintValue, // l2 gas + l2 msg.value the bridgehub will withdraw the mintValue from the base token bridge for gas
             l2Value: 0, // For base token deposits, there is no msg.value during the call, as the base token is minted to the recipient address
             l2Calldata: l2Calldata,
             l2GasLimit: _l2TxGasLimit,
@@ -351,6 +351,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bool legacyDeposit = false;
         bytes1 encodingVersion = _data[0];
 
+        // The new encoding ensures that the calldata is collision-resistant with respect to the legacy format.
+        // In the legacy calldata, the first input was the address, meaning the most significant byte was always `0x00`.
         if (encodingVersion == 0x01) {
             (assetId, transferData) = abi.decode(_data[1:], (bytes32, bytes));
             require(
@@ -430,7 +432,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         });
     }
 
-    /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
+    /// @dev Calls the internal `_encodeTxDataHash`. Used as a wrapped for try / catch case.
     /// @param _isLegacyEncoding Boolean flag indicating whether to use the legacy encoding standard (true) or the latest encoding standard (false).
     /// @param _prevMsgSender The address of the entity that initiated the deposit.
     /// @param _assetId The unique identifier of the deposited L1 token.
@@ -442,12 +444,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         bytes32 _assetId,
         bytes calldata _transferData
     ) external view returns (bytes32 txDataHash) {
-        if (_isLegacyEncoding) {
-            (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
-            txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(_assetId), depositAmount));
-        } else {
-            txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(_prevMsgSender, _assetId, _transferData)));
-        }
+        return _encodeTxDataHash(_isLegacyEncoding, _prevMsgSender, _assetId, _transferData);
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
@@ -492,7 +489,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             // If the dataHash matches the legacy transaction hash, skip the next step.
             // Otherwise, perform the check using the new transaction data hash encoding.
             if (!isLegacyTxDataHash) {
-                bytes32 txDataHash = this.encodeTxDataHash(false, _depositSender, _assetId, _assetData);
+                bytes32 txDataHash = _encodeTxDataHash(false, _depositSender, _assetId, _assetData);
                 require(dataHash == txDataHash, "ShB: d.it not hap");
             }
         }
@@ -664,7 +661,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             return abi.encodeCall(IL2Bridge.finalizeDeposit, (_assetId, _assetData));
         } else {
             // slither-disable-next-line unused-return
-            (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = DataEncoding
+            (, address _l2Receiver, address _parsedL1Token, uint256 _amount, bytes memory _gettersData) = DataEncoding
                 .decodeBridgeMintData(_assetData);
             return
                 abi.encodeCall(
@@ -711,6 +708,28 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             return txDataHash == _expectedTxDataHash;
         } catch {
             return false;
+        }
+    }
+
+    /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
+    /// @param _isLegacyEncoding Boolean flag indicating whether to use the legacy encoding standard (true) or the latest encoding standard (false).
+    /// @param _prevMsgSender The address of the entity that initiated the deposit.
+    /// @param _assetId The unique identifier of the deposited L1 token.
+    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
+    /// @return txDataHash The resulting encoded transaction data hash.
+    function _encodeTxDataHash(
+        bool _isLegacyEncoding,
+        address _prevMsgSender,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal view returns (bytes32 txDataHash) {
+        if (_isLegacyEncoding) {
+            (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
+            txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(_assetId), depositAmount));
+        } else {
+            // Similarly to calldata, the txDataHash is collision-resistant.
+            // In the legacy data hash, the first encoded variable was the address, which is padded with zeros during `abi.encode`.
+            txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(_prevMsgSender, _assetId, _transferData)));
         }
     }
 

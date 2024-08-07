@@ -11,46 +11,46 @@ import {NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../Config.sol";
  */
 library DataEncoding {
     /// @notice Abi.encodes the data required for bridgeMint on remote chain.
-    /// @param _amount The amount of token to be transferred.
     /// @param _prevMsgSender The address which initiated the transfer.
     /// @param _l2Receiver The address which to receive tokens on remote chain.
-    /// @param _erc20Metadata The transferred token metadata.
     /// @param _l1Token The transferred token address.
+    /// @param _amount The amount of token to be transferred.
+    /// @param _erc20Metadata The transferred token metadata.
     /// @return The encoded bridgeMint data
     function encodeBridgeMintData(
-        uint256 _amount,
         address _prevMsgSender,
         address _l2Receiver,
-        bytes memory _erc20Metadata,
-        address _l1Token
+        address _l1Token,
+        uint256 _amount,
+        bytes memory _erc20Metadata
     ) internal pure returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encode(_amount, _prevMsgSender, _l2Receiver, _erc20Metadata, _l1Token);
+        return abi.encode(_prevMsgSender, _l2Receiver, _l1Token, _amount, _erc20Metadata);
     }
 
     /// @notice Function decoding transfer data previously encoded with this library.
     /// @param _bridgeMintData The encoded bridgeMint data
-    /// @return _amount The amount of token to be transferred.
     /// @return _prevMsgSender The address which initiated the transfer.
     /// @return _l2Receiver The address which to receive tokens on remote chain.
-    /// @return _erc20Metadata The transferred token metadata.
     /// @return _parsedL1Token The transferred token address.
+    /// @return _amount The amount of token to be transferred.
+    /// @return _erc20Metadata The transferred token metadata.
     function decodeBridgeMintData(
         bytes memory _bridgeMintData
     )
         internal
         pure
         returns (
-            uint256 _amount,
             address _prevMsgSender,
             address _l2Receiver,
-            bytes memory _erc20Metadata,
-            address _parsedL1Token
+            address _parsedL1Token,
+            uint256 _amount,
+            bytes memory _erc20Metadata
         )
     {
-        (_amount, _prevMsgSender, _l2Receiver, _erc20Metadata, _parsedL1Token) = abi.decode(
+        (_prevMsgSender, _l2Receiver, _parsedL1Token, _amount, _erc20Metadata) = abi.decode(
             _bridgeMintData,
-            (uint256, address, address, bytes, address)
+            (address, address, address, uint256, bytes)
         );
     }
 
@@ -78,12 +78,12 @@ library DataEncoding {
     }
 
     /// @notice Encodes the asset data by combining chain id, NTV as asset deployment tracker and asset data.
-    /// @param _tokenAaddress The address of token that has to be encoded (asset data is the address itself).
+    /// @param _tokenAddress The address of token that has to be encoded (asset data is the address itself).
     /// @return The encoded asset data.
-    function encodeNTVAssetId(address _tokenAaddress) internal view returns (bytes32) {
+    function encodeNTVAssetId(address _tokenAddress) internal view returns (bytes32) {
         return
             keccak256(
-                abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_tokenAaddress))))
+                abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, bytes32(uint256(uint160(_tokenAddress))))
             );
     }
 }

@@ -104,11 +104,11 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable override onlyBridge {
         address token = tokenAddress[_assetId];
         (
-            uint256 _amount,
             address _l1Sender,
             address _l2Receiver,
-            bytes memory erc20Data,
-            address originToken
+            address originToken,
+            uint256 _amount,
+            bytes memory erc20Data
         ) = DataEncoding.decodeBridgeMintData(_data);
 
         if (token == address(0)) {

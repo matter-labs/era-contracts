@@ -42,9 +42,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     mapping(address account => mapping(address l1Token => mapping(bytes32 depositL2TxHash => uint256 amount)))
         public depositAmount;
 
-    /// @dev The address that is used as a L2 native token vault in ZKsync Era.
+    /// @dev The address that is used as a L2 Shared Bridge in ZKsync Era.
     // slither-disable-next-line uninitialized-state
-    address public l2NativeTokenVault;
+    address public l2Bridge;
 
     /// @dev The address that is used as a beacon for L2 tokens in ZKsync Era.
     // slither-disable-next-line uninitialized-state
@@ -172,11 +172,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         emit WithdrawalFinalized(l1Receiver, l1Token, amount);
     }
 
-    /// @notice View-only function for backward compatibility
-    function l2Bridge() external view returns (address) {
-        return l2NativeTokenVault;
-    }
-
     /// @notice Initiates a deposit by locking funds on the contract and sending the request
     /// @dev Initiates a deposit by locking funds on the contract and sending the request
     /// of processing an L2 transaction where tokens would be minted
@@ -246,12 +241,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         bytes32 constructorInputHash = keccak256(abi.encode(l2TokenBeacon, ""));
         bytes32 salt = bytes32(uint256(uint160(_l1Token)));
 
-        return
-            L2ContractHelper.computeCreate2Address(
-                l2NativeTokenVault,
-                salt,
-                l2TokenProxyBytecodeHash,
-                constructorInputHash
-            );
+        return L2ContractHelper.computeCreate2Address(l2Bridge, salt, l2TokenProxyBytecodeHash, constructorInputHash);
     }
 }

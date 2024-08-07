@@ -67,8 +67,6 @@ interface IL1ERC20Bridge {
 
     function l2TokenBeacon() external view returns (address);
 
-    function l2NativeTokenVault() external view returns (address);
-
     function l2Bridge() external view returns (address);
 
     function depositAmount(
