@@ -175,7 +175,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
         uint256 _amount,
         bytes calldata _data
     ) external override {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(_l1Token);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         // solhint-disable-next-line func-named-parameters
         bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);
         finalizeDeposit(assetId, data);
@@ -187,7 +187,7 @@ contract L2SharedBridge is IL2SharedBridge, ILegacyL2SharedBridge, Initializable
     /// @param _l2Token The address of the token transferred.
     /// @param _amount The amount of the token transferred.
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(getL1TokenAddress(_l2Token));
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, getL1TokenAddress(_l2Token));
         bytes memory data = abi.encode(_amount, _l1Receiver);
         withdraw(assetId, data);
     }

@@ -22,6 +22,10 @@ import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFail
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
+    /// @dev Chain ID of L1 for bridging reasons.
+    uint256 public immutable L1_CHAIN_ID;
+
+    /// @dev The address of the Shared Bridge on L2.
     IL2SharedBridge public override l2Bridge;
 
     /// @dev Contract that stores the implementation address for token.
@@ -31,7 +35,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
 
-    mapping(bytes32 assetId => address tokenAddress) public override tokenAddress;
+    mapping(bytes32 _assetId => address tokenAddress) public override tokenAddress;
 
     modifier onlyBridge() {
         if (msg.sender != address(l2Bridge)) {
@@ -43,7 +47,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
-    constructor() {
+    constructor(uint256 _l1ChainId) {
+        L1_CHAIN_ID = _l1ChainId;
         _disableInitializers();
     }
 
@@ -113,7 +118,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
 
         if (token == address(0)) {
             address expectedToken = _calculateCreate2TokenAddress(originToken);
-            bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(originToken);
+            bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, originToken);
             if (_assetId != expectedAssetId) {
                 // Make sure that a NativeTokenVault sent the message
                 revert AssetIdMismatch(expectedAssetId, _assetId);
@@ -179,7 +184,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @param _l1Token The address of token on L1.
     /// @return expectedToken The address of token on L2.
     function l2TokenAddress(address _l1Token) public view override returns (address expectedToken) {
-        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_l1Token);
+        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         expectedToken = tokenAddress[expectedAssetId];
         if (expectedToken == address(0)) {
             expectedToken = _calculateCreate2TokenAddress(_l1Token);
