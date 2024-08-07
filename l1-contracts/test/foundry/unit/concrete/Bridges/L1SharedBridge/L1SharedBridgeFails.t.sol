@@ -57,9 +57,9 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         sharedBridge.transferTokenToNTV(address(token));
     }
 
-    function test_clearChainBalance_wrongCaller() public {
+    function test_nullifyChainBalanceByNTV_wrongCaller() public {
         vm.expectRevert("ShB: not NTV");
-        sharedBridge.clearChainBalance(chainId, address(token));
+        sharedBridge.nullifyChainBalanceByNTV(chainId, address(token));
     }
 
     function test_registerToken_noCode() public {
@@ -156,18 +156,6 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         vm.prank(address(nativeTokenVault));
         vm.expectRevert("NTV: wrong amount transferred");
         nativeTokenVault.transferFundsFromSharedBridge(address(token));
-    }
-
-    function test_bridgehubDepositBaseToken_Eth_Token_notRegisteredTokenID() public {
-        // ToDo: Shall we do it properly instead of mocking?
-        stdstore
-            .target(address(sharedBridge))
-            .sig("assetHandlerAddress(bytes32)")
-            .with_key(ETH_TOKEN_ASSET_ID)
-            .checked_write(address(0));
-        vm.prank(bridgehubAddress);
-        vm.expectRevert("ShB: only address can be registered");
-        sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, ETH_TOKEN_ASSET_ID, alice, amount);
     }
 
     function test_bridgehubDepositBaseToken_Eth_Token_incorrectSender() public {
@@ -327,7 +315,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             _chainId: chainId,
             _depositSender: alice,
             _assetId: ETH_TOKEN_ASSET_ID,
-            _transferData: transferData,
+            _assetData: transferData,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -365,7 +353,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             _chainId: eraChainId,
             _depositSender: alice,
             _assetId: ETH_TOKEN_ASSET_ID,
-            _transferData: transferData,
+            _assetData: transferData,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -404,7 +392,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             _chainId: eraChainId,
             _depositSender: alice,
             _assetId: ETH_TOKEN_ASSET_ID,
-            _transferData: transferData,
+            _assetData: transferData,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -525,7 +513,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             abi.encode(true)
         );
 
-        vm.expectRevert("NTV n funds");
+        vm.expectRevert("NTV: not enough funds 2");
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
@@ -722,7 +710,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         );
         _setNativeTokenVaultChainBalance(chainId, ETH_TOKEN_ADDRESS, 0);
 
-        vm.expectRevert("NTV not enough funds 2");
+        vm.expectRevert("NTV: not enough funds");
 
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,

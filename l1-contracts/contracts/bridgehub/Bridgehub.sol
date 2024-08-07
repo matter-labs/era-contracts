@@ -11,8 +11,9 @@ import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOu
 import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
@@ -25,19 +26,19 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice the asset id of Eth
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
-    /// @notice all the ether is held by the weth bridge
+    /// @notice all the ether is held by the shared bridge
     IL1SharedBridge public sharedBridge;
 
     /// @notice we store registered stateTransitionManagers
-    mapping(address stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
+    mapping(address _stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
     /// @notice we store registered tokens (for arbitrary base token)
-    mapping(address token => bool) public tokenIsRegistered;
+    mapping(address _baseToken => bool) public tokenIsRegistered;
 
     /// @notice chainID => StateTransitionManager contract address, storing StateTransitionManager
-    mapping(uint256 chainId => address) public stateTransitionManager;
+    mapping(uint256 _chainId => address) public stateTransitionManager;
 
     /// @notice chainID => baseToken contract address, storing baseToken
-    mapping(uint256 chainId => address) public baseToken;
+    mapping(uint256 _chainId => address) public baseToken;
 
     /// @dev used to manage non critical updates
     address public admin;
@@ -46,23 +47,21 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     address private pendingAdmin;
 
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
-    mapping(uint256 chainId => bytes32 baseTokenAssetId) public baseTokenAssetId;
+    mapping(uint256 _chainId => bytes32) public baseTokenAssetId;
+
+    modifier onlyOwnerOrAdmin() {
+        require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
+        _;
+    }
 
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {
-        ETH_TOKEN_ASSET_ID = keccak256(
-            abi.encode(block.chainid, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, ETH_TOKEN_ADDRESS)
-        );
+        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
     }
 
     /// @notice used to initialize the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
-    }
-
-    modifier onlyOwnerOrAdmin() {
-        require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
-        _;
     }
 
     /// @inheritdoc IBridgehub
@@ -88,14 +87,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         emit NewPendingAdmin(currentPendingAdmin, address(0));
         emit NewAdmin(previousAdmin, currentPendingAdmin);
     }
-
-    ///// Getters
-
-    /// @notice return the state transition chain contract for a chainId
-    function getHyperchain(uint256 _chainId) public view returns (address) {
-        return IStateTransitionManager(stateTransitionManager[_chainId]).getHyperchain(_chainId);
-    }
-
     //// Registry
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
@@ -105,6 +96,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             "Bridgehub: state transition already registered"
         );
         stateTransitionManagerIsRegistered[_stateTransitionManager] = true;
+
+        emit StateTransitionManagerAdded(_stateTransitionManager);
     }
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
@@ -115,18 +108,25 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             "Bridgehub: state transition not registered yet"
         );
         stateTransitionManagerIsRegistered[_stateTransitionManager] = false;
+
+        emit StateTransitionManagerRemoved(_stateTransitionManager);
     }
 
     /// @notice token can be any contract with the appropriate interface/functionality
+    /// @param _token address of base token to be registered
     function addToken(address _token) external onlyOwner {
         require(!tokenIsRegistered[_token], "Bridgehub: token already registered");
         tokenIsRegistered[_token] = true;
+
+        emit TokenRegistered(_token);
     }
 
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
     function setSharedBridge(address _sharedBridge) external onlyOwner {
         sharedBridge = IL1SharedBridge(_sharedBridge);
+
+        emit SharedBridgeUpdated(_sharedBridge);
     }
 
     /// @notice register new chain
@@ -148,14 +148,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             "Bridgehub: state transition not registered"
         );
         require(tokenIsRegistered[_baseToken], "Bridgehub: token not registered");
-        require(address(sharedBridge) != address(0), "Bridgehub: weth bridge not set");
+        require(address(sharedBridge) != address(0), "Bridgehub: shared bridge not set");
 
         require(stateTransitionManager[_chainId] == address(0), "Bridgehub: chainId already registered");
 
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
+
         /// For now all base tokens have to use the NTV.
-        baseTokenAssetId[_chainId] = sharedBridge.nativeTokenVault().getAssetId(_baseToken);
+        baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(block.chainid, _baseToken);
 
         IStateTransitionManager(_stateTransitionManager).createNewChain({
             _chainId: _chainId,
@@ -170,6 +171,126 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     //// Mailbox forwarder
+
+    /// @notice the mailbox is called directly after the sharedBridge received the deposit
+    /// this assumes that either ether is the base token or
+    /// the msg.sender has approved mintValue allowance for the nativeTokenVault.
+    /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token.
+    /// In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
+    function requestL2TransactionDirect(
+        L2TransactionRequestDirect calldata _request
+    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+        // Note: If the hyperchain with corresponding `chainId` is not yet created,
+        // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
+        {
+            bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
+            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
+                require(msg.value == _request.mintValue, "Bridgehub: msg.value mismatch 1");
+            } else {
+                require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
+            }
+
+            // slither-disable-next-line arbitrary-send-eth
+            sharedBridge.bridgehubDepositBaseToken{value: msg.value}(
+                _request.chainId,
+                tokenAssetId,
+                msg.sender,
+                _request.mintValue
+            );
+        }
+
+        address hyperchain = getHyperchain(_request.chainId);
+        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
+        canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(
+            BridgehubL2TransactionRequest({
+                sender: msg.sender,
+                contractL2: _request.l2Contract,
+                mintValue: _request.mintValue,
+                l2Value: _request.l2Value,
+                l2Calldata: _request.l2Calldata,
+                l2GasLimit: _request.l2GasLimit,
+                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
+                factoryDeps: _request.factoryDeps,
+                refundRecipient: refundRecipient
+            })
+        );
+    }
+
+    /// @notice After depositing funds to the sharedBridge, the secondBridge is called
+    ///  to return the actual L2 message which is sent to the Mailbox.
+    ///  This assumes that either ether is the base token or
+    ///  the msg.sender has approved the nativeTokenVault with the mintValue,
+    ///  and also the necessary approvals are given for the second bridge.
+    ///  In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
+    /// @notice The logic of this bridge is to allow easy depositing for bridges.
+    /// Each contract that handles the users ERC20 tokens needs approvals from the user, this contract allows
+    /// the user to approve for each token only its respective bridge
+    /// @notice This function is great for contract calls to L2, the secondBridge can be any contract.
+    function requestL2TransactionTwoBridges(
+        L2TransactionRequestTwoBridgesOuter calldata _request
+    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+        require(
+            _request.secondBridgeAddress > BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
+            "Bridgehub: second bridge address too low"
+        ); // to avoid calls to precompiles
+
+        {
+            bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
+            uint256 baseTokenMsgValue;
+            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
+                require(
+                    msg.value == _request.mintValue + _request.secondBridgeValue,
+                    "Bridgehub: msg.value mismatch 2"
+                );
+                baseTokenMsgValue = _request.mintValue;
+            } else {
+                require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 3");
+                baseTokenMsgValue = 0;
+            }
+            // slither-disable-next-line arbitrary-send-eth
+            sharedBridge.bridgehubDepositBaseToken{value: baseTokenMsgValue}(
+                _request.chainId,
+                tokenAssetId,
+                msg.sender,
+                _request.mintValue
+            );
+        }
+
+        address hyperchain = getHyperchain(_request.chainId);
+
+        // slither-disable-next-line arbitrary-send-eth
+        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1SharedBridge(_request.secondBridgeAddress)
+            .bridgehubDeposit{value: _request.secondBridgeValue}(
+            _request.chainId,
+            msg.sender,
+            _request.l2Value,
+            _request.secondBridgeCalldata
+        );
+
+        require(outputRequest.magicValue == TWO_BRIDGES_MAGIC_VALUE, "Bridgehub: magic value mismatch");
+
+        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
+
+        canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(
+            BridgehubL2TransactionRequest({
+                sender: _request.secondBridgeAddress,
+                contractL2: outputRequest.l2Contract,
+                mintValue: _request.mintValue,
+                l2Value: _request.l2Value,
+                l2Calldata: outputRequest.l2Calldata,
+                l2GasLimit: _request.l2GasLimit,
+                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
+                factoryDeps: outputRequest.factoryDeps,
+                refundRecipient: refundRecipient
+            })
+        );
+
+        IL1SharedBridge(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
+            _request.chainId,
+            outputRequest.txDataHash,
+            canonicalTxHash
+        );
+    }
 
     /// @notice forwards function call to Mailbox based on ChainId
     /// @param _chainId The chain ID of the hyperchain where to prove L2 message inclusion.
@@ -249,121 +370,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return IZkSyncHyperchain(hyperchain).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
     }
 
-    /// @notice the mailbox is called directly after the sharedBridge received the deposit
-    /// this assumes that either ether is the base token or
-    /// the msg.sender has approved mintValue allowance for the sharedBridge.
-    /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token
-    function requestL2TransactionDirect(
-        L2TransactionRequestDirect calldata _request
-    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
-        // Note: If the hyperchain with corresponding `chainId` is not yet created,
-        // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
-        {
-            bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
-                require(msg.value == _request.mintValue, "Bridgehub: msg.value mismatch 1");
-            } else {
-                require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
-            }
+    ///// Getters
 
-            // slither-disable-next-line arbitrary-send-eth
-            sharedBridge.bridgehubDepositBaseToken{value: msg.value}(
-                _request.chainId,
-                tokenAssetId,
-                msg.sender,
-                _request.mintValue
-            );
-        }
-
-        address hyperchain = getHyperchain(_request.chainId);
-        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
-        canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(
-            BridgehubL2TransactionRequest({
-                sender: msg.sender,
-                contractL2: _request.l2Contract,
-                mintValue: _request.mintValue,
-                l2Value: _request.l2Value,
-                l2Calldata: _request.l2Calldata,
-                l2GasLimit: _request.l2GasLimit,
-                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                factoryDeps: _request.factoryDeps,
-                refundRecipient: refundRecipient
-            })
-        );
-    }
-
-    /// @notice After depositing funds to the sharedBridge, the secondBridge is called
-    ///  to return the actual L2 message which is sent to the Mailbox.
-    ///  This assumes that either ether is the base token or
-    ///  the msg.sender has approved the sharedBridge with the mintValue,
-    ///  and also the necessary approvals are given for the second bridge.
-    /// @notice The logic of this bridge is to allow easy depositing for bridges.
-    /// Each contract that handles the users ERC20 tokens needs approvals from the user, this contract allows
-    /// the user to approve for each token only its respective bridge
-    /// @notice This function is great for contract calls to L2, the secondBridge can be any contract.
-    function requestL2TransactionTwoBridges(
-        L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
-        {
-            bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
-            uint256 baseTokenMsgValue;
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
-                require(
-                    msg.value == _request.mintValue + _request.secondBridgeValue,
-                    "Bridgehub: msg.value mismatch 2"
-                );
-                baseTokenMsgValue = _request.mintValue;
-            } else {
-                require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 3");
-                baseTokenMsgValue = 0;
-            }
-            // slither-disable-next-line arbitrary-send-eth
-            sharedBridge.bridgehubDepositBaseToken{value: baseTokenMsgValue}(
-                _request.chainId,
-                tokenAssetId,
-                msg.sender,
-                _request.mintValue
-            );
-        }
-
-        address hyperchain = getHyperchain(_request.chainId);
-
-        // slither-disable-next-line arbitrary-send-eth
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1SharedBridge(_request.secondBridgeAddress)
-            .bridgehubDeposit{value: _request.secondBridgeValue}(
-            _request.chainId,
-            msg.sender,
-            _request.l2Value,
-            _request.secondBridgeCalldata
-        );
-
-        require(outputRequest.magicValue == TWO_BRIDGES_MAGIC_VALUE, "Bridgehub: magic value mismatch");
-
-        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
-
-        require(
-            _request.secondBridgeAddress > BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
-            "Bridgehub: second bridge address too low"
-        ); // to avoid calls to precompiles
-        canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(
-            BridgehubL2TransactionRequest({
-                sender: _request.secondBridgeAddress,
-                contractL2: outputRequest.l2Contract,
-                mintValue: _request.mintValue,
-                l2Value: _request.l2Value,
-                l2Calldata: outputRequest.l2Calldata,
-                l2GasLimit: _request.l2GasLimit,
-                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                factoryDeps: outputRequest.factoryDeps,
-                refundRecipient: refundRecipient
-            })
-        );
-
-        IL1SharedBridge(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
-            _request.chainId,
-            outputRequest.txDataHash,
-            canonicalTxHash
-        );
+    /// @notice return the state transition chain contract for a chainId
+    function getHyperchain(uint256 _chainId) public view returns (address) {
+        return IStateTransitionManager(stateTransitionManager[_chainId]).getHyperchain(_chainId);
     }
 
     /*//////////////////////////////////////////////////////////////

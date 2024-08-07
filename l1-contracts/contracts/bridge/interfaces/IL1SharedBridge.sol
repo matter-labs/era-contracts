@@ -25,7 +25,7 @@ interface IL1SharedBridge {
         bytes32 indexed txDataHash,
         address indexed from,
         bytes32 assetId,
-        bytes l2BridgeMintCalldata
+        bytes bridgeMintCalldata
     );
 
     event BridgehubDepositBaseTokenInitiated(
@@ -55,6 +55,12 @@ interface IL1SharedBridge {
         bytes assetData
     );
 
+    event AssetDeploymentTrackerSet(
+        bytes32 indexed assetId,
+        address indexed assetDeploymentTracker,
+        bytes32 indexed additionalData
+    );
+
     event AssetHandlerRegisteredInitial(
         bytes32 indexed assetId,
         address indexed assetHandlerAddress,
@@ -62,16 +68,14 @@ interface IL1SharedBridge {
         address sender
     );
 
-    event AssetHandlerRegistered(bytes32 indexed assetId, address indexed assetHandlerAddress);
-
     function isWithdrawalFinalized(
         uint256 _chainId,
         uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex
+        uint256 _l2ToL1MessageNumber
     ) external view returns (bool);
 
     function depositLegacyErc20Bridge(
-        address _msgSender,
+        address _prevMsgSender,
         address _l2Receiver,
         address _l1Token,
         uint256 _amount,
@@ -79,17 +83,6 @@ interface IL1SharedBridge {
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) external payable returns (bytes32 txHash);
-
-    function claimFailedDepositLegacyErc20Bridge(
-        address _depositSender,
-        address _l1Token,
-        uint256 _amount,
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
-    ) external;
 
     function claimFailedDeposit(
         uint256 _chainId,
@@ -109,7 +102,7 @@ interface IL1SharedBridge {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external returns (address l1Receiver, address l1Token, uint256 amount);
+    ) external returns (address l1Receiver, address l1Asset, uint256 amount);
 
     function finalizeWithdrawal(
         uint256 _chainId,
@@ -128,12 +121,15 @@ interface IL1SharedBridge {
 
     function l2BridgeAddress(uint256 _chainId) external view returns (address);
 
-    function depositHappened(uint256 _chainId, bytes32 _l2TxHash) external view returns (bytes32);
+    function depositHappened(uint256 _chainId, bytes32 _l2DepositTxHash) external view returns (bytes32);
 
-    /// data is abi encoded :
+    /// @dev Data has the following abi encoding for legacy deposits:
     /// address _l1Token,
     /// uint256 _amount,
     /// address _l2Receiver
+    /// for new deposits:
+    /// bytes32 _assetId,
+    /// bytes _transferData
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
@@ -166,7 +162,7 @@ interface IL1SharedBridge {
         uint256 _chainId,
         address _depositSender,
         bytes32 _assetId,
-        bytes calldata _tokenData,
+        bytes calldata _assetData,
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
@@ -174,9 +170,9 @@ interface IL1SharedBridge {
         bytes32[] calldata _merkleProof
     ) external;
 
-    function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
+    function chainBalance(uint256 _chainId, address _l1Token) external view returns (uint256);
 
     function transferTokenToNTV(address _token) external;
 
-    function clearChainBalance(uint256 _chainId, address _token) external;
+    function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external;
 }
