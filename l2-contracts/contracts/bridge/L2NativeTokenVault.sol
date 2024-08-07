@@ -37,13 +37,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         _;
     }
 
-    modifier onlyOwner() {
-        if (msg.sender != owner()) {
-            revert InvalidCaller(msg.sender);
-        }
-        _;
-    }
-
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
