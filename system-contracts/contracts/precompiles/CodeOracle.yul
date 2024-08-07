@@ -27,14 +27,14 @@ object "CodeOracle" {
             ////////////////////////////////////////////////////////////////
             //                      HELPER FUNCTIONS
             ////////////////////////////////////////////////////////////////
-            
+
             /// @notice The function that returns whether a certain versioned hash is marked as `known`
             /// @param versionedHash The versioned hash to check
             /// @return Whether the versioned hash is known
             function isCodeHashKnown(versionedHash) -> ret {
-                // 1. Selector for `KnownCodesStorage.getMarker(bytes32)`
+                // 1. Selector for `KnwonCodesStorage.getMarker(bytes32)`
                 mstore(0, 0x4c6314f000000000000000000000000000000000000000000000000000000000)
-                // 2. Input for `KnownCodesStorage.getMarker(bytes32)`
+                // 2. Input for `KnwonCodesStorage.getMarker(bytes32)`
                 mstore(4, versionedHash)
 
                 let success := staticcall(
@@ -66,7 +66,7 @@ object "CodeOracle" {
             /// @param versionedHash The versioned hash to decommit.
             /// @param lenInWords The length of the data in bytes to decommit.
             function decommit(versionedHash, lenInWords) {
-                // The operation below are never expected to overflow since the `lenInWords` is at most 2 bytes long.
+                // The operation below are never expected to overflow since the `lenInWords` is a most 2 bytes long.
                 let gasCost := mul(decommmitCostPerWord(), lenInWords)
 
                 // The cost of the decommit operation can not exceed the maximum value of the `uint32` type.
@@ -88,7 +88,7 @@ object "CodeOracle" {
                     // Decommitment failed
                     revert(0,0)
                 }
-                
+
                 // The "real" result of the `decommit` operation is a pointer to the memory page where the data was unpacked.
                 // We do not know whether the data was unpacked into the memory of this contract or not.
                 //  
@@ -96,13 +96,13 @@ object "CodeOracle" {
                 // decommit operation into the `active` pointer. 
                 verbatim_0i_0o("decommit_ptr_to_active")
 
-                // This operation is never expected to overflow since the `lenInWords` is at most 2 bytes long.
+                // This operation is never expected to overflow since the `lenInWords` is a most 2 bytes long.
                 let lenInBytes := mul(lenInWords, 32) 
 
                 // To avoid the complexity of calculating the length of the preimage in circuits, the length of the pointer is always fixed to 2^21 bytes.
                 // So the amount of data actually copied is determined here.
                 // Note, that here we overwrite the first `lenInBytes` bytes of the memory, but it is fine since the written values are equivalent
-                // to the bytes previously written there by the `decommit` operation (in case this is the first page where the decommit happened).
+                // to the bytes previously written there by the `decommit` operation (in case this is the first page where the decomit happened).
                 // In the future we won't do this and simply return the pointer returned by the `decommit` operation, shrunk to the `lenInBytes` length.
                 verbatim_3i_0o("active_ptr_data_copy", 0, 0, lenInBytes)
 
@@ -127,9 +127,15 @@ object "CodeOracle" {
             //   - hash[1] -- whether the contract is being constructed
             //   - hash[2..3] -- big endian length of the bytecode in 32-byte words. This number must be odd.
             //   - hash[4..31] -- the last 28 bytes of the sha256 hash.
+            // 2. EVM bytecode. It has the following format:
+            //   - hash[0] -- version (0x02)
+            //   - hash[1] -- whether the contract is being constructed
+            //   - hash[2..3] -- big endian length of the bytecode in bytes. This number can be arbitrary.
+            //   - hash[4..31] -- the last 28 bytes of the sha256 hash.
             // 
-            // Note, that in theory it can represent just some random blob of bytes, while 
-            // in practice it only represents only the corresponding bytecodes.
+            // Note, that in theory both values can represent just some random blob of bytes, while 
+            // in practice they only represent only the corresponding bytecodes.
+
 
             switch version 
             case 1 {
@@ -137,6 +143,14 @@ object "CodeOracle" {
                 // can pass the `isCodeHashKnown` check.
                 let lengthInWords := and(shr(224, versionedCodeHash), 0xffff)
                 decommit(versionedCodeHash, lengthInWords)
+            }
+            case 2 {
+                // We do not double check whether the length is 32 mod 64, since it assumed that only valid bytecodes
+                // can pass the `isCodeHashKnown` check.
+                let lengthInBytes := and(shr(224, versionedCodeHash), 0xffff)
+
+                // It is assumed that the `lengthInBytes` is divisible by 32.
+                decommit(versionedCodeHash, div(lengthInBytes, 32))
             }
             default {
                 // Unsupported

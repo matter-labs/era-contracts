@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import {MSG_VALUE_SYSTEM_CONTRACT, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT} from "../Constants.sol";
 import {Utils} from "./Utils.sol";
@@ -36,6 +36,10 @@ address constant PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS = address((1 << 16) - 24);
 address constant PTR_PACK_INTO_ACTIVE_CALL_ADDRESS = address((1 << 16) - 25);
 address constant MULTIPLICATION_HIGH_ADDRESS = address((1 << 16) - 26);
 address constant GET_EXTRA_ABI_DATA_ADDRESS = address((1 << 16) - 27);
+
+address constant PTR_DATA_LOAD = address((1 << 16) - 28);
+address constant PTR_DATA_COPY = address((1 << 16) - 29);
+address constant PTR_DATA_SIZE = address((1 << 16) - 30);
 
 // All the offsets are in bits
 uint256 constant META_PUBDATA_PUBLISHED_OFFSET = 0 * 8;

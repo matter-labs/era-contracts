@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import {SYSTEM_CALL_CALL_ADDRESS, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, SystemContractsCaller, CalldataForwardingMode} from "../libraries/SystemContractsCaller.sol";
 import {Utils} from "../libraries/Utils.sol";

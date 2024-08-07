@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
-import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT} from "./Constants.sol";
+import {CREATE2_EVM_PREFIX, CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT , IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, KECCAK256_SYSTEM_CONTRACT} from "./Constants.sol";
 
 import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
+
+import {RLPEncoder} from "./libraries/RLPEncoder.sol";
 
 /**
  * @author Matter Labs
@@ -24,6 +26,33 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @notice Information about an account contract.
     /// @dev For EOA and simple contracts (i.e. not accounts) this value is 0.
     mapping(address => AccountInfo) internal accountInfo;
+
+    enum EvmContractState {
+        None,
+        ConstructorPending,
+        ConstructorCalled,
+        Deployed
+    }
+
+    mapping(address => bytes32) public evmCodeHash;
+
+    uint256 public constructorReturnGas;
+
+    function setDeployedCode(uint256 constructorGasLeft, bytes calldata paddedNewDeployedCode) external {
+        require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender));
+
+        uint256 bytecodeLen = uint256(bytes32(paddedNewDeployedCode[:32]));
+        bytes memory trueBytecode = paddedNewDeployedCode[32:32 + bytecodeLen];
+
+        evmCodeHash[msg.sender] = keccak256(trueBytecode);
+        constructorReturnGas = constructorGasLeft;
+
+        // ToDO: use efficient call
+        KNOWN_CODE_STORAGE_CONTRACT.publishEVMBytecode(paddedNewDeployedCode);
+
+        bytes32 codeHash = Utils.hashEVMBytecode(paddedNewDeployedCode);
+        ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructedCodeHash(msg.sender, codeHash);
+    }
 
     modifier onlySelf() {
         require(msg.sender == address(this), "Callable only by self");
@@ -153,6 +182,38 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         return createAccount(_salt, _bytecodeHash, _input, AccountAbstractionVersion.None);
     }
 
+    function createEVM(bytes calldata _initCode) external payable override returns (address) {
+        // If the account is an EOA, use the min nonce. If it's a contract, use deployment nonce
+        // Subtract 1 for EOA since the nonce has already been incremented for this transaction
+        uint256 senderNonce = msg.sender == tx.origin
+            ? NONCE_HOLDER_SYSTEM_CONTRACT.getMinNonce(msg.sender) - 1
+            : NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender) + 1;
+        address newAddress = Utils.getNewAddressCreateEVM(msg.sender, senderNonce);
+        _evmDeployOnAddress(newAddress, _initCode);
+        return newAddress;
+    }
+
+    /// @notice Deploys an EVM contract using address derivation of EVM's `CREATE2` opcode
+    /// @param _salt The CREATE2 salt
+    /// @param _initCode The init code for the contract
+    /// Note: this method may be callable only in system mode,
+    /// that is checked in the `createAccount` by `onlySystemCall` modifier.
+    function create2EVM(bytes32 _salt, bytes calldata _initCode) external payable override returns (address) {
+        // No collision is possible with the zksync's non-EVM CREATE2, since
+        // the prefixes are different
+        bytes32 bytecodeHash = EfficientCall.keccak(_initCode);
+        address newAddress = Utils.getNewAddressCreate2EVM(msg.sender, _salt, bytecodeHash);
+
+        _evmDeployOnAddress(newAddress, _initCode);
+
+        return newAddress;
+    }
+
+    function createEVMInternal(address _newAddress, bytes calldata _initCode) external payable {
+        require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender));
+        _evmDeployOnAddress(_newAddress, _initCode);
+    }
+
     /// @notice Deploys a contract account with similar address derivation rules to the EVM's `CREATE2` opcode.
     /// @param _salt The CREATE2 salt
     /// @param _bytecodeHash The correctly formatted hash of the bytecode.
@@ -273,7 +334,14 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         // Do not allow deploying contracts to default accounts that have already executed transactions.
         require(NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(_newAddress) == 0x00, "Account is occupied");
 
-        _performDeployOnAddress(_bytecodeHash, _newAddress, _aaVersion, _input);
+        _performDeployOnAddress(_bytecodeHash, _newAddress, _aaVersion, _input, true);
+    }
+
+    function _evmDeployOnAddress(address _newAddress, bytes calldata _initCode) internal {
+        // Unfortunately we can not provide revert reason as it would break EVM compatibility
+        // TODO: maybe it is redundant
+        require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getCodeHash(uint256(uint160(_newAddress))) == 0x0);
+        _performDeployOnAddressEVM(_newAddress, AccountAbstractionVersion.None, _initCode, false);
     }
 
     /// @notice Deploy a certain bytecode on the address.
@@ -285,7 +353,8 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         bytes32 _bytecodeHash,
         address _newAddress,
         AccountAbstractionVersion _aaVersion,
-        bytes calldata _input
+        bytes calldata _input,
+        bool _callConstructor
     ) internal {
         _ensureBytecodeIsKnown(_bytecodeHash);
 
@@ -301,8 +370,49 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
             _bytecodeHash: _bytecodeHash,
             _input: _input,
             _isSystem: false,
-            _callConstructor: true
+            _callConstructor: _callConstructor
         });
+    }
+
+    function convertToConstructorEVMInput(bytes calldata _input) internal pure returns (bytes memory) {
+        // With how the contracts work, the calldata to the constuctor must be an ABI-encoded `bytes`.
+        // This means that it should also contain offset as well as length
+        uint256 _fullLength = _input.length;
+        bytes memory extendedInput = new bytes(_input.length + 64);
+
+        assembly {
+            // "Offset" for the calldata
+            mstore(add(extendedInput, 0x20), 0x20)
+            // "Length"
+            mstore(add(extendedInput, 0x40), _fullLength)
+
+            calldatacopy(add(extendedInput, 0x60), _input.offset, _fullLength)
+        }
+
+        return extendedInput;
+    }
+
+    /// @notice Deploy a certain bytecode on the address.
+    /// @param _newAddress The address of the contract to be deployed.
+    /// @param _aaVersion The version of the account abstraction protocol to use.
+    /// @param _input The constructor calldata.
+    function _performDeployOnAddressEVM(
+        address _newAddress,
+        AccountAbstractionVersion _aaVersion,
+        bytes calldata _input,
+        bool _callConstructor
+    ) internal {
+        AccountInfo memory newAccountInfo;
+        newAccountInfo.supportedAAVersion = _aaVersion;
+        // Accounts have sequential nonces by default.
+        newAccountInfo.nonceOrdering = AccountNonceOrdering.Sequential;
+        _storeAccountInfo(_newAddress, newAccountInfo);
+
+        // Note, that for contracts the "nonce" is set as deployment nonce.
+        NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(_newAddress);
+
+        // When constructing they just get the intrepeter bytecode hash in consutrcting mode
+        _constructEVMContract(msg.sender, _newAddress, _input);
     }
 
     /// @notice Check that bytecode hash is marked as known on the `KnownCodeStorage` system contracts
@@ -368,5 +478,46 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         }
 
         emit ContractDeployed(_sender, _bytecodeHash, _newAddress);
+    }
+
+    function _constructEVMContract(address _sender, address _newAddress, bytes calldata _input) internal {
+        // FIXME: this is a temporary limitation.
+        // To be removed in the future
+        require(_input.length > 0);
+
+        constructorReturnGas = 0;
+
+        uint256 value = msg.value;
+        // 1. Transfer the balance to the new address on the constructor call.
+        if (value > 0) {
+            BASE_TOKEN_SYSTEM_CONTRACT.transferFromTo(address(this), _newAddress, value);
+        }
+
+        // 2. Set the constructed code hash on the account
+        _storeConstructingByteCodeHashOnAddress(
+            _newAddress,
+            // Dummy EVM bytecode hash just to call simulator.
+            // The second byte is `0x01` to indicate that it is being constructed.
+            bytes32(0x0201000000000000000000000000000000000000000000000000000000000000)
+        );
+
+        // 3. Call the constructor on behalf of the account
+        if (value > 0) {
+            // Safe to cast value, because `msg.value` <= `uint128.max` due to `MessageValueSimulator` invariant
+            SystemContractHelper.setValueForNextFarCall(uint128(value));
+        }
+
+        // In case of EVM contracts returnData is the new deployed code
+        bool success = SystemContractHelper.mimicCall(uint32(gasleft()), _newAddress, msg.sender, _input, true, false);
+
+        if (!success) {
+            assembly {
+                // Just propagate the error back
+                returndatacopy(0, 0, returndatasize())
+                revert(0, returndatasize())
+            }
+        }
+
+        require(evmCodeHash[_newAddress] != 0x0, "The code hash must be set after the constructor call");
     }
 }

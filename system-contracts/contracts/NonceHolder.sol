@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import {INonceHolder} from "./interfaces/INonceHolder.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
-import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -134,7 +134,8 @@ contract NonceHolder is INonceHolder, ISystemContract {
     /// @return prevDeploymentNonce The deployment nonce at the time this function is called.
     function incrementDeploymentNonce(address _address) external returns (uint256 prevDeploymentNonce) {
         require(
-            msg.sender == address(DEPLOYER_SYSTEM_CONTRACT),
+            msg.sender == address(DEPLOYER_SYSTEM_CONTRACT) ||
+                ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender),
             "Only the contract deployer can increment the deployment nonce"
         );
         uint256 addressAsKey = uint256(uint160(_address));
