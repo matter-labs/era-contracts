@@ -16,7 +16,7 @@ import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.so
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
-import {Messaging} from "../../../common/libraries/Messaging.sol";
+import {MessageHashing} from "../../../common/libraries/MessageHashing.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
@@ -181,7 +181,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             }
 
             // Now, we'll have to check that the SyncLayer included the message.
-            bytes32 batchLeafHash = Messaging.batchLeafHash(batchSettlementRoot, _batchNumber);
+            bytes32 batchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, _batchNumber);
 
             uint256 batchLeafProofMask = uint256(bytes32(_proof[ptr]));
             ++ptr;
@@ -193,7 +193,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             );
             ptr += batchLeafProofLen;
 
-            chainIdLeaf = Messaging.chainIdLeafHash(chainIdRoot, s.chainId);
+            chainIdLeaf = MessageHashing.chainIdLeafHash(chainIdRoot, s.chainId);
         }
 
         uint256 syncLayerBatchNumber;

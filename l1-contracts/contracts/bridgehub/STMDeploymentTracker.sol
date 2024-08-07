@@ -41,11 +41,13 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     }
 
     /// @notice used to initialize the contract
+    /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
     }
 
     /// @notice Used to register the stm asset in L1 contracts, AssetRouter and Bridgehub.
+    /// @param _stmAddress the address of the stm asset
     function registerSTMAssetOnL1(address _stmAddress) external onlyOwner {
         // solhint-disable-next-line gas-custom-errors
 
@@ -64,6 +66,9 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     /// for the L2 transaction.
     /// The second approach is used due to its simplicity even though it gives the sender slightly more control over the call:
     /// `gasLimit`, etc.
+    /// @param _chainId the chainId of the chain
+    /// @param _prevMsgSender the previous message sender
+    /// @param _data the data of the transaction
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
         uint256 _chainId,
@@ -84,6 +89,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
 
     // todo this has to be put in L1AssetRouter via TwoBridges for custom base tokens. Hard, because we have to have multiple msg types in bridgehubDeposit in the AssetRouter.
     /// @notice Used to register the stm asset in L2 AssetRouter.
+    /// @param _chainId the chainId of the chain
     function registerSTMAssetOnL2SharedBridge(
         uint256 _chainId,
         address _stmL1Address,
@@ -110,6 +116,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
 
     // Todo this works for now, but it will not work in the future if we want to change STM DTs. Probably ok.
     /// @notice Used to register the stm asset in L2 Bridgehub.
+    /// @param _chainId the chainId of the chain
     function _registerSTMAssetOnL2Bridgehub(
         // solhint-disable-next-line no-unused-vars
         uint256 _chainId,
@@ -133,11 +140,12 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     }
 
     /// @dev we need to implement this for the bridgehub for the TwoBridges logic
-    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {
-        // This function is typically used on bridges for e.g.
+    function bridgehubConfirmL2Transaction(uint256, bytes32, bytes32) external {
+        // This function is typically used on bridges for e.g. confirm that a tx took place
     }
 
     /// @notice Return the assetId of the STM.
+    /// @param _l1STM the address of the STM on L1
     function getAssetId(address _l1STM) public view override returns (bytes32) {
         return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1STM)))));
     }

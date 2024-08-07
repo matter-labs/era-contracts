@@ -112,12 +112,15 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @notice Returns the address of the hyperchain with the corresponding chainID
+    /// @param _chainId the chainId of the chain
+    /// @return chainAddress the address of the hyperchain
     function getHyperchain(uint256 _chainId) public view override returns (address chainAddress) {
         // slither-disable-next-line unused-return
         (, chainAddress) = hyperchainMap.tryGet(_chainId);
     }
 
     /// @notice Returns the address of the hyperchain admin with the corresponding chainID
+    /// @param _chainId the chainId of the chain
     function getChainAdmin(uint256 _chainId) external view override returns (address) {
         return IZkSyncHyperchain(hyperchainMap.get(_chainId)).getAdmin();
     }
@@ -209,6 +212,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev set validatorTimelock. Cannot do it during initialization, as validatorTimelock is deployed after STM
+    /// @param _validatorTimelock the new validatorTimelock address
     function setValidatorTimelock(address _validatorTimelock) external onlyOwnerOrAdmin {
         address oldValidatorTimelock = validatorTimelock;
         validatorTimelock = _validatorTimelock;
@@ -216,6 +220,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev set New Version with upgrade from old version
+    /// @param _cutData the new diamond cut data
+    /// @param _oldProtocolVersion the old protocol version
+    /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
+    /// @param _newProtocolVersion the new protocol version
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
@@ -233,16 +241,21 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev check that the protocolVersion is active
+    /// @param _protocolVersion the protocol version to check
     function protocolVersionIsActive(uint256 _protocolVersion) external view override returns (bool) {
         return block.timestamp <= protocolVersionDeadline[_protocolVersion];
     }
 
     /// @dev set the protocol version timestamp
+    /// @param _protocolVersion the protocol version
+    /// @param _timestamp the timestamp is the deadline
     function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
         protocolVersionDeadline[_protocolVersion] = _timestamp;
     }
 
     /// @dev set upgrade for some protocolVersion
+    /// @param _cutData the new diamond cut data
+    /// @param _oldProtocolVersion the old protocol version
     function setUpgradeDiamondCut(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion
@@ -253,21 +266,28 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev freezes the specified chain
+    /// @param _chainId the chainId of the chain
     function freezeChain(uint256 _chainId) external onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).freezeDiamond();
     }
 
     /// @dev freezes the specified chain
+    /// @param _chainId the chainId of the chain
     function unfreezeChain(uint256 _chainId) external onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).unfreezeDiamond();
     }
 
     /// @dev reverts batches on the specified chain
+    /// @param _chainId the chainId of the chain
+    /// @param _newLastBatch the new last batch
     function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).revertBatches(_newLastBatch);
     }
 
     /// @dev execute predefined upgrade
+    /// @param _chainId the chainId of the chain
+    /// @param _oldProtocolVersion the old protocol version
+    /// @param _diamondCut the diamond cut data
     function upgradeChainFromVersion(
         uint256 _chainId,
         uint256 _oldProtocolVersion,
@@ -277,35 +297,49 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev executes upgrade on chain
+    /// @param _chainId the chainId of the chain
+    /// @param _diamondCut the diamond cut data
     function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).executeUpgrade(_diamondCut);
     }
 
     /// @dev setPriorityTxMaxGasLimit for the specified chain
+    /// @param _chainId the chainId of the chain
+    /// @param _maxGasLimit the new max gas limit
     function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external {
         // onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// @dev setTokenMultiplier for the specified chain
+    /// @param _chainId the chainId of the chain
+    /// @param _nominator the new nominator of the token multiplier
+    /// @param _denominator the new denominator of the token multiplier
     function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external {
         // onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).setTokenMultiplier(_nominator, _denominator);
     }
 
     /// @dev changeFeeParams for the specified chain
+    /// @param _chainId the chainId of the chain
+    /// @param _newFeeParams the new fee params
     function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external {
         // onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).changeFeeParams(_newFeeParams);
     }
 
     /// @dev setValidator for the specified chain
+    /// @param _chainId the chainId of the chain
+    /// @param _validator the new validator
+    /// @param _active whether the validator is active
     function setValidator(uint256 _chainId, address _validator, bool _active) external {
         // onlyOwnerOrAdmin {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).setValidator(_validator, _active);
     }
 
     /// @dev setPorterAvailability for the specified chain
+    /// @param _chainId the chainId of the chain
+    /// @param _zkPorterIsAvailable whether the zkPorter mode is available
     function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
         // onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPorterAvailability(_zkPorterIsAvailable);
@@ -381,6 +415,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @param _sharedBridge the shared bridge address, used as base token bridge
     /// @param _admin the chain's admin address
     /// @param _initData the diamond cut data, force deployments and factoryDeps encoded
+    /// @param _factoryDeps the factory dependencies used for the genesis upgrade
     /// that initializes the chains Diamond Proxy
     function createNewChain(
         uint256 _chainId,
@@ -404,10 +439,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         IAdmin(hyperchainAddress).genesisUpgrade(l1GenesisUpgrade, _forceDeploymentData, _factoryDeps);
     }
 
+    /// @param _chainId the chainId of the chain
     function getProtocolVersion(uint256 _chainId) public view returns (uint256) {
         return IZkSyncHyperchain(hyperchainMap.get(_chainId)).getProtocolVersion();
     }
 
+    /// @param _newSyncLayerChainId newGatewayChainId newSettlmentLayerChainId the chainId of the chain
     function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external onlyOwner {
         require(_newSyncLayerChainId != 0, "Bad chain id");
 
@@ -458,6 +495,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @notice Called by the bridgehub during the failed migration of a chain.
+    /// @param _chainId the chainId of the chain
+    /// @param _assetInfo the assetInfo of the chain
+    /// @param _prevMsgSender the previous message sender
+    /// @param _data the data of the migration
     function bridgeClaimFailedBurn(
         uint256 _chainId,
         bytes32 _assetInfo,

@@ -109,6 +109,11 @@ interface IMailbox is IZkSyncHyperchainBase {
     ) external;
 
     /// @dev On L1 we have to forward to the Settlement Layer's mailbox which sends to the Bridgehub on the SL
+    /// @param _chainId the chainId of the chain
+    /// @param _transaction the transaction to be relayed
+    /// @param _factoryDeps the factory dependencies
+    /// @param _canonicalTxHash the canonical transaction hash
+    /// @param _expirationTimestamp the expiration timestamp
     function requestL2TransactionToSyncLayerMailbox(
         uint256 _chainId,
         L2CanonicalTransaction calldata _transaction,
