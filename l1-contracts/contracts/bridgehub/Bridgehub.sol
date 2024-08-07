@@ -12,7 +12,7 @@ import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, VIRTUAL_SENDER_ALIASED_ZERO_ADDRESS} from "../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
@@ -96,7 +96,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     modifier onlyAliasedZero() {
-        require(msg.sender == AddressAliasHelper.applyL1ToL2Alias(address(0)), "BH: not aliased zero");
+        /// There is no sender for the wrapping, we use a virtual address.
+        require(msg.sender == VIRTUAL_SENDER_ALIASED_ZERO_ADDRESS, "BH: not aliased zero");
         _;
     }
 
