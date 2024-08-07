@@ -19,6 +19,8 @@ import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
+import {ValidiumL1DAValidator} from "da-contracts/ValidiumL1DAValidator.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {STMDeploymentTracker} from "contracts/bridgehub/STMDeploymentTracker.sol";
@@ -62,6 +64,8 @@ contract DeployL1Script is Script {
         address blobVersionedHashRetriever;
         address validatorTimelock;
         address create2Factory;
+        address rollupL1DAValidator;
+        address validiumL1DAValidator;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -162,10 +166,13 @@ contract DeployL1Script is Script {
 
         deployDefaultUpgrade();
         deployGenesisUpgrade();
-        deployValidatorTimelock();
+
+        deployDAValidators();
 
         deployGovernance();
         deployChainAdmin();
+
+        deployValidatorTimelock();
         deployTransparentProxyAdmin();
         deployBridgehubContract();
         deployMessageRootContract();
@@ -334,6 +341,16 @@ contract DeployL1Script is Script {
         address contractAddress = deployViaCreate2(bytecode);
         console.log("ValidatorTimelock deployed at:", contractAddress);
         addresses.validatorTimelock = contractAddress;
+    }
+
+    function deployDAValidators() internal {
+        address contractAddress = deployViaCreate2(type(RollupL1DAValidator).creationCode);
+        console.log("RollupL1DAValidator deployed at:", contractAddress);
+        addresses.rollupL1DAValidator = contractAddress;
+
+        contractAddress = deployViaCreate2(type(ValidiumL1DAValidator).creationCode);
+        console.log("ValidiumL1DAValidator deployed at:", contractAddress);
+        addresses.validiumL1DAValidator = contractAddress;
     }
 
     function deployGovernance() internal {
@@ -875,6 +892,9 @@ contract DeployL1Script is Script {
             "blob_versioned_hash_retriever_addr",
             addresses.blobVersionedHashRetriever
         );
+        vm.serializeAddress("deployed_addresses", "rollup_l1_da_validator_addr", addresses.rollupL1DAValidator);
+        vm.serializeAddress("deployed_addresses", "validium_l1_da_validator_addr", addresse.validiumL1DAValidator);
+
         vm.serializeAddress("deployed_addresses", "validator_timelock_addr", addresses.validatorTimelock);
         vm.serializeAddress("deployed_addresses", "native_token_vault_addr", addresses.vaults.l1NativeTokenVaultProxy);
         vm.serializeString("deployed_addresses", "bridgehub", bridgehub);

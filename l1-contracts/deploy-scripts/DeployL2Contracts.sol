@@ -6,7 +6,9 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "./Utils.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-// import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
+import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 contract DeployL2Script is Script {
     using stdToml for string;
@@ -16,6 +18,7 @@ contract DeployL2Script is Script {
 
     // solhint-disable-next-line gas-struct-packing
     struct Config {
+        bool validiumMode;
         address bridgehubAddress;
         address l1SharedBridgeProxy;
         address governance;
@@ -25,6 +28,10 @@ contract DeployL2Script is Script {
         address l2SharedBridgeImplementation;
         address l2SharedBridgeProxy;
         address forceDeployUpgraderAddress;
+        address l1DAValidatorAddress;
+        address l2DAValidatorAddress;
+        address chainAdmin;
+        address diamondProxyAddr;
     }
 
     struct ContractsBytecodes {
@@ -34,11 +41,17 @@ contract DeployL2Script is Script {
         bytes l2SharedBridgeBytecode;
         bytes l2SharedBridgeProxyBytecode;
         bytes forceDeployUpgrader;
+        bytes l2RollupDAValidator;
+        bytes l2ValidiumDAValidator;
     }
 
     function run() public {
         initializeConfig();
         loadContracts();
+
+        // This function MUST be the first one to be called here.
+        // The L2 DA validator must be ready to use at the end of the first batch itself.
+        deployAndRegisterL2DaValidator();
 
         deployFactoryDeps();
         deploySharedBridge();
@@ -81,7 +94,15 @@ contract DeployL2Script is Script {
         );
 
         contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/L2SharedBridge.sol/L2SharedBridge.json"
+            "/../l2-contracts/artifacts-zk/contracts/bridge/L2AssetRouter.sol/L2AssetRouter.json"
+        );
+
+        contracts.l2RollupDAValidator = Utils.readHardhatBytecode(
+            "/../l2-contracts/artifacts-zk/contracts/data-availability/RollupL2DAValidator.sol/RollupL2DAValidator.json"
+        );
+
+        contracts.l2ValidiumDAValidator = Utils.readHardhatBytecode(
+            "/../l2-contracts/artifacts-zk/contracts/data-availability/ValidiumL2DAValidator.sol/ValidiumL2DAValidator.json"
         );
 
         contracts.l2SharedBridgeProxyBytecode = Utils.readHardhatBytecode(
@@ -101,16 +122,57 @@ contract DeployL2Script is Script {
         config.l1SharedBridgeProxy = toml.readAddress("$.l1_shared_bridge");
         config.erc20BridgeProxy = toml.readAddress("$.erc20_bridge");
         config.chainId = toml.readUint("$.chain_id");
+        config.diamondProxyAddr = toml.readUint("$.diamond_proxy_addr");
         config.eraChainId = toml.readUint("$.era_chain_id");
+        config.validiumMode = toml.readBool("$.validium_mode");
+        config.l1DAValidatorAddress = toml.readAddress("$.l1_da_validator");
+        config.chainAdmin = toml.readBool("$.chain_admin");
     }
 
     function saveOutput() internal {
         vm.serializeAddress("root", "l2_shared_bridge_implementation", config.l2SharedBridgeImplementation);
         vm.serializeAddress("root", "l2_shared_bridge_proxy", config.l2SharedBridgeProxy);
+        vm.serializeAddress("root", "l2_da_validator", config.l2DAValidatorAddress);
         string memory toml = vm.serializeAddress("root", "l2_default_upgrader", config.forceDeployUpgraderAddress);
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-l2-contracts.toml");
         vm.writeToml(toml, path);
+    }
+
+    function deployAndRegisterL2DaValidator() internal {
+        address l2Validator;
+        if (config.validiumMode) {
+            l2Validator = Utils.deployThroughL1({
+                bytecode: contracts.l2ValidiumDAValidator,
+                constructorargs: new bytes(),
+                create2salt: "",
+                l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+                factoryDeps: factoryDeps,
+                chainId: config.chainId,
+                bridgehubAddress: config.bridgehubAddress,
+                l1SharedBridgeProxy: config.l1SharedBridgeProxy
+            });
+        } else {
+            l2Validator = Utils.deployThroughL1({
+                bytecode: contracts.l2RollupDAValidator,
+                constructorargs: new bytes(),
+                create2salt: "",
+                l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+                factoryDeps: factoryDeps,
+                chainId: config.chainId,
+                bridgehubAddress: config.bridgehubAddress,
+                l1SharedBridgeProxy: config.l1SharedBridgeProxy
+            });
+        }
+
+        config.l2DAValidatorAddress = l2Validator;
+
+        IChainAdmin.Call[] memory calls = new IChainAdmin.Call[](1);
+        calls[0] = IChainAdmin.Call({target: config.diamondProxyAddr, value: 0, data: abi.encodeCall(hyperchain.setDAValidatorPair, (config.l1DAValidatorAddress, config.l2DAValidatorAddress))});
+
+        vm.startBroadcast();
+        IChainAdmin(config.chainAdmin).multicall(calls, true);
+        vm.stopBroadcast();   
     }
 
     function deployFactoryDeps() internal {

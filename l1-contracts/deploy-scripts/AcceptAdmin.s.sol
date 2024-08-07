@@ -10,28 +10,9 @@ import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {Utils} from "./Utils.sol";
 
 contract AcceptAdmin is Script {
-    using stdToml for string;
-
-    struct Config {
-        address admin;
-        address governor;
-    }
-
-    Config internal config;
-
-    function initConfig() public {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/config-accept-admin.toml");
-        string memory toml = vm.readFile(path);
-        config.admin = toml.readAddress("$.target_addr");
-        config.governor = toml.readAddress("$.governor");
-    }
-
     // This function should be called by the owner to accept the owner role
-    function acceptOwner() public {
-        initConfig();
-
-        Ownable2Step adminContract = Ownable2Step(config.admin);
+    function acceptOwner(address governor, address target) public {
+        Ownable2Step adminContract = Ownable2Step(target);
         Utils.executeUpgrade({
             _governor: governor,
             _salt: bytes32(0),
