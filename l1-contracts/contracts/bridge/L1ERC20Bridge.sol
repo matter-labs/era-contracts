@@ -63,7 +63,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
     function initialize() external reentrancyGuardInitializer {}
 
-    /// @dev transfer token to shared bridge as part of upgrade
+    /// @dev transfer token to the shared bridge as part of upgrade
     function transferTokenToSharedBridge(address _token) external {
         require(msg.sender == address(SHARED_BRIDGE), "Not shared bridge");
         uint256 amount = IERC20(_token).balanceOf(address(this));

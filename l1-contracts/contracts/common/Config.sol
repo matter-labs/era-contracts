@@ -75,7 +75,7 @@ uint256 constant L1_TX_DELTA_FACTORY_DEPS_PUBDATA = 64;
 /// @dev The number of pubdata an L1->L2 transaction requires with each new factory dependency
 uint256 constant MAX_NEW_FACTORY_DEPS = 32;
 
-/// @dev The L2 gasPricePerPubdata required to be used in bridges.
+/// @dev The L2 gasPricePerPubdata is required to be used in bridges.
 uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
 
 /// @dev The mask which should be applied to the packed batch and L2 block timestamp in order
