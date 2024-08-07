@@ -26,7 +26,7 @@ interface IL2NativeTokenVault is IL2AssetHandler {
 
     function l2Bridge() external view returns (IL2SharedBridge);
 
-    function tokenAddress(bytes32 assetId) external view returns (address);
+    function tokenAddress(bytes32 _assetId) external view returns (address);
 
     function l2TokenAddress(address _l1Token) external view returns (address);
 

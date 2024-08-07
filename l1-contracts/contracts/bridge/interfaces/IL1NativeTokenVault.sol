@@ -22,8 +22,8 @@ interface IL1NativeTokenVault {
     function getERC20Getters(address _token) external view returns (bytes memory);
 
     /// @notice Used the get token balance for specific ZK chain in shared bridge
-    function chainBalance(uint256 chainId, address l1Token) external view returns (uint256);
+    function chainBalance(uint256 _chainId, address _l1Token) external view returns (uint256);
 
     /// @notice Used to get the token address of an assetId
-    function tokenAddress(bytes32 assetId) external view returns (address);
+    function tokenAddress(bytes32 _assetId) external view returns (address);
 }

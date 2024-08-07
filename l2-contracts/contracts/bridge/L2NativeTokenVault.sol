@@ -31,7 +31,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
 
-    mapping(bytes32 assetId => address tokenAddress) public override tokenAddress;
+    mapping(bytes32 _assetId => address tokenAddress) public override tokenAddress;
 
     modifier onlyBridge() {
         if (msg.sender != address(l2Bridge)) {
@@ -113,7 +113,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
 
         if (token == address(0)) {
             address expectedToken = _calculateCreate2TokenAddress(originToken);
-            bytes32 expectedAssetId = keccak256(abi.encode(_chainId, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, originToken));
+            bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(originToken);
             if (_assetId != expectedAssetId) {
                 // Make sure that a NativeTokenVault sent the message
                 revert AssetIdMismatch(expectedAssetId, _assetId);
@@ -129,8 +129,13 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         IL2StandardToken(token).bridgeMint(_l2Receiver, _amount);
         /// backwards compatible event
         emit FinalizeDeposit(_l1Sender, _l2Receiver, token, _amount);
-        // solhint-disable-next-line func-named-parameters
-        emit BridgeMint(_chainId, _assetId, _l1Sender, _l2Receiver, _amount);
+        emit BridgeMint({
+            chainId: _chainId, 
+            assetId: _assetId,
+            sender: _l1Sender,
+            l2Receiver: _l2Receiver,
+            amount: _amount
+        });
     }
 
     /// @notice Burns wrapped tokens and returns the calldata for L2 -> L1 message.
@@ -159,8 +164,19 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
 
         /// backwards compatible event
         emit WithdrawalInitiated(_prevMsgSender, _l1Receiver, l2Token, _amount);
-        // solhint-disable-next-line func-named-parameters
-        emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _l1Receiver, _mintValue, _amount);
+        chainId: _chainId, 
+            assetId: _assetId,
+            sender: _l1Sender,
+            l2Receiver: _l2Receiver,
+            amount: _amount
+        emit BridgeBurn({
+            chainId: _chainId,
+            assetId: _assetId,
+            l2Sender: _prevMsgSender,
+            receiver: _l1Receiver,
+            mintValue: _mintValue,
+            amount: _amount
+        });
         l1BridgeMintData = _data;
     }
 

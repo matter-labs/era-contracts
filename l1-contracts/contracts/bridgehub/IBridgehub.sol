@@ -56,15 +56,15 @@ interface IBridgehub {
     function acceptAdmin() external;
 
     /// Getters
-    function stateTransitionManagerIsRegistered(address stateTransitionManager) external view returns (bool);
+    function stateTransitionManagerIsRegistered(address _stateTransitionManager) external view returns (bool);
 
-    function stateTransitionManager(uint256 chainId) external view returns (address);
+    function stateTransitionManager(uint256 _chainId) external view returns (address);
 
-    function tokenIsRegistered(address baseToken) external view returns (bool);
+    function tokenIsRegistered(address _baseToken) external view returns (bool);
 
-    function baseToken(uint256 chainId) external view returns (address);
+    function baseToken(uint256 _chainId) external view returns (address);
 
-    function baseTokenAssetId(uint256 chainId) external view returns (bytes32);
+    function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
     function sharedBridge() external view returns (IL1SharedBridge);
 

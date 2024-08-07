@@ -74,39 +74,39 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     IL1ERC20Bridge public override legacyBridge;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
-    mapping(uint256 chainId => address l2Bridge) public override l2BridgeAddress;
+    mapping(uint256 _chainId => address l2Bridge) public override l2BridgeAddress;
 
     /// @dev A mapping chainId => L2 deposit transaction hash => dataHash
     // keccak256(abi.encode(account, tokenAddress, amount)) for legacy transfers
     // keccak256(abi.encode(_prevMsgSender, assetId, transferData)) for new transfers
     /// @dev Tracks deposit transactions to L2 to enable users to claim their funds if a deposit fails.
-    mapping(uint256 chainId => mapping(bytes32 l2DepositTxHash => bytes32 depositDataHash))
+    mapping(uint256 _chainId => mapping(bytes32 _l2DepositTxHash => bytes32 depositDataHash))
         public
         override depositHappened;
 
     /// @dev Tracks the processing status of L2 to L1 messages, indicating whether a message has already been finalized.
-    mapping(uint256 chainId => mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized)))
+    mapping(uint256 _chainId => mapping(uint256 _l2BatchNumber => mapping(uint256 _l2ToL1MessageNumber => bool isFinalized)))
         public isWithdrawalFinalized;
 
     /// @notice Deprecated. Kept for backwards compatibility.
     /// @dev Indicates whether the hyperbridging is enabled for a given chain.
     // slither-disable-next-line uninitialized-state
-    mapping(uint256 chainId => bool enabled) public hyperbridgingEnabled;
+    mapping(uint256 _chainId => bool enabled) public hyperbridgingEnabled;
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chain.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
-    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
+    mapping(uint256 _chainId => mapping(address _l1Token => uint256 balance)) public chainBalance;
 
     /// @dev Maps asset ID to address of corresponding asset handler.
     /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset.
     /// @dev P.S. this liquidity was locked directly in SharedBridge before.
-    mapping(bytes32 assetId => address assetHandlerAddress) public assetHandlerAddress;
+    mapping(bytes32 _assetId => address assetHandlerAddress) public assetHandlerAddress;
 
     /// @dev Maps asset ID to the asset deployment tracker address.
     /// @dev Tracks the address of Deployment Tracker contract on L1, which sets Asset Handlers on L2s (ZK chain).
     /// @dev For the asset and stores respective addresses.
-    mapping(bytes32 assetId => address assetDeploymentTracker) public assetDeploymentTracker;
+    mapping(bytes32 _assetId => address assetDeploymentTracker) public assetDeploymentTracker;
 
     /// @dev Address of native token vault.
     IL1NativeTokenVault public nativeTokenVault;

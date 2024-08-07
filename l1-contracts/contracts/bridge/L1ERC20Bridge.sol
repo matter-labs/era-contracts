@@ -219,8 +219,13 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             _refundRecipient: _refundRecipient
         });
         depositAmount[msg.sender][_l1Token][txHash] = _amount;
-        // solhint-disable-next-line func-named-parameters
-        emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, _amount);
+        emit DepositInitiated({
+            l2DepositTxHash: txHash,
+            from: msg.sender,
+            to: _l2Receiver,
+            l1Token: _l1Token,
+            amount: _amount
+        });
     }
 
     /// @dev Transfers tokens from the depositor address to the shared bridge address.
