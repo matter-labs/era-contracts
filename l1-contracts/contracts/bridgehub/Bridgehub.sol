@@ -68,6 +68,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev used to indicate the currently active settlement layer for a given chainId
     mapping(uint256 chainId => uint256 activeSettlementLayerChainId) public settlementLayer;
 
+    /// @notice shows whether the given chain can be used as a settlement layer.
+    /// @dev the Gateway will be one of the possible settlement layers. The L1 is also a settlement layer.
     /// @dev Sync layer chain is expected to have .. as the base token.
     mapping(uint256 chainId => bool isWhitelistedSettlementLayer) public whitelistedSettlementLayers;
 
