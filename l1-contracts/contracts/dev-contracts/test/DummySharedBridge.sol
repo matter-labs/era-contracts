@@ -5,11 +5,12 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
-import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IL2Bridge} from "../../bridge/interfaces/IL2Bridge.sol";
 
 contract DummySharedBridge is PausableUpgradeable {
     using SafeERC20 for IERC20;
@@ -155,14 +156,33 @@ contract DummySharedBridge is PausableUpgradeable {
     }
 
     function bridgehubDeposit(
-        uint256, //_chainId,
-        address, //_prevMsgSender,
-        uint256, // l2Value, needed for Weth deposits in the future
-        bytes calldata //_data
+        uint256,
+        address _prevMsgSender,
+        uint256,
+        bytes calldata _data
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request) {
-        // Request the finalization of the deposit on the L2 side
-        bytes memory l2TxCalldata = bytes("0xabcd123");
-        bytes32 txDataHash = bytes32("0x1212121212abf");
+        (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
+            _data,
+            (address, uint256, address)
+        );
+        uint256 amount;
+
+        if (_l1Token == ETH_TOKEN_ADDRESS) {
+            amount = msg.value;
+            require(_depositAmount == 0, "ShB wrong withdraw amount");
+        } else {
+            require(msg.value == 0, "ShB m.v > 0 for BH d.it 2");
+            amount = _depositAmount;
+
+            uint256 withdrawAmount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _depositAmount);
+            require(withdrawAmount == _depositAmount, "5T"); // The token has non-standard transfer logic
+        }
+
+        bytes memory l2TxCalldata = abi.encodeCall(
+            IL2Bridge.finalizeDeposit,
+            (_prevMsgSender, _l2Receiver, _l1Token, amount, new bytes(0))
+        );
+        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,

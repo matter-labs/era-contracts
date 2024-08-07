@@ -49,7 +49,7 @@ contract ReentrancyTest is L1Erc20BridgeTest {
             .sig("depositAmount(address,address,bytes32)")
             .with_key(alice)
             .with_key(address(token))
-            .with_key(dummyL2DepositTxHash)
+            .with_key(bytes32(""))
             .checked_write(amount);
 
         vm.prank(alice);
@@ -58,7 +58,7 @@ contract ReentrancyTest is L1Erc20BridgeTest {
         bridgeReenterItself.claimFailedDeposit({
             _depositSender: alice,
             _l1Token: address(token),
-            _l2TxHash: dummyL2DepositTxHash,
+            _l2TxHash: bytes32(""),
             _l2BatchNumber: 0,
             _l2MessageIndex: 0,
             _l2TxNumberInBatch: 0,
