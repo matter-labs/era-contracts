@@ -11,9 +11,10 @@ import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 contract DeployL2Script is Script {
     using stdToml for string;
 
-    Config config;
-    ContractsBytecodes contracts;
+    Config internal config;
+    ContractsBytecodes internal contracts;
 
+    // solhint-disable-next-line gas-struct-packing
     struct Config {
         address bridgehubAddress;
         address l1SharedBridgeProxy;

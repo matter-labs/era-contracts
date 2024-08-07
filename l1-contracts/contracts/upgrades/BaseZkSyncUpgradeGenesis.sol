@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
+import {ProtocolVersionShouldBeGreater, ProtocolVersionDeltaTooLarge, PreviousUpgradeNotFinalized, PreviousUpgradeBatchNotCleared, ProtocolMajorVersionNotZero} from "./ZkSyncUpgradeErrors.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
@@ -18,21 +19,27 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
         uint256 _newProtocolVersion
     ) internal override returns (uint32 newMinorVersion, bool patchOnly) {
         uint256 previousProtocolVersion = s.protocolVersion;
-        // IMPORTANT Genesis Upgrade difference: Note this is the only thing change > to >=
-        require(
-            _newProtocolVersion >= previousProtocolVersion,
-            "New protocol version is not greater than the current one"
-        );
+        if (
+            // IMPORTANT Genesis Upgrade difference: Note this is the only thing change > to >=
+            _newProtocolVersion < previousProtocolVersion
+        ) {
+            revert ProtocolVersionShouldBeGreater(previousProtocolVersion, _newProtocolVersion);
+        }
         // slither-disable-next-line unused-return
         (uint32 previousMajorVersion, uint32 previousMinorVersion, ) = SemVer.unpackSemVer(
             SafeCast.toUint96(previousProtocolVersion)
         );
-        require(previousMajorVersion == 0, "Implementation requires that the major version is 0 at all times");
+
+        if (previousMajorVersion != 0) {
+            revert ProtocolMajorVersionNotZero();
+        }
 
         uint32 newMajorVersion;
         // slither-disable-next-line unused-return
         (newMajorVersion, newMinorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion));
-        require(newMajorVersion == 0, "Major must always be 0");
+        if (newMajorVersion != 0) {
+            revert ProtocolMajorVersionNotZero();
+        }
 
         // Since `_newProtocolVersion > previousProtocolVersion`, and both old and new major version is 0,
         // the difference between minor versions is >= 0.
@@ -42,7 +49,9 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
         patchOnly = false;
 
         // While this is implicitly enforced by other checks above, we still double check just in case
-        require(minorDelta <= MAX_ALLOWED_MINOR_VERSION_DELTA, "Too big protocol version difference");
+        if (minorDelta > MAX_ALLOWED_MINOR_VERSION_DELTA) {
+            revert ProtocolVersionDeltaTooLarge(minorDelta, MAX_ALLOWED_MINOR_VERSION_DELTA);
+        }
 
         // If the minor version changes also, we need to ensure that the previous upgrade has been finalized.
         // In case the minor version does not change, we permit to keep the old upgrade transaction in the system, but it
@@ -50,11 +59,12 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
         if (!patchOnly) {
             // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
             // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
-            require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
-            require(
-                s.l2SystemContractsUpgradeBatchNumber == 0,
-                "The batch number of the previous upgrade has not been cleaned"
-            );
+            if (s.l2SystemContractsUpgradeTxHash != bytes32(0)) {
+                revert PreviousUpgradeNotFinalized();
+            }
+            if (s.l2SystemContractsUpgradeBatchNumber != 0) {
+                revert PreviousUpgradeBatchNotCleared();
+            }
         }
 
         s.protocolVersion = _newProtocolVersion;

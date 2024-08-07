@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable gas-custom-errors
+
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 
@@ -59,6 +61,7 @@ library Diamond {
     /// @param action The action that is made on the facet
     /// @param isFreezable Denotes whether the facet & all their selectors can be frozen
     /// @param selectors An array of unique selectors that belongs to the facet address
+    // solhint-disable-next-line gas-struct-packing
     struct FacetCut {
         address facet;
         Action action;

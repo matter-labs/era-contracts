@@ -3,7 +3,7 @@ import { ethers } from "hardhat";
 import type { Wallet } from "zksync-ethers";
 import type { Create2Factory } from "../typechain";
 import { deployContract, getWallets, loadArtifact } from "./shared/utils";
-import { create2Address, getDeployedContracts, hashBytecode } from "zksync-ethers/build/src/utils";
+import { create2Address, getDeployedContracts, hashBytecode } from "zksync-ethers/build/utils";
 
 describe("Create2Factory tests", function () {
   let wallet: Wallet;

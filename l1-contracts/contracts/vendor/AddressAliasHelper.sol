@@ -19,7 +19,7 @@
 pragma solidity 0.8.24;
 
 library AddressAliasHelper {
-    uint160 constant offset = uint160(0x1111000000000000000000000000000000001111);
+    uint160 private constant offset = uint160(0x1111000000000000000000000000000000001111);
 
     /// @notice Utility function converts the address that submitted a tx
     /// to the inbox on L1 to the msg.sender viewed on L2
@@ -51,6 +51,7 @@ library AddressAliasHelper {
     ) internal view returns (address _recipient) {
         if (_refundRecipient == address(0)) {
             // If the `_refundRecipient` is not provided, we use the `_prevMsgSender` as the recipient.
+            // solhint-disable avoid-tx-origin
             // slither-disable-next-line tx-origin
             _recipient = _prevMsgSender == tx.origin
                 ? _prevMsgSender

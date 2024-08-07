@@ -7,7 +7,7 @@ import * as ethers from "ethers";
 import type { BigNumberish, Wallet } from "ethers";
 import { Interface } from "ethers/lib/utils";
 import * as zkethers from "zksync-ethers";
-import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
+import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/utils";
 import * as fs from "fs";
 
 import type { FacetCut } from "./diamondCut";

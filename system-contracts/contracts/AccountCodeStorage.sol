@@ -5,6 +5,7 @@ pragma solidity 0.8.20;
 import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PRECOMPILE_ADDRESS} from "./Constants.sol";
+import {Unauthorized, InvalidCodeHash, CodeHashReason} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -20,10 +21,12 @@ import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PREC
  * system contracts to enforce the invariants mentioned above.
  */
 contract AccountCodeStorage is IAccountCodeStorage {
-    bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
+    bytes32 internal constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
     modifier onlyDeployer() {
-        require(msg.sender == address(DEPLOYER_SYSTEM_CONTRACT), "Callable only by the deployer system contract");
+        if (msg.sender != address(DEPLOYER_SYSTEM_CONTRACT)) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
@@ -34,7 +37,9 @@ contract AccountCodeStorage is IAccountCodeStorage {
     /// but checks whether the bytecode hash corresponds to the constructing smart contract.
     function storeAccountConstructingCodeHash(address _address, bytes32 _hash) external override onlyDeployer {
         // Check that code hash corresponds to the deploying smart contract
-        require(Utils.isContractConstructing(_hash), "Code hash is not for a contract on constructor");
+        if (!Utils.isContractConstructing(_hash)) {
+            revert InvalidCodeHash(CodeHashReason.NotContractOnConstructor);
+        }
         _storeCodeHash(_address, _hash);
     }
 
@@ -45,7 +50,9 @@ contract AccountCodeStorage is IAccountCodeStorage {
     /// but checks whether the bytecode hash corresponds to the constructed smart contract.
     function storeAccountConstructedCodeHash(address _address, bytes32 _hash) external override onlyDeployer {
         // Check that code hash corresponds to the deploying smart contract
-        require(Utils.isContractConstructed(_hash), "Code hash is not for a constructed contract");
+        if (!Utils.isContractConstructed(_hash)) {
+            revert InvalidCodeHash(CodeHashReason.NotConstructedContract);
+        }
         _storeCodeHash(_address, _hash);
     }
 
@@ -54,7 +61,9 @@ contract AccountCodeStorage is IAccountCodeStorage {
     function markAccountCodeHashAsConstructed(address _address) external override onlyDeployer {
         bytes32 codeHash = getRawCodeHash(_address);
 
-        require(Utils.isContractConstructing(codeHash), "Code hash is not for a contract on constructor");
+        if (!Utils.isContractConstructing(codeHash)) {
+            revert InvalidCodeHash(CodeHashReason.NotContractOnConstructor);
+        }
 
         // Get the bytecode hash with "isConstructor" flag equal to false
         bytes32 constructedBytecodeHash = Utils.constructedBytecodeHash(codeHash);

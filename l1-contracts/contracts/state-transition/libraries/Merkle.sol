@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable gas-custom-errors
+
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 
 /// @author Matter Labs

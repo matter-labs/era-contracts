@@ -15,7 +15,7 @@ import { web3Provider, GAS_MULTIPLIER } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import { ethTestConfig, getAddressFromEnv } from "../src.ts/utils";
 import { hashL2Bytecode } from "../../l2-contracts/src/utils";
-import { Provider } from "zksync-web3";
+import { Provider } from "zksync-ethers";
 import beaconProxy = require("../../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json");
 
 const provider = web3Provider();

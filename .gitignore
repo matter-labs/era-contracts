@@ -26,3 +26,4 @@ l1-contracts/broadcast/*
 l1-contracts/script-config/*
 l1-contracts/script-out/*
 !l1-contracts/script-out/.gitkeep
+*.timestamp

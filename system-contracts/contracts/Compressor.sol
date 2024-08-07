@@ -8,6 +8,7 @@ import {Utils} from "./libraries/Utils.sol";
 import {UnsafeBytesCalldata} from "./libraries/UnsafeBytesCalldata.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {L1_MESSENGER_CONTRACT, STATE_DIFF_ENTRY_SIZE, KNOWN_CODE_STORAGE_CONTRACT} from "./Constants.sol";
+import {MalformedBytecode, BytecodeError, IndexOutOfBounds, IndexSizeError, ValuesNotEqual, UnsupportedOperation} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -48,24 +49,27 @@ contract Compressor is ICompressor, ISystemContract {
         unchecked {
             (bytes calldata dictionary, bytes calldata encodedData) = _decodeRawBytecode(_rawCompressedData);
 
-            require(
-                encodedData.length * 4 == _bytecode.length,
-                "Encoded data length should be 4 times shorter than the original bytecode"
-            );
+            if (encodedData.length * 4 != _bytecode.length) {
+                revert MalformedBytecode(BytecodeError.Length);
+            }
 
-            require(
-                dictionary.length / 8 <= encodedData.length / 2,
-                "Dictionary should have at most the same number of entries as the encoded data"
-            );
+            if (dictionary.length / 8 > encodedData.length / 2) {
+                revert MalformedBytecode(BytecodeError.DictionaryLength);
+            }
 
+            // solhint-disable-next-line gas-length-in-loops
             for (uint256 encodedDataPointer = 0; encodedDataPointer < encodedData.length; encodedDataPointer += 2) {
                 uint256 indexOfEncodedChunk = uint256(encodedData.readUint16(encodedDataPointer)) * 8;
-                require(indexOfEncodedChunk < dictionary.length, "Encoded chunk index is out of bounds");
+                if (indexOfEncodedChunk > dictionary.length - 1) {
+                    revert IndexOutOfBounds();
+                }
 
                 uint64 encodedChunk = dictionary.readUint64(indexOfEncodedChunk);
                 uint64 realChunk = _bytecode.readUint64(encodedDataPointer * 4);
 
-                require(encodedChunk == realChunk, "Encoded chunk does not match the original bytecode");
+                if (encodedChunk != realChunk) {
+                    revert ValuesNotEqual(realChunk, encodedChunk);
+                }
             }
         }
 
@@ -116,7 +120,9 @@ contract Compressor is ICompressor, ISystemContract {
         // We do not enforce the operator to use the optimal, i.e. the minimally possible _enumerationIndexSize.
         // We do enforce however, that the _enumerationIndexSize is not larger than 8 bytes long, which is the
         // maximal ever possible size for enumeration index.
-        require(_enumerationIndexSize <= MAX_ENUMERATION_INDEX_SIZE, "enumeration index size is too large");
+        if (_enumerationIndexSize > MAX_ENUMERATION_INDEX_SIZE) {
+            revert IndexSizeError();
+        }
 
         uint256 numberOfInitialWrites = uint256(_compressedStateDiffs.readUint16(0));
 
@@ -132,16 +138,18 @@ contract Compressor is ICompressor, ISystemContract {
                 continue;
             }
 
-            numInitialWritesProcessed++;
+            ++numInitialWritesProcessed;
 
             bytes32 derivedKey = stateDiff.readBytes32(52);
             uint256 initValue = stateDiff.readUint256(92);
             uint256 finalValue = stateDiff.readUint256(124);
-            require(derivedKey == _compressedStateDiffs.readBytes32(stateDiffPtr), "iw: initial key mismatch");
+            if (derivedKey != _compressedStateDiffs.readBytes32(stateDiffPtr)) {
+                revert ValuesNotEqual(uint256(derivedKey), _compressedStateDiffs.readUint256(stateDiffPtr));
+            }
             stateDiffPtr += 32;
 
             uint8 metadata = uint8(bytes1(_compressedStateDiffs[stateDiffPtr]));
-            stateDiffPtr++;
+            ++stateDiffPtr;
             uint8 operation = metadata & OPERATION_BITMASK;
             uint8 len = operation == 0 ? 32 : metadata >> LENGTH_BITS_OFFSET;
             _verifyValueCompression(
@@ -153,7 +161,9 @@ contract Compressor is ICompressor, ISystemContract {
             stateDiffPtr += len;
         }
 
-        require(numInitialWritesProcessed == numberOfInitialWrites, "Incorrect number of initial storage diffs");
+        if (numInitialWritesProcessed != numberOfInitialWrites) {
+            revert ValuesNotEqual(numberOfInitialWrites, numInitialWritesProcessed);
+        }
 
         // Process repeated writes
         for (uint256 i = 0; i < _numberOfStateDiffs * STATE_DIFF_ENTRY_SIZE; i += STATE_DIFF_ENTRY_SIZE) {
@@ -168,11 +178,13 @@ contract Compressor is ICompressor, ISystemContract {
             uint256 compressedEnumIndex = _sliceToUint256(
                 _compressedStateDiffs[stateDiffPtr:stateDiffPtr + _enumerationIndexSize]
             );
-            require(enumIndex == compressedEnumIndex, "rw: enum key mismatch");
+            if (enumIndex != compressedEnumIndex) {
+                revert ValuesNotEqual(enumIndex, compressedEnumIndex);
+            }
             stateDiffPtr += _enumerationIndexSize;
 
             uint8 metadata = uint8(bytes1(_compressedStateDiffs[stateDiffPtr]));
-            stateDiffPtr += 1;
+            ++stateDiffPtr;
             uint8 operation = metadata & OPERATION_BITMASK;
             uint8 len = operation == 0 ? 32 : metadata >> LENGTH_BITS_OFFSET;
             _verifyValueCompression(
@@ -184,7 +196,9 @@ contract Compressor is ICompressor, ISystemContract {
             stateDiffPtr += len;
         }
 
-        require(stateDiffPtr == _compressedStateDiffs.length, "Extra data in _compressedStateDiffs");
+        if (stateDiffPtr != _compressedStateDiffs.length) {
+            revert ValuesNotEqual(stateDiffPtr, _compressedStateDiffs.length);
+        }
 
         stateDiffHash = EfficientCall.keccak(_stateDiffs);
     }
@@ -227,19 +241,19 @@ contract Compressor is ICompressor, ISystemContract {
 
         unchecked {
             if (_operation == 0 || _operation == 3) {
-                require(convertedValue == _finalValue, "transform or no compression: compressed and final mismatch");
+                if (convertedValue != _finalValue) {
+                    revert ValuesNotEqual(_finalValue, convertedValue);
+                }
             } else if (_operation == 1) {
-                require(
-                    _initialValue + convertedValue == _finalValue,
-                    "add: initial plus converted not equal to final"
-                );
+                if (_initialValue + convertedValue != _finalValue) {
+                    revert ValuesNotEqual(_finalValue, _initialValue + convertedValue);
+                }
             } else if (_operation == 2) {
-                require(
-                    _initialValue - convertedValue == _finalValue,
-                    "sub: initial minus converted not equal to final"
-                );
+                if (_initialValue - convertedValue != _finalValue) {
+                    revert ValuesNotEqual(_finalValue, _initialValue - convertedValue);
+                }
             } else {
-                revert("unsupported operation");
+                revert UnsupportedOperation();
             }
         }
     }
