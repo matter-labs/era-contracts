@@ -150,7 +150,7 @@ contract L1SharedBridgeTest is Test {
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
         vm.prank(owner);
         sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
-        tokenAssetId = DataEncoding.encodeNTVAssetId(address(token));
+        tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
         vm.prank(owner);
         sharedBridge.setNativeTokenVault(IL1NativeTokenVault(address(nativeTokenVault)));
         vm.prank(address(nativeTokenVault));

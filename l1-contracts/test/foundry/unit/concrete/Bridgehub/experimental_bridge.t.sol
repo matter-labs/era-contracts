@@ -58,7 +58,7 @@ contract ExperimentalBridgeTest is Test {
         vm.prank(address(ntv));
         ntv.registerToken(ETH_TOKEN_ADDRESS);
         ntv.registerToken(address(testToken));
-        tokenAssetId = DataEncoding.encodeNTVAssetId(address(testToken));
+        tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(testToken));
 
         // test if the ownership of the bridgeHub is set correctly or not
         address defaultOwner = bridgeHub.owner();
