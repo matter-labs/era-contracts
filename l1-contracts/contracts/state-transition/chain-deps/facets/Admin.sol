@@ -137,11 +137,15 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAdmin
-    function freezeDiamond() external onlyStateTransitionManager {
+    function freezeDiamond() external onlyAdminOrStateTransitionManager {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         require(!diamondStorage.isFrozen, "a9"); // diamond proxy is frozen already
         diamondStorage.isFrozen = true;
+
+        if (msg.sender == s.admin) {
+            s.frozenByAdmin = true;
+        }
 
         emit Freeze();
     }
@@ -151,8 +155,16 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         require(diamondStorage.isFrozen, "a7"); // diamond proxy is not frozen
+        require(!s.frozenByAdmin, "a5"); // require admin to unfreeze diamond proxy
+
         diamondStorage.isFrozen = false;
 
         emit Unfreeze();
+    }
+
+    /// @inheritdoc IAdmin
+    function allowUnfreezeDiamond() external onlyAdmin {
+        require(s.frozenByAdmin, "a6"); // diamond proxy needs to be previously frozen by admin
+        s.frozenByAdmin = false;
     }
 }
