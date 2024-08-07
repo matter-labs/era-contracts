@@ -35,7 +35,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
 
-    mapping(bytes32 _assetId => address tokenAddress) public override tokenAddress;
+    mapping(bytes32 assetId => address tokenAddress) public override tokenAddress;
 
     modifier onlyBridge() {
         if (msg.sender != address(l2Bridge)) {
@@ -119,10 +119,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         if (token == address(0)) {
             address expectedToken = _calculateCreate2TokenAddress(originToken);
             bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, originToken);
-            // if (_assetId != expectedAssetId) {
-            //     // Make sure that a NativeTokenVault sent the message
-            //     revert AssetIdMismatch(expectedAssetId, _assetId);
-            // }
+            if (_assetId != expectedAssetId) {
+                // Make sure that a NativeTokenVault sent the message
+                revert AssetIdMismatch(expectedAssetId, _assetId);
+            }
             address deployedToken = _deployL2Token(originToken, erc20Data);
             if (deployedToken != expectedToken) {
                 revert AddressMismatch(expectedToken, deployedToken);
