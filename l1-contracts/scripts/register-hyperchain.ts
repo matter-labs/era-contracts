@@ -113,7 +113,7 @@ async function main() {
         null,
         useGovernance
       );
-      await deployer.transferAdminFromDeployerToGovernance();
+      await deployer.transferAdminFromDeployerToChainAdmin();
     });
 
   await program.parseAsync(process.argv);
