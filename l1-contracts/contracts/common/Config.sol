@@ -111,12 +111,8 @@ address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint
 
 uint256 constant MAX_NUMBER_OF_HYPERCHAINS = 100;
 
-/// FIXME: move to a different file
-
-struct StoredBatchHashInfo {
-    uint256 number;
-    bytes32 hash;
-}
+/// @dev Used to when there is no sender contract on L1. This is the alias we apply to L1->L2 messages.
+address constant VIRTUAL_SENDER_ALIASED_ZERO_ADDRESS = address(uint160(0x1111000000000000000000000000000000001111));
 
 struct PriorityTreeCommitment {
     uint256 nextLeafIndex;

@@ -57,7 +57,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @notice Sets L2 token beacon used by wrapped ERC20 tokens deployed by NTV.
     /// @dev we don't call this in the constructor, as we need to provide factory deps
     /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed
-    function setL2TokenBeacon(bool _contractsDeployedAlready, address _l2TokenBeacon) external {
+    function setL2TokenBeacon(bool _contractsDeployedAlready, address _l2TokenBeacon) external onlyOwner {
         if (address(l2TokenBeacon) != address(0)) {
             revert AddressMismatch(address(l2TokenBeacon), address(0));
         }

@@ -26,6 +26,9 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
     0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
 );
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
 contract MessageRoot is IMessageRoot, ReentrancyGuard {
     event AddedChain(uint256 indexed chainId, uint256 indexed chainIndex);
 
@@ -43,7 +46,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     mapping(uint256 chainIndex => uint256 chainId) public chainIndexToId;
 
     // There are two ways to distinguish chains:
-    // - Either by reserving the index 0 as a special value which denotes an unregistede chain
+    // - Either by reserving the index 0 as a special value which denotes an unregistered chain
     // - Use a separate mapping
     // The second approach is used due to explicitness.
     mapping(uint256 chainId => bool isRegistered) public chainRegistered;
@@ -104,7 +107,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     function _addNewChain(uint256 _chainId) internal {
         // The chain itself can not be the part of the message root.
         // The message root will only aggregate chains that settle on it.
-        require(_chainId != block.chainid);
+        require(_chainId != block.chainid, "MR: chainId is this chain");
 
         chainRegistered[_chainId] = true;
 
@@ -159,7 +162,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     // `_updateTree` should be false only if the caller ensures that it is followed by updating the entire tree.
     function _unsafeResetChainRoot(uint256 _index, bool _updateTree) internal {
         uint256 chainId = chainIndexToId[_index];
-        bytes32 initialRoot = chainTree[chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
+        bytes32 initialRoot = chainTree[chainId].reset(CHAIN_TREE_EMPTY_ENTRY_HASH);
 
         if (_updateTree) {
             // slither-disable-next-line unused-return
