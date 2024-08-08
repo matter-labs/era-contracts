@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.24;
 
-import {ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
 interface IL1GenesisUpgrade {
@@ -21,6 +20,4 @@ interface IL1GenesisUpgrade {
         bytes calldata _forceDeployments,
         bytes[] calldata _factoryDeps
     ) external returns (bytes32);
-
-    function upgradeInner(ProposedUpgrade calldata _proposedUpgrade) external returns (bytes32);
 }
