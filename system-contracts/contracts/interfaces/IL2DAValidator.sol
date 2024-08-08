@@ -13,6 +13,6 @@ interface IL2DAValidator {
         // The chained hash of uncompressed bytecodes sent to L1
         bytes32 _chainedBytescodesHash,
         // Same operator input
-        bytes calldata _operatorInput
+        bytes calldata _totalL2ToL1PubdataAndStateDiffs
     ) external returns (bytes32 outputHash);
 }
