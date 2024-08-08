@@ -343,14 +343,14 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             // solhint-disable-next-line func-named-parameters
             mandatoryInitData = bytes.concat(
                 bytes32(_chainId),
-                bytes32(uint256(uint160(address(BRIDGE_HUB)))),
+                bytes32(uint256(uint160(BRIDGE_HUB))),
                 bytes32(uint256(uint160(address(this)))),
-                bytes32(uint256(protocolVersion)),
+                bytes32(protocolVersion),
                 bytes32(uint256(uint160(_admin))),
                 bytes32(uint256(uint160(validatorTimelock))),
                 bytes32(uint256(uint160(_baseToken))),
                 bytes32(uint256(uint160(_sharedBridge))),
-                bytes32(storedBatchZero)
+                storedBatchZero
             );
         }
 

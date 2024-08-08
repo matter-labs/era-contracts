@@ -514,7 +514,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(_chainId, _stmData);
         }
 
-        IMessageRoot(messageRoot).addNewChainIfNeeded(_chainId);
+        messageRoot.addNewChainIfNeeded(_chainId);
         IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData);
         return address(0);
     }
