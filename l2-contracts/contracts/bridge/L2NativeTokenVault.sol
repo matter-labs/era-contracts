@@ -25,7 +25,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     UpgradeableBeacon public l2TokenBeacon;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
-    bytes32 internal l2TokenProxyBytecodeHash;
+    bytes32 internal immutable l2TokenProxyBytecodeHash;
 
     mapping(bytes32 assetId => address tokenAddress) public override tokenAddress;
 
@@ -41,8 +41,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @dev Disable the initialization to prevent Parity hack.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
-    /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed
-    constructor(bytes32 _l2TokenProxyBytecodeHash, address _aliasedOwner, bool _contractsDeployedAlready) {
+    constructor(bytes32 _l2TokenProxyBytecodeHash, address _aliasedOwner) {
         _disableInitializers();
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
             revert EmptyBytes32();
@@ -51,22 +50,27 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
             revert EmptyAddress();
         }
 
-        if (!_contractsDeployedAlready) {
-            l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
-        }
-
+        l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
         _transferOwnership(_aliasedOwner);
     }
 
     /// @notice Sets L2 token beacon used by wrapped ERC20 tokens deployed by NTV.
     /// @dev we don't call this in the constructor, as we need to provide factory deps
-    function setL2TokenBeacon() external onlyOwner {
+    /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed
+    function setL2TokenBeacon(bool _contractsDeployedAlready, address _l2TokenBeacon) external onlyOwner {
         if (address(l2TokenBeacon) != address(0)) {
             revert AddressMismatch(address(l2TokenBeacon), address(0));
         }
-        address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
-        l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
-        l2TokenBeacon.transferOwnership(owner());
+        if (_contractsDeployedAlready) {
+            if (_l2TokenBeacon == address(0)) {
+                revert EmptyAddress();
+            }
+            l2TokenBeacon = UpgradeableBeacon(_l2TokenBeacon);
+        } else {
+            address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
+            l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
+            l2TokenBeacon.transferOwnership(owner());
+        }
     }
 
     /// @notice Mints the wrapped asset during shared bridge deposit finalization.
