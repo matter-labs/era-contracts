@@ -87,7 +87,7 @@
     "contractName": "L2GenesisUpgrade",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/L2GenesisUpgrade.sol/L2GenesisUpgrade.json",
     "sourceCodePath": "contracts-preprocessed/L2GenesisUpgrade.sol",
-    "bytecodeHash": "0x010000974222230beff5f3bdcfb4b58940fe547a2907fc7417d4dd26a7abe07f",
+    "bytecodeHash": "0x01000097aabbd0a81c2722ce4a175d2bfc94e407fadbf71eaee9869789a54971",
     "sourceCodeHash": "0xcb190d0dfd41bbc809409a8aa04a4847b86edfe010b1d75e23b4c8d07b13a9d0"
   },
   {
