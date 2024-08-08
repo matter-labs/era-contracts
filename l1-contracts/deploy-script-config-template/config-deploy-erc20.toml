@@ -1,0 +1,15 @@
+additional_addresses_for_minting = []
+
+[tokens.DAI]
+name = "DAI"
+symbol = "DAI"
+decimals = 18
+implementation = "TestnetERC20Token.sol"
+mint = "10000000000"
+
+[tokens.WETH]
+name = "Wrapped Ether"
+symbol = "WETH"
+decimals = 18
+implementation = "WETH9.sol"
+mint = "0"

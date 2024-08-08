@@ -289,6 +289,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
             virtualBlockUpgradeInfo.virtualBlockStartBatch = currentBatchNumber;
 
             require(_maxVirtualBlocksToCreate > 0, "Can't initialize the first virtual block");
+            // solhint-disable-next-line gas-increment-by-one
             _maxVirtualBlocksToCreate -= 1;
         } else if (_maxVirtualBlocksToCreate == 0) {
             // The virtual blocks have been already initialized, but the operator didn't ask to create
@@ -484,7 +485,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     }
 
     function incrementTxNumberInBatch() external onlyCallFromBootloader {
-        txNumberInBlock += 1;
+        ++txNumberInBlock;
     }
 
     function resetTxNumberInBatch() external onlyCallFromBootloader {

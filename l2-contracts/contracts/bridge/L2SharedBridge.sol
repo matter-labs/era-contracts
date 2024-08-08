@@ -15,13 +15,15 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
+import {EmptyAddress, EmptyBytes32, InvalidCaller, AddressMismatch, AmountMustBeGreaterThanZero, DeployFailed} from "../L2ContractErrors.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2SharedBridge is IL2SharedBridge, Initializable {
-    /// @dev The address of the L1 bridge counterpart.
-    address public override l1Bridge;
+    /// @dev The address of the L1 shared bridge counterpart.
+    address public override l1SharedBridge;
 
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
@@ -33,11 +35,13 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @dev A mapping l2 token address => l1 token address
     mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
 
-    address private l1LegacyBridge;
+    /// @dev The address of the legacy L1 erc20 bridge counterpart.
+    /// This is non-zero only on Era, and should not be renamed for backward compatibility with the SDKs.
+    address public override l1Bridge;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
-    uint256 immutable ERA_CHAIN_ID;
+    uint256 public immutable ERA_CHAIN_ID;
 
     constructor(uint256 _eraChainId) {
         ERA_CHAIN_ID = _eraChainId;
@@ -45,20 +49,29 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     }
 
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
-    /// @param _l1Bridge The address of the L1 Bridge contract.
+    /// @param _l1SharedBridge The address of the L1 Bridge contract.
+    /// @param _l1Bridge The address of the legacy L1 Bridge contract.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
     function initialize(
+        address _l1SharedBridge,
         address _l1Bridge,
-        address _l1LegacyBridge,
         bytes32 _l2TokenProxyBytecodeHash,
         address _aliasedOwner
     ) external reinitializer(2) {
-        require(_l1Bridge != address(0), "bf");
-        require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
-        require(_aliasedOwner != address(0), "sf");
+        if (_l1SharedBridge == address(0)) {
+            revert EmptyAddress();
+        }
 
-        l1Bridge = _l1Bridge;
+        if (_l2TokenProxyBytecodeHash == bytes32(0)) {
+            revert EmptyBytes32();
+        }
+
+        if (_aliasedOwner == address(0)) {
+            revert EmptyAddress();
+        }
+
+        l1SharedBridge = _l1SharedBridge;
 
         if (block.chainid != ERA_CHAIN_ID) {
             address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
@@ -66,8 +79,10 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
             l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
             l2TokenBeacon.transferOwnership(_aliasedOwner);
         } else {
-            require(_l1LegacyBridge != address(0), "bf2");
-            l1LegacyBridge = _l1LegacyBridge;
+            if (_l1Bridge == address(0)) {
+                revert EmptyAddress();
+            }
+            l1Bridge = _l1Bridge;
             // l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
         }
     }
@@ -86,20 +101,26 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         bytes calldata _data
     ) external override {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
-        require(
-            AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
-                AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1LegacyBridge,
-            "mq"
-        );
+        if (
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge
+        ) {
+            revert InvalidCaller(msg.sender);
+        }
 
         address expectedL2Token = l2TokenAddress(_l1Token);
         address currentL1Token = l1TokenAddress[expectedL2Token];
         if (currentL1Token == address(0)) {
             address deployedToken = _deployL2Token(_l1Token, _data);
-            require(deployedToken == expectedL2Token, "mt");
+            if (deployedToken != expectedL2Token) {
+                revert AddressMismatch(expectedL2Token, deployedToken);
+            }
+
             l1TokenAddress[expectedL2Token] = _l1Token;
         } else {
-            require(currentL1Token == _l1Token, "gg"); // Double check that the expected value equal to real one
+            if (currentL1Token != _l1Token) {
+                revert AddressMismatch(_l1Token, currentL1Token);
+            }
         }
 
         IL2StandardToken(expectedL2Token).bridgeMint(_l2Receiver, _amount);
@@ -122,12 +143,16 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @param _l2Token The L2 token address which is withdrawn
     /// @param _amount The total amount of tokens to be withdrawn
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external override {
-        require(_amount > 0, "Amount cannot be zero");
+        if (_amount == 0) {
+            revert AmountMustBeGreaterThanZero();
+        }
 
         IL2StandardToken(_l2Token).bridgeBurn(msg.sender, _amount);
 
         address l1Token = l1TokenAddress[_l2Token];
-        require(l1Token != address(0), "yh");
+        if (l1Token == address(0)) {
+            revert EmptyAddress();
+        }
 
         bytes memory message = _getL1WithdrawMessage(_l1Receiver, l1Token, _amount);
         L2ContractHelper.sendMessageToL1(message);
@@ -174,7 +199,9 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         );
 
         // The deployment should be successful and return the address of the proxy
-        require(success, "mk");
+        if (!success) {
+            revert DeployFailed();
+        }
         proxy = BeaconProxy(abi.decode(returndata, (address)));
     }
 }

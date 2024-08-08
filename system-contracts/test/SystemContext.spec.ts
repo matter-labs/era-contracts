@@ -28,7 +28,10 @@ describe("SystemContext tests", () => {
   describe("setTxOrigin", async () => {
     it("should revert not called by bootlader", async () => {
       const txOriginExpected = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
-      await expect(systemContext.setTxOrigin(txOriginExpected)).to.be.rejectedWith("Callable only by the bootloader");
+      await expect(systemContext.setTxOrigin(txOriginExpected)).to.be.revertedWithCustomError(
+        systemContext,
+        "CallerMustBeBootloader"
+      );
     });
 
     it("should set tx.origin", async () => {
@@ -44,7 +47,10 @@ describe("SystemContext tests", () => {
   describe("setGasPrice", async () => {
     it("should revert not called by bootlader", async () => {
       const newGasPrice = 4294967295;
-      await expect(systemContext.setGasPrice(newGasPrice)).to.be.rejectedWith("Callable only by the bootloader");
+      await expect(systemContext.setGasPrice(newGasPrice)).to.be.revertedWithCustomError(
+        systemContext,
+        "CallerMustBeBootloader"
+      );
     });
 
     it("should set tx.gasprice", async () => {
@@ -92,7 +98,7 @@ describe("SystemContext tests", () => {
       const batchHash = await systemContext.getBatchHash(batchData.batchNumber);
       await expect(
         systemContext.setNewBatch(batchHash, batchData.batchTimestamp.add(1), batchData.batchNumber.add(1), 1)
-      ).to.be.rejectedWith("Callable only by the bootloader");
+      ).to.be.revertedWithCustomError(systemContext, "CallerMustBeBootloader");
     });
 
     it("should revert timestamp should be incremental", async () => {
@@ -159,7 +165,7 @@ describe("SystemContext tests", () => {
           true,
           1
         )
-      ).to.be.rejectedWith("Callable only by the bootloader");
+      ).to.be.revertedWithCustomError(systemContext, "CallerMustBeBootloader");
     });
 
     it("should revert The timestamp of the L2 block must be greater than or equal to the timestamp of the current batch", async () => {

@@ -71,7 +71,9 @@ export async function deployBytecodeViaCreate2(
   const receipt = await tx.wait();
 
   const gasUsed = receipt.gasUsed;
-  log(`${contractName} deployed, gasUsed: ${gasUsed.toString()}`);
+  log(
+    `${contractName} deployed, gasUsed: ${gasUsed.toString()}, tx hash: ${tx.hash}, expected address: ${expectedAddress}`
+  );
 
   const deployedBytecodeAfter = await deployWallet.provider.getCode(expectedAddress);
   if (ethers.utils.hexDataLength(deployedBytecodeAfter) == 0) {
@@ -111,6 +113,7 @@ export interface DeployedAddresses {
   BaseToken: string;
   TransparentProxyAdmin: string;
   Governance: string;
+  ChainAdmin: string;
   BlobVersionedHashRetriever: string;
   ValidatorTimeLock: string;
   Create2Factory: string;
@@ -150,5 +153,6 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     BlobVersionedHashRetriever: getAddressFromEnv("CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR"),
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
     Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
+    ChainAdmin: getAddressFromEnv("CONTRACTS_CHAIN_ADMIN_ADDR"),
   };
 }

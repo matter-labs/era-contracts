@@ -43,7 +43,7 @@ export default {
       // contract verification endpoint
       verifyURL: "https://explorer.sepolia.era.zksync.dev/contract_verification",
     },
-    zksyncMainnet: {
+    zkSyncMainnet: {
       url: "https://mainnet.era.zksync.io",
       ethNetwork: "mainnet",
       zksync: true,

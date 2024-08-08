@@ -33,7 +33,7 @@
     "ethjs": "^0.4.0",
     "fs": "^0.0.1-security",
     "handlebars": "^4.7.6",
-    "hardhat": "^2.18.3",
+    "hardhat": "=2.22.2",
     "hardhat-contract-sizer": "^2.0.2",
     "hardhat-gas-reporter": "^1.0.9",
     "hardhat-typechain": "^0.3.3",
@@ -50,7 +50,7 @@
     "ts-node": "^10.1.0",
     "typechain": "^4.0.0",
     "typescript": "^4.6.4",
-    "zksync-ethers": "https://github.com/zksync-sdk/zksync-ethers#ethers-v5-feat/bridgehub"
+    "zksync-ethers": "^5.9.0"
   },
   "scripts": {
     "build": "hardhat compile",
@@ -75,10 +75,9 @@
     "migrate-governance": "ts-node scripts/migrate-governance.ts",
     "display-governance": "ts-node scripts/display-governance.ts",
     "upgrade-system": "ts-node upgrade-system/index.ts",
-    "hyperchain-upgrade-1": "ts-node scripts/hyperchain-upgrade-1.ts",
-    "hyperchain-upgrade-2": "ts-node scripts/hyperchain-upgrade-2.ts",
-    "hyperchain-upgrade-3": "ts-node scripts/hyperchain-upgrade-3.ts",
-    "setup-legacy-bridge-era": "ts-node scripts/setup-legacy-bridge-era.ts"
+    "token-migration": "ts-node scripts/token-migration.ts",
+    "setup-legacy-bridge-era": "ts-node scripts/setup-legacy-bridge-era.ts",
+    "upgrade-consistency-checker": "ts-node scripts/upgrade-consistency-checker.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3",

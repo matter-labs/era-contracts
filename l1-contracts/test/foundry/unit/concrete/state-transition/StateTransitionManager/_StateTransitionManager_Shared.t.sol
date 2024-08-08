@@ -16,7 +16,7 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {GenesisUpgrade} from "contracts/upgrades/GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
-import {StateTransitionManagerInitializeData} from "contracts/state-transition/IStateTransitionManager.sol";
+import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
 contract StateTransitionManagerTest is Test {
@@ -78,14 +78,18 @@ contract StateTransitionManagerTest is Test {
             })
         );
 
+        ChainCreationParams memory chainCreationParams = ChainCreationParams({
+            genesisUpgrade: address(genesisUpgradeContract),
+            genesisBatchHash: bytes32(uint256(0x01)),
+            genesisIndexRepeatedStorageChanges: 0x01,
+            genesisBatchCommitment: bytes32(uint256(0x01)),
+            diamondCut: getDiamondCutData(address(diamondInit))
+        });
+
         StateTransitionManagerInitializeData memory stmInitializeDataNoGovernor = StateTransitionManagerInitializeData({
             owner: address(0),
             validatorTimelock: validator,
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(""),
-            genesisIndexRepeatedStorageChanges: 0,
-            genesisBatchCommitment: bytes32(""),
-            diamondCut: getDiamondCutData(address(diamondInit)),
+            chainCreationParams: chainCreationParams,
             protocolVersion: 0
         });
 
@@ -99,11 +103,7 @@ contract StateTransitionManagerTest is Test {
         StateTransitionManagerInitializeData memory stmInitializeData = StateTransitionManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(""),
-            genesisIndexRepeatedStorageChanges: 0,
-            genesisBatchCommitment: bytes32(""),
-            diamondCut: getDiamondCutData(address(diamondInit)),
+            chainCreationParams: chainCreationParams,
             protocolVersion: 0
         });
 
@@ -118,7 +118,7 @@ contract StateTransitionManagerTest is Test {
         vm.startPrank(governor);
     }
 
-    function getDiamondCutData(address _diamondInit) internal returns (Diamond.DiamondCutData memory) {
+    function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
         InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier);
 
         bytes memory initCalldata = abi.encode(initializeData);

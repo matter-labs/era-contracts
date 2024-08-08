@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable gas-custom-errors
+
 /// @notice The structure that contains meta information of the L2 transaction that was requested from L1
 /// @dev The weird size of fields was selected specifically to minimize the structure storage size
 /// @param canonicalTxHash Hashed L2 transaction data that is needed to process it

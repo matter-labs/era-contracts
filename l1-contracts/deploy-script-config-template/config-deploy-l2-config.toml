@@ -1,0 +1,6 @@
+chain_id = 215
+era_chain_id = 270
+l1_shared_bridge = "0x2ae37d8130b82c7e79b3863a39027178e073eedb"
+bridgehub = "0xea785a9c91a07ed69b83eb165f4ce2c30ecb4c0b"
+governance = "0x6a08d69675af7755569a1a25ef37e795493473a1"
+erc20_bridge = "0x84fbda16bd5f2d66d7fbaec5e8d816e7b7014595"

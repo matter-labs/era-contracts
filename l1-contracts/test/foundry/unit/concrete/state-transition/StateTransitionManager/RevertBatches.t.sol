@@ -41,13 +41,13 @@ contract revertBatchesTest is StateTransitionManagerTest {
 
         genesisStoredBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: 0,
-            batchHash: bytes32(""),
-            indexRepeatedStorageChanges: 0,
+            batchHash: bytes32(uint256(0x01)),
+            indexRepeatedStorageChanges: 1,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: EMPTY_STRING_KECCAK,
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             timestamp: 0,
-            commitment: bytes32("")
+            commitment: bytes32(uint256(0x01))
         });
 
         adminFacet.setTokenMultiplier(1, 1);
@@ -65,7 +65,7 @@ contract revertBatchesTest is StateTransitionManagerTest {
         newCommitBatchInfo = IExecutor.CommitBatchInfo({
             batchNumber: 1,
             timestamp: uint64(currentTimestamp),
-            indexRepeatedStorageChanges: 0,
+            indexRepeatedStorageChanges: 1,
             newStateRoot: Utils.randomBytes32("newStateRoot"),
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
@@ -91,6 +91,13 @@ contract revertBatchesTest is StateTransitionManagerTest {
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
+        correctL2Logs[uint256(uint256(SystemLogKey.PREV_BATCH_HASH_KEY))] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
+            bytes32(uint256(0x01))
+        );
+
         l2Logs = Utils.encodePacked(correctL2Logs);
         newCommitBatchInfo.timestamp = uint64(currentTimestamp);
         newCommitBatchInfo.systemLogs = l2Logs;
@@ -107,7 +114,7 @@ contract revertBatchesTest is StateTransitionManagerTest {
         newStoredBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: 1,
             batchHash: entries[0].topics[2],
-            indexRepeatedStorageChanges: 0,
+            indexRepeatedStorageChanges: 1,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
             l2LogsTreeRoot: 0,

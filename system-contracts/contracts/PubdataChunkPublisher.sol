@@ -5,6 +5,7 @@ import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {L1_MESSENGER_CONTRACT, BLOB_SIZE_BYTES, MAX_NUMBER_OF_BLOBS, SystemLogKey} from "./Constants.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
+import {TooMuchPubdata} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -17,7 +18,9 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
     /// @dev Note: This is an early implementation, in the future we plan to support up to 16 blobs per l1 batch.
     /// @dev We always publish 6 system logs even if our pubdata fits into a single blob. This makes processing logs on L1 easier.
     function chunkAndPublishPubdata(bytes calldata _pubdata) external onlyCallFrom(address(L1_MESSENGER_CONTRACT)) {
-        require(_pubdata.length <= BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS, "pubdata should fit in 6 blobs");
+        if (_pubdata.length > BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS) {
+            revert TooMuchPubdata(BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS, _pubdata.length);
+        }
 
         bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
 
@@ -31,7 +34,7 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
             calldatacopy(ptr, _pubdata.offset, _pubdata.length)
         }
 
-        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
+        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; ++i) {
             uint256 start = BLOB_SIZE_BYTES * i;
 
             // We break if the pubdata isn't enough to cover all 6 blobs. On L1 it is expected that the hash
@@ -50,7 +53,7 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
             blobHashes[i] = blobHash;
         }
 
-        for (uint8 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
+        for (uint8 i = 0; i < MAX_NUMBER_OF_BLOBS; ++i) {
             SystemContractHelper.toL1(
                 true,
                 bytes32(uint256(SystemLogKey(i + uint256(SystemLogKey.BLOB_ONE_HASH_KEY)))),

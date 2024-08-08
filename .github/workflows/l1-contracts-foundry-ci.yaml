@@ -6,6 +6,7 @@ env:
 
 on:
   pull_request:
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,7 +29,7 @@ jobs:
         run: yarn
 
       - name: Build artifacts
-        working-directory: ./l1-contracts-foundry
+        working-directory: ./l1-contracts
         run: forge build
 
       - name: Build system-contract artifacts
@@ -39,8 +40,8 @@ jobs:
         with:
           key: artifacts-l1-contracts-foudry-${{ github.sha }}
           path: |
-            l1-contracts-foundry/cache
-            l1-contracts-foundry/out
+            l1-contracts/cache
+            l1-contracts/out
             system-contracts/artifacts-zk
             system-contracts/bootloader/build
             system-contracts/cache-zk
@@ -62,8 +63,8 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-contracts-foudry-${{ github.sha }}
           path: |
-            l1-contracts-foundry/cache
-            l1-contracts-foundry/out
+            l1-contracts/cache
+            l1-contracts/out
             system-contracts/artifacts-zk
             system-contracts/bootloader/build
             system-contracts/cache-zk
@@ -72,6 +73,10 @@ jobs:
 
       - name: Use Foundry
         uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Copy configs from template
+        working-directory: ./l1-contracts
+        run: cp -r deploy-script-config-template script-config
 
       - name: Run anvil
         run: |
@@ -95,17 +100,18 @@ jobs:
           fi
 
       - name: Run DeployL1 script
-        working-directory: ./l1-contracts-foundry
-        run: forge script ./script/DeployL1.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
-
-      - name: Run RegisterHyperchain script
-        working-directory: ./l1-contracts-foundry
-        run: forge script ./script/RegisterHyperchain.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+        working-directory: ./l1-contracts
+        run: forge script ./deploy-scripts/DeployL1.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
 
       - name: Run DeployErc20 script
-        working-directory: ./l1-contracts-foundry
-        run: forge script ./script/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
-
-      - name: Run InitializeL2WethToken script
-        working-directory: ./l1-contracts-foundry
-        run: forge script ./script/InitializeL2WethToken.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+        working-directory: ./l1-contracts
+        run: forge script ./deploy-scripts/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+# TODO restore scripts verification
+#      - name: Run RegisterHyperchain script
+#        working-directory: ./l1-contracts
+#        run: |
+#          cat ./script-out/output-deploy-l1.toml >> ./script-config/register-hyperchain.toml
+#          forge script ./deploy-scripts/RegisterHyperchain.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+#      - name: Run InitializeL2WethToken script
+#        working-directory: ./l1-contracts-foundry
+#        run: forge script ./deploy-scripts/InitializeL2WethToken.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY

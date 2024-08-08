@@ -7,6 +7,8 @@ import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/
 import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 
+import {EmptyAddress, Unauthorized, UnimplementedMessage, BRIDGE_MINT_NOT_IMPLEMENTED, WithdrawFailed} from "../L2ContractErrors.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The canonical implementation of the WETH token.
@@ -42,13 +44,18 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2S
     /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 WETH.
     /// Note: The decimals are hardcoded to 18, the same as on Ether.
     function initializeV2(
-        string memory name_,
-        string memory symbol_,
+        string calldata name_,
+        string calldata symbol_,
         address _l2Bridge,
         address _l1Address
     ) external reinitializer(2) {
-        require(_l2Bridge != address(0), "L2 bridge address cannot be zero");
-        require(_l1Address != address(0), "L1 WETH token address cannot be zero");
+        if (_l2Bridge == address(0)) {
+            revert EmptyAddress();
+        }
+
+        if (_l1Address == address(0)) {
+            revert EmptyAddress();
+        }
         l2Bridge = _l2Bridge;
         l1Address = _l1Address;
 
@@ -62,7 +69,9 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2S
     }
 
     modifier onlyBridge() {
-        require(msg.sender == l2Bridge, "permission denied"); // Only L2 bridge can call this method
+        if (msg.sender != l2Bridge) {
+            revert Unauthorized();
+        }
         _;
     }
 
@@ -71,7 +80,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2S
     /// Note: Use `deposit`/`depositTo` methods instead.
     // solhint-disable-next-line no-unused-vars
     function bridgeMint(address _to, uint256 _amount) external override onlyBridge {
-        revert("bridgeMint is not implemented! Use deposit/depositTo methods instead.");
+        revert UnimplementedMessage(BRIDGE_MINT_NOT_IMPLEMENTED);
     }
 
     /// @dev Burn tokens from a given account and send the same amount of Ether to the bridge.
@@ -82,7 +91,9 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2S
         _burn(_from, _amount);
         // sends Ether to the bridge
         (bool success, ) = msg.sender.call{value: _amount}("");
-        require(success, "Failed withdrawal");
+        if (!success) {
+            revert WithdrawFailed();
+        }
 
         emit BridgeBurn(_from, _amount);
     }
@@ -107,7 +118,9 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2S
     function withdrawTo(address _to, uint256 _amount) public override {
         _burn(msg.sender, _amount);
         (bool success, ) = _to.call{value: _amount}("");
-        require(success, "Failed withdrawal");
+        if (!success) {
+            revert WithdrawFailed();
+        }
     }
 
     /// @dev Fallback function to allow receiving Ether.

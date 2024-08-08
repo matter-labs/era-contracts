@@ -22,7 +22,8 @@ l1-contracts/lcov.info
 l1-contracts/report/*
 l1-contracts/coverage/*
 l1-contracts/out/*
-l1-contracts-foundry/broadcast/*
-l1-contracts-foundry/script-out/*
-!l1-contracts-foundry/script-out/.gitkeep
+l1-contracts/broadcast/*
+l1-contracts/script-config/*
+l1-contracts/script-out/*
+!l1-contracts/script-out/.gitkeep
 *.timestamp

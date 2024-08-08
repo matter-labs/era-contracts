@@ -7,6 +7,7 @@ import {stdStorage, StdStorage, Test} from "forge-std/Test.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {DummyStateTransitionManagerWBH} from "contracts/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
 import {DummyHyperchain} from "contracts/dev-contracts/test/DummyHyperchain.sol";
@@ -861,7 +862,16 @@ contract ExperimentalBridgeTest is Test {
         diamondCutData.initAddress = address(0);
         diamondCutData.initCalldata = "";
 
-        mockSTM.setInitialCutHash(diamondCutData);
+        ChainCreationParams memory params = ChainCreationParams({
+            diamondCut: diamondCutData,
+            // Just some dummy values:
+            genesisUpgrade: address(0x01),
+            genesisBatchHash: bytes32(uint256(0x01)),
+            genesisIndexRepeatedStorageChanges: uint64(0x01),
+            genesisBatchCommitment: bytes32(uint256(0x01))
+        });
+
+        mockSTM.setChainCreationParams(params);
 
         return abi.encode(diamondCutData);
     }

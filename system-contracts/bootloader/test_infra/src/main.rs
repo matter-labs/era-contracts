@@ -21,7 +21,7 @@ use zksync_state::{
     InMemoryStorage, StoragePtr, StorageView, IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID,
 };
 use zksync_types::system_contracts::get_system_smart_contracts_from_dir;
-use zksync_types::{block::MiniblockHasher, Address, L1BatchNumber, MiniblockNumber, U256};
+use zksync_types::{block::L2BlockHasher, Address, L1BatchNumber, L2BlockNumber, U256};
 use zksync_types::{L2ChainId, Transaction};
 use zksync_utils::bytecode::hash_bytecode;
 use zksync_utils::{bytes_to_be_words, u256_to_h256};
@@ -63,7 +63,7 @@ fn execute_internal_bootloader_test() {
         zk_porter_available: false,
         version: zksync_types::ProtocolVersionId::latest(),
         base_system_smart_contracts: base_system_contract,
-        gas_limit: u32::MAX,
+        bootloader_gas_limit: u32::MAX,
         execution_mode: TxExecutionMode::VerifyExecute,
         default_validation_computational_gas_limit: u32::MAX,
         chain_id: zksync_types::L2ChainId::from(299),
@@ -80,7 +80,7 @@ fn execute_internal_bootloader_test() {
         first_l2_block: L2BlockEnv {
             number: 1,
             timestamp: 15,
-            prev_block_hash: MiniblockHasher::legacy_hash(MiniblockNumber(0)),
+            prev_block_hash: L2BlockHasher::legacy_hash(L2BlockNumber(0)),
             max_virtual_blocks_to_create: 1,
         },
     };

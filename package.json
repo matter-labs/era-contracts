@@ -6,7 +6,8 @@
     "packages": [
       "l1-contracts",
       "l2-contracts",
-      "system-contracts"
+      "system-contracts",
+      "gas-bound-caller"
     ],
     "nohoist": [
       "**/@openzeppelin/**"
@@ -24,7 +25,7 @@
     "markdownlint-cli": "^0.33.0",
     "prettier-plugin-solidity": "^1.1.3",
     "prettier": "^3.0.3",
-    "solhint": "^3.6.2"
+    "solhint": "4.5.4"
   },
   "scripts": {
     "lint:check": "yarn lint:md && yarn lint:sol && yarn lint:ts && yarn prettier:check",
@@ -36,6 +37,7 @@
     "prettier:fix": "prettier --write \"**/*.{js,json,md,sol,ts,yaml}\"",
     "l1": "yarn workspace l1-contracts",
     "l2": "yarn workspace l2-contracts",
-    "sc": "yarn workspace system-contracts"
+    "sc": "yarn workspace system-contracts",
+    "gas-bound-caller": "yarn workspace gas-bound-caller"
   }
 }

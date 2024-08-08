@@ -59,16 +59,14 @@ async function main() {
 
   program
     .option("--private-key <private-key>")
-    .option("--chain-id <chain-id>")
     .option("--gas-price <gas-price>")
     .option("--nonce <nonce>")
     .option("--governor-address <governor-address>")
-    .option("--create2-salt <create2-salt>")
-    .option("--diamond-upgrade-init <version>")
     .option("--only-verifier")
     .option("--validium-mode")
     .option("--base-token-name <base-token-name>")
     .option("--base-token-address <base-token-address>")
+    .option("--use-governance <use-governance>")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -99,11 +97,23 @@ async function main() {
       await checkTokenAddress(baseTokenAddress);
       console.log(`Using base token address: ${baseTokenAddress}`);
 
+      const useGovernance = !!cmd.useGovernance && cmd.useGovernance === "true";
+
       if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
-        await deployer.registerToken(baseTokenAddress);
+        await deployer.registerToken(baseTokenAddress, useGovernance);
       }
 
-      await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice);
+      await deployer.registerHyperchain(
+        baseTokenAddress,
+        cmd.validiumMode,
+        null,
+        gasPrice,
+        true,
+        null,
+        null,
+        useGovernance
+      );
+      await deployer.transferAdminFromDeployerToChainAdmin();
     });
 
   await program.parseAsync(process.argv);

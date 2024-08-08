@@ -22,12 +22,13 @@ async function main() {
   // Contracts without constructor parameters
   for (const address of [
     process.env.CONTRACTS_L2_WETH_TOKEN_IMPL_ADDR,
-    process.env.CONTRACTS_L2_ERC20_BRIDGE_IMPL_ADDR,
     process.env.CONTRACTS_L2_ERC20_BRIDGE_TOKEN_IMPL_ADDR,
   ]) {
     const promise = verifyPromise(address);
     promises.push(promise);
   }
+
+  promises.push(verifyPromise(process.env.CONTRACTS_L2_SHARED_BRIDGE_IMPL_ADDR, [process.env.CONTRACTS_ERA_CHAIN_ID]));
 
   const messages = await Promise.allSettled(promises);
   for (const message of messages) {

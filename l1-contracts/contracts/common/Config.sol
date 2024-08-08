@@ -27,10 +27,11 @@ uint256 constant PRIORITY_OPERATION_L2_TX_TYPE = 255;
 /// @dev Denotes the type of the zkSync transaction that is used for system upgrades.
 uint256 constant SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 
-/// @dev The maximal allowed difference between protocol versions in an upgrade. The 100 gap is needed
+/// @dev The maximal allowed difference between protocol minor versions in an upgrade. The 100 gap is needed
 /// in case a protocol version has been tested on testnet, but then not launched on mainnet, e.g.
 /// due to a bug found.
-uint256 constant MAX_ALLOWED_PROTOCOL_VERSION_DELTA = 100;
+/// We are allowed to jump at most 100 minor versions at a time. The major version is always expected to be 0.
+uint256 constant MAX_ALLOWED_MINOR_VERSION_DELTA = 100;
 
 /// @dev The amount of time in seconds the validator has to process the priority transaction
 /// NOTE: The constant is set to zero for the Alpha release period

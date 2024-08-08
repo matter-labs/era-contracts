@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 
 import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
 import {FORCE_DEPLOYER} from "./Constants.sol";
+import {Unauthorized, AddressHasNoCode} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -19,9 +20,13 @@ contract ComplexUpgrader is IComplexUpgrader {
     /// @param _delegateTo the address of the contract to which the calls will be delegated
     /// @param _calldata the calldata to be delegate called in the `_delegateTo` contract
     function upgrade(address _delegateTo, bytes calldata _calldata) external payable {
-        require(msg.sender == FORCE_DEPLOYER, "Can only be called by FORCE_DEPLOYER");
+        if (msg.sender != FORCE_DEPLOYER) {
+            revert Unauthorized(msg.sender);
+        }
 
-        require(_delegateTo.code.length > 0, "Delegatee is an EOA");
+        if (_delegateTo.code.length == 0) {
+            revert AddressHasNoCode(_delegateTo);
+        }
         (bool success, bytes memory returnData) = _delegateTo.delegatecall(_calldata);
         assembly {
             if iszero(success) {

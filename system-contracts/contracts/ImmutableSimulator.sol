@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 
 import {IImmutableSimulator, ImmutableData} from "./interfaces/IImmutableSimulator.sol";
 import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
+import {Unauthorized} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -32,7 +33,9 @@ contract ImmutableSimulator is IImmutableSimulator {
     /// @param _dest The address which to store the immutables for.
     /// @param _immutables The list of the immutables.
     function setImmutables(address _dest, ImmutableData[] calldata _immutables) external override {
-        require(msg.sender == address(DEPLOYER_SYSTEM_CONTRACT), "Callable only by the deployer system contract");
+        if (msg.sender != address(DEPLOYER_SYSTEM_CONTRACT)) {
+            revert Unauthorized(msg.sender);
+        }
         unchecked {
             uint256 immutablesLength = _immutables.length;
             for (uint256 i = 0; i < immutablesLength; ++i) {
