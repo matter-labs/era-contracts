@@ -127,12 +127,6 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice New pair of DA validators set
     event NewL2DAValidator(address indexed oldL2DAValidator, address indexed newL2DAValidator);
     event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
-    /// @dev emitted when a chain registers and a SetChainIdUpgrade happens
-    event SetChainIdUpgrade(
-        address indexed _hyperchain,
-        L2CanonicalTransaction _l2Transaction,
-        uint256 indexed _protocolVersion
-    );
 
     event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
 
