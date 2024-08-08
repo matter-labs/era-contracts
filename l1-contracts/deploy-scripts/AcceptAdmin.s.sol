@@ -31,7 +31,8 @@ contract AcceptAdmin is Script {
             _salt: bytes32(0),
             _target: target,
             _data: abi.encodeCall(adminContract.acceptAdmin, ()),
-            _value: 0
+            _value: 0,
+            _delay: 0
         });
     }
 
