@@ -223,7 +223,7 @@ fee-on-transfer tokens or other custom logic for handling user balances. Only wo
 - `claimFailedDeposit` - unlock funds if the deposit was initiated but then failed on L2.
 - `finalizeWithdrawal` - unlock funds for the valid withdrawal request from L2.
 
-##### L1SharedBridge
+##### L1AssetRouter
 
 The "standard" implementation of the ERC20 and WETH token bridge. Works only with regular ERC20 tokens, i.e. not with
 fee-on-transfer tokens or other custom logic for handling user balances.

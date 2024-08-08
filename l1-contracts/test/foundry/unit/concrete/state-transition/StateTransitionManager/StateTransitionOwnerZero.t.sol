@@ -13,7 +13,8 @@ contract initializingSTMOwnerZeroTest is StateTransitionManagerTest {
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: 1,
             genesisBatchCommitment: bytes32(uint256(0x01)),
-            diamondCut: getDiamondCutData(address(diamondInit))
+            diamondCut: getDiamondCutData(address(diamondInit)),
+            forceDeploymentsData: bytes("")
         });
 
         StateTransitionManagerInitializeData memory stmInitializeDataNoOwner = StateTransitionManagerInitializeData({

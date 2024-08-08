@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {IL1NativeTokenVault} from "../../bridge/L1NativeTokenVault.sol";
-import {NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS} from "../../common/Config.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../../common/L2ContractAddresses.sol";
 
 contract DummySharedBridge {
     IL1NativeTokenVault public nativeTokenVault;
@@ -103,7 +103,7 @@ contract DummySharedBridge {
         uint256 _amount
     ) external payable {
         if (_l1Token == address(1)) {
-            require(msg.value == _amount, "L1SharedBridge: msg.value not equal to amount");
+            require(msg.value == _amount, "L1AssetRouter: msg.value not equal to amount");
         } else {
             // The Bridgehub also checks this, but we want to be sure
             require(msg.value == 0, "ShB m.v > 0 b d.it");
@@ -158,10 +158,13 @@ contract DummySharedBridge {
 
     /// @dev Used to set the assedAddress for a given assetId.
     function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external {
-        address sender = msg.sender == address(nativeTokenVault) ? NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS : msg.sender;
+        address sender = msg.sender == address(nativeTokenVault) ? L2_NATIVE_TOKEN_VAULT_ADDRESS : msg.sender;
         bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData));
         assetHandlerAddress[assetId] = _assetHandlerAddress;
         // assetDeploymentTracker[assetId] = sender;
         // emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _additionalData, sender);
     }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }

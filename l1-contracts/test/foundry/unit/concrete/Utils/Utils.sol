@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 
+import "forge-std/console.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
@@ -17,13 +18,15 @@ import {InitializeData, InitializeDataNewChain} from "contracts/state-transition
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
 address constant L2_BOOTLOADER_ADDRESS = 0x0000000000000000000000000000000000008001;
 address constant L2_KNOWN_CODE_STORAGE_ADDRESS = 0x0000000000000000000000000000000000008004;
 address constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008;
-address constant PUBDATA_PUBLISHER_ADDRESS = 0x0000000000000000000000000000000000008011;
+// constant in tests, but can be arbitrary address in real environments
+address constant L2_DA_VALIDATOR_ADDRESS = 0x2f3Bc0cB46C9780990afbf86A60bdf6439DE991C;
 
 uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
@@ -56,8 +59,8 @@ library Utils {
         return abi.encodePacked(servicePrefix, bytes2(0x0000), sender, key, value);
     }
 
-    function createSystemLogs() public pure returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](13);
+    function createSystemLogs(bytes32 _outputHash) public returns (bytes[] memory) {
+        bytes[] memory logs = new bytes[](9);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -95,34 +98,27 @@ library Utils {
             uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
             bytes32("")
         );
-        logs[7] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_ONE_HASH_KEY), bytes32(0));
-        logs[8] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_TWO_HASH_KEY), bytes32(0));
-        logs[9] = constructL2Log(
+
+        logs[7] = constructL2Log(
             true,
-            PUBDATA_PUBLISHER_ADDRESS,
-            uint256(SystemLogKey.BLOB_THREE_HASH_KEY),
-            bytes32(0)
+            L2_TO_L1_MESSENGER,
+            uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY),
+            _outputHash
         );
-        logs[10] = constructL2Log(
+        logs[8] = constructL2Log(
             true,
-            PUBDATA_PUBLISHER_ADDRESS,
-            uint256(SystemLogKey.BLOB_FOUR_HASH_KEY),
-            bytes32(0)
+            L2_TO_L1_MESSENGER,
+            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            bytes32(uint256(uint160(L2_DA_VALIDATOR_ADDRESS)))
         );
-        logs[11] = constructL2Log(
-            true,
-            PUBDATA_PUBLISHER_ADDRESS,
-            uint256(SystemLogKey.BLOB_FIVE_HASH_KEY),
-            bytes32(0)
-        );
-        logs[12] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_SIX_HASH_KEY), bytes32(0));
+
         return logs;
     }
 
     function createSystemLogsWithUpgradeTransaction(
         bytes32 _expectedSystemContractUpgradeTxHash
-    ) public pure returns (bytes[] memory) {
-        bytes[] memory logsWithoutUpgradeTx = createSystemLogs();
+    ) public returns (bytes[] memory) {
+        bytes[] memory logsWithoutUpgradeTx = createSystemLogs(bytes32(0));
         bytes[] memory logs = new bytes[](logsWithoutUpgradeTx.length + 1);
         for (uint256 i = 0; i < logsWithoutUpgradeTx.length; i++) {
             logs[i] = logsWithoutUpgradeTx[i];
@@ -162,7 +158,7 @@ library Utils {
                 bootloaderHeapInitialContentsHash: randomBytes32("bootloaderHeapInitialContentsHash"),
                 eventsQueueStateHash: randomBytes32("eventsQueueStateHash"),
                 systemLogs: abi.encode(randomBytes32("systemLogs")),
-                pubdataCommitments: abi.encodePacked(uint256(0))
+                operatorDAInput: abi.encodePacked(uint256(0))
             });
     }
 
@@ -186,7 +182,7 @@ library Utils {
     }
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](11);
+        bytes4[] memory selectors = new bytes4[](12);
         selectors[0] = AdminFacet.setPendingAdmin.selector;
         selectors[1] = AdminFacet.acceptAdmin.selector;
         selectors[2] = AdminFacet.setValidator.selector;
@@ -198,6 +194,7 @@ library Utils {
         selectors[8] = AdminFacet.executeUpgrade.selector;
         selectors[9] = AdminFacet.freezeDiamond.selector;
         selectors[10] = AdminFacet.unfreezeDiamond.selector;
+        selectors[11] = AdminFacet.genesisUpgrade.selector;
         return selectors;
     }
 
@@ -462,8 +459,8 @@ library Utils {
     ) internal pure returns (bytes32[] memory blobAuxOutputWords) {
         // These invariants should be checked by the caller of this function, but we double check
         // just in case.
-        require(_blobCommitments.length == MAX_NUMBER_OF_BLOBS, "b10");
-        require(_blobHashes.length == MAX_NUMBER_OF_BLOBS, "b11");
+        require(_blobCommitments.length == TOTAL_BLOBS_IN_COMMITMENT, "b10");
+        require(_blobHashes.length == TOTAL_BLOBS_IN_COMMITMENT, "b11");
 
         // for each blob we have:
         // linear hash (hash of preimage from system logs) and
@@ -475,9 +472,59 @@ library Utils {
 
         blobAuxOutputWords = new bytes32[](2 * TOTAL_BLOBS_IN_COMMITMENT);
 
-        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
+        for (uint256 i = 0; i < TOTAL_BLOBS_IN_COMMITMENT; i++) {
             blobAuxOutputWords[i * 2] = _blobHashes[i];
             blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
+        }
+    }
+
+    function constructRollupL2DAValidatorOutputHash(
+        bytes32 _stateDiffHash,
+        bytes32 _totalPubdataHash,
+        uint8 _blobsAmount,
+        bytes32[] memory _blobHashes
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(_stateDiffHash, _totalPubdataHash, _blobsAmount, _blobHashes));
+    }
+
+    function getDefaultBlobCommitment() public pure returns (bytes memory) {
+        bytes16 blobOpeningPoint = 0x7142c5851421a2dc03dde0aabdb0ffdb;
+        bytes32 blobClaimedValue = 0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0;
+        bytes
+            memory commitment = hex"ad5a32c9486ad7ab553916b36b742ed89daffd4538d95f4fc8a6c5c07d11f4102e34b3c579d9b4eb6c295a78e484d3bf";
+        bytes
+            memory blobProof = hex"b7565b1cf204d9f35cec98a582b8a15a1adff6d21f3a3a6eb6af5a91f0a385c069b34feb70bea141038dc7faca5ed364";
+
+        return abi.encodePacked(blobOpeningPoint, blobClaimedValue, commitment, blobProof);
+    }
+
+    function defaultPointEvaluationPrecompileInput(bytes32 _versionedHash) public view returns (bytes memory) {
+        return
+            abi.encodePacked(
+                _versionedHash,
+                bytes32(uint256(uint128(0x7142c5851421a2dc03dde0aabdb0ffdb))), // opening point
+                abi.encodePacked(
+                    bytes32(0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0), // claimed value
+                    hex"ad5a32c9486ad7ab553916b36b742ed89daffd4538d95f4fc8a6c5c07d11f4102e34b3c579d9b4eb6c295a78e484d3bf", // commitment
+                    hex"b7565b1cf204d9f35cec98a582b8a15a1adff6d21f3a3a6eb6af5a91f0a385c069b34feb70bea141038dc7faca5ed364" // proof
+                )
+            );
+    }
+
+    function emptyData() internal pure returns (PriorityOpsBatchInfo[] calldata _empty) {
+        assembly {
+            _empty.offset := 0
+            _empty.length := 0
+        }
+    }
+
+    function generatePriorityOps(uint256 len) internal pure returns (PriorityOpsBatchInfo[] memory _ops) {
+        _ops = new PriorityOpsBatchInfo[](len);
+        bytes32[] memory empty;
+        PriorityOpsBatchInfo memory info = PriorityOpsBatchInfo({leftPath: empty, rightPath: empty, itemHashes: empty});
+
+        for (uint256 i = 0; i < len; ++i) {
+            _ops[i] = info;
         }
     }
 

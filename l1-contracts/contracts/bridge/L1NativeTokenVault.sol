@@ -12,7 +12,8 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
-import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
+
+import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
@@ -29,7 +30,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
     address public immutable override L1_WETH_TOKEN;
 
     /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
-    IL1SharedBridge public immutable override L1_SHARED_BRIDGE;
+    IL1AssetRouter public immutable override L1_SHARED_BRIDGE;
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
@@ -47,7 +48,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2Ste
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(address _l1WethAddress, IL1SharedBridge _l1SharedBridge) {
+    constructor(address _l1WethAddress, IL1AssetRouter _l1SharedBridge) {
         _disableInitializers();
         L1_WETH_TOKEN = _l1WethAddress;
         L1_SHARED_BRIDGE = _l1SharedBridge;

@@ -1,8 +1,13 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
-import type { L1SharedBridge, Bridgehub, L1NativeTokenVault } from "../../typechain";
-import { L1SharedBridgeFactory, BridgehubFactory, TestnetERC20TokenFactory } from "../../typechain";
+import type { L1AssetRouter, Bridgehub, L1NativeTokenVault, MockExecutorFacet } from "../../typechain";
+import {
+  L1AssetRouterFactory,
+  BridgehubFactory,
+  TestnetERC20TokenFactory,
+  MockExecutorFacetFactory,
+} from "../../typechain";
 import { L1NativeTokenVaultFactory } from "../../typechain/L1NativeTokenVaultFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
@@ -11,7 +16,7 @@ import { ethTestConfig } from "../../src.ts/utils";
 import type { Deployer } from "../../src.ts/deploy";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
-import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
+import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DUMMY_MERKLE_PROOF_START } from "./utils";
 
 describe("Shared Bridge tests", () => {
   let owner: ethers.Signer;
@@ -20,10 +25,13 @@ describe("Shared Bridge tests", () => {
   let deployer: Deployer;
   let bridgehub: Bridgehub;
   let l1NativeTokenVault: L1NativeTokenVault;
-  let l1SharedBridge: L1SharedBridge;
+  let proxyAsMockExecutor: MockExecutorFacet;
+  let l1SharedBridge: L1AssetRouter;
   let erc20TestToken: ethers.Contract;
   const mailboxFunctionSignature = "0x6c0960f9";
   const ERC20functionSignature = "0x11a2ccc1";
+  const dummyProof = Array(9).fill(ethers.constants.HashZero);
+  dummyProof[0] = DUMMY_MERKLE_PROOF_START;
 
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
@@ -56,7 +64,19 @@ describe("Shared Bridge tests", () => {
     chainId = deployer.chainId;
     // prepare the bridge
 
-    l1SharedBridge = L1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
+    proxyAsMockExecutor = MockExecutorFacetFactory.connect(
+      deployer.addresses.StateTransition.DiamondProxy,
+      mockExecutorContract.signer
+    );
+
+    await (
+      await proxyAsMockExecutor.saveL2LogsRootHash(
+        0,
+        "0x0000000000000000000000000000000000000000000000000000000000000001"
+      )
+    ).wait();
+
+    l1SharedBridge = L1AssetRouterFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
     l1NativeTokenVault = L1NativeTokenVaultFactory.connect(
       deployer.addresses.Bridges.NativeTokenVaultProxy,
@@ -194,9 +214,9 @@ describe("Shared Bridge tests", () => {
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 10, 0, 0, l2ToL1message, [])
+      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 10, 0, 0, l2ToL1message, dummyProof)
     );
-    expect(revertReason).equal("xx");
+    expect(revertReason).equal("local root is 0");
   });
 
   it("Should revert on finalizing a withdrawal with wrong length of proof", async () => {
@@ -208,9 +228,11 @@ describe("Shared Bridge tests", () => {
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, [])
+      l1SharedBridge
+        .connect(randomSigner)
+        .finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, [dummyProof[0], dummyProof[1]])
     );
-    expect(revertReason).equal("xc");
+    expect(revertReason).equal("ShB withd w proof");
   });
 
   it("Should revert on finalizing a withdrawal with wrong proof", async () => {
@@ -222,9 +244,7 @@ describe("Shared Bridge tests", () => {
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
-      l1SharedBridge
-        .connect(randomSigner)
-        .finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, Array(9).fill(ethers.constants.HashZero))
+      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, dummyProof)
     );
     expect(revertReason).equal("ShB withd w proof");
   });

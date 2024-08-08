@@ -107,5 +107,5 @@ function TEST_systemLogKeys() {
 
     testing_assertEq(chainedPriorityTxnHashLogKey, 5, "Invalid priority txn hash log key")
     testing_assertEq(numberOfLayer1TxsLogKey, 6, "Invalid num layer 1 txns log key")
-    testing_assertEq(protocolUpgradeTxHashKey, 13, "Invalid protocol upgrade txn hash log key")
+    testing_assertEq(protocolUpgradeTxHashKey, 9, "Invalid protocol upgrade txn hash log key")
 }

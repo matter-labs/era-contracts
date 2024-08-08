@@ -2,8 +2,11 @@
 
 pragma solidity 0.8.24;
 
-import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
-import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
+import {L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
+import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -39,13 +42,21 @@ struct L2TransactionRequestTwoBridgesInner {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IBridgehub {
+interface IBridgehub is IL1AssetHandler {
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
 
     /// @notice Admin changed
     event NewAdmin(address indexed oldAdmin, address indexed newAdmin);
+
+    /// @notice STM asset registered
+    event AssetRegistered(
+        bytes32 indexed assetInfo,
+        address indexed _assetAddress,
+        bytes32 indexed additionalData,
+        address sender
+    );
 
     /// @notice Starts the transfer of admin rights. Only the current admin or owner can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
@@ -66,7 +77,9 @@ interface IBridgehub {
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
-    function sharedBridge() external view returns (IL1SharedBridge);
+    function sharedBridge() external view returns (IL1AssetRouter);
+
+    function messageRoot() external view returns (IMessageRoot);
 
     function getHyperchain(uint256 _chainId) external view returns (address);
 
@@ -121,7 +134,8 @@ interface IBridgehub {
         address _baseToken,
         uint256 _salt,
         address _admin,
-        bytes calldata _initData
+        bytes calldata _initData,
+        bytes[] calldata _factoryDeps
     ) external returns (uint256 chainId);
 
     function addStateTransitionManager(address _stateTransitionManager) external;
@@ -130,7 +144,15 @@ interface IBridgehub {
 
     function addToken(address _token) external;
 
-    function setSharedBridge(address _sharedBridge) external;
+    function setAddresses(
+        address _sharedBridge,
+        ISTMDeploymentTracker _stmDeployer,
+        IMessageRoot _messageRoot
+    ) external;
+
+    // function relayTxThroughBH(uint256 _baseDestChainId, uint256 _destChainId, bytes calldata _dataToRelay) external;
+
+    // function registerCounterpart(uint256 chainid, address _counterpart) external;
 
     event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
 
@@ -141,4 +163,40 @@ interface IBridgehub {
     event TokenRegistered(address indexed token);
 
     event SharedBridgeUpdated(address indexed sharedBridge);
+
+    function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
+
+    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
+
+    // function finalizeMigrationToSyncLayer(
+    //     uint256 _chainId,
+    //     address _baseToken,
+    //     address _sharedBridge,
+    //     address _admin,
+    //     uint256 _expectedProtocolVersion,
+    //     HyperchainCommitment calldata _commitment,
+    //     bytes calldata _diamondCut
+    // ) external;
+
+    function forwardTransactionOnSyncLayer(
+        uint256 _chainId,
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external;
+
+    function stmAssetIdFromChainId(uint256 _chainId) external view returns (bytes32);
+
+    function stmAssetId(address _stmAddress) external view returns (bytes32);
+
+    function stmDeployer() external view returns (ISTMDeploymentTracker);
+
+    function setSTMDeployer(ISTMDeploymentTracker _stmDeployer) external;
+
+    function stmAssetIdToAddress(bytes32 _assetInfo) external view returns (address);
+
+    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetAddress) external;
+
+    function L1_CHAIN_ID() external view returns (uint256);
 }

@@ -51,6 +51,9 @@ interface IGetters is IZkSyncHyperchainBase {
     /// @return The total number of priority operations that were added to the priority queue, including all processed ones
     function getTotalPriorityTxs() external view returns (uint256);
 
+    /// @return The root hash of the priority tree
+    function getPriorityTreeRoot() external view returns (bytes32);
+
     /// @notice The function that returns the first unprocessed priority transaction.
     /// @dev Returns zero if and only if no operations were processed from the queue.
     /// @dev If all the transactions were processed, it will return the last processed index, so
@@ -61,7 +64,8 @@ interface IGetters is IZkSyncHyperchainBase {
     /// @return The number of priority operations currently in the queue
     function getPriorityQueueSize() external view returns (uint256);
 
-    /// @return The first unprocessed priority operation from the queue
+    /// @notice This function is deprecated and will return an empty priority operation.
+    /// @return Empty priority operation
     function priorityQueueFrontOperation() external view returns (PriorityOperation memory);
 
     /// @return Whether the address has a validator access
@@ -150,4 +154,7 @@ interface IGetters is IZkSyncHyperchainBase {
 
     /// @return isFreezable Whether the facet can be frozen by the admin or always accessible
     function isFacetFreezable(address _facet) external view returns (bool isFreezable);
+
+    /// TODO
+    function getSyncLayer() external view returns (address);
 }

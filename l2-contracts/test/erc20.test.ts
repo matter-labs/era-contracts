@@ -4,9 +4,9 @@ import { ethers } from "ethers";
 import * as hre from "hardhat";
 import { Provider, Wallet } from "zksync-ethers";
 import { hashBytecode } from "zksync-ethers/build/utils";
-import { unapplyL1ToL2Alias } from "./test-utils";
-import type { L2SharedBridge, L2NativeTokenVault, L2StandardERC20 } from "../typechain";
-import { L2SharedBridgeFactory, L2NativeTokenVaultFactory, L2StandardERC20Factory } from "../typechain";
+import { unapplyL1ToL2Alias, setCode } from "./test-utils";
+import type { L2AssetRouter, L2NativeTokenVault, L2StandardERC20 } from "../typechain";
+import { L2AssetRouterFactory, L2NativeTokenVaultFactory, L2StandardERC20Factory } from "../typechain";
 
 const richAccount = [
   {
@@ -39,13 +39,14 @@ describe("ERC20Bridge", function () {
 
   // We won't actually deploy an L1 token in these tests, but we need some address for it.
   const L1_TOKEN_ADDRESS = "0x1111000000000000000000000000000000001111";
+  const L2_NATIVE_TOKEN_VAULT_ADDRESS = "0x0000000000000000000000000000000000010004";
 
   const testChainId = 9;
 
-  let erc20Bridge: L2SharedBridge;
+  let erc20Bridge: L2AssetRouter;
   let erc20NativeTokenVault: L2NativeTokenVault;
   let erc20Token: L2StandardERC20;
-  let contractsDeployedAlready: boolean = false;
+  const contractsDeployedAlready: boolean = false;
 
   before("Deploy token and bridge", async function () {
     const deployer = new Deployer(hre, deployerWallet);
@@ -57,48 +58,40 @@ describe("ERC20Bridge", function () {
     ]);
     await deployer.deploy(await deployer.loadArtifact("BeaconProxy"), [l2Erc20TokenBeacon.address, "0x"]);
     const beaconProxyBytecodeHash = hashBytecode((await deployer.loadArtifact("BeaconProxy")).bytecode);
-    const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [testChainId, 1]);
-    const erc20NativeTokenVaultImpl = await deployer.deploy(await deployer.loadArtifact("L2NativeTokenVault"), [1]);
-    const assetHandlerInitializeData = erc20NativeTokenVaultImpl.interface.encodeFunctionData("initialize", [
-      beaconProxyBytecodeHash,
-      governorWallet.address, // Note on real deployment this will be the deployerWallet
-      contractsDeployedAlready,
+    const erc20BridgeContract = await deployer.deploy(await deployer.loadArtifact("L2AssetRouter"), [
+      testChainId,
+      1,
+      unapplyL1ToL2Alias(l1BridgeWallet.address),
+      unapplyL1ToL2Alias(l1BridgeWallet.address),
     ]);
 
-    const erc20NativeTokenVaultProxy = await deployer.deploy(
-      await deployer.loadArtifact("TransparentUpgradeableProxy"),
-      [erc20NativeTokenVaultImpl.address, proxyAdminWallet.address, assetHandlerInitializeData]
+    erc20Bridge = L2AssetRouterFactory.connect(erc20BridgeContract.address, deployerWallet);
+    const l2NativeTokenVaultArtifact = await deployer.loadArtifact("L2NativeTokenVault");
+    const constructorArgs = ethers.utils.defaultAbiCoder.encode(
+      ["bytes32", "address", "bool"],
+      /// note in real deployment we have to transfer ownership of standard deployer here
+      [beaconProxyBytecodeHash, governorWallet.address, contractsDeployedAlready]
+    );
+    await setCode(
+      deployerWallet,
+      L2_NATIVE_TOKEN_VAULT_ADDRESS,
+      l2NativeTokenVaultArtifact.bytecode,
+      true,
+      constructorArgs
     );
 
-    contractsDeployedAlready = true;
-
-    const bridgeInitializeData = erc20BridgeImpl.interface.encodeFunctionData("initialize", [
-      unapplyL1ToL2Alias(l1BridgeWallet.address),
-      // ethers.constants.AddressZero,
-      unapplyL1ToL2Alias(governorWallet.address), // note on real deployment this will be the governor
-      erc20NativeTokenVaultProxy.address,
-    ]);
-
-    const erc20BridgeProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
-      erc20BridgeImpl.address,
-      proxyAdminWallet.address,
-      bridgeInitializeData,
-    ]);
-
-    erc20Bridge = L2SharedBridgeFactory.connect(erc20BridgeProxy.address, deployerWallet);
-    erc20NativeTokenVault = L2NativeTokenVaultFactory.connect(erc20NativeTokenVaultProxy.address, governorWallet);
-    await erc20NativeTokenVault.setSharedBridge(erc20BridgeProxy.address);
-
-    /// note in real deployment we have to transfer ownership of standard deployer here
+    erc20NativeTokenVault = L2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, l1BridgeWallet);
+    // await erc20NativeTokenVault.setL2TokenBeacon();
   });
 
   it("Should finalize deposit ERC20 deposit", async function () {
-    const erc20BridgeWithL1BridgeWallet = L2SharedBridgeFactory.connect(erc20Bridge.address, l1BridgeWallet);
+    const erc20BridgeWithL1BridgeWallet = L2AssetRouterFactory.connect(erc20Bridge.address, proxyAdminWallet);
 
     const l1Depositor = ethers.Wallet.createRandom();
     const l2Receiver = ethers.Wallet.createRandom();
+    const l1Bridge = await hre.ethers.getImpersonatedSigner(l1BridgeWallet.address);
     const tx = await (
-      await erc20BridgeWithL1BridgeWallet["finalizeDeposit(address,address,address,uint256,bytes)"](
+      await erc20BridgeWithL1BridgeWallet.connect(l1Bridge)["finalizeDeposit(address,address,address,uint256,bytes)"](
         // Depositor and l2Receiver can be any here
         l1Depositor.address,
         l2Receiver.address,

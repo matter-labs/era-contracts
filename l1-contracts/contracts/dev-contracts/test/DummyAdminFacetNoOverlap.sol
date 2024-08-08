@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {ZkSyncHyperchainBase} from "../../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
-import {IL1SharedBridge} from "../../bridge/interfaces/IL1SharedBridge.sol";
+import {IL1AssetRouter} from "../../bridge/interfaces/IL1AssetRouter.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 /// selectors do not overlap with normal facet selectors (getName does not count)

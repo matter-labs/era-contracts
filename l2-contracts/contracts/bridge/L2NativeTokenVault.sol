@@ -6,12 +6,12 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/acces
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
+import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
 import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
-import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
+import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT, L2_ASSET_ROUTER, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
@@ -25,9 +25,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @dev Chain ID of L1 for bridging reasons.
     uint256 public immutable L1_CHAIN_ID;
 
-    /// @dev The address of the Shared Bridge on L2.
-    IL2SharedBridge public override l2Bridge;
-
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
     UpgradeableBeacon public l2TokenBeacon;
@@ -38,29 +35,26 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     mapping(bytes32 assetId => address tokenAddress) public override tokenAddress;
 
     modifier onlyBridge() {
-        if (msg.sender != address(l2Bridge)) {
+        if (msg.sender != address(L2_ASSET_ROUTER)) {
             revert InvalidCaller(msg.sender);
             // Only L2 bridge can call this method
         }
         _;
     }
 
-    /// @dev Contract is expected to be used as proxy implementation.
-    /// @dev Disable the initialization to prevent Parity hack.
-    constructor(uint256 _l1ChainId) {
-        L1_CHAIN_ID = _l1ChainId;
-        _disableInitializers();
-    }
-
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
+    /// @param _l1ChainId The L1 chain id differs between mainnet and testnets.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
     /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed
-    function initialize(
+    constructor(
+        uint256 _l1ChainId,
         bytes32 _l2TokenProxyBytecodeHash,
         address _aliasedOwner,
         bool _contractsDeployedAlready
-    ) external reinitializer(2) {
+    ) {
+        L1_CHAIN_ID = _l1ChainId;
+        _disableInitializers();
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
             revert EmptyBytes32();
         }
@@ -69,27 +63,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         }
 
         if (!_contractsDeployedAlready) {
-            address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
-            l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
             l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
-            l2TokenBeacon.transferOwnership(_aliasedOwner);
         }
 
         _transferOwnership(_aliasedOwner);
-    }
-
-    /// @dev Sets the Shared Bridge contract address. Should be called only once.
-    function setSharedBridge(IL2SharedBridge _sharedBridge) external onlyOwner {
-        if (address(l2Bridge) != address(0)) {
-            // "SD: shared bridge already set";
-            revert AddressMismatch(address(0), address(l2Bridge));
-        }
-        if (address(_sharedBridge) == address(0)) {
-            // "SD: shared bridge 0");
-            revert EmptyAddress();
-        }
-
-        l2Bridge = _sharedBridge;
     }
 
     /// @notice Sets L2 token beacon used by wrapped ERC20 tokens deployed by NTV.

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {IL2SharedBridge} from "./IL2SharedBridge.sol";
+// import {IL2AssetRouter} from "./IL2AssetRouter.sol";
 import {IL2AssetHandler} from "./IL2AssetHandler.sol";
 
 /// @author Matter Labs
@@ -24,13 +24,9 @@ interface IL2NativeTokenVault is IL2AssetHandler {
 
     event L2TokenBeaconUpdated(address indexed l2TokenBeacon, bytes32 indexed l2TokenProxyBytecodeHash);
 
-    function l2Bridge() external view returns (IL2SharedBridge);
-
     function tokenAddress(bytes32 _assetId) external view returns (address);
 
     function l2TokenAddress(address _l1Token) external view returns (address);
-
-    function setSharedBridge(IL2SharedBridge _sharedBridge) external;
 
     function setL2TokenBeacon(address _l2TokenBeacon, bytes32 _l2TokenProxyBytecodeHash) external;
 }
