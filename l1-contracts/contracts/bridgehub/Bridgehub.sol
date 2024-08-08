@@ -132,14 +132,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         emit NewAdmin(previousAdmin, currentPendingAdmin);
     }
 
-    /// @notice To set stmDeploymetTracker, only Owner. Not done in initialize, as
-    /// the order of deployment is Bridgehub, Shared bridge, and then we call this
-    function setSTMDeployer(ISTMDeploymentTracker _stmDeployer) external onlyOwner {
-        stmDeployer = _stmDeployer;
-    }
-
-    /// @notice To set shared bridge, only Owner. Not done in initialize, as
-    /// the order of deployment is Bridgehub, Shared bridge, and then we call this
+    /// @notice To set the addresses of some of the ecosystem contracts, only Owner. Not done in initialize, as
+    /// the order of deployment is Bridgehub, other contracts, and then we call this.
     function setAddresses(
         address _sharedBridge,
         ISTMDeploymentTracker _stmDeployer,
@@ -175,12 +169,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function addToken(address _token) external onlyOwner {
         require(!tokenIsRegistered[_token], "Bridgehub: token already registered");
         tokenIsRegistered[_token] = true;
-    }
-
-    /// @notice To set shared bridge, only Owner. Not done in initialize, as
-    /// the order of deployment is Bridgehub, Shared bridge, and then we call this
-    function setSharedBridge(address _sharedBridge) external onlyOwner {
-        sharedBridge = IL1AssetRouter(_sharedBridge);
     }
 
     function registerSyncLayer(
