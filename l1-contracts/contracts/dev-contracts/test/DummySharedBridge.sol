@@ -91,10 +91,10 @@ contract DummySharedBridge {
         uint256 _amount
     ) external payable {
         if (_l1Token == address(1)) {
-            require(msg.value == _amount, "L1AssetRouter: msg.value not equal to amount");
+            require(msg.value == _amount, "L1AR: msg.value not equal to amount");
         } else {
             // The Bridgehub also checks this, but we want to be sure
-            require(msg.value == 0, "ShB m.v > 0 b d.it");
+            require(msg.value == 0, "L1AR: m.v > 0 b d.it");
             uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
             require(amount == _amount, "5T"); // The token has non-standard transfer logic
         }
@@ -139,8 +139,8 @@ contract DummySharedBridge {
 
     /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
     function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external {
-        require(address(nativeTokenVault) == address(0), "ShB: legacy bridge already set");
-        require(address(_nativeTokenVault) != address(0), "ShB: legacy bridge 0");
+        require(address(nativeTokenVault) == address(0), "L1AR: legacy bridge already set");
+        require(address(_nativeTokenVault) != address(0), "L1AR: legacy bridge 0");
         nativeTokenVault = _nativeTokenVault;
     }
 

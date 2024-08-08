@@ -353,17 +353,18 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   }
   const stmDeploymentTracker = deployer.stmDeploymentTracker(deployer.deployWallet);
 
-  const receipt2 = await (
-    await stmDeploymentTracker.registerSTMAssetOnL2SharedBridge(
+  const receipt2 = await deployer.executeUpgrade(
+    stmDeploymentTracker.address,
+    value,
+    stmDeploymentTracker.encodeFunctionData("registerSTMAssetOnL2SharedBridge", [
       chainId,
       l1STM.address,
       value,
       priorityTxMaxGasLimit,
       SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
       deployer.deployWallet.address,
-      { value }
-    )
-  ).wait();
+    ])
+  );
   const l2TxHash = zkUtils.getL2HashFromPriorityOp(receipt2, gatewayAddress);
   console.log("STM asset registered in L2SharedBridge on SL l2 tx hash: ", l2TxHash);
   const receipt3 = await deployer.executeUpgrade(
