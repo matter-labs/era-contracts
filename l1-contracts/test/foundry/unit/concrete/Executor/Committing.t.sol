@@ -25,7 +25,6 @@ contract CommittingTest is ExecutorTest {
         bytes1 source = bytes1(0x01);
         defaultBlobCommitment = Utils.getDefaultBlobCommitment();
 
-        // revert("here");
         bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
         bytes32 totalL2PubdataHash = Utils.randomBytes32("totalL2PubdataHash");
         uint8 numberOfBlobs = 1;

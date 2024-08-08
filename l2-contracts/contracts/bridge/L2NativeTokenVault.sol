@@ -78,6 +78,17 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         emit L2TokenBeaconUpdated(_l2TokenBeacon, _l2TokenProxyBytecodeHash);
     }
 
+    /// @notice Configure L2 token beacon used by wrapped ERC20 tokens deployed by NTV.
+    /// @dev we don't call this in the constructor, as we need to provide factory deps
+    function configureL2TokenBeacon() external {
+        if (address(l2TokenBeacon) != address(0)) {
+            revert AddressMismatch(address(l2TokenBeacon), address(0));
+        }
+        address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
+        l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
+        l2TokenBeacon.transferOwnership(owner());
+    }
+
     /// @notice Used when the chain receives a transfer from L1 Shared Bridge and correspondingly mints the asset.
     /// @param _chainId The chainId that the message is from.
     /// @param _assetId The assetId of the asset being bridged.
