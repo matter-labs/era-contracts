@@ -102,7 +102,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         chainAddresses = new address[](keys.length);
         uint256 keysLength = keys.length;
         for (uint256 i = 0; i < keysLength; ++i) {
-            chainAddresses[i] = hyperchainMap.get(i);
+            chainAddresses[i] = hyperchainMap.get(keys[i]);
         }
     }
 
