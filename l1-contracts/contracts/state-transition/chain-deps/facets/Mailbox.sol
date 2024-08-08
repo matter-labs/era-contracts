@@ -106,7 +106,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     }
 
     // /// @inheritdoc IMailbox
-    function proveL1ToL2TransactionStatusViaSyncLayer(
+    function proveL1ToL2TransactionStatusViaGateway(
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
@@ -169,7 +169,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
             // Note that this logic works only for chains that do not migrate away from the synclayer back to L1.
             // Support for chains that migrate back to L1 will be added in the future.
-            if (s.syncLayer == address(0)) {
+            if (s.settlementLayer == address(0)) {
                 bytes32 correctBatchRoot = s.l2LogsRootHashes[_batchNumber];
                 require(correctBatchRoot != bytes32(0), "local root is 0");
                 return correctBatchRoot == batchSettlementRoot;
@@ -177,7 +177,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
             require(s.l2LogsRootHashes[_batchNumber] == bytes32(0), "local root must be 0");
 
-            // Now, we'll have to check that the SyncLayer included the message.
+            // Now, we'll have to check that the Gateway included the message.
             bytes32 batchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, _batchNumber);
 
             uint256 batchLeafProofMask = uint256(bytes32(_proof[ptr]));
@@ -193,22 +193,22 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             chainIdLeaf = MessageHashing.chainIdLeafHash(chainIdRoot, s.chainId);
         }
 
-        uint256 syncLayerBatchNumber;
-        uint256 syncLayerBatchRootMask;
+        uint256 settlementLayerBatchNumber;
+        uint256 settlementLayerBatchRootMask;
 
         // Preventing stack too deep error
         {
             // Now, we just need to double check whether this chainId leaf was present in the tree.
-            uint256 syncLayerPackedBatchInfo = uint256(_proof[ptr]);
+            uint256 settlementLayerPackedBatchInfo = uint256(_proof[ptr]);
             ++ptr;
-            syncLayerBatchNumber = uint256(syncLayerPackedBatchInfo >> 128);
-            syncLayerBatchRootMask = uint256(syncLayerPackedBatchInfo & ((1 << 128) - 1));
+            settlementLayerBatchNumber = uint256(settlementLayerPackedBatchInfo >> 128);
+            settlementLayerBatchRootMask = uint256(settlementLayerPackedBatchInfo & ((1 << 128) - 1));
         }
 
         return
-            IMailbox(s.syncLayer).proveL2LeafInclusion(
-                syncLayerBatchNumber,
-                syncLayerBatchRootMask,
+            IMailbox(s.settlementLayer).proveL2LeafInclusion(
+                settlementLayerBatchNumber,
+                settlementLayerBatchRootMask,
                 chainIdLeaf,
                 extractSlice(_proof, ptr, _proof.length)
             );
@@ -291,7 +291,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     }
 
     /// @inheritdoc IMailbox
-    function requestL2TransactionToSyncLayerMailbox(
+    function requestL2TransactionToGatewayMailbox(
         uint256 _chainId,
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
@@ -311,11 +311,11 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             _canonicalTxHash: _canonicalTxHash,
             _expirationTimestamp: _expirationTimestamp
         });
-        canonicalTxHash = _requestL2TransactionToSyncLayerFree(wrappedRequest);
+        canonicalTxHash = _requestL2TransactionToGatewayFree(wrappedRequest);
     }
 
     /// @inheritdoc IMailbox
-    function bridgehubRequestL2TransactionOnSyncLayer(
+    function bridgehubRequestL2TransactionOnGateway(
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
@@ -333,7 +333,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     ) internal view returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encodeCall(
-            IBridgehub(s.bridgehub).forwardTransactionOnSyncLayer,
+            IBridgehub(s.bridgehub).forwardTransactionOnGateway,
             (_chainId, _transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp)
         );
         return
@@ -410,9 +410,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         (transaction, canonicalTxHash) = _validateTx(_params);
 
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
-        if (s.syncLayer != address(0)) {
+        if (s.settlementLayer != address(0)) {
             // slither-disable-next-line unused-return
-            IMailbox(s.syncLayer).requestL2TransactionToSyncLayerMailbox({
+            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
                 _chainId: s.chainId,
                 _transaction: transaction,
                 _factoryDeps: _params.request.factoryDeps,
@@ -430,7 +430,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         }
     }
 
-    function _requestL2TransactionToSyncLayerFree(
+    function _requestL2TransactionToGatewayFree(
         BridgehubL2TransactionRequest memory _request
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         WritePriorityOpParams memory params = WritePriorityOpParams({

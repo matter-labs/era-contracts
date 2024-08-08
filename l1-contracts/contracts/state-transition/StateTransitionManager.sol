@@ -439,17 +439,18 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         return IZkSyncHyperchain(hyperchainMap.get(_chainId)).getProtocolVersion();
     }
 
-    /// @param _newSyncLayerChainId newGatewayChainId newSettlementLayerChainId the chainId of the chain
-    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external onlyOwner {
-        require(_newSyncLayerChainId != 0, "Bad chain id");
+    /// @param _newSettlementLayerChainId the chainId of the chain
+    /// @param _isWhitelisted whether the chain is whitelisted
+    function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external onlyOwner {
+        require(_newSettlementLayerChainId != 0, "Bad chain id");
 
         // Currently, we require that the sync layer is deployed by the same STM.
-        address syncLayerAddress = hyperchainMap.get(_newSyncLayerChainId);
+        address settlementLayerAddress = hyperchainMap.get(_newSettlementLayerChainId);
 
         // TODO: Maybe `get` already ensured its existence.
-        require(syncLayerAddress != address(0), "STM: sync layer not registered");
+        require(settlementLayerAddress != address(0), "STM: sync layer not registered");
 
-        IBridgehub(BRIDGE_HUB).registerSyncLayer(_newSyncLayerChainId, _isWhitelisted);
+        IBridgehub(BRIDGE_HUB).registerSettlementLayer(_newSettlementLayerChainId, _isWhitelisted);
 
         // TODO: emit event
     }
@@ -461,10 +462,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 _chainId,
         bytes calldata _data
     ) external view override onlyBridgehub returns (bytes memory stmForwardedBridgeMintData) {
-        (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
-        require(_newSyncLayerAdmin != address(0), "STM: admin zero");
+        (address _newGatewayAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
+        require(_newGatewayAdmin != address(0), "STM: admin zero");
         // todo check protocol version
-        return abi.encode(IBridgehub(BRIDGE_HUB).baseToken(_chainId), _newSyncLayerAdmin, protocolVersion, _diamondCut);
+        return abi.encode(IBridgehub(BRIDGE_HUB).baseToken(_chainId), _newGatewayAdmin, protocolVersion, _diamondCut);
     }
 
     /// @notice Called by the bridgehub during the migration of a chain to the current settlement layer.

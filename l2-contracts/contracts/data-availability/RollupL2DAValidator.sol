@@ -21,13 +21,13 @@ contract RollupL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
         // The chained hash of the L2->L1 messages
         bytes32 _chainedMessagesHash,
         // The chained hash of uncompressed bytecodes sent to L1
-        bytes32 _chainedBytescodesHash,
+        bytes32 _chainedBytecodesHash,
         // Operator data, that is related to the DA itself
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
     ) external returns (bytes32 outputHash) {
         (bytes32 stateDiffHash, bytes calldata _totalPubdata, bytes calldata leftover) = _produceStateDiffPubdata(
             _chainedMessagesHash,
-            _chainedBytescodesHash,
+            _chainedBytecodesHash,
             _totalL2ToL1PubdataAndStateDiffs
         );
 

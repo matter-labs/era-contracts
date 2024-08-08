@@ -154,9 +154,9 @@ interface IBridgehub is IL1AssetHandler {
 
     function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
 
-    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
+    function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external;
 
-    // function finalizeMigrationToSyncLayer(
+    // function finalizeMigrationToGateway(
     //     uint256 _chainId,
     //     address _baseToken,
     //     address _sharedBridge,
@@ -166,7 +166,7 @@ interface IBridgehub is IL1AssetHandler {
     //     bytes calldata _diamondCut
     // ) external;
 
-    function forwardTransactionOnSyncLayer(
+    function forwardTransactionOnGateway(
         uint256 _chainId,
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,

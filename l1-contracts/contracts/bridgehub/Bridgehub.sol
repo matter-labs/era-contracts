@@ -70,8 +70,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev used to indicate the currently active settlement layer for a given chainId
     mapping(uint256 chainId => uint256 activeSettlementLayerChainId) public settlementLayer;
 
+    /// @notice shows whether the given chain can be used as a settlement layer.
+    /// @dev the Gateway will be one of the possible settlement layers. The L1 is also a settlement layer.
     /// @dev Sync layer chain is expected to have .. as the base token.
-    mapping(uint256 chainId => bool isWhitelistedSyncLayer) public whitelistedSettlementLayers;
+    mapping(uint256 chainId => bool isWhitelistedSettlementLayer) public whitelistedSettlementLayers;
 
     /// @notice to avoid parity hack
     constructor(uint256 _l1ChainId, address _owner) reentrancyGuardInitializer {
@@ -179,13 +181,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @notice Used to register a chain as a settlement layer.
-    /// @param _newSyncLayerChainId the chainId of the chain
+    /// @param _newSettlementLayerChainId the chainId of the chain
     /// @param _isWhitelisted whether the chain is a whitelisted settlement layer
-    function registerSyncLayer(
-        uint256 _newSyncLayerChainId,
+    function registerSettlementLayer(
+        uint256 _newSettlementLayerChainId,
         bool _isWhitelisted
-    ) external onlyChainSTM(_newSyncLayerChainId) {
-        whitelistedSettlementLayers[_newSyncLayerChainId] = _isWhitelisted;
+    ) external onlyChainSTM(_newSettlementLayerChainId) {
+        whitelistedSettlementLayers[_newSettlementLayerChainId] = _isWhitelisted;
 
         // TODO: emit event
     }
@@ -473,13 +475,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         );
     }
 
-    /// @notice Used to forward a transaction on a settlement layer to the chains mailbox (from L1).
+    /// @notice Used to forward a transaction on the gateway to the chains mailbox (from L1).
     /// @param _chainId the chainId of the chain
     /// @param _transaction the transaction to be forwarded
     /// @param _factoryDeps the factory dependencies for the transaction
     /// @param _canonicalTxHash the canonical transaction hash
     /// @param _expirationTimestamp the expiration timestamp for the transaction
-    function forwardTransactionOnSyncLayer(
+    function forwardTransactionOnGateway(
         uint256 _chainId,
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
@@ -488,7 +490,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) external override onlyAliasedZero {
         require(L1_CHAIN_ID != block.chainid, "BH: not in sync layer mode");
         address hyperchain = getHyperchain(_chainId);
-        IZkSyncHyperchain(hyperchain).bridgehubRequestL2TransactionOnSyncLayer(
+        IZkSyncHyperchain(hyperchain).bridgehubRequestL2TransactionOnGateway(
             _transaction,
             _factoryDeps,
             _canonicalTxHash,

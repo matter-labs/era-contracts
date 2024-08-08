@@ -210,12 +210,12 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function forwardedBridgeBurn(
-        address _syncLayer,
+        address _settlementLayer,
         address _prevMsgSender,
         bytes calldata
     ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
-        // (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
-        require(s.syncLayer == address(0), "Af: already migrated");
+        // (address _newSettlementLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
+        require(s.settlementLayer == address(0), "Af: already migrated");
         require(_prevMsgSender == s.admin, "Af: not chainAdmin");
         IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
 
@@ -225,7 +225,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
 
-        s.syncLayer = _syncLayer;
+        s.settlementLayer = _settlementLayer;
         chainBridgeMintData = abi.encode(_prepareChainCommitment());
     }
 
@@ -317,21 +317,21 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         return abi.encode(_prepareChainCommitment());
     }
 
-    // function recoverFromFailedMigrationToSyncLayer(
-    //     uint256 _syncLayerChainId,
+    // function recoverFromFailedMigrationToGateway(
+    //     uint256 _settlementLayerChainId,
     //     uint256 _l2BatchNumber,
     //     uint256 _l2MessageIndex,
     //     uint16 _l2TxNumberInBatch,
     //     bytes32[] calldata _merkleProof
     // ) external onlyAdmin {
-    //     require(s.syncLayerState == SyncLayerState.MigratedFromL1, "not migrated L1");
+    //     require(s.settlementLayerState == SettlementLayerState.MigratedFromL1, "not migrated L1");
 
-    //     bytes32 migrationHash = s.syncLayerMigrationHash;
+    //     bytes32 migrationHash = s.settlementLayerMigrationHash;
     //     require(migrationHash != bytes32(0), "can not recover when there is no migration");
 
     //     require(
     //         IBridgehub(s.bridgehub).proveL1ToL2TransactionStatus(
-    //             _syncLayerChainId,
+    //             _settlementLayerChainId,
     //             migrationHash,
     //             _l2BatchNumber,
     //             _l2MessageIndex,
@@ -342,9 +342,9 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     //         "Migration not failed"
     //     );
 
-    //     s.syncLayerState = SyncLayerState.ActiveOnL1;
-    //     s.syncLayerChainId = 0;
-    //     s.syncLayerMigrationHash = bytes32(0);
+    //     s.settlementLayerState = SettlementLayerState.ActiveOnL1;
+    //     s.settlementLayerChainId = 0;
+    //     s.settlementLayerMigrationHash = bytes32(0);
 
     //     // We do not need to perform any additional actions, since no changes related to the chain commitment can be performed
     //     // while the chain is in the "migrated" state.
