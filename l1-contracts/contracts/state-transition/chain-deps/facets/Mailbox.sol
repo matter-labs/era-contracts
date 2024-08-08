@@ -332,16 +332,12 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
-        uint256 _expirationTimestamp
+        uint64 _expirationTimestamp
     ) internal view returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
-        bytes memory data = abi.encodeWithSelector(
-            IBridgehub(s.bridgehub).forwardTransactionOnSyncLayer.selector,
-            _chainId,
-            _transaction,
-            _factoryDeps,
-            _canonicalTxHash,
-            _expirationTimestamp
+        bytes memory data = abi.encodeCall(
+            IBridgehub(s.bridgehub).forwardTransactionOnSyncLayer,
+            (_chainId, _transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp)
         );
         return
             BridgehubL2TransactionRequest({
