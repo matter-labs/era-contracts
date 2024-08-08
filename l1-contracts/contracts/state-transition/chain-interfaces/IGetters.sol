@@ -156,5 +156,5 @@ interface IGetters is IZkSyncHyperchainBase {
     function isFacetFreezable(address _facet) external view returns (bool isFreezable);
 
     /// TODO
-    function getSyncLayer() external view returns (address);
+    function getSettlementLayer() external view returns (address);
 }

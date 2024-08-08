@@ -160,7 +160,7 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         });
         vm.chainId(12345);
         vm.startBroadcast(AddressAliasHelper.applyL1ToL2Alias(address(0)));
-        bridgehub.forwardTransactionOnSyncLayer(mintChainId, tx, new bytes[](0), bytes32(0), 0);
+        bridgehub.forwardTransactionOnGateway(mintChainId, tx, new bytes[](0), bytes32(0), 0);
         vm.stopBroadcast();
     }
 

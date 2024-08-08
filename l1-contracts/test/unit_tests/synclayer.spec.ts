@@ -21,7 +21,7 @@ describe("Synclayer", function () {
   // let stateTransition: StateTransitionManager;
   let owner: ethers.Signer;
   let migratingDeployer: Deployer;
-  let syncLayerDeployer: Deployer;
+  let gatewayDeployer: Deployer;
   // const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
   // const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
   // let forwarder: Forwarder;
@@ -57,15 +57,15 @@ describe("Synclayer", function () {
     //   deployWallet
     // );
 
-    syncLayerDeployer = await defaultDeployerForTests(deployWallet, ownerAddress);
-    syncLayerDeployer.chainId = 10;
+    gatewayDeployer = await defaultDeployerForTests(deployWallet, ownerAddress);
+    gatewayDeployer.chainId = 10;
     await registerHyperchainWithBridgeRegistration(
-      syncLayerDeployer,
+      gatewayDeployer,
       false,
       [],
       gasPrice,
       undefined,
-      syncLayerDeployer.chainId.toString()
+      gatewayDeployer.chainId.toString()
     );
 
     // For tests, the chainId is 9
@@ -73,13 +73,13 @@ describe("Synclayer", function () {
   });
 
   it("Check register synclayer", async () => {
-    await syncLayerDeployer.registerSyncLayer();
+    await gatewayDeployer.registerSettlementLayer();
   });
 
   it("Check start move chain to synclayer", async () => {
     const gasPrice = await owner.provider.getGasPrice();
-    await migratingDeployer.moveChainToSyncLayer(syncLayerDeployer.chainId.toString(), gasPrice, false);
-    expect(await bridgehub.settlementLayer(migratingDeployer.chainId)).to.equal(syncLayerDeployer.chainId);
+    await migratingDeployer.moveChainToGateway(gatewayDeployer.chainId.toString(), gasPrice, false);
+    expect(await bridgehub.settlementLayer(migratingDeployer.chainId)).to.equal(gatewayDeployer.chainId);
   });
 
   it("Check l2 registration", async () => {
@@ -93,11 +93,11 @@ describe("Synclayer", function () {
     const stmDeploymentTracker = migratingDeployer.stmDeploymentTracker(migratingDeployer.deployWallet);
     const calldata = stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL2SharedBridge", [
       chainId,
-      syncLayerDeployer.addresses.StateTransition.StateTransitionProxy,
+      gatewayDeployer.addresses.StateTransition.StateTransitionProxy,
       value,
       priorityTxMaxGasLimit,
       SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-      syncLayerDeployer.deployWallet.address,
+      gatewayDeployer.deployWallet.address,
     ]);
     await migratingDeployer.executeUpgrade(stmDeploymentTracker.address, value, calldata);
     await migratingDeployer.executeUpgrade(
@@ -155,7 +155,7 @@ describe("Synclayer", function () {
   //     ["uint256", "bytes", "bytes"],
   //     [mintChainId, stmData, chainData]
   //   );
-  //   await bridgehub.bridgeMint(syncLayerChainId, assetInfo, bridgehubMintData);
+  //   await bridgehub.bridgeMint(gatewayChainId, assetInfo, bridgehubMintData);
   //   expect(await stateTransition.getHyperchain(mintChainId)).to.not.equal(ethers.constants.AddressZero);
   // });
 
@@ -202,6 +202,6 @@ describe("Synclayer", function () {
       paymasterInput: "0x",
       reservedDynamic: "0x",
     };
-    bridgehub.forwardTransactionOnSyncLayer(mintChainId, tx, [], ethers.constants.HashZero, 0);
+    bridgehub.forwardTransactionOnGateway(mintChainId, tx, [], ethers.constants.HashZero, 0);
   });
 });

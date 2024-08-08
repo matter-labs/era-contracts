@@ -133,7 +133,7 @@ interface IAdmin is IZkSyncHyperchainBase {
 
     /// @dev Similar to IL1AssetHandler interface, used to send chains.
     function forwardedBridgeBurn(
-        address _syncLayer,
+        address _settlementLayer,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);

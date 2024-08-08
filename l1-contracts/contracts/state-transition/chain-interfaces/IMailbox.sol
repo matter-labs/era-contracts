@@ -100,21 +100,21 @@ interface IMailbox is IZkSyncHyperchainBase {
         BridgehubL2TransactionRequest calldata _request
     ) external returns (bytes32 canonicalTxHash);
 
-    /// @dev On SL the chain's mailbox receives the tx from the bridgehub.
-    function bridgehubRequestL2TransactionOnSyncLayer(
+    /// @dev On the Gateway the chain's mailbox receives the tx from the bridgehub.
+    function bridgehubRequestL2TransactionOnGateway(
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external;
 
-    /// @dev On L1 we have to forward to the Settlement Layer's mailbox which sends to the Bridgehub on the SL
+    /// @dev On L1 we have to forward to the Gateway's mailbox which sends to the Bridgehub on the Gw
     /// @param _chainId the chainId of the chain
     /// @param _transaction the transaction to be relayed
     /// @param _factoryDeps the factory dependencies
     /// @param _canonicalTxHash the canonical transaction hash
     /// @param _expirationTimestamp the expiration timestamp
-    function requestL2TransactionToSyncLayerMailbox(
+    function requestL2TransactionToGatewayMailbox(
         uint256 _chainId,
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
