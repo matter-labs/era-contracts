@@ -89,7 +89,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByteLimit,
         address _refundRecipient
-    ) public payable {
+    ) public payable onlyOwner {
         bytes32 assetId;
         {
             assetId = getAssetId(_stmL1Address);
