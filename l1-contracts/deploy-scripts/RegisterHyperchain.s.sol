@@ -42,7 +42,6 @@ contract RegisterHyperchainScript is Script {
         address newDiamondProxy;
         address governance;
         address chainAdmin;
-        address tokenMultiplierSetter;
     }
 
     Config config;
@@ -153,7 +152,6 @@ contract RegisterHyperchainScript is Script {
         vm.broadcast();
         ChainAdmin chainAdmin = new ChainAdmin(config.ownerAddress, address(0));
         console.log("ChainAdmin deployed at:", address(chainAdmin));
-        chainAdmin.setTokenMultiplierSetter(config.tokenMultiplierSetter);
         config.chainAdmin = address(chainAdmin);
     }
 
