@@ -11,13 +11,7 @@ import {
   defaultDeployerForTests,
   registerHyperchainWithBridgeRegistration,
 } from "../../src.ts/deploy-test-process";
-import {
-  ethTestConfig,
-  DIAMOND_CUT_DATA_ABI_STRING,
-  ADDRESS_ONE,
-  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-  priorityTxMaxGasLimit,
-} from "../../src.ts/utils";
+import { ethTestConfig, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, priorityTxMaxGasLimit } from "../../src.ts/utils";
 import { SYSTEM_CONFIG } from "../../scripts/utils";
 
 import type { Deployer } from "../../src.ts/deploy";
