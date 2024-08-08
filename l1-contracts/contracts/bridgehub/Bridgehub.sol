@@ -12,7 +12,7 @@ import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, VIRTUAL_SENDER_ALIASED_ZERO_ADDRESS} from "../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
@@ -92,6 +92,17 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     modifier onlyChainSTM(uint256 _chainId) {
         require(msg.sender == stateTransitionManager[_chainId], "BH: not chain STM");
+        _;
+    }
+
+    modifier onlyAliasedZero() {
+        /// There is no sender for the wrapping, we use a virtual address.
+        require(msg.sender == VIRTUAL_SENDER_ALIASED_ZERO_ADDRESS, "BH: not aliased zero");
+        _;
+    }
+
+    modifier onlyAssetRouter() {
+        require(msg.sender == address(sharedBridge), "BH: not asset router");
         _;
     }
 
@@ -452,7 +463,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external override {
+    ) external override onlyAliasedZero {
         require(L1_CHAIN_ID != block.chainid, "BH: not in sync layer mode");
         address hyperchain = getHyperchain(_chainId);
         IZkSyncHyperchain(hyperchain).bridgehubRequestL2TransactionOnSyncLayer(
@@ -474,7 +485,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override returns (bytes memory bridgehubMintData) {
+    ) external payable override onlyAssetRouter returns (bytes memory bridgehubMintData) {
         require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
 
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainData) = abi.decode(_data, (uint256, bytes, bytes));
@@ -499,7 +510,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256,
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
-    ) external payable override returns (address l1Receiver) {
+    ) external payable override onlyAssetRouter returns (address l1Receiver) {
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainMintData) = abi.decode(
             _bridgehubMintData,
             (uint256, bytes, bytes)
@@ -524,7 +535,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
-    ) external payable override {}
+    ) external payable override onlyAssetRouter {}
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE
