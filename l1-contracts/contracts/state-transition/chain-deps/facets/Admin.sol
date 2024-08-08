@@ -105,6 +105,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         emit ValidiumModeStatusUpdate(_pricingMode);
     }
 
+    /// @inheritdoc IAdmin
     function setTransactionFilterer(address _transactionFilterer) external onlyAdmin {
         address oldTransactionFilterer = s.transactionFilterer;
         s.transactionFilterer = _transactionFilterer;
@@ -207,7 +208,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
                             CHAIN MIGRATION
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev we can move assets using these
+    /// @inheritdoc IAdmin
     function forwardedBridgeBurn(
         address _syncLayer,
         address _prevMsgSender,
@@ -228,7 +229,8 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         chainBridgeMintData = abi.encode(_prepareChainCommitment());
     }
 
-    function forwardedBridgeMint(bytes calldata _data) external payable override {
+    /// @inheritdoc IAdmin
+    function forwardedBridgeMint(bytes calldata _data) external payable override onlyBridgehub {
         HyperchainCommitment memory _commitment = abi.decode(_data, (HyperchainCommitment));
 
         uint256 batchesExecuted = _commitment.totalBatchesExecuted;
@@ -268,12 +270,13 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         emit MigrationComplete();
     }
 
+    /// @inheritdoc IAdmin
     function forwardedBridgeClaimFailedBurn(
         uint256 _chainId,
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override {}
+    ) external payable override onlyBridgehub {}
 
     // todo make internal. For now useful for testing
     function _prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {
@@ -309,7 +312,8 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         commitment.batchHashes = batchHashes;
     }
 
-    function readChainCommitment() external view returns (bytes memory commitment) {
+    /// @inheritdoc IAdmin
+    function readChainCommitment() external view override returns (bytes memory commitment) {
         return abi.encode(_prepareChainCommitment());
     }
 
