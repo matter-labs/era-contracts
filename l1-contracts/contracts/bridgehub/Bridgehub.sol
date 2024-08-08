@@ -54,7 +54,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     // FIXME: `messageRoot` DOES NOT contain messages that come from the current layer and go to the settlement layer.
     // it may make sense to store the final root somewhere for interop purposes.
-    // THough maybe it can be postponed.
+    // Though maybe it can be postponed.
     IMessageRoot public override messageRoot;
 
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
@@ -180,7 +180,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // TODO: emit event
     }
 
-    /// @dev Used to set the assedAddress for a given assetInfo.
+    /// @dev Used to set the assetAddress for a given assetInfo.
     function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetAddress) external {
         address sender = L1_CHAIN_ID == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender); // Todo: this might be dangerous. We should decide based on the tx type.
         bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData)); /// todo make other asse

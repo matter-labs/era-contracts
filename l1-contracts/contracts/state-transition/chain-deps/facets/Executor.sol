@@ -39,9 +39,9 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
     ) internal returns (StoredBatchInfo memory) {
-        require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batchs
+        require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batch
 
-        // Check that batch contain all meta information for L2 logs.
+        // Check that batch contains all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
@@ -169,7 +169,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             }
         }
 
-        // FIXME: temporarily old logs were kept for backwards compaitibility. This check can not work now.
+        // FIXME: temporarily old logs were kept for backwards compatibility. This check cannot work now.
         //
         // We only require 8 logs to be checked, the 9th is if we are expecting a protocol upgrade
         // Without the protocol upgrade we expect 8 logs: 2^8 - 1 = 255

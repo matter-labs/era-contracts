@@ -256,7 +256,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
             chainId: _chainId,
             l2Contract: L2_ASSET_ROUTER_ADDR,
-            mintValue: _mintValue, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
+            mintValue: _mintValue, // l2 gas + l2 msg.value the bridgehub will withdraw the mintValue from the base token bridge for gas
             l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
             l2Calldata: l2Calldata,
             l2GasLimit: _l2TxGasLimit,
