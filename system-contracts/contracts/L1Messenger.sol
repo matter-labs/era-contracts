@@ -293,15 +293,18 @@ contract L1Messenger is IL1Messenger, ISystemContract {
             revert ReconstructionMismatch(PubdataField.InputLogsRootHash, localLogsRootHash, inputChainedLogsRootHash);
         }
 
-        bytes memory returnData = EfficientCall.call({
-            _gas: gasleft(),
-            _address: _l2DAValidator,
-            _value: 0,
-            _data: _operatorInput,
-            _isSystem: false
-        });
+        bytes32 l2DAValidatorOutputhash = bytes32(0);
+        if (_l2DAValidator != address(0)) {
+            bytes memory returnData = EfficientCall.call({
+                _gas: gasleft(),
+                _address: _l2DAValidator,
+                _value: 0,
+                _data: _operatorInput,
+                _isSystem: false
+            });
 
-        bytes32 l2DAValidatorOutputhash = abi.decode(returnData, (bytes32));
+            l2DAValidatorOutputhash = abi.decode(returnData, (bytes32));
+        }
 
         /// Native (VM) L2 to L1 log
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), fullRootHash);

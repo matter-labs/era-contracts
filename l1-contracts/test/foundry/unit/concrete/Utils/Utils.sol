@@ -517,6 +517,16 @@ library Utils {
         }
     }
 
+    function generatePriorityOps(uint256 len) internal pure returns (PriorityOpsBatchInfo[] memory _ops) {
+        _ops = new PriorityOpsBatchInfo[](len);
+        bytes32[] memory empty;
+        PriorityOpsBatchInfo memory info = PriorityOpsBatchInfo({leftPath: empty, rightPath: empty, itemHashes: empty});
+
+        for (uint256 i = 0; i < len; ++i) {
+            _ops[i] = info;
+        }
+    }
+
     // add this to be excluded from coverage report
     function test() internal {}
 }

@@ -158,7 +158,7 @@ async function main() {
       deployer.addresses.BlobVersionedHashRetriever = getAddressFromEnv("GATEWAY_BLOB_VERSIONED_HASH_RETRIEVER_ADDR");
       deployer.addresses.StateTransition.DiamondInit = getAddressFromEnv("GATEWAY_DIAMOND_INIT_ADDR");
 
-      const receipt = await deployer.moveChainToGateway(gatewayChainId, gasPrice, true);
+      const receipt = await deployer.moveChainToGateway(gatewayChainId, gasPrice);
 
       const gatewayAddress = await stm.getHyperchain(gatewayChainId);
 

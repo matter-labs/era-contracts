@@ -17,6 +17,7 @@ import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interf
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
+import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
@@ -57,6 +58,7 @@ contract DeployL1Script is Script {
         L1NativeTokenVaultAddresses vaults;
         address transparentProxyAdmin;
         address governance;
+        address chainAdmin;
         address blobVersionedHashRetriever;
         address validatorTimelock;
         address create2Factory;
@@ -163,6 +165,7 @@ contract DeployL1Script is Script {
         deployValidatorTimelock();
 
         deployGovernance();
+        deployChainAdmin();
         deployTransparentProxyAdmin();
         deployBridgehubContract();
         deployMessageRootContract();
@@ -345,6 +348,13 @@ contract DeployL1Script is Script {
         address contractAddress = deployViaCreate2(bytecode);
         console.log("Governance deployed at:", contractAddress);
         addresses.governance = contractAddress;
+    }
+
+    function deployChainAdmin() internal {
+        bytes memory bytecode = abi.encodePacked(type(ChainAdmin).creationCode, abi.encode(config.ownerAddress));
+        address contractAddress = deployViaCreate2(bytecode);
+        console.log("ChainAdmin deployed at:", contractAddress);
+        addresses.chainAdmin = contractAddress;
     }
 
     function deployTransparentProxyAdmin() internal {
