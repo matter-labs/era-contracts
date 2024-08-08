@@ -86,7 +86,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     modifier onlyOwnerOrAdmin() {
-        require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
+        require(msg.sender == admin || msg.sender == owner(), "BH: not owner or admin");
         _;
     }
 
@@ -150,7 +150,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function addStateTransitionManager(address _stateTransitionManager) external onlyOwner {
         require(
             !stateTransitionManagerIsRegistered[_stateTransitionManager],
-            "Bridgehub: state transition already registered"
+            "BH: state transition already registered"
         );
         stateTransitionManagerIsRegistered[_stateTransitionManager] = true;
     }
@@ -158,16 +158,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice State Transition can be any contract with the appropriate interface/functionality
     /// @notice this stops new Chains from using the STF, old chains are not affected
     function removeStateTransitionManager(address _stateTransitionManager) external onlyOwner {
-        require(
-            stateTransitionManagerIsRegistered[_stateTransitionManager],
-            "Bridgehub: state transition not registered yet"
-        );
+        require(stateTransitionManagerIsRegistered[_stateTransitionManager], "BH: state transition not registered yet");
         stateTransitionManagerIsRegistered[_stateTransitionManager] = false;
     }
 
     /// @notice token can be any contract with the appropriate interface/functionality
     function addToken(address _token) external onlyOwner {
-        require(!tokenIsRegistered[_token], "Bridgehub: token already registered");
+        require(!tokenIsRegistered[_token], "BH: token already registered");
         tokenIsRegistered[_token] = true;
     }
 
@@ -340,9 +337,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         {
             bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
             if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
-                require(msg.value == _request.mintValue, "Bridgehub: msg.value mismatch 1");
+                require(msg.value == _request.mintValue, "BH: msg.value mismatch 1");
             } else {
-                require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
+                require(msg.value == 0, "BH: non-eth bridge with msg.value");
             }
 
             // slither-disable-next-line arbitrary-send-eth
@@ -387,13 +384,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
             uint256 baseTokenMsgValue;
             if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
-                require(
-                    msg.value == _request.mintValue + _request.secondBridgeValue,
-                    "Bridgehub: msg.value mismatch 2"
-                );
+                require(msg.value == _request.mintValue + _request.secondBridgeValue, "BH: msg.value mismatch 2");
                 baseTokenMsgValue = _request.mintValue;
             } else {
-                require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 3");
+                require(msg.value == _request.secondBridgeValue, "BH: msg.value mismatch 3");
                 baseTokenMsgValue = 0;
             }
             // slither-disable-next-line arbitrary-send-eth
@@ -416,13 +410,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _request.secondBridgeCalldata
         );
 
-        require(outputRequest.magicValue == TWO_BRIDGES_MAGIC_VALUE, "Bridgehub: magic value mismatch");
+        require(outputRequest.magicValue == TWO_BRIDGES_MAGIC_VALUE, "BH: magic value mismatch");
 
         address refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
 
         require(
             _request.secondBridgeAddress > BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
-            "Bridgehub: second bridge address too low"
+            "BH: second bridge address too low"
         ); // to avoid calls to precompiles
         canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(
             BridgehubL2TransactionRequest({

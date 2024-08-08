@@ -84,7 +84,7 @@ describe("Custom base token chain and bridge tests", () => {
         )
     );
 
-    expect(revertReason).equal("ShB not legacy bridge");
+    expect(revertReason).equal("L1AR: not legacy bridge");
   });
 
   it("Should deposit base token successfully direct via bridgehub", async () => {
@@ -138,13 +138,13 @@ describe("Custom base token chain and bridge tests", () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [])
     );
-    expect(revertReason).equal("ShB wrong msg len");
+    expect(revertReason).equal("L1AR: wrong msg len");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
     );
-    expect(revertReason).equal("ShB Incorrect message function selector");
+    expect(revertReason).equal("L1AR: Incorrect message function selector");
   });
 });
