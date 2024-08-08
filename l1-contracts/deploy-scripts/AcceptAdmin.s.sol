@@ -47,4 +47,12 @@ contract AcceptAdmin is Script {
         chainAdmin.multicall(calls, true);
         vm.stopBroadcast();
     }
+
+
+    function chainSetTokenMultiplierSetter(address chainAdmin, address target) public {
+        IChainAdmin admin = IChainAdmin(chainAdmin);
+        vm.startBroadcast();
+        admin.setTokenMultiplierSetter(target);
+        vm.stopBroadcast();
+    }
 }
