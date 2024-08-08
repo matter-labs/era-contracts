@@ -52,10 +52,10 @@ library FullMerkle {
             uint256 oldMaxNodeNumber = index - 1;
             uint256 maxNodeNumber = index;
             for (uint256 i; i < self._height; i = i.uncheckedInc()) {
-                self._nodes[i].push(self._zeros[i]);
                 if (oldMaxNodeNumber == maxNodeNumber) {
                     break;
                 }
+                self._nodes[i].push(self._zeros[i]);
                 maxNodeNumber /= 2;
                 oldMaxNodeNumber /= 2;
             }
