@@ -97,7 +97,7 @@ describe("Synclayer", function () {
       value,
       priorityTxMaxGasLimit,
       SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-      syncLayerDeployer.deployWallet.address,
+      gatewayDeployer.deployWallet.address,
     ]);
     await migratingDeployer.executeUpgrade(stmDeploymentTracker.address, value, calldata);
     await migratingDeployer.executeUpgrade(
