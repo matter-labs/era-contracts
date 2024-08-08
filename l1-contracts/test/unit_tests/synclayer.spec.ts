@@ -4,12 +4,7 @@ import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
 import type { Bridgehub, L1AssetRouter, StateTransitionManager } from "../../typechain";
-import {
-  AdminFacetFactory,
-  BridgehubFactory,
-  L1AssetRouterFactory,
-  StateTransitionManagerFactory,
-} from "../../typechain";
+import { AdminFacetFactory, BridgehubFactory, StateTransitionManagerFactory } from "../../typechain";
 
 import {
   initialTestnetDeploymentProcess,
@@ -30,7 +25,6 @@ import type { Deployer } from "../../src.ts/deploy";
 
 describe("Synclayer", function () {
   let bridgehub: Bridgehub;
-  let l1SharedBridge: L1AssetRouter;
   let stateTransition: StateTransitionManager;
   let owner: ethers.Signer;
   let migratingDeployer: Deployer;

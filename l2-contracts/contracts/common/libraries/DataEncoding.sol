@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {L2_NATIVE_TOKEN_VAULT, L1_CHAIN_ID} from "../../L2ContractHelper.sol";
+import {L2_NATIVE_TOKEN_VAULT} from "../../L2ContractHelper.sol";
 
 /**
  * @author Matter Labs

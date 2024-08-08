@@ -7,11 +7,10 @@ import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol"
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
-import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
 import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
-import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT, L2_ASSET_ROUTER, IContractDeployer} from "../L2ContractHelper.sol";
+import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
