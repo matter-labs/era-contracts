@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.20;
 
-// solhint-disable gas-custom-errors, reason-string
-
 import {ReconstructionMismatch, PubdataField} from "./DAErrors.sol";
 import {COMPRESSOR_CONTRACT, L2ContractHelper} from "../L2ContractHelper.sol";
 
