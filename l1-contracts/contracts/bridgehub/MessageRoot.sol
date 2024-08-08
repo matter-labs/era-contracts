@@ -26,6 +26,9 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
     0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
 );
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
 contract MessageRoot is IMessageRoot, ReentrancyGuard {
     event AddedChain(uint256 indexed chainId, uint256 indexed chainIndex);
 
