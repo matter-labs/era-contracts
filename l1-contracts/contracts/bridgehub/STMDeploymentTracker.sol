@@ -61,7 +61,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     /// @dev Since the L2 settlement layers `_chainId` might potentially have ERC20 tokens as native assets,
     /// there are two ways to perform the L1->L2 transaction:
     /// - via the `Bridgehub.requestL2TransactionDirect`. However, this would require the STMDeploymentTracker to
-    /// hahndle the ERC20 balances to be used in the transaction.
+    /// handle the ERC20 balances to be used in the transaction.
     /// - via the `Bridgehub.requestL2TransactionTwoBridges`. This way it will be the sender that provides the funds
     /// for the L2 transaction.
     /// The second approach is used due to its simplicity even though it gives the sender slightly more control over the call:
@@ -97,7 +97,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByteLimit,
         address _refundRecipient
-    ) public payable {
+    ) public payable onlyOwner {
         bytes32 assetId;
         {
             assetId = getAssetId(_stmL1Address);
@@ -123,11 +123,10 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         address _stmL1Address,
         address _stmL2Address
     ) internal pure returns (L2TransactionRequestTwoBridgesInner memory request) {
-        bytes memory l2TxCalldata = abi.encodeWithSelector(
+        bytes memory l2TxCalldata = abi.encodeCall(
             /// todo it should not be initial in setAssetHandlerAddressInitial
-            IBridgehub.setAssetHandlerAddressInitial.selector,
-            bytes32(uint256(uint160(_stmL1Address))),
-            _stmL2Address
+            IBridgehub.setAssetHandlerAddressInitial,
+            (bytes32(uint256(uint160(_stmL1Address))), _stmL2Address)
         );
 
         request = L2TransactionRequestTwoBridgesInner({

@@ -3,8 +3,8 @@ import * as ethers from "ethers";
 import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
-import type { Bridgehub, StateTransitionManager } from "../../typechain";
-import { AdminFacetFactory, BridgehubFactory, StateTransitionManagerFactory } from "../../typechain";
+import type { Bridgehub } from "../../typechain";
+import { BridgehubFactory } from "../../typechain";
 
 import {
   initialTestnetDeploymentProcess,
@@ -24,7 +24,7 @@ import type { Deployer } from "../../src.ts/deploy";
 
 describe("Synclayer", function () {
   let bridgehub: Bridgehub;
-  let stateTransition: StateTransitionManager;
+  // let stateTransition: StateTransitionManager;
   let owner: ethers.Signer;
   let migratingDeployer: Deployer;
   let syncLayerDeployer: Deployer;
@@ -58,10 +58,10 @@ describe("Synclayer", function () {
     chainId = migratingDeployer.chainId;
 
     bridgehub = BridgehubFactory.connect(migratingDeployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
-    stateTransition = StateTransitionManagerFactory.connect(
-      migratingDeployer.addresses.StateTransition.StateTransitionProxy,
-      deployWallet
-    );
+    // stateTransition = StateTransitionManagerFactory.connect(
+    //   migratingDeployer.addresses.StateTransition.StateTransitionProxy,
+    //   deployWallet
+    // );
 
     syncLayerDeployer = await defaultDeployerForTests(deployWallet, ownerAddress);
     syncLayerDeployer.chainId = 10;
@@ -96,20 +96,16 @@ describe("Synclayer", function () {
     ).mul(10);
     // const baseTokenAddress = await bridgehub.baseToken(chainId);
     // const ethIsBaseToken = baseTokenAddress == ADDRESS_ONE;
-
     const stmDeploymentTracker = migratingDeployer.stmDeploymentTracker(migratingDeployer.deployWallet);
-    await (
-      await stmDeploymentTracker.registerSTMAssetOnL2SharedBridge(
-        chainId,
-        syncLayerDeployer.addresses.StateTransition.StateTransitionProxy,
-        value,
-        priorityTxMaxGasLimit,
-        SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-        syncLayerDeployer.deployWallet.address,
-        { value: value }
-      )
-    ).wait();
-    // console.log("STM asset registered in L2SharedBridge on SL");
+    const calldata = stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL2SharedBridge", [
+      chainId,
+      syncLayerDeployer.addresses.StateTransition.StateTransitionProxy,
+      value,
+      priorityTxMaxGasLimit,
+      SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+      syncLayerDeployer.deployWallet.address,
+    ]);
+    await migratingDeployer.executeUpgrade(stmDeploymentTracker.address, value, calldata);
     await migratingDeployer.executeUpgrade(
       bridgehub.address,
       value,
@@ -130,16 +126,17 @@ describe("Synclayer", function () {
     // console.log("STM asset registered in L2 Bridgehub on SL");
   });
 
-  it("Check finish move chain", async () => {
-    const syncLayerChainId = syncLayerDeployer.chainId;
-    const assetInfo = await bridgehub.stmAssetId(migratingDeployer.addresses.StateTransition.StateTransitionProxy);
-    const diamondCutData = await migratingDeployer.initialZkSyncHyperchainDiamondCut();
-    const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
+  // we have the foundry test for it
+  // it("Check finish move chain", async () => {
+    // const syncLayerChainId = syncLayerDeployer.chainId;
+    // const assetInfo = await bridgehub.stmAssetId(migratingDeployer.addresses.StateTransition.StateTransitionProxy);
+    // const diamondCutData = await migratingDeployer.initialZkSyncHyperchainDiamondCut();
+    // const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
-    const adminFacet = AdminFacetFactory.connect(
-      migratingDeployer.addresses.StateTransition.DiamondProxy,
-      migratingDeployer.deployWallet
-    );
+    // const adminFacet = AdminFacetFactory.connect(
+    //   migratingDeployer.addresses.StateTransition.DiamondProxy,
+    //   migratingDeployer.deployWallet
+    // );
 
     // const chainCommitment = {
     //   totalBatchesExecuted: 0,
@@ -155,18 +152,18 @@ describe("Synclayer", function () {
     //   l2SystemContractsUpgradeTxHash: ethers.constants.HashZero,
     //   l2SystemContractsUpgradeBatchNumber:0 ,
     //   batchHashes: ['0xcd4e278573a3b2076a81f91b97e2dd0c85882d9f735ad81dc34b509033671e7b']}
-    const chainData = await adminFacet.readChainCommitment();
-    const stmData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint256", "bytes"],
-      [ADDRESS_ONE, migratingDeployer.deployWallet.address, await stateTransition.protocolVersion(), initialDiamondCut]
-    );
-    const bridgehubMintData = ethers.utils.defaultAbiCoder.encode(
-      ["uint256", "bytes", "bytes"],
-      [mintChainId, stmData, chainData]
-    );
-    await bridgehub.bridgeMint(syncLayerChainId, assetInfo, bridgehubMintData);
-    expect(await stateTransition.getHyperchain(mintChainId)).to.not.equal(ethers.constants.AddressZero);
-  });
+  //   const chainData = await adminFacet.readChainCommitment();
+  //   const stmData = ethers.utils.defaultAbiCoder.encode(
+  //     ["address", "address", "uint256", "bytes"],
+  //     [ADDRESS_ONE, migratingDeployer.deployWallet.address, await stateTransition.protocolVersion(), initialDiamondCut]
+  //   );
+  //   const bridgehubMintData = ethers.utils.defaultAbiCoder.encode(
+  //     ["uint256", "bytes", "bytes"],
+  //     [mintChainId, stmData, chainData]
+  //   );
+  //   await bridgehub.bridgeMint(syncLayerChainId, assetInfo, bridgehubMintData);
+  //   expect(await stateTransition.getHyperchain(mintChainId)).to.not.equal(ethers.constants.AddressZero);
+  // });
 
   it("Check start message to L3 on L1", async () => {
     const amount = ethers.utils.parseEther("2");

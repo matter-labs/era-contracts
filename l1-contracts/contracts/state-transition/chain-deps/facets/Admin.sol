@@ -233,7 +233,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function forwardedBridgeMint(bytes calldata _data) external payable override {
+    function forwardedBridgeMint(bytes calldata _data) external payable override onlyBridgehub {
         HyperchainCommitment memory _commitment = abi.decode(_data, (HyperchainCommitment));
 
         uint256 batchesExecuted = _commitment.totalBatchesExecuted;
@@ -279,7 +279,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override {}
+    ) external payable override onlyBridgehub {}
 
     // todo make internal. For now useful for testing
     function _prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {

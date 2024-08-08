@@ -87,7 +87,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
             facetCuts: emptyArray,
             initAddress: _l1GenesisUpgrade,
-            initCalldata: abi.encodeCall(this.upgradeInner, (proposedUpgrade))
+            initCalldata: abi.encodeCall(this.upgrade, (proposedUpgrade))
         });
         Diamond.diamondCut(cutData);
 
@@ -96,7 +96,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
     }
 
     /// @notice the upgrade function.
-    function upgradeInner(ProposedUpgrade calldata _proposedUpgrade) external override returns (bytes32) {
+    function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         super.upgrade(_proposedUpgrade);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }

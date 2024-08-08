@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity ^0.8.24;
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
 // solhint-disable gas-custom-errors
 
@@ -40,7 +40,7 @@ library PriorityTree {
 
     /// @return The total number of unprocessed priority operations in a priority queue
     function getSize(Tree storage _tree) internal view returns (uint256) {
-        return uint256(_tree.tree._nextLeafIndex - _tree.unprocessedIndex);
+        return _tree.tree._nextLeafIndex - _tree.unprocessedIndex;
     }
 
     /// @notice Add the priority operation to the end of the priority queue
