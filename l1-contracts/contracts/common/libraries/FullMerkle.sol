@@ -27,6 +27,7 @@ library FullMerkle {
      *
      * IMPORTANT: The zero value should be carefully chosen since it will be stored in the tree representing
      * empty leaves. It should be a value that is not expected to be part of the tree.
+     * @param zero The zero value to be used in the tree.
      */
     function setup(FullTree storage self, bytes32 zero) internal returns (bytes32 initialRoot) {
         // Store depth in the dynamic array
@@ -36,6 +37,10 @@ library FullMerkle {
         return zero;
     }
 
+    /**
+     * @dev Push a new leaf to the tree.
+     * @param _leaf The leaf to be added to the tree.
+     */
     function pushNewLeaf(FullTree storage self, bytes32 _leaf) internal returns (bytes32 newRoot) {
         // solhint-disable-next-line gas-increment-by-one
         uint256 index = self._leafNumber++;
@@ -63,6 +68,11 @@ library FullMerkle {
         return updateLeaf(self, index, _leaf);
     }
 
+    /**
+     * @dev Update a leaf at index in the tree.
+     * @param _index The index of the leaf to be updated.
+     * @param _itemHash The new hash of the leaf.
+     */
     function updateLeaf(FullTree storage self, uint256 _index, bytes32 _itemHash) internal returns (bytes32) {
         // solhint-disable-next-line gas-custom-errors
         uint256 maxNodeNumber = self._leafNumber - 1;
@@ -85,12 +95,21 @@ library FullMerkle {
         return currentHash;
     }
 
+    /**
+     * @dev Updated all leaves in the tree.
+     * @param _newLeaves The new leaves to be added to the tree.
+     */
     function updateAllLeaves(FullTree storage self, bytes32[] memory _newLeaves) internal returns (bytes32) {
         // solhint-disable-next-line gas-custom-errors
         require(_newLeaves.length == self._leafNumber, "FMT, wrong length");
         return updateAllNodesAtHeight(self, 0, _newLeaves);
     }
 
+    /**
+     * @dev Update all nodes at a certain height in the tree.
+     * @param _height The height of the nodes to be updated.
+     * @param _newNodes The new nodes to be added to the tree.
+     */
     function updateAllNodesAtHeight(
         FullTree storage self,
         uint256 _height,
@@ -118,6 +137,9 @@ library FullMerkle {
         return updateAllNodesAtHeight(self, _height + 1, _newRow);
     }
 
+    /**
+     * @dev Returns the root of the tree.
+     */
     function root(FullTree storage self) internal view returns (bytes32) {
         return self._nodes[self._height][0];
     }

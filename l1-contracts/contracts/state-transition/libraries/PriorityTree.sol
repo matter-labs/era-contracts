@@ -49,15 +49,18 @@ library PriorityTree {
         _tree.historicalRoots[newRoot] = true;
     }
 
+    /// @notice Set up the tree
     function setup(Tree storage _tree, uint256 _startIndex) internal {
         _tree.tree.setup(ZERO_LEAF_HASH);
         _tree.startIndex = _startIndex;
     }
 
+    /// @return Returns the tree root.
     function getRoot(Tree storage _tree) internal view returns (bytes32) {
         return _tree.tree.root();
     }
 
+    /// @notice Process the priority operations of a batch.
     function processBatch(Tree storage _tree, PriorityOpsBatchInfo calldata _priorityOpsData) internal {
         if (_priorityOpsData.itemHashes.length > 0) {
             bytes32 expectedRoot = Merkle.calculateRootPaths(
@@ -71,6 +74,7 @@ library PriorityTree {
         }
     }
 
+    /// @notice Initialize a chain from a commitment.
     function initFromCommitment(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal {
         uint256 height = _commitment.sides.length; // Height, including the root node.
         require(height > 0, "PT: invalid commitment");
@@ -87,6 +91,7 @@ library PriorityTree {
         _tree.historicalRoots[_tree.tree.root()] = true;
     }
 
+    /// @notice Returns the commitment to the priority tree.
     function getCommitment(Tree storage _tree) internal view returns (PriorityTreeCommitment memory commitment) {
         commitment.nextLeafIndex = _tree.tree._nextLeafIndex;
         commitment.startIndex = _tree.startIndex;

@@ -132,12 +132,14 @@ interface IAdmin is IZkSyncHyperchainBase {
 
     event BridgeMint(address indexed _account, uint256 _amount);
 
+    /// @dev Similar to IL1AssetHandler interface, used to send chains.
     function forwardedBridgeBurn(
         address _syncLayer,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);
 
+    /// @dev Similar to IL1AssetHandler interface, used to claim failed chain transfers.
     function forwardedBridgeClaimFailedBurn(
         uint256 _chainId,
         bytes32 _assetInfo,
@@ -145,5 +147,9 @@ interface IAdmin is IZkSyncHyperchainBase {
         bytes calldata _data
     ) external payable;
 
+    /// @dev Similar to IL1AssetHandler interface, used to receive chains.
     function forwardedBridgeMint(bytes calldata _data) external payable;
+
+    /// @dev Returns the commitments to the chain.
+    function readChainCommitment() external view returns (bytes memory);
 }

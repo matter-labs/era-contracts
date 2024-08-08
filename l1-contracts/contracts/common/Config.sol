@@ -102,13 +102,16 @@ uint256 constant MEMORY_OVERHEAD_GAS = 10;
 /// @dev The maximum gas limit for a priority transaction in L2.
 uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 
+/// @dev the address used to identify eth as the base token for chains.
 address constant ETH_TOKEN_ADDRESS = address(1);
 
+/// @dev the value returned in bridgehubDeposit in the TwoBridges function.
 bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
 
 /// @dev https://eips.ethereum.org/EIPS/eip-1352
 address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint16).max));
 
+/// @dev the maximum number of supported chains, this is an arbitrary limit.
 uint256 constant MAX_NUMBER_OF_HYPERCHAINS = 100;
 
 /// @dev Used to when there is no sender contract on L1. This is the alias we apply to L1->L2 messages.

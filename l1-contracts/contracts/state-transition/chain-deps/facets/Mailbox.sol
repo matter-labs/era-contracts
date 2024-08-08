@@ -16,7 +16,7 @@ import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.so
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
-import {Messaging} from "../../../common/libraries/Messaging.sol";
+import {MessageHashing} from "../../../common/libraries/MessageHashing.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
@@ -48,7 +48,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         ERA_CHAIN_ID = _eraChainId;
     }
 
-    /// @notice when requesting transactions through the bridgehub
+    /// @inheritdoc IMailbox
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
     ) external onlyBridgehub returns (bytes32 canonicalTxHash) {
@@ -117,7 +117,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
     function _parseProofMetadata(
         bytes32 _proofMetadata
-    ) internal view returns (uint256 logLeafProofLen, uint256 batchLeafProofLen) {
+    ) internal pure returns (uint256 logLeafProofLen, uint256 batchLeafProofLen) {
         bytes1 metadataVersion = bytes1(_proofMetadata[0]);
         require(metadataVersion == 0x01, "Mailbox: unsupported proof metadata version");
 
@@ -136,16 +136,16 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         }
     }
 
+    /// @inheritdoc IMailbox
     function proveL2LeafInclusion(
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
-    ) external view returns (bool) {
+    ) external view override returns (bool) {
         return _proveL2LeafInclusion(_batchNumber, _leafProofMask, _leaf, _proof);
     }
 
-    /// Proves that a certain leaf was included as part of the log merkle tree.
     function _proveL2LeafInclusion(
         uint256 _batchNumber,
         uint256 _leafProofMask,
@@ -178,7 +178,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             }
 
             // Now, we'll have to check that the SyncLayer included the message.
-            bytes32 batchLeafHash = Messaging.batchLeafHash(batchSettlementRoot, _batchNumber);
+            bytes32 batchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, _batchNumber);
 
             uint256 batchLeafProofMask = uint256(bytes32(_proof[ptr]));
             ++ptr;
@@ -190,7 +190,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             );
             ptr += batchLeafProofLen;
 
-            chainIdLeaf = Messaging.chainIdLeafHash(chainIdRoot, s.chainId);
+            chainIdLeaf = MessageHashing.chainIdLeafHash(chainIdRoot, s.chainId);
         }
 
         uint256 syncLayerBatchNumber;
@@ -290,14 +290,14 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         return Math.max(l2GasPrice, minL2GasPriceBaseToken);
     }
 
-    /// @dev On L1 we have to forward to SyncLayer mailbox
+    /// @inheritdoc IMailbox
     function requestL2TransactionToSyncLayerMailbox(
         uint256 _chainId,
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external returns (bytes32 canonicalTxHash) {
+    ) external override returns (bytes32 canonicalTxHash) {
         require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId), "Mailbox SL: not SL");
         require(
             IStateTransitionManager(s.stateTransitionManager).getHyperchain(_chainId) == msg.sender,
@@ -314,13 +314,13 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         canonicalTxHash = _requestL2TransactionToSyncLayerFree(wrappedRequest);
     }
 
-    /// @dev On SL the chain's mailbox
+    /// @inheritdoc IMailbox
     function bridgehubRequestL2TransactionOnSyncLayer(
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external onlyBridgehub {
+    ) external override onlyBridgehub {
         _writePriorityOp(_transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp);
     }
 
@@ -472,7 +472,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
     function _validateTx(
         WritePriorityOpParams memory _priorityOpParams
-    ) internal returns (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) {
+    ) internal view returns (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) {
         transaction = _serializeL2Transaction(_priorityOpParams);
         bytes memory transactionEncoding = abi.encode(transaction);
         TransactionValidator.validateL1ToL2Transaction(
