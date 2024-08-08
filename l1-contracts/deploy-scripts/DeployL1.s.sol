@@ -893,7 +893,7 @@ contract DeployL1Script is Script {
             addresses.blobVersionedHashRetriever
         );
         vm.serializeAddress("deployed_addresses", "rollup_l1_da_validator_addr", addresses.rollupL1DAValidator);
-        vm.serializeAddress("deployed_addresses", "validium_l1_da_validator_addr", addresse.validiumL1DAValidator);
+        vm.serializeAddress("deployed_addresses", "validium_l1_da_validator_addr", addresses.validiumL1DAValidator);
 
         vm.serializeAddress("deployed_addresses", "validator_timelock_addr", addresses.validatorTimelock);
         vm.serializeAddress("deployed_addresses", "native_token_vault_addr", addresses.vaults.l1NativeTokenVaultProxy);
