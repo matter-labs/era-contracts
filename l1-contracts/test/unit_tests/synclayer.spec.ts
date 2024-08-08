@@ -128,30 +128,30 @@ describe("Synclayer", function () {
 
   // we have the foundry test for it
   // it("Check finish move chain", async () => {
-    // const syncLayerChainId = syncLayerDeployer.chainId;
-    // const assetInfo = await bridgehub.stmAssetId(migratingDeployer.addresses.StateTransition.StateTransitionProxy);
-    // const diamondCutData = await migratingDeployer.initialZkSyncHyperchainDiamondCut();
-    // const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
+  // const syncLayerChainId = syncLayerDeployer.chainId;
+  // const assetInfo = await bridgehub.stmAssetId(migratingDeployer.addresses.StateTransition.StateTransitionProxy);
+  // const diamondCutData = await migratingDeployer.initialZkSyncHyperchainDiamondCut();
+  // const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
-    // const adminFacet = AdminFacetFactory.connect(
-    //   migratingDeployer.addresses.StateTransition.DiamondProxy,
-    //   migratingDeployer.deployWallet
-    // );
+  // const adminFacet = AdminFacetFactory.connect(
+  //   migratingDeployer.addresses.StateTransition.DiamondProxy,
+  //   migratingDeployer.deployWallet
+  // );
 
-    // const chainCommitment = {
-    //   totalBatchesExecuted: 0,
-    //   totalBatchesVerified: 0,
-    //   totalBatchesCommitted:0,
-    //   priorityQueueHead: 0,
-    //   priorityQueueTxs: [
-    //     {
-    //       canonicalTxHash: '0xea79e9b7c3c46a76174b3aea3760570a7e18b593d2b5a087fce52cee95d2d57e',
-    //       expirationTimestamp: "1716557077",
-    //       layer2Tip: 0
-    //   }],
-    //   l2SystemContractsUpgradeTxHash: ethers.constants.HashZero,
-    //   l2SystemContractsUpgradeBatchNumber:0 ,
-    //   batchHashes: ['0xcd4e278573a3b2076a81f91b97e2dd0c85882d9f735ad81dc34b509033671e7b']}
+  // const chainCommitment = {
+  //   totalBatchesExecuted: 0,
+  //   totalBatchesVerified: 0,
+  //   totalBatchesCommitted:0,
+  //   priorityQueueHead: 0,
+  //   priorityQueueTxs: [
+  //     {
+  //       canonicalTxHash: '0xea79e9b7c3c46a76174b3aea3760570a7e18b593d2b5a087fce52cee95d2d57e',
+  //       expirationTimestamp: "1716557077",
+  //       layer2Tip: 0
+  //   }],
+  //   l2SystemContractsUpgradeTxHash: ethers.constants.HashZero,
+  //   l2SystemContractsUpgradeBatchNumber:0 ,
+  //   batchHashes: ['0xcd4e278573a3b2076a81f91b97e2dd0c85882d9f735ad81dc34b509033671e7b']}
   //   const chainData = await adminFacet.readChainCommitment();
   //   const stmData = ethers.utils.defaultAbiCoder.encode(
   //     ["address", "address", "uint256", "bytes"],
