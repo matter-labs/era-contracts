@@ -282,32 +282,27 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev setPriorityTxMaxGasLimit for the specified chain
-    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external {
-        // onlyOwner {
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// @dev setTokenMultiplier for the specified chain
-    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external {
-        // onlyOwner {
+    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).setTokenMultiplier(_nominator, _denominator);
     }
 
     /// @dev changeFeeParams for the specified chain
-    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external {
-        // onlyOwner {
+    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).changeFeeParams(_newFeeParams);
     }
 
     /// @dev setValidator for the specified chain
-    function setValidator(uint256 _chainId, address _validator, bool _active) external {
-        // onlyOwnerOrAdmin {
+    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwnerOrAdmin {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).setValidator(_validator, _active);
     }
 
     /// @dev setPorterAvailability for the specified chain
     function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
-        // onlyOwner {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPorterAvailability(_zkPorterIsAvailable);
     }
 
@@ -348,20 +343,20 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             // solhint-disable-next-line func-named-parameters
             mandatoryInitData = bytes.concat(
                 bytes32(_chainId),
-                bytes32(uint256(uint160(address(BRIDGE_HUB)))),
+                bytes32(uint256(uint160(BRIDGE_HUB))),
                 bytes32(uint256(uint160(address(this)))),
-                bytes32(uint256(protocolVersion)),
+                bytes32(protocolVersion),
                 bytes32(uint256(uint160(_admin))),
                 bytes32(uint256(uint160(validatorTimelock))),
                 bytes32(uint256(uint160(_baseToken))),
                 bytes32(uint256(uint160(_sharedBridge))),
-                bytes32(storedBatchZero)
+                storedBatchZero
             );
         }
 
         // construct init data
         bytes memory initData;
-        /// all together 4+9*32=292 bytes
+        /// all together 4+9*32=292 bytes for the selector + mandatory data
         // solhint-disable-next-line func-named-parameters
         initData = bytes.concat(IDiamondInit.initialize.selector, mandatoryInitData, diamondCut.initCalldata);
 
