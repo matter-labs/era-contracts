@@ -21,7 +21,7 @@ import {Unauthorized, InvalidCodeHash, CodeHashReason} from "./SystemContractErr
  * system contracts to enforce the invariants mentioned above.
  */
 contract AccountCodeStorage is IAccountCodeStorage {
-    bytes32 internal constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
+    bytes32 private constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
     modifier onlyDeployer() {
         if (msg.sender != address(DEPLOYER_SYSTEM_CONTRACT)) {

@@ -107,7 +107,7 @@ describe("NonceHolder tests", () => {
     it("should revert Incorrect nonce", async () => {
       await expect(nonceHolder.connect(systemAccount).incrementMinNonceIfEquals(2222222)).to.be.revertedWithCustomError(
         nonceHolder,
-        "ValuesNotEqual"
+        "ValueMismatch"
       );
     });
 

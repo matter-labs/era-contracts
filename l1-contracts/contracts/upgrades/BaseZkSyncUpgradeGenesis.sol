@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.24;
 
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
-import {ProtocolVersionShouldBeGreater, ProtocolVersionDeltaTooLarge, PreviousUpgradeNotFinalized, PreviousUpgradeBatchNotCleared, ProtocolMajorVersionNotZero} from "./ZkSyncUpgradeErrors.sol";
+import {ProtocolVersionTooSmall, ProtocolVersionDeltaTooLarge, PreviousUpgradeNotFinalized, PreviousUpgradeBatchNotCleared, ProtocolMajorVersionNotZero} from "./ZkSyncUpgradeErrors.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
@@ -20,10 +20,10 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
     ) internal override returns (uint32 newMinorVersion, bool patchOnly) {
         uint256 previousProtocolVersion = s.protocolVersion;
         if (
-            // IMPORTANT Genesis Upgrade difference: Note this is the only thing change > to >=
+            // IMPORTANT Genesis Upgrade difference: Note this is the only thing change <= to <
             _newProtocolVersion < previousProtocolVersion
         ) {
-            revert ProtocolVersionShouldBeGreater(previousProtocolVersion, _newProtocolVersion);
+            revert ProtocolVersionTooSmall();
         }
         // slither-disable-next-line unused-return
         (uint32 previousMajorVersion, uint32 previousMinorVersion, ) = SemVer.unpackSemVer(
@@ -55,12 +55,12 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
 
         // If the minor version changes also, we need to ensure that the previous upgrade has been finalized.
         // In case the minor version does not change, we permit to keep the old upgrade transaction in the system, but it
-        // must be ensured in the other parts of the upgrade that the is not overridden.
+        // must be ensured in the other parts of the upgrade that the upgrade transaction is not overridden.
         if (!patchOnly) {
             // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
             // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
             if (s.l2SystemContractsUpgradeTxHash != bytes32(0)) {
-                revert PreviousUpgradeNotFinalized();
+                revert PreviousUpgradeNotFinalized(s.l2SystemContractsUpgradeTxHash);
             }
             if (s.l2SystemContractsUpgradeBatchNumber != 0) {
                 revert PreviousUpgradeBatchNotCleared();

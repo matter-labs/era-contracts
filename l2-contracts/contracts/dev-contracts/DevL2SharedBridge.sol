@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {L2SharedBridge} from "../bridge/L2SharedBridge.sol";
 import {L2StandardERC20} from "../bridge/L2StandardERC20.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
 /// @author Matter Labs
 /// @notice The implementation of the shared bridge that allows setting legacy bridge. Must only be used in local testing environments.

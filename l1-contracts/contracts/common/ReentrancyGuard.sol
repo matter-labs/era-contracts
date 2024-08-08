@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
-pragma solidity 0.8.24;
-
-// solhint-disable gas-custom-errors
+import {SlotOccupied, NotInitializedReentrancyGuard, Reentrancy} from "./L1ContractErrors.sol";
 
 /**
  * @custom:security-contact security@matterlabs.dev
@@ -57,7 +57,9 @@ abstract contract ReentrancyGuard {
         }
 
         // Check that storage slot for reentrancy guard is empty to rule out possibility of slot conflict
-        require(lockSlotOldValue == 0, "1B");
+        if (lockSlotOldValue != 0) {
+            revert SlotOccupied();
+        }
     }
 
     /**
@@ -73,8 +75,13 @@ abstract contract ReentrancyGuard {
             _status := sload(LOCK_FLAG_ADDRESS)
         }
 
-        // On the first call to nonReentrant, _notEntered will be true
-        require(_status == _NOT_ENTERED, "r1");
+        if (_status == 0) {
+            revert NotInitializedReentrancyGuard();
+        }
+        // On the first call to nonReentrant, _NOT_ENTERED will be true
+        if (_status != _NOT_ENTERED) {
+            revert Reentrancy();
+        }
 
         // Any calls to nonReentrant after this point will fail
         assembly {

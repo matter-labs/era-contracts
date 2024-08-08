@@ -9,8 +9,8 @@ import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_COD
 import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
-import {Unauthorized, InvalidNonceOrderingChange, ValuesNotEqual, EmptyBytes32, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue} from "./SystemContractErrors.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
+import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -21,7 +21,7 @@ import {Unauthorized, InvalidNonceOrderingChange, ValuesNotEqual, EmptyBytes32, 
  * Note, contracts with bytecode that have already been published to L1 once
  * do not need to be published anymore.
  */
-contract ContractDeployer is IContractDeployer, ISystemContract {
+contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @notice Information about an account contract.
     /// @dev For EOA and simple contracts (i.e. not accounts) this value is 0.
     mapping(address => AccountInfo) internal accountInfo;
@@ -253,7 +253,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
             sumOfValues += _deployments[i].value;
         }
         if (msg.value != sumOfValues) {
-            revert ValuesNotEqual(sumOfValues, msg.value);
+            revert ValueMismatch(sumOfValues, msg.value);
         }
 
         for (uint256 i = 0; i < deploymentsLength; ++i) {

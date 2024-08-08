@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
-pragma solidity 0.8.24;
-
-// solhint-disable gas-custom-errors
+import {QueueIsEmpty} from "../../common/L1ContractErrors.sol";
 
 /// @notice The structure that contains meta information of the L2 transaction that was requested from L1
 /// @dev The weird size of fields was selected specifically to minimize the structure storage size
@@ -64,7 +64,10 @@ library PriorityQueue {
 
     /// @return The first unprocessed priority operation from the queue
     function front(Queue storage _queue) internal view returns (PriorityOperation memory) {
-        require(!_queue.isEmpty(), "D"); // priority queue is empty
+        // priority queue is empty
+        if (_queue.isEmpty()) {
+            revert QueueIsEmpty();
+        }
 
         return _queue.data[_queue.head];
     }
@@ -72,7 +75,10 @@ library PriorityQueue {
     /// @notice Remove the first unprocessed priority operation from the queue
     /// @return priorityOperation that was popped from the priority queue
     function popFront(Queue storage _queue) internal returns (PriorityOperation memory priorityOperation) {
-        require(!_queue.isEmpty(), "s"); // priority queue is empty
+        // priority queue is empty
+        if (_queue.isEmpty()) {
+            revert QueueIsEmpty();
+        }
 
         // Save value into the stack to avoid double reading from the storage
         uint256 head = _queue.head;

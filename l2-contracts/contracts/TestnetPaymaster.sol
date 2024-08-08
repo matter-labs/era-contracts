@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
 
-pragma solidity 0.8.20;
-
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {IPaymaster, ExecutionResult, PAYMASTER_VALIDATION_SUCCESS_MAGIC} from "./interfaces/IPaymaster.sol";
 import {IPaymasterFlow} from "./interfaces/IPaymasterFlow.sol";
 import {Transaction, BOOTLOADER_ADDRESS} from "./L2ContractHelper.sol";
-import {InvalidCaller, InvalidInput, InsufficientAllowance, FailedToTransferTokens, UnsupportedPaymasterFlow} from "./L2ContractErrors.sol";
+import {Unauthorized, InvalidInput, InsufficientAllowance, FailedToTransferTokens, UnsupportedPaymasterFlow} from "./errors/L2ContractErrors.sol";
 
 // This is a dummy paymaster. It expects the paymasterInput to contain its "signature" as well as the needed exchange rate.
 // It supports only approval-based paymaster flow.
@@ -16,12 +16,12 @@ contract TestnetPaymaster is IPaymaster {
         bytes32,
         bytes32,
         Transaction calldata _transaction
-    ) external payable returns (bytes4 magic, bytes memory context) {
+    ) external payable returns (bytes4 magic, bytes memory) {
         // By default we consider the transaction as accepted.
         magic = PAYMASTER_VALIDATION_SUCCESS_MAGIC;
 
         if (msg.sender != BOOTLOADER_ADDRESS) {
-            revert InvalidCaller(msg.sender);
+            revert Unauthorized(msg.sender);
         }
 
         if (_transaction.paymasterInput.length < 4) {

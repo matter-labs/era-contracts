@@ -24,4 +24,4 @@ system-contracts/contracts/test-contracts
 system-contracts/contracts-preprocessed
 
 # gas-bound-caller
-gas-bound-caller/contracts/test-contracts
+gas-bound-caller

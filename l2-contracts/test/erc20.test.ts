@@ -60,11 +60,12 @@ describe("ERC20Bridge", function () {
       governorWallet.address,
     ]);
 
-    const erc20BridgeProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
-      erc20BridgeImpl.address,
-      governorWallet.address,
-      bridgeInitializeData,
-    ]);
+    const erc20BridgeProxy = await deployer.deploy(
+      await deployer.loadArtifact(
+        "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy"
+      ),
+      [erc20BridgeImpl.address, governorWallet.address, bridgeInitializeData]
+    );
 
     erc20Bridge = L2SharedBridgeFactory.connect(erc20BridgeProxy.address, deployerWallet);
   });

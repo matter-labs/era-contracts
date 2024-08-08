@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// solhint-disable reason-string, gas-custom-errors
 pragma solidity 0.8.24;
 
 import {Script} from "forge-std/Script.sol";

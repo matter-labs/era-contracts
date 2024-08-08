@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, REAL_BASE_TOKEN_SYSTEM_CONTRACT} from "./Constants.sol";
 import {InvalidCall} from "./SystemContractErrors.sol";
@@ -17,7 +17,7 @@ import {InvalidCall} from "./SystemContractErrors.sol";
  * the address to call in the second extraAbi param, transfers the funds and uses `mimicCall` to continue the
  * call with the same msg.sender.
  */
-contract MsgValueSimulator is ISystemContract {
+contract MsgValueSimulator is SystemContractBase {
     /// @notice Extract value, isSystemCall and to from the extraAbi params.
     /// @dev The contract accepts value, the callee and whether the call should be a system one via its ABI params.
     /// @dev The first ABI param contains the value in the [0..127] bits. The 128th contains
@@ -34,12 +34,12 @@ contract MsgValueSimulator is ISystemContract {
     }
 
     /// @notice The maximal number of gas out of the stipend that should be passed to the callee.
-    uint256 internal constant GAS_TO_PASS = 2300;
+    uint256 private constant GAS_TO_PASS = 2300;
 
     /// @notice The amount of gas that is passed to the MsgValueSimulator as a stipend.
     /// This number servers to pay for the ETH transfer as well as to provide gas for the `GAS_TO_PASS` gas.
     /// It is equal to the following constant: https://github.com/matter-labs/era-zkevm_opcode_defs/blob/7bf8016f5bb13a73289f321ad6ea8f614540ece9/src/system_params.rs#L96.
-    uint256 internal constant MSG_VALUE_SIMULATOR_STIPEND_GAS = 27000;
+    uint256 private constant MSG_VALUE_SIMULATOR_STIPEND_GAS = 27000;
 
     /// @notice The fallback function that is the main entry point for the MsgValueSimulator.
     /// @dev The contract accepts value, the callee and whether the call should be a system one via its ABI params.

@@ -241,9 +241,12 @@ export class Deployer {
       console.log("Deploying Proxy Admin");
     }
     // Note: we cannot deploy using Create2, as the owner of the ProxyAdmin is msg.sender
-    const contractFactory = await hardhat.ethers.getContractFactory("ProxyAdmin", {
-      signer: this.deployWallet,
-    });
+    const contractFactory = await hardhat.ethers.getContractFactory(
+      "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin",
+      {
+        signer: this.deployWallet,
+      }
+    );
 
     const proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
     const rec = await proxyAdmin.deployTransaction.wait();
@@ -279,7 +282,7 @@ export class Deployer {
     const initCalldata = bridgehub.encodeFunctionData("initialize", [this.ownerAddress]);
 
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [this.addresses.Bridgehub.BridgehubImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
@@ -343,7 +346,7 @@ export class Deployer {
     ]);
 
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [
         this.addresses.StateTransition.StateTransitionImplementation,
         this.addresses.TransparentProxyAdmin,
@@ -539,7 +542,7 @@ export class Deployer {
       "initialize"
     );
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [this.addresses.Bridges.ERC20BridgeImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
@@ -582,7 +585,7 @@ export class Deployer {
       [this.addresses.Governance]
     );
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [this.addresses.Bridges.SharedBridgeImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
