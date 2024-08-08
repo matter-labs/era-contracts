@@ -184,9 +184,9 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         emit BytecodeL1PublicationRequested(_bytecodeHash);
     }
 
-    /// @notice Verifies that the {_totalL2ToL1PubdataAndStateDiffs} reflects what occurred within the L1Batch and that
+    /// @notice Verifies that the {_operatorInput} reflects what occurred within the L1Batch and that
     ///         the compressed statediffs are equivalent to the full state diffs.
-    /// @param _totalL2ToL1PubdataAndStateDiffs The total pubdata and uncompressed state diffs of transactions that were
+    /// @param _operatorInput The total pubdata and uncompressed state diffs of transactions that were
     ///        processed in the current L1 Batch. Pubdata consists of L2 to L1 Logs, messages, deployed bytecode, and state diffs.
     /// @dev Function that should be called exactly once per L1 Batch by the bootloader.
     /// @dev Checks that totalL2ToL1Pubdata is strictly packed data that should to be published to L1.
@@ -196,7 +196,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     /// to L1 using low-level (VM) L2Log.
     function publishPubdataAndClearState(
         address _l2DAValidator,
-        bytes calldata _totalL2ToL1PubdataAndStateDiffs
+        bytes calldata _operatorInput
     ) external onlyCallFromBootloader {
         uint256 calldataPtr = 0;
 
@@ -210,9 +210,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         // Operator data: 32 bytes for offset
         //                32 bytes for length
 
-        bytes4 inputL2DAValidatePubdataFunctionSig = bytes4(
-            _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]
-        );
+        bytes4 inputL2DAValidatePubdataFunctionSig = bytes4(_operatorInput[calldataPtr:calldataPtr + 4]);
         if (inputL2DAValidatePubdataFunctionSig != IL2DAValidator.validatePubdata.selector) {
             revert ReconstructionMismatch(
                 PubdataField.InputDAFunctionSig,
@@ -222,23 +220,23 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         }
         calldataPtr += 4;
 
-        bytes32 inputChainedLogsHash = bytes32(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 32]);
+        bytes32 inputChainedLogsHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
         if (inputChainedLogsHash != chainedLogsHash) {
             revert ReconstructionMismatch(PubdataField.InputLogsHash, chainedLogsHash, inputChainedLogsHash);
         }
         calldataPtr += 32;
 
         // Check happens below after we reconstruct the logs root hash
-        bytes32 inputChainedLogsRootHash = bytes32(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 32]);
+        bytes32 inputChainedLogsRootHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
         calldataPtr += 32;
 
-        bytes32 inputChainedMsgsHash = bytes32(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 32]);
+        bytes32 inputChainedMsgsHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
         if (inputChainedMsgsHash != chainedMessagesHash) {
             revert ReconstructionMismatch(PubdataField.InputMsgsHash, chainedMessagesHash, inputChainedMsgsHash);
         }
         calldataPtr += 32;
 
-        bytes32 inputChainedBytecodesHash = bytes32(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 32]);
+        bytes32 inputChainedBytecodesHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
         if (inputChainedBytecodesHash != chainedL1BytecodesRevealDataHash) {
             revert ReconstructionMismatch(
                 PubdataField.InputBytecodeHash,
@@ -251,7 +249,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         calldataPtr += 64;
 
         /// Check logs
-        uint32 numberOfL2ToL1Logs = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
+        uint32 numberOfL2ToL1Logs = uint32(bytes4(_operatorInput[calldataPtr:calldataPtr + 4]));
         if (numberOfL2ToL1Logs > L2_TO_L1_LOGS_MERKLE_TREE_LEAVES) {
             revert ReconstructionMismatch(
                 PubdataField.NumberOfLogs,
@@ -265,7 +263,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         bytes32 reconstructedChainedLogsHash;
         for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
             bytes32 hashedLog = EfficientCall.keccak(
-                _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + L2_TO_L1_LOG_SERIALIZE_SIZE]
+                _operatorInput[calldataPtr:calldataPtr + L2_TO_L1_LOG_SERIALIZE_SIZE]
             );
             calldataPtr += L2_TO_L1_LOG_SERIALIZE_SIZE;
             l2ToL1LogsTreeArray[i] = hashedLog;
@@ -299,7 +297,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
             _gas: gasleft(),
             _address: _l2DAValidator,
             _value: 0,
-            _data: _totalL2ToL1PubdataAndStateDiffs,
+            _data: _operatorInput,
             _isSystem: false
         });
 

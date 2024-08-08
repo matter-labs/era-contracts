@@ -27,7 +27,6 @@ abstract contract StateDiffL2DAValidator {
     /// On Era or other "vanilla" rollups it is empty, but it can be used for providing additional data by the operator,
     /// e.g. DA committee signatures, etc.
     function _produceStateDiffPubdata(
-        bytes32 _chainedLogsHash,
         bytes32 _chainedMessagesHash,
         bytes32 _chainedBytescodesHash,
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
@@ -40,19 +39,7 @@ abstract contract StateDiffL2DAValidator {
 
         /// Check logs
         uint32 numberOfL2ToL1Logs = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-        calldataPtr += 4;
-
-        bytes32 reconstructedChainedLogsHash;
-        for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
-            bytes32 hashedLog = EfficientCall.keccak(
-                _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + L2_TO_L1_LOG_SERIALIZE_SIZE]
-            );
-            calldataPtr += L2_TO_L1_LOG_SERIALIZE_SIZE;
-            reconstructedChainedLogsHash = keccak256(abi.encode(reconstructedChainedLogsHash, hashedLog));
-        }
-        if (reconstructedChainedLogsHash != _chainedLogsHash) {
-            revert ReconstructionMismatch(PubdataField.LogsHash, _chainedLogsHash, reconstructedChainedLogsHash);
-        }
+        calldataPtr += 4 + numberOfL2ToL1Logs * L2_TO_L1_LOG_SERIALIZE_SIZE;
 
         /// Check messages
         uint32 numberOfMessages = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
