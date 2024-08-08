@@ -9,6 +9,9 @@ pragma solidity 0.8.24;
 /// @dev Our circuits will prove that a EIP-4844 blob and our internal blob are the same.
 uint256 constant BLOB_SIZE_BYTES = 126_976;
 
+// the state diff hash, hash of pubdata + the number of blobs.
+uint256 constant BLOB_DATA_OFFSET = 65;
+
 /// @notice Contract that contains the functionality for process the calldata DA.
 /// @dev The expected l2DAValidator that should be used with it `RollupL2DAValidator`.
 abstract contract CalldataDA {
@@ -38,7 +41,7 @@ abstract contract CalldataDA {
         // - Then, there are linear hashes of the published blobs, 32 bytes each.
 
         // Check that it accommodates enough pubdata for the state diff hash, hash of pubdata + the number of blobs.
-        require(_operatorDAInput.length >= 32 + 32 + 1, "too small");
+        require(_operatorDAInput.length >= BLOB_DATA_OFFSET, "too small");
 
         stateDiffHash = bytes32(_operatorDAInput[:32]);
         fullPubdataHash = bytes32(_operatorDAInput[32:64]);
@@ -50,15 +53,16 @@ abstract contract CalldataDA {
         // the `_maxBlobsSupported`
         blobsLinearHashes = new bytes32[](_maxBlobsSupported);
 
-        require(_operatorDAInput.length >= 65 + 32 * blobsProvided, "invalid blobs hashes");
+        require(_operatorDAInput.length >= BLOB_DATA_OFFSET + 32 * blobsProvided, "invalid blobs hashes");
 
-        uint256 ptr = 65;
-
-        for (uint256 i = 0; i < blobsProvided; ++i) {
-            // Take the 32 bytes of the blob linear hash
-            blobsLinearHashes[i] = bytes32(_operatorDAInput[ptr:ptr + 32]);
-            ptr += 32;
+        assembly {
+            // The pointer to the allocated memory above. We skip 32 bytes to avoid overwriting the length.
+            let blobsPtr := add(blobsLinearHashes, 0x20)
+            let inputPtr := add(_operatorDAInput.offset, BLOB_DATA_OFFSET)
+            calldatacopy(blobsPtr, inputPtr, mul(blobsProvided, 32))
         }
+
+        uint256 ptr = BLOB_DATA_OFFSET + 32 * blobsProvided;
 
         // Now, we need to double check that the provided input was indeed retutned by the L2 DA validator.
         require(keccak256(_operatorDAInput[:ptr]) == _l2DAValidatorOutputHash, "invalid l2 DA output hash");
@@ -79,12 +83,12 @@ abstract contract CalldataDA {
         uint256 _maxBlobsSupported,
         bytes calldata _pubdataInput
     ) internal pure returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
+        require(_blobsProvided == 1, "one one blob with calldata");
+
         // We typically do not know whether we'll use calldata or blobs at the time when
         // we start proving the batch. That's why the blob commitment for a single blob is still present in the case of calldata.
 
         blobCommitments = new bytes32[](_maxBlobsSupported);
-
-        require(_blobsProvided == 1, "one one blob with calldata");
 
         _pubdata = _pubdataInput[:_pubdataInput.length - 32];
 

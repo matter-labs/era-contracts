@@ -167,16 +167,13 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         bytes calldata _forceDeploymentData,
         bytes[] calldata _factoryDeps
     ) external onlyStateTransitionManager {
-        uint256 cachedProtocolVersion = s.protocolVersion;
-        uint256 chainId = s.chainId;
-
         Diamond.FacetCut[] memory emptyArray;
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
             facetCuts: emptyArray,
             initAddress: _l1GenesisUpgrade,
             initCalldata: abi.encodeCall(
                 IL1GenesisUpgrade.genesisUpgrade,
-                (_l1GenesisUpgrade, chainId, cachedProtocolVersion, _forceDeploymentData, _factoryDeps)
+                (_l1GenesisUpgrade, s.chainId, s.protocolVersion, _forceDeploymentData, _factoryDeps)
             )
         });
 

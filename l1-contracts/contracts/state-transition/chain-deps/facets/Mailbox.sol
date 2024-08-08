@@ -173,9 +173,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
                 bytes32 correctBatchRoot = s.l2LogsRootHashes[_batchNumber];
                 require(correctBatchRoot != bytes32(0), "local root is 0");
                 return correctBatchRoot == batchSettlementRoot;
-            } else {
-                require(s.l2LogsRootHashes[_batchNumber] == bytes32(0), "local root must be 0");
             }
+
+            require(s.l2LogsRootHashes[_batchNumber] == bytes32(0), "local root must be 0");
 
             // Now, we'll have to check that the Gateway included the message.
             bytes32 batchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, _batchNumber);

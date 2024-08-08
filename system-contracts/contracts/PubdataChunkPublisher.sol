@@ -38,12 +38,6 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
         for (uint256 i = 0; i < blobCount; ++i) {
             uint256 start = BLOB_SIZE_BYTES * i;
 
-            // We break if the pubdata isn't enough to cover all 6 blobs. On L1 it is expected that the hash
-            // will be bytes32(0) if a blob isn't going to be used.
-            if (start >= _pubdata.length) {
-                break;
-            }
-
             bytes32 blobHash;
             assembly {
                 // The pointer to the allocated memory above skipping the length.
