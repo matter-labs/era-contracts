@@ -48,9 +48,10 @@ contract AcceptAdmin is Script {
         vm.stopBroadcast();
     }
 
-
+    // This function should be called by the owner to update token multiplier setter role
     function chainSetTokenMultiplierSetter(address chainAdmin, address target) public {
         IChainAdmin admin = IChainAdmin(chainAdmin);
+
         vm.startBroadcast();
         admin.setTokenMultiplierSetter(target);
         vm.stopBroadcast();
