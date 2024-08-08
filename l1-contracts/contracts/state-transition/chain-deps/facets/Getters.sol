@@ -9,7 +9,7 @@ import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
+import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
@@ -130,9 +130,6 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
             return s.priorityQueue.getSize();
         }
     }
-
-    /// @inheritdoc IGetters
-    function priorityQueueFrontOperation() external view returns (PriorityOperation memory op) {}
 
     /// @inheritdoc IGetters
     function isValidator(address _address) external view returns (bool) {

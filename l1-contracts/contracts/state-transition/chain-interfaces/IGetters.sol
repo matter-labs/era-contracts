@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.24;
 
-import {PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
 import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
@@ -63,10 +62,6 @@ interface IGetters is IZkSyncHyperchainBase {
 
     /// @return The number of priority operations currently in the queue
     function getPriorityQueueSize() external view returns (uint256);
-
-    /// @notice This function is deprecated and will return an empty priority operation.
-    /// @return Empty priority operation
-    function priorityQueueFrontOperation() external view returns (PriorityOperation memory);
 
     /// @return Whether the address has a validator access
     function isValidator(address _address) external view returns (bool);
