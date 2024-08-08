@@ -35,7 +35,11 @@ abstract contract StateDiffL2DAValidator {
         virtual
         returns (bytes32 uncompressedStateDiffHash, bytes calldata totalL2Pubdata, bytes calldata leftoverSuffix)
     {
-        uint256 calldataPtr = 4;
+        uint256 calldataPtr = 0;
+
+        /// Check logs
+        uint32 numberOfL2ToL1Logs = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
+        calldataPtr += 4 + numberOfL2ToL1Logs * L2_TO_L1_LOG_SERIALIZE_SIZE;
 
         /// Check messages
         uint32 numberOfMessages = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
