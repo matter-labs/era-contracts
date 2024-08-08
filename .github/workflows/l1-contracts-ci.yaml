@@ -217,7 +217,7 @@ jobs:
           minimum-coverage: 85 # Set coverage threshold.
 
   gas-report:
-    needs: [build, lint, test-foundry]
+    needs: [build, lint]
     runs-on: ubuntu-latest
 
     steps:
@@ -258,7 +258,7 @@ jobs:
           summaryQuantile: 0.0 # only display the 10% most significant gas diffs in the summary (defaults to 20%)
           sortCriteria: avg,max # sort diff rows by criteria
           sortOrders: desc,asc # and directions
-          ignore: test-foundry/**/* # filter out gas reports from specific paths (test/ is included by default)
+          ignore: test-foundry/**/*,l1-contracts/contracts/dev-contracts/**/*,l1-contracts/lib/**/*,l1-contracts/contracts/common/Dependencies.sol
         id: gas_diff
 
       - name: Add gas diff to sticky comment
