@@ -132,7 +132,7 @@ contract DeployL2Script is Script {
     function saveOutput() internal {
         vm.serializeAddress("root", "l2_shared_bridge_implementation", config.l2SharedBridgeImplementation);
         vm.serializeAddress("root", "l2_shared_bridge_proxy", config.l2SharedBridgeProxy);
-        vm.serializeAddress("root", "l2_da_validator", config.l2DAValidatorAddress);
+        vm.serializeAddress("root", "l2_da_validator_addr", config.l2DAValidatorAddress);
         string memory toml = vm.serializeAddress("root", "l2_default_upgrader", config.forceDeployUpgraderAddress);
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-l2-contracts.toml");
