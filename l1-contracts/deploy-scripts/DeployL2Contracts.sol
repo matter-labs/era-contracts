@@ -10,6 +10,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {L2_ASSET_ROUTER_ADDRESS} from "./GenesisUtils.sol";
 
 contract DeployL2Script is Script {
     using stdToml for string;
@@ -26,7 +27,6 @@ contract DeployL2Script is Script {
         address erc20BridgeProxy;
         uint256 chainId;
         uint256 eraChainId;
-        address l2SharedBridgeImplementation;
         address l2SharedBridgeProxy;
         address forceDeployUpgraderAddress;
         address l1DAValidatorAddress;
@@ -55,7 +55,6 @@ contract DeployL2Script is Script {
         deployAndRegisterL2DaValidator();
 
         deployFactoryDeps();
-        deploySharedBridge();
         deploySharedBridgeProxy();
         deployForceDeployer();
 
@@ -67,7 +66,6 @@ contract DeployL2Script is Script {
         loadContracts();
 
         deployFactoryDeps();
-        deploySharedBridge();
         deploySharedBridgeProxy();
 
         saveOutput();
@@ -131,7 +129,6 @@ contract DeployL2Script is Script {
     }
 
     function saveOutput() internal {
-        vm.serializeAddress("root", "l2_shared_bridge_implementation", config.l2SharedBridgeImplementation);
         vm.serializeAddress("root", "l2_shared_bridge_proxy", config.l2SharedBridgeProxy);
         vm.serializeAddress("root", "l2_da_validator_addr", config.l2DAValidatorAddress);
         string memory toml = vm.serializeAddress("root", "l2_default_upgrader", config.forceDeployUpgraderAddress);
@@ -184,24 +181,6 @@ contract DeployL2Script is Script {
         Utils.publishBytecodes(factoryDeps, config.chainId, config.bridgehubAddress, config.l1SharedBridgeProxy);
     }
 
-    function deploySharedBridge() internal {
-        bytes[] memory factoryDeps = new bytes[](1);
-        factoryDeps[0] = contracts.beaconProxy;
-
-        bytes memory constructorData = abi.encode(config.eraChainId);
-
-        config.l2SharedBridgeImplementation = Utils.deployThroughL1({
-            bytecode: contracts.l2SharedBridgeBytecode,
-            constructorargs: constructorData,
-            create2salt: "",
-            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-            factoryDeps: factoryDeps,
-            chainId: config.chainId,
-            bridgehubAddress: config.bridgehubAddress,
-            l1SharedBridgeProxy: config.l1SharedBridgeProxy
-        });
-    }
-
     function deployForceDeployer() internal {
         bytes[] memory factoryDeps = new bytes[](0);
         config.forceDeployUpgraderAddress = Utils.deployThroughL1({
@@ -217,33 +196,6 @@ contract DeployL2Script is Script {
     }
 
     function deploySharedBridgeProxy() internal {
-        address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
-        bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(contracts.beaconProxy);
-
-        // solhint-disable-next-line func-named-parameters
-        bytes memory proxyInitializationParams = abi.encodeWithSignature(
-            "initialize(address,address,bytes32,address)",
-            config.l1SharedBridgeProxy,
-            config.erc20BridgeProxy,
-            l2StandardErc20BytecodeHash,
-            l2GovernorAddress
-        );
-
-        bytes memory l2SharedBridgeProxyConstructorData = abi.encode(
-            config.l2SharedBridgeImplementation,
-            l2GovernorAddress,
-            proxyInitializationParams
-        );
-
-        config.l2SharedBridgeProxy = Utils.deployThroughL1({
-            bytecode: contracts.l2SharedBridgeProxyBytecode,
-            constructorargs: l2SharedBridgeProxyConstructorData,
-            create2salt: "",
-            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-            factoryDeps: new bytes[](0),
-            chainId: config.chainId,
-            bridgehubAddress: config.bridgehubAddress,
-            l1SharedBridgeProxy: config.l1SharedBridgeProxy
-        });
+        config.l2SharedBridgeProxy = L2_ASSET_ROUTER_ADDRESS;
     }
 }
