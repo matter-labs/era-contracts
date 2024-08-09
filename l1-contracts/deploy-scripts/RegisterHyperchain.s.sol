@@ -16,6 +16,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Utils} from "./Utils.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract RegisterHyperchainScript is Script {
     using stdToml for string;
@@ -150,7 +151,7 @@ contract RegisterHyperchainScript is Script {
     function registerTokenOnNTV() internal {
         IL1NativeTokenVault ntv = IL1NativeTokenVault(config.nativeTokenVault);
         // Ownable ownable = Ownable(config.nativeTokenVault);
-        bytes32 assetId = ntv.getAssetId(config.baseToken);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
         if (ntv.tokenAddress(assetId) != address(0)) {
             console.log("Token already registered on NTV");
         } else {

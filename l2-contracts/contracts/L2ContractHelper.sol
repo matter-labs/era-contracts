@@ -113,6 +113,8 @@ IL2AssetRouter constant L2_ASSET_ROUTER = IL2AssetRouter(address(USER_CONTRACTS_
 /// @dev The contract responsible for handling tokens native to a single chain.
 IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(address(USER_CONTRACTS_OFFSET + 0x04));
 
+uint256 constant L1_CHAIN_ID = 1;
+
 IL2Messenger constant L2_MESSENGER = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
 
 IBaseToken constant L2_BASE_TOKEN_ADDRESS = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
@@ -193,7 +195,7 @@ library L2ContractHelper {
     }
 }
 
-/// @notice Structure used to represent a zkSync transaction.
+/// @notice Structure used to represent a ZKsync transaction.
 struct Transaction {
     // The type of the transaction.
     uint256 txType;

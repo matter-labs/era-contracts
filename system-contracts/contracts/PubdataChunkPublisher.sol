@@ -25,7 +25,7 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
 
         blobLinearHashes = new bytes32[](blobCount);
 
-        // We allocate to the full size of blobLinearHashes * BLOB_SIZE_BYTES because we need to pad
+        // We allocate to the full size of blobCount * BLOB_SIZE_BYTES because we need to pad
         // the data on the right with 0s if it doesn't take up the full blob
         bytes memory totalBlobs = new bytes(BLOB_SIZE_BYTES * blobCount);
 
@@ -37,12 +37,6 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
 
         for (uint256 i = 0; i < blobCount; ++i) {
             uint256 start = BLOB_SIZE_BYTES * i;
-
-            // We break if the pubdata isn't enough to cover all 6 blobs. On L1 it is expected that the hash
-            // will be bytes32(0) if a blob isn't going to be used.
-            if (start >= _pubdata.length) {
-                break;
-            }
 
             bytes32 blobHash;
             assembly {

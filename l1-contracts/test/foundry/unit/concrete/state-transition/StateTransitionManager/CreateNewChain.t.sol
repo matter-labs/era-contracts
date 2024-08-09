@@ -28,13 +28,24 @@ contract createNewChainTest is StateTransitionManagerTest {
         });
     }
 
-    // function test_SuccessfulCreationOfNewChain() public {
-    //     createNewChain(getDiamondCutData(diamondInit));
+    function test_SuccessfulCreationOfNewChain() public {
+        createNewChain(getDiamondCutData(diamondInit));
 
-    //     address admin = chainContractAddress.getChainAdmin(chainId);
-    //     address newChainAddress = chainContractAddress.getHyperchain(chainId);
+        address admin = chainContractAddress.getChainAdmin(chainId);
+        address newChainAddress = chainContractAddress.getHyperchain(chainId);
 
-    //     assertEq(newChainAdmin, admin);
-    //     assertNotEq(newChainAddress, address(0));
-    // }
+        assertEq(newChainAdmin, admin);
+        assertNotEq(newChainAddress, address(0));
+
+        address[] memory chainAddresses = chainContractAddress.getAllHyperchains();
+        assertEq(chainAddresses.length, 1);
+        assertEq(chainAddresses[0], newChainAddress);
+
+        uint256[] memory chainIds = chainContractAddress.getAllHyperchainChainIDs();
+        assertEq(chainIds.length, 1);
+        assertEq(chainIds[0], chainId);
+
+        uint256 protocolVersion = chainContractAddress.getProtocolVersion(chainId);
+        assertEq(protocolVersion, 0);
+    }
 }

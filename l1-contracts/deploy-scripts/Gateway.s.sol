@@ -119,8 +119,8 @@ contract GatewayScript is Script {
         IStateTransitionManager stm = IStateTransitionManager(config.stateTransitionProxy);
         Ownable ownable = Ownable(config.stateTransitionProxy);
         vm.prank(ownable.owner());
-        stm.registerSyncLayer(config.gatewayChainId, true);
-        // bytes memory data = abi.encodeCall(stm.registerSyncLayer, (config.chainChainId, true));
+        stm.registerSettlementLayer(config.gatewayChainId, true);
+        // bytes memory data = abi.encodeCall(stm.registerSettlementLayer, (config.chainChainId, true));
         // Utils.executeUpgrade({
         //     _governor: ownable.owner(),
         //     _salt: bytes32(config.bridgehubCreateNewChainSalt),

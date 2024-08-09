@@ -155,7 +155,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
 
         // Bridgehub bridgehub = new Bridgehub();
         // vm.store(address(bridgehub),  bytes32(uint256(5 +2)), bytes32(uint256(31337)));
-        // require(address(bridgehub.deployer()) == address(31337), "Bridgehub: deployer wrong");
+        // require(address(bridgehub.deployer()) == address(31337), "BH: deployer wrong");
         vm.store(
             address(sharedBridge),
             keccak256(abi.encode(tokenAssetId, isWithdrawalFinalizedStorageLocation + 2)),
@@ -187,7 +187,8 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         emit ClaimedFailedDepositSharedBridge(eraChainId, alice, (tokenAssetId), abi.encode(bytes32(0)));
         vm.prank(l1ERC20BridgeAddress);
 
-        sharedBridge.claimFailedDepositLegacyErc20Bridge({
+        sharedBridge.claimFailedDeposit({
+            _chainId: eraChainId,
             _depositSender: alice,
             _l1Asset: address(token),
             _amount: amount,

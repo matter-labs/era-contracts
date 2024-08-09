@@ -9,7 +9,7 @@ import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
+import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
@@ -132,9 +132,6 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function priorityQueueFrontOperation() external view returns (PriorityOperation memory op) {}
-
-    /// @inheritdoc IGetters
     function isValidator(address _address) external view returns (bool) {
         return s.validators[_address];
     }
@@ -227,9 +224,9 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getSyncLayer() external view returns (address) {
+    function getSettlementLayer() external view returns (address) {
         // TODO: consider making private so that no one relies on it
-        return s.syncLayer;
+        return s.settlementLayer;
     }
 
     function getDAValidatorPair() external view returns (address, address) {

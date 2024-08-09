@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.24;
 
 /// @notice A struct that describes a forced deployment on an address
 struct ForceDeployment {
@@ -15,6 +15,8 @@ struct ForceDeployment {
     bytes input;
 }
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IL2GenesisUpgrade {
     function genesisUpgrade(uint256 _chainId, bytes calldata _forceDeploymentsData) external payable;
 }

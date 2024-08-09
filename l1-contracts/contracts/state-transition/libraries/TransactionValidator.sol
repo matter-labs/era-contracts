@@ -9,7 +9,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import {TX_SLOT_OVERHEAD_L2_GAS, MEMORY_OVERHEAD_GAS, L1_TX_INTRINSIC_L2_GAS, L1_TX_DELTA_544_ENCODING_BYTES, L1_TX_DELTA_FACTORY_DEPS_L2_GAS, L1_TX_MIN_L2_GAS_BASE, L1_TX_INTRINSIC_PUBDATA, L1_TX_DELTA_FACTORY_DEPS_PUBDATA} from "../../common/Config.sol";
 
-/// @title zkSync Library for validating L1 -> L2 transactions
+/// @title ZKsync Library for validating L1 -> L2 transactions
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 library TransactionValidator {
@@ -124,7 +124,7 @@ library TransactionValidator {
     /// @notice Based on the total L2 gas limit and several other parameters of the transaction
     /// returns the part of the L2 gas that will be spent on the batch's overhead.
     /// @dev The details of how this function works can be checked in the documentation
-    /// of the fee model of zkSync. The appropriate comments are also present
+    /// of the fee model of ZKsync. The appropriate comments are also present
     /// in the Rust implementation description of function `get_maximal_allowed_overhead`.
     /// @param _encodingLength The length of the binary encoding of the transaction in bytes
     function getOverheadForTransaction(

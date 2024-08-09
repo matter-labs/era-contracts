@@ -28,6 +28,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -158,7 +159,9 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
             reservedDynamic: "0x"
         });
         vm.chainId(12345);
-        bridgehub.forwardTransactionOnSyncLayer(mintChainId, tx, new bytes[](0), bytes32(0), 0);
+        vm.startBroadcast(AddressAliasHelper.applyL1ToL2Alias(address(0)));
+        bridgehub.forwardTransactionOnGateway(mintChainId, tx, new bytes[](0), bytes32(0), 0);
+        vm.stopBroadcast();
     }
 
     function finishMoveChain() public {

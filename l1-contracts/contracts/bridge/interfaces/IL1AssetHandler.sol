@@ -11,15 +11,15 @@ interface IL1AssetHandler {
     event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
 
     /// @dev Emitted when a token is minted
-    event BridgeMint(uint256 indexed _chainId, bytes32 indexed _assetId, address _l1Receiver, uint256 _amount);
+    event BridgeMint(uint256 indexed chainId, bytes32 indexed assetId, address l1Receiver, uint256 amount);
 
     /// @dev Emitted when a token is burned
     event BridgeBurn(
-        uint256 indexed _chainId,
-        bytes32 indexed _assetId,
+        uint256 indexed chainId,
+        bytes32 indexed assetId,
         address indexed l1Sender,
-        address _l2receiver,
-        uint256 _amount
+        address l2receiver,
+        uint256 amount
     );
 
     /// @param _chainId the chainId that the message is from
@@ -32,13 +32,13 @@ interface IL1AssetHandler {
     ) external payable returns (address l1Receiver);
 
     /// @param _chainId the chainId that the message will be sent to
-    /// param mintValue the amount of base tokens to be minted on L2, will be used by Weth AssetHandler
+    /// @param _l2Value the msg.value of the L2 transaction
     /// @param _assetId the assetId of the asset being bridged
     /// @param _prevMsgSender the original caller of the Bridgehub,
     /// @param _data the actual data specified for the function
     function bridgeBurn(
         uint256 _chainId,
-        uint256 _mintValue,
+        uint256 _l2Value,
         bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
@@ -46,6 +46,12 @@ interface IL1AssetHandler {
 
     /// @param _chainId the chainId that the message will be sent to
     /// @param _assetId the assetId of the asset being bridged
+    /// @param _depositSender the address of the entity that initiated the deposit.
     /// @param _data the actual data specified for the function
-    function bridgeRecoverFailedTransfer(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable;
+    function bridgeRecoverFailedTransfer(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _depositSender,
+        bytes calldata _data
+    ) external payable;
 }

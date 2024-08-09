@@ -7,7 +7,7 @@ import {MalformedBytecode, BytecodeError, Overflow} from "../SystemContractError
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @dev Common utilities used in zkSync system contracts
+ * @dev Common utilities used in ZKsync system contracts
  */
 library Utils {
     /// @dev Bit mask of bytecode hash "isConstructor" marker

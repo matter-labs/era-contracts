@@ -489,7 +489,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         uint256 beforeBalance = currentToken.balanceOf(sharedBridgeProxyAddress);
 
         if (beforeChainBalance < amountToWithdraw) {
-            vm.expectRevert("ShB not enough funds 2");
+            vm.expectRevert("L1AR: not enough funds 2");
         } else {
             tokenSumWithdrawal[currentTokenAddress] += amountToWithdraw;
         }
@@ -551,7 +551,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         uint256 beforeBalance = sharedBridgeProxyAddress.balance;
 
         if (beforeChainBalance < amountToWithdraw) {
-            vm.expectRevert("ShB not enough funds 2");
+            vm.expectRevert("L1AR: not enough funds 2");
         } else {
             tokenSumWithdrawal[currentTokenAddress] += amountToWithdraw;
         }

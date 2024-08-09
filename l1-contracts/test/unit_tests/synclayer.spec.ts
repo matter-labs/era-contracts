@@ -3,32 +3,25 @@ import * as ethers from "ethers";
 import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
-import type { Bridgehub, StateTransitionManager } from "../../typechain";
-import { AdminFacetFactory, BridgehubFactory, StateTransitionManagerFactory } from "../../typechain";
+import type { Bridgehub } from "../../typechain";
+import { BridgehubFactory } from "../../typechain";
 
 import {
   initialTestnetDeploymentProcess,
   defaultDeployerForTests,
   registerHyperchainWithBridgeRegistration,
 } from "../../src.ts/deploy-test-process";
-import {
-  ethTestConfig,
-  DIAMOND_CUT_DATA_ABI_STRING,
-  HYPERCHAIN_COMMITMENT_ABI_STRING,
-  ADDRESS_ONE,
-  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-  priorityTxMaxGasLimit,
-} from "../../src.ts/utils";
+import { ethTestConfig, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, priorityTxMaxGasLimit } from "../../src.ts/utils";
 import { SYSTEM_CONFIG } from "../../scripts/utils";
 
 import type { Deployer } from "../../src.ts/deploy";
 
 describe("Synclayer", function () {
   let bridgehub: Bridgehub;
-  let stateTransition: StateTransitionManager;
+  // let stateTransition: StateTransitionManager;
   let owner: ethers.Signer;
   let migratingDeployer: Deployer;
-  let syncLayerDeployer: Deployer;
+  let gatewayDeployer: Deployer;
   // const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
   // const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
   // let forwarder: Forwarder;
@@ -61,20 +54,16 @@ describe("Synclayer", function () {
     chainId = migratingDeployer.chainId;
 
     bridgehub = BridgehubFactory.connect(migratingDeployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
-    stateTransition = StateTransitionManagerFactory.connect(
-      migratingDeployer.addresses.StateTransition.StateTransitionProxy,
-      deployWallet
-    );
 
-    syncLayerDeployer = await defaultDeployerForTests(deployWallet, ownerAddress);
-    syncLayerDeployer.chainId = 10;
+    gatewayDeployer = await defaultDeployerForTests(deployWallet, ownerAddress);
+    gatewayDeployer.chainId = 10;
     await registerHyperchainWithBridgeRegistration(
-      syncLayerDeployer,
+      gatewayDeployer,
       false,
       [],
       gasPrice,
       undefined,
-      syncLayerDeployer.chainId.toString()
+      gatewayDeployer.chainId.toString()
     );
 
     // For tests, the chainId is 9
@@ -82,13 +71,13 @@ describe("Synclayer", function () {
   });
 
   it("Check register synclayer", async () => {
-    await syncLayerDeployer.registerSyncLayer();
+    await gatewayDeployer.registerSettlementLayer();
   });
 
   it("Check start move chain to synclayer", async () => {
     const gasPrice = await owner.provider.getGasPrice();
-    await migratingDeployer.moveChainToSyncLayer(syncLayerDeployer.chainId.toString(), gasPrice, false);
-    expect(await bridgehub.settlementLayer(migratingDeployer.chainId)).to.equal(syncLayerDeployer.chainId);
+    await migratingDeployer.moveChainToGateway(gatewayDeployer.chainId.toString(), gasPrice, false);
+    expect(await bridgehub.settlementLayer(migratingDeployer.chainId)).to.equal(gatewayDeployer.chainId);
   });
 
   it("Check l2 registration", async () => {
@@ -99,20 +88,16 @@ describe("Synclayer", function () {
     ).mul(10);
     // const baseTokenAddress = await bridgehub.baseToken(chainId);
     // const ethIsBaseToken = baseTokenAddress == ADDRESS_ONE;
-
     const stmDeploymentTracker = migratingDeployer.stmDeploymentTracker(migratingDeployer.deployWallet);
-    await (
-      await stmDeploymentTracker.registerSTMAssetOnL2SharedBridge(
-        chainId,
-        syncLayerDeployer.addresses.StateTransition.StateTransitionProxy,
-        value,
-        priorityTxMaxGasLimit,
-        SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-        syncLayerDeployer.deployWallet.address,
-        { value: value }
-      )
-    ).wait();
-    // console.log("STM asset registered in L2SharedBridge on SL");
+    const calldata = stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL2SharedBridge", [
+      chainId,
+      gatewayDeployer.addresses.StateTransition.StateTransitionProxy,
+      value,
+      priorityTxMaxGasLimit,
+      SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+      gatewayDeployer.deployWallet.address,
+    ]);
+    await migratingDeployer.executeUpgrade(stmDeploymentTracker.address, value, calldata);
     await migratingDeployer.executeUpgrade(
       bridgehub.address,
       value,
@@ -131,48 +116,6 @@ describe("Synclayer", function () {
       ])
     );
     // console.log("STM asset registered in L2 Bridgehub on SL");
-  });
-
-  it("Check finish move chain", async () => {
-    const syncLayerChainId = syncLayerDeployer.chainId;
-    const assetInfo = await bridgehub.stmAssetId(migratingDeployer.addresses.StateTransition.StateTransitionProxy);
-    const diamondCutData = await migratingDeployer.initialZkSyncHyperchainDiamondCut();
-    const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
-
-    const adminFacet = AdminFacetFactory.connect(
-      migratingDeployer.addresses.StateTransition.DiamondProxy,
-      migratingDeployer.deployWallet
-    );
-
-    // const chainCommitment = {
-    //   totalBatchesExecuted: 0,
-    //   totalBatchesVerified: 0,
-    //   totalBatchesCommitted:0,
-    //   priorityQueueHead: 0,
-    //   priorityQueueTxs: [
-    //     {
-    //       canonicalTxHash: '0xea79e9b7c3c46a76174b3aea3760570a7e18b593d2b5a087fce52cee95d2d57e',
-    //       expirationTimestamp: "1716557077",
-    //       layer2Tip: 0
-    //   }],
-    //   l2SystemContractsUpgradeTxHash: ethers.constants.HashZero,
-    //   l2SystemContractsUpgradeBatchNumber:0 ,
-    //   batchHashes: ['0xcd4e278573a3b2076a81f91b97e2dd0c85882d9f735ad81dc34b509033671e7b']}
-    const chainData = ethers.utils.defaultAbiCoder.encode(
-      [HYPERCHAIN_COMMITMENT_ABI_STRING],
-      [await adminFacet._prepareChainCommitment()]
-    );
-    // const chainData = await adminFacet.readChainCommitment();
-    const stmData = ethers.utils.defaultAbiCoder.encode(
-      ["address", "address", "uint256", "bytes"],
-      [ADDRESS_ONE, migratingDeployer.deployWallet.address, await stateTransition.protocolVersion(), initialDiamondCut]
-    );
-    const bridgehubMintData = ethers.utils.defaultAbiCoder.encode(
-      ["uint256", "bytes", "bytes"],
-      [mintChainId, stmData, chainData]
-    );
-    await bridgehub.bridgeMint(syncLayerChainId, assetInfo, bridgehubMintData);
-    expect(await stateTransition.getHyperchain(mintChainId)).to.not.equal(ethers.constants.AddressZero);
   });
 
   it("Check start message to L3 on L1", async () => {
@@ -218,6 +161,6 @@ describe("Synclayer", function () {
       paymasterInput: "0x",
       reservedDynamic: "0x",
     };
-    bridgehub.forwardTransactionOnSyncLayer(mintChainId, tx, [], ethers.constants.HashZero, 0);
+    bridgehub.forwardTransactionOnGateway(mintChainId, tx, [], ethers.constants.HashZero, 0);
   });
 });
