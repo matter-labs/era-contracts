@@ -226,20 +226,21 @@ library Utils {
         selectors[12] = GettersFacet.storedBatchHash.selector;
         selectors[13] = GettersFacet.getL2BootloaderBytecodeHash.selector;
         selectors[14] = GettersFacet.getL2DefaultAccountBytecodeHash.selector;
-        selectors[15] = GettersFacet.getVerifierParams.selector;
-        selectors[16] = GettersFacet.isDiamondStorageFrozen.selector;
-        selectors[17] = GettersFacet.getPriorityTxMaxGasLimit.selector;
-        selectors[18] = GettersFacet.isEthWithdrawalFinalized.selector;
-        selectors[19] = GettersFacet.facets.selector;
-        selectors[20] = GettersFacet.facetFunctionSelectors.selector;
-        selectors[21] = GettersFacet.facetAddresses.selector;
-        selectors[22] = GettersFacet.facetAddress.selector;
-        selectors[23] = GettersFacet.isFunctionFreezable.selector;
-        selectors[24] = GettersFacet.isFacetFreezable.selector;
-        selectors[25] = GettersFacet.getTotalBatchesCommitted.selector;
-        selectors[26] = GettersFacet.getTotalBatchesVerified.selector;
-        selectors[27] = GettersFacet.getTotalBatchesExecuted.selector;
-        selectors[28] = GettersFacet.getL2SystemContractsUpgradeTxHash.selector;
+        selectors[15] = GettersFacet.getL2EvmSimulatorBytecodeHash.selector;
+        selectors[16] = GettersFacet.getVerifierParams.selector;
+        selectors[17] = GettersFacet.isDiamondStorageFrozen.selector;
+        selectors[18] = GettersFacet.getPriorityTxMaxGasLimit.selector;
+        selectors[19] = GettersFacet.isEthWithdrawalFinalized.selector;
+        selectors[20] = GettersFacet.facets.selector;
+        selectors[21] = GettersFacet.facetFunctionSelectors.selector;
+        selectors[22] = GettersFacet.facetAddresses.selector;
+        selectors[23] = GettersFacet.facetAddress.selector;
+        selectors[24] = GettersFacet.isFunctionFreezable.selector;
+        selectors[25] = GettersFacet.isFacetFreezable.selector;
+        selectors[26] = GettersFacet.getTotalBatchesCommitted.selector;
+        selectors[27] = GettersFacet.getTotalBatchesVerified.selector;
+        selectors[28] = GettersFacet.getTotalBatchesExecuted.selector;
+        selectors[29] = GettersFacet.getL2SystemContractsUpgradeTxHash.selector;
         return selectors;
     }
 
@@ -276,29 +277,31 @@ library Utils {
         selectors[15] = UtilsFacet.util_getL2BootloaderBytecodeHash.selector;
         selectors[16] = UtilsFacet.util_setL2DefaultAccountBytecodeHash.selector;
         selectors[17] = UtilsFacet.util_getL2DefaultAccountBytecodeHash.selector;
-        selectors[18] = UtilsFacet.util_setPendingAdmin.selector;
-        selectors[19] = UtilsFacet.util_getPendingAdmin.selector;
-        selectors[20] = UtilsFacet.util_setAdmin.selector;
-        selectors[21] = UtilsFacet.util_getAdmin.selector;
-        selectors[22] = UtilsFacet.util_setValidator.selector;
-        selectors[23] = UtilsFacet.util_getValidator.selector;
-        selectors[24] = UtilsFacet.util_setZkPorterAvailability.selector;
-        selectors[25] = UtilsFacet.util_getZkPorterAvailability.selector;
-        selectors[26] = UtilsFacet.util_setStateTransitionManager.selector;
-        selectors[27] = UtilsFacet.util_getStateTransitionManager.selector;
-        selectors[28] = UtilsFacet.util_setPriorityTxMaxGasLimit.selector;
-        selectors[29] = UtilsFacet.util_getPriorityTxMaxGasLimit.selector;
-        selectors[30] = UtilsFacet.util_setFeeParams.selector;
-        selectors[31] = UtilsFacet.util_getFeeParams.selector;
-        selectors[32] = UtilsFacet.util_setProtocolVersion.selector;
-        selectors[33] = UtilsFacet.util_getProtocolVersion.selector;
-        selectors[34] = UtilsFacet.util_setIsFrozen.selector;
-        selectors[35] = UtilsFacet.util_getIsFrozen.selector;
-        selectors[36] = UtilsFacet.util_setTransactionFilterer.selector;
-        selectors[37] = UtilsFacet.util_setBaseTokenGasPriceMultiplierDenominator.selector;
-        selectors[38] = UtilsFacet.util_setTotalBatchesExecuted.selector;
-        selectors[39] = UtilsFacet.util_setL2LogsRootHash.selector;
-        selectors[40] = UtilsFacet.util_setBaseTokenGasPriceMultiplierNominator.selector;
+        selectors[18] = UtilsFacet.util_getL2EvmSimulatorBytecodeHash.selector;
+        selectors[19] = UtilsFacet.util_setL2EvmSimulatorBytecodeHash.selector;
+        selectors[20] = UtilsFacet.util_setPendingAdmin.selector;
+        selectors[21] = UtilsFacet.util_getPendingAdmin.selector;
+        selectors[22] = UtilsFacet.util_setAdmin.selector;
+        selectors[23] = UtilsFacet.util_getAdmin.selector;
+        selectors[24] = UtilsFacet.util_setValidator.selector;
+        selectors[25] = UtilsFacet.util_getValidator.selector;
+        selectors[26] = UtilsFacet.util_setZkPorterAvailability.selector;
+        selectors[27] = UtilsFacet.util_getZkPorterAvailability.selector;
+        selectors[28] = UtilsFacet.util_setStateTransitionManager.selector;
+        selectors[29] = UtilsFacet.util_getStateTransitionManager.selector;
+        selectors[30] = UtilsFacet.util_setPriorityTxMaxGasLimit.selector;
+        selectors[31] = UtilsFacet.util_getPriorityTxMaxGasLimit.selector;
+        selectors[32] = UtilsFacet.util_setFeeParams.selector;
+        selectors[33] = UtilsFacet.util_getFeeParams.selector;
+        selectors[34] = UtilsFacet.util_setProtocolVersion.selector;
+        selectors[35] = UtilsFacet.util_getProtocolVersion.selector;
+        selectors[36] = UtilsFacet.util_setIsFrozen.selector;
+        selectors[37] = UtilsFacet.util_getIsFrozen.selector;
+        selectors[38] = UtilsFacet.util_setTransactionFilterer.selector;
+        selectors[39] = UtilsFacet.util_setBaseTokenGasPriceMultiplierDenominator.selector;
+        selectors[40] = UtilsFacet.util_setTotalBatchesExecuted.selector;
+        selectors[41] = UtilsFacet.util_setL2LogsRootHash.selector;
+        selectors[42] = UtilsFacet.util_setBaseTokenGasPriceMultiplierNominator.selector;
         return selectors;
     }
 
@@ -339,6 +342,7 @@ library Utils {
                 verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+                l2EvmSimulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 priorityTxMaxGasLimit: 500000,
                 feeParams: makeFeeParams(),
                 blobVersionedHashRetriever: address(0x23746765237749923040872834)
@@ -354,6 +358,7 @@ library Utils {
                 verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+                l2EvmSimulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 priorityTxMaxGasLimit: 80000000,
                 feeParams: makeFeeParams(),
                 blobVersionedHashRetriever: address(0x23746765237749923040872834)

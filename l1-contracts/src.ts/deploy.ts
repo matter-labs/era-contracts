@@ -40,6 +40,7 @@ import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
 import { ChainAdminFactory, ERC20Factory, StateTransitionManagerFactory } from "../typechain";
 import type { Contract, Overrides } from "@ethersproject/contracts";
+import { L2_EVM_SIMULATOR_BYTECODE_HASH } from "./deploy-process";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -105,6 +106,7 @@ export class Deployer {
       verifierParams,
       L2_BOOTLOADER_BYTECODE_HASH,
       L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+      L2_EVM_SIMULATOR_BYTECODE_HASH,
       this.addresses.StateTransition.Verifier,
       this.addresses.BlobVersionedHashRetriever,
       +priorityTxMaxGasLimit,

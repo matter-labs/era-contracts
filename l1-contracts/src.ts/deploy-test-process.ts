@@ -15,6 +15,7 @@ import { Deployer } from "./deploy";
 import {
   L2_BOOTLOADER_BYTECODE_HASH,
   L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+  L2_EVM_SIMULATOR_BYTECODE_HASH,
   initialBridgehubDeployment,
   registerHyperchain,
 } from "./deploy-process";
@@ -315,6 +316,7 @@ export class EraDeployer extends Deployer {
         verifierParams,
         l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
         l2DefaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+        l2EvmSimulatorBytecodeHash: L2_EVM_SIMULATOR_BYTECODE_HASH,
         priorityTxMaxGasLimit,
         feeParams,
         blobVersionedHashRetriever: this.addresses.BlobVersionedHashRetriever,

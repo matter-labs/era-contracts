@@ -66,8 +66,9 @@ const expectedGenesisRoot = "0xabdb766b18a479a5c783a4b80e12686bc8ea3cc2d8a305049
 const expectedRecursionNodeLevelVkHash = "0xf520cd5b37e74e19fdb369c8d676a04dce8a19457497ac6686d2bb95d94109c8";
 const expectedRecursionLeafLevelVkHash = "0xf9664f4324c1400fa5c3822d667f30e873f53f1b8033180cd15fe41c1e2355c6";
 const expectedRecursionCircuitsSetVksHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
-const expectedBootloaderHash = "0x010008e742608b21bf7eb23c1a9d0602047e3618b464c9b59c0fba3b3d7ab66e";
-const expectedDefaultAccountHash = "0x01000563374c277a2c1e34659a2a1e87371bb6d852ce142022d497bfb50b9e32";
+const expectedBootloaderHash = "0x010008e7894d0dd14681c76bdb4d5e4e7f6b51bfe40c957d50eed3fec829fdb0";
+const expectedDefaultAccountHash = "0x0100058deb36e1f2eeb48bf3846d0e8eb38e9176754b73116bb41a472459a4dd";
+const expectedEvmSimulatorHash = "0x01000f197081a9906cc411d0698c4961aeb5c74877f37f7071681da6e8ef3f31";
 
 const validatorOne = process.env.ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR!;
 const validatorTwo = process.env.ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR!;
@@ -219,6 +220,7 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
     recursionCircuitsSetVksHash,
     l2BootloaderBytecodeHash,
     l2DefaultAccountBytecodeHash,
+    l2EvmSimulatorBytecodeHash,
     // priorityTxMaxGasLimit,
 
     // // We unpack fee params
@@ -233,6 +235,7 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
   ] = ethers.utils.defaultAbiCoder.decode(
     [
       "address",
+      "bytes32",
       "bytes32",
       "bytes32",
       "bytes32",
@@ -271,6 +274,10 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
   }
 
   if (l2DefaultAccountBytecodeHash.toLowerCase() !== expectedDefaultAccountHash.toLowerCase()) {
+    throw new Error("L2 default account bytecode hash is not correct");
+  }
+
+  if (l2EvmSimulatorBytecodeHash.toLowerCase() !== expectedEvmSimulatorHash.toLowerCase()) {
     throw new Error("L2 default account bytecode hash is not correct");
   }
 

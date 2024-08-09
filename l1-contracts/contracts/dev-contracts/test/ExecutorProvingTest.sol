@@ -33,9 +33,10 @@ contract ExecutorProvingTest is ExecutorFacet {
     }
 
     /// Sets the DefaultAccount Hash and Bootloader Hash.
-    function setHashes(bytes32 l2DefaultAccountBytecodeHash, bytes32 l2BootloaderBytecodeHash) external {
+    function setHashes(bytes32 l2DefaultAccountBytecodeHash, bytes32 l2BootloaderBytecodeHash, bytes32 l2EvmSimulatorBytecode) external {
         s.l2DefaultAccountBytecodeHash = l2DefaultAccountBytecodeHash;
         s.l2BootloaderBytecodeHash = l2BootloaderBytecodeHash;
+        s.l2EvmSimulatorBytecodeHash = l2EvmSimulatorBytecode;
         s.zkPorterIsAvailable = false;
     }
 }

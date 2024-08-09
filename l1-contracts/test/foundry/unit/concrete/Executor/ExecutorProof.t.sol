@@ -75,9 +75,12 @@ contract ExecutorProofTest is Test {
     /// This test is based on a block generated in a local system.
     function test_Hashes() public {
         utilsFacet.util_setL2DefaultAccountBytecodeHash(
-            0x0100065d134a862a777e50059f5e0fbe68b583f3617a67820f7edda0d7f253a0
+            0x0100058deb36e1f2eeb48bf3846d0e8eb38e9176754b73116bb41a472459a4dd
         );
-        utilsFacet.util_setL2BootloaderBytecodeHash(0x010009416e909e0819593a9806bbc841d25c5cdfed3f4a1523497c6814e5194a);
+        utilsFacet.util_setL2EvmSimulatorBytecodeHash(
+            0x01000f197081a9906cc411d0698c4961aeb5c74877f37f7071681da6e8ef3f31
+        );
+        utilsFacet.util_setL2BootloaderBytecodeHash(0x010008e7894d0dd14681c76bdb4d5e4e7f6b51bfe40c957d50eed3fec829fdb0);
         utilsFacet.util_setZkPorterAvailability(false);
 
         IExecutor.CommitBatchInfo memory nextBatch = IExecutor.CommitBatchInfo({

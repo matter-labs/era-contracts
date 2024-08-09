@@ -16,6 +16,8 @@ import { ADDRESS_ONE } from "../src.ts/utils";
 
 export const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000";
 export const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
+// This is the actual hash, not a placeholder like the other two.
+export const L2_EVM_SIMULATOR_BYTECODE_HASH = "0x01000f197081a9906cc411d0698c4961aeb5c74877f37f7071681da6e8ef3f31";
 
 export async function initialBridgehubDeployment(
   deployer: Deployer,

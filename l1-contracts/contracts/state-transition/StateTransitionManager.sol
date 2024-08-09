@@ -343,6 +343,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             factoryDeps: bytesEmptyArray,
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
+            evmSimulatorHash: bytes32(0),
             verifier: address(0),
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: bytes32(0),
