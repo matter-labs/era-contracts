@@ -89,6 +89,8 @@ describe("ERC20Bridge", function () {
 
     erc20NativeTokenVault = L2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, l1BridgeWallet);
     await erc20NativeTokenVault.configureL2TokenBeacon();
+    // const governorNTV = L2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, governorWallet);
+    // await governorNTV.setL2TokenBeacon(false, ethers.constants.AddressZero);
   });
 
   it("Should finalize deposit ERC20 deposit", async function () {

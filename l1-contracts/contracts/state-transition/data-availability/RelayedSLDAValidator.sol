@@ -12,7 +12,7 @@ import {CalldataDA} from "./CalldataDA.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 
 /// @notice The DA validator intended to be used in Era-environment.
-/// @dev For compaitbility reasons it accepts calldata in the same format as the `RollupL1DAValidator`, but unlike the latter it
+/// @dev For compatibility reasons it accepts calldata in the same format as the `RollupL1DAValidator`, but unlike the latter it
 /// does not support blobs.
 /// @dev Note that it does not provide any compression whatsoever.
 contract RelayedSLDAValidator is IL1DAValidator, CalldataDA {

@@ -115,7 +115,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
-        require(msg.sender == address(BRIDGE_HUB), "ShB not BH");
+        require(msg.sender == address(BRIDGE_HUB), "L1AR: not BH");
         _;
     }
 
@@ -123,14 +123,14 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
             msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY),
-            "L1AssetRouter: msg.sender not equal to bridgehub or era chain"
+            "L1AR: msg.sender not equal to bridgehub or era chain"
         );
         _;
     }
 
     /// @notice Checks that the message sender is the legacy bridge.
     modifier onlyLegacyBridge() {
-        require(msg.sender == address(legacyBridge), "ShB not legacy bridge");
+        require(msg.sender == address(legacyBridge), "L1AR: not legacy bridge");
         _;
     }
 
@@ -164,7 +164,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         uint256 _eraLegacyBridgeLastDepositBatch,
         uint256 _eraLegacyBridgeLastDepositTxNumber
     ) external reentrancyGuardInitializer initializer {
-        require(_owner != address(0), "ShB owner 0");
+        require(_owner != address(0), "L1AR: owner 0");
         _transferOwnership(_owner);
         if (eraPostDiamondUpgradeFirstBatch == 0) {
             eraPostDiamondUpgradeFirstBatch = _eraPostDiamondUpgradeFirstBatch;
@@ -179,7 +179,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @param _token The address of the token to be transferred to NTV.
     function transferTokenToNTV(address _token) external {
         address ntvAddress = address(nativeTokenVault);
-        require(msg.sender == ntvAddress, "ShB: not NTV");
+        require(msg.sender == ntvAddress, "L1AR: not NTV");
         if (ETH_TOKEN_ADDRESS == _token) {
             uint256 amount = address(this).balance;
             bool callSuccess;
@@ -187,7 +187,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
             assembly {
                 callSuccess := call(gas(), ntvAddress, amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "ShB: eth transfer failed");
+            require(callSuccess, "L1AR: eth transfer failed");
         } else {
             IERC20(_token).safeTransfer(ntvAddress, IERC20(_token).balanceOf(address(this)));
         }
@@ -198,7 +198,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @param _chainId The ID of the ZK chain.
     /// @param _token The address of the token which was previously deposit to shared bridge.
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external {
-        require(msg.sender == address(nativeTokenVault), "ShB: not NTV");
+        require(msg.sender == address(nativeTokenVault), "L1AR: not NTV");
         chainBalance[_chainId][_token] = 0;
     }
 
@@ -206,8 +206,8 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
     function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
-        require(address(legacyBridge) == address(0), "ShB: legacy bridge already set");
-        require(_legacyBridge != address(0), "ShB: legacy bridge 0");
+        require(address(legacyBridge) == address(0), "L1AR: legacy bridge already set");
+        require(_legacyBridge != address(0), "L1AR: legacy bridge 0");
         legacyBridge = IL1ERC20Bridge(_legacyBridge);
     }
 
@@ -215,8 +215,8 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @dev Should be called only once by the owner.
     /// @param _nativeTokenVault The address of the native token vault.
     function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external onlyOwner {
-        require(address(nativeTokenVault) == address(0), "ShB: native token vault already set");
-        require(address(_nativeTokenVault) != address(0), "ShB: native token vault 0");
+        require(address(nativeTokenVault) == address(0), "L1AR: native token vault already set");
+        require(address(_nativeTokenVault) != address(0), "L1AR: native token vault 0");
         nativeTokenVault = _nativeTokenVault;
     }
 
@@ -271,8 +271,8 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes32 _assetId,
         address _assetHandlerAddressOnCounterPart
     ) external payable returns (bytes32 txHash) {
-        require(msg.sender == assetDeploymentTracker[_assetId] || msg.sender == owner(), "ShB: only ADT or owner");
-
+        require(msg.sender == assetDeploymentTracker[_assetId] || msg.sender == owner(), "L1AR: only ADT or owner");
+        
         bytes memory l2Calldata = abi.encodeCall(
             IL2Bridge.setAssetHandlerAddress,
             (_assetId, _assetHandlerAddressOnCounterPart)
@@ -320,7 +320,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
         emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _assetId, _amount);
     }
-
+    
     /// @notice Initiates a deposit transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
     /// @param _chainId The chain ID of the ZK chain to which deposit.
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
@@ -357,7 +357,8 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
             (assetId, transferData) = _handleLegacyData(_data, _prevMsgSender);
             legacyDeposit = true;
         }
-        require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, "ShB: baseToken deposit not supported");
+        
+        require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, "L1AR: baseToken deposit not supported");
 
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
@@ -395,7 +396,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes32 _txDataHash,
         bytes32 _txHash
     ) external override onlyBridgehub whenNotPaused {
-        require(depositHappened[_chainId][_txHash] == 0x00, "ShB tx hap");
+        require(depositHappened[_chainId][_txHash] == 0x00, "L1AR: tx hap");
         depositHappened[_chainId][_txHash] = _txDataHash;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
@@ -475,7 +476,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
             require(proofValid, "yn");
         }
 
-        require(!_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch), "ShB: legacy cFD");
+        require(!_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch), "L1AR: legacy cFD");
         {
             bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
             // Determine if the given dataHash matches the calculated legacy transaction hash.
@@ -558,12 +559,16 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) internal nonReentrant whenNotPaused returns (address l1Receiver, bytes32 assetId, uint256 amount) {
-        require(!isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");
+        require(
+            !isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex],
+            "L1AR: Withdrawal is already finalized"
+        );
         isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
         // Handling special case for withdrawal from ZKsync Era initiated before Shared Bridge.
-        require(!_isEraLegacyEthWithdrawal(_chainId, _l2BatchNumber), "ShB: legacy eth withdrawal");
-        require(!_isEraLegacyTokenWithdrawal(_chainId, _l2BatchNumber), "ShB: legacy token withdrawal");
+        require(!_isEraLegacyEthWithdrawal(_chainId, _l2BatchNumber), "L1AR: legacy eth withdrawal");
+        require(!_isEraLegacyTokenWithdrawal(_chainId, _l2BatchNumber), "L1AR: legacy token withdrawal");
+
         bytes memory transferData;
         {
             MessageParams memory messageParams = MessageParams({
@@ -780,7 +785,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
             _message: l2ToL1Message,
             _proof: _merkleProof
         });
-        require(success, "ShB withd w proof"); // withdrawal wrong proof
+        require(success, "L1AR: withd w proof"); // withdrawal wrong proof
     }
 
     /// @notice Parses the withdrawal message and returns withdrawal details.
@@ -825,7 +830,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
             // Check that the message length is correct.
             // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
             // 76 (bytes).
-            require(_l2ToL1message.length == 76, "ShB wrong msg len 2");
+            require(_l2ToL1message.length == 76, "L1AR: wrong msg len 2");
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             // slither-disable-next-line unused-return
@@ -839,7 +844,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
             (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
             transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         } else {
-            revert("ShB Incorrect message function selector");
+            revert("L1AR: Incorrect message function selector");
         }
     }
 
@@ -923,7 +928,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 txHash) {
-        require(_l1Token != L1_WETH_TOKEN, "ShB: WETH deposit not supported 2");
+        require(_l1Token != L1_WETH_TOKEN, "L1AR: WETH deposit not supported 2");
 
         bytes32 _assetId;
         bytes memory bridgeMintCalldata;

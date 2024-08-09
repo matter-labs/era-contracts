@@ -14,7 +14,7 @@ uint256 constant BLOBS_SUPPORTED = 6;
 
 contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
     /// @dev The published blob commitments. Note, that the correctness of blob commitment with relation to the linear hash
-    /// is *not* checked in this contract, but is expected to be checked at the veriifcation stage of the ZK contract.
+    /// is *not* checked in this contract, but is expected to be checked at the verification stage of the ZK contract.
     mapping(bytes32 blobCommitment => bool isPublished) public publishedBlobCommitments;
 
     /// @notice Publishes certain blobs, marking commitments to them as published.
@@ -123,7 +123,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
 
         uint256 versionedHashIndex = 0;
 
-        // we iterate over the `_operatorDAInput`, while advacning the pointer by `BLOB_DA_INPUT_SIZE` each time
+        // we iterate over the `_operatorDAInput`, while advancing the pointer by `BLOB_DA_INPUT_SIZE` each time
         for (uint256 i = 0; i < _blobsProvided; ++i) {
             bytes calldata commitmentData = _operatorDAInput[:PUBDATA_COMMITMENT_SIZE];
             bytes32 prepublishedCommitment = bytes32(

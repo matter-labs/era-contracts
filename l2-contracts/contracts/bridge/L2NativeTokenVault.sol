@@ -29,7 +29,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     UpgradeableBeacon public l2TokenBeacon;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
-    bytes32 internal l2TokenProxyBytecodeHash;
+    bytes32 internal immutable l2TokenProxyBytecodeHash;
 
     mapping(bytes32 assetId => address tokenAddress) public override tokenAddress;
 
@@ -53,6 +53,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         bool _contractsDeployedAlready
     ) {
         L1_CHAIN_ID = _l1ChainId;
+
         _disableInitializers();
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
             revert EmptyBytes32();
@@ -61,10 +62,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
             revert EmptyAddress();
         }
 
-        if (!_contractsDeployedAlready) {
-            l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
-        }
-
+        l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
         _transferOwnership(_aliasedOwner);
     }
 
@@ -84,9 +82,16 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         if (address(l2TokenBeacon) != address(0)) {
             revert AddressMismatch(address(l2TokenBeacon), address(0));
         }
-        address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
-        l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
-        l2TokenBeacon.transferOwnership(owner());
+        if (_contractsDeployedAlready) {
+            if (_l2TokenBeacon == address(0)) {
+                revert EmptyAddress();
+            }
+            l2TokenBeacon = UpgradeableBeacon(_l2TokenBeacon);
+        } else {
+            address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
+            l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
+            l2TokenBeacon.transferOwnership(owner());
+        }
     }
 
     /// @notice Used when the chain receives a transfer from L1 Shared Bridge and correspondingly mints the asset.

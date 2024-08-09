@@ -125,6 +125,13 @@ IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher
     address(SYSTEM_CONTRACTS_OFFSET + 0x11)
 );
 
+address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
+
+IL2AssetRouter constant L2_ASSET_ROUTER = IL2AssetRouter(address(USER_CONTRACTS_OFFSET + 0x03));
+
+/// @dev The contract responsible for handling tokens native to a single chain.
+IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(address(USER_CONTRACTS_OFFSET + 0x04));
+
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev

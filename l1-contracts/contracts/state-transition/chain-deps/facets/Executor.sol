@@ -39,9 +39,9 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
     ) internal returns (StoredBatchInfo memory) {
-        require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batchs
+        require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batch
 
-        // Check that batch contain all meta information for L2 logs.
+        // Check that batch contains all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
@@ -169,13 +169,13 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             }
         }
 
-        // FIXME: temporarily old logs were kept for backwards compaitibility. This check can not work now.
+        // FIXME: temporarily old logs were kept for backwards compatibility. This check cannot work now.
         //
-        // We only require 13 logs to be checked, the 14th is if we are expecting a protocol upgrade
-        // Without the protocol upgrade we expect 13 logs: 2^13 - 1 = 8191
-        // With the protocol upgrade we expect 14 logs: 2^14 - 1 = 16383
+        // We only require 8 logs to be checked, the 9th is if we are expecting a protocol upgrade
+        // Without the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
+        // With the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
-            // require(processedLogs == 127, "b7");
+            // require(processedLogs == 255, "b7");
         } else {
             // FIXME: do restore this code to the one that was before
             require(_checkBit(processedLogs, uint8(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)), "b8");
@@ -336,11 +336,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         bytes32 priorityOperationsHash = _collectOperationsFromPriorityQueue(_storedBatch.numberOfLayer1Txs);
         _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash);
 
-        uint256 firstUnprocessed = s.priorityQueue.getFirstUnprocessedPriorityTx();
-        uint256 treeStartIndex = s.priorityTree.startIndex;
-        if (firstUnprocessed > treeStartIndex) {
-            s.priorityTree.unprocessedIndex = firstUnprocessed - treeStartIndex;
-        }
         uint256 currentBatchNumber = _storedBatch.batchNumber;
 
         // Save root hash of L2 -> L1 logs tree
@@ -378,6 +373,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         messageRootContract.addChainBatchRoot(s.chainId, currentBatchNumber, _storedBatch.l2LogsTreeRoot);
     }
 
+    /// @inheritdoc IExecutor
     function executeBatchesSharedBridge(
         uint256,
         StoredBatchInfo[] calldata _batchesData,
@@ -386,6 +382,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         _executeBatches(_batchesData, _priorityOpsData);
     }
 
+    /// @inheritdoc IExecutor
     function executeBatches(
         StoredBatchInfo[] calldata _batchesData,
         PriorityOpsBatchInfo[] calldata _priorityOpsData

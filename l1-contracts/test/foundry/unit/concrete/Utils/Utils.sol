@@ -218,7 +218,7 @@ library Utils {
         selectors[6] = GettersFacet.getTotalPriorityTxs.selector;
         selectors[7] = GettersFacet.getFirstUnprocessedPriorityTx.selector;
         selectors[8] = GettersFacet.getPriorityQueueSize.selector;
-        selectors[9] = GettersFacet.priorityQueueFrontOperation.selector;
+        selectors[9] = GettersFacet.getL2SystemContractsUpgradeTxHash.selector;
         selectors[10] = GettersFacet.isValidator.selector;
         selectors[11] = GettersFacet.l2LogsRootHash.selector;
         selectors[12] = GettersFacet.storedBatchHash.selector;
@@ -237,8 +237,7 @@ library Utils {
         selectors[25] = GettersFacet.getTotalBatchesCommitted.selector;
         selectors[26] = GettersFacet.getTotalBatchesVerified.selector;
         selectors[27] = GettersFacet.getTotalBatchesExecuted.selector;
-        selectors[28] = GettersFacet.getL2SystemContractsUpgradeTxHash.selector;
-        selectors[29] = GettersFacet.getProtocolVersion.selector;
+        selectors[28] = GettersFacet.getProtocolVersion.selector;
         return selectors;
     }
 
