@@ -16,5 +16,11 @@ contract setNewVersionUpgradeTest is StateTransitionManagerTest {
 
         assertEq(chainContractAddress.upgradeCutHash(0), newCutHash, "Diamond cut upgrade was not successful");
         assertEq(chainContractAddress.protocolVersion(), 1, "New protocol version is not correct");
+
+        (uint32 major, uint32 minor, uint32 patch) = chainContractAddress.getSemverProtocolVersion();
+
+        assertEq(major, 0);
+        assertEq(minor, 0);
+        assertEq(patch, 1);
     }
 }
