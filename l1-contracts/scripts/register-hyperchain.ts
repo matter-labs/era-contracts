@@ -107,15 +107,13 @@ async function main() {
         await deployer.registerToken(baseTokenAddress, useGovernance);
       }
 
-      const tokenMultiplierSetterAddress =
-        cmd.tokenMultiplierSetterAddress ||
-        Wallet.fromMnemonic(process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic, "m/44'/60'/0'/0/2")
-          .address;
-
-      console.log(`Using token multiplier setter address: ${tokenMultiplierSetterAddress}`);
+      const tokenMultiplierSetterAddress = cmd.tokenMultiplierSetterAddress || "";
 
       await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice, useGovernance);
-      await deployer.setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress);
+      if (tokenMultiplierSetterAddress != "") {
+        console.log(`Using token multiplier setter address: ${tokenMultiplierSetterAddress}`);
+        await deployer.setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress);
+      }
       await deployer.transferAdminFromDeployerToChainAdmin();
     });
 
