@@ -112,12 +112,12 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         require(chainRegistered[_chainId], "MR: not registered");
         bytes32 chainRoot;
         // slither-disable-next-line unused-return
-        (, chainRoot) = chainTree[_chainId].push(Messaging.batchLeafHash(_chainBatchRoot, _batchNumber));
+        (, chainRoot) = chainTree[_chainId].push(MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber));
 
         // slither-disable-next-line unused-return
-        sharedTree.updateLeaf(chainIndex[_chainId], Messaging.chainIdLeafHash(chainRoot, _chainId));
+        sharedTree.updateLeaf(chainIndex[_chainId], MessageHashing.chainIdLeafHash(chainRoot, _chainId));
 
-        emit Preimage(chainRoot, Messaging.chainIdLeafHash(chainRoot, _chainId));
+        emit Preimage(chainRoot, MessageHashing.chainIdLeafHash(chainRoot, _chainId));
 
         emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
     }
@@ -137,7 +137,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         uint256 cachedChainCount = chainCount;
         bytes32[] memory newLeaves = new bytes32[](cachedChainCount);
         for (uint256 i = 0; i < cachedChainCount; ++i) {
-            newLeaves[i] = Messaging.chainIdLeafHash(chainTree[chainIndexToId[i]].root(), chainIndexToId[i]);
+            newLeaves[i] = MessageHashing.chainIdLeafHash(chainTree[chainIndexToId[i]].root(), chainIndexToId[i]);
         }
         // slither-disable-next-line unused-return
         sharedTree.updateAllLeaves(newLeaves);

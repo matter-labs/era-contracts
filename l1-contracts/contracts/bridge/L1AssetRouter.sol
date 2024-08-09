@@ -272,7 +272,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         address _assetHandlerAddressOnCounterPart
     ) external payable returns (bytes32 txHash) {
         require(msg.sender == assetDeploymentTracker[_assetId] || msg.sender == owner(), "L1AR: only ADT or owner");
-        
+
         bytes memory l2Calldata = abi.encodeCall(
             IL2Bridge.setAssetHandlerAddress,
             (_assetId, _assetHandlerAddressOnCounterPart)
@@ -320,7 +320,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
         emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _assetId, _amount);
     }
-    
+
     /// @notice Initiates a deposit transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
     /// @param _chainId The chain ID of the ZK chain to which deposit.
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
@@ -357,7 +357,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
             (assetId, transferData) = _handleLegacyData(_data, _prevMsgSender);
             legacyDeposit = true;
         }
-        
+
         require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, "L1AR: baseToken deposit not supported");
 
         bytes memory bridgeMintCalldata = _burn({
@@ -485,7 +485,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
             // Otherwise, perform the check using the new transaction data hash encoding.
             if (!isLegacyTxDataHash) {
                 bytes32 txDataHash = _encodeTxDataHash(false, _depositSender, _assetId, _assetData);
-                require(dataHash == txDataHash, "ShB: d.it not hap");
+                require(dataHash == txDataHash, "L1AR: d.it not hap");
             }
         }
         delete depositHappened[_chainId][_l2TxHash];
@@ -674,7 +674,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
     /// @return Whether withdrawal was initiated on ZKsync Era before diamond proxy upgrade.
     function _isEraLegacyEthWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
-        require((_chainId != ERA_CHAIN_ID) || eraPostDiamondUpgradeFirstBatch != 0, "ShB: diamondUFB not set for Era");
+        require((_chainId != ERA_CHAIN_ID) || eraPostDiamondUpgradeFirstBatch != 0, "L1AR: diamondUFB not set for Era");
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostDiamondUpgradeFirstBatch);
     }
 
@@ -685,7 +685,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     function _isEraLegacyTokenWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
         require(
             (_chainId != ERA_CHAIN_ID) || eraPostLegacyBridgeUpgradeFirstBatch != 0,
-            "ShB: LegacyUFB not set for Era"
+            "L1AR: LegacyUFB not set for Era"
         );
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostLegacyBridgeUpgradeFirstBatch);
     }
@@ -743,7 +743,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     ) internal view returns (bool) {
         require(
             (_chainId != ERA_CHAIN_ID) || (eraLegacyBridgeLastDepositBatch != 0),
-            "ShB: last deposit time not set for Era"
+            "L1AR: last deposit time not set for Era"
         );
         return
             (_chainId == ERA_CHAIN_ID) &&
@@ -813,7 +813,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
             address l1Receiver;
 
             // The data is expected to be at least 56 bytes long.
-            require(_l2ToL1message.length >= 56, "ShB wrong msg len"); // wrong message length
+            require(_l2ToL1message.length >= 56, "L1AR: wrong msg len"); // wrong message length
             // this message is a base token withdrawal
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             // slither-disable-next-line unused-return
@@ -840,7 +840,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
             transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
             // The data is expected to be at least 36 bytes long to contain assetId.
-            require(_l2ToL1message.length >= 36, "ShB wrong msg len"); // wrong message length
+            require(_l2ToL1message.length >= 36, "L1AR: wrong msg len"); // wrong message length
             (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
             transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         } else {

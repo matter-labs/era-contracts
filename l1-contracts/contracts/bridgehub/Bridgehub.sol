@@ -15,7 +15,6 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, VIRTUAL_SENDER_ALIASED_ZERO_ADDRESS} from "../common/Config.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
@@ -78,7 +77,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     mapping(uint256 chainId => bool isWhitelistedSettlementLayer) public whitelistedSettlementLayers;
 
     modifier onlyOwnerOrAdmin() {
-        require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
+        require(msg.sender == admin || msg.sender == owner(), "BH: not owner or admin");
         _;
     }
 
@@ -100,17 +99,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
-    }
-
-    modifier onlyOwnerOrAdmin() {
-        require(msg.sender == admin || msg.sender == owner(), "BH: not owner or admin");
-        _;
-    }
-
-    /// @param _chainId the chainId of the chain
-    modifier onlyChainSTM(uint256 _chainId) {
-        require(msg.sender == stateTransitionManager[_chainId], "BH: not chain STM");
-        _;
     }
 
     modifier onlyAliasedZero() {
@@ -226,28 +214,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData)); /// todo make other asse
         stmAssetIdToAddress[assetInfo] = _assetAddress;
         emit AssetRegistered(assetInfo, _assetAddress, _additionalData, msg.sender);
-    }
-    
-    /*//////////////////////////////////////////////////////////////
-                              Getters
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice return the state transition chain contract for a chainId
-    /// @param _chainId the chainId of the chain
-    function getHyperchain(uint256 _chainId) public view returns (address) {
-        return IStateTransitionManager(stateTransitionManager[_chainId]).getHyperchain(_chainId);
-    }
-
-    /// @notice return the stm asset id of a chain.
-    /// @param _chainId the chainId of the chain
-    function stmAssetIdFromChainId(uint256 _chainId) public view override returns (bytes32) {
-        return stmAssetId(stateTransitionManager[_chainId]);
-    }
-
-    /// @notice return the stm asset id of an stm.
-    /// @param _stmAddress the stm address
-    function stmAssetId(address _stmAddress) public view override returns (bytes32) {
-        return keccak256(abi.encode(L1_CHAIN_ID, address(stmDeployer), bytes32(uint256(uint160(_stmAddress)))));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -463,21 +429,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _canonicalTxHash,
             _expirationTimestamp
         );
-    }
-    
-    /// @notice forwards function call to Mailbox based on ChainId
-    /// @param _chainId the chainId of the chain
-    /// @param _gasPrice the gas price for the l2 priority operation
-    /// @param _l2GasLimit the gas limit for the l2 priority operation
-    /// @param _l2GasPerPubdataByteLimit the gas per pubdata byte limit for the l2 priority operation
-    function l2TransactionBaseCost(
-        uint256 _chainId,
-        uint256 _gasPrice,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit
-    ) external view returns (uint256) {
-        address hyperchain = getHyperchain(_chainId);
-        return IZkSyncHyperchain(hyperchain).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
     }
 
     /// @notice forwards function call to Mailbox based on ChainId

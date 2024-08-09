@@ -30,5 +30,5 @@ interface IL2NativeTokenVault is IL2AssetHandler {
 
     function setL2TokenBeacon(address _l2TokenBeacon, bytes32 _l2TokenProxyBytecodeHash) external;
 
-    function configureL2TokenBeacon() external;
+    function configureL2TokenBeacon(bool _contractsDeployedAlready, address _l2TokenBeacon) external;
 }

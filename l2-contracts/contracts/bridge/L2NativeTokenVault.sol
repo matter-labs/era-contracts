@@ -24,14 +24,15 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @dev Chain ID of L1 for bridging reasons.
     uint256 public immutable L1_CHAIN_ID;
 
+    bytes32 internal l2TokenProxyBytecodeHash;
+
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
     UpgradeableBeacon public l2TokenBeacon;
 
-    /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
-    bytes32 internal immutable l2TokenProxyBytecodeHash;
-
     mapping(bytes32 assetId => address tokenAddress) public override tokenAddress;
+
+    /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
 
     modifier onlyBridge() {
         if (msg.sender != address(L2_ASSET_ROUTER)) {
@@ -45,13 +46,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @param _l1ChainId The L1 chain id differs between mainnet and testnets.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
-    /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed
-    constructor(
-        uint256 _l1ChainId,
-        bytes32 _l2TokenProxyBytecodeHash,
-        address _aliasedOwner,
-        bool _contractsDeployedAlready
-    ) {
+    constructor(uint256 _l1ChainId, bytes32 _l2TokenProxyBytecodeHash, address _aliasedOwner) {
         L1_CHAIN_ID = _l1ChainId;
 
         _disableInitializers();
@@ -77,8 +72,9 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     }
 
     /// @notice Configure L2 token beacon used by wrapped ERC20 tokens deployed by NTV.
-    /// @dev we don't call this in the constructor, as we need to provide factory deps
-    function configureL2TokenBeacon() external {
+    /// @dev we don't call this in the constructor, as we need to provide factory deps.
+    /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed.
+    function configureL2TokenBeacon(bool _contractsDeployedAlready, address _l2TokenBeacon) external {
         if (address(l2TokenBeacon) != address(0)) {
             revert AddressMismatch(address(l2TokenBeacon), address(0));
         }

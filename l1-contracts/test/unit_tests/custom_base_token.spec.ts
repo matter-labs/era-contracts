@@ -51,9 +51,7 @@ describe("Custom base token chain and bridge tests", () => {
 
     await owner.sendTransaction(tx);
     // note we can use initialDeployment so we don't go into deployment details here
-    console.log("Here");
     deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [], "BAT");
-    console.log("not here");
     chainId = deployer.chainId;
     bridgehub = IBridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
 
