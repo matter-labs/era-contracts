@@ -18,26 +18,48 @@ contract ConsensusRegistry is Ownable2Step {
     address[] public nodeOwners;
     // A map of node owners => nodes.
     mapping(address => Node) public nodes;
-    // The current validator committee list.
-    CommitteeValidator[] public validatorCommittee;
-    // The current attester committee list.
-    CommitteeAttester[] public attesterCommittee;
+
+    uint256 validatorsCommit;
+    uint256 attestersCommit;
+    PendingNodeRemoval[] pendingRemovals;
+
+    struct Node {
+        AttesterAttr attesterLatest;
+        AttesterAttr attesterSnapshot;
+        uint256 attesterLastUpdateCommit;
+        ValidatorAttr validatorLatest;
+        ValidatorAttr validatorSnapshot;
+        uint256 validatorLastUpdateCommit;
+    }
 
     /// @dev Represents a consensus node.
-    struct Node {
+    struct AttesterAttr {
         // A flag stating if the node is active.
-        // Inactive nodes are not considered when selecting committees.
+        // Inactive attesters are not considered when selecting committees.
+        bool active;
+        // Attester's Voting weight.
+        uint32 weight;
+        // Attester's Secp256k1 public key.
+        Secp256k1PublicKey pubKey;
+    }
+
+    /// @dev Represents a consensus node.
+    struct ValidatorAttr {
+        // A flag stating if the node is active.
+        // Inactive validators are not considered when selecting committees.
         bool active;
         // Validator's voting weight.
-        uint32 validatorWeight;
+        uint32 weight;
         // Validator's BLS12-381 public key.
-        BLS12_381PublicKey validatorPubKey;
+        BLS12_381PublicKey pubKey;
         // Validator's Proof-of-possession (a signature over the public key).
-        BLS12_381Signature validatorPoP;
-        // Attester's Voting weight.
-        uint32 attesterWeight;
-        // Attester's Secp256k1 public key.
-        Secp256k1PublicKey attesterPubKey;
+        BLS12_381Signature pop;
+    }
+
+    struct PendingNodeRemoval {
+        address nodeOwner;
+        bool pendingAttestersCommit;
+        bool pendingValidatorsCommit;
     }
 
     /// @dev Represents BLS12_381 public key.
@@ -94,8 +116,8 @@ contract ConsensusRegistry is Ownable2Step {
     event NodeValidatorPubKeyChanged(address indexed nodeOwner, BLS12_381PublicKey newPubKey);
     event NodeValidatorPoPChanged(address indexed nodeOwner, BLS12_381Signature newPoP);
     event NodeAttesterPubKeyChanged(address indexed nodeOwner, Secp256k1PublicKey newPubKey);
-    event ValidatorCommitteeSet();
-    event AttesterCommitteeSet();
+    event ValidatorsCommitted();
+    event AttestersCommitted();
 
     modifier onlyOwnerOrNodeOwner(address _nodeOwner) {
         if (owner() != msg.sender && _nodeOwner != msg.sender) {
@@ -139,22 +161,40 @@ contract ConsensusRegistry is Ownable2Step {
             if (nodeOwners[i] == _nodeOwner) {
                 revert NodeOwnerAlreadyExists();
             }
-            if (compareBLS12_381PublicKey(nodes[nodeOwners[i]].validatorPubKey, _validatorPubKey)) {
+            if (compareBLS12_381PublicKey(nodes[nodeOwners[i]].validatorLatest.pubKey, _validatorPubKey)) {
                 revert ValidatorPubKeyAlreadyExists();
             }
-            if (compareSecp256k1PublicKey(nodes[nodeOwners[i]].attesterPubKey, _attesterPubKey)) {
+            if (compareSecp256k1PublicKey(nodes[nodeOwners[i]].attesterLatest.pubKey, _attesterPubKey)) {
                 revert AttesterPubKeyAlreadyExists();
             }
         }
 
         nodeOwners.push(_nodeOwner);
         nodes[_nodeOwner] = Node({
+            attesterLatest: AttesterAttr({
             active: true,
-            validatorWeight: _validatorWeight,
-            validatorPubKey: _validatorPubKey,
-            validatorPoP: _validatorPoP,
-            attesterWeight: _attesterWeight,
-            attesterPubKey: _attesterPubKey
+            weight: _attesterWeight,
+            pubKey: _attesterPubKey
+        }),
+            attesterSnapshot: AttesterAttr({
+            active: false,
+            weight: 0,
+            pubKey: Secp256k1PublicKey({a: bytes1(0), b: bytes16(0)})
+        }),
+            attesterLastUpdateCommit: attestersCommit,
+            validatorLatest: ValidatorAttr({
+            active: true,
+            weight: _validatorWeight,
+            pubKey: _validatorPubKey,
+            pop: _validatorPoP
+        }),
+            validatorSnapshot: ValidatorAttr({
+            active: false,
+            weight: 0,
+            pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
+            pop: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
+        }),
+            validatorLastUpdateCommit: validatorsCommit
         });
 
         emit NodeAdded(
@@ -174,7 +214,11 @@ contract ConsensusRegistry is Ownable2Step {
     function deactivate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         verifyNodeOwnerExists(_nodeOwner);
 
-        nodes[_nodeOwner].active = false;
+        Node storage node = nodes[_nodeOwner];
+        ensureAttesterSnapshot(node);
+        node.attesterLatest.active = false;
+        ensureValidatorSnapshot(node);
+        node.validatorLatest.active = false;
 
         emit NodeDeactivated(_nodeOwner);
     }
@@ -186,7 +230,11 @@ contract ConsensusRegistry is Ownable2Step {
     function activate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         verifyNodeOwnerExists(_nodeOwner);
 
-        nodes[_nodeOwner].active = true;
+        Node storage node = nodes[_nodeOwner];
+        ensureAttesterSnapshot(node);
+        node.attesterLatest.active = true;
+        ensureValidatorSnapshot(node);
+        node.validatorLatest.active = true;
 
         emit NodeActivated(_nodeOwner);
     }
@@ -198,11 +246,7 @@ contract ConsensusRegistry is Ownable2Step {
     function remove(address _nodeOwner) external onlyOwner {
         verifyNodeOwnerExists(_nodeOwner);
 
-        // Remove from array by swapping the last element (gas-efficient, not preserving order).
-        nodeOwners[nodeOwnerIdx(_nodeOwner)] = nodeOwners[nodeOwners.length - 1];
-        nodeOwners.pop();
-        // Remove from mapping.
-        delete nodes[_nodeOwner];
+        scheduleNodeRemoval(_nodeOwner);
 
         emit NodeRemoved(_nodeOwner);
     }
@@ -215,7 +259,9 @@ contract ConsensusRegistry is Ownable2Step {
     function changeValidatorWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
         verifyNodeOwnerExists(_nodeOwner);
 
-        nodes[_nodeOwner].validatorWeight = _weight;
+        Node storage node = nodes[_nodeOwner];
+        ensureValidatorSnapshot(node);
+        node.validatorLatest.weight = _weight;
 
         emit NodeValidatorWeightChanged(_nodeOwner, _weight);
     }
@@ -228,7 +274,9 @@ contract ConsensusRegistry is Ownable2Step {
     function changeAttesterWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
         verifyNodeOwnerExists(_nodeOwner);
 
-        nodes[_nodeOwner].attesterWeight = _weight;
+        Node storage node = nodes[_nodeOwner];
+        ensureAttesterSnapshot(node);
+        node.attesterLatest.weight = _weight;
 
         emit NodeAttesterWeightChanged(_nodeOwner, _weight);
     }
@@ -248,8 +296,10 @@ contract ConsensusRegistry is Ownable2Step {
         verifyInputBLS12_381Signature(_pop);
         verifyNodeOwnerExists(_nodeOwner);
 
-        nodes[_nodeOwner].validatorPubKey = _pubKey;
-        nodes[_nodeOwner].validatorPoP = _pop;
+        Node storage node = nodes[_nodeOwner];
+        ensureValidatorSnapshot(node);
+        node.validatorLatest.pubKey = _pubKey;
+        node.validatorLatest.pop = _pop;
 
         emit NodeValidatorPubKeyChanged(_nodeOwner, _pubKey);
         emit NodeValidatorPoPChanged(_nodeOwner, _pop);
@@ -267,45 +317,75 @@ contract ConsensusRegistry is Ownable2Step {
         verifyInputSecp256k1PublicKey(_pubKey);
         verifyNodeOwnerExists(_nodeOwner);
 
-        nodes[_nodeOwner].attesterPubKey = _pubKey;
+        Node storage node = nodes[_nodeOwner];
+        ensureAttesterSnapshot(node);
+        node.attesterLatest.pubKey = _pubKey;
 
         emit NodeAttesterPubKeyChanged(_nodeOwner, _pubKey);
     }
 
     /// @notice Rotates the validator committee list based on active nodes in the registry.
     /// @dev Only callable by the contract owner.
-    function setValidatorCommittee() external onlyOwner {
-        // Creates a new committee based on active validators.
-        delete validatorCommittee;
-        uint256 len = nodeOwners.length;
+    function commitValidators() external onlyOwner {
+        validatorsCommit++;
+
+        uint256 len = pendingRemovals.length;
         for (uint256 i = 0; i < len; ++i) {
-            address nodeOwner = nodeOwners[i];
-            Node memory node = nodes[nodeOwner];
-            if (node.active) {
-                validatorCommittee.push(
-                    CommitteeValidator(nodeOwner, node.validatorWeight, node.validatorPubKey, node.validatorPoP)
-                );
+            PendingNodeRemoval storage entry = pendingRemovals[i];
+            entry.pendingValidatorsCommit = false; // Validator is considered as removed.
+            if (!entry.pendingAttestersCommit) {
+                finalizeNodeRemoval(entry.nodeOwner);
             }
         }
 
-        emit ValidatorCommitteeSet();
+        emit ValidatorsCommitted();
     }
 
     /// @notice Rotates the attester committee list based on active nodes in the registry.
     /// @dev Only callable by the contract owner.
-    function setAttesterCommittee() external onlyOwner {
-        // Creates a new committee based on active attesters.
-        delete attesterCommittee;
-        uint256 len = nodeOwners.length;
+    function commitAttesters() external onlyOwner {
+        attestersCommit++;
+
+        uint256 len = pendingRemovals.length;
         for (uint256 i = 0; i < len; ++i) {
-            address nodeOwner = nodeOwners[i];
-            Node memory node = nodes[nodeOwner];
-            if (node.active) {
-                attesterCommittee.push(CommitteeAttester(node.attesterWeight, nodeOwner, node.attesterPubKey));
+            PendingNodeRemoval storage entry = pendingRemovals[i];
+            entry.pendingAttestersCommit = false; // Attester is considered as removed.
+            if (!entry.pendingValidatorsCommit) {
+                finalizeNodeRemoval(entry.nodeOwner);
             }
         }
 
-        emit AttesterCommitteeSet();
+        emit AttestersCommitted();
+    }
+
+    function ensureAttesterSnapshot(Node storage node) internal {
+        if (attestersCommit > node.attesterLastUpdateCommit) {
+            node.attesterSnapshot = node.attesterLatest;
+        }
+    }
+
+    function ensureValidatorSnapshot(Node storage node) internal {
+        if (validatorsCommit > node.validatorLastUpdateCommit) {
+            node.validatorSnapshot = node.validatorLatest;
+        }
+    }
+
+    function scheduleNodeRemoval(address _nodeOwner) internal {
+        pendingRemovals.push(PendingNodeRemoval({
+            nodeOwner: _nodeOwner,
+            pendingAttestersCommit: true,
+            pendingValidatorsCommit: true
+        }));
+    }
+
+    function finalizeNodeRemoval(address _nodeOwner) internal onlyOwner {
+        // Remove from array by swapping the last element (gas-efficient, not preserving order).
+        nodeOwners[nodeOwnerIdx(_nodeOwner)] = nodeOwners[nodeOwners.length - 1];
+        nodeOwners.pop();
+
+        delete nodes[_nodeOwner];
+
+        // TODO: remove entry from pendingRemovals
     }
 
     /// @notice Finds the index of a node owner in the `nodeOwners` array.
@@ -326,7 +406,7 @@ contract ConsensusRegistry is Ownable2Step {
     /// @dev Throws an error if the node owner does not exist.
     /// @param _nodeOwner The address of the node's owner to verify.
     function verifyNodeOwnerExists(address _nodeOwner) private view {
-        BLS12_381PublicKey storage pubKey = nodes[_nodeOwner].validatorPubKey;
+        BLS12_381PublicKey storage pubKey = nodes[_nodeOwner].validatorLatest.pubKey;
         if (
             pubKey.a == bytes32(0) &&
             pubKey.b == bytes32(0) &&
@@ -394,13 +474,5 @@ contract ConsensusRegistry is Ownable2Step {
 
     function numNodes() public view returns (uint256) {
         return nodeOwners.length;
-    }
-
-    function validatorCommitteeSize() public view returns (uint256) {
-        return validatorCommittee.length;
-    }
-
-    function attesterCommitteeSize() public view returns (uint256) {
-        return attesterCommittee.length;
     }
 }
