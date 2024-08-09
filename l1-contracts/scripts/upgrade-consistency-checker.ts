@@ -58,7 +58,7 @@ const maxNumberOfHyperchains = 100;
 const expectedStoredBatchHashZero = "0x1574fa776dec8da2071e5f20d71840bfcbd82c2bca9ad68680edfedde1710bc4";
 const expectedL2BridgeAddress = "0x11f943b2c77b743AB90f4A0Ae7d5A4e7FCA3E102";
 const expectedL1LegacyBridge = "0x57891966931Eb4Bb6FB81430E6cE0A03AAbDe063";
-const expectedGenesisBatchCommitment = "0x2d00e5f8d77afcebf58a6b82ae56ba967566fe7dfbcb6760319fb0d215d18ffd";
+const expectedGenesisBatchCommitment = "0x8933c43b571c2bd43bc73fbaaa2ea8de7e07fcedcbd58935400f1c18620c396f";
 const expectedIndexRepeatedStorageChanges = BigNumber.from(54);
 const expectedProtocolVersion = BigNumber.from(2).pow(32).mul(24);
 

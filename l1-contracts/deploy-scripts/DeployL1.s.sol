@@ -7,6 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { GenesisUtils } from "./GenesisUtils.sol";
 // import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {Utils} from "./Utils.sol";
@@ -270,8 +271,6 @@ contract DeployL1Script is Script {
         config.contracts.bootloaderHash = toml.readBytes32("$.contracts.bootloader_hash");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
-
-        config.contracts.forceDeploymentsData = toml.readBytes("$.contracts.force_deployments_data");
     }
 
     function instantiateCreate2Factory() internal {
@@ -558,6 +557,17 @@ contract DeployL1Script is Script {
         });
 
         config.contracts.diamondCutData = abi.encode(diamondCut);
+
+        config.contracts.forceDeploymentsData = GenesisUtils.getGenesisTransactionData(
+            config.eraChainId, 
+            addresses.bridges.sharedBridgeProxy, 
+            block.chainid, 
+            addresses.governance, 
+            addresses.bridges.erc20BridgeProxy, 
+            GenesisUtils.getL2TokenProxyBytecodeHash()
+        );
+
+        console.logBytes(config.contracts.forceDeploymentsData);
 
         ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: addresses.stateTransition.genesisUpgrade,

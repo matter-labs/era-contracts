@@ -7,6 +7,8 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
+import { GenesisUtils } from "./GenesisUtils.sol";
+
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
@@ -40,7 +42,7 @@ contract RegisterHyperchainScript is Script {
         address stateTransitionProxy;
         address validatorTimelock;
         bytes diamondCutData;
-        bytes forceDeployments;
+        bytes forceDeploymentsData;
         address governanceSecurityCouncilAddress;
         uint256 governanceMinDelay;
         address newDiamondProxy;
@@ -88,7 +90,7 @@ contract RegisterHyperchainScript is Script {
         // config.bridgehubGovernance = toml.readAddress("$.deployed_addresses.governance_addr");
         config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
-        config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
+        config.forceDeploymentsData = toml.readBytes("$.contracts_config.force_deployments_data");
         path = string.concat(root, vm.envString("HYPERCHAIN_CONFIG"));
         toml = vm.readFile(path);
 
@@ -192,8 +194,8 @@ contract RegisterHyperchainScript is Script {
                 config.baseToken,
                 config.bridgehubCreateNewChainSalt,
                 msg.sender,
-                abi.encode(config.diamondCutData, config.forceDeployments),
-                new bytes[](0)
+                abi.encode(config.diamondCutData, config.forceDeploymentsData),
+                GenesisUtils.getGenesisTransactionFactoryDeps()
             )
         );
         Utils.executeUpgrade({
