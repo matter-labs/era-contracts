@@ -27,12 +27,15 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 );
 
 contract MessageRoot is IMessageRoot, ReentrancyGuard {
+    using FullMerkle for FullMerkle.FullTree;
+    using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
+
     event AddedChain(uint256 indexed chainId, uint256 indexed chainIndex);
 
     event AppendedChainBatchRoot(uint256 indexed chainId, uint256 indexed batchNumber, bytes32 batchRoot);
 
-    using FullMerkle for FullMerkle.FullTree;
-    using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
+    event Preimage(bytes32 one, bytes32 two);
+
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
@@ -77,11 +80,6 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         _initialize();
     }
 
-    function _initialize() internal {
-        // slither-disable-next-line unused-return
-        sharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
-    }
-
     function addNewChain(uint256 _chainId) external onlyBridgehub {
         require(!chainRegistered[_chainId], "MR: chain exists");
         _addNewChain(_chainId);
@@ -93,12 +91,46 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         }
     }
 
+    /// @dev add a new chainBatchRoot to the chainTree
+    function addChainBatchRoot(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        bytes32 _chainBatchRoot
+    ) external onlyChain(_chainId) {
+        require(chainRegistered[_chainId], "MR: not registered");
+        bytes32 chainRoot;
+        // slither-disable-next-line unused-return
+        (, chainRoot) = chainTree[_chainId].push(Messaging.batchLeafHash(_chainBatchRoot, _batchNumber));
+
+        // slither-disable-next-line unused-return
+        sharedTree.updateLeaf(chainIndex[_chainId], Messaging.chainIdLeafHash(chainRoot, _chainId));
+
+        emit Preimage(chainRoot, Messaging.chainIdLeafHash(chainRoot, _chainId));
+
+        emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
+    }
+
     function getAggregatedRoot() external view returns (bytes32) {
         return sharedTree.root();
     }
 
     function getChainRoot(uint256 _chainId) external view returns (bytes32) {
         return chainTree[_chainId].root();
+    }
+
+    function updateFullTree() public {
+        uint256 cachedChainCount = chainCount;
+        bytes32[] memory newLeaves = new bytes32[](cachedChainCount);
+        for (uint256 i = 0; i < cachedChainCount; ++i) {
+            newLeaves[i] = Messaging.chainIdLeafHash(chainTree[chainIndexToId[i]].root(), chainIndexToId[i]);
+        }
+        // slither-disable-next-line unused-return
+        sharedTree.updateAllLeaves(newLeaves);
+    }
+
+    function _initialize() internal {
+        // slither-disable-next-line unused-return
+        sharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
     }
 
     function _addNewChain(uint256 _chainId) internal {
@@ -122,36 +154,5 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         sharedTree.pushNewLeaf(Messaging.chainIdLeafHash(initialHash, _chainId));
 
         emit AddedChain(_chainId, cachedChainCount);
-    }
-
-    event Preimage(bytes32 one, bytes32 two);
-
-    /// @dev add a new chainBatchRoot to the chainTree
-    function addChainBatchRoot(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        bytes32 _chainBatchRoot
-    ) external onlyChain(_chainId) {
-        require(chainRegistered[_chainId], "MR: not registered");
-        bytes32 chainRoot;
-        // slither-disable-next-line unused-return
-        (, chainRoot) = chainTree[_chainId].push(Messaging.batchLeafHash(_chainBatchRoot, _batchNumber));
-
-        // slither-disable-next-line unused-return
-        sharedTree.updateLeaf(chainIndex[_chainId], Messaging.chainIdLeafHash(chainRoot, _chainId));
-
-        emit Preimage(chainRoot, Messaging.chainIdLeafHash(chainRoot, _chainId));
-
-        emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
-    }
-
-    function updateFullTree() public {
-        uint256 cachedChainCount = chainCount;
-        bytes32[] memory newLeaves = new bytes32[](cachedChainCount);
-        for (uint256 i = 0; i < cachedChainCount; ++i) {
-            newLeaves[i] = Messaging.chainIdLeafHash(chainTree[chainIndexToId[i]].root(), chainIndexToId[i]);
-        }
-        // slither-disable-next-line unused-return
-        sharedTree.updateAllLeaves(newLeaves);
     }
 }

@@ -214,13 +214,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         proxy = BeaconProxy(abi.decode(returndata, (address)));
     }
 
-    /// @notice Converts the L1 token address to the create2 salt of deployed L2 token.
-    /// @param _l1Token The address of token on L1.
-    /// @return salt The salt used to compute address of wrapped token on L2 and for beacon proxy deployment.
-    function _getCreate2Salt(address _l1Token) internal pure returns (bytes32 salt) {
-        salt = bytes32(uint256(uint160(_l1Token)));
-    }
-
     /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
     /// @param _l1Token The address of token on L1.
     /// @return Address of an L2 token counterpart.
@@ -229,5 +222,12 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         bytes32 salt = _getCreate2Salt(_l1Token);
         return
             L2ContractHelper.computeCreate2Address(address(this), salt, l2TokenProxyBytecodeHash, constructorInputHash);
+    }
+
+    /// @notice Converts the L1 token address to the create2 salt of deployed L2 token.
+    /// @param _l1Token The address of token on L1.
+    /// @return salt The salt used to compute address of wrapped token on L2 and for beacon proxy deployment.
+    function _getCreate2Salt(address _l1Token) internal pure returns (bytes32 salt) {
+        salt = bytes32(uint256(uint160(_l1Token)));
     }
 }

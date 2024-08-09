@@ -198,22 +198,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         emit AssetRegistered(assetInfo, _assetAddress, _additionalData, msg.sender);
     }
 
-    ///// Getters
-
-    /// @notice return the state transition chain contract for a chainId
-    function getHyperchain(uint256 _chainId) public view returns (address) {
-        return IStateTransitionManager(stateTransitionManager[_chainId]).getHyperchain(_chainId);
-    }
-
-    function stmAssetIdFromChainId(uint256 _chainId) public view override returns (bytes32) {
-        return stmAssetId(stateTransitionManager[_chainId]);
-    }
-
-    function stmAssetId(address _stmAddress) public view override returns (bytes32) {
-        return keccak256(abi.encode(L1_CHAIN_ID, address(stmDeployer), bytes32(uint256(uint160(_stmAddress)))));
-    }
-
-    /// New chain
+    /*//////////////////////////////////////////////////////////////
+                          Chain Registration
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice register new chain
     /// @notice for Eth the baseToken address is 1
@@ -255,6 +242,23 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         emit NewChain(_chainId, _stateTransitionManager, _admin);
         return _chainId;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                             Getters
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice return the state transition chain contract for a chainId
+    function getHyperchain(uint256 _chainId) public view returns (address) {
+        return IStateTransitionManager(stateTransitionManager[_chainId]).getHyperchain(_chainId);
+    }
+
+    function stmAssetIdFromChainId(uint256 _chainId) public view override returns (bytes32) {
+        return stmAssetId(stateTransitionManager[_chainId]);
+    }
+
+    function stmAssetId(address _stmAddress) public view override returns (bytes32) {
+        return keccak256(abi.encode(L1_CHAIN_ID, address(stmDeployer), bytes32(uint256(uint160(_stmAddress)))));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -381,6 +385,23 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         );
     }
 
+    function forwardTransactionOnSyncLayer(
+        uint256 _chainId,
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external override {
+        require(L1_CHAIN_ID != block.chainid, "BH: not in sync layer mode");
+        address hyperchain = getHyperchain(_chainId);
+        IZkSyncHyperchain(hyperchain).bridgehubRequestL2TransactionOnSyncLayer(
+            _transaction,
+            _factoryDeps,
+            _canonicalTxHash,
+            _expirationTimestamp
+        );
+    }
+
     /// @notice forwards function call to Mailbox based on ChainId
     /// @param _chainId The chain ID of the hyperchain where to prove L2 message inclusion.
     /// @param _batchNumber The executed L2 batch number in which the message appeared
@@ -457,23 +478,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) external view returns (uint256) {
         address hyperchain = getHyperchain(_chainId);
         return IZkSyncHyperchain(hyperchain).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
-    }
-
-    function forwardTransactionOnSyncLayer(
-        uint256 _chainId,
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external override {
-        require(L1_CHAIN_ID != block.chainid, "BH: not in sync layer mode");
-        address hyperchain = getHyperchain(_chainId);
-        IZkSyncHyperchain(hyperchain).bridgehubRequestL2TransactionOnSyncLayer(
-            _transaction,
-            _factoryDeps,
-            _canonicalTxHash,
-            _expirationTimestamp
-        );
     }
 
     /*//////////////////////////////////////////////////////////////
