@@ -162,7 +162,7 @@ struct ZkSyncHyperchainStorage {
     /// @dev the Asset Id of the baseToken
     bytes32 baseTokenAssetId;
     /// @dev address of the synclayer, only set on L1 if settling on it
-    address syncLayer;
+    address settlementLayer;
     /// @dev Priority tree, the new data structure for priority queue
     PriorityTree.Tree priorityTree;
 }

@@ -40,6 +40,8 @@ struct L2TransactionRequestTwoBridgesInner {
     bytes32 txDataHash;
 }
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IBridgehub is IL1AssetHandler {
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
@@ -148,17 +150,13 @@ interface IBridgehub is IL1AssetHandler {
         IMessageRoot _messageRoot
     ) external;
 
-    // function relayTxThroughBH(uint256 _baseDestChainId, uint256 _destChainId, bytes calldata _dataToRelay) external;
-
-    // function registerCounterpart(uint256 chainid, address _counterpart) external;
-
     event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
 
     function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
 
-    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
+    function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external;
 
-    // function finalizeMigrationToSyncLayer(
+    // function finalizeMigrationToGateway(
     //     uint256 _chainId,
     //     address _baseToken,
     //     address _sharedBridge,
@@ -168,7 +166,7 @@ interface IBridgehub is IL1AssetHandler {
     //     bytes calldata _diamondCut
     // ) external;
 
-    function forwardTransactionOnSyncLayer(
+    function forwardTransactionOnGateway(
         uint256 _chainId,
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
@@ -181,8 +179,6 @@ interface IBridgehub is IL1AssetHandler {
     function stmAssetId(address _stmAddress) external view returns (bytes32);
 
     function stmDeployer() external view returns (ISTMDeploymentTracker);
-
-    function setSTMDeployer(ISTMDeploymentTracker _stmDeployer) external;
 
     function stmAssetIdToAddress(bytes32 _assetInfo) external view returns (address);
 

@@ -215,8 +215,8 @@ export class Deployer {
       callConstructor: true,
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(
-        ["bytes32", "address", "bool"],
-        [l2TokenProxyBytecodeHash, this.addresses.Governance, false]
+        ["bytes32", "address"],
+        [l2TokenProxyBytecodeHash, this.addresses.Governance]
       ),
     };
 
@@ -1059,21 +1059,21 @@ export class Deployer {
     }
   }
 
-  public async registerSyncLayer() {
+  public async registerSettlementLayer() {
     const stm = this.stateTransitionManagerContract(this.deployWallet);
-    const calldata = stm.interface.encodeFunctionData("registerSyncLayer", [this.chainId, true]);
+    const calldata = stm.interface.encodeFunctionData("registerSettlementLayer", [this.chainId, true]);
     await this.executeUpgrade(this.addresses.StateTransition.StateTransitionProxy, 0, calldata);
     if (this.verbose) {
-      console.log("SyncLayer registered");
+      console.log("Gateway registered");
     }
   }
 
-  public async moveChainToSyncLayer(syncLayerChainId: string, gasPrice: BigNumberish) {
+  public async moveChainToGateway(gatewayChainId: string, gasPrice: BigNumberish) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     // Just some large gas limit that should always be enough
     const l2GasLimit = ethers.BigNumber.from(72_000_000);
     const expectedCost = (
-      await bridgehub.l2TransactionBaseCost(syncLayerChainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
+      await bridgehub.l2TransactionBaseCost(gatewayChainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
     ).mul(5);
 
     const newAdmin = this.deployWallet.address;
@@ -1101,7 +1101,7 @@ export class Deployer {
         target: bridgehub.address,
         data: bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
           {
-            chainId: syncLayerChainId,
+            chainId: gatewayChainId,
             mintValue: expectedCost,
             l2Value: 0,
             l2GasLimit: l2GasLimit,

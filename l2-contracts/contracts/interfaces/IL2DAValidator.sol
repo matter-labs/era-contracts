@@ -5,14 +5,14 @@ pragma solidity 0.8.20;
 interface IL2DAValidator {
     function validatePubdata(
         // The rolling hash of the user L2->L1 logs.
-        bytes32 chainedLogsHash,
+        bytes32 _chainedLogsHash,
         // The root hash of the user L2->L1 logs.
-        bytes32 logsRootHash,
+        bytes32 _logsRootHash,
         // The chained hash of the L2->L1 messages
-        bytes32 chainedMessagesHash,
+        bytes32 _chainedMessagesHash,
         // The chained hash of uncompressed bytecodes sent to L1
-        bytes32 chainedBytescodesHash,
+        bytes32 _chainedBytecodesHash,
         // Same operator input
-        bytes calldata operatorInput
+        bytes calldata _totalL2ToL1PubdataAndStateDiffs
     ) external returns (bytes32 outputHash);
 }
