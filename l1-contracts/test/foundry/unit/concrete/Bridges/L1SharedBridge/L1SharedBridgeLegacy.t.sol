@@ -187,7 +187,8 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         emit ClaimedFailedDepositSharedBridge(eraChainId, alice, (tokenAssetId), abi.encode(bytes32(0)));
         vm.prank(l1ERC20BridgeAddress);
 
-        sharedBridge.claimFailedDepositLegacyErc20Bridge({
+        sharedBridge.claimFailedDeposit({
+            _chainId: eraChainId,
             _depositSender: alice,
             _l1Asset: address(token),
             _amount: amount,

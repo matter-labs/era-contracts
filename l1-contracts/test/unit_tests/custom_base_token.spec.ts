@@ -8,6 +8,8 @@ import type { IBridgehub } from "../../typechain/IBridgehub";
 import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
 import type { IL1AssetRouter } from "../../typechain/IL1AssetRouter";
 import { IL1AssetRouterFactory } from "../../typechain/IL1AssetRouterFactory";
+import type { IL1NativeTokenVault } from "../../typechain/IL1NativeTokenVault";
+import { IL1NativeTokenVaultFactory } from "../../typechain/IL1NativeTokenVaultFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
@@ -23,6 +25,7 @@ describe("Custom base token chain and bridge tests", () => {
   let deployer: Deployer;
   let l1SharedBridge: IL1AssetRouter;
   let bridgehub: IBridgehub;
+  let nativeTokenVault: IL1NativeTokenVault;
   let baseToken: TestnetERC20Token;
   let baseTokenAddress: string;
   let altTokenAddress: string;
@@ -61,6 +64,11 @@ describe("Custom base token chain and bridge tests", () => {
 
     // prepare the bridge
     l1SharedBridge = IL1AssetRouterFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
+
+    nativeTokenVault = IL1NativeTokenVaultFactory.connect(
+      deployer.addresses.Bridges.NativeTokenVaultProxy,
+      deployWallet
+    );
   });
 
   it("Should have correct base token", async () => {
@@ -106,6 +114,7 @@ describe("Custom base token chain and bridge tests", () => {
   });
 
   it("Should deposit alternative token successfully twoBridges method", async () => {
+    nativeTokenVault.registerToken(altTokenAddress);
     const altTokenAmount = ethers.utils.parseUnits("800", 18);
     const baseTokenAmount = ethers.utils.parseUnits("800", 18);
 
@@ -135,8 +144,9 @@ describe("Custom base token chain and bridge tests", () => {
   });
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
+    const mailboxFunctionSignature = "0x6c0960f9";
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [])
+      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [])
     );
     expect(revertReason).equal("L1AR: wrong msg len");
   });

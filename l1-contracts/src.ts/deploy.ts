@@ -611,9 +611,10 @@ export class Deployer {
     ethTxOptions: ethers.providers.TransactionRequest,
     dummy: boolean = false
   ) {
+    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const contractAddress = await this.deployViaCreate2(
       dummy ? "DummyL1ERC20Bridge" : "L1ERC20Bridge",
-      [this.addresses.Bridges.SharedBridgeProxy, this.addresses.Bridges.NativeTokenVaultProxy],
+      [this.addresses.Bridges.SharedBridgeProxy, this.addresses.Bridges.NativeTokenVaultProxy, eraChainId],
       create2Salt,
       ethTxOptions
     );
@@ -820,19 +821,19 @@ export class Deployer {
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
-    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
+    // const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const tokens = getTokens();
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
 
     const contractAddress = await this.deployViaCreate2(
       "L1NativeTokenVault",
-      [l1WethToken, this.addresses.Bridges.SharedBridgeProxy, eraChainId],
+      [l1WethToken, this.addresses.Bridges.SharedBridgeProxy],
       create2Salt,
       ethTxOptions
     );
 
     if (this.verbose) {
-      console.log(`With era chain id ${eraChainId}`);
+      // console.log(`With era chain id ${eraChainId}`);
       console.log(`CONTRACTS_L1_NATIVE_TOKEN_VAULT_IMPL_ADDR=${contractAddress}`);
     }
 
@@ -925,21 +926,21 @@ export class Deployer {
   public async registerAddresses() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
-    /// registering ETH as a valid token, with address 1.
-    const upgradeData1 = bridgehub.interface.encodeFunctionData("addToken", [ADDRESS_ONE]);
-    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData1);
-    if (this.verbose) {
-      console.log("ETH token registered in Bridgehub");
-    }
-
-    const upgradeData2 = bridgehub.interface.encodeFunctionData("setAddresses", [
+    const upgradeData1 = await bridgehub.interface.encodeFunctionData("setAddresses", [
       this.addresses.Bridges.SharedBridgeProxy,
       this.addresses.Bridgehub.STMDeploymentTrackerProxy,
       this.addresses.Bridgehub.MessageRootProxy,
     ]);
-    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
+    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData1);
     if (this.verbose) {
       console.log("Shared bridge was registered in Bridgehub");
+    }
+
+    /// registering ETH as a valid token, with address 1.
+    const upgradeData2 = bridgehub.interface.encodeFunctionData("addToken", [ADDRESS_ONE]);
+    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
+    if (this.verbose) {
+      console.log("ETH token registered in Bridgehub");
     }
   }
 
@@ -1046,12 +1047,26 @@ export class Deployer {
       }
 
       const stmDeploymentTracker = this.stmDeploymentTracker(this.deployWallet);
+
+      const l1AssetRouter = this.defaultSharedBridge(this.deployWallet);
+      const whitelistData = l1AssetRouter.interface.encodeFunctionData("setAssetDeploymentTracker", [
+        ethers.utils.hexZeroPad(this.addresses.StateTransition.StateTransitionProxy, 32),
+        stmDeploymentTracker.address,
+      ]);
+      const receipt2 = await this.executeUpgrade(l1AssetRouter.address, 0, whitelistData);
+      if (this.verbose) {
+        console.log("STM deployment tracker whitelisted in L1 Shared Bridge", receipt2.gasUsed.toString());
+        console.log(
+          `CONTRACTS_STM_ASSET_INFO=${await bridgehub.stmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
+        );
+      }
+
       const data1 = stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL1", [
         this.addresses.StateTransition.StateTransitionProxy,
       ]);
-      const receipt2 = await this.executeUpgrade(this.addresses.Bridgehub.STMDeploymentTrackerProxy, 0, data1);
+      const receipt3 = await this.executeUpgrade(this.addresses.Bridgehub.STMDeploymentTrackerProxy, 0, data1);
       if (this.verbose) {
-        console.log("STM asset registered in L1 Shared Bridge via STM Deployment Tracker", receipt2.gasUsed.toString());
+        console.log("STM asset registered in L1 Shared Bridge via STM Deployment Tracker", receipt3.gasUsed.toString());
         console.log(
           `CONTRACTS_STM_ASSET_INFO=${await bridgehub.stmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
         );
@@ -1324,7 +1339,6 @@ export class Deployer {
 
   public async registerTokenBridgehub(tokenAddress: string, useGovernance: boolean = false) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
-
     const receipt = await this.executeDirectOrGovernance(useGovernance, bridgehub, "addToken", [tokenAddress], 0);
 
     if (this.verbose) {

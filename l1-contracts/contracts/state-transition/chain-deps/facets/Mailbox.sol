@@ -30,7 +30,7 @@ import {IL1AssetRouter} from "../../../bridge/interfaces/IL1AssetRouter.sol";
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
-/// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
+/// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
@@ -397,7 +397,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
         request.refundRecipient = AddressAliasHelper.actualRefundRecipient(request.refundRecipient, request.sender);
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
-        // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
+        // Please note, currently ZKsync address derivation is different from Ethereum one, but it may be changed in the future.
         // slither-disable-next-line tx-origin
         if (request.sender != tx.origin) {
             request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);

@@ -87,6 +87,11 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         request = _registerSTMAssetOnL2Bridgehub(_chainId, _stmL1Address, _stmL2Address);
     }
 
+    /// @dev we need to implement this for the bridgehub for the TwoBridges logic
+    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {
+        // This function is typically used on bridges for e.g.
+    }
+
     // todo this has to be put in L1AssetRouter via TwoBridges for custom base tokens. Hard, because we have to have multiple msg types in bridgehubDeposit in the AssetRouter.
     /// @notice Used to register the stm asset in L2 AssetRouter.
     /// @param _chainId the chainId of the chain
@@ -114,6 +119,10 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         });
     }
 
+    function getAssetId(address _l1STM) public view override returns (bytes32) {
+        return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1STM)))));
+    }
+
     // Todo this works for now, but it will not work in the future if we want to change STM DTs. Probably ok.
     /// @notice Used to register the stm asset in L2 Bridgehub.
     /// @param _chainId the chainId of the chain
@@ -136,16 +145,5 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
             factoryDeps: new bytes[](0),
             txDataHash: bytes32(0)
         });
-    }
-
-    /// @dev we need to implement this for the bridgehub for the TwoBridges logic
-    function bridgehubConfirmL2Transaction(uint256, bytes32, bytes32) external {
-        // This function is typically used on bridges for e.g. confirm that a tx took place
-    }
-
-    /// @notice Return the assetId of the STM.
-    /// @param _l1STM the address of the STM on L1
-    function getAssetId(address _l1STM) public view override returns (bytes32) {
-        return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1STM)))));
     }
 }
