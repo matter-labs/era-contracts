@@ -1,20 +1,17 @@
-
 import {Vm} from "forge-std/Vm.sol";
 
-import { Utils } from "./Utils.sol";
+import {Utils} from "./Utils.sol";
 
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 
-import { IL2ContractDeployer } from "contracts/common/interfaces/IL2ContractDeployer.sol";
-import { AddressAliasHelper } from "contracts/vendor/AddressAliasHelper.sol";
-
+import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 address constant L2_BRIDGEHUB_ADDRESS = 0x0000000000000000000000000000000000010002;
 address constant L2_ASSET_ROUTER_ADDRESS = 0x0000000000000000000000000000000000010003;
 address constant L2_NATIVE_TOKEN_VAULT_ADDRESS = 0x0000000000000000000000000000000000010004;
 
 library GenesisUtils {
-
     struct Bytecodes {
         bytes l2Bridgehub;
         bytes l2AssetRouter;
@@ -76,11 +73,12 @@ library GenesisUtils {
     }
 
     function getL2TokenProxyBytecodeHash() internal view returns (bytes32) {
-        return L2ContractHelper.hashL2Bytecode(
-            Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
-            )
-        );
+        return
+            L2ContractHelper.hashL2Bytecode(
+                Utils.readHardhatBytecode(
+                    "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
+                )
+            );
     }
 
     function getGenesisTransactionData(
@@ -91,16 +89,17 @@ library GenesisUtils {
         address legacyBridge,
         bytes32 l2TokenProxyBytecodeHash
     ) internal view returns (bytes memory) {
-        return abi.encode(
-            genesisForceDeployments(
-                eraChainId,
-                sharedBridgeProxy,
-                l1ChainId,
-                governance,
-                legacyBridge,
-                l2TokenProxyBytecodeHash
-            )
-        );
+        return
+            abi.encode(
+                genesisForceDeployments(
+                    eraChainId,
+                    sharedBridgeProxy,
+                    l1ChainId,
+                    governance,
+                    legacyBridge,
+                    l2TokenProxyBytecodeHash
+                )
+            );
     }
 
     function getGenesisTransactionFactoryDeps() internal view returns (bytes[] memory) {
@@ -114,5 +113,4 @@ library GenesisUtils {
 
         return result;
     }
-
 }

@@ -172,7 +172,6 @@ contract DeployL2Script is Script {
         }
 
         config.l2DAValidatorAddress = l2Validator;
- 
     }
 
     function deployFactoryDeps() internal {
@@ -214,12 +213,15 @@ contract DeployL2Script is Script {
         );
 
         Utils.executeUpgradeOnL2(
-            abi.encodeCall(IBridgehub.setAddresses, (
-                L2_ASSET_ROUTER_ADDRESS,
-                // there is no such address on L2
-                ISTMDeploymentTracker(ADDRESS_ONE),
-                IMessageRoot(L2_MESSAGE_ROOT_ADDRESS)
-            )),
+            abi.encodeCall(
+                IBridgehub.setAddresses,
+                (
+                    L2_ASSET_ROUTER_ADDRESS,
+                    // there is no such address on L2
+                    ISTMDeploymentTracker(ADDRESS_ONE),
+                    IMessageRoot(L2_MESSAGE_ROOT_ADDRESS)
+                )
+            ),
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
             L2_NATIVE_TOKEN_VAULT_ADDRESS,

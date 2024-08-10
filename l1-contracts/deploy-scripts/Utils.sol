@@ -231,12 +231,9 @@ library Utils {
         Bridgehub bridgehub = Bridgehub(bridgehubAddress);
         uint256 gasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
 
-        requiredValue = bridgehub.l2TransactionBaseCost(
-            chainId,
-            gasPrice,
-            l2GasLimit,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-        ) * 2;
+        requiredValue =
+            bridgehub.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
+            2;
 
         L2TransactionRequestDirect memory l2TransactionRequestDirect = L2TransactionRequestDirect({
             chainId: chainId,
@@ -358,7 +355,6 @@ library Utils {
         bytes32 _salt,
         uint256 _delay
     ) internal {
-
         (bytes memory data, uint256 requiredValue) = prepareL1L2Transaction(
             _l2Calldata,
             _l2GasLimit,

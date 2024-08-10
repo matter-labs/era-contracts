@@ -40,16 +40,20 @@ contract AcceptAdmin is Script {
     function setDAValidatorPair(
         address payable _admin,
         address diamondProxyAddress,
-        address l1DAValidatorAddress, 
+        address l1DAValidatorAddress,
         address l2DAValidatorAddress
     ) public {
         ChainAdmin chainAdmin = ChainAdmin(_admin);
 
         ChainAdmin.Call[] memory calls = new ChainAdmin.Call[](1);
-        calls[0] = IChainAdmin.Call({target: diamondProxyAddress, value: 0, data: abi.encodeCall(AdminFacet.setDAValidatorPair, (l1DAValidatorAddress, l2DAValidatorAddress))});
+        calls[0] = IChainAdmin.Call({
+            target: diamondProxyAddress,
+            value: 0,
+            data: abi.encodeCall(AdminFacet.setDAValidatorPair, (l1DAValidatorAddress, l2DAValidatorAddress))
+        });
 
         vm.startBroadcast();
         chainAdmin.multicall(calls, true);
-        vm.stopBroadcast();  
+        vm.stopBroadcast();
     }
 }
