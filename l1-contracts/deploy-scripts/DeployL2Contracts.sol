@@ -9,11 +9,19 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {ISTMDeploymentTracker} from "contracts/bridgehub/ISTMDeploymentTracker.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {L2_ASSET_ROUTER_ADDRESS} from "./GenesisUtils.sol";
+import {L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS} from "./GenesisUtils.sol";
+
+import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 
 contract DeployL2Script is Script {
     using stdToml for string;
+
+    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+
+    address internal constant L2_MESSAGE_ROOT_ADDRESS = 0x0000000000000000000000000000000000010005;
 
     Config internal config;
     ContractsBytecodes internal contracts;
@@ -164,13 +172,7 @@ contract DeployL2Script is Script {
         }
 
         config.l2DAValidatorAddress = l2Validator;
-
-        ChainAdmin.Call[] memory calls = new ChainAdmin.Call[](1);
-        calls[0] = IChainAdmin.Call({target: config.diamondProxyAddr, value: 0, data: abi.encodeCall(AdminFacet.setDAValidatorPair, (config.l1DAValidatorAddress, config.l2DAValidatorAddress))});
-
-        vm.startBroadcast();
-        ChainAdmin(payable(config.chainAdmin)).multicall(calls, true);
-        vm.stopBroadcast();   
+ 
     }
 
     function deployFactoryDeps() internal {
@@ -197,5 +199,36 @@ contract DeployL2Script is Script {
 
     function deploySharedBridgeProxy() internal {
         config.l2SharedBridgeProxy = L2_ASSET_ROUTER_ADDRESS;
+
+        Utils.executeUpgradeOnL2(
+            abi.encodeCall(IL2NativeTokenVault.setL2TokenBeacon, ()),
+            Utils.MAX_PRIORITY_TX_GAS,
+            new bytes[](0),
+            L2_NATIVE_TOKEN_VAULT_ADDRESS,
+            config.chainId,
+            config.bridgehubAddress,
+            config.l1SharedBridgeProxy,
+            config.governance,
+            bytes32(0),
+            0
+        );
+
+        Utils.executeUpgradeOnL2(
+            abi.encodeCall(IBridgehub.setAddresses, (
+                L2_ASSET_ROUTER_ADDRESS,
+                // there is no such address on L2
+                ISTMDeploymentTracker(ADDRESS_ONE),
+                IMessageRoot(L2_MESSAGE_ROOT_ADDRESS)
+            )),
+            Utils.MAX_PRIORITY_TX_GAS,
+            new bytes[](0),
+            L2_NATIVE_TOKEN_VAULT_ADDRESS,
+            config.chainId,
+            config.bridgehubAddress,
+            config.l1SharedBridgeProxy,
+            config.governance,
+            bytes32(0),
+            0
+        );
     }
 }

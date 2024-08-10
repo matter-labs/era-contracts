@@ -219,10 +219,7 @@ library Utils {
         return contractAddress;
     }
 
-    /**
-     * @dev Run the l2 l1 transaction
-     */
-    function runL1L2Transaction(
+    function prepareL1L2Transaction(
         bytes memory l2Calldata,
         uint256 l2GasLimit,
         bytes[] memory factoryDeps,
@@ -230,11 +227,11 @@ library Utils {
         uint256 chainId,
         address bridgehubAddress,
         address l1SharedBridgeProxy
-    ) internal {
+    ) internal returns (bytes memory data, uint256 requiredValue) {
         Bridgehub bridgehub = Bridgehub(bridgehubAddress);
         uint256 gasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
 
-        uint256 requiredValueToDeploy = bridgehub.l2TransactionBaseCost(
+        requiredValue = bridgehub.l2TransactionBaseCost(
             chainId,
             gasPrice,
             l2GasLimit,
@@ -243,7 +240,7 @@ library Utils {
 
         L2TransactionRequestDirect memory l2TransactionRequestDirect = L2TransactionRequestDirect({
             chainId: chainId,
-            mintValue: requiredValueToDeploy,
+            mintValue: requiredValue,
             l2Contract: dstAddress,
             l2Value: 0,
             l2Calldata: l2Calldata,
@@ -257,12 +254,37 @@ library Utils {
         if (ADDRESS_ONE != baseTokenAddress) {
             IERC20 baseToken = IERC20(baseTokenAddress);
             vm.broadcast();
-            baseToken.approve(l1SharedBridgeProxy, requiredValueToDeploy);
-            requiredValueToDeploy = 0;
+            baseToken.approve(l1SharedBridgeProxy, requiredValue);
+            requiredValue = 0;
         }
 
+        data = abi.encodeCall(bridgehub.requestL2TransactionDirect, (l2TransactionRequestDirect));
+    }
+
+    /**
+     * @dev Run the l2 l1 transaction
+     */
+    function runL1L2Transaction(
+        bytes memory l2Calldata,
+        uint256 l2GasLimit,
+        bytes[] memory factoryDeps,
+        address dstAddress,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy
+    ) internal {
+        (bytes memory data, uint256 requiredValue) = prepareL1L2Transaction(
+            l2Calldata,
+            l2GasLimit,
+            factoryDeps,
+            dstAddress,
+            chainId,
+            bridgehubAddress,
+            l1SharedBridgeProxy
+        );
+
         vm.broadcast();
-        bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
+        bridgehubAddress.call{value: requiredValue}(data);
     }
 
     /**
@@ -320,6 +342,49 @@ library Utils {
         governance.scheduleTransparent(operation, _delay);
         if (_delay == 0) {
             governance.execute{value: _value}(operation);
+        }
+        vm.stopBroadcast();
+    }
+
+    function executeUpgradeOnL2(
+        bytes memory _l2Calldata,
+        uint256 _l2GasLimit,
+        bytes[] memory _factoryDeps,
+        address _dstAddress,
+        uint256 _chainId,
+        address _bridgehubAddress,
+        address _l1SharedBridgeProxy,
+        address _governor,
+        bytes32 _salt,
+        uint256 _delay
+    ) internal {
+
+        (bytes memory data, uint256 requiredValue) = prepareL1L2Transaction(
+            _l2Calldata,
+            _l2GasLimit,
+            _factoryDeps,
+            _dstAddress,
+            _chainId,
+            _bridgehubAddress,
+            _l1SharedBridgeProxy
+        );
+
+        IGovernance governance = IGovernance(_governor);
+        Ownable ownable = Ownable(_governor);
+
+        IGovernance.Call[] memory calls = new IGovernance.Call[](1);
+        calls[0] = IGovernance.Call({target: _bridgehubAddress, value: requiredValue, data: data});
+
+        IGovernance.Operation memory operation = IGovernance.Operation({
+            calls: calls,
+            predecessor: bytes32(0),
+            salt: _salt
+        });
+
+        vm.startBroadcast(ownable.owner());
+        governance.scheduleTransparent(operation, _delay);
+        if (_delay == 0) {
+            governance.execute{value: requiredValue}(operation);
         }
         vm.stopBroadcast();
     }
