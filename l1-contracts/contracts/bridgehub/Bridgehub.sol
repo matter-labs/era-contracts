@@ -38,12 +38,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by this shared Bridge.
     IL1AssetRouter public sharedBridge;
 
-    /// @notice StateTransitionManagers that are registered and can be used by the children chains.
+    /// @notice StateTransitionManagers that are registered, and ZKchains that use these STMs can use this bridgehub as settlement layer.
     mapping(address stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
     /// @notice we store registered tokens (for arbitrary base token)
     mapping(address token => bool) public tokenIsRegistered;
 
-    /// @notice chainID => StateTransitionManager contract address, STM that is managing a given child chain.
+    /// @notice chainID => StateTransitionManager contract address, STM that is managing rules for a given ZKchain.
     mapping(uint256 chainId => address) public stateTransitionManager;
 
     /// @notice chainID => baseToken contract address, token that is used as 'base token' by a given child chain.
