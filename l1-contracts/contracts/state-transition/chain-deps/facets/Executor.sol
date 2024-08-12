@@ -33,7 +33,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
     /// @dev Checks that the chain is connected to the current bridehub and not migrated away.
     modifier chainOnCurrentBridgehub() {
-        require(s.syncLayer == address(0), "Chain was migrated");
+        require(s.settlementLayer == address(0), "Chain was migrated");
         _;
     }
 

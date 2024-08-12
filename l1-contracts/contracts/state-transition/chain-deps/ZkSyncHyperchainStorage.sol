@@ -161,7 +161,8 @@ struct ZkSyncHyperchainStorage {
     address l2DAValidator;
     /// @dev the Asset Id of the baseToken
     bytes32 baseTokenAssetId;
-    /// @dev address of the synclayer, only set on L1 if settling on it
+    /// @dev chain_id of the settlement layer. If zero, then the current chain is the settlement layer.
+    /// TODO: should this be address or u256?
     address settlementLayer;
     /// @dev Priority tree, the new data structure for priority queue
     PriorityTree.Tree priorityTree;
