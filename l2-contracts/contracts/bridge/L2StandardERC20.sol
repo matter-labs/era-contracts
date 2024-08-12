@@ -37,6 +37,22 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     /// @dev Address of the L1 token that can be deposited to mint this L2 token
     address public override l1Address;
 
+    modifier onlyBridge() {
+        if (msg.sender != l2Bridge) {
+            revert Unauthorized();
+        }
+        _;
+    }
+
+    modifier onlyNextVersion(uint8 _version) {
+        // The version should be incremented by 1. Otherwise, the governor risks disabling
+        // future reinitialization of the token by providing too large a version.
+        if (_version != _getInitializedVersion() + 1) {
+            revert NonSequentialVersion();
+        }
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     constructor() {
         // Disable initialization to prevent Parity hack.
@@ -131,22 +147,6 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
         emit BridgeInitialize(l1Address, _newName, _newSymbol, decimals_);
     }
 
-    modifier onlyBridge() {
-        if (msg.sender != l2Bridge) {
-            revert Unauthorized();
-        }
-        _;
-    }
-
-    modifier onlyNextVersion(uint8 _version) {
-        // The version should be incremented by 1. Otherwise, the governor risks disabling
-        // future reinitialization of the token by providing too large a version.
-        if (_version != _getInitializedVersion() + 1) {
-            revert NonSequentialVersion();
-        }
-        _;
-    }
-
     /// @dev Mint tokens to a given account.
     /// @param _to The account that will receive the created tokens.
     /// @param _amount The amount that will be created.
@@ -165,6 +165,16 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
         emit BridgeBurn(_from, _amount);
     }
 
+    /// @dev External function to decode a string from bytes.
+    function decodeString(bytes calldata _input) external pure returns (string memory result) {
+        (result) = abi.decode(_input, (string));
+    }
+
+    /// @dev External function to decode a uint8 from bytes.
+    function decodeUint8(bytes calldata _input) external pure returns (uint8 result) {
+        (result) = abi.decode(_input, (uint8));
+    }
+
     function name() public view override returns (string memory) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
         if (availableGetters.ignoreName) revert Unimplemented();
@@ -181,15 +191,5 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
         // If method is not available, behave like a token that does not implement this method - revert on call.
         if (availableGetters.ignoreDecimals) revert Unimplemented();
         return decimals_;
-    }
-
-    /// @dev External function to decode a string from bytes.
-    function decodeString(bytes calldata _input) external pure returns (string memory result) {
-        (result) = abi.decode(_input, (string));
-    }
-
-    /// @dev External function to decode a uint8 from bytes.
-    function decodeUint8(bytes calldata _input) external pure returns (uint8 result) {
-        (result) = abi.decode(_input, (uint8));
     }
 }

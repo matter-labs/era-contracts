@@ -156,7 +156,7 @@ interface IStateTransitionManager {
 
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32);
 
-    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
+    function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external;
 
     event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
 

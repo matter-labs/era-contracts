@@ -32,7 +32,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         _;
     }
 
-    /// @dev Contract is expected to be used as proxy implementation.
+    /// @dev Contract is expected to be used as proxy implementation on L1.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(IBridgehub _bridgehub, IL1AssetRouter _sharedBridge) reentrancyGuardInitializer {
         _disableInitializers();
@@ -41,10 +41,13 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     }
 
     /// @notice used to initialize the contract
+    /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
     }
 
+    /// @notice Used to register the stm asset in L1 contracts, AssetRouter and Bridgehub.
+    /// @param _stmAddress the address of the stm asset
     function registerSTMAssetOnL1(address _stmAddress) external onlyOwner {
         // solhint-disable-next-line gas-custom-errors
 
@@ -58,11 +61,14 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     /// @dev Since the L2 settlement layers `_chainId` might potentially have ERC20 tokens as native assets,
     /// there are two ways to perform the L1->L2 transaction:
     /// - via the `Bridgehub.requestL2TransactionDirect`. However, this would require the STMDeploymentTracker to
-    /// hahndle the ERC20 balances to be used in the transaction.
+    /// handle the ERC20 balances to be used in the transaction.
     /// - via the `Bridgehub.requestL2TransactionTwoBridges`. This way it will be the sender that provides the funds
     /// for the L2 transaction.
     /// The second approach is used due to its simplicity even though it gives the sender slightly more control over the call:
     /// `gasLimit`, etc.
+    /// @param _chainId the chainId of the chain
+    /// @param _prevMsgSender the previous message sender
+    /// @param _data the data of the transaction
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
         uint256 _chainId,
@@ -81,7 +87,14 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         request = _registerSTMAssetOnL2Bridgehub(_chainId, _stmL1Address, _stmL2Address);
     }
 
-    // todo this has to be put in L1AssetRouter via TwoBridges. Hard, because we have to have multiple msg types
+    /// @dev we need to implement this for the bridgehub for the TwoBridges logic
+    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {
+        // This function is typically used on bridges for e.g.
+    }
+
+    // todo this has to be put in L1AssetRouter via TwoBridges for custom base tokens. Hard, because we have to have multiple msg types in bridgehubDeposit in the AssetRouter.
+    /// @notice Used to register the stm asset in L2 AssetRouter.
+    /// @param _chainId the chainId of the chain
     function registerSTMAssetOnL2SharedBridge(
         uint256 _chainId,
         address _stmL1Address,
@@ -89,7 +102,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByteLimit,
         address _refundRecipient
-    ) public payable {
+    ) public payable onlyOwner {
         bytes32 assetId;
         {
             assetId = getAssetId(_stmL1Address);
@@ -105,18 +118,24 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
             _assetAddressOnCounterPart: L2_BRIDGEHUB_ADDR
         });
     }
+
+    function getAssetId(address _l1STM) public view override returns (bytes32) {
+        return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1STM)))));
+    }
+
     // Todo this works for now, but it will not work in the future if we want to change STM DTs. Probably ok.
+    /// @notice Used to register the stm asset in L2 Bridgehub.
+    /// @param _chainId the chainId of the chain
     function _registerSTMAssetOnL2Bridgehub(
         // solhint-disable-next-line no-unused-vars
         uint256 _chainId,
         address _stmL1Address,
         address _stmL2Address
     ) internal pure returns (L2TransactionRequestTwoBridgesInner memory request) {
-        bytes memory l2TxCalldata = abi.encodeWithSelector(
+        bytes memory l2TxCalldata = abi.encodeCall(
             /// todo it should not be initial in setAssetHandlerAddressInitial
-            IBridgehub.setAssetHandlerAddressInitial.selector,
-            bytes32(uint256(uint160(_stmL1Address))),
-            _stmL2Address
+            IBridgehub.setAssetHandlerAddressInitial,
+            (bytes32(uint256(uint160(_stmL1Address))), _stmL2Address)
         );
 
         request = L2TransactionRequestTwoBridgesInner({
@@ -126,14 +145,5 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
             factoryDeps: new bytes[](0),
             txDataHash: bytes32(0)
         });
-    }
-
-    /// @dev we need to implement this for the bridgehub for the TwoBridges logic
-    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {
-        // This function is typically used on bridges for e.g.
-    }
-
-    function getAssetId(address _l1STM) public view override returns (bytes32) {
-        return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1STM)))));
     }
 }
