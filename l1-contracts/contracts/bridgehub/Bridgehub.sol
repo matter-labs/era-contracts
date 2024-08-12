@@ -186,14 +186,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         emit TokenRegistered(_token);
     }
 
-    /// @notice To set shared bridge, only Owner. Not done in initialize, as
-    /// the order of deployment is Bridgehub, Shared bridge, and then we call this
-    function setSharedBridge(address _sharedBridge) external onlyOwner {
-        sharedBridge = IL1AssetRouter(_sharedBridge);
-
-        emit SharedBridgeUpdated(_sharedBridge);
-    }
-
     /// @notice Used to register a chain as a settlement layer.
     /// @param _newSettlementLayerChainId the chainId of the chain
     /// @param _isWhitelisted whether the chain is a whitelisted settlement layer
