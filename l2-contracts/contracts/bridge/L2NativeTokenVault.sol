@@ -53,7 +53,13 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @param _l1ChainId The L1 chain id differs between mainnet and testnets.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
-    constructor(uint256 _l1ChainId, bytes32 _l2TokenProxyBytecodeHash, address _aliasedOwner, uint256 _eraChainId, address _legacySharedBridge) {
+    constructor(
+        uint256 _l1ChainId,
+        bytes32 _l2TokenProxyBytecodeHash,
+        address _aliasedOwner,
+        uint256 _eraChainId,
+        address _legacySharedBridge
+    ) {
         L1_CHAIN_ID = _l1ChainId;
 
         _disableInitializers();

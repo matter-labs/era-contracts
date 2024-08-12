@@ -47,7 +47,6 @@ describe("ERC20Bridge", function () {
   let erc20Bridge: L2AssetRouter;
   let erc20NativeTokenVault: L2NativeTokenVault;
   let erc20Token: L2StandardERC20;
-  const contractsDeployedAlready: boolean = false;
 
   before("Deploy token and bridge", async function () {
     const deployer = new Deployer(hre, deployerWallet);
@@ -62,7 +61,13 @@ describe("ERC20Bridge", function () {
     let constructorArgs = ethers.utils.defaultAbiCoder.encode(
       ["uint256", "uint256", "address", "address", "address"],
       /// note in real deployment we have to transfer ownership of standard deployer here
-      [testChainId, 1, unapplyL1ToL2Alias(l1BridgeWallet.address), unapplyL1ToL2Alias(l1BridgeWallet.address), ethers.constants.AddressZero]
+      [
+        testChainId,
+        1,
+        unapplyL1ToL2Alias(l1BridgeWallet.address),
+        unapplyL1ToL2Alias(l1BridgeWallet.address),
+        ethers.constants.AddressZero,
+      ]
     );
     await setCode(
       deployerWallet,

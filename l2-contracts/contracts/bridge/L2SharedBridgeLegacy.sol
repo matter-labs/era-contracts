@@ -4,19 +4,15 @@ pragma solidity 0.8.20;
 
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
-import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 
-import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
-import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 import {L2StandardERC20} from "./L2StandardERC20.sol";
 
-import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT, L2_ASSET_ROUTER, IContractDeployer} from "../L2ContractHelper.sol";
+import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
 
-import {EmptyAddress, InvalidCaller, EmptyBytes32, DeployFailed, AmountMustBeGreaterThanZero} from "../L2ContractErrors.sol";
+import {EmptyAddress, EmptyBytes32, DeployFailed, AmountMustBeGreaterThanZero} from "../L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -98,7 +94,6 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
             revert AmountMustBeGreaterThanZero();
         }
         L2_ASSET_ROUTER.withdrawLegacyBridge(_l1Receiver, _l2Token, _amount, msg.sender);
-
     }
 
     /// @return Address of an L2 token counterpart
