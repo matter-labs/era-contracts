@@ -34,4 +34,6 @@ interface IL2AssetRouter {
     function l1SharedBridge() external view returns (address);
 
     function l1TokenAddress(address _l2Token) external view returns (address);
+
+    function withdrawLegacyBridge(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) external;
 }

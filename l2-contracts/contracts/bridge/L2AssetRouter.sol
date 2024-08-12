@@ -7,7 +7,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 
 import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
-import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
+import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
 import {IL2AssetHandler} from "./interfaces/IL2AssetHandler.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
@@ -22,12 +22,15 @@ import {EmptyAddress, InvalidCaller} from "../L2ContractErrors.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
+contract L2AssetRouter is IL2AssetRouter, Initializable {
     /// @dev Chain ID of Era for legacy reasons
     uint256 public immutable ERA_CHAIN_ID;
 
     /// @dev Chain ID of L1 for bridging reasons
     uint256 public immutable L1_CHAIN_ID;
+
+    /// @dev The address of the L2 legacy shared bridge.
+    address public L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev The address of the L1 shared bridge counterpart.
     address public override l1SharedBridge;
@@ -54,7 +57,7 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
     /// @dev A mapping of asset ID to asset handler address
     mapping(bytes32 assetId => address assetHandlerAddress) public override assetHandlerAddress;
 
-    /// @notice Checks that the message sender is the legacy bridge.
+    /// @notice Checks that the message sender is the l1 bridge.
     modifier onlyL1Bridge() {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
         if (
@@ -66,13 +69,25 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
         _;
     }
 
+    /// @notice Checks that the message sender is the legacy l2 bridge.
+    modifier onlyLegacyBridge() {
+        // Only the L1 bridge counterpart can initiate and finalize the deposit.
+        if (
+            msg.sender != L2_LEGACY_SHARED_BRIDGE
+        ) {
+            revert InvalidCaller(msg.sender);
+        }
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
     /// @param _l1SharedBridge The address of the L1 Bridge contract.
     /// @param _l1Bridge The address of the legacy L1 Bridge contract.
-    constructor(uint256 _eraChainId, uint256 _l1ChainId, address _l1SharedBridge, address _l1Bridge) {
+    constructor(uint256 _eraChainId, uint256 _l1ChainId, address _l1SharedBridge, address _l1Bridge, address _legacySharedBridge) {
         ERA_CHAIN_ID = _eraChainId;
         L1_CHAIN_ID = _l1ChainId;
+        L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         if (_l1SharedBridge == address(0)) {
             revert EmptyAddress();
         }
@@ -116,19 +131,27 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
     /// @param _assetId The asset id of the withdrawn asset
     /// @param _assetData The data that is passed to the asset handler contract
     function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
+        _withdrawSender(_assetId, _assetData, msg.sender);
+    }
+
+            /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
+    /// where tokens would be unlocked
+    /// @param _assetId The asset id of the withdrawn asset
+    /// @param _assetData The data that is passed to the asset handler contract
+    function _withdrawSender(bytes32 _assetId, bytes memory _assetData, address _sender) internal {
         address assetHandler = assetHandlerAddress[_assetId];
         bytes memory _l1bridgeMintData = IL2AssetHandler(assetHandler).bridgeBurn({
             _chainId: L1_CHAIN_ID,
             _mintValue: 0,
             _assetId: _assetId,
-            _prevMsgSender: msg.sender,
+            _prevMsgSender: _sender,
             _data: _assetData
         });
 
         bytes memory message = _getL1WithdrawMessage(_assetId, _l1bridgeMintData);
         L2ContractHelper.sendMessageToL1(message);
 
-        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, msg.sender, _assetId, _assetData);
+        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, _sender, _assetId, _assetData);
     }
 
     /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
@@ -161,7 +184,7 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external override {
+    ) external {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         // solhint-disable-next-line func-named-parameters
         bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);
@@ -177,6 +200,12 @@ contract L2AssetRouter is IL2AssetRouter, ILegacyL2SharedBridge, Initializable {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, getL1TokenAddress(_l2Token));
         bytes memory data = abi.encode(_amount, _l1Receiver);
         withdraw(assetId, data);
+    }
+
+    function withdrawLegacyBridge(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) external onlyLegacyBridge {
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, getL1TokenAddress(_l2Token));
+        bytes memory data = abi.encode(_amount, _l1Receiver);
+        _withdrawSender(assetId, data, _sender);
     }
 
     /// @notice Legacy getL1TokenAddress.

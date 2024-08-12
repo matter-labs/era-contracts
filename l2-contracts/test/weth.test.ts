@@ -30,6 +30,7 @@ describe("WETH token & WETH bridge", function () {
       1,
       richAccount.address,
       richAccount.address,
+      ethers.constants.AddressZero,
     ]);
     const randomAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
 

@@ -60,9 +60,9 @@ describe("ERC20Bridge", function () {
     await deployer.deploy(await deployer.loadArtifact("BeaconProxy"), [l2Erc20TokenBeacon.address, "0x"]);
     const beaconProxyBytecodeHash = hashBytecode((await deployer.loadArtifact("BeaconProxy")).bytecode);
     let constructorArgs = ethers.utils.defaultAbiCoder.encode(
-      ["uint256", "uint256", "address", "address"],
+      ["uint256", "uint256", "address", "address", "address"],
       /// note in real deployment we have to transfer ownership of standard deployer here
-      [testChainId, 1, unapplyL1ToL2Alias(l1BridgeWallet.address), unapplyL1ToL2Alias(l1BridgeWallet.address)]
+      [testChainId, 1, unapplyL1ToL2Alias(l1BridgeWallet.address), unapplyL1ToL2Alias(l1BridgeWallet.address), ethers.constants.AddressZero]
     );
     await setCode(
       deployerWallet,
@@ -75,9 +75,9 @@ describe("ERC20Bridge", function () {
     erc20Bridge = L2AssetRouterFactory.connect(L2_ASSET_ROUTER_ADDRESS, deployerWallet);
     const l2NativeTokenVaultArtifact = await deployer.loadArtifact("L2NativeTokenVault");
     constructorArgs = ethers.utils.defaultAbiCoder.encode(
-      ["uint256", "bytes32", "address", "bool"],
+      ["uint256", "bytes32", "address", "uint256", "address"],
       /// note in real deployment we have to transfer ownership of standard deployer here
-      [1, beaconProxyBytecodeHash, governorWallet.address, contractsDeployedAlready]
+      [1, beaconProxyBytecodeHash, governorWallet.address, 0, ethers.constants.AddressZero]
     );
     await setCode(
       deployerWallet,
