@@ -228,7 +228,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(L1_CHAIN_ID == block.chainid, "BH: New chain registration only allowed on L1");
         require(_chainId != 0, "BH: chainId cannot be 0");
         require(_chainId <= type(uint48).max, "BH: chainId too large");
-        require(_chainId != block.chainId, "BH: chain id must not match current chainid");
+        require(_chainId != block.chainid, "BH: chain id must not match current chainid");
 
         require(stateTransitionManagerIsRegistered[_stateTransitionManager], "BH: state transition not registered");
         require(tokenIsRegistered[_baseToken], "BH: token not registered");

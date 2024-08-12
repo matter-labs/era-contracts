@@ -203,7 +203,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) internal {
-        require(s.syncLayer == 0, "Chain was migrated");
+        require(s.syncLayer == address(0), "Chain was migrated");
         // check that we have the right protocol version
         // three comments:
         // 1. A chain has to keep their protocol version up to date, as processing a block requires the latest or previous protocol version
@@ -398,7 +398,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         StoredBatchInfo[] calldata _batchesData,
         PriorityOpsBatchInfo[] calldata _priorityOpsData
     ) internal {
-        require(s.syncLayer == 0, "Chain was migrated");
+        require(s.syncLayer == address(0), "Chain was migrated");
 
         uint256 nBatches = _batchesData.length;
         require(_batchesData.length == _priorityOpsData.length, "bp");
@@ -450,7 +450,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         StoredBatchInfo[] calldata _committedBatches,
         ProofInput calldata _proof
     ) internal {
-        require(s.syncLayer == 0, "Chain was migrated");
+        require(s.syncLayer == address(0), "Chain was migrated");
 
         // Save the variables into the stack to save gas on reading them later
         uint256 currentTotalBatchesVerified = s.totalBatchesVerified;
@@ -515,7 +515,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     }
 
     function _revertBatches(uint256 _newLastBatch) internal {
-        require(s.syncLayer == 0, "Chain was migrated");
+        require(s.syncLayer == address(0), "Chain was migrated");
         require(s.totalBatchesCommitted > _newLastBatch, "v1"); // The last committed batch is less than new last batch
         require(_newLastBatch >= s.totalBatchesExecuted, "v2"); // Already executed batches cannot be reverted
 
