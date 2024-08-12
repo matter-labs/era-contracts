@@ -475,7 +475,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                         Chain migration
     //////////////////////////////////////////////////////////////
 
-    Methods below are used when we're moving a 'child' chain between diffent layers
+    Methods below are used when we're moving a 'child' chain between different layers
     For example from L1 to Gateway.
     In these cases, we treat the child chain as an 'NFT' (and STM as assetId / NFT contract) - where we burn it
     in the 'source bridgehub' and then we mint it in the destination bridgehub.

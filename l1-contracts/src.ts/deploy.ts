@@ -387,8 +387,8 @@ export class Deployer {
 
     if (this.verbose) {
       console.log(
-        `Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}, tx hash ${rec.transactionHash}, expected address: ${proxyAdmin.address
-        }`
+        `Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}, tx hash ${rec.transactionHash}, expected address:
+         ${proxyAdmin.address}`
       );
       console.log(`CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR=${proxyAdmin.address}`);
     }
@@ -400,8 +400,8 @@ export class Deployer {
 
     if (this.verbose) {
       console.log(
-        `ProxyAdmin ownership transferred to Governance in tx ${receipt.transactionHash
-        }, gas used: ${receipt.gasUsed.toString()}`
+        `ProxyAdmin ownership transferred to Governance in tx
+        ${receipt.transactionHash}, gas used: ${receipt.gasUsed.toString()}`
       );
     }
   }
@@ -1091,7 +1091,7 @@ export class Deployer {
     // console.log("this.addresses.ChainAssetInfo", this.addresses.ChainAssetInfo)
 
     // The stmAssetIFromChainId gives us a unique 'asset' identifier for a given chain.
-    let chainAssetId = await bridgehub.stmAssetIdFromChainId(this.chainId);
+    const chainAssetId = await bridgehub.stmAssetIdFromChainId(this.chainId);
     console.log("Chain asset id is: ", chainAssetId);
 
     let sharedBridgeData = ethers.utils.defaultAbiCoder.encode(
@@ -1250,8 +1250,8 @@ export class Deployer {
     const receiptRegisterValidator = await txRegisterValidator.wait();
     if (this.verbose) {
       console.log(
-        `Validator registered, gas used: ${receiptRegisterValidator.gasUsed.toString()}, tx hash: ${txRegisterValidator.hash
-        }`
+        `Validator registered, gas used: ${receiptRegisterValidator.gasUsed.toString()}, tx hash:
+         ${txRegisterValidator.hash}`
       );
     }
 
