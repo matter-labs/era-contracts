@@ -26,16 +26,16 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 /// facilitating interactions between end user and bridges.
 /// It also manages state transition managers, base tokens, and chain registrations.
 /// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
-/// between different parents (for example from L1 to Gateway).
+/// between different settlement layers (for example from L1 to Gateway).
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice the asset id of Eth
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
     /// @dev The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
-    // L1 that is at the most base layer.
+    /// L1 that is at the most base layer.
     uint256 public immutable L1_CHAIN_ID;
 
-    /// @notice all the ether and ERC20 tokens are held by this bridge.
+    /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by this shared Bridge.
     IL1AssetRouter public sharedBridge;
 
     /// @notice StateTransitionManagers that are registered and can be used by the children chains.
@@ -78,7 +78,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     constructor(uint256 _l1ChainId, address _owner) reentrancyGuardInitializer {
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
-        // TODO: this assumes that the bridgehub is deployed only on the chains that have ETH as base token, right?
+        // TODO: this assumes that the bridgehub is deployed only on the chains that have ETH as base token.
         ETH_TOKEN_ASSET_ID = keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, ETH_TOKEN_ADDRESS));
         _transferOwnership(_owner);
     }
@@ -202,12 +202,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     function stmAssetIdFromChainId(uint256 _chainId) public view override returns (bytes32) {
-        // TODO: should we generate the assetid even for chains that don't have state transition manager set?
         return stmAssetId(stateTransitionManager[_chainId]);
     }
 
     function stmAssetId(address _stmAddress) public view override returns (bytes32) {
-        // TODO: check that the STM is registered.
+        require(stateTransitionManagerIsRegistered[_stmAddress] == true, "BH: STM not registered");
         return keccak256(abi.encode(L1_CHAIN_ID, address(stmDeployer), bytes32(uint256(uint160(_stmAddress)))));
     }
 
@@ -478,8 +477,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     Methods below are used when we're moving a 'child' chain between diffent layers
     For example from L1 to Gateway.
-    In these cases, we treat the child chain as an 'asset' - where we burn it in the 'source bridgehub'
-    and then we mint it in the destination bridgehub.
+    In these cases, we treat the child chain as an 'NFT' (and STM as assetId / NFT contract) - where we burn it
+    in the 'source bridgehub' and then we mint it in the destination bridgehub.
     */
 
     /// @dev "burns" the child chain on this bridgehub for the migration. Packages all the necessary child

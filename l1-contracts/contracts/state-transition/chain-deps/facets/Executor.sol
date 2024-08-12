@@ -31,6 +31,12 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "ExecutorFacet";
 
+    /// @dev Checks that the chain is connected to the current bridehub and not migrated away.
+    modifier chainOnCurrentBridgehub() {
+        require(s.syncLayer == address(0), "Chain was migrated");
+        _;
+    }
+
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
     /// @dev returns new batch StoredBatchInfo
     /// @notice Does not change storage
@@ -202,8 +208,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     function _commitBatches(
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
-    ) internal {
-        require(s.syncLayer == address(0), "Chain was migrated");
+    ) internal chainOnCurrentBridgehub {
         // check that we have the right protocol version
         // three comments:
         // 1. A chain has to keep their protocol version up to date, as processing a block requires the latest or previous protocol version
@@ -397,9 +402,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     function _executeBatches(
         StoredBatchInfo[] calldata _batchesData,
         PriorityOpsBatchInfo[] calldata _priorityOpsData
-    ) internal {
-        require(s.syncLayer == address(0), "Chain was migrated");
-
+    ) internal chainOnCurrentBridgehub {
         uint256 nBatches = _batchesData.length;
         require(_batchesData.length == _priorityOpsData.length, "bp");
 
@@ -449,9 +452,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         StoredBatchInfo calldata _prevBatch,
         StoredBatchInfo[] calldata _committedBatches,
         ProofInput calldata _proof
-    ) internal {
-        require(s.syncLayer == address(0), "Chain was migrated");
-
+    ) internal chainOnCurrentBridgehub {
         // Save the variables into the stack to save gas on reading them later
         uint256 currentTotalBatchesVerified = s.totalBatchesVerified;
         uint256 committedBatchesLength = _committedBatches.length;
@@ -514,8 +515,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         _revertBatches(_newLastBatch);
     }
 
-    function _revertBatches(uint256 _newLastBatch) internal {
-        require(s.syncLayer == address(0), "Chain was migrated");
+    function _revertBatches(uint256 _newLastBatch) internal chainOnCurrentBridgehub {
         require(s.totalBatchesCommitted > _newLastBatch, "v1"); // The last committed batch is less than new last batch
         require(_newLastBatch >= s.totalBatchesExecuted, "v2"); // Already executed batches cannot be reverted
 
