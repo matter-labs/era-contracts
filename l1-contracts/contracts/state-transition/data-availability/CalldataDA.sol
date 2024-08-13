@@ -18,7 +18,7 @@ uint256 constant BLOB_COMMITMENT_SIZE = 32;
 /// @notice Contract that contains the functionality for process the calldata DA.
 /// @dev The expected l2DAValidator that should be used with it `RollupL2DAValidator`.
 abstract contract CalldataDA {
-    /// @notice Parses the input that the l2 Da validator has provided to the contract.
+    /// @notice Parses the input that the L2 DA validator has provided to the contract.
     /// @param _l2DAValidatorOutputHash The hash of the output of the L2 DA validator.
     /// @param _maxBlobsSupported The maximal number of blobs supported by the chain.
     /// @param _operatorDAInput The DA input by the operator provided on L1.
@@ -37,7 +37,7 @@ abstract contract CalldataDA {
             bytes calldata l1DaInput
         )
     {
-        // The preimage under the hash `l2DAValidatorOutputHash` is expected to be in the following format:
+        // The preimage under the hash `_l2DAValidatorOutputHash` is expected to be in the following format:
         // - First 32 bytes are the hash of the uncompressed state diff.
         // - Then, there is a 32-byte hash of the full pubdata.
         // - Then, there is the 1-byte number of blobs published.
@@ -62,10 +62,10 @@ abstract contract CalldataDA {
 
         uint256 ptr = BLOB_DATA_OFFSET + 32 * blobsProvided;
 
-        // Now, we need to double check that the provided input was indeed retutned by the L2 DA validator.
+        // Now, we need to double check that the provided input was indeed returned by the L2 DA validator.
         require(keccak256(_operatorDAInput[:ptr]) == _l2DAValidatorOutputHash, "invalid l2 DA output hash");
 
-        // The rest of the output were provided specifically by the operator
+        // The rest of the output was provided specifically by the operator
         l1DaInput = _operatorDAInput[ptr:];
     }
 
