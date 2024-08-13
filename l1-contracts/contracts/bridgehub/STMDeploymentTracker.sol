@@ -52,8 +52,8 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         // solhint-disable-next-line gas-custom-errors
 
         require(BRIDGE_HUB.stateTransitionManagerIsRegistered(_stmAddress), "STMDT: stm not registered");
-        SHARED_BRIDGE.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_stmAddress))), address(BRIDGE_HUB));
-        BRIDGE_HUB.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_stmAddress))), _stmAddress);
+        SHARED_BRIDGE.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_stmAddress))), address(BRIDGE_HUB));
+        BRIDGE_HUB.setAssetHandlerAddress(bytes32(uint256(uint160(_stmAddress))), _stmAddress);
     }
 
     /// @notice The function responsible for registering the L2 counterpart of an STM asset on the L2 Bridgehub.
@@ -87,10 +87,9 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         request = _registerSTMAssetOnL2Bridgehub(_chainId, _stmL1Address, _stmL2Address);
     }
 
-    /// @dev we need to implement this for the bridgehub for the TwoBridges logic
-    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {
-        // This function is typically used on bridges for e.g.
-    }
+    /// @notice The function called by the Bridgehub after the L2 transaction has been initiated.
+    /// @dev Not used in this contract. In case the transaction fails, we can just re-try it.
+    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {}
 
     // todo this has to be put in L1AssetRouter via TwoBridges for custom base tokens. Hard, because we have to have multiple msg types in bridgehubDeposit in the AssetRouter.
     /// @notice Used to register the stm asset in L2 AssetRouter.
@@ -123,7 +122,6 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1STM)))));
     }
 
-    // Todo this works for now, but it will not work in the future if we want to change STM DTs. Probably ok.
     /// @notice Used to register the stm asset in L2 Bridgehub.
     /// @param _chainId the chainId of the chain
     function _registerSTMAssetOnL2Bridgehub(
@@ -133,8 +131,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         address _stmL2Address
     ) internal pure returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes memory l2TxCalldata = abi.encodeCall(
-            /// todo it should not be initial in setAssetHandlerAddressInitial
-            IBridgehub.setAssetHandlerAddressInitial,
+            IBridgehub.setAssetHandlerAddress,
             (bytes32(uint256(uint160(_stmL1Address))), _stmL2Address)
         );
 
@@ -143,6 +140,10 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
             l2Contract: L2_BRIDGEHUB_ADDR,
             l2Calldata: l2TxCalldata,
             factoryDeps: new bytes[](0),
+            // The `txDataHash` is typically used in usual ERC20 bridges to commit to the transaction data
+            // so that the user can recover funds in case the bridging fails on L2.
+            // However, this contract uses the `requestL2TransactionTwoBridges` method just to perform an L1->L2 transaction.
+            // We do not need to recover anything and so `bytes32(0)` here is okay.
             txDataHash: bytes32(0)
         });
     }

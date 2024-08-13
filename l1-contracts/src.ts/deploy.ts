@@ -404,9 +404,8 @@ export class Deployer {
 
     if (this.verbose) {
       console.log(
-        `Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}, tx hash ${rec.transactionHash}, expected address: ${
-          proxyAdmin.address
-        }`
+        `Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}, tx hash ${rec.transactionHash}, expected address:
+         ${proxyAdmin.address}`
       );
       console.log(`CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR=${proxyAdmin.address}`);
     }
@@ -418,9 +417,8 @@ export class Deployer {
 
     if (this.verbose) {
       console.log(
-        `ProxyAdmin ownership transferred to Governance in tx ${
-          receipt.transactionHash
-        }, gas used: ${receipt.gasUsed.toString()}`
+        `ProxyAdmin ownership transferred to Governance in tx
+        ${receipt.transactionHash}, gas used: ${receipt.gasUsed.toString()}`
       );
     }
   }
@@ -1100,6 +1098,7 @@ export class Deployer {
     }
   }
 
+  // Main function to move the current chain (that is hooked to l1), on top of the syncLayer chain.
   public async moveChainToGateway(gatewayChainId: string, gasPrice: BigNumberish) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     // Just some large gas limit that should always be enough
@@ -1108,6 +1107,7 @@ export class Deployer {
       await bridgehub.l2TransactionBaseCost(gatewayChainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
     ).mul(5);
 
+    // We are creating the new DiamondProxy for our chain, to be deployed on top of sync Layer.
     const newAdmin = this.deployWallet.address;
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut();
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
@@ -1121,17 +1121,26 @@ export class Deployer {
 
     // console.log("bridgehubData", bridgehubData)
     // console.log("this.addresses.ChainAssetInfo", this.addresses.ChainAssetInfo)
+
+    // The stmAssetIFromChainId gives us a unique 'asset' identifier for a given chain.
+    const chainAssetId = await bridgehub.stmAssetIdFromChainId(this.chainId);
+    console.log("Chain asset id is: ", chainAssetId);
+
     let sharedBridgeData = ethers.utils.defaultAbiCoder.encode(
       ["bytes32", "bytes"],
 
-      [await bridgehub.stmAssetIdFromChainId(this.chainId), bridgehubData]
+      [chainAssetId, bridgehubData]
     );
+    // The 0x01 is the encoding for the L1AssetRouter.
     sharedBridgeData = "0x01" + sharedBridgeData.slice(2);
 
+    // And now we 'transfer' the chain through the bridge (it behaves like a 'regular' asset, where we 'freeze' it in L1
+    // and then create on SyncLayer). You can see these methods in Admin.sol (part of DiamondProxy).
     const receipt = await this.executeChainAdminMulticall([
       {
         target: bridgehub.address,
         data: bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
+          // These arguments must match L2TransactionRequestTwoBridgesOuter struct.
           {
             chainId: gatewayChainId,
             mintValue: expectedCost,
@@ -1281,9 +1290,8 @@ export class Deployer {
     const receiptRegisterValidator = await txRegisterValidator.wait();
     if (this.verbose) {
       console.log(
-        `Validator registered, gas used: ${receiptRegisterValidator.gasUsed.toString()}, tx hash: ${
-          txRegisterValidator.hash
-        }`
+        `Validator registered, gas used: ${receiptRegisterValidator.gasUsed.toString()}, tx hash:
+         ${txRegisterValidator.hash}`
       );
     }
 
