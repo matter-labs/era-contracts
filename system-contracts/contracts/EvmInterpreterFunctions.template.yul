@@ -1272,6 +1272,21 @@ function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGa
     mstore(sub(offset, 0x80), back)
 }
 
+function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
+    let dest_end := add(dest, and(len, sub(0, 32)))
+    for {let i := dest} lt(i, dest_end) { i := add(i, 32) } {
+        mstore(i, 0)
+    }
+
+    let rest_len := and(len, 31)
+    if rest_len {
+        let rest_bits := shl(3, rest_len)
+        let mask := shr(rest_bits, MAX_UINT())
+        let value := mload(dest_end)
+        mstore(dest_end, and(value, mask))
+    }
+}
+
 function performExtCodeCopy(evmGas,oldSp) -> evmGasLeft, sp {
     evmGasLeft := chargeGas(evmGas, 100)
 
@@ -1294,17 +1309,7 @@ function performExtCodeCopy(evmGas,oldSp) -> evmGasLeft, sp {
     }
     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-
-    let len_32 := shr(5, len)
-    for {let i := 0} lt(i, len_32) { i := add(i, 1) } {
-        mstore(add(dest,shl(5,i)),0)
-    }
-
-    let size_32 := shl(5,len_32)
-    let rest_32 := sub(len, size_32)
-    for {let i := 0} lt(i, rest_32) { i := add(i, 1) } {
-        mstore8(add(dest,add(size_32,i)),0)
-    }
+    $llvm_AlwaysInline_llvm$_memsetToZero(dest, len)
 
     // Gets the code from the addr
     if and(iszero(iszero(_getRawCodeHash(addr))),gt(len,0)) {
