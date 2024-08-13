@@ -13,11 +13,6 @@ import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 /// the blockchain node to accept the protocol upgrade. Another role - `tokenMultiplierSetter` can be used in the contract
 /// to change the base token gas price in the Chain contract.
 contract ChainAdmin is IChainAdmin, Ownable2Step {
-    constructor(address _initialOwner) {
-        require(_initialOwner != address(0), "Initial owner should be non zero address");
-        _transferOwnership(_initialOwner);
-    }
-
     /// @notice Mapping of protocol versions to their expected upgrade timestamps.
     /// @dev Needed for the offchain node administration to know when to start building batches with the new protocol version.
     mapping(uint256 protocolVersion => uint256 upgradeTimestamp) public protocolVersionToUpgradeTimestamp;
