@@ -8,9 +8,12 @@ import {RelayedSLDAValidator} from "contracts/state-transition/data-availability
 import {L1DAValidatorOutput, PubdataSource} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1Messenger} from "contracts/common/interfaces/IL1Messenger.sol";
+import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 contract RelayedSLDAValidatorTest is Test {
     uint256 constant CHAIN_ID = 193;
+    address constant CHAIN_ADDRESS = address(0x1234);
     RelayedSLDAValidator daValidator;
 
     function setUp() public {
@@ -20,6 +23,11 @@ contract RelayedSLDAValidatorTest is Test {
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(IL1Messenger.sendToL1.selector),
             abi.encode(bytes32(0))
+        );
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, (CHAIN_ID)),
+            abi.encode(CHAIN_ADDRESS)
         );
     }
 
@@ -41,8 +49,9 @@ contract RelayedSLDAValidatorTest is Test {
 
         bytes memory operatorDAInput = abi.encodePacked(daInput, l1DaInput);
 
+        vm.prank(CHAIN_ADDRESS);
         vm.expectRevert("l1-da-validator/invalid-pubdata-source");
-        daValidator.checkDA(CHAIN_ID, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
+        daValidator.checkDA(CHAIN_ID, 0, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
     }
 
     function test_revertWhen_PubdataInputTooSmall() public {
@@ -63,8 +72,31 @@ contract RelayedSLDAValidatorTest is Test {
 
         bytes memory operatorDAInput = abi.encodePacked(daInput, pubdataSource, l1DaInput);
 
+        vm.prank(CHAIN_ADDRESS);
         vm.expectRevert("pubdata too small");
-        daValidator.checkDA(CHAIN_ID, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
+        daValidator.checkDA(CHAIN_ID, 0, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
+    }
+
+    function test_revertWhenInvalidSender() public {
+        bytes memory pubdata = "verifydont";
+        console.logBytes(pubdata);
+
+        bytes32 stateDiffHash = Utils.randomBytes32("stateDiffHash");
+        uint8 blobsProvided = 1;
+        uint256 maxBlobsSupported = 6;
+        bytes32 blobLinearHash = Utils.randomBytes32("blobLinearHash");
+        uint8 pubdataSource = uint8(PubdataSource.Calldata);
+        bytes memory l1DaInput = "verifydonttrust";
+        bytes32 fullPubdataHash = keccak256(pubdata);
+
+        bytes memory daInput = abi.encodePacked(stateDiffHash, fullPubdataHash, blobsProvided, blobLinearHash);
+
+        bytes32 l2DAValidatorOutputHash = keccak256(daInput);
+
+        bytes memory operatorDAInput = abi.encodePacked(daInput, pubdataSource, l1DaInput);
+
+        vm.expectRevert("l1-da-validator/invalid-sender");
+        daValidator.checkDA(CHAIN_ID, 0, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
     }
 
     function test_checkDA() public {
@@ -85,8 +117,10 @@ contract RelayedSLDAValidatorTest is Test {
 
         bytes memory operatorDAInput = abi.encodePacked(daInput, pubdataSource, l1DaInput);
 
+        vm.prank(CHAIN_ADDRESS);
         L1DAValidatorOutput memory output = daValidator.checkDA(
             CHAIN_ID,
+            0,
             l2DAValidatorOutputHash,
             operatorDAInput,
             maxBlobsSupported
