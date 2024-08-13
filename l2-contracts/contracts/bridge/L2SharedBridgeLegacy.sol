@@ -7,7 +7,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER, L2_NATIVE_TOKEN_VAULT, IContractDeployer} from "../L2ContractHelper.sol";
+import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER, L2_NATIVE_TOKEN_VAULT, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
@@ -102,7 +102,17 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         if (token != address(0)) {
             return token;
         }
-        return L2_NATIVE_TOKEN_VAULT.calculateCreate2TokenAddress(_l1Token);
+        return calculateCreate2TokenAddress(_l1Token);
+    }
+
+    /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
+    /// @param _l1Token The address of token on L1.
+    /// @return Address of an L2 token counterpart.
+    function calculateCreate2TokenAddress(address _l1Token) internal view returns (address) {
+        bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
+        bytes32 salt = _getCreate2Salt(_l1Token);
+        return
+            L2ContractHelper.computeCreate2Address(address(this), salt, l2TokenProxyBytecodeHash, constructorInputHash);
     }
 
     /// @dev Convert the L1 token address to the create2 salt of deployed L2 token

@@ -22,15 +22,16 @@ import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFail
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
-    /// @dev Chain ID of Era for legacy reasons
-    uint256 public immutable ERA_CHAIN_ID;
-
     /// @dev Chain ID of L1 for bridging reasons.
     uint256 public immutable L1_CHAIN_ID;
+
+    /// @dev Chain ID of Era for legacy reasons
+    uint256 public immutable ERA_CHAIN_ID;
 
     /// @dev The address of the L2 legacy shared bridge.
     IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE;
 
+    /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
 
     /// @dev Contract that stores the implementation address for token.
@@ -38,8 +39,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     UpgradeableBeacon public l2TokenBeacon;
 
     mapping(bytes32 assetId => address tokenAddress) public override tokenAddress;
-
-    /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
 
     modifier onlyBridge() {
         if (msg.sender != address(L2_ASSET_ROUTER)) {
@@ -67,6 +66,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         bool _contractsDeployedAlready
     ) {
         L1_CHAIN_ID = _l1ChainId;
+        ERA_CHAIN_ID = _eraChainId;
+        L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
         _disableInitializers();
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
@@ -78,9 +79,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
 
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
         _transferOwnership(_aliasedOwner);
-
-        ERA_CHAIN_ID = _eraChainId;
-        L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
         if (_contractsDeployedAlready) {
             if (_l2TokenBeacon == address(0)) {

@@ -68,7 +68,7 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
         _;
     }
 
-    /// @notice Checks that the message sender is the legacy l2 bridge.
+    /// @notice Checks that the message sender is the legacy L2 bridge.
     modifier onlyLegacyBridge() {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
         if (msg.sender != L2_LEGACY_SHARED_BRIDGE) {
