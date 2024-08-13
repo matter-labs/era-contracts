@@ -19,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         run: yarn
-      
+
       # - name: Install l2 deps
       #   working-directory: ./l2-contracts
       #   run: yarn
@@ -109,7 +109,7 @@ jobs:
       - name: Install l1 deps
         working-directory: ./l1-contracts
         run: yarn
-      
+
       - name: Build l2 deps
         working-directory: ./l2-contracts
         run: yarn build
@@ -146,7 +146,7 @@ jobs:
       - name: Install l1 deps
         working-directory: ./l1-contracts
         run: yarn
-      
+
       - name: Build l2 deps
         working-directory: ./l2-contracts
         run: yarn build
