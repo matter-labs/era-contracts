@@ -91,7 +91,8 @@ jobs:
             l2-contracts/artifacts-zk
 
       - name: Run tests
-        run: yarn l1 test:foundry
+        working-directory: ./l1-contracts
+        run: yarn test:foundry
 
   test-hardhat:
     needs: [build, lint]
