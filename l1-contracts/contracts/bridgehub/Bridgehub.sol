@@ -108,7 +108,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     constructor(uint256 _l1ChainId, address _owner) reentrancyGuardInitializer {
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
-        // TODO: this assumes that the bridgehub is deployed only on the chains that have ETH as base token.
+
+        // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only. 
+        // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
     }
@@ -552,6 +554,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         settlementLayer[_chainId] = _settlementChainId;
 
         address hyperchain = getHyperchain(_chainId);
+        require(hyperchain != address(0), "BH: hyperchain not registered");
         require(_prevMsgSender == IZkSyncHyperchain(hyperchain).getAdmin(), "BH: incorrect sender");
 
         bytes memory stmMintData = IStateTransitionManager(stateTransitionManager[_chainId]).forwardedBridgeBurn(
@@ -564,7 +567,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _chainData
         );
         bridgehubMintData = abi.encode(_chainId, stmMintData, chainMintData);
-        // TODO: double check that get only returns when chain id is there.
     }
 
     /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
