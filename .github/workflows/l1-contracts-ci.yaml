@@ -77,16 +77,6 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Install l2 deps
-        working-directory: ./l2-contracts
-        run: yarn
-
-      - name: Build l2 deps
-        run: yarn l2 build
-
-      - name: Build l1 deps
-        run: yarn l1 build
-
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
         with:
@@ -99,6 +89,16 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
+
+      - name: Install l2 deps
+        working-directory: ./l2-contracts
+        run: yarn
+
+      - name: Build l2 deps
+        run: yarn l2 build
+
+      - name: Build l1 deps
+        run: yarn l1 build
 
       - name: Run tests
         working-directory: ./l1-contracts
@@ -133,6 +133,7 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
+            l1-contracts/lib
 
       - name: Run tests
         run: yarn l1 test --no-compile
@@ -183,6 +184,9 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      - name: Sleep
+        run: sleep 120
+
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
         with:
@@ -192,6 +196,24 @@ jobs:
             l1-contracts/artifacts
             l1-contracts/cache
             l1-contracts/typechain
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
+            l2-contracts/typechain
+            l1-contracts/lib
+
+      - name: Install l2 deps
+        working-directory: ./l2-contracts
+        run: yarn
+
+      - name: Install l1 deps
+        working-directory: ./l1-contracts
+        run: yarn
+
+      - name: Build l2 deps
+        run: yarn l2 build
+
+      - name: Build l1 deps
+        run: yarn l1 build
 
       - name: Run coverage
         run: FOUNDRY_PROFILE=default yarn test:foundry && FOUNDRY_PROFILE=default yarn coverage:foundry --report summary --report lcov
