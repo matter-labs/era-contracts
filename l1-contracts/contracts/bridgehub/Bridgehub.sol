@@ -93,6 +93,17 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
+    modifier onlyAliasedZero() {
+        /// There is no sender for the wrapping, we use a virtual address.
+        require(msg.sender == VIRTUAL_SENDER_ALIASED_ZERO_ADDRESS, "BH: not aliased zero");
+        _;
+    }
+
+    modifier onlyAssetRouter() {
+        require(msg.sender == address(sharedBridge), "BH: not asset router");
+        _;
+    }
+
     /// @notice to avoid parity hack
     constructor(uint256 _l1ChainId, address _owner) reentrancyGuardInitializer {
         _disableInitializers();
@@ -107,17 +118,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
-    }
-
-    modifier onlyAliasedZero() {
-        /// There is no sender for the wrapping, we use a virtual address.
-        require(msg.sender == VIRTUAL_SENDER_ALIASED_ZERO_ADDRESS, "BH: not aliased zero");
-        _;
-    }
-
-    modifier onlyAssetRouter() {
-        require(msg.sender == address(sharedBridge), "BH: not asset router");
-        _;
     }
 
     //// Initialization and registration
@@ -551,11 +551,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(settlementLayer[_chainId] == block.chainid, "BH: not current SL");
         settlementLayer[_chainId] = _settlementChainId;
 
+        address hyperchain = getHyperchain(_chainId);
+        require(_prevMsgSender == IZkSyncHyperchain(hyperchain).getAdmin(), "BH: incorrect sender");
+
         bytes memory stmMintData = IStateTransitionManager(stateTransitionManager[_chainId]).forwardedBridgeBurn(
             _chainId,
             _stmData
         );
-        bytes memory chainMintData = IZkSyncHyperchain(getHyperchain(_chainId)).forwardedBridgeBurn(
+        bytes memory chainMintData = IZkSyncHyperchain(hyperchain).forwardedBridgeBurn(
             getHyperchain(_settlementChainId),
             _prevMsgSender,
             _chainData
