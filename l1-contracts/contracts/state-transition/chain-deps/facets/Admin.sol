@@ -281,8 +281,10 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         bytes calldata _data
     ) external payable override onlyBridgehub {}
 
-    // todo make internal. For now useful for testing
-    function _prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {
+    /// @notice Returns the commitment for a chain.
+    /// @dev Note, that this is a getter method helpful for debugging and should not be relied upon by clients.
+    /// @return commitment The commitment for the chain. 
+    function prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {
         require(s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex, "PQ not ready");
 
         commitment.totalBatchesCommitted = s.totalBatchesCommitted;
@@ -313,11 +315,6 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         }
 
         commitment.batchHashes = batchHashes;
-    }
-
-    /// @inheritdoc IAdmin
-    function readChainCommitment() external view override returns (bytes memory commitment) {
-        return abi.encode(_prepareChainCommitment());
     }
 
     // function recoverFromFailedMigrationToGateway(
