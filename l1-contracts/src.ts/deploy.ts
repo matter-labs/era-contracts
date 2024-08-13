@@ -209,12 +209,7 @@ export class Deployer {
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(
         ["uint256", "uint256", "address", "address"],
-        [
-          getNumberFromEnv("ETH_CLIENT_CHAIN_ID"),
-          eraChainId,
-          this.addresses.Bridges.SharedBridgeProxy,
-          ADDRESS_ONE,
-        ]
+        [getNumberFromEnv("ETH_CLIENT_CHAIN_ID"), eraChainId, this.addresses.Bridges.SharedBridgeProxy, ADDRESS_ONE]
       ),
     };
     const ntvDeployment = {

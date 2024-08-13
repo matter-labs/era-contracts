@@ -61,12 +61,7 @@ describe("ERC20Bridge", function () {
     let constructorArgs = ethers.utils.defaultAbiCoder.encode(
       ["uint256", "uint256", "address", "address"],
       /// note in real deployment we have to transfer ownership of standard deployer here
-      [
-        testChainId,
-        1,
-        unapplyL1ToL2Alias(l1BridgeWallet.address),
-        ethers.constants.AddressZero,
-      ]
+      [testChainId, 1, unapplyL1ToL2Alias(l1BridgeWallet.address), ethers.constants.AddressZero]
     );
     await setCode(
       deployerWallet,
