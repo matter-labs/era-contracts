@@ -78,9 +78,6 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Sleep
-        run: sleep 120
-
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
         with:
@@ -99,11 +96,9 @@ jobs:
         working-directory: ./l2-contracts
         run: yarn
 
-      - name: Build l2 deps
-        run: yarn l2 build
-
-      - name: Build l1 deps
-        run: yarn l1 build
+      - name: Install l1 deps
+        working-directory: ./l1-contracts
+        run: yarn
 
       - name: Run tests
         working-directory: ./l1-contracts
@@ -126,6 +121,14 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      - name: Install l2 deps
+        working-directory: ./l2-contracts
+        run: yarn
+
+      - name: Install l1 deps
+        working-directory: ./l1-contracts
+        run: yarn
+
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
         with:
@@ -138,6 +141,7 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
+            l1-contracts/lib
 
       - name: Run tests
         run: yarn l1 test --no-compile
@@ -187,9 +191,6 @@ jobs:
 
       - name: Install dependencies
         run: yarn
-
-      - name: Sleep
-        run: sleep 120
 
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
