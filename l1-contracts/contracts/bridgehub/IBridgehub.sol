@@ -58,6 +58,8 @@ interface IBridgehub is IL1AssetHandler {
         address sender
     );
 
+    event SettlementLayerRegistered(uint256 indexed chainId, bool indexed isWhitelisted);
+
     /// @notice Starts the transfer of admin rights. Only the current admin or owner can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin

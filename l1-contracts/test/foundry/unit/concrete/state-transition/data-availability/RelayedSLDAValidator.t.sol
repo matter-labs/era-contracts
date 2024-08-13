@@ -42,7 +42,7 @@ contract RelayedSLDAValidatorTest is Test {
         bytes memory operatorDAInput = abi.encodePacked(daInput, l1DaInput);
 
         vm.expectRevert("l1-da-validator/invalid-pubdata-source");
-        daValidator.checkDA(CHAIN_ID, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
+        daValidator.checkDA(CHAIN_ID, 0, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
     }
 
     function test_revertWhen_PubdataInputTooSmall() public {
@@ -64,7 +64,7 @@ contract RelayedSLDAValidatorTest is Test {
         bytes memory operatorDAInput = abi.encodePacked(daInput, pubdataSource, l1DaInput);
 
         vm.expectRevert("pubdata too small");
-        daValidator.checkDA(CHAIN_ID, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
+        daValidator.checkDA(CHAIN_ID, 0, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
     }
 
     function test_checkDA() public {

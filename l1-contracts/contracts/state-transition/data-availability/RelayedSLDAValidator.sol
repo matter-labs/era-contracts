@@ -7,7 +7,7 @@ pragma solidity 0.8.24;
 import {IL1DAValidator, L1DAValidatorOutput, PubdataSource} from "../chain-interfaces/IL1DAValidator.sol";
 import {IL1Messenger} from "../../common/interfaces/IL1Messenger.sol";
 
-import {CalldataDA} from "./CalldataDA.sol";
+import {CalldataDAGateway} from "./CalldataDAGateway.sol";
 
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 
@@ -15,10 +15,21 @@ import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAd
 /// @dev For compatibility reasons it accepts calldata in the same format as the `RollupL1DAValidator`, but unlike the latter it
 /// does not support blobs.
 /// @dev Note that it does not provide any compression whatsoever.
-contract RelayedSLDAValidator is IL1DAValidator, CalldataDA {
+contract RelayedSLDAValidator is IL1DAValidator, CalldataDAGateway {
+    function _relayCalldata(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        bytes calldata _pubdata
+    ) internal {
+        // Re-sending all the pubdata in pure form to L1.
+        // slither-disable-next-line unused-return
+        IL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(abi.encode(_chainId, _batchNumber, _pubdata));
+    }
+
     /// @inheritdoc IL1DAValidator
     function checkDA(
         uint256 _chainId,
+        uint256 _batchNumber,
         bytes32 _l2DAValidatorOutputHash,
         bytes calldata _operatorDAInput,
         uint256 _maxBlobsSupported
@@ -56,10 +67,7 @@ contract RelayedSLDAValidator is IL1DAValidator, CalldataDA {
                 l1DaInput[1:]
             );
 
-            // Re-sending all the pubdata in pure form to L1.
-            // FIXME: we should also supply batch number, this is needed for logs to work.
-            // slither-disable-next-line unused-return
-            IL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(abi.encode(_chainId, pubdata));
+            _relayCalldata(_chainId, _batchNumber, pubdata);
 
             output.blobsOpeningCommitments = blobCommitments;
         } else {

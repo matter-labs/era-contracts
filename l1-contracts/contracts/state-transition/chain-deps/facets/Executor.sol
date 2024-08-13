@@ -53,6 +53,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA(
             s.chainId,
+            uint256(_newBatch.batchNumber),
             logOutput.l2DAValidatorOutputHash,
             _newBatch.operatorDAInput,
             TOTAL_BLOBS_IN_COMMITMENT

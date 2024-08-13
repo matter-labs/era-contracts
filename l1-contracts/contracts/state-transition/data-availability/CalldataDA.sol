@@ -9,8 +9,11 @@ pragma solidity 0.8.24;
 /// @dev Our circuits will prove that a EIP-4844 blob and our internal blob are the same.
 uint256 constant BLOB_SIZE_BYTES = 126_976;
 
-// the state diff hash, hash of pubdata + the number of blobs.
+/// @dev The state diff hash, hash of pubdata + the number of blobs.
 uint256 constant BLOB_DATA_OFFSET = 65;
+
+/// @dev The size of the commitment for a single blob. 
+uint256 constant BLOB_COMMITMENT_SIZE = 32;
 
 /// @notice Contract that contains the functionality for process the calldata DA.
 /// @dev The expected l2DAValidator that should be used with it `RollupL2DAValidator`.
@@ -55,12 +58,7 @@ abstract contract CalldataDA {
 
         require(_operatorDAInput.length >= BLOB_DATA_OFFSET + 32 * blobsProvided, "invalid blobs hashes");
 
-        assembly {
-            // The pointer to the allocated memory above. We skip 32 bytes to avoid overwriting the length.
-            let blobsPtr := add(blobsLinearHashes, 0x20)
-            let inputPtr := add(_operatorDAInput.offset, BLOB_DATA_OFFSET)
-            calldatacopy(blobsPtr, inputPtr, mul(blobsProvided, 32))
-        }
+        cloneCalldata(blobsLinearHashes, _operatorDAInput[BLOB_DATA_OFFSET:], blobsProvided);
 
         uint256 ptr = BLOB_DATA_OFFSET + 32 * blobsProvided;
 
@@ -82,20 +80,35 @@ abstract contract CalldataDA {
         bytes32 _fullPubdataHash,
         uint256 _maxBlobsSupported,
         bytes calldata _pubdataInput
-    ) internal pure returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
-        require(_blobsProvided == 1, "only one blob with calldata");
-        require(_pubdataInput.length >= 32, "pubdata too small");
+    ) internal virtual pure returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
+        require(_blobsProvided == 1, "one blob with calldata");
 
         // We typically do not know whether we'll use calldata or blobs at the time when
         // we start proving the batch. That's why the blob commitment for a single blob is still present in the case of calldata.
 
         blobCommitments = new bytes32[](_maxBlobsSupported);
 
-        _pubdata = _pubdataInput[:_pubdataInput.length - 32];
+        _pubdata = _pubdataInput[:_pubdataInput.length - BLOB_COMMITMENT_SIZE];
 
-        // FIXME: allow larger lengths for Gateway-based chains.
         require(_pubdata.length <= BLOB_SIZE_BYTES, "cz");
         require(_fullPubdataHash == keccak256(_pubdata), "wp");
-        blobCommitments[0] = bytes32(_pubdataInput[_pubdataInput.length - 32:_pubdataInput.length]);
+        blobCommitments[0] = bytes32(_pubdataInput[_pubdataInput.length - BLOB_COMMITMENT_SIZE:_pubdataInput.length]);
+    }
+
+    /// @notice Method that clones a slice of calldata into a bytes32[] memory array.
+    /// @param _dst The destination array.
+    /// @param _input The input calldata.   
+    /// @param _len The length of the slice in 32-byte words to clone.
+    function cloneCalldata(
+        bytes32[] memory _dst,
+        bytes calldata _input,
+        uint256 _len
+    ) internal pure {
+        assembly {
+            // The pointer to the allocated memory above. We skip 32 bytes to avoid overwriting the length.
+            let dstPtr := add(_dst, 0x20)
+            let inputPtr := _input.offset
+            calldatacopy(dstPtr, inputPtr, mul(_len, 32))
+        }
     }
 }
