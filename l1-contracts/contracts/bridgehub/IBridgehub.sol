@@ -129,7 +129,7 @@ interface IBridgehub is IL1AssetHandler {
     //// Registry
 
     function createNewChain(
-        uint256 _chainId,
+        bytes32 _assetId,
         address _stateTransitionManager,
         address _baseToken,
         uint256 _salt,

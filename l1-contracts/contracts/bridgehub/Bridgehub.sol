@@ -65,6 +65,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
     mapping(uint256 _chainId => bytes32) public baseTokenAssetId;
 
+    /// @notice Mapping from asset id encoding of the base token to chain id
+    mapping(bytes32 _assetId => uint256 chainId) public baseTokenChainId;
+
     /// @notice The deployment tracker for the state transition managers.
     ISTMDeploymentTracker public stmDeployer;
 
@@ -224,9 +227,26 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                           Chain Registration
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Register new chain id. New chains can be only registered on Bridgehub deployed on L1. Later they can be moved to any other layer.
+    /// @dev Allows to register custom asset handler for chains.
+    /// @param _baseToken The address of chain's base token.
+    /// @param _chainAssetHandlerAddress The address of the asset handler to be set for the provided asset.
+    /// @param _chainId The id of the chain to be registed.
+    function registerNewChain(
+        address _baseToken,
+        address _chainAssetHandlerAddress,
+        uint256 _chainId
+    ) external onlyOwnerOrAdmin nonReentrant whenNotPaused {
+        bytes32 registeredAssetId = _chainAssetHandlerAddress == address(0)
+            ? DataEncoding.encodeNTVAssetId(block.chainid, _baseToken)
+            : DataEncoding.encodeAssetId(block.chainid, _chainAssetHandlerAddress, _baseToken);
+        baseTokenAssetId[_chainId] = registeredAssetId;
+        baseTokenChainId[registeredAssetId] = _chainId;
+    }
+
     /// @notice register new chain. New chains can be only registered on Bridgehub deployed on L1. Later they can be moved to any other layer.
     /// @notice for Eth the baseToken address is 1
-    /// @param _chainId the chainId of the chain
+    /// @param _baseTokenAssetId the encoded base token asset id
     /// @param _stateTransitionManager the state transition manager address
     /// @param _baseToken the base token of the chain
     /// @param _salt the salt for the chainId, currently not used
@@ -234,7 +254,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _initData the fixed initialization data for the chain
     /// @param _factoryDeps the factory dependencies for the chain's deployment
     function createNewChain(
-        uint256 _chainId,
+        bytes32 _baseTokenAssetId,
         address _stateTransitionManager,
         address _baseToken,
         // solhint-disable-next-line no-unused-vars
@@ -243,36 +263,34 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
     ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256) {
+        uint256 chainId = baseTokenChainId[_baseTokenAssetId];
         require(L1_CHAIN_ID == block.chainid, "BH: New chain registration only allowed on L1");
-        require(_chainId != 0, "BH: chainId cannot be 0");
-        require(_chainId <= type(uint48).max, "BH: chainId too large");
-        require(_chainId != block.chainid, "BH: chain id must not match current chainid");
+        require(chainId != 0, "BH: chainId cannot be 0");
+        require(chainId <= type(uint48).max, "BH: chainId too large");
+        require(chainId != block.chainid, "BH: chain id must not match current chainid");
 
         require(stateTransitionManagerIsRegistered[_stateTransitionManager], "BH: state transition not registered");
         require(tokenIsRegistered[_baseToken], "BH: token not registered");
         require(address(sharedBridge) != address(0), "BH: shared bridge not set");
 
-        require(stateTransitionManager[_chainId] == address(0), "BH: chainId already registered");
+        require(stateTransitionManager[chainId] == address(0), "BH: chainId already registered");
 
-        stateTransitionManager[_chainId] = _stateTransitionManager;
-        baseToken[_chainId] = _baseToken;
-
-        /// For now all base tokens have to use the NTV.
-        baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(block.chainid, _baseToken);
-        settlementLayer[_chainId] = block.chainid;
+        stateTransitionManager[chainId] = _stateTransitionManager;
+        baseToken[chainId] = _baseToken;
+        settlementLayer[chainId] = block.chainid;
 
         IStateTransitionManager(_stateTransitionManager).createNewChain({
-            _chainId: _chainId,
+            _chainId: chainId,
             _baseToken: _baseToken,
             _sharedBridge: address(sharedBridge),
             _admin: _admin,
             _initData: _initData,
             _factoryDeps: _factoryDeps
         });
-        messageRoot.addNewChain(_chainId);
+        messageRoot.addNewChain(chainId);
 
-        emit NewChain(_chainId, _stateTransitionManager, _admin);
-        return _chainId;
+        emit NewChain(chainId, _stateTransitionManager, _admin);
+        return chainId;
     }
 
     /*//////////////////////////////////////////////////////////////
