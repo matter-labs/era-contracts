@@ -89,6 +89,7 @@ jobs:
             l1-contracts/cache
             l1-contracts/typechain
             l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
 
       - name: Run tests
         working-directory: ./l1-contracts

@@ -46,6 +46,7 @@ jobs:
             l1-contracts/cache
             l1-contracts/out
             l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
             system-contracts/artifacts-zk
             system-contracts/bootloader/build
             system-contracts/cache-zk
@@ -70,6 +71,7 @@ jobs:
             l1-contracts/cache
             l1-contracts/out
             l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
             system-contracts/artifacts-zk
             system-contracts/bootloader/build
             system-contracts/cache-zk
