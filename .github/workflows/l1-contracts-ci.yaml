@@ -79,6 +79,10 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      - name: Install l2 deps
+        working-directory: ./l2-contracts
+        run: yarn
+
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
         with:
