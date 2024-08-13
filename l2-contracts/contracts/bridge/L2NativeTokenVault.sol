@@ -49,16 +49,22 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         _;
     }
 
-    /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
+    /// @notice Initializes the bridge contract for later use.
     /// @param _l1ChainId The L1 chain id differs between mainnet and testnets.
+    /// @param _eraChainId The chain id of Era for legacy reasons.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
+    /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
+    /// @param _l2TokenBeacon The address of the L2 token beacon for legacy chains.
+    /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed.
     constructor(
         uint256 _l1ChainId,
-        bytes32 _l2TokenProxyBytecodeHash,
-        address _aliasedOwner,
         uint256 _eraChainId,
-        address _legacySharedBridge
+        address _aliasedOwner,
+        bytes32 _l2TokenProxyBytecodeHash,
+        address _legacySharedBridge,
+        address _l2TokenBeacon,
+        bool _contractsDeployedAlready
     ) {
         L1_CHAIN_ID = _l1ChainId;
 
@@ -75,25 +81,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
 
         ERA_CHAIN_ID = _eraChainId;
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
-    }
 
-    /// @notice Sets L2 token beacon used by wrapped ERC20 tokens deployed by NTV.
-    /// @dev Sets the l2TokenBeacon, called after initialize.
-    /// @param _l2TokenBeacon The address of L2 token beacon implementation.
-    /// @param _l2TokenProxyBytecodeHash The bytecode hash of the L2 token proxy that will be deployed for wrapped tokens.
-    function setL2TokenBeacon(address _l2TokenBeacon, bytes32 _l2TokenProxyBytecodeHash) external onlyOwner {
-        l2TokenBeacon = UpgradeableBeacon(_l2TokenBeacon);
-        l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
-        emit L2TokenBeaconUpdated(_l2TokenBeacon, _l2TokenProxyBytecodeHash);
-    }
-
-    /// @notice Configure L2 token beacon used by wrapped ERC20 tokens deployed by NTV.
-    /// @dev we don't call this in the constructor, as we need to provide factory deps.
-    /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed.
-    function configureL2TokenBeacon(bool _contractsDeployedAlready, address _l2TokenBeacon) external {
-        if (address(l2TokenBeacon) != address(0)) {
-            revert AddressMismatch(address(l2TokenBeacon), address(0));
-        }
         if (_contractsDeployedAlready) {
             if (_l2TokenBeacon == address(0)) {
                 revert EmptyAddress();
@@ -103,7 +91,14 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
             address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
             l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
             l2TokenBeacon.transferOwnership(owner());
+            emit L2TokenBeaconUpdated(_l2TokenBeacon, _l2TokenProxyBytecodeHash);
         }
+    }
+
+    function setLegacyTokenAssetId(address _l2TokenAddress) public {
+        address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress);
+        tokenAddress[assetId] = _l2TokenAddress;
     }
 
     /// @notice Used when the chain receives a transfer from L1 Shared Bridge and correspondingly mints the asset.
@@ -121,7 +116,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         ) = DataEncoding.decodeBridgeMintData(_data);
 
         if (token == address(0)) {
-            address expectedToken = _calculateCreate2TokenAddress(originToken);
+            address expectedToken = calculateCreate2TokenAddress(originToken);
             bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, originToken);
             if (_assetId != expectedAssetId) {
                 // Make sure that a NativeTokenVault sent the message
@@ -190,9 +185,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     function l2TokenAddress(address _l1Token) public view override returns (address expectedToken) {
         bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         expectedToken = tokenAddress[expectedAssetId];
-        if (expectedToken == address(0)) {
-            expectedToken = _calculateCreate2TokenAddress(_l1Token);
-        }
     }
 
     /// @notice Deploys and initializes the L2 token for the L1 counterpart.
@@ -242,7 +234,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
     /// @param _l1Token The address of token on L1.
     /// @return Address of an L2 token counterpart.
-    function _calculateCreate2TokenAddress(address _l1Token) internal view returns (address) {
+    function calculateCreate2TokenAddress(address _l1Token) public view returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_l1Token);
         return

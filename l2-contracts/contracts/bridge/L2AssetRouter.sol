@@ -77,13 +77,12 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
         _;
     }
 
-    /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
     /// @param _l1SharedBridge The address of the L1 Bridge contract.
     /// @param _l1Bridge The address of the legacy L1 Bridge contract.
     constructor(
-        uint256 _eraChainId,
         uint256 _l1ChainId,
+        uint256 _eraChainId,
         address _l1SharedBridge,
         address _l1Bridge,
         address _legacySharedBridge
