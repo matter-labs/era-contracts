@@ -38,6 +38,7 @@ jobs:
             l2-contracts/cache-zk
             l2-contracts/typechain
             l1-contracts/lib
+            l1-contracts/lib/openzeppelin-contracts
 
   lint:
     runs-on: ubuntu-latest
@@ -91,6 +92,7 @@ jobs:
             l2-contracts/cache-zk
             l2-contracts/typechain
             l1-contracts/lib
+            l1-contracts/lib/openzeppelin-contracts
 
       - name: Install l2 deps
         working-directory: ./l2-contracts
@@ -142,6 +144,7 @@ jobs:
             l2-contracts/cache-zk
             l2-contracts/typechain
             l1-contracts/lib
+            l1-contracts/lib/openzeppelin-contracts
 
       - name: Run tests
         run: yarn l1 test --no-compile
