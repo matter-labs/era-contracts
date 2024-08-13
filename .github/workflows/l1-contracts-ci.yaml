@@ -19,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         run: yarn
-      
+
       - name: Build L2 artifacts
         run: yarn l2 build
 

@@ -29,6 +29,9 @@ jobs:
         run: yarn
 
       - name: Build artifacts
+        run: yarn l1 build
+
+      - name: Build artifacts
         working-directory: ./l1-contracts
         run: forge build
 
