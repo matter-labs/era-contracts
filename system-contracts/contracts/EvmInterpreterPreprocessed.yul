@@ -21,10 +21,7 @@ object "EVMInterpreter" {
             // This error should never be triggered
             // require(offset > 100, "Offset too small");
 
-            mstore8(sub(offset, 100), 0xd9)
-            mstore8(sub(offset, 99), 0xeb)
-            mstore8(sub(offset, 98), 0x76)
-            mstore8(sub(offset, 97), 0xb2)
+            mstore(sub(offset, 100), 0xD9EB76B200000000000000000000000000000000000000000000000000000000)
             mstore(sub(offset, 96), gasLeft)
             mstore(sub(offset, 64), 0x40)
             mstore(sub(offset, 32), len)
@@ -276,11 +273,7 @@ object "EVMInterpreter" {
         }
         
         function _getRawCodeHash(account) -> hash {
-            // TODO: Unhardcode this selector
-            mstore8(0, 0x4d)
-            mstore8(1, 0xe2)
-            mstore8(2, 0xe4)
-            mstore8(3, 0x68)
+            mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
             mstore(4, account)
         
             let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -295,12 +288,7 @@ object "EVMInterpreter" {
         
         function _getCodeHash(account) -> hash {
             // function getCodeHash(uint256 _input) external view override returns (bytes32)
-            // 0xe03fe177
-            // TODO: Unhardcode this selector
-            mstore8(0, 0xe0)
-            mstore8(1, 0x3f)
-            mstore8(2, 0xe1)
-            mstore8(3, 0x77)
+            mstore(0, 0xE03FE17700000000000000000000000000000000000000000000000000000000)
             mstore(4, account)
         
             let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -384,11 +372,7 @@ object "EVMInterpreter" {
         
         function consumeEvmFrame() -> passGas, isStatic, callerEVM {
             // function consumeEvmFrame() external returns (uint256 passGas, bool isStatic)
-            // TODO: Unhardcode selector
-            mstore8(0, 0x04)
-            mstore8(1, 0xc1)
-            mstore8(2, 0x4e)
-            mstore8(3, 0x9e)
+            mstore(0, 0x04C14E9E00000000000000000000000000000000000000000000000000000000)
         
             let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 64)
         
@@ -633,11 +617,7 @@ object "EVMInterpreter" {
         }
         
         function isSlotWarm(key) -> isWarm {
-            // TODO: Unhardcode this selector 0x482d2e74
-            mstore8(0, 0x48)
-            mstore8(1, 0x2d)
-            mstore8(2, 0x2e)
-            mstore8(3, 0x74)
+            mstore(0, 0x482D2E7400000000000000000000000000000000000000000000000000000000)
             mstore(4, key)
         
             let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
@@ -651,11 +631,7 @@ object "EVMInterpreter" {
         }
         
         function warmSlot(key,currentValue) -> isWarm, originalValue {
-            // TODO: Unhardcode this selector 0xbdf78160
-            mstore8(0, 0xbd)
-            mstore8(1, 0xf7)
-            mstore8(2, 0x81)
-            mstore8(3, 0x60)
+            mstore(0, 0xBDF7816000000000000000000000000000000000000000000000000000000000)
             mstore(4, key)
             mstore(36,currentValue)
         
@@ -748,10 +724,7 @@ object "EVMInterpreter" {
         }
         
         function incrementNonce(addr) {
-            mstore8(0, 0x30)
-            mstore8(1, 0x63)
-            mstore8(2, 0x95)
-            mstore8(3, 0xc6)
+            mstore(0, 0x306395C600000000000000000000000000000000000000000000000000000000)
             mstore(4, addr)
         
             let result := call(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 0, 36, 0, 0)
@@ -783,11 +756,7 @@ object "EVMInterpreter" {
         }
         
         function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
-            // TODO: Unhardcode this selector 0x8db2ba78
-            mstore8(0, 0x8d)
-            mstore8(1, 0xb2)
-            mstore8(2, 0xba)
-            mstore8(3, 0x78)
+            mstore(0, 0x8DB2BA7800000000000000000000000000000000000000000000000000000000)
             mstore(4, addr)
         
             let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
@@ -801,10 +770,7 @@ object "EVMInterpreter" {
         }
         
         function getNonce(addr) -> nonce {
-            mstore8(0, 0xfb)
-            mstore8(1, 0x1a)
-            mstore8(2, 0x9a)
-            mstore8(3, 0x57)
+            mstore(0, 0xFB1A9A5700000000000000000000000000000000000000000000000000000000)
             mstore(4, addr)
         
             let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -817,10 +783,7 @@ object "EVMInterpreter" {
         }
         
         function getRawNonce(addr) -> nonce {
-            mstore8(0, 0x5a)
-            mstore8(1, 0xa9)
-            mstore8(2, 0xb6)
-            mstore8(3, 0xb5)
+            mstore(0, 0x5AA9B6B500000000000000000000000000000000000000000000000000000000)
             mstore(4, addr)
         
             let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -839,10 +802,7 @@ object "EVMInterpreter" {
             //      address(SYSTEM_CONTRACTS_OFFSET + 0x02)
             // );
         
-            mstore8(0, 0x8c)
-            mstore8(1, 0x04)
-            mstore8(2, 0x04)
-            mstore8(3, 0x77)
+            mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
             mstore(4, _addr)
         
             let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -857,12 +817,8 @@ object "EVMInterpreter" {
         
         function _pushEVMFrame(_passGas, _isStatic) {
             // function pushEVMFrame(uint256 _passGas, bool _isStatic) external
-            let selector := 0xead77156
         
-            mstore8(0, 0xea)
-            mstore8(1, 0xd7)
-            mstore8(2, 0x71)
-            mstore8(3, 0x56)
+            mstore(0, 0xEAD7715600000000000000000000000000000000000000000000000000000000)
             mstore(4, _passGas)
             mstore(36, _isStatic)
         
@@ -875,13 +831,8 @@ object "EVMInterpreter" {
         
         function _popEVMFrame() {
             // function popEVMFrame() external
-            // 0xe467d2f0
-            let selector := 0xe467d2f0
         
-            mstore8(0, 0xe4)
-            mstore8(1, 0x67)
-            mstore8(2, 0xd2)
-            mstore8(3, 0xf0)
+            mstore(0, 0xE467D2F000000000000000000000000000000000000000000000000000000000)
         
             let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 0)
             if iszero(success) {
@@ -1309,12 +1260,7 @@ object "EVMInterpreter" {
         }
         
         function _fetchConstructorReturnGas() -> gasLeft {
-            //selector is 0x24e5ab4a
-        
-            mstore8(0, 0x24)
-            mstore8(1, 0xe5)
-            mstore8(2, 0xab)
-            mstore8(3, 0x4a)
+            mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
         
             let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 32)
         
@@ -1522,7 +1468,7 @@ object "EVMInterpreter" {
         
             {
                 let hashedBytecode := keccak256(add(MEM_OFFSET_INNER(), offset), size)
-                mstore8(0, 0xFF)
+                mstore(0, 0xFF00000000000000000000000000000000000000000000000000000000000000)
                 mstore(0x01, shl(0x60, address()))
                 mstore(0x15, salt)
                 mstore(0x35, hashedBytecode)
@@ -3272,11 +3218,7 @@ object "EVMInterpreter" {
             }
             
             function _getRawCodeHash(account) -> hash {
-                // TODO: Unhardcode this selector
-                mstore8(0, 0x4d)
-                mstore8(1, 0xe2)
-                mstore8(2, 0xe4)
-                mstore8(3, 0x68)
+                mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
                 mstore(4, account)
             
                 let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -3291,12 +3233,7 @@ object "EVMInterpreter" {
             
             function _getCodeHash(account) -> hash {
                 // function getCodeHash(uint256 _input) external view override returns (bytes32)
-                // 0xe03fe177
-                // TODO: Unhardcode this selector
-                mstore8(0, 0xe0)
-                mstore8(1, 0x3f)
-                mstore8(2, 0xe1)
-                mstore8(3, 0x77)
+                mstore(0, 0xE03FE17700000000000000000000000000000000000000000000000000000000)
                 mstore(4, account)
             
                 let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -3380,11 +3317,7 @@ object "EVMInterpreter" {
             
             function consumeEvmFrame() -> passGas, isStatic, callerEVM {
                 // function consumeEvmFrame() external returns (uint256 passGas, bool isStatic)
-                // TODO: Unhardcode selector
-                mstore8(0, 0x04)
-                mstore8(1, 0xc1)
-                mstore8(2, 0x4e)
-                mstore8(3, 0x9e)
+                mstore(0, 0x04C14E9E00000000000000000000000000000000000000000000000000000000)
             
                 let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 64)
             
@@ -3629,11 +3562,7 @@ object "EVMInterpreter" {
             }
             
             function isSlotWarm(key) -> isWarm {
-                // TODO: Unhardcode this selector 0x482d2e74
-                mstore8(0, 0x48)
-                mstore8(1, 0x2d)
-                mstore8(2, 0x2e)
-                mstore8(3, 0x74)
+                mstore(0, 0x482D2E7400000000000000000000000000000000000000000000000000000000)
                 mstore(4, key)
             
                 let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
@@ -3647,11 +3576,7 @@ object "EVMInterpreter" {
             }
             
             function warmSlot(key,currentValue) -> isWarm, originalValue {
-                // TODO: Unhardcode this selector 0xbdf78160
-                mstore8(0, 0xbd)
-                mstore8(1, 0xf7)
-                mstore8(2, 0x81)
-                mstore8(3, 0x60)
+                mstore(0, 0xBDF7816000000000000000000000000000000000000000000000000000000000)
                 mstore(4, key)
                 mstore(36,currentValue)
             
@@ -3744,10 +3669,7 @@ object "EVMInterpreter" {
             }
             
             function incrementNonce(addr) {
-                mstore8(0, 0x30)
-                mstore8(1, 0x63)
-                mstore8(2, 0x95)
-                mstore8(3, 0xc6)
+                mstore(0, 0x306395C600000000000000000000000000000000000000000000000000000000)
                 mstore(4, addr)
             
                 let result := call(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 0, 36, 0, 0)
@@ -3779,11 +3701,7 @@ object "EVMInterpreter" {
             }
             
             function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
-                // TODO: Unhardcode this selector 0x8db2ba78
-                mstore8(0, 0x8d)
-                mstore8(1, 0xb2)
-                mstore8(2, 0xba)
-                mstore8(3, 0x78)
+                mstore(0, 0x8DB2BA7800000000000000000000000000000000000000000000000000000000)
                 mstore(4, addr)
             
                 let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
@@ -3797,10 +3715,7 @@ object "EVMInterpreter" {
             }
             
             function getNonce(addr) -> nonce {
-                mstore8(0, 0xfb)
-                mstore8(1, 0x1a)
-                mstore8(2, 0x9a)
-                mstore8(3, 0x57)
+                mstore(0, 0xFB1A9A5700000000000000000000000000000000000000000000000000000000)
                 mstore(4, addr)
             
                 let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -3813,10 +3728,7 @@ object "EVMInterpreter" {
             }
             
             function getRawNonce(addr) -> nonce {
-                mstore8(0, 0x5a)
-                mstore8(1, 0xa9)
-                mstore8(2, 0xb6)
-                mstore8(3, 0xb5)
+                mstore(0, 0x5AA9B6B500000000000000000000000000000000000000000000000000000000)
                 mstore(4, addr)
             
                 let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -3835,10 +3747,7 @@ object "EVMInterpreter" {
                 //      address(SYSTEM_CONTRACTS_OFFSET + 0x02)
                 // );
             
-                mstore8(0, 0x8c)
-                mstore8(1, 0x04)
-                mstore8(2, 0x04)
-                mstore8(3, 0x77)
+                mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
                 mstore(4, _addr)
             
                 let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -3853,12 +3762,8 @@ object "EVMInterpreter" {
             
             function _pushEVMFrame(_passGas, _isStatic) {
                 // function pushEVMFrame(uint256 _passGas, bool _isStatic) external
-                let selector := 0xead77156
             
-                mstore8(0, 0xea)
-                mstore8(1, 0xd7)
-                mstore8(2, 0x71)
-                mstore8(3, 0x56)
+                mstore(0, 0xEAD7715600000000000000000000000000000000000000000000000000000000)
                 mstore(4, _passGas)
                 mstore(36, _isStatic)
             
@@ -3871,13 +3776,8 @@ object "EVMInterpreter" {
             
             function _popEVMFrame() {
                 // function popEVMFrame() external
-                // 0xe467d2f0
-                let selector := 0xe467d2f0
             
-                mstore8(0, 0xe4)
-                mstore8(1, 0x67)
-                mstore8(2, 0xd2)
-                mstore8(3, 0xf0)
+                mstore(0, 0xE467D2F000000000000000000000000000000000000000000000000000000000)
             
                 let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 0)
                 if iszero(success) {
@@ -4305,12 +4205,7 @@ object "EVMInterpreter" {
             }
             
             function _fetchConstructorReturnGas() -> gasLeft {
-                //selector is 0x24e5ab4a
-            
-                mstore8(0, 0x24)
-                mstore8(1, 0xe5)
-                mstore8(2, 0xab)
-                mstore8(3, 0x4a)
+                mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
             
                 let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 32)
             
@@ -4518,7 +4413,7 @@ object "EVMInterpreter" {
             
                 {
                     let hashedBytecode := keccak256(add(MEM_OFFSET_INNER(), offset), size)
-                    mstore8(0, 0xFF)
+                    mstore(0, 0xFF00000000000000000000000000000000000000000000000000000000000000)
                     mstore(0x01, shl(0x60, address()))
                     mstore(0x15, salt)
                     mstore(0x35, hashedBytecode)
