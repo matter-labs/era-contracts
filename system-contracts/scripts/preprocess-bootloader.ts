@@ -51,10 +51,10 @@ function getPaddedSelector(contractName: string, method: string): string {
 function getSystemContextCodeHash() {
   let bytecode;
   try {
-    bytecode = hre.artifacts.readArtifactSync("SystemContext").bytecode;
-  } catch (e) {
     const artifact = JSON.parse(fs.readFileSync("zkout/SystemContext.sol/SystemContext.json", { encoding: "utf-8" }));
     bytecode = "0x" + artifact.bytecode.object;
+  } catch (e) {
+    bytecode = hre.artifacts.readArtifactSync("SystemContext").bytecode;
   }
   return ethers.utils.hexlify(utils.hashBytecode(bytecode));
 }

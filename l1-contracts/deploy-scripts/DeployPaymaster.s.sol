@@ -8,8 +8,9 @@ import {Utils} from "./Utils.sol";
 
 contract DeployPaymaster is Script {
     using stdToml for string;
-    Config config;
+    Config internal config;
 
+    // solhint-disable-next-line gas-struct-packing
     struct Config {
         address bridgehubAddress;
         address l1SharedBridgeProxy;

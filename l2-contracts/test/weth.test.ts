@@ -2,7 +2,7 @@ import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { expect } from "chai";
 import { ethers } from "ethers";
 import * as hre from "hardhat";
-import { Provider, Wallet } from "zksync-web3";
+import { Provider, Wallet } from "zksync-ethers";
 import type { L2WrappedBaseToken } from "../typechain/L2WrappedBaseToken";
 import type { L2SharedBridge } from "../typechain/L2SharedBridge";
 import { L2SharedBridgeFactory } from "../typechain/L2SharedBridgeFactory";

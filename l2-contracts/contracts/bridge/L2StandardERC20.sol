@@ -7,6 +7,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 import {ERC1967Upgrade} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Upgrade.sol";
 
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
+import {EmptyAddress, Unauthorized, NonSequentialVersion, Unimplemented} from "../L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -47,8 +48,10 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 token
     /// @param _data The additional data that the L1 bridge provide for initialization.
     /// In this case, it is packed `name`/`symbol`/`decimals` of the L1 token.
-    function bridgeInitialize(address _l1Address, bytes memory _data) external initializer {
-        require(_l1Address != address(0), "in6"); // Should be non-zero address
+    function bridgeInitialize(address _l1Address, bytes calldata _data) external initializer {
+        if (_l1Address == address(0)) {
+            revert EmptyAddress();
+        }
         l1Address = _l1Address;
 
         l2Bridge = msg.sender;
@@ -110,14 +113,16 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     /// to ensure that the governor can not accidentally disable future reinitialization of the token.
     function reinitializeToken(
         ERC20Getters calldata _availableGetters,
-        string memory _newName,
-        string memory _newSymbol,
+        string calldata _newName,
+        string calldata _newSymbol,
         uint8 _version
     ) external onlyNextVersion(_version) reinitializer(_version) {
         // It is expected that this token is deployed as a beacon proxy, so we'll
         // allow the governor of the beacon to reinitialize the token.
         address beaconAddress = _getBeacon();
-        require(msg.sender == UpgradeableBeacon(beaconAddress).owner(), "tt");
+        if (msg.sender != UpgradeableBeacon(beaconAddress).owner()) {
+            revert Unauthorized();
+        }
 
         __ERC20_init_unchained(_newName, _newSymbol);
         __ERC20Permit_init(_newName);
@@ -127,14 +132,18 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     }
 
     modifier onlyBridge() {
-        require(msg.sender == l2Bridge, "xnt"); // Only L2 bridge can call this method
+        if (msg.sender != l2Bridge) {
+            revert Unauthorized();
+        }
         _;
     }
 
     modifier onlyNextVersion(uint8 _version) {
         // The version should be incremented by 1. Otherwise, the governor risks disabling
         // future reinitialization of the token by providing too large a version.
-        require(_version == _getInitializedVersion() + 1, "v");
+        if (_version != _getInitializedVersion() + 1) {
+            revert NonSequentialVersion();
+        }
         _;
     }
 
@@ -158,29 +167,29 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
 
     function name() public view override returns (string memory) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
-        if (availableGetters.ignoreName) revert();
+        if (availableGetters.ignoreName) revert Unimplemented();
         return super.name();
     }
 
     function symbol() public view override returns (string memory) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
-        if (availableGetters.ignoreSymbol) revert();
+        if (availableGetters.ignoreSymbol) revert Unimplemented();
         return super.symbol();
     }
 
     function decimals() public view override returns (uint8) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
-        if (availableGetters.ignoreDecimals) revert();
+        if (availableGetters.ignoreDecimals) revert Unimplemented();
         return decimals_;
     }
 
     /// @dev External function to decode a string from bytes.
-    function decodeString(bytes memory _input) external pure returns (string memory result) {
+    function decodeString(bytes calldata _input) external pure returns (string memory result) {
         (result) = abi.decode(_input, (string));
     }
 
     /// @dev External function to decode a uint8 from bytes.
-    function decodeUint8(bytes memory _input) external pure returns (uint8 result) {
+    function decodeUint8(bytes calldata _input) external pure returns (uint8 result) {
         (result) = abi.decode(_input, (uint8));
     }
 }

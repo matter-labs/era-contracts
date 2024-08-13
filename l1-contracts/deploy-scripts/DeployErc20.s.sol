@@ -13,6 +13,7 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {WETH9} from "contracts/dev-contracts/WETH9.sol";
 
 import {Utils} from "./Utils.sol";
+import {MintFailed} from "./ZkSyncScriptErrors.sol";
 
 contract DeployErc20Script is Script {
     using stdToml for string;
@@ -34,7 +35,7 @@ contract DeployErc20Script is Script {
         uint256 mint;
     }
 
-    Config config;
+    Config internal config;
 
     function run() public {
         console.log("Deploying ERC20 Tokens");
@@ -66,7 +67,8 @@ contract DeployErc20Script is Script {
 
         string[] memory tokens = vm.parseTomlKeys(toml, "$.tokens");
 
-        for (uint256 i = 0; i < tokens.length; i++) {
+        uint256 tokensLength = tokens.length;
+        for (uint256 i = 0; i < tokensLength; ++i) {
             TokenDescription memory token;
             string memory key = string.concat("$.tokens.", tokens[i]);
             token.name = toml.readString(string.concat(key, ".name"));
@@ -79,8 +81,9 @@ contract DeployErc20Script is Script {
     }
 
     function deployTokens() internal {
-        for (uint256 i = 0; i < config.tokens.length; i++) {
-            TokenDescription storage token = config.tokens[i];
+        uint256 tokensLength = config.tokens.length;
+        for (uint256 i = 0; i < tokensLength; ++i) {
+            TokenDescription memory token = config.tokens[i];
             console.log("Deploying token:", token.name);
             address tokenAddress = deployErc20({
                 name: token.name,
@@ -130,7 +133,8 @@ contract DeployErc20Script is Script {
 
     function saveOutput() internal {
         string memory tokens = "";
-        for (uint256 i = 0; i < config.tokens.length; i++) {
+        uint256 tokensLength = config.tokens.length;
+        for (uint256 i = 0; i < tokensLength; ++i) {
             TokenDescription memory token = config.tokens[i];
             vm.serializeString(token.symbol, "name", token.name);
             vm.serializeString(token.symbol, "symbol", token.symbol);

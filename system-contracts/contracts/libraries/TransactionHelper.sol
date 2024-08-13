@@ -9,6 +9,7 @@ import {IPaymasterFlow} from "../interfaces/IPaymasterFlow.sol";
 import {BASE_TOKEN_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
 import {RLPEncoder} from "./RLPEncoder.sol";
 import {EfficientCall} from "./EfficientCall.sol";
+import {UnsupportedTxType, InvalidInput, UnsupportedPaymasterFlow} from "../SystemContractErrors.sol";
 
 /// @dev The type id of zkSync's EIP-712-signed transaction.
 uint8 constant EIP_712_TX_TYPE = 0x71;
@@ -78,9 +79,10 @@ library TransactionHelper {
     using SafeERC20 for IERC20;
 
     /// @notice The EIP-712 typehash for the contract's domain
-    bytes32 constant EIP712_DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,string version,uint256 chainId)");
+    bytes32 internal constant EIP712_DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId)");
 
-    bytes32 constant EIP712_TRANSACTION_TYPE_HASH =
+    bytes32 internal constant EIP712_TRANSACTION_TYPE_HASH =
         keccak256(
             "Transaction(uint256 txType,uint256 from,uint256 to,uint256 gasLimit,uint256 gasPerPubdataByteLimit,uint256 maxFeePerGas,uint256 maxPriorityFeePerGas,uint256 paymaster,uint256 nonce,uint256 value,bytes data,bytes32[] factoryDeps,bytes paymasterInput)"
         );
@@ -108,7 +110,7 @@ library TransactionHelper {
         } else {
             // Currently no other transaction types are supported.
             // Any new transaction types will be processed in a similar manner.
-            revert("Encoding unsupported tx");
+            revert UnsupportedTxType(_transaction.txType);
         }
     }
 
@@ -365,14 +367,15 @@ library TransactionHelper {
     /// for tokens, etc. For more information on the expected behavior, check out
     /// the "Paymaster flows" section in the documentation.
     function processPaymasterInput(Transaction calldata _transaction) internal {
-        require(_transaction.paymasterInput.length >= 4, "The standard paymaster input must be at least 4 bytes long");
+        if (_transaction.paymasterInput.length < 4) {
+            revert InvalidInput();
+        }
 
         bytes4 paymasterInputSelector = bytes4(_transaction.paymasterInput[0:4]);
         if (paymasterInputSelector == IPaymasterFlow.approvalBased.selector) {
-            require(
-                _transaction.paymasterInput.length >= 68,
-                "The approvalBased paymaster input must be at least 68 bytes long"
-            );
+            if (_transaction.paymasterInput.length < 68) {
+                revert InvalidInput();
+            }
 
             // While the actual data consists of address, uint256 and bytes data,
             // the data is needed only for the paymaster, so we ignore it here for the sake of optimization
@@ -390,7 +393,7 @@ library TransactionHelper {
         } else if (paymasterInputSelector == IPaymasterFlow.general.selector) {
             // Do nothing. general(bytes) paymaster flow means that the paymaster must interpret these bytes on his own.
         } else {
-            revert("Unsupported paymaster flow");
+            revert UnsupportedPaymasterFlow();
         }
     }
 

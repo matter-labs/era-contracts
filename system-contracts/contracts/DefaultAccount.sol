@@ -9,6 +9,7 @@ import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, INonceHolder} from "./Constants.sol";
 import {Utils} from "./libraries/Utils.sol";
+import {InsufficientFunds, InvalidSig, SigField, FailedToPayOperator} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -99,7 +100,9 @@ contract DefaultAccount is IAccount {
         // should be checked explicitly to prevent user paying for fee for a
         // transaction that wouldn't be included on Ethereum.
         uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
-        require(totalRequiredBalance <= address(this).balance, "Not enough balance for fee + value");
+        if (totalRequiredBalance > address(this).balance) {
+            revert InsufficientFunds(totalRequiredBalance, address(this).balance);
+        }
 
         if (_isValidSignature(txHash, _transaction.signature)) {
             magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
@@ -165,7 +168,9 @@ contract DefaultAccount is IAccount {
     /// @param _signature The signature of the transaction.
     /// @return EIP1271_SUCCESS_RETURN_VALUE if the signature is correct. It reverts otherwise.
     function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
-        require(_signature.length == 65, "Signature length is incorrect");
+        if (_signature.length != 65) {
+            revert InvalidSig(SigField.Length, _signature.length);
+        }
         uint8 v;
         bytes32 r;
         bytes32 s;
@@ -178,7 +183,9 @@ contract DefaultAccount is IAccount {
             s := mload(add(_signature, 0x40))
             v := and(mload(add(_signature, 0x41)), 0xff)
         }
-        require(v == 27 || v == 28, "v is neither 27 nor 28");
+        if (v != 27 && v != 28) {
+            revert InvalidSig(SigField.V, v);
+        }
 
         // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
         // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
@@ -189,7 +196,9 @@ contract DefaultAccount is IAccount {
         // with 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - s1 and flip v from 27 to 28 or
         // vice versa. If your library also generates signatures with 0/1 for v instead 27/28, add 27 to v to accept
         // these malleable signatures as well.
-        require(uint256(s) <= 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0, "Invalid s");
+        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+            revert InvalidSig(SigField.S, uint256(s));
+        }
 
         address recoveredAddress = ecrecover(_hash, v, r, s);
 
@@ -207,7 +216,9 @@ contract DefaultAccount is IAccount {
         Transaction calldata _transaction
     ) external payable ignoreNonBootloader ignoreInDelegateCall {
         bool success = _transaction.payToTheBootloader();
-        require(success, "Failed to pay the fee to the operator");
+        if (!success) {
+            revert FailedToPayOperator();
+        }
     }
 
     /// @notice Method, where the user should prepare for the transaction to be

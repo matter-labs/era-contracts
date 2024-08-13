@@ -1,4 +1,4 @@
-import { hashBytecode } from "zksync-web3/build/src/utils";
+import { hashBytecode } from "zksync-ethers/build/utils";
 import type { CodeOracleTest } from "../typechain";
 import { REAL_CODE_ORACLE_CONTRACT_ADDRESS } from "./shared/constants";
 import { publishBytecode, setCode, getCode, deployContract } from "./shared/utils";
