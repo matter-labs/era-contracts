@@ -67,6 +67,7 @@ async function main() {
     .option("--base-token-name <base-token-name>")
     .option("--base-token-address <base-token-address>")
     .option("--use-governance <use-governance>")
+    .option("--token-multiplier-setter-address <token-multiplier-setter-address>")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -103,16 +104,13 @@ async function main() {
         await deployer.registerToken(baseTokenAddress, useGovernance);
       }
 
-      await deployer.registerHyperchain(
-        baseTokenAddress,
-        cmd.validiumMode,
-        null,
-        gasPrice,
-        true,
-        null,
-        null,
-        useGovernance
-      );
+      const tokenMultiplierSetterAddress = cmd.tokenMultiplierSetterAddress || "";
+
+      await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice, useGovernance);
+      if (tokenMultiplierSetterAddress != "") {
+        console.log(`Using token multiplier setter address: ${tokenMultiplierSetterAddress}`);
+        await deployer.setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress);
+      }
       await deployer.transferAdminFromDeployerToChainAdmin();
     });
 
