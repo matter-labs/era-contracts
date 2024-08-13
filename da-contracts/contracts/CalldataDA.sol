@@ -82,6 +82,7 @@ abstract contract CalldataDA {
         bytes calldata _pubdataInput
     ) internal virtual pure returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
         require(_blobsProvided == 1, "one blob with calldata");
+        require(_pubdataInput.length >= BLOB_COMMITMENT_SIZE, "pubdata too small");
 
         // We typically do not know whether we'll use calldata or blobs at the time when
         // we start proving the batch. That's why the blob commitment for a single blob is still present in the case of calldata.

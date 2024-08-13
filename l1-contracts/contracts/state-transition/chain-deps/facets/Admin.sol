@@ -226,7 +226,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
 
         s.settlementLayer = _settlementLayer;
-        chainBridgeMintData = abi.encode(_prepareChainCommitment());
+        chainBridgeMintData = abi.encode(prepareChainCommitment());
     }
 
     /// @inheritdoc IAdmin
