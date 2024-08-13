@@ -52,8 +52,8 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         // solhint-disable-next-line gas-custom-errors
 
         require(BRIDGE_HUB.stateTransitionManagerIsRegistered(_stmAddress), "STMDT: stm not registered");
-        SHARED_BRIDGE.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_stmAddress))), address(BRIDGE_HUB));
-        BRIDGE_HUB.setAssetHandlerAddressInitial(bytes32(uint256(uint160(_stmAddress))), _stmAddress);
+        SHARED_BRIDGE.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_stmAddress))), address(BRIDGE_HUB));
+        BRIDGE_HUB.setAssetHandlerAddress(bytes32(uint256(uint160(_stmAddress))), _stmAddress);
     }
 
     /// @notice The function responsible for registering the L2 counterpart of an STM asset on the L2 Bridgehub.
@@ -122,7 +122,6 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1STM)))));
     }
 
-    // Todo this works for now, but it will not work in the future if we want to change STM DTs. Probably ok.
     /// @notice Used to register the stm asset in L2 Bridgehub.
     /// @param _chainId the chainId of the chain
     function _registerSTMAssetOnL2Bridgehub(
@@ -132,8 +131,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         address _stmL2Address
     ) internal pure returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes memory l2TxCalldata = abi.encodeCall(
-            /// todo it should not be initial in setAssetHandlerAddressInitial
-            IBridgehub.setAssetHandlerAddressInitial,
+            IBridgehub.setAssetHandlerAddress,
             (bytes32(uint256(uint160(_stmL1Address))), _stmL2Address)
         );
 

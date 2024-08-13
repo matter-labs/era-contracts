@@ -216,7 +216,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev Used to set the assetAddress for a given assetInfo.
     /// @param _additionalData the additional data to identify the asset
     /// @param _assetAddress the asset handler address
-    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetAddress) external {
+    function setAssetHandlerAddress(bytes32 _additionalData, address _assetAddress) external {
         // It is a simplified version of the logic used by the AssetRouter to manage asset handlers. 
         // STM's assetId is `keccak256(abi.encode(L1_CHAIN_ID, stmDeployer, stmAddress))`.
         // And the STMDeployer is considered the deployment tracker for the STM asset.
