@@ -185,6 +185,18 @@ contract RegisterHyperchainScript is Script {
 
         vm.recordLogs();
         bytes memory data = abi.encodeCall(
+            bridgehub.registerNewChain,
+            (config.chainChainId, address(0), config.baseToken)
+        );
+        Utils.executeUpgrade({
+            _governor: ownable.owner(),
+            _salt: bytes32(config.bridgehubCreateNewChainSalt),
+            _target: config.bridgehub,
+            _data: data,
+            _value: 0,
+            _delay: 0
+        });
+        data = abi.encodeCall(
             bridgehub.createNewChain,
             (
                 config.chainChainId,

@@ -1200,6 +1200,24 @@ export class Deployer {
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
     const forceDeploymentsData = await this.genesisForceDeploymentsData();
     const initData = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes"], [initialDiamondCut, forceDeploymentsData]);
+
+    await this.executeDirectOrGovernance(
+      useGovernance,
+      bridgehub,
+      "registerNewChain",
+      [inputChainId, "0x0000000000000000000000000000000000000000", baseTokenAddress],
+      0,
+      {
+        gasPrice,
+        ...txOptions,
+      }
+    );
+    nonce++;
+    if (useGovernance) {
+      // deploying through governance requires two transactions
+      nonce++;
+    }
+
     // note the factory deps are provided at genesis
     const receipt = await this.executeDirectOrGovernance(
       useGovernance,
@@ -1220,7 +1238,7 @@ export class Deployer {
         ...txOptions,
       }
     );
-    const chainId = receipt.logs.find((log) => log.topics[0] == bridgehub.interface.getEventTopic("NewChain"))
+    const chainId = receipt.logs.find((log) => log.topics[0] == bridgehub.interface.getEventTopic("NewChainCreated"))
       .topics[1];
 
     nonce++;

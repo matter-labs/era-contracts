@@ -128,8 +128,10 @@ interface IBridgehub is IL1AssetHandler {
 
     //// Registry
 
+    function registerNewChain(uint256 _chainId, address _chainAssetHandlerAddress, address _baseToken) external;
+
     function createNewChain(
-        bytes32 _assetId,
+        uint256 _chainId,
         address _stateTransitionManager,
         address _baseToken,
         uint256 _salt,
@@ -150,7 +152,13 @@ interface IBridgehub is IL1AssetHandler {
         IMessageRoot _messageRoot
     ) external;
 
-    event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
+    event NewChainRegistered(
+        uint256 indexed chainId,
+        address indexed chainAssetHandlerAddress,
+        address indexed baseToken
+    );
+
+    event NewChainCreated(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
 
     event StateTransitionManagerAdded(address indexed stateTransitionManager);
 
