@@ -35,6 +35,9 @@ jobs:
       - name: Build system-contract artifacts
         run: yarn sc build
 
+      - name: Build l2 artifacts
+        run: yarn l2 build
+
       - name: Create cache
         uses: actions/cache/save@v3
         with:
@@ -42,6 +45,7 @@ jobs:
           path: |
             l1-contracts/cache
             l1-contracts/out
+            l2-contracts/artifacts-zk
             system-contracts/artifacts-zk
             system-contracts/bootloader/build
             system-contracts/cache-zk
@@ -65,6 +69,7 @@ jobs:
           path: |
             l1-contracts/cache
             l1-contracts/out
+            l2-contracts/artifacts-zk
             system-contracts/artifacts-zk
             system-contracts/bootloader/build
             system-contracts/cache-zk
