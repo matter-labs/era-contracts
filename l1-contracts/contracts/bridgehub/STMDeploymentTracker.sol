@@ -32,6 +32,13 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         _;
     }
 
+    /// @notice Checks that the message sender is the bridgehub.
+    modifier onlyOwnerViaRouter(address _prevMsgSender) {
+        // solhint-disable-next-line gas-custom-errors
+        require(msg.sender == address(SHARED_BRIDGE) && _prevMsgSender == owner(), "STM DT: not owner via router");
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation on L1.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(IBridgehub _bridgehub, IL1AssetRouter _sharedBridge) reentrancyGuardInitializer {
@@ -92,31 +99,16 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         // This function is typically used on bridges for e.g.
     }
 
-    // todo this has to be put in L1AssetRouter via TwoBridges for custom base tokens. Hard, because we have to have multiple msg types in bridgehubDeposit in the AssetRouter.
     /// @notice Used to register the stm asset in L2 AssetRouter.
-    /// @param _chainId the chainId of the chain
-    function registerSTMAssetOnL2SharedBridge(
-        uint256 _chainId,
-        address _stmL1Address,
-        uint256 _mintValue,
-        uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByteLimit,
-        address _refundRecipient
-    ) public payable onlyOwner {
-        bytes32 assetId;
-        {
-            assetId = getAssetId(_stmL1Address);
-        }
-        // slither-disable-next-line unused-return
-        SHARED_BRIDGE.setAssetHandlerAddressOnCounterPart{value: msg.value}({
-            _chainId: _chainId,
-            _mintValue: _mintValue,
-            _l2TxGasLimit: _l2TxGasLimit,
-            _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByteLimit,
-            _refundRecipient: _refundRecipient,
-            _assetId: assetId,
-            _assetAddressOnCounterPart: L2_BRIDGEHUB_ADDR
-        });
+    /// @param _prevMsgSender the address that called the Router
+    /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
+    function bridgeCheckCounterpartAddres(
+        uint256,
+        bytes32,
+        address _prevMsgSender,
+        address _assetHandlerAddressOnCounterpart
+    ) external view override onlyOwnerViaRouter(_prevMsgSender) {
+        require(_assetHandlerAddressOnCounterpart == L2_BRIDGEHUB_ADDR, "STMDT: wrong counter part");
     }
 
     function getAssetId(address _l1STM) public view override returns (bytes32) {
