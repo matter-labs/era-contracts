@@ -26,25 +26,28 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 /// @dev The Bridgehub contract serves as the primary entry point for L1<->L2 communication,
 /// facilitating interactions between end user and bridges.
 /// It also manages state transition managers, base tokens, and chain registrations.
+/// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
+/// between different settlement layers (for example from L1 to Gateway).
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice the asset id of Eth
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
-    /// @notice The chain id of L1, this contract will be deployed on multiple layers.
+    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
+    /// L1 that is at the most base layer.
     uint256 public immutable L1_CHAIN_ID;
 
-    /// @notice all the ether is held by the weth bridge
+    /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by this shared Bridge.
     IL1AssetRouter public sharedBridge;
 
-    /// @notice we store registered stateTransitionManagers
+    /// @notice StateTransitionManagers that are registered, and ZKchains that use these STMs can use this bridgehub as settlement layer.
     mapping(address _stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
     /// @notice we store registered tokens (for arbitrary base token)
     mapping(address _baseToken => bool) public tokenIsRegistered;
 
-    /// @notice chainID => StateTransitionManager contract address, storing StateTransitionManager
+    /// @notice chainID => StateTransitionManager contract address, STM that is managing rules for a given ZKchain.
     mapping(uint256 _chainId => address) public stateTransitionManager;
 
-    /// @notice chainID => baseToken contract address, storing baseToken
+    /// @notice chainID => baseToken contract address, token that is used as 'base token' by a given child chain.
     mapping(uint256 _chainId => address) public baseToken;
 
     /// @dev used to manage non critical updates
@@ -90,6 +93,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     constructor(uint256 _l1ChainId, address _owner) reentrancyGuardInitializer {
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
+        // TODO: this assumes that the bridgehub is deployed only on the chains that have ETH as base token.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
     }
@@ -220,7 +224,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                           Chain Registration
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice register new chain
+    /// @notice register new chain. New chains can be only registered on Bridgehub deployed on L1. Later they can be moved to any other layer.
     /// @notice for Eth the baseToken address is 1
     /// @param _chainId the chainId of the chain
     /// @param _stateTransitionManager the state transition manager address
@@ -239,8 +243,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
     ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256) {
+        require(L1_CHAIN_ID == block.chainid, "BH: New chain registration only allowed on L1");
         require(_chainId != 0, "BH: chainId cannot be 0");
         require(_chainId <= type(uint48).max, "BH: chainId too large");
+        require(_chainId != block.chainid, "BH: chain id must not match current chainid");
 
         require(stateTransitionManagerIsRegistered[_stateTransitionManager], "BH: state transition not registered");
         require(tokenIsRegistered[_baseToken], "BH: token not registered");
@@ -520,7 +526,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _data the data for the migration
     function bridgeBurn(
         uint256 _settlementChainId,
-        uint256,
+        uint256, // mintValue
         bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
@@ -549,7 +555,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _assetId the assetId of the chain's STM
     /// @param _bridgehubMintData the data for the mint
     function bridgeMint(
-        uint256,
+        uint256, // chainId
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
     ) external payable override onlyAssetRouter returns (address l1Receiver) {

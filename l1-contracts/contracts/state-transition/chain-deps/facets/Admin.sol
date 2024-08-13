@@ -265,6 +265,9 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
         s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
 
+        // Set the settlement to 0 - as this is the current settlement chain.
+        s.settlementLayer = address(0);
+
         _setDAValidatorPair(address(0), address(0));
 
         emit MigrationComplete();
