@@ -251,11 +251,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         // We need to change offset by 32 - 4 = 28 bytes, since 32 bytes is the length of the offset
         // itself and the 4 bytes are the selector which is not included inside the offset.
         if (offset != calldataPtr + 28) {
-            revert ReconstructionMismatch(
-                PubdataField.Offset,
-                bytes32(calldataPtr + 28),
-                bytes32(offset)
-            );
+            revert ReconstructionMismatch(PubdataField.Offset, bytes32(calldataPtr + 28), bytes32(offset));
         }
         uint256 length = uint256(bytes32(_operatorInput[calldataPtr + 32:calldataPtr + 64]));
 
