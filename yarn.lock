@@ -792,10 +792,10 @@
     sinon-chai "^3.7.0"
     zksync-ethers "^5.0.0"
 
-"@matterlabs/hardhat-zksync-verify@^0.2.0":
-  version "0.2.2"
-  resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-verify/-/hardhat-zksync-verify-0.2.2.tgz#daa34bc4404096ed0f44461ee366c1cb0e5a4f2f"
-  integrity sha512-WgcItoZGY702oJ708uCP5uLvmwzDLBfhMqq2D0Kh1U/3fCTlPza9zMGUFHxKMQYsITKTeQ5zKOjKoi8MXOeUdQ==
+"@matterlabs/hardhat-zksync-verify@^0.4.0":
+  version "0.4.0"
+  resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-verify/-/hardhat-zksync-verify-0.4.0.tgz#f812c19950022fc36728f3796f6bdae5633e2fcd"
+  integrity sha512-GPZmAumFl3ZMPKbECX7Qw8CriwZKWd1DlCRhoG/6YYc6mFy4+MXkF1XsHLMs5r34N+GDOfbVZVMeftIlJC96Kg==
   dependencies:
     "@matterlabs/hardhat-zksync-solc" "^1.0.5"
     "@nomicfoundation/hardhat-verify" "^1.0.2"
@@ -4490,7 +4490,7 @@ hardhat@^2.14.0:
     uuid "^8.3.2"
     ws "^7.4.6"
 
-hardhat@^2.18.3, hardhat@^2.19.4:
+hardhat@^2.19.4:
   version "2.22.5"
   resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.22.5.tgz#7e1a4311fa9e34a1cfe337784eae06706f6469a5"
   integrity sha512-9Zq+HonbXCSy6/a13GY1cgHglQRfh4qkzmj1tpPlhxJDwNVnhxlReV6K7hCWFKlOrV13EQwsdcD0rjcaQKWRZw==
@@ -7922,12 +7922,6 @@ zksync-ethers@^5.0.0:
   version "5.8.0"
   resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.8.0.tgz#ff054345048f851c33cb6efcf2094f40d4da6063"
   integrity sha512-/4qI5UElh0lspu0ew2IXBCO+O9kXEzZOM7JqvlfRWWGIUKZ+EDXnjIPgkH0y5/MnMT3FDq9koAAUCyZVWqHUJg==
-  dependencies:
-    ethers "~5.7.0"
-
-"zksync-ethers@https://github.com/zksync-sdk/zksync-ethers#ethers-v5-feat/bridgehub":
-  version "5.1.0"
-  resolved "https://github.com/zksync-sdk/zksync-ethers#28ccbe7d67b170c202b17475e06a82002e6e3acc"
   dependencies:
     ethers "~5.7.0"
 
