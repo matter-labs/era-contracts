@@ -237,11 +237,19 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address _chainAssetHandlerAddress,
         uint256 _chainId
     ) external onlyOwnerOrAdmin nonReentrant whenNotPaused {
-        bytes32 registeredAssetId = _chainAssetHandlerAddress == address(0)
-            ? DataEncoding.encodeNTVAssetId(block.chainid, _baseToken)
-            : DataEncoding.encodeAssetId(block.chainid, _chainAssetHandlerAddress, _baseToken);
-        baseTokenAssetId[_chainId] = registeredAssetId;
-        baseTokenChainId[registeredAssetId] = _chainId;
+        require(tokenIsRegistered[_baseToken], "BH: token not registered");
+        uint256 blockChainId = block.chainid;
+        require(L1_CHAIN_ID == blockChainId, "BH: New chain registration only allowed on L1");
+        require(_chainId != 0, "BH: chainId cannot be 0");
+        require(_chainId <= type(uint48).max, "BH: chainId too large");
+        require(_chainId != blockChainId, "BH: chain id must not match current chainid");
+
+        bytes32 assetId = _chainAssetHandlerAddress == address(0)
+            ? DataEncoding.encodeNTVAssetId(blockChainId, _baseToken)
+            : DataEncoding.encodeAssetId(blockChainId, _chainAssetHandlerAddress, _baseToken);
+        baseToken[_chainId] = _baseToken;
+        baseTokenAssetId[_chainId] = assetId;
+        baseTokenChainId[assetId] = _chainId;
     }
 
     /// @notice register new chain. New chains can be only registered on Bridgehub deployed on L1. Later they can be moved to any other layer.
@@ -264,10 +272,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes[] calldata _factoryDeps
     ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256) {
         uint256 chainId = baseTokenChainId[_baseTokenAssetId];
-        require(L1_CHAIN_ID == block.chainid, "BH: New chain registration only allowed on L1");
-        require(chainId != 0, "BH: chainId cannot be 0");
-        require(chainId <= type(uint48).max, "BH: chainId too large");
-        require(chainId != block.chainid, "BH: chain id must not match current chainid");
 
         require(stateTransitionManagerIsRegistered[_stateTransitionManager], "BH: state transition not registered");
         require(tokenIsRegistered[_baseToken], "BH: token not registered");
@@ -276,7 +280,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(stateTransitionManager[chainId] == address(0), "BH: chainId already registered");
 
         stateTransitionManager[chainId] = _stateTransitionManager;
-        baseToken[chainId] = _baseToken;
         settlementLayer[chainId] = block.chainid;
 
         IStateTransitionManager(_stateTransitionManager).createNewChain({
