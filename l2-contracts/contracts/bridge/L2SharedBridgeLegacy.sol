@@ -12,7 +12,7 @@ import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
 
-import {EmptyAddress, EmptyBytes32, DeployFailed, AmountMustBeGreaterThanZero} from "../L2ContractErrors.sol";
+import {EmptyAddress, EmptyBytes32, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -39,6 +39,13 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
     /// @dev The address of the legacy L1 erc20 bridge counterpart.
     /// This is non-zero only on Era, and should not be renamed for backward compatibility with the SDKs.
     address public override l1Bridge;
+
+    modifier onlyNTV() {
+        if (msg.sender != address(L2_NATIVE_TOKEN_VAULT)) {
+            revert InvalidCaller(msg.sender);
+        }
+        _;
+    }
 
     constructor(uint256 _eraChainId) {
         ERA_CHAIN_ID = _eraChainId;
@@ -102,13 +109,13 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         if (token != address(0)) {
             return token;
         }
-        return calculateCreate2TokenAddress(_l1Token);
+        return _calculateCreate2TokenAddress(_l1Token);
     }
 
     /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
     /// @param _l1Token The address of token on L1.
     /// @return Address of an L2 token counterpart.
-    function calculateCreate2TokenAddress(address _l1Token) internal view returns (address) {
+    function _calculateCreate2TokenAddress(address _l1Token) internal view returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_l1Token);
         return
@@ -123,7 +130,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
     /// @dev Deploy the beacon proxy for the L2 token, while using ContractDeployer system contract.
     /// @dev This function uses raw call to ContractDeployer to make sure that exactly `l2TokenProxyBytecodeHash` is used
     /// for the code of the proxy.
-    function deployBeaconProxy(bytes32 salt) external returns (address proxy) {
+    function deployBeaconProxy(bytes32 salt) external onlyNTV returns (address proxy) {
         (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
             uint32(gasleft()),
             DEPLOYER_SYSTEM_CONTRACT,

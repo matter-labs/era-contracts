@@ -106,7 +106,7 @@ contract GenerateForceDeploymentsData is Script {
             callConstructor: true,
             value: 0,
             // solhint-disable-next-line func-named-parameters
-            input: abi.encode(config.chainId, config.eraChainId, config.l1AssetRouterProxy, address(1), address(1))
+            input: abi.encode(config.chainId, config.eraChainId, config.l1AssetRouterProxy, address(1))
         });
 
         forceDeployments[2] = ForceDeployment({

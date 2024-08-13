@@ -59,12 +59,11 @@ describe("ERC20Bridge", function () {
     await deployer.deploy(await deployer.loadArtifact("BeaconProxy"), [l2Erc20TokenBeacon.address, "0x"]);
     const beaconProxyBytecodeHash = hashBytecode((await deployer.loadArtifact("BeaconProxy")).bytecode);
     let constructorArgs = ethers.utils.defaultAbiCoder.encode(
-      ["uint256", "uint256", "address", "address", "address"],
+      ["uint256", "uint256", "address", "address"],
       /// note in real deployment we have to transfer ownership of standard deployer here
       [
         testChainId,
         1,
-        unapplyL1ToL2Alias(l1BridgeWallet.address),
         unapplyL1ToL2Alias(l1BridgeWallet.address),
         ethers.constants.AddressZero,
       ]
