@@ -68,7 +68,9 @@ enum PubdataField {
     InputLogsHash,
     InputLogsRootHash,
     InputMsgsHash,
-    InputBytecodeHash
+    InputBytecodeHash,
+    Offset,
+    Length
 }
 
 enum BytecodeError {

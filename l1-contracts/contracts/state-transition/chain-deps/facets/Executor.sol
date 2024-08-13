@@ -51,13 +51,13 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
-        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA(
-            s.chainId,
-            uint256(_newBatch.batchNumber),
-            logOutput.l2DAValidatorOutputHash,
-            _newBatch.operatorDAInput,
-            TOTAL_BLOBS_IN_COMMITMENT
-        );
+        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
+            _chainId: s.chainId,
+            _batchNumber: uint256(_newBatch.batchNumber),
+            _l2DAValidatorOutputHash: logOutput.l2DAValidatorOutputHash,
+            _operatorDAInput: _newBatch.operatorDAInput,
+            _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
+        });
 
         require(_previousBatch.batchHash == logOutput.previousBatchHash, "l");
         // Check that the priority operation hash in the L2 logs is as expected

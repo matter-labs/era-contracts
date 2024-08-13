@@ -250,7 +250,13 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         // The length of the pubdata input should be stored right next to the calldata.
         // We need to change offset by 32 - 4 = 28 bytes, since 32 bytes is the length of the offset
         // itself and the 4 bytes are the selector which is not included inside the offset.
-        require(offset == calldataPtr + 28, "invalid offset");
+        if (offset != calldataPtr + 28) {
+            revert ReconstructionMismatch(
+                PubdataField.Offset,
+                bytes32(L2_TO_L1_LOGS_MERKLE_TREE_LEAVES),
+                bytes32(uint256(numberOfL2ToL1Logs))
+            );
+        }
         uint256 length = uint256(_operatorInput[calldataPtr + 32:calldataPtr + 64]);
 
         // Shift calldata ptr past the pubdata offset and len
@@ -268,7 +274,13 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         calldataPtr += 4;
 
         // We need to ensure that length is enough to read all logs
-        require(length >= 4 + numberOfL2ToL1Logs * L2_TO_L1_LOG_SERIALIZE_SIZE, "invalid length");
+        if (length < 4 + numberOfL2ToL1Logs * L2_TO_L1_LOG_SERIALIZE_SIZE) {
+            revert ReconstructionMismatch(
+                PubdataField.Length,
+                bytes32(L2_TO_L1_LOGS_MERKLE_TREE_LEAVES),
+                bytes32(uint256(numberOfL2ToL1Logs))
+            );
+        }
 
         bytes32[] memory l2ToL1LogsTreeArray = new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES);
         bytes32 reconstructedChainedLogsHash;
