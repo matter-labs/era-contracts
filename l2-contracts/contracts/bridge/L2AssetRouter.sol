@@ -29,7 +29,7 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
     uint256 public immutable L1_CHAIN_ID;
 
     /// @dev The address of the L2 legacy shared bridge.
-    address public L2_LEGACY_SHARED_BRIDGE;
+    address public immutable L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev The address of the L1 shared bridge counterpart.
     address public override l1SharedBridge;
@@ -56,7 +56,7 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
     /// @dev A mapping of asset ID to asset handler address
     mapping(bytes32 assetId => address assetHandlerAddress) public override assetHandlerAddress;
 
-    /// @notice Checks that the message sender is the l1 bridge.
+    /// @notice Checks that the message sender is the L1 bridge.
     modifier onlyL1Bridge() {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
         if (
