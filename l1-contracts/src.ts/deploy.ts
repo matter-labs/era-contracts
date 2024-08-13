@@ -208,7 +208,7 @@ export class Deployer {
       callConstructor: true,
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(
-        ["uint256", "uint256", "address", "address"],
+        ["uint256", "uint256", "address", "address", "address"],
         [
           getNumberFromEnv("ETH_CLIENT_CHAIN_ID"),
           eraChainId,
@@ -224,7 +224,7 @@ export class Deployer {
       callConstructor: true,
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(
-        ["bytes32", "address"],
+        ["uint256", "uint256", "address", "bytes32", "address", "address", "bool"],
         [
           getNumberFromEnv("ETH_CLIENT_CHAIN_ID"),
           eraChainId,

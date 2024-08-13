@@ -24,7 +24,7 @@ contract GenerateForceDeploymentsData is Script {
         bytes forceDeploymentsData;
         address l2LegacySharedBridge;
         address l2TokenBeacon;
-        address contractsDeployedAlready;
+        bool contractsDeployedAlready;
     }
 
     struct ContractsBytecodes {
@@ -78,7 +78,7 @@ contract GenerateForceDeploymentsData is Script {
         config.eraChainId = toml.readUint("$.era_chain_id");
         config.l2LegacySharedBridge = toml.readAddress("$.l2_legacy_shared_bridge");
         config.l2TokenBeacon = toml.readAddress("$.l2_token_beacon");
-        config.contractsDeployedAlready = toml.readAddress("$.l2_contracts_deployed_already");
+        config.contractsDeployedAlready = toml.readBool("$.l2_contracts_deployed_already");
     }
 
     function saveOutput() internal {
