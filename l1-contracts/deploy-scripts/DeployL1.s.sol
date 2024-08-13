@@ -295,7 +295,10 @@ contract DeployL1Script is Script {
     }
 
     function deployChainAdmin() internal {
-        bytes memory bytecode = abi.encodePacked(type(ChainAdmin).creationCode, abi.encode(config.ownerAddress));
+        bytes memory bytecode = abi.encodePacked(
+            type(ChainAdmin).creationCode,
+            abi.encode(config.ownerAddress, address(0))
+        );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("ChainAdmin deployed at:", contractAddress);
         addresses.chainAdmin = contractAddress;
