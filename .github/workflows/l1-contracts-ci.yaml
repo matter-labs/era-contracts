@@ -64,8 +64,6 @@ jobs:
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Use Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -84,8 +82,10 @@ jobs:
         run: yarn
 
       - name: Build l2 deps
-        working-directory: ./l2-contracts
-        run: yarn build
+        run: yarn l2 build
+
+      - name: Build l1 deps
+        run: yarn l1 build
 
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
@@ -98,6 +98,7 @@ jobs:
             l1-contracts/typechain
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
+            l2-contracts/typechain
 
       - name: Run tests
         working-directory: ./l1-contracts
