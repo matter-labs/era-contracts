@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import { CalldataDA, BLOB_COMMITMENT_SIZE, BLOB_SIZE_BYTES } from "./CalldataDA.sol";
+import {CalldataDA, BLOB_COMMITMENT_SIZE, BLOB_SIZE_BYTES} from "./CalldataDA.sol";
 
 // solhint-disable gas-custom-errors, reason-string
 
@@ -15,7 +15,7 @@ abstract contract CalldataDAGateway is CalldataDA {
         bytes32 _fullPubdataHash,
         uint256 _maxBlobsSupported,
         bytes calldata _pubdataInput
-    ) internal override pure returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
+    ) internal pure override returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
         require(_pubdataInput.length >= _blobsProvided * BLOB_COMMITMENT_SIZE, "pubdata too small");
 
         // We typically do not know whether we'll use calldata or blobs at the time when
@@ -27,8 +27,10 @@ abstract contract CalldataDAGateway is CalldataDA {
         require(_pubdata.length <= _blobsProvided * BLOB_SIZE_BYTES, "cz");
         require(_fullPubdataHash == keccak256(_pubdata), "wp");
 
-        bytes calldata providedCommitments = _pubdataInput[_pubdataInput.length - _blobsProvided * BLOB_COMMITMENT_SIZE:];
-        
+        bytes calldata providedCommitments = _pubdataInput[_pubdataInput.length -
+            _blobsProvided *
+            BLOB_COMMITMENT_SIZE:];
+
         cloneCalldata(blobCommitments, providedCommitments, _blobsProvided);
     }
 }

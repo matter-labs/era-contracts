@@ -283,7 +283,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
     /// @notice Returns the commitment for a chain.
     /// @dev Note, that this is a getter method helpful for debugging and should not be relied upon by clients.
-    /// @return commitment The commitment for the chain. 
+    /// @return commitment The commitment for the chain.
     function prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {
         require(s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex, "PQ not ready");
 

@@ -57,8 +57,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     address private pendingAdmin;
 
     /// @notice The contract that stores the cross-chain message root for each chain and the aggregated root.
-    /// @dev Note that the message root does not contain messages from the chain it is deployed on. It may 
-    /// be added later on if needed. 
+    /// @dev Note that the message root does not contain messages from the chain it is deployed on. It may
+    /// be added later on if needed.
     IMessageRoot public override messageRoot;
 
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
@@ -109,7 +109,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
 
-        // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only. 
+        // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
@@ -219,14 +219,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _additionalData the additional data to identify the asset
     /// @param _assetAddress the asset handler address
     function setAssetHandlerAddress(bytes32 _additionalData, address _assetAddress) external {
-        // It is a simplified version of the logic used by the AssetRouter to manage asset handlers. 
+        // It is a simplified version of the logic used by the AssetRouter to manage asset handlers.
         // STM's assetId is `keccak256(abi.encode(L1_CHAIN_ID, stmDeployer, stmAddress))`.
         // And the STMDeployer is considered the deployment tracker for the STM asset.
         //
         // The STMDeployer will call this method to set the asset handler address for the assetId.
         // If the chain is not the same as L1, we assume that it is done via L1->L2 communication and so we unalias the sender.
-        // 
-        // For simpler handling we allow anyone to call this method. It is okay, since during bridging operations 
+        //
+        // For simpler handling we allow anyone to call this method. It is okay, since during bridging operations
         // it is double checked that `assetId` is indeed derived from the `stmDeployer`.
 
         address sender = L1_CHAIN_ID == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);

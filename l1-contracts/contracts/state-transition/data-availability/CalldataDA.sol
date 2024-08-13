@@ -12,7 +12,7 @@ uint256 constant BLOB_SIZE_BYTES = 126_976;
 /// @dev The state diff hash, hash of pubdata + the number of blobs.
 uint256 constant BLOB_DATA_OFFSET = 65;
 
-/// @dev The size of the commitment for a single blob. 
+/// @dev The size of the commitment for a single blob.
 uint256 constant BLOB_COMMITMENT_SIZE = 32;
 
 /// @notice Contract that contains the functionality for process the calldata DA.
@@ -80,7 +80,7 @@ abstract contract CalldataDA {
         bytes32 _fullPubdataHash,
         uint256 _maxBlobsSupported,
         bytes calldata _pubdataInput
-    ) internal virtual pure returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
+    ) internal pure virtual returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
         require(_blobsProvided == 1, "only one blob with calldata");
         require(_pubdataInput.length >= BLOB_COMMITMENT_SIZE, "pubdata too small");
 
@@ -98,13 +98,9 @@ abstract contract CalldataDA {
 
     /// @notice Method that clones a slice of calldata into a bytes32[] memory array.
     /// @param _dst The destination array.
-    /// @param _input The input calldata.   
+    /// @param _input The input calldata.
     /// @param _len The length of the slice in 32-byte words to clone.
-    function cloneCalldata(
-        bytes32[] memory _dst,
-        bytes calldata _input,
-        uint256 _len
-    ) internal pure {
+    function cloneCalldata(bytes32[] memory _dst, bytes calldata _input, uint256 _len) internal pure {
         assembly {
             // The pointer to the allocated memory above. We skip 32 bytes to avoid overwriting the length.
             let dstPtr := add(_dst, 0x20)

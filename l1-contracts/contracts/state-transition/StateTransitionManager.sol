@@ -422,7 +422,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         bytes[] calldata _factoryDeps
     ) external onlyBridgehub {
         (bytes memory _diamondCut, bytes memory _forceDeploymentData) = abi.decode(_initData, (bytes, bytes));
-        
+
         // solhint-disable-next-line func-named-parameters
         address hyperchainAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut);
 
@@ -459,11 +459,11 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         bytes calldata _data
     ) external view override onlyBridgehub returns (bytes memory stmForwardedBridgeMintData) {
         // Note that the `_diamondCut` here is not for the current chain, for the chain where the migration
-        // happens. The correctness of it will be checked on the STM on the new settlement layer. 
+        // happens. The correctness of it will be checked on the STM on the new settlement layer.
         (address _newGatewayAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
         require(_newGatewayAdmin != address(0), "STM: admin zero");
 
-        // We ensure that the chain has the latest protocol version to avoid edge cases 
+        // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
         address hyperchain = hyperchainMap.get(_chainId);
         require(IZkSyncHyperchain(hyperchain).getProtocolVersion() == protocolVersion, "STM: outdated pv");
@@ -483,7 +483,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             (address, address, uint256, bytes)
         );
 
-        // We ensure that the chain has the latest protocol version to avoid edge cases 
+        // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
         require(_protocolVersion == protocolVersion, "STM, outdated pv");
         chainAddress = _deployNewChain({

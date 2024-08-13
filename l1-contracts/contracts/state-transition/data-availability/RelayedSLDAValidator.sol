@@ -9,7 +9,7 @@ import {IL1Messenger} from "../../common/interfaces/IL1Messenger.sol";
 
 import {CalldataDAGateway} from "./CalldataDAGateway.sol";
 
-import { IBridgehub } from "../../bridgehub/IBridgehub.sol";
+import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
 
 /// @notice The DA validator intended to be used in Era-environment.
@@ -20,8 +20,8 @@ contract RelayedSLDAValidator is IL1DAValidator, CalldataDAGateway {
     /// @dev Ensures that the sender is the chain that is supposed to send the message.
     /// @param _chainId The chain id of the chain that is supposed to send the message.
     function _ensureOnlyChainSender(uint256 _chainId) internal view {
-        // Note that this contract is only supposed to be deployed on L2, where the 
-        // bridgehub is predeployed at `L2_BRIDGEHUB_ADDR` address. 
+        // Note that this contract is only supposed to be deployed on L2, where the
+        // bridgehub is predeployed at `L2_BRIDGEHUB_ADDR` address.
         require(IBridgehub(L2_BRIDGEHUB_ADDR).getHyperchain(_chainId) == msg.sender, "l1-da-validator/invalid-sender");
     }
 
@@ -29,11 +29,7 @@ contract RelayedSLDAValidator is IL1DAValidator, CalldataDAGateway {
     /// @param _chainId The chain id of the chain that is supposed to send the message.
     /// @param _batchNumber The batch number for which the data availability is being checked.
     /// @param _pubdata The pubdata to be relayed to L1.
-    function _relayCalldata(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        bytes calldata _pubdata
-    ) internal {
+    function _relayCalldata(uint256 _chainId, uint256 _batchNumber, bytes calldata _pubdata) internal {
         // Re-sending all the pubdata in pure form to L1.
         // slither-disable-next-line unused-return
         IL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(abi.encode(_chainId, _batchNumber, _pubdata));
@@ -46,7 +42,7 @@ contract RelayedSLDAValidator is IL1DAValidator, CalldataDAGateway {
         bytes32 _l2DAValidatorOutputHash,
         bytes calldata _operatorDAInput,
         uint256 _maxBlobsSupported
-    ) external  returns (L1DAValidatorOutput memory output) {
+    ) external returns (L1DAValidatorOutput memory output) {
         // Unfortunately we have to use a method call instead of a modifier
         // because of the stack-too-deep error caused by it.
         _ensureOnlyChainSender(_chainId);

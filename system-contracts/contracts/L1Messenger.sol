@@ -249,7 +249,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         uint256 offset = uint256(_operatorInput[calldataPtr:calldataPtr + 32]);
         // The length of the pubdata input should be stored right next to the calldata.
         // We need to change offset by 32 - 4 = 28 bytes, since 32 bytes is the length of the offset
-        // itself and the 4 bytes are the selector which is not included inside the offset. 
+        // itself and the 4 bytes are the selector which is not included inside the offset.
         require(offset == calldataPtr + 28, "invalid offset");
         uint256 length = uint256(_operatorInput[calldataPtr + 32:calldataPtr + 64]);
 
