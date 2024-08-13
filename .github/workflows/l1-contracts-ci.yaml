@@ -37,6 +37,7 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
+            l1-contracts/lib
 
   lint:
     runs-on: ubuntu-latest
@@ -213,7 +214,7 @@ jobs:
         run: yarn
 
       - name: Build l2 deps
-        working-directory: ../l2-contracts
+        working-directory: ./l2-contracts
         run: yarn build
 
       - name: Build l1 deps

@@ -74,11 +74,10 @@ describe("ERC20Bridge", function () {
     erc20Bridge = L2AssetRouterFactory.connect(L2_ASSET_ROUTER_ADDRESS, deployerWallet);
     const l2NativeTokenVaultArtifact = await deployer.loadArtifact("L2NativeTokenVault");
     constructorArgs = ethers.utils.defaultAbiCoder.encode(
-      ["uint256", "uint256", "address", "bytes32", "address", "address", "bool"],
+      ["uint256", "address", "bytes32", "address", "address", "bool"],
       /// note in real deployment we have to transfer ownership of standard deployer here
       [
         9,
-        270,
         governorWallet.address,
         beaconProxyBytecodeHash,
         ethers.constants.AddressZero,
