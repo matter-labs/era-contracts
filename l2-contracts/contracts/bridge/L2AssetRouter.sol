@@ -101,6 +101,7 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
     /// where tokens would be unlocked
     /// @param _assetId The asset id of the withdrawn asset
     /// @param _assetData The data that is passed to the asset handler contract
+    /// @param _sender The address of the sender of the message
     function _withdrawSender(bytes32 _assetId, bytes memory _assetData, address _sender) internal {
         address assetHandler = assetHandlerAddress[_assetId];
         bytes memory _l1bridgeMintData = IL2AssetHandler(assetHandler).bridgeBurn({

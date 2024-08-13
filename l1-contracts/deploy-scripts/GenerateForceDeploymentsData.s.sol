@@ -6,7 +6,6 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "./Utils.sol";
 import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-// import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
 import {ForceDeployment} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 contract GenerateForceDeploymentsData is Script {
@@ -117,7 +116,6 @@ contract GenerateForceDeploymentsData is Script {
             // solhint-disable-next-line func-named-parameters
             input: abi.encode(
                 config.chainId,
-                config.eraChainId,
                 aliasedGovernance,
                 keccak256(contracts.l2TokenProxyBytecode),
                 config.l2LegacySharedBridge,

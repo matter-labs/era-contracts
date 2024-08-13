@@ -25,9 +25,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @dev Chain ID of L1 for bridging reasons.
     uint256 public immutable L1_CHAIN_ID;
 
-    /// @dev Chain ID of Era for legacy reasons
-    uint256 public immutable ERA_CHAIN_ID;
-
     /// @dev The address of the L2 legacy shared bridge.
     IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE;
 
@@ -50,7 +47,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
 
     /// @notice Initializes the bridge contract for later use.
     /// @param _l1ChainId The L1 chain id differs between mainnet and testnets.
-    /// @param _eraChainId The chain id of Era for legacy reasons.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
     /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
@@ -58,7 +54,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed.
     constructor(
         uint256 _l1ChainId,
-        uint256 _eraChainId,
         address _aliasedOwner,
         bytes32 _l2TokenProxyBytecodeHash,
         address _legacySharedBridge,
@@ -66,7 +61,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         bool _contractsDeployedAlready
     ) {
         L1_CHAIN_ID = _l1ChainId;
-        ERA_CHAIN_ID = _eraChainId;
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
         _disableInitializers();
@@ -193,7 +187,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         bytes32 salt = _getCreate2Salt(_l1Token);
 
         BeaconProxy l2Token;
-        if (block.chainid != ERA_CHAIN_ID) {
+        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
             // Deploy the beacon proxy for the L2 token
             l2Token = _deployBeaconProxy(salt);
         } else {
