@@ -459,12 +459,7 @@ for { } true { } {
             revertWithGas(evmGasLeft)
         }
 
-        for { let i := 0 } lt(i, len) { i := add(i, 1) } {
-            mstore8(
-                add(dst, i),
-                shr(248, mload(add(offset, i)))
-            )
-        }
+        $llvm_AlwaysInline_llvm$_memcpy(dst, offset, len)
         ip := add(ip, 1)
     }
     case 0x3A { // OP_GASPRICE

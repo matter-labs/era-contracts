@@ -1343,6 +1343,33 @@ object "EVMInterpreter" {
             mstore(sub(offset, 0x80), back)
         }
         
+        function $llvm_AlwaysInline_llvm$_copyRest(dest, val, len) {
+            let rest_bits := shl(3, len)
+            let upper_bits := sub(256, rest_bits)
+            let val_mask := shl(upper_bits, MAX_UINT())
+            let val_masked := and(val, val_mask)
+            let dst_val := mload(dest)
+            let dst_mask := shr(rest_bits, MAX_UINT())
+            let dst_masked := and(dst_val, dst_mask)
+            mstore(dest, or(val_masked, dst_masked))
+        }
+        
+        function $llvm_AlwaysInline_llvm$_memcpy(dest, src, len) {
+            let dest_addr := dest
+            let src_addr := src
+            let dest_end := add(dest, and(len, sub(0, 32)))
+            for { } lt(dest_addr, dest_end) {} {
+                mstore(dest_addr, mload(src_addr))
+                dest_addr := add(dest_addr, 32)
+                src_addr := add(src_addr, 32)
+            }
+        
+            let rest_len := and(len, 31)
+            if rest_len {
+                $llvm_AlwaysInline_llvm$_copyRest(dest_addr, mload(src_addr), rest_len)
+            }
+        }
+        
         function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
             let dest_end := add(dest, and(len, sub(0, 32)))
             for {let i := dest} lt(i, dest_end) { i := add(i, 32) } {
@@ -1351,10 +1378,7 @@ object "EVMInterpreter" {
         
             let rest_len := and(len, 31)
             if rest_len {
-                let rest_bits := shl(3, rest_len)
-                let mask := shr(rest_bits, MAX_UINT())
-                let value := mload(dest_end)
-                mstore(dest_end, and(value, mask))
+                $llvm_AlwaysInline_llvm$_copyRest(dest_end, 0, rest_len)
             }
         }
         
@@ -1958,12 +1982,7 @@ object "EVMInterpreter" {
                         revertWithGas(evmGasLeft)
                     }
             
-                    for { let i := 0 } lt(i, len) { i := add(i, 1) } {
-                        mstore8(
-                            add(dst, i),
-                            shr(248, mload(add(offset, i)))
-                        )
-                    }
+                    $llvm_AlwaysInline_llvm$_memcpy(dst, offset, len)
                     ip := add(ip, 1)
                 }
                 case 0x3A { // OP_GASPRICE
@@ -4288,6 +4307,33 @@ object "EVMInterpreter" {
                 mstore(sub(offset, 0x80), back)
             }
             
+            function $llvm_AlwaysInline_llvm$_copyRest(dest, val, len) {
+                let rest_bits := shl(3, len)
+                let upper_bits := sub(256, rest_bits)
+                let val_mask := shl(upper_bits, MAX_UINT())
+                let val_masked := and(val, val_mask)
+                let dst_val := mload(dest)
+                let dst_mask := shr(rest_bits, MAX_UINT())
+                let dst_masked := and(dst_val, dst_mask)
+                mstore(dest, or(val_masked, dst_masked))
+            }
+            
+            function $llvm_AlwaysInline_llvm$_memcpy(dest, src, len) {
+                let dest_addr := dest
+                let src_addr := src
+                let dest_end := add(dest, and(len, sub(0, 32)))
+                for { } lt(dest_addr, dest_end) {} {
+                    mstore(dest_addr, mload(src_addr))
+                    dest_addr := add(dest_addr, 32)
+                    src_addr := add(src_addr, 32)
+                }
+            
+                let rest_len := and(len, 31)
+                if rest_len {
+                    $llvm_AlwaysInline_llvm$_copyRest(dest_addr, mload(src_addr), rest_len)
+                }
+            }
+            
             function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
                 let dest_end := add(dest, and(len, sub(0, 32)))
                 for {let i := dest} lt(i, dest_end) { i := add(i, 32) } {
@@ -4296,10 +4342,7 @@ object "EVMInterpreter" {
             
                 let rest_len := and(len, 31)
                 if rest_len {
-                    let rest_bits := shl(3, rest_len)
-                    let mask := shr(rest_bits, MAX_UINT())
-                    let value := mload(dest_end)
-                    mstore(dest_end, and(value, mask))
+                    $llvm_AlwaysInline_llvm$_copyRest(dest_end, 0, rest_len)
                 }
             }
             
@@ -4903,12 +4946,7 @@ object "EVMInterpreter" {
                             revertWithGas(evmGasLeft)
                         }
                 
-                        for { let i := 0 } lt(i, len) { i := add(i, 1) } {
-                            mstore8(
-                                add(dst, i),
-                                shr(248, mload(add(offset, i)))
-                            )
-                        }
+                        $llvm_AlwaysInline_llvm$_memcpy(dst, offset, len)
                         ip := add(ip, 1)
                     }
                     case 0x3A { // OP_GASPRICE
