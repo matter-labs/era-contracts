@@ -1,5 +1,5 @@
 [profile.default]
-src = "contracts"
+src = "contracts-preprocessed"
 out = "out"
 libs = ["lib"]
 evm_version = 'paris'
