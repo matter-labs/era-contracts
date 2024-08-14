@@ -34,26 +34,6 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         assertEq(sharedBridge.paused(), false, "Shared Bridge Remains Paused");
     }
 
-    // we test this in integration tests anyway
-    // function test_setAssetHandlerAddressOnCounterpart() public payable {
-    //     uint256 l2TxGasLimit = 100000;
-    //     uint256 l2TxGasPerPubdataByte = 100;
-    //     uint256 mintValue = 1;
-    //     address refundRecipient = address(0);
-
-    //     vm.deal(owner, amount);
-    //     vm.prank(owner);
-    //     sharedBridge.setAssetHandlerAddressOnCounterpart{value: 1}(
-    //         eraChainId,
-    //         mintValue,
-    //         l2TxGasLimit,
-    //         l2TxGasPerPubdataByte,
-    //         refundRecipient,
-    //         tokenAssetId,
-    //         address(token)
-    //     );
-    // }
-
     function test_bridgehubDepositBaseToken_Eth() public {
         vm.prank(bridgehubAddress);
         // solhint-disable-next-line func-named-parameters

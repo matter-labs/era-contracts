@@ -725,16 +725,13 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes32 _assetId,
         bytes memory _transferData
     ) internal view returns (bytes32 txDataHash) {
-        if (_encodingVersion == 0x01) {
-            // Similarly to calldata, the txDataHash is collision-resistant.
-            // In the legacy data hash, the first encoded variable was the address, which is padded with zeros during `abi.encode`.
-            txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(_prevMsgSender, _assetId, _transferData)));
-        }
-        if (_encodingVersion == 0x02) {
-            txDataHash = keccak256(bytes.concat(bytes1(0x02), abi.encode(_prevMsgSender, _assetId, _transferData)));
-        } else {
+        if (_encodingVersion == 0x00) {
             (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
             txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(_assetId), depositAmount));
+        } else {
+            // Similarly to calldata, the txDataHash is collision-resistant.
+            // In the legacy data hash, the first encoded variable was the address, which is padded with zeros during `abi.encode`.
+            txDataHash = keccak256(bytes.concat(_encodingVersion, abi.encode(_prevMsgSender, _assetId, _transferData)));
         }
     }
 

@@ -91,18 +91,8 @@ describe("Gateway", function () {
     const value = (
       await bridgehub.l2TransactionBaseCost(chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
     ).mul(10);
-    // const baseTokenAddress = await bridgehub.baseToken(chainId);
-    // const ethIsBaseToken = baseTokenAddress == ADDRESS_ONE;
+
     const stmDeploymentTracker = migratingDeployer.stmDeploymentTracker(migratingDeployer.deployWallet);
-    // const calldata = stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL2SharedBridge", [
-    //   chainId,
-    //   gatewayDeployer.addresses.StateTransition.StateTransitionProxy,
-    //   value,
-    //   priorityTxMaxGasLimit,
-    //   SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-    //   gatewayDeployer.deployWallet.address,
-    // ]);
-    // await migratingDeployer.executeUpgrade(stmDeploymentTracker.address, value, calldata);
     const assetRouter = migratingDeployer.defaultSharedBridge(migratingDeployer.deployWallet);
     const assetId = await bridgehub.stmAssetIdFromChainId(chainId);
 
