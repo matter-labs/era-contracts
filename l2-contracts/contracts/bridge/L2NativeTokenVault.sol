@@ -229,8 +229,16 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     function calculateCreate2TokenAddress(address _l1Token) public view returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_l1Token);
+        address deployerAddress = address(L2_LEGACY_SHARED_BRIDGE) == address(0)
+            ? address(this)
+            : address(L2_LEGACY_SHARED_BRIDGE);
         return
-            L2ContractHelper.computeCreate2Address(address(this), salt, l2TokenProxyBytecodeHash, constructorInputHash);
+            L2ContractHelper.computeCreate2Address(
+                deployerAddress,
+                salt,
+                l2TokenProxyBytecodeHash,
+                constructorInputHash
+            );
     }
 
     /// @notice Converts the L1 token address to the create2 salt of deployed L2 token.
