@@ -22,9 +22,6 @@ import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFail
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
-    /// @dev Chain ID of Era for legacy reasons
-    uint256 public immutable ERA_CHAIN_ID;
-
     /// @dev Chain ID of L1 for bridging reasons.
     uint256 public immutable L1_CHAIN_ID;
 
@@ -50,7 +47,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
 
     /// @notice Initializes the bridge contract for later use.
     /// @param _l1ChainId The L1 chain id differs between mainnet and testnets.
-    /// @param _eraChainId The chain id of Era for legacy reasons.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
     /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
