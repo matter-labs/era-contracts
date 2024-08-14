@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+import { Call } from "./Common.sol";
+
 /// @title Governance contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -16,16 +18,6 @@ interface IGovernance {
         Waiting,
         Ready,
         Done
-    }
-
-    /// @dev Represents a call to be made during an operation.
-    /// @param target The address to which the call will be made.
-    /// @param value The amount of Ether (in wei) to be sent along with the call.
-    /// @param data The calldata to be executed on the `target` address.
-    struct Call {
-        address target;
-        uint256 value;
-        bytes data;
     }
 
     /// @dev Defines the structure of an operation that Governance executes.

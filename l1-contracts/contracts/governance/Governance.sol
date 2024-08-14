@@ -6,6 +6,7 @@ pragma solidity 0.8.24;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IGovernance} from "./IGovernance.sol";
+import { Call } from "./Common.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
