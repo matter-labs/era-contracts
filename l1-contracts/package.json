@@ -53,7 +53,7 @@
     "zksync-ethers": "5.8.0-beta.5"
   },
   "scripts": {
-    "build": "hardhat compile && CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat compile ",
+    "build": "hardhat compile & CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat compile ",
     "build-l1": "hardhat compile",
     "clean": "hardhat clean",
     "clean:foundry": "forge clean",
@@ -81,7 +81,8 @@
     "upgrade-consistency-checker": "ts-node scripts/upgrade-consistency-checker.ts",
     "governance-accept-ownership": "ts-node scripts/governance-accept-ownership.ts",
     "sync-layer": "ts-node scripts/sync-layer.ts",
-    "size": "hardhat size-contracts"
+    "size": "hardhat size-contracts",
+    "run2": "hardhat --help"
   },
   "dependencies": {
     "dotenv": "^16.0.3",
