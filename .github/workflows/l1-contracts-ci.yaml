@@ -40,6 +40,7 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             l1-contracts/artifacts
+            l1-contracts/artifacts-zk
             l1-contracts/cache
             l1-contracts/typechain
             l2-contracts/artifacts-zk
@@ -88,35 +89,35 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      # - name: Restore artifacts cache
-      #   uses: actions/cache/restore@v3
-      #   with:
-      #     fail-on-cache-miss: true
-      #     key: artifacts-l1-${{ github.sha }}
-      #     path: |
-      #       l1-contracts/artifacts
-      #       l1-contracts/cache
-      #       l1-contracts/typechain
-      #       l2-contracts/artifacts-zk
-      #       l2-contracts/cache-zk
-      #       l2-contracts/typechain
-      #       l1-contracts/lib
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            l1-contracts/artifacts
+            l1-contracts/cache
+            l1-contracts/typechain
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
+            l2-contracts/typechain
+            l1-contracts/lib
 
-      - name: Install l2 deps
-        working-directory: ./l2-contracts
-        run: yarn
+      # - name: Install l2 deps
+      #   working-directory: ./l2-contracts
+      #   run: yarn
 
-      - name: Install l1 deps
-        working-directory: ./l1-contracts
-        run: yarn
+      # - name: Install l1 deps
+      #   working-directory: ./l1-contracts
+      #   run: yarn
 
-      - name: Build l2 deps
-        working-directory: ./l2-contracts
-        run: yarn build
+      # - name: Build l2 deps
+      #   working-directory: ./l2-contracts
+      #   run: yarn build
 
-      - name: Build l1 deps
-        working-directory: ./l1-contracts
-        run: yarn build
+      # - name: Build l1 deps
+      #   working-directory: ./l1-contracts
+      #   run: yarn build
 
       - name: Run tests
         working-directory: ./l1-contracts
@@ -162,6 +163,7 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             l1-contracts/artifacts
+            l1-contracts/artifacts-zk
             l1-contracts/cache
             l1-contracts/typechain
             l2-contracts/artifacts-zk
@@ -225,6 +227,7 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             l1-contracts/artifacts
+            l1-contracts/artifacts-zk
             l1-contracts/cache
             l1-contracts/typechain
             l2-contracts/artifacts-zk
