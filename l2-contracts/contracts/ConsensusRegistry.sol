@@ -112,9 +112,8 @@ contract ConsensusRegistry is Ownable2Step {
     event NodeRemoved(address indexed nodeOwner);
     event NodeValidatorWeightChanged(address indexed nodeOwner, uint32 newWeight);
     event NodeAttesterWeightChanged(address indexed nodeOwner, uint32 newWeight);
-    event NodeValidatorPubKeyChanged(address indexed nodeOwner, BLS12_381PublicKey newPubKey);
-    event NodeValidatorPoPChanged(address indexed nodeOwner, BLS12_381Signature newPoP);
-    event NodeAttesterPubKeyChanged(address indexed nodeOwner, Secp256k1PublicKey newPubKey);
+    event NodeValidatorKeyChanged(address indexed nodeOwner, BLS12_381PublicKey newPubKey, BLS12_381Signature newPoP);
+    event NodeAttesterKeyChanged(address indexed nodeOwner, Secp256k1PublicKey newPubKey);
     event ValidatorsCommitted();
     event AttestersCommitted();
 
@@ -325,8 +324,7 @@ contract ConsensusRegistry is Ownable2Step {
         node.validatorLatest.pubKey = _pubKey;
         node.validatorLatest.pop = _pop;
 
-        emit NodeValidatorPubKeyChanged(_nodeOwner, _pubKey);
-        emit NodeValidatorPoPChanged(_nodeOwner, _pop);
+        emit NodeValidatorKeyChanged(_nodeOwner, _pubKey, _pop);
     }
 
     /// @notice Changes the attester's public key of a node in the registry.
@@ -334,7 +332,7 @@ contract ConsensusRegistry is Ownable2Step {
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner whose attester public key will be changed.
     /// @param _pubKey The new ECDSA public key to assign to the node's attester.
-    function changeAttesterPubKey(
+    function changeAttesterKey(
         address _nodeOwner,
         Secp256k1PublicKey calldata _pubKey
     ) external onlyOwnerOrNodeOwner(_nodeOwner) {
@@ -353,7 +351,7 @@ contract ConsensusRegistry is Ownable2Step {
         _ensureAttesterSnapshot(node);
         node.attesterLatest.pubKey = _pubKey;
 
-        emit NodeAttesterPubKeyChanged(_nodeOwner, _pubKey);
+        emit NodeAttesterKeyChanged(_nodeOwner, _pubKey);
     }
 
     /// @notice Adds a new commit to the validator committee.
