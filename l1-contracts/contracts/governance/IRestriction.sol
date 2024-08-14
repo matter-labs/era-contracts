@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import { Call } from "./Common.sol";
 
-/// @title ChainAdmin contract interface
+/// @title Restriction contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IRestriction {
