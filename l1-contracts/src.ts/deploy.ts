@@ -85,6 +85,7 @@ export interface DeployerConfig {
   defaultAccountBytecodeHash?: string;
   deployedLogPrefix?: string;
   l1Deployer?: Deployer;
+  l1ChainId: string;
 }
 
 export interface Operation {
@@ -100,6 +101,7 @@ export class Deployer {
   public deployWallet: Wallet | ZkWallet;
   public verbose: boolean;
   public chainId: number;
+  public l1ChainId: number;
   public ownerAddress: string;
   public deployedLogPrefix: string;
 
@@ -119,6 +121,7 @@ export class Deployer {
       : hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
     this.chainId = parseInt(process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID!);
+    this.l1ChainId = parseInt(config.l1ChainId);
     this.deployedLogPrefix = config.deployedLogPrefix ?? "CONTRACTS";
   }
 
@@ -933,20 +936,12 @@ export class Deployer {
     if (this.verbose) {
       console.log("Shared bridge was registered in Bridgehub");
     }
-
-    /// registering ETH as a valid token, with address 1.
-    const upgradeData2 = bridgehub.interface.encodeFunctionData("addToken", [ADDRESS_ONE]);
-    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
-    if (this.verbose) {
-      console.log("ETH token registered in Bridgehub");
-    }
   }
 
   public async registerTokenInNativeTokenVault(token: string) {
     const nativeTokenVault = this.nativeTokenVault(this.deployWallet);
 
-    const data = nativeTokenVault.interface.encodeFunctionData("registerToken", [token]);
-    await this.executeUpgrade(this.addresses.Bridges.NativeTokenVaultProxy, 0, data);
+    nativeTokenVault.interface.encodeFunctionData("registerToken", [token]);
     if (this.verbose) {
       console.log("Native token vault registered with ETH");
     }
@@ -1011,7 +1006,6 @@ export class Deployer {
     nonce?
   ) {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
-
     await this.deployStateTransitionDiamondFacets(create2Salt, gasPrice, nonce);
     await this.deployStateTransitionManagerImplementation(create2Salt, { gasPrice });
     await this.deployStateTransitionManagerProxy(create2Salt, { gasPrice }, extraFacets);
@@ -1342,15 +1336,6 @@ export class Deployer {
 
     if (this.verbose) {
       console.log("Pending admin successfully accepted");
-    }
-  }
-
-  public async registerTokenBridgehub(tokenAddress: string, useGovernance: boolean = false) {
-    const bridgehub = this.bridgehubContract(this.deployWallet);
-    const receipt = await this.executeDirectOrGovernance(useGovernance, bridgehub, "addToken", [tokenAddress], 0);
-
-    if (this.verbose) {
-      console.log(`Token ${tokenAddress} was registered, gas used: ${receipt.gasUsed.toString()}`);
     }
   }
 

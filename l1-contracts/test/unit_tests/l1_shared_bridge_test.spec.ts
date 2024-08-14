@@ -12,7 +12,7 @@ import { L1NativeTokenVaultFactory } from "../../typechain/L1NativeTokenVaultFac
 
 import { getTokens } from "../../src.ts/deploy-token";
 import { Action, facetCut } from "../../src.ts/diamondCut";
-import { ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig, ETH_ADDRESS_IN_CONTRACTS } from "../../src.ts/utils";
 import type { Deployer } from "../../src.ts/deploy";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
@@ -94,6 +94,7 @@ describe("Shared Bridge tests", () => {
       .approve(l1NativeTokenVault.address, ethers.utils.parseUnits("10000", 18));
 
     await l1NativeTokenVault.registerToken(erc20TestToken.address);
+    await l1NativeTokenVault.registerToken(ETH_ADDRESS_IN_CONTRACTS);
   });
 
   it("Should not allow depositing zero erc20 amount", async () => {

@@ -344,11 +344,6 @@ async function checkBridgehub() {
     throw new Error("Bridgehub stateTransitionManager is not registered");
   }
 
-  const tokenIsRegistered = await contract.tokenIsRegistered(utils.ETH_ADDRESS_IN_CONTRACTS);
-  if (!tokenIsRegistered) {
-    throw new Error("Bridgehub token is not registered");
-  }
-
   console.log("Bridgehub is correct!");
 }
 

@@ -84,7 +84,7 @@ contract InitializeTest is DiamondInitTest {
         assertEq(utilsFacet.util_getChainId(), initializeData.chainId);
         assertEq(utilsFacet.util_getBridgehub(), initializeData.bridgehub);
         assertEq(utilsFacet.util_getStateTransitionManager(), initializeData.stateTransitionManager);
-        assertEq(utilsFacet.util_getBaseToken(), initializeData.baseToken);
+        assertEq(utilsFacet.util_getBaseTokenAssetId(), initializeData.baseTokenAssetId);
         assertEq(utilsFacet.util_getBaseTokenBridge(), initializeData.baseTokenBridge);
         assertEq(utilsFacet.util_getProtocolVersion(), initializeData.protocolVersion);
 

@@ -3,9 +3,10 @@ import * as ethers from "ethers";
 import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
-import type { Bridgehub, Forwarder, MailboxFacetTest, MockExecutorFacet } from "../../typechain";
+import type { Bridgehub, L1NativeTokenVault, Forwarder, MailboxFacetTest, MockExecutorFacet } from "../../typechain";
 import {
   BridgehubFactory,
+  L1NativeTokenVaultFactory,
   ForwarderFactory,
   MailboxFacetFactory,
   MailboxFacetTestFactory,
@@ -13,7 +14,7 @@ import {
 } from "../../typechain";
 import type { IMailbox } from "../../typechain/IMailbox";
 
-import { PubdataPricingMode, ethTestConfig } from "../../src.ts/utils";
+import { PubdataPricingMode, ethTestConfig, ETH_ADDRESS_IN_CONTRACTS } from "../../src.ts/utils";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 import { Action, facetCut } from "../../src.ts/diamondCut";
 
@@ -31,6 +32,7 @@ describe("Mailbox tests", function () {
   let mailbox: IMailbox;
   let proxyAsMockExecutor: MockExecutorFacet;
   let bridgehub: Bridgehub;
+  let l1NativeTokenVault: L1NativeTokenVault;
   let owner: ethers.Signer;
   let forwarder: Forwarder;
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 271;
@@ -63,6 +65,10 @@ describe("Mailbox tests", function () {
     chainId = deployer.chainId;
 
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
+    l1NativeTokenVault = L1NativeTokenVaultFactory.connect(
+      deployer.addresses.Bridges.NativeTokenVaultProxy,
+      deployWallet
+    );
     mailbox = MailboxFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
 
     proxyAsMockExecutor = MockExecutorFacetFactory.connect(
@@ -73,6 +79,8 @@ describe("Mailbox tests", function () {
     const forwarderFactory = await hardhat.ethers.getContractFactory("Forwarder");
     const forwarderContract = await forwarderFactory.deploy();
     forwarder = ForwarderFactory.connect(forwarderContract.address, forwarderContract.signer);
+
+    await l1NativeTokenVault.registerToken(ETH_ADDRESS_IN_CONTRACTS);
   });
 
   it("Should accept correctly formatted bytecode", async () => {

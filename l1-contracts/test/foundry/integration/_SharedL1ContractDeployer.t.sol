@@ -57,19 +57,6 @@ contract L1ContractDeployer is Test {
         vm.stopPrank();
     }
 
-    function _registerNewToken(address _tokenAddress) internal {
-        if (!bridgeHub.tokenIsRegistered(_tokenAddress)) {
-            vm.prank(bridgehubOwnerAddress);
-            bridgeHub.addToken(_tokenAddress);
-        }
-    }
-
-    function _registerNewTokens(address[] memory _tokens) internal {
-        for (uint256 i = 0; i < _tokens.length; i++) {
-            _registerNewToken(_tokens[i]);
-        }
-    }
-
     function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
         stdstore
             .target(address(sharedBridge))

@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract createNewChainTest is StateTransitionManagerTest {
     function test_RevertWhen_InitialDiamondCutHashMismatch() public {
@@ -20,7 +21,7 @@ contract createNewChainTest is StateTransitionManagerTest {
 
         chainContractAddress.createNewChain({
             _chainId: chainId,
-            _baseToken: baseToken,
+            _baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, baseToken),
             _sharedBridge: sharedBridge,
             _admin: admin,
             _initData: abi.encode(abi.encode(initialDiamondCutData), bytes("")),

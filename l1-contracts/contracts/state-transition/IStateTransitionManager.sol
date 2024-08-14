@@ -114,7 +114,7 @@ interface IStateTransitionManager {
 
     function createNewChain(
         uint256 _chainId,
-        address _baseToken,
+        bytes32 _baseTokenAssetId,
         address _sharedBridge,
         address _admin,
         bytes calldata _initData,

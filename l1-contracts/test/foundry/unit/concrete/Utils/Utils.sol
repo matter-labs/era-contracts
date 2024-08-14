@@ -260,7 +260,7 @@ library Utils {
         selectors[2] = UtilsFacet.util_setBridgehub.selector;
         selectors[3] = UtilsFacet.util_getBridgehub.selector;
         selectors[4] = UtilsFacet.util_setBaseToken.selector;
-        selectors[5] = UtilsFacet.util_getBaseToken.selector;
+        selectors[5] = UtilsFacet.util_getBaseTokenAssetId.selector;
         selectors[6] = UtilsFacet.util_setBaseTokenBridge.selector;
         selectors[7] = UtilsFacet.util_getBaseTokenBridge.selector;
         selectors[8] = UtilsFacet.util_setVerifier.selector;
@@ -328,7 +328,7 @@ library Utils {
                 protocolVersion: 0,
                 admin: address(0x32149872498357874258787),
                 validatorTimelock: address(0x85430237648403822345345),
-                baseToken: address(0x923645439232223445),
+                baseTokenAssetId: bytes32(uint256(0x923645439232223445)),
                 baseTokenBridge: address(0x23746765237749923040872834),
                 storedBatchZero: bytes32(0),
                 verifier: makeVerifier(testnetVerifier),

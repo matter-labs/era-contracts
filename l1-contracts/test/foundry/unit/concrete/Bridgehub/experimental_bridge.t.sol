@@ -245,63 +245,6 @@ contract ExperimentalBridgeTest is Test {
         }
     }
 
-    function test_addToken(address randomAddress) public {
-        vm.startPrank(bridgeOwner);
-        bridgeHub.setSharedBridge(address(mockSharedBridge));
-        vm.stopPrank();
-
-        assertTrue(!bridgeHub.tokenIsRegistered(testTokenAddress), "This random address is not registered as a token");
-
-        vm.prank(bridgeOwner);
-        bridgeHub.addToken(testTokenAddress);
-
-        assertTrue(
-            bridgeHub.tokenIsRegistered(testTokenAddress),
-            "after call from the bridgeowner, this randomAddress should be a registered token"
-        );
-
-        if (randomAddress != address(testTokenAddress)) {
-            // Testing to see if a random address can also be added or not
-            vm.prank(bridgeOwner);
-            bridgeHub.addToken(address(randomAddress));
-            assertTrue(bridgeHub.tokenIsRegistered(randomAddress));
-        }
-
-        // An already registered token cannot be registered again
-        vm.prank(bridgeOwner);
-        vm.expectRevert("BH: token already registered");
-        bridgeHub.addToken(testTokenAddress);
-    }
-
-    function test_addToken_cannotBeCalledByRandomAddress(address randomAddress, address randomCaller) public {
-        vm.startPrank(bridgeOwner);
-        bridgeHub.setSharedBridge(address(mockSharedBridge));
-        vm.stopPrank();
-
-        if (randomCaller != bridgeOwner) {
-            vm.prank(randomCaller);
-            vm.expectRevert(bytes("Ownable: caller is not the owner"));
-            bridgeHub.addToken(testTokenAddress);
-        }
-
-        assertTrue(!bridgeHub.tokenIsRegistered(testTokenAddress), "This random address is not registered as a token");
-
-        vm.prank(bridgeOwner);
-        bridgeHub.addToken(testTokenAddress);
-
-        assertTrue(
-            bridgeHub.tokenIsRegistered(testTokenAddress),
-            "after call from the bridgeowner, this testTokenAddress should be a registered token"
-        );
-
-        // An already registered token cannot be registered again by randomCaller
-        if (randomCaller != bridgeOwner) {
-            vm.prank(bridgeOwner);
-            vm.expectRevert("BH: token already registered");
-            bridgeHub.addToken(testTokenAddress);
-        }
-    }
-
     // function test_setSharedBridge(address randomAddress) public {
     //     assertTrue(
     //         bridgeHub.sharedBridge() == IL1AssetRouter(address(0)),

@@ -20,6 +20,7 @@ import {StateTransitionManager} from "contracts/state-transition/StateTransition
 import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract StateTransitionManagerTest is Test {
     StateTransitionManager internal stateTransitionManager;
@@ -136,7 +137,7 @@ contract StateTransitionManagerTest is Test {
 
         chainContractAddress.createNewChain({
             _chainId: chainId,
-            _baseToken: baseToken,
+            _baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, baseToken),
             _sharedBridge: sharedBridge,
             _admin: newChainAdmin,
             _initData: abi.encode(abi.encode(_diamondCut), bytes("")),

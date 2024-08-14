@@ -11,6 +11,7 @@ import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifi
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
@@ -66,7 +67,14 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getBaseToken() external view returns (address) {
-        return s.baseToken;
+        IBridgehub bridgehub = IBridgehub(s.bridgehub);
+        bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(s.chainId);
+        return bridgehub.baseToken(baseTokenAssetId);
+    }
+
+    /// @inheritdoc IGetters
+    function getBaseTokenAssetId() external view returns (bytes32) {
+        return s.baseTokenAssetId;
     }
 
     /// @inheritdoc IGetters

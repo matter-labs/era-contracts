@@ -355,7 +355,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev deploys a full set of chains contracts
     function _deployNewChain(
         uint256 _chainId,
-        address _baseToken,
+        bytes32 _baseTokenAssetId,
         address _sharedBridge,
         address _admin,
         bytes memory _diamondCut
@@ -383,7 +383,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
                 bytes32(protocolVersion),
                 bytes32(uint256(uint160(_admin))),
                 bytes32(uint256(uint160(validatorTimelock))),
-                bytes32(uint256(uint160(_baseToken))),
+                _baseTokenAssetId,
                 bytes32(uint256(uint160(_sharedBridge))),
                 storedBatchZero
             );
@@ -407,7 +407,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @notice called by Bridgehub when a chain registers
     /// @param _chainId the chain's id
-    /// @param _baseToken the base token address used to pay for gas fees
+    /// @param _baseTokenAssetId the base token asset id used to pay for gas fees
     /// @param _sharedBridge the shared bridge address, used as base token bridge
     /// @param _admin the chain's admin address
     /// @param _initData the diamond cut data, force deployments and factoryDeps encoded
@@ -415,7 +415,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// that initializes the chains Diamond Proxy
     function createNewChain(
         uint256 _chainId,
-        address _baseToken,
+        bytes32 _baseTokenAssetId,
         address _sharedBridge,
         address _admin,
         bytes calldata _initData,
@@ -424,7 +424,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         (bytes memory _diamondCut, bytes memory _forceDeploymentData) = abi.decode(_initData, (bytes, bytes));
 
         // solhint-disable-next-line func-named-parameters
-        address hyperchainAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut);
+        address hyperchainAddress = _deployNewChain(_chainId, _baseTokenAssetId, _sharedBridge, _admin, _diamondCut);
 
         {
             // check input
@@ -468,7 +468,13 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address hyperchain = hyperchainMap.get(_chainId);
         require(IZkSyncHyperchain(hyperchain).getProtocolVersion() == protocolVersion, "STM: outdated pv");
 
-        return abi.encode(IBridgehub(BRIDGE_HUB).baseToken(_chainId), _newGatewayAdmin, protocolVersion, _diamondCut);
+        return
+            abi.encode(
+                IBridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId),
+                _newGatewayAdmin,
+                protocolVersion,
+                _diamondCut
+            );
     }
 
     /// @notice Called by the bridgehub during the migration of a chain to the current settlement layer.
@@ -478,9 +484,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 _chainId,
         bytes calldata _stmData
     ) external override onlyBridgehub returns (address chainAddress) {
-        (address _baseToken, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
+        (bytes32 _baseTokenAssetId, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
             _stmData,
-            (address, address, uint256, bytes)
+            (bytes32, address, uint256, bytes)
         );
 
         // We ensure that the chain has the latest protocol version to avoid edge cases
@@ -488,7 +494,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         require(_protocolVersion == protocolVersion, "STM, outdated pv");
         chainAddress = _deployNewChain({
             _chainId: _chainId,
-            _baseToken: _baseToken,
+            _baseTokenAssetId: _baseTokenAssetId,
             _sharedBridge: address(IBridgehub(BRIDGE_HUB).sharedBridge()),
             _admin: _admin,
             _diamondCut: _diamondCut

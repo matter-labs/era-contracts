@@ -666,7 +666,6 @@ contract DeployL1Script is Script {
     function registerSharedBridge() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         vm.startBroadcast(msg.sender);
-        bridgehub.addToken(ADDRESS_ONE);
         // bridgehub.setSharedBridge(addresses.bridges.sharedBridgeProxy);
         bridgehub.setAddresses(
             addresses.bridges.sharedBridgeProxy,

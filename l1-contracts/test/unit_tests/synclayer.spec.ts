@@ -3,21 +3,27 @@ import * as ethers from "ethers";
 import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
-import type { Bridgehub } from "../../typechain";
-import { BridgehubFactory } from "../../typechain";
+import type { Bridgehub, L1NativeTokenVault } from "../../typechain";
+import { BridgehubFactory, L1NativeTokenVaultFactory } from "../../typechain";
 
 import {
   initialTestnetDeploymentProcess,
   defaultDeployerForTests,
   registerHyperchainWithBridgeRegistration,
 } from "../../src.ts/deploy-test-process";
-import { ethTestConfig, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, priorityTxMaxGasLimit } from "../../src.ts/utils";
+import {
+  ethTestConfig,
+  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  priorityTxMaxGasLimit,
+  ETH_ADDRESS_IN_CONTRACTS,
+} from "../../src.ts/utils";
 import { SYSTEM_CONFIG } from "../../scripts/utils";
 
 import type { Deployer } from "../../src.ts/deploy";
 
 describe("Synclayer", function () {
   let bridgehub: Bridgehub;
+  let l1NativeTokenVault: L1NativeTokenVault;
   // let stateTransition: StateTransitionManager;
   let owner: ethers.Signer;
   let migratingDeployer: Deployer;
@@ -54,6 +60,10 @@ describe("Synclayer", function () {
     chainId = migratingDeployer.chainId;
 
     bridgehub = BridgehubFactory.connect(migratingDeployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
+    l1NativeTokenVault = L1NativeTokenVaultFactory.connect(
+      migratingDeployer.addresses.Bridges.NativeTokenVaultProxy,
+      deployWallet
+    );
 
     gatewayDeployer = await defaultDeployerForTests(deployWallet, ownerAddress);
     gatewayDeployer.chainId = 10;
@@ -68,6 +78,8 @@ describe("Synclayer", function () {
 
     // For tests, the chainId is 9
     migratingDeployer.chainId = 9;
+
+    await l1NativeTokenVault.registerToken(ETH_ADDRESS_IN_CONTRACTS);
   });
 
   it("Check register synclayer", async () => {

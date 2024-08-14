@@ -4,9 +4,10 @@ import * as hardhat from "hardhat";
 import type { BytesLike } from "ethers/lib/utils";
 import { Interface } from "ethers/lib/utils";
 
-import type { Bridgehub, GettersFacet, MockExecutorFacet } from "../../typechain";
+import type { Bridgehub, L1NativeTokenVault, GettersFacet, MockExecutorFacet } from "../../typechain";
 import {
   BridgehubFactory,
+  L1NativeTokenVaultFactory,
   TestnetERC20TokenFactory,
   MailboxFacetFactory,
   GettersFacetFactory,
@@ -16,7 +17,7 @@ import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
 import type { IMailbox } from "../../typechain/IMailbox";
 
-import { ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig, ETH_ADDRESS_IN_CONTRACTS } from "../../src.ts/utils";
 import { Action, facetCut } from "../../src.ts/diamondCut";
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
@@ -46,6 +47,7 @@ describe("Legacy Era tests", function () {
   // let sharedBridgeProxy: L1AssetRouter;
   let erc20TestToken: ethers.Contract;
   let bridgehub: Bridgehub;
+  let l1NativeTokenVault: L1NativeTokenVault;
   let chainId = "9"; // Hardhat config ERA_CHAIN_ID
   const functionSignature = "0x11a2ccc1";
   let l2ToL1message: BytesLike;
@@ -86,6 +88,10 @@ describe("Legacy Era tests", function () {
     chainId = deployer.chainId.toString();
 
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
+    l1NativeTokenVault = L1NativeTokenVaultFactory.connect(
+      deployer.addresses.Bridges.NativeTokenVaultProxy,
+      deployWallet
+    );
 
     l1ERC20BridgeAddress = deployer.addresses.Bridges.ERC20BridgeProxy;
 
@@ -144,6 +150,8 @@ describe("Legacy Era tests", function () {
       erc20TestToken.address,
       ethers.constants.HashZero,
     ]);
+
+    await l1NativeTokenVault.registerToken(ETH_ADDRESS_IN_CONTRACTS);
   });
 
   it("Should not allow depositing zero amount", async () => {
@@ -162,6 +170,7 @@ describe("Legacy Era tests", function () {
       l1ERC20Bridge.connect(randomSigner),
       bridgehub,
       chainId,
+      deployer.l1ChainId,
       depositorAddress,
       erc20TestToken.address,
       ethers.utils.parseUnits("800", 18),
