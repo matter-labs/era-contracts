@@ -120,7 +120,7 @@ jobs:
 
       - name: Run tests
         working-directory: ./l1-contracts
-        run: yarn test:foundry
+        run: FOUNDRY_PROFILE=default yarn test:foundry
 
   test-hardhat:
     needs: [build, lint]
