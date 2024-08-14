@@ -1042,7 +1042,7 @@ export class Deployer {
         if (this.verbose) {
           console.log(`StateTransition System registered, gas used: ${receipt1.gasUsed.toString()}`);
         }
-      
+
         const stmDeploymentTracker = this.stmDeploymentTracker(this.deployWallet);
 
         const l1AssetRouter = this.defaultSharedBridge(this.deployWallet);
@@ -1063,7 +1063,10 @@ export class Deployer {
         ]);
         const receipt3 = await this.executeUpgrade(this.addresses.Bridgehub.STMDeploymentTrackerProxy, 0, data1);
         if (this.verbose) {
-          console.log("STM asset registered in L1 Shared Bridge via STM Deployment Tracker", receipt3.gasUsed.toString());
+          console.log(
+            "STM asset registered in L1 Shared Bridge via STM Deployment Tracker",
+            receipt3.gasUsed.toString()
+          );
           console.log(
             `CONTRACTS_STM_ASSET_INFO=${await bridgehub.stmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
           );
