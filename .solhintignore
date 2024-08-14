@@ -29,6 +29,3 @@ gas-bound-caller/contracts/test-contracts
 lib/*
 l2-contracts/lib
 system-contracts/lib
-
-
-
