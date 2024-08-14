@@ -16,6 +16,9 @@ import {
 import {
   deployViaCreate2 as deployViaCreate2Zk,
   BUILT_IN_ZKSYNC_CREATE2_FACTORY,
+  L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
+  L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
+  L2_STANDARD_TOKEN_PROXY_BYTECODE,
   // deployBytecodeViaCreate2OnPath,
   // L2_SHARED_BRIDGE_PATH,
 } from "./deploy-utils-zk";
@@ -206,7 +209,7 @@ export class Deployer {
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(
         ["uint256", "uint256", "address", "address"],
-        [eraChainId, getNumberFromEnv("ETH_CLIENT_CHAIN_ID"), this.addresses.Bridges.SharedBridgeProxy, ADDRESS_ONE]
+        [getNumberFromEnv("ETH_CLIENT_CHAIN_ID"), eraChainId, this.addresses.Bridges.SharedBridgeProxy, ADDRESS_ONE]
       ),
     };
     const ntvDeployment = {
@@ -215,8 +218,15 @@ export class Deployer {
       callConstructor: true,
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(
-        ["bytes32", "address"],
-        [l2TokenProxyBytecodeHash, this.addresses.Governance]
+        ["uint256", "address", "bytes32", "address", "address", "bool"],
+        [
+          getNumberFromEnv("ETH_CLIENT_CHAIN_ID"),
+          applyL1ToL2Alias(this.addresses.Governance),
+          l2TokenProxyBytecodeHash,
+          ethers.constants.AddressZero,
+          ethers.constants.AddressZero,
+          false,
+        ]
       ),
     };
 
@@ -1200,6 +1210,14 @@ export class Deployer {
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
     const forceDeploymentsData = await this.genesisForceDeploymentsData();
     const initData = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes"], [initialDiamondCut, forceDeploymentsData]);
+    let factoryDeps = [];
+    if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
+      factoryDeps = [
+        L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
+        L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
+        L2_STANDARD_TOKEN_PROXY_BYTECODE,
+      ];
+    }
     // note the factory deps are provided at genesis
     const receipt = await this.executeDirectOrGovernance(
       useGovernance,
@@ -1212,7 +1230,7 @@ export class Deployer {
         Date.now(),
         admin,
         initData,
-        [],
+        factoryDeps,
       ],
       0,
       {
