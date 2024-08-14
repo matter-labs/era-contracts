@@ -70,6 +70,18 @@ contract DummySharedBridge {
         bytes32[] calldata // _merkleProof
     ) external {}
 
+    function claimFailedDeposit(
+        uint256, // _chainId,
+        address, // _depositSender,
+        address, // _l1Asset,
+        uint256, // _amount,
+        bytes32, // _l2TxHash,
+        uint256, // _l2BatchNumber,
+        uint256, // _l2MessageIndex,
+        uint16, // _l2TxNumberInBatch,
+        bytes32[] calldata //_merkleProof
+    ) external {}
+
     function finalizeWithdrawalLegacyErc20Bridge(
         uint256, //_l2BatchNumber,
         uint256, //_l2MessageIndex,
@@ -91,10 +103,10 @@ contract DummySharedBridge {
         uint256 _amount
     ) external payable {
         if (_l1Token == address(1)) {
-            require(msg.value == _amount, "L1AssetRouter: msg.value not equal to amount");
+            require(msg.value == _amount, "L1AR: msg.value not equal to amount");
         } else {
             // The Bridgehub also checks this, but we want to be sure
-            require(msg.value == 0, "ShB m.v > 0 b d.it");
+            require(msg.value == 0, "L1AR: m.v > 0 b d.it");
             uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
             require(amount == _amount, "5T"); // The token has non-standard transfer logic
         }
@@ -139,13 +151,13 @@ contract DummySharedBridge {
 
     /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
     function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external {
-        require(address(nativeTokenVault) == address(0), "ShB: legacy bridge already set");
-        require(address(_nativeTokenVault) != address(0), "ShB: legacy bridge 0");
+        require(address(nativeTokenVault) == address(0), "L1AR: legacy bridge already set");
+        require(address(_nativeTokenVault) != address(0), "L1AR: legacy bridge 0");
         nativeTokenVault = _nativeTokenVault;
     }
 
     /// @dev Used to set the assedAddress for a given assetId.
-    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external {
+    function setAssetHandlerAddressThisChain(bytes32 _additionalData, address _assetHandlerAddress) external {
         address sender = msg.sender == address(nativeTokenVault) ? L2_NATIVE_TOKEN_VAULT_ADDRESS : msg.sender;
         bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData));
         assetHandlerAddress[assetId] = _assetHandlerAddress;

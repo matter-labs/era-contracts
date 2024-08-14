@@ -123,7 +123,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
-            _l1Token: address(token),
+            _l1Asset: address(token),
             _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
@@ -141,7 +141,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
 
         // Bridgehub bridgehub = new Bridgehub();
         // vm.store(address(bridgehub),  bytes32(uint256(5 +2)), bytes32(uint256(31337)));
-        // require(address(bridgehub.deployer()) == address(31337), "Bridgehub: deployer wrong");
+        // require(address(bridgehub.deployer()) == address(31337), "BH: deployer wrong");
 
         vm.mockCall(
             bridgehubAddress,
@@ -166,7 +166,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
-            _l1Token: ETH_TOKEN_ADDRESS,
+            _l1Asset: ETH_TOKEN_ADDRESS,
             _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,

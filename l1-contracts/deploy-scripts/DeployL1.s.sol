@@ -577,13 +577,19 @@ contract DeployL1Script is Script {
         vm.startBroadcast(msg.sender);
         bridgehub.addStateTransitionManager(addresses.stateTransition.stateTransitionProxy);
         console.log("StateTransitionManager registered");
-
         STMDeploymentTracker stmDT = STMDeploymentTracker(addresses.bridgehub.stmDeploymentTrackerProxy);
         // vm.startBroadcast(msg.sender);
+        L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
+        sharedBridge.setAssetDeploymentTracker(
+            bytes32(uint256(uint160(addresses.stateTransition.stateTransitionProxy))),
+            address(stmDT)
+        );
+        console.log("STM DT whitelisted");
+
         stmDT.registerSTMAssetOnL1(addresses.stateTransition.stateTransitionProxy);
         vm.stopBroadcast();
         console.log("STM registered in STMDeploymentTracker");
-        L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
+
         bytes32 assetId = bridgehub.stmAssetId(addresses.stateTransition.stateTransitionProxy);
         // console.log(address(bridgehub.stmDeployer()), addresses.bridgehub.stmDeploymentTrackerProxy);
         // console.log(address(bridgehub.stmDeployer().BRIDGE_HUB()), addresses.bridgehub.bridgehubProxy);
@@ -674,7 +680,7 @@ contract DeployL1Script is Script {
     function deployErc20BridgeImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(L1ERC20Bridge).creationCode,
-            abi.encode(addresses.bridges.sharedBridgeProxy, addresses.vaults.l1NativeTokenVaultProxy)
+            abi.encode(addresses.bridges.sharedBridgeProxy, addresses.vaults.l1NativeTokenVaultProxy, config.eraChainId)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("Erc20BridgeImplementation deployed at:", contractAddress);

@@ -4,14 +4,21 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
-import {BLOB_SIZE_BYTES} from "./DAUtils.sol";
+/// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
+/// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
+/// @dev Our circuits will prove that a EIP-4844 blob and our internal blob are the same.
+uint256 constant BLOB_SIZE_BYTES = 126_976;
 
-uint256 constant BLOBS_SUPPORTED = 6;
+/// @dev The state diff hash, hash of pubdata + the number of blobs.
+uint256 constant BLOB_DATA_OFFSET = 65;
+
+/// @dev The size of the commitment for a single blob.
+uint256 constant BLOB_COMMITMENT_SIZE = 32;
 
 /// @notice Contract that contains the functionality for process the calldata DA.
 /// @dev The expected l2DAValidator that should be used with it `RollupL2DAValidator`.
 abstract contract CalldataDA {
-    /// @notice Parses the input that the l2 Da validator has provided to the contract.
+    /// @notice Parses the input that the L2 DA validator has provided to the contract.
     /// @param _l2DAValidatorOutputHash The hash of the output of the L2 DA validator.
     /// @param _maxBlobsSupported The maximal number of blobs supported by the chain.
     /// @param _operatorDAInput The DA input by the operator provided on L1.
@@ -30,14 +37,14 @@ abstract contract CalldataDA {
             bytes calldata l1DaInput
         )
     {
-        // The preimage under the hash `l2DAValidatorOutputHash` is expected to be in the following format:
+        // The preimage under the hash `_l2DAValidatorOutputHash` is expected to be in the following format:
         // - First 32 bytes are the hash of the uncompressed state diff.
         // - Then, there is a 32-byte hash of the full pubdata.
         // - Then, there is the 1-byte number of blobs published.
         // - Then, there are linear hashes of the published blobs, 32 bytes each.
 
         // Check that it accommodates enough pubdata for the state diff hash, hash of pubdata + the number of blobs.
-        require(_operatorDAInput.length >= 32 + 32 + 1, "too small");
+        require(_operatorDAInput.length >= BLOB_DATA_OFFSET, "too small");
 
         stateDiffHash = bytes32(_operatorDAInput[:32]);
         fullPubdataHash = bytes32(_operatorDAInput[32:64]);
@@ -49,43 +56,56 @@ abstract contract CalldataDA {
         // the `_maxBlobsSupported`
         blobsLinearHashes = new bytes32[](_maxBlobsSupported);
 
-        require(_operatorDAInput.length >= 65 + 32 * blobsProvided, "invalid blobs hashes");
+        require(_operatorDAInput.length >= BLOB_DATA_OFFSET + 32 * blobsProvided, "invalid blobs hashes");
 
-        uint256 ptr = 65;
+        cloneCalldata(blobsLinearHashes, _operatorDAInput[BLOB_DATA_OFFSET:], blobsProvided);
 
-        for (uint256 i = 0; i < blobsProvided; ++i) {
-            // Take the 32 bytes of the blob linear hash
-            blobsLinearHashes[i] = bytes32(_operatorDAInput[ptr:ptr + 32]);
-            ptr += 32;
-        }
+        uint256 ptr = BLOB_DATA_OFFSET + 32 * blobsProvided;
 
-        // Now, we need to double check that the provided input was indeed retutned by the L2 DA validator.
+        // Now, we need to double check that the provided input was indeed returned by the L2 DA validator.
         require(keccak256(_operatorDAInput[:ptr]) == _l2DAValidatorOutputHash, "invalid l2 DA output hash");
 
-        // The rest of the output were provided specifically by the operator
+        // The rest of the output was provided specifically by the operator
         l1DaInput = _operatorDAInput[ptr:];
     }
 
     /// @notice Verify that the calldata DA was correctly provided.
-    /// todo: better doc comments
+    /// @param _blobsProvided The number of blobs provided.
+    /// @param _fullPubdataHash Hash of the pubdata preimage.
+    /// @param _maxBlobsSupported Maximum number of blobs supported.
+    /// @param _pubdataInput Full pubdata + an additional 32 bytes containing the blob commitment for the pubdata.
+    /// @dev We supply the blob commitment as part of the pubdata because even with calldata the prover will check these values.
     function _processCalldataDA(
         uint256 _blobsProvided,
         bytes32 _fullPubdataHash,
         uint256 _maxBlobsSupported,
         bytes calldata _pubdataInput
-    ) internal pure returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
+    ) internal pure virtual returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
+        require(_blobsProvided == 1, "one blob with calldata");
+        require(_pubdataInput.length >= BLOB_COMMITMENT_SIZE, "pubdata too small");
+
         // We typically do not know whether we'll use calldata or blobs at the time when
         // we start proving the batch. That's why the blob commitment for a single blob is still present in the case of calldata.
 
         blobCommitments = new bytes32[](_maxBlobsSupported);
 
-        require(_blobsProvided == 1, "one one blob with calldata");
+        _pubdata = _pubdataInput[:_pubdataInput.length - BLOB_COMMITMENT_SIZE];
 
-        _pubdata = _pubdataInput[:_pubdataInput.length - 32];
-
-        // FIXME: allow larger lengths for SyncLayer-based chains.
         require(_pubdata.length <= BLOB_SIZE_BYTES, "cz");
         require(_fullPubdataHash == keccak256(_pubdata), "wp");
-        blobCommitments[0] = bytes32(_pubdataInput[_pubdataInput.length - 32:_pubdataInput.length]);
+        blobCommitments[0] = bytes32(_pubdataInput[_pubdataInput.length - BLOB_COMMITMENT_SIZE:_pubdataInput.length]);
+    }
+
+    /// @notice Method that clones a slice of calldata into a bytes32[] memory array.
+    /// @param _dst The destination array.
+    /// @param _input The input calldata.
+    /// @param _len The length of the slice in 32-byte words to clone.
+    function cloneCalldata(bytes32[] memory _dst, bytes calldata _input, uint256 _len) internal pure {
+        assembly {
+            // The pointer to the allocated memory above. We skip 32 bytes to avoid overwriting the length.
+            let dstPtr := add(_dst, 0x20)
+            let inputPtr := _input.offset
+            calldatacopy(dstPtr, inputPtr, mul(_len, 32))
+        }
     }
 }

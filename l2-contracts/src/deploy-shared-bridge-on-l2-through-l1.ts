@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import type { BigNumberish } from "ethers";
-import { Wallet } from "ethers";
+import { Wallet, ethers } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { provider, publishBytecodeFromL1, priorityTxMaxGasLimit } from "./utils";
 
@@ -63,7 +63,7 @@ async function setL2TokenBeacon(deployer: Deployer, chainId: string, gasPrice: B
     chainId,
     L2_NATIVE_TOKEN_VAULT_ADDRESS,
     gasPrice,
-    l2NTV.interface.encodeFunctionData("setL2TokenBeacon"),
+    l2NTV.interface.encodeFunctionData("configureL2TokenBeacon", [false, ethers.constants.AddressZero]),
     priorityTxMaxGasLimit
   );
   if (deployer.verbose) {

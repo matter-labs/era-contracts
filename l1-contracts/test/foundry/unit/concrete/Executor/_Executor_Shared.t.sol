@@ -94,7 +94,7 @@ contract ExecutorTest is Test {
         selectors[6] = getters.getTotalPriorityTxs.selector;
         selectors[7] = getters.getFirstUnprocessedPriorityTx.selector;
         selectors[8] = getters.getPriorityQueueSize.selector;
-        selectors[9] = getters.priorityQueueFrontOperation.selector;
+        selectors[9] = getters.getTotalBatchesExecuted.selector;
         selectors[10] = getters.isValidator.selector;
         selectors[11] = getters.l2LogsRootHash.selector;
         selectors[12] = getters.storedBatchHash.selector;
@@ -112,7 +112,6 @@ contract ExecutorTest is Test {
         selectors[24] = getters.isFacetFreezable.selector;
         selectors[25] = getters.getTotalBatchesCommitted.selector;
         selectors[26] = getters.getTotalBatchesVerified.selector;
-        selectors[27] = getters.getTotalBatchesExecuted.selector;
         return selectors;
     }
 

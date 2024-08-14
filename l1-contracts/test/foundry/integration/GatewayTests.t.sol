@@ -16,7 +16,7 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {HyperchainDeployer} from "./_SharedHyperchainDeployer.t.sol";
 import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {L2Message} from "contracts/common/Messaging.sol";
@@ -28,6 +28,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -158,7 +159,9 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
             reservedDynamic: "0x"
         });
         vm.chainId(12345);
-        bridgehub.forwardTransactionOnSyncLayer(mintChainId, tx, new bytes[](0), bytes32(0), 0);
+        vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
+        bridgehub.forwardTransactionOnGateway(mintChainId, tx, new bytes[](0), bytes32(0), 0);
+        vm.stopBroadcast();
     }
 
     function finishMoveChain() public {
@@ -168,7 +171,7 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         bytes32 assetId = bridgehub.stmAssetIdFromChainId(migratingChainId);
 
         bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
-        bytes memory chainData = abi.encode(AdminFacet(address(chain))._prepareChainCommitment());
+        bytes memory chainData = abi.encode(AdminFacet(address(chain)).prepareChainCommitment());
         bytes memory stmData = abi.encode(address(1), msg.sender, stm.protocolVersion(), initialDiamondCut);
         bytes memory bridgehubMintData = abi.encode(mintChainId, stmData, chainData);
         vm.startBroadcast(address(bridgehub.sharedBridge()));

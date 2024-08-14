@@ -7,22 +7,46 @@ pragma solidity 0.8.24;
 import {IL1DAValidator, L1DAValidatorOutput, PubdataSource} from "../chain-interfaces/IL1DAValidator.sol";
 import {IL1Messenger} from "../../common/interfaces/IL1Messenger.sol";
 
-import {CalldataDA} from "./CalldataDA.sol";
+import {CalldataDAGateway} from "./CalldataDAGateway.sol";
 
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
+import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
 
 /// @notice The DA validator intended to be used in Era-environment.
-/// @dev For compaitbility reasons it accepts calldata in the same format as the `RollupL1DAValidator`, but unlike the latter it
+/// @dev For compatibility reasons it accepts calldata in the same format as the `RollupL1DAValidator`, but unlike the latter it
 /// does not support blobs.
 /// @dev Note that it does not provide any compression whatsoever.
-contract RelayedSLDAValidator is IL1DAValidator, CalldataDA {
+contract RelayedSLDAValidator is IL1DAValidator, CalldataDAGateway {
+    /// @dev Ensures that the sender is the chain that is supposed to send the message.
+    /// @param _chainId The chain id of the chain that is supposed to send the message.
+    function _ensureOnlyChainSender(uint256 _chainId) internal view {
+        // Note that this contract is only supposed to be deployed on L2, where the
+        // bridgehub is predeployed at `L2_BRIDGEHUB_ADDR` address.
+        require(IBridgehub(L2_BRIDGEHUB_ADDR).getHyperchain(_chainId) == msg.sender, "l1-da-validator/invalid-sender");
+    }
+
+    /// @dev Relays the calldata to L1.
+    /// @param _chainId The chain id of the chain that is supposed to send the message.
+    /// @param _batchNumber The batch number for which the data availability is being checked.
+    /// @param _pubdata The pubdata to be relayed to L1.
+    function _relayCalldata(uint256 _chainId, uint256 _batchNumber, bytes calldata _pubdata) internal {
+        // Re-sending all the pubdata in pure form to L1.
+        // slither-disable-next-line unused-return
+        IL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(abi.encode(_chainId, _batchNumber, _pubdata));
+    }
+
     /// @inheritdoc IL1DAValidator
     function checkDA(
         uint256 _chainId,
+        uint256 _batchNumber,
         bytes32 _l2DAValidatorOutputHash,
         bytes calldata _operatorDAInput,
         uint256 _maxBlobsSupported
     ) external returns (L1DAValidatorOutput memory output) {
+        // Unfortunately we have to use a method call instead of a modifier
+        // because of the stack-too-deep error caused by it.
+        _ensureOnlyChainSender(_chainId);
+
         // Preventing "stack too deep" error
         uint256 blobsProvided;
         bytes32 fullPubdataHash;
@@ -56,10 +80,7 @@ contract RelayedSLDAValidator is IL1DAValidator, CalldataDA {
                 l1DaInput[1:]
             );
 
-            // Re-sending all the pubdata in pure form to L1.
-            // FIXME: we should also supply batch number, this is needed for logs to work.
-            // slither-disable-next-line unused-return
-            IL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(abi.encode(_chainId, pubdata));
+            _relayCalldata(_chainId, _batchNumber, pubdata);
 
             output.blobsOpeningCommitments = blobCommitments;
         } else {

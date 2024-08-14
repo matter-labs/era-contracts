@@ -14,7 +14,7 @@ uint256 constant BLOBS_SUPPORTED = 6;
 
 contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
     /// @dev The published blob commitments. Note, that the correctness of blob commitment with relation to the linear hash
-    /// is *not* checked in this contract, but is expected to be checked at the veriifcation stage of the ZK contract.
+    /// is *not* checked in this contract, but is expected to be checked at the verification stage of the ZK contract.
     mapping(bytes32 blobCommitment => bool isPublished) public publishedBlobCommitments;
 
     /// @notice Publishes certain blobs, marking commitments to them as published.
@@ -35,6 +35,49 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
             publishedBlobCommitments[blobCommitment] = true;
             ++versionedHashIndex;
         }
+    }
+
+    /// @inheritdoc IL1DAValidator
+    function checkDA(
+        uint256, // _chainId
+        uint256, // _batchNumber
+        bytes32 _l2DAValidatorOutputHash,
+        bytes calldata _operatorDAInput,
+        uint256 _maxBlobsSupported
+    ) external view returns (L1DAValidatorOutput memory output) {
+        (
+            bytes32 stateDiffHash,
+            bytes32 fullPubdataHash,
+            bytes32[] memory blobsLinearHashes,
+            uint256 blobsProvided,
+            bytes calldata l1DaInput
+        ) = _processL2RollupDAValidatorOutputHash(_l2DAValidatorOutputHash, _maxBlobsSupported, _operatorDAInput);
+
+        uint8 pubdataSource = uint8(l1DaInput[0]);
+        bytes32[] memory blobCommitments;
+
+        if (pubdataSource == uint8(PubdataSource.Blob)) {
+            blobCommitments = _processBlobDA(blobsProvided, _maxBlobsSupported, l1DaInput[1:]);
+        } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
+            (blobCommitments, ) = _processCalldataDA(blobsProvided, fullPubdataHash, _maxBlobsSupported, l1DaInput[1:]);
+        } else {
+            revert("l1-da-validator/invalid-pubdata-source");
+        }
+
+        // We verify that for each set of blobHash/blobCommitment are either both empty
+        // or there are values for both.
+        // This is mostly a sanity check and it is not strictly required.
+        for (uint256 i = 0; i < _maxBlobsSupported; ++i) {
+            require(
+                (blobsLinearHashes[i] == bytes32(0) && blobCommitments[i] == bytes32(0)) ||
+                    (blobsLinearHashes[i] != bytes32(0) && blobCommitments[i] != bytes32(0)),
+                "bh"
+            );
+        }
+
+        output.stateDiffHash = stateDiffHash;
+        output.blobsLinearHashes = blobsLinearHashes;
+        output.blobsOpeningCommitments = blobCommitments;
     }
 
     /// @notice Generated the blob commitemnt to be used in the cryptographic proof by calling the point evaluation precompile.
@@ -81,7 +124,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
 
         uint256 versionedHashIndex = 0;
 
-        // we iterate over the `_operatorDAInput`, while advacning the pointer by `BLOB_DA_INPUT_SIZE` each time
+        // we iterate over the `_operatorDAInput`, while advancing the pointer by `BLOB_DA_INPUT_SIZE` each time
         for (uint256 i = 0; i < _blobsProvided; ++i) {
             bytes calldata commitmentData = _operatorDAInput[:PUBDATA_COMMITMENT_SIZE];
             bytes32 prepublishedCommitment = bytes32(
@@ -107,48 +150,6 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         // Calling the BLOBHASH opcode with an index > # blobs - 1 yields bytes32(0)
         bytes32 versionedHash = _getBlobVersionedHash(versionedHashIndex);
         require(versionedHash == bytes32(0), "lh");
-    }
-
-    /// @inheritdoc IL1DAValidator
-    function checkDA(
-        uint256, // _chainId
-        bytes32 _l2DAValidatorOutputHash,
-        bytes calldata _operatorDAInput,
-        uint256 _maxBlobsSupported
-    ) external returns (L1DAValidatorOutput memory output) {
-        (
-            bytes32 stateDiffHash,
-            bytes32 fullPubdataHash,
-            bytes32[] memory blobsLinearHashes,
-            uint256 blobsProvided,
-            bytes calldata l1DaInput
-        ) = _processL2RollupDAValidatorOutputHash(_l2DAValidatorOutputHash, _maxBlobsSupported, _operatorDAInput);
-
-        uint8 pubdataSource = uint8(l1DaInput[0]);
-        bytes32[] memory blobCommitments;
-
-        if (pubdataSource == uint8(PubdataSource.Blob)) {
-            blobCommitments = _processBlobDA(blobsProvided, _maxBlobsSupported, l1DaInput[1:]);
-        } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
-            (blobCommitments, ) = _processCalldataDA(blobsProvided, fullPubdataHash, _maxBlobsSupported, l1DaInput[1:]);
-        } else {
-            revert("l1-da-validator/invalid-pubdata-source");
-        }
-
-        // We verify that for each set of blobHash/blobCommitment are either both empty
-        // or there are values for both.
-        // This is mostly a sanity check and it is not strictly required.
-        for (uint256 i = 0; i < _maxBlobsSupported; ++i) {
-            require(
-                (blobsLinearHashes[i] == bytes32(0) && blobCommitments[i] == bytes32(0)) ||
-                    (blobsLinearHashes[i] != bytes32(0) && blobCommitments[i] != bytes32(0)),
-                "bh"
-            );
-        }
-
-        output.stateDiffHash = stateDiffHash;
-        output.blobsLinearHashes = blobsLinearHashes;
-        output.blobsOpeningCommitments = blobCommitments;
     }
 
     /// @notice Calls the point evaluation precompile and verifies the output

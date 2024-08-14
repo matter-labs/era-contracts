@@ -19,12 +19,14 @@ import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
 
     Bridgehub bridgeHub;
     address public bridgeOwner;
+    address public testTokenAddress;
     DummyStateTransitionManagerWBH mockSTM;
     DummyHyperchain mockChainContract;
     DummySharedBridge mockSharedBridge;
@@ -50,14 +52,15 @@ contract ExperimentalBridgeTest is Test {
         mockChainContract = new DummyHyperchain(address(bridgeHub), eraChainId);
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
-        ntv = new L1NativeTokenVault(weth, IL1AssetRouter(address(mockSharedBridge)), eraChainId);
+        ntv = new L1NativeTokenVault(weth, IL1AssetRouter(address(mockSharedBridge)));
         mockSharedBridge.setNativeTokenVault(ntv);
         mockSecondSharedBridge.setNativeTokenVault(ntv);
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
+        testTokenAddress = address(testToken);
         vm.prank(address(ntv));
         ntv.registerToken(ETH_TOKEN_ADDRESS);
         ntv.registerToken(address(testToken));
-        tokenAssetId = ntv.getAssetId(address(testToken));
+        tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(testToken));
 
         // test if the ownership of the bridgeHub is set correctly or not
         address defaultOwner = bridgeHub.owner();
@@ -104,7 +107,7 @@ contract ExperimentalBridgeTest is Test {
     function test_randomCallerCannotSetDeployer(address randomCaller, address randomDeployer) public {
         if (randomCaller != bridgeHub.owner() && randomCaller != bridgeHub.admin()) {
             vm.prank(randomCaller);
-            vm.expectRevert(bytes("Bridgehub: not owner or admin"));
+            vm.expectRevert(bytes("BH: not owner or admin"));
             bridgeHub.setPendingAdmin(randomDeployer);
 
             // The deployer shouldn't have changed.
@@ -124,7 +127,7 @@ contract ExperimentalBridgeTest is Test {
 
         // An address that has already been registered, cannot be registered again (at least not before calling `removeStateTransitionManager`).
         vm.prank(bridgeOwner);
-        vm.expectRevert(bytes("Bridgehub: state transition already registered"));
+        vm.expectRevert(bytes("BH: state transition already registered"));
         bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
 
         isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
@@ -153,7 +156,7 @@ contract ExperimentalBridgeTest is Test {
 
         // An address that has already been registered, cannot be registered again (at least not before calling `removeStateTransitionManager`).
         vm.prank(bridgeOwner);
-        vm.expectRevert(bytes("Bridgehub: state transition already registered"));
+        vm.expectRevert(bytes("BH: state transition already registered"));
         bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
 
         // Definitely not by a random caller
@@ -173,7 +176,7 @@ contract ExperimentalBridgeTest is Test {
 
         // A non-existent STM cannot be removed
         vm.prank(bridgeOwner);
-        vm.expectRevert(bytes("Bridgehub: state transition not registered yet"));
+        vm.expectRevert(bytes("BH: state transition not registered yet"));
         bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
 
         // Let's first register our particular stateTransitionManager
@@ -192,7 +195,7 @@ contract ExperimentalBridgeTest is Test {
 
         // An already removed STM cannot be removed again
         vm.prank(bridgeOwner);
-        vm.expectRevert(bytes("Bridgehub: state transition not registered yet"));
+        vm.expectRevert(bytes("BH: state transition not registered yet"));
         bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
     }
 
@@ -212,7 +215,7 @@ contract ExperimentalBridgeTest is Test {
 
         // A non-existent STM cannot be removed
         vm.prank(bridgeOwner);
-        vm.expectRevert(bytes("Bridgehub: state transition not registered yet"));
+        vm.expectRevert(bytes("BH: state transition not registered yet"));
         bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
 
         // Let's first register our particular stateTransitionManager
@@ -231,7 +234,7 @@ contract ExperimentalBridgeTest is Test {
 
         // An already removed STM cannot be removed again
         vm.prank(bridgeOwner);
-        vm.expectRevert(bytes("Bridgehub: state transition not registered yet"));
+        vm.expectRevert(bytes("BH: state transition not registered yet"));
         bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
 
         // Not possible by a randomcaller as well
@@ -242,61 +245,60 @@ contract ExperimentalBridgeTest is Test {
         }
     }
 
-    function test_addToken(address, address randomAddress) public {
-        assertTrue(!bridgeHub.tokenIsRegistered(randomAddress), "This random address is not registered as a token");
+    function test_addToken(address randomAddress) public {
+        vm.startPrank(bridgeOwner);
+        bridgeHub.setSharedBridge(address(mockSharedBridge));
+        vm.stopPrank();
+
+        assertTrue(!bridgeHub.tokenIsRegistered(testTokenAddress), "This random address is not registered as a token");
 
         vm.prank(bridgeOwner);
-        bridgeHub.addToken(randomAddress);
+        bridgeHub.addToken(testTokenAddress);
 
         assertTrue(
-            bridgeHub.tokenIsRegistered(randomAddress),
+            bridgeHub.tokenIsRegistered(testTokenAddress),
             "after call from the bridgeowner, this randomAddress should be a registered token"
         );
 
-        if (randomAddress != address(testToken)) {
-            // Testing to see if an actual ERC20 implementation can also be added or not
+        if (randomAddress != address(testTokenAddress)) {
+            // Testing to see if a random address can also be added or not
             vm.prank(bridgeOwner);
-            bridgeHub.addToken(address(testToken));
-
-            assertTrue(bridgeHub.tokenIsRegistered(address(testToken)));
+            bridgeHub.addToken(address(randomAddress));
+            assertTrue(bridgeHub.tokenIsRegistered(randomAddress));
         }
 
         // An already registered token cannot be registered again
         vm.prank(bridgeOwner);
-        vm.expectRevert("Bridgehub: token already registered");
-        bridgeHub.addToken(randomAddress);
+        vm.expectRevert("BH: token already registered");
+        bridgeHub.addToken(testTokenAddress);
     }
 
     function test_addToken_cannotBeCalledByRandomAddress(address randomAddress, address randomCaller) public {
+        vm.startPrank(bridgeOwner);
+        bridgeHub.setSharedBridge(address(mockSharedBridge));
+        vm.stopPrank();
+
         if (randomCaller != bridgeOwner) {
             vm.prank(randomCaller);
             vm.expectRevert(bytes("Ownable: caller is not the owner"));
-            bridgeHub.addToken(randomAddress);
+            bridgeHub.addToken(testTokenAddress);
         }
 
-        assertTrue(!bridgeHub.tokenIsRegistered(randomAddress), "This random address is not registered as a token");
+        assertTrue(!bridgeHub.tokenIsRegistered(testTokenAddress), "This random address is not registered as a token");
 
         vm.prank(bridgeOwner);
-        bridgeHub.addToken(randomAddress);
+        bridgeHub.addToken(testTokenAddress);
 
         assertTrue(
-            bridgeHub.tokenIsRegistered(randomAddress),
-            "after call from the bridgeowner, this randomAddress should be a registered token"
+            bridgeHub.tokenIsRegistered(testTokenAddress),
+            "after call from the bridgeowner, this testTokenAddress should be a registered token"
         );
-
-        if (randomAddress != address(testToken)) {
-            // Testing to see if an actual ERC20 implementation can also be added or not
-            vm.prank(bridgeOwner);
-            bridgeHub.addToken(address(testToken));
-
-            assertTrue(bridgeHub.tokenIsRegistered(address(testToken)));
-        }
 
         // An already registered token cannot be registered again by randomCaller
         if (randomCaller != bridgeOwner) {
             vm.prank(bridgeOwner);
-            vm.expectRevert("Bridgehub: token already registered");
-            bridgeHub.addToken(randomAddress);
+            vm.expectRevert("BH: token already registered");
+            bridgeHub.addToken(testTokenAddress);
         }
     }
 
@@ -336,8 +338,8 @@ contract ExperimentalBridgeTest is Test {
     //     );
     // }
 
-    uint256 newChainId;
-    address admin;
+    // uint256 newChainId;
+    // address admin;
 
     // function test_createNewChain(
     //     address randomCaller,
@@ -351,27 +353,27 @@ contract ExperimentalBridgeTest is Test {
     //     admin = makeAddr("NEW_CHAIN_ADMIN");
     //     // Diamond.DiamondCutData memory dcData;
 
-    //     vm.prank(bridgeOwner);
-    //     bridgeHub.setPendingAdmin(deployerAddress);
-    //     vm.prank(deployerAddress);
-    //     bridgeHub.acceptAdmin();
-    //     vm.startPrank(bridgeOwner);
-    //     bridgeHub.addStateTransitionManager(address(mockSTM));
-    //     bridgeHub.addToken(address(testToken));
-    //     bridgeHub.setSharedBridge(address(mockSharedBridge));
-    //     vm.stopPrank();
+    // vm.prank(bridgeOwner);
+    // bridgeHub.setPendingAdmin(deployerAddress);
+    // vm.prank(deployerAddress);
+    // bridgeHub.acceptAdmin();
+    // vm.startPrank(bridgeOwner);
+    // bridgeHub.setSharedBridge(address(mockSharedBridge));
+    // bridgeHub.addStateTransitionManager(address(mockSTM));
+    // bridgeHub.addToken(testTokenAddress);
+    // bridgeHub.setSharedBridge(address(mockSharedBridge));
+    // vm.stopPrank();
 
     // if (randomCaller != deployerAddress && randomCaller != bridgeOwner) {
     //     vm.prank(randomCaller);
-    //     vm.expectRevert(bytes("Bridgehub: not owner or admin"));
+    //     vm.expectRevert(bytes("BH: not owner or admin"));
     //     bridgeHub.createNewChain({
     //         _chainId: chainId,
     //         _stateTransitionManager: address(mockSTM),
-    //         _baseToken: address(testToken),
+    //         _baseToken: testTokenAddress,
     //         _salt: uint256(123),
     //         _admin: admin,
-    //         _initData: abi.encode(bytes(""), bytes("")),
-    //         _factoryDeps: new bytes[](0)
+    //         _initData: bytes("")
     //     });
     // }
 
@@ -389,36 +391,35 @@ contract ExperimentalBridgeTest is Test {
     //     mockSTM.setHyperchain(chainId, address(mockChainContract));
     //     assertTrue(mockSTM.getHyperchain(chainId) == address(mockChainContract));
 
-    //     vm.startPrank(deployerAddress);
-    //     vm.mockCall(
-    //         address(mockSTM),
-    //         // solhint-disable-next-line func-named-parameters
-    //         abi.encodeWithSelector(
-    //             mockSTM.createNewChain.selector,
-    //             chainId,
-    //             address(testToken),
-    //             address(mockSharedBridge),
-    //             admin,
-    //             _newChainInitData
-    //         ),
-    //         bytes("")
-    //     );
+    // vm.startPrank(deployerAddress);
+    // vm.mockCall(
+    //     address(mockSTM),
+    //     // solhint-disable-next-line func-named-parameters
+    //     abi.encodeWithSelector(
+    //         mockSTM.createNewChain.selector,
+    //         chainId,
+    //         testTokenAddress,
+    //         address(mockSharedBridge),
+    //         admin,
+    //         _newChainInitData
+    //     ),
+    //     bytes("")
+    // );
 
     // newChainId = bridgeHub.createNewChain({
     //     _chainId: chainId,
     //     _stateTransitionManager: address(mockSTM),
-    //     _baseToken: address(testToken),
+    //     _baseToken: testTokenAddress,
     //     _salt: uint256(chainId * 2),
     //     _admin: admin,
-    //     _initData: _newChainInitData,
-    //     _factoryDeps: new bytes[](0)
+    //     _initData: _newChainInitData
     // });
 
     //     vm.stopPrank();
     //     vm.clearMockedCalls();
 
     //     assertTrue(bridgeHub.stateTransitionManager(newChainId) == address(mockSTM));
-    //     assertTrue(bridgeHub.baseToken(newChainId) == address(testToken));
+    //     assertTrue(bridgeHub.baseToken(newChainId) == testTokenAddress);
     // }
 
     // function test_getHyperchain(uint256 mockChainId) public {
@@ -734,7 +735,7 @@ contract ExperimentalBridgeTest is Test {
     //     vm.deal(randomCaller, 1 ether);
 
     //     vm.prank(randomCaller);
-    //     vm.expectRevert("Bridgehub: non-eth bridge with msg.value");
+    //     vm.expectRevert("BH: non-eth bridge with msg.value");
     //     bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
 
     //     // Now, let's call the same function with zero msg.value
