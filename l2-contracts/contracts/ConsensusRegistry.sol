@@ -228,9 +228,9 @@ contract ConsensusRegistry is Ownable2Step {
             return;
         }
 
-        ensureAttesterSnapshot(_nodeOwner, node);
+        ensureAttesterSnapshot(node);
         node.attesterLatest.active = false;
-        ensureValidatorSnapshot(_nodeOwner, node);
+        ensureValidatorSnapshot(node);
         node.validatorLatest.active = false;
 
         emit NodeDeactivated(_nodeOwner);
@@ -247,9 +247,9 @@ contract ConsensusRegistry is Ownable2Step {
             return;
         }
 
-        ensureAttesterSnapshot(_nodeOwner, node);
+        ensureAttesterSnapshot(node);
         node.attesterLatest.active = true;
-        ensureValidatorSnapshot(_nodeOwner, node);
+        ensureValidatorSnapshot(node);
         node.validatorLatest.active = true;
 
         emit NodeActivated(_nodeOwner);
@@ -263,9 +263,9 @@ contract ConsensusRegistry is Ownable2Step {
         verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
 
-        ensureAttesterSnapshot(_nodeOwner, node);
+        ensureAttesterSnapshot(node);
         node.attesterLatest.pendingRemoval = true;
-        ensureValidatorSnapshot(_nodeOwner, node);
+        ensureValidatorSnapshot(node);
         node.validatorLatest.pendingRemoval = true;
 
         emit NodeRemoved(_nodeOwner);
@@ -283,7 +283,7 @@ contract ConsensusRegistry is Ownable2Step {
             return;
         }
 
-        ensureValidatorSnapshot(_nodeOwner, node);
+        ensureValidatorSnapshot(node);
         node.validatorLatest.weight = _weight;
 
         emit NodeValidatorWeightChanged(_nodeOwner, _weight);
@@ -301,7 +301,7 @@ contract ConsensusRegistry is Ownable2Step {
             return;
         }
 
-        ensureAttesterSnapshot(_nodeOwner, node);
+        ensureAttesterSnapshot(node);
         node.attesterLatest.weight = _weight;
 
         emit NodeAttesterWeightChanged(_nodeOwner, _weight);
@@ -326,7 +326,7 @@ contract ConsensusRegistry is Ownable2Step {
             return;
         }
 
-        ensureValidatorSnapshot(_nodeOwner, node);
+        ensureValidatorSnapshot(node);
         node.validatorLatest.pubKey = _pubKey;
         node.validatorLatest.pop = _pop;
 
@@ -350,7 +350,7 @@ contract ConsensusRegistry is Ownable2Step {
             return;
         }
 
-        ensureAttesterSnapshot(_nodeOwner, node);
+        ensureAttesterSnapshot(node);
         node.attesterLatest.pubKey = _pubKey;
 
         emit NodeAttesterPubKeyChanged(_nodeOwner, _pubKey);
@@ -387,15 +387,17 @@ contract ConsensusRegistry is Ownable2Step {
         return false;
     }
 
-    function ensureAttesterSnapshot(address _nodeOwner, Node storage _node) internal {
-        if (attestersCommit > _node.attesterLastUpdateCommit) {
+    function ensureAttesterSnapshot(Node storage _node) internal {
+        if (_node.attesterLastUpdateCommit < attestersCommit) {
             _node.attesterSnapshot = _node.attesterLatest;
+            _node.attesterLastUpdateCommit = attestersCommit;
         }
     }
 
-    function ensureValidatorSnapshot(address _nodeOwner, Node storage _node) internal {
-        if (validatorsCommit > _node.validatorLastUpdateCommit) {
+    function ensureValidatorSnapshot(Node storage _node) internal {
+        if (_node.validatorLastUpdateCommit < validatorsCommit) {
             _node.validatorSnapshot = _node.validatorLatest;
+            _node.validatorLastUpdateCommit = validatorsCommit;
         }
     }
 
