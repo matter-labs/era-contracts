@@ -9,7 +9,7 @@ import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/li
 /// @custom:security-contact security@matterlabs.dev
 /// @title ConsensusRegistry
 /// @dev Manages consensus nodes and committees for the L2 consensus protocol,
-/// owned by a governance protocol. Nodes act as both validators and attesters,
+/// owned by Matter Labs Multisig. Nodes act as both validators and attesters,
 /// each playing a distinct role in the consensus process. This contract facilitates
 /// the rotation of validator and attester committees, which represent a subset of nodes
 /// expected to actively participate in the consensus process during a specific time window.
