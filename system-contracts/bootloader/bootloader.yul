@@ -885,6 +885,9 @@ object "Bootloader" {
                         nearCallPanic()
                     }
                 }
+                debugLog("mint Ether", amount)
+                debugLog("mint Ether to", to)
+                debugLog("mint Ether success", success)
             }
 
             /// @notice Marks the txs as executed in the L2Nullifier
@@ -1108,7 +1111,8 @@ object "Bootloader" {
                 let toRefundRecipient
                 switch success
                 case 0 {
-                    if iszero(isPriorityOp) {
+                    let isUpgradeTx := and(iszero(isPriorityOp), isL1Tx) 
+                    if isUpgradeTx {
                         // Upgrade transactions must always succeed
                         assertionError("Upgrade tx failed")
                     }
@@ -1165,6 +1169,8 @@ object "Bootloader" {
                 transactionIndex,
                 gasPerPubdata
             ) { 
+                debugLog("Process XL2 tx", 2)
+
                 // todo check merkle proof here
                 let canonicalTxHash, success := processXChainTx(txDataOffset, resultPtr, transactionIndex, gasPerPubdata, false, false)
                 if success {
@@ -1978,6 +1984,7 @@ object "Bootloader" {
                 // If the success is zero, we will revert in order
                 // to revert the minting of ether to the user
                 if iszero(success) {
+                    debugLog("Reverting minting", 0)
                     nearCallPanic()
                 }
 
@@ -1992,6 +1999,7 @@ object "Bootloader" {
                 ) {
                     // If not enough gas for pubdata was provided, we revert all the state diffs / messages
                     // that caused the pubdata to be published
+                    debugLog("Reverting due to pubdata", 0)
                     nearCallPanic()
                 }
             }
