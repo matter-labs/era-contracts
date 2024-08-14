@@ -333,10 +333,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             }
             amount = _depositAmount;
 
-            uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _depositAmount);
+            uint256 depAmount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _depositAmount);
             // The token has non-standard transfer logic
-            if (amount != _depositAmount) {
-                revert DepositIncorrectAmount(amount, _depositAmount);
+            if (depAmount != _depositAmount) {
+                revert DepositIncorrectAmount(depAmount, _depositAmount);
             }
         }
         // empty deposit amount
