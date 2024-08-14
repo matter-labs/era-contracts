@@ -1345,10 +1345,12 @@ function performExtCodeCopy(evmGas,oldSp) -> evmGasLeft, sp {
     }
     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
+
     let len_32 := shr(5, len)
     for {let i := 0} lt(i, len_32) { i := add(i, 1) } {
         mstore(add(dest,shl(5,i)),0)
     }
+
     let size_32 := shl(5,len_32)
     let rest_32 := sub(len, size_32)
     for {let i := 0} lt(i, rest_32) { i := add(i, 1) } {
@@ -1356,10 +1358,9 @@ function performExtCodeCopy(evmGas,oldSp) -> evmGasLeft, sp {
     }
 
     // Gets the code from the addr
-    if iszero(iszero(_getRawCodeHash(addr))) {
+    if and(iszero(iszero(_getRawCodeHash(addr))),gt(len,0)) {
         pop(_fetchDeployedCodeWithDest(addr, offset, len,add(dest,MEM_OFFSET_INNER())))  
     }
-
 }
 
 function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
