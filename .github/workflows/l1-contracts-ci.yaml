@@ -103,21 +103,13 @@ jobs:
             l2-contracts/typechain
             l1-contracts/lib
 
-      # - name: Install l2 deps
-      #   working-directory: ./l2-contracts
-      #   run: yarn
+      - name: Install l2 deps
+        working-directory: ./l2-contracts
+        run: yarn
 
-      # - name: Install l1 deps
-      #   working-directory: ./l1-contracts
-      #   run: yarn
-
-      # - name: Build l2 deps
-      #   working-directory: ./l2-contracts
-      #   run: yarn build
-
-      # - name: Build l1 deps
-      #   working-directory: ./l1-contracts
-      #   run: yarn build
+      - name: Build l2 deps
+        working-directory: ./l2-contracts
+        run: yarn build
 
       - name: Run tests
         working-directory: ./l1-contracts
@@ -140,20 +132,16 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Install l2 deps
-        working-directory: ./l2-contracts
-        run: yarn
+      # - name: Install l2 deps
+      #   working-directory: ./l2-contracts
+      #   run: yarn
 
       - name: Install l1 deps
         working-directory: ./l1-contracts
         run: yarn
 
-      - name: Build l2 deps
-        working-directory: ./l2-contracts
-        run: yarn build
-
-      # - name: Build l1 deps
-      #   working-directory: ./l1-contracts
+      # - name: Build l2 deps
+      #   working-directory: ./l2-contracts
       #   run: yarn build
 
       - name: Restore artifacts cache
@@ -246,10 +234,6 @@ jobs:
       - name: Build l2 deps
         working-directory: ./l2-contracts
         run: yarn build
-
-      # - name: Build l1 deps
-      #   working-directory: ./l1-contracts
-      #   run: yarn build
 
       - name: Run coverage
         run: FOUNDRY_PROFILE=default yarn test:foundry && FOUNDRY_PROFILE=default yarn coverage:foundry --report summary --report lcov
