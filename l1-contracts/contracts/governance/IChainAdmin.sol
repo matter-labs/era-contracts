@@ -19,5 +19,6 @@ interface IChainAdmin {
     function isRestrictionActive(address) external view returns (bool);
 
     function addRestriction(address restriction) external;
+
     function removeRestriction(address restriction) external;
 }
