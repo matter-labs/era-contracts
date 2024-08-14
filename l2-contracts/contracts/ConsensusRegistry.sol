@@ -177,7 +177,7 @@ contract ConsensusRegistry is Ownable2Step {
             active: false,
             pendingRemoval: false,
             weight: 0,
-            pubKey: Secp256k1PublicKey({tag: bytes1(0), x: bytes16(0)})
+            pubKey: Secp256k1PublicKey({tag: bytes1(0), x: bytes32(0)})
         }),
             attesterLastUpdateCommit: attestersCommit,
             validatorLatest: ValidatorAttr({
