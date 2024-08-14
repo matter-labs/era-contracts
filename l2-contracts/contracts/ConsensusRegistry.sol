@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
+import {IConsensusRegistry} from "./interfaces/IConsensusRegistry.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -13,7 +14,7 @@ import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/li
 /// each playing a distinct role in the consensus process. This contract facilitates
 /// the rotation of validator and attester committees, which represent a subset of nodes
 /// expected to actively participate in the consensus process during a specific time window.
-contract ConsensusRegistry is Ownable2Step {
+contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     /// @dev An array to keep track of node owners.
     address[] public nodeOwners;
     /// @dev A map of node owners => nodes.
@@ -26,96 +27,6 @@ contract ConsensusRegistry is Ownable2Step {
     uint256 attestersCommit;
     /// @dev Counter that increments with each new commit to the validator committee.
     uint256 validatorsCommit;
-
-    /// @dev Represents a consensus node.
-    /// @param attesterLastUpdateCommit The latest `attestersCommit` where the node's attester attributes were updated.
-    /// @param attesterLatest Attester attributes to read if `node.attesterLastUpdateCommit` < `attestersCommit`.
-    /// @param attesterSnapshot Attester attributes to read if `node.attesterLastUpdateCommit` == `attestersCommit`.
-    /// @param validatorLastUpdateCommit The latest `validatorsCommit` where the node's validator attributes were updated.
-    /// @param validatorLatest Validator attributes to read if `node.validatorLastUpdateCommit` < `validatorsCommit`.
-    /// @param validatorSnapshot Validator attributes to read if `node.validatorLastUpdateCommit` == `validatorsCommit`.
-    struct Node {
-        uint256 attesterLastUpdateCommit;
-        AttesterAttr attesterLatest;
-        AttesterAttr attesterSnapshot;
-        uint256 validatorLastUpdateCommit;
-        ValidatorAttr validatorLatest;
-        ValidatorAttr validatorSnapshot;
-    }
-
-    /// @dev Represents the attester attributes of a consensus node.
-    /// @param active A flag stating if the attester is active.
-    /// @param pendingRemoval A flag stating if the attester is pending removal.
-    /// @param weight Attester's voting weight.
-    /// @param pubKey Attester's Secp256k1 public key.
-    struct AttesterAttr {
-        bool active;
-        bool pendingRemoval;
-        uint32 weight;
-        Secp256k1PublicKey pubKey;
-    }
-
-    /// @dev Represents the validator attributes of a consensus node.
-    /// @param active A flag stating if the validator is active.
-    /// @param pendingRemoval A flag stating if the validator is pending removal.
-    /// @param weight Validator's voting weight.
-    /// @param pubKey Validator's BLS12-381 public key.
-    /// @param pop Validator's Proof-of-possession (a signature over the public key).
-    struct ValidatorAttr {
-        bool active;
-        bool pendingRemoval;
-        uint32 weight;
-        BLS12_381PublicKey pubKey;
-        BLS12_381Signature pop;
-    }
-
-    /// @dev Represents BLS12_381 public key.
-    /// @param a First component of the BLS12-381 public key.
-    /// @param b Second component of the BLS12-381 public key.
-    /// @param c Third component of the BLS12-381 public key.
-    struct BLS12_381PublicKey {
-        bytes32 a;
-        bytes32 b;
-        bytes32 c;
-    }
-
-    /// @dev Represents BLS12_381 signature.
-    /// @param a First component of the BLS12-381 signature.
-    /// @param b Second component of the BLS12-381 signature.
-    struct BLS12_381Signature {
-        bytes32 a;
-        bytes16 b;
-    }
-
-    /// @dev Represents Secp256k1 public key.
-    /// @param tag Y-coordinate's even/odd indicator of the Secp256k1 public key.
-    /// @param x X-coordinate component of the Secp256k1 public key.
-    struct Secp256k1PublicKey {
-        bytes1 tag;
-        bytes32 x;
-    }
-
-    error UnauthorizedOnlyOwnerOrNodeOwner();
-    error NodeOwnerExists();
-    error NodeOwnerDoesNotExist();
-    error NodeOwnerNotFound();
-    error ValidatorPubKeyExists();
-    error AttesterPubKeyExists();
-    error InvalidInputNodeOwnerAddress();
-    error InvalidInputBLS12_381PublicKey();
-    error InvalidInputBLS12_381Signature();
-    error InvalidInputSecp256k1PublicKey();
-
-    event NodeAdded(address indexed nodeOwner, uint32 validatorWeight, BLS12_381PublicKey validatorPubKey, BLS12_381Signature validatorPoP, uint32 attesterWeight, Secp256k1PublicKey attesterPubKey);
-    event NodeDeactivated(address indexed nodeOwner);
-    event NodeActivated(address indexed nodeOwner);
-    event NodeRemoved(address indexed nodeOwner);
-    event NodeValidatorWeightChanged(address indexed nodeOwner, uint32 newWeight);
-    event NodeAttesterWeightChanged(address indexed nodeOwner, uint32 newWeight);
-    event NodeValidatorKeyChanged(address indexed nodeOwner, BLS12_381PublicKey newPubKey, BLS12_381Signature newPoP);
-    event NodeAttesterKeyChanged(address indexed nodeOwner, Secp256k1PublicKey newPubKey);
-    event ValidatorsCommitted();
-    event AttestersCommitted();
 
     modifier onlyOwnerOrNodeOwner(address _nodeOwner) {
         if (owner() != msg.sender && _nodeOwner != msg.sender) {
