@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Wallet } from "zksync-ethers";
 import * as zksync from "zksync-ethers";
-import { serialize } from "zksync-ethers/build/src/utils";
+import { serialize } from "zksync-ethers/build/utils";
 import type { BootloaderUtilities } from "../typechain";
 import { BootloaderUtilitiesFactory } from "../typechain";
 import { TEST_BOOTLOADER_UTILITIES_ADDRESS } from "./shared/constants";
