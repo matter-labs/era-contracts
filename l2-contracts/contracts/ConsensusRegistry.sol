@@ -14,64 +14,65 @@ import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/li
 /// the rotation of validator and attester committees, which represent a subset of nodes
 /// expected to actively participate in the consensus process during a specific time window.
 contract ConsensusRegistry is Ownable2Step {
-    // An array to keep track of node owners.
+    /// @dev An array to keep track of node owners.
     address[] public nodeOwners;
-    // A map of node owners => nodes.
+    /// @dev A map of node owners => nodes.
     mapping(address => Node) public nodes;
-    // A map for enabling efficient lookups when checking if a given attester public key exists.
+    /// @dev A mapping for enabling efficient lookups when checking whether a given attester public key exists.
     mapping(bytes32 => bool) attesterPubKeyHashes;
-    // A map for enabling efficient lookups when checking if a given validator public key exists.
+    /// @dev A mapping for enabling efficient lookups when checking whether a given validator public key exists.
     mapping(bytes32 => bool) validatorPubKeyHashes;
-
-    uint256 validatorsCommit;
+    /// @dev Counter that increments with each new commit to the attester committee.
     uint256 attestersCommit;
-
-    struct Node {
-        AttesterAttr attesterLatest;
-        AttesterAttr attesterSnapshot;
-        uint256 attesterLastUpdateCommit;
-        ValidatorAttr validatorLatest;
-        ValidatorAttr validatorSnapshot;
-        uint256 validatorLastUpdateCommit;
-    }
+    /// @dev Counter that increments with each new commit to the validator committee.
+    uint256 validatorsCommit;
 
     /// @dev Represents a consensus node.
+    /// @param attesterLastUpdateCommit The latest `attestersCommit` where the node's attester attributes were updated.
+    /// @param attesterLatest Attester attributes to read if `node.attesterLastUpdateCommit` < `attestersCommit`.
+    /// @param attesterSnapshot Attester attributes to read if `node.attesterLastUpdateCommit` == `attestersCommit`.
+    /// @param validatorLastUpdateCommit The latest `validatorsCommit` where the node's validator attributes were updated.
+    /// @param validatorLatest Validator attributes to read if `node.validatorLastUpdateCommit` < `validatorsCommit`.
+    /// @param validatorSnapshot Validator attributes to read if `node.validatorLastUpdateCommit` == `validatorsCommit`.
+    struct Node {
+        uint256 attesterLastUpdateCommit;
+        AttesterAttr attesterLatest;
+        AttesterAttr attesterSnapshot;
+        uint256 validatorLastUpdateCommit;
+        ValidatorAttr validatorLatest;
+        ValidatorAttr validatorSnapshot;
+    }
+
+    /// @dev Represents the attester attributes of a consensus node.
+    /// @param active A flag stating if the attester is active.
+    /// @param pendingRemoval A flag stating if the attester is pending removal.
+    /// @param weight Attester's voting weight.
+    /// @param pubKey Attester's Secp256k1 public key.
     struct AttesterAttr {
-        // A flag stating if the attester is active.
-        // Inactive attesters are not considered when selecting committees.
         bool active;
-        // A flag stating if the attester is pending removal.
-        // Pending removal attesters are not considered when selecting committees.
         bool pendingRemoval;
-        // Attester's Voting weight.
         uint32 weight;
-        // Attester's Secp256k1 public key.
         Secp256k1PublicKey pubKey;
     }
 
-    /// @dev Represents a consensus node.
+    /// @dev Represents the validator attributes of a consensus node.
+    /// @param active A flag stating if the validator is active.
+    /// @param pendingRemoval A flag stating if the validator is pending removal.
+    /// @param weight Validator's voting weight.
+    /// @param pubKey Validator's BLS12-381 public key.
+    /// @param pop Validator's Proof-of-possession (a signature over the public key).
     struct ValidatorAttr {
-        // A flag stating if the validator is active.
-        // Inactive validators are not considered when selecting committees.
         bool active;
-        // A flag stating if the validator is pending removal.
-        // Pending removal validators are not considered when selecting committees.
         bool pendingRemoval;
-        // Validator's voting weight.
         uint32 weight;
-        // Validator's BLS12-381 public key.
         BLS12_381PublicKey pubKey;
-        // Validator's Proof-of-possession (a signature over the public key).
         BLS12_381Signature pop;
     }
 
-    struct PendingNodeRemoval {
-        address nodeOwner;
-        bool pendingAttestersCommit;
-        bool pendingValidatorsCommit;
-    }
-
     /// @dev Represents BLS12_381 public key.
+    /// @param a First component of the BLS12-381 public key.
+    /// @param b Second component of the BLS12-381 public key.
+    /// @param c Third component of the BLS12-381 public key.
     struct BLS12_381PublicKey {
         bytes32 a;
         bytes32 b;
@@ -79,30 +80,19 @@ contract ConsensusRegistry is Ownable2Step {
     }
 
     /// @dev Represents BLS12_381 signature.
+    /// @param a First component of the BLS12-381 signature.
+    /// @param b Second component of the BLS12-381 signature.
     struct BLS12_381Signature {
         bytes32 a;
         bytes16 b;
     }
 
     /// @dev Represents Secp256k1 public key.
+    /// @param tag Y-coordinate's even/odd indicator of the Secp256k1 public key.
+    /// @param x X-coordinate component of the Secp256k1 public key.
     struct Secp256k1PublicKey {
         bytes1 tag;
         bytes32 x;
-    }
-
-    /// @dev Represents a validator committee member.
-    struct CommitteeValidator {
-        address nodeOwner;
-        uint32 weight;
-        BLS12_381PublicKey pubKey;
-        BLS12_381Signature pop;
-    }
-
-    /// @dev Represents an attester committee member.
-    struct CommitteeAttester {
-        uint32 weight;
-        address nodeOwner;
-        Secp256k1PublicKey pubKey;
     }
 
     error UnauthorizedOnlyOwnerOrNodeOwner();
@@ -224,7 +214,7 @@ contract ConsensusRegistry is Ownable2Step {
     function deactivate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_ensureNodeRemoval(_nodeOwner, node)) {
+        if (_finalizeNodeRemoval(_nodeOwner, node)) {
             return;
         }
 
@@ -243,7 +233,7 @@ contract ConsensusRegistry is Ownable2Step {
     function activate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_ensureNodeRemoval(_nodeOwner, node)) {
+        if (_finalizeNodeRemoval(_nodeOwner, node)) {
             return;
         }
 
@@ -279,7 +269,7 @@ contract ConsensusRegistry is Ownable2Step {
     function changeValidatorWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_ensureNodeRemoval(_nodeOwner, node)) {
+        if (_finalizeNodeRemoval(_nodeOwner, node)) {
             return;
         }
 
@@ -297,7 +287,7 @@ contract ConsensusRegistry is Ownable2Step {
     function changeAttesterWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_ensureNodeRemoval(_nodeOwner, node)) {
+        if (_finalizeNodeRemoval(_nodeOwner, node)) {
             return;
         }
 
@@ -322,7 +312,7 @@ contract ConsensusRegistry is Ownable2Step {
         _verifyInputBLS12_381Signature(_pop);
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_ensureNodeRemoval(_nodeOwner, node)) {
+        if (_finalizeNodeRemoval(_nodeOwner, node)) {
             return;
         }
 
@@ -351,7 +341,7 @@ contract ConsensusRegistry is Ownable2Step {
         _verifyInputSecp256k1PublicKey(_pubKey);
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_ensureNodeRemoval(_nodeOwner, node)) {
+        if (_finalizeNodeRemoval(_nodeOwner, node)) {
             return;
         }
 
@@ -366,7 +356,10 @@ contract ConsensusRegistry is Ownable2Step {
         emit NodeAttesterPubKeyChanged(_nodeOwner, _pubKey);
     }
 
-    /// @notice Rotates the validator committee list based on active nodes in the registry.
+    /// @notice Adds a new commit to the validator committee.
+    /// @dev Implicitly updates the validator committee by affecting off-chain readers based on the current state of a node's validator attributes:
+    /// - If "validatorsCommit" > "node.validatorLastUpdateCommit", read "node.validatorLatest".
+    /// - If "validatorsCommit" == "node.validatorLastUpdateCommit", read "node.validatorSnapshot".
     /// @dev Only callable by the contract owner.
     function commitValidators() external onlyOwner {
         validatorsCommit++;
@@ -374,7 +367,10 @@ contract ConsensusRegistry is Ownable2Step {
         emit ValidatorsCommitted();
     }
 
-    /// @notice Rotates the attester committee list based on active nodes in the registry.
+    /// @notice Adds a new commit to the attester committee.
+    /// @dev Implicitly updates the attester committee by affecting off-chain readers based on the current state of a node's attester attributes:
+    /// - If "attestersCommit" > "node.attesterLastUpdateCommit", read "node.attesterLatest".
+    /// - If "attestersCommit" == "node.attesterLastUpdateCommit", read "node.attesterSnapshot".
     /// @dev Only callable by the contract owner.
     function commitAttesters() external onlyOwner {
         attestersCommit++;
@@ -386,7 +382,7 @@ contract ConsensusRegistry is Ownable2Step {
         return nodeOwners.length;
     }
 
-    function _ensureNodeRemoval(address _nodeOwner, Node storage _node) private returns (bool) {
+    function _finalizeNodeRemoval(address _nodeOwner, Node storage _node) private returns (bool) {
         if (
             _node.attesterSnapshot.pendingRemoval &&
             _node.validatorSnapshot.pendingRemoval
@@ -417,10 +413,6 @@ contract ConsensusRegistry is Ownable2Step {
         }
     }
 
-    /// @notice Finds the index of a node owner in the `nodeOwners` array.
-    /// @dev Throws an error if the node owner is not found in the array.
-    /// @param _nodeOwner The address of the node's owner to find in the `nodeOwners` array.
-    /// @return The index of the node owner in the `nodeOwners` array.
     function _nodeOwnerIdx(address _nodeOwner) private view returns (uint256) {
         uint256 len = nodeOwners.length;
         for (uint256 i = 0; i < len; ++i) {
