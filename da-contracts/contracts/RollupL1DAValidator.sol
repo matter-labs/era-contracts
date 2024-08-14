@@ -40,6 +40,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
     /// @inheritdoc IL1DAValidator
     function checkDA(
         uint256, // _chainId
+        uint256, // _batchNumber
         bytes32 _l2DAValidatorOutputHash,
         bytes calldata _operatorDAInput,
         uint256 _maxBlobsSupported

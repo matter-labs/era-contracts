@@ -226,7 +226,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
 
         s.settlementLayer = _settlementLayer;
-        chainBridgeMintData = abi.encode(_prepareChainCommitment());
+        chainBridgeMintData = abi.encode(prepareChainCommitment());
     }
 
     /// @inheritdoc IAdmin
@@ -265,6 +265,9 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
         s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
 
+        // Set the settlement to 0 - as this is the current settlement chain.
+        s.settlementLayer = address(0);
+
         _setDAValidatorPair(address(0), address(0));
 
         emit MigrationComplete();
@@ -278,8 +281,10 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         bytes calldata _data
     ) external payable override onlyBridgehub {}
 
-    // todo make internal. For now useful for testing
-    function _prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {
+    /// @notice Returns the commitment for a chain.
+    /// @dev Note, that this is a getter method helpful for debugging and should not be relied upon by clients.
+    /// @return commitment The commitment for the chain.
+    function prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {
         require(s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex, "PQ not ready");
 
         commitment.totalBatchesCommitted = s.totalBatchesCommitted;
@@ -310,11 +315,6 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         }
 
         commitment.batchHashes = batchHashes;
-    }
-
-    /// @inheritdoc IAdmin
-    function readChainCommitment() external view override returns (bytes memory commitment) {
-        return abi.encode(_prepareChainCommitment());
     }
 
     // function recoverFromFailedMigrationToGateway(

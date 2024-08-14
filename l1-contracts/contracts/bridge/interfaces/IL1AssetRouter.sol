@@ -150,7 +150,7 @@ interface IL1AssetRouter {
 
     function setAssetDeploymentTracker(bytes32 _assetRegistrationData, address _assetDeploymentTracker) external;
 
-    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external;
+    function setAssetHandlerAddressThisChain(bytes32 _additionalData, address _assetHandlerAddress) external;
 
     // function setAssetHandlerAddressOnCounterpart(
     //     uint256 _chainId,

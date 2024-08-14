@@ -61,13 +61,7 @@ describe("ERC20Bridge", function () {
     let constructorArgs = ethers.utils.defaultAbiCoder.encode(
       ["uint256", "uint256", "address", "address", "address"],
       /// note in real deployment we have to transfer ownership of standard deployer here
-      [
-        testChainId,
-        1,
-        unapplyL1ToL2Alias(l1BridgeWallet.address),
-        unapplyL1ToL2Alias(l1BridgeWallet.address),
-        ethers.constants.AddressZero,
-      ]
+      [testChainId, 1, unapplyL1ToL2Alias(l1BridgeWallet.address), ethers.constants.AddressZero]
     );
     await setCode(
       deployerWallet,
@@ -80,9 +74,16 @@ describe("ERC20Bridge", function () {
     erc20Bridge = L2AssetRouterFactory.connect(L2_ASSET_ROUTER_ADDRESS, deployerWallet);
     const l2NativeTokenVaultArtifact = await deployer.loadArtifact("L2NativeTokenVault");
     constructorArgs = ethers.utils.defaultAbiCoder.encode(
-      ["uint256", "bytes32", "address", "uint256", "address"],
+      ["uint256", "address", "bytes32", "address", "address", "bool"],
       /// note in real deployment we have to transfer ownership of standard deployer here
-      [1, beaconProxyBytecodeHash, governorWallet.address, 0, ethers.constants.AddressZero]
+      [
+        9,
+        governorWallet.address,
+        beaconProxyBytecodeHash,
+        ethers.constants.AddressZero,
+        ethers.constants.AddressZero,
+        false,
+      ]
     );
     await setCode(
       deployerWallet,
@@ -93,8 +94,6 @@ describe("ERC20Bridge", function () {
     );
 
     erc20NativeTokenVault = L2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, l1BridgeWallet);
-    const governorNTV = L2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, governorWallet);
-    await governorNTV.configureL2TokenBeacon(false, ethers.constants.AddressZero);
   });
 
   it("Should finalize deposit ERC20 deposit", async function () {

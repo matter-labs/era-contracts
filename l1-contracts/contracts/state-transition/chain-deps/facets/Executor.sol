@@ -31,6 +31,12 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "ExecutorFacet";
 
+    /// @dev Checks that the chain is connected to the current bridehub and not migrated away.
+    modifier chainOnCurrentBridgehub() {
+        require(s.settlementLayer == address(0), "Chain was migrated");
+        _;
+    }
+
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
     /// @dev returns new batch StoredBatchInfo
     /// @notice Does not change storage
@@ -45,12 +51,13 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
-        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA(
-            s.chainId,
-            logOutput.l2DAValidatorOutputHash,
-            _newBatch.operatorDAInput,
-            TOTAL_BLOBS_IN_COMMITMENT
-        );
+        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
+            _chainId: s.chainId,
+            _batchNumber: uint256(_newBatch.batchNumber),
+            _l2DAValidatorOutputHash: logOutput.l2DAValidatorOutputHash,
+            _operatorDAInput: _newBatch.operatorDAInput,
+            _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
+        });
 
         require(_previousBatch.batchHash == logOutput.previousBatchHash, "l");
         // Check that the priority operation hash in the L2 logs is as expected
@@ -202,7 +209,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     function _commitBatches(
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
-    ) internal {
+    ) internal chainOnCurrentBridgehub {
         // check that we have the right protocol version
         // three comments:
         // 1. A chain has to keep their protocol version up to date, as processing a block requires the latest or previous protocol version
@@ -393,7 +400,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     function _executeBatches(
         StoredBatchInfo[] calldata _batchesData,
         PriorityOpsBatchInfo[] calldata _priorityOpsData
-    ) internal {
+    ) internal chainOnCurrentBridgehub {
         uint256 nBatches = _batchesData.length;
         require(_batchesData.length == _priorityOpsData.length, "bp");
 
@@ -443,7 +450,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         StoredBatchInfo calldata _prevBatch,
         StoredBatchInfo[] calldata _committedBatches,
         ProofInput calldata _proof
-    ) internal {
+    ) internal chainOnCurrentBridgehub {
         // Save the variables into the stack to save gas on reading them later
         uint256 currentTotalBatchesVerified = s.totalBatchesVerified;
         uint256 committedBatchesLength = _committedBatches.length;
@@ -506,7 +513,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         _revertBatches(_newLastBatch);
     }
 
-    function _revertBatches(uint256 _newLastBatch) internal {
+    function _revertBatches(uint256 _newLastBatch) internal chainOnCurrentBridgehub {
         require(s.totalBatchesCommitted > _newLastBatch, "v1"); // The last committed batch is less than new last batch
         require(_newLastBatch >= s.totalBatchesExecuted, "v2"); // Already executed batches cannot be reverted
 

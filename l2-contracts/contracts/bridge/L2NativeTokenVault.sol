@@ -31,6 +31,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @dev The address of the L2 legacy shared bridge.
     IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE;
 
+    /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
 
     /// @dev Contract that stores the implementation address for token.
@@ -38,8 +39,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     UpgradeableBeacon public l2TokenBeacon;
 
     mapping(bytes32 assetId => address tokenAddress) public override tokenAddress;
-
-    /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
 
     modifier onlyBridge() {
         if (msg.sender != address(L2_ASSET_ROUTER)) {
@@ -59,7 +58,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed.
     constructor(
         uint256 _l1ChainId,
-        uint256 _eraChainId,
         address _aliasedOwner,
         bytes32 _l2TokenProxyBytecodeHash,
         address _legacySharedBridge,
@@ -67,6 +65,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         bool _contractsDeployedAlready
     ) {
         L1_CHAIN_ID = _l1ChainId;
+        L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
         _disableInitializers();
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
@@ -78,9 +77,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
 
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
         _transferOwnership(_aliasedOwner);
-
-        ERA_CHAIN_ID = _eraChainId;
-        L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
         if (_contractsDeployedAlready) {
             if (_l2TokenBeacon == address(0)) {
@@ -195,7 +191,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
         bytes32 salt = _getCreate2Salt(_l1Token);
 
         BeaconProxy l2Token;
-        if (block.chainid != ERA_CHAIN_ID) {
+        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
             // Deploy the beacon proxy for the L2 token
             l2Token = _deployBeaconProxy(salt);
         } else {
@@ -237,8 +233,16 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     function calculateCreate2TokenAddress(address _l1Token) public view returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_l1Token);
+        address deployerAddress = address(L2_LEGACY_SHARED_BRIDGE) == address(0)
+            ? address(this)
+            : address(L2_LEGACY_SHARED_BRIDGE);
         return
-            L2ContractHelper.computeCreate2Address(address(this), salt, l2TokenProxyBytecodeHash, constructorInputHash);
+            L2ContractHelper.computeCreate2Address(
+                deployerAddress,
+                salt,
+                l2TokenProxyBytecodeHash,
+                constructorInputHash
+            );
     }
 
     /// @notice Converts the L1 token address to the create2 salt of deployed L2 token.

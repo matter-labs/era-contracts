@@ -58,6 +58,8 @@ interface IBridgehub is IL1AssetHandler {
         address sender
     );
 
+    event SettlementLayerRegistered(uint256 indexed chainId, bool indexed isWhitelisted);
+
     /// @notice Starts the transfer of admin rights. Only the current admin or owner can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin
@@ -190,7 +192,7 @@ interface IBridgehub is IL1AssetHandler {
 
     function stmAssetIdToAddress(bytes32 _assetInfo) external view returns (address);
 
-    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetAddress) external;
+    function setAssetHandlerAddress(bytes32 _additionalData, address _assetAddress) external;
 
     function L1_CHAIN_ID() external view returns (uint256);
 }
