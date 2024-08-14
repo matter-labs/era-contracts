@@ -82,8 +82,8 @@ contract ConsensusRegistry is Ownable2Step {
 
     /// @dev Represents Secp256k1 public key.
     struct Secp256k1PublicKey {
-        bytes1 a;
-        bytes32 b;
+        bytes1 tag;
+        bytes32 x;
     }
 
     /// @dev Represents a validator committee member.
@@ -186,7 +186,7 @@ contract ConsensusRegistry is Ownable2Step {
             active: false,
             pendingRemoval: false,
             weight: 0,
-            pubKey: Secp256k1PublicKey({a: bytes1(0), b: bytes16(0)})
+            pubKey: Secp256k1PublicKey({tag: bytes1(0), x: bytes16(0)})
         }),
             attesterLastUpdateCommit: attestersCommit,
             validatorLatest: ValidatorAttr({
@@ -457,8 +457,8 @@ contract ConsensusRegistry is Ownable2Step {
 
     function _compareSecp256k1PublicKey(Secp256k1PublicKey storage _x, Secp256k1PublicKey calldata _y) private view returns (bool) {
         return
-            _x.a == _y.a &&
-            _x.b == _y.b;
+            _x.tag == _y.tag &&
+            _x.x == _y.x;
     }
 
     function _compareBLS12_381PublicKey(BLS12_381PublicKey storage _x, BLS12_381PublicKey calldata _y) private view returns (bool) {
@@ -483,7 +483,7 @@ contract ConsensusRegistry is Ownable2Step {
 
     function _isEmptySecp256k1PublicKey(Secp256k1PublicKey calldata _pubKey) private pure returns (bool) {
         return
-            _pubKey.a == bytes1(0) &&
-            _pubKey.b == bytes32(0);
+            _pubKey.tag == bytes1(0) &&
+            _pubKey.x == bytes32(0);
     }
 }
