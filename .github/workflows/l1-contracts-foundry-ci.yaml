@@ -48,6 +48,7 @@ jobs:
           path: |
             l1-contracts/cache
             l1-contracts/out
+            l1-contracts/artifacts-zk
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             system-contracts/artifacts-zk
@@ -73,6 +74,7 @@ jobs:
           path: |
             l1-contracts/cache
             l1-contracts/out
+            l1-contracts/artifacts-zk
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             system-contracts/artifacts-zk
