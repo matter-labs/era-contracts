@@ -215,8 +215,8 @@ export class Deployer {
       callConstructor: true,
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(
-        ["bytes32", "address"],
-        [l2TokenProxyBytecodeHash, this.addresses.Governance]
+        ["uint256", "bytes32", "address"],
+        [getNumberFromEnv("ETH_CLIENT_CHAIN_ID"), l2TokenProxyBytecodeHash, applyL1ToL2Alias(this.addresses.Governance)]
       ),
     };
 
