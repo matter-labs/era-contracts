@@ -68,7 +68,7 @@ jobs:
         run: yarn lint:check
 
   test-foundry:
-    needs: [lint]
+    needs: [build, lint]
     runs-on: ubuntu-latest
 
     steps:
