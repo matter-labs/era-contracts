@@ -266,7 +266,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes32 _assetId,
         address _assetHandlerAddressOnCounterpart
     ) internal returns (L2TransactionRequestTwoBridgesInner memory request) {
-        IL1AssetDeploymentTracker(assetDeploymentTracker[_assetId]).bridgeCheckCounterpartAddres(
+        IL1AssetDeploymentTracker(assetDeploymentTracker[_assetId]).bridgeCheckCounterpartAddress(
             _chainId,
             _assetId,
             _prevMsgSender,

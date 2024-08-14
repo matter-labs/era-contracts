@@ -101,7 +101,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     /// @notice Used to register the stm asset in L2 AssetRouter.
     /// @param _prevMsgSender the address that called the Router
     /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
-    function bridgeCheckCounterpartAddres(
+    function bridgeCheckCounterpartAddress(
         uint256,
         bytes32,
         address _prevMsgSender,
