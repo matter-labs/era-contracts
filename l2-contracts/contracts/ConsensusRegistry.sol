@@ -21,7 +21,6 @@ contract ConsensusRegistry is Ownable2Step {
 
     uint256 validatorsCommit;
     uint256 attestersCommit;
-    PendingNodeRemoval[] pendingRemovals;
 
     struct Node {
         AttesterAttr attesterLatest;
@@ -157,20 +156,20 @@ contract ConsensusRegistry is Ownable2Step {
         uint32 _attesterWeight,
         Secp256k1PublicKey calldata _attesterPubKey
     ) external onlyOwner {
-        verifyInputAddress(_nodeOwner);
-        verifyInputBLS12_381PublicKey(_validatorPubKey);
-        verifyInputBLS12_381Signature(_validatorPoP);
-        verifyInputSecp256k1PublicKey(_attesterPubKey);
+        _verifyInputAddress(_nodeOwner);
+        _verifyInputBLS12_381PublicKey(_validatorPubKey);
+        _verifyInputBLS12_381Signature(_validatorPoP);
+        _verifyInputSecp256k1PublicKey(_attesterPubKey);
 
         uint256 len = nodeOwners.length;
         for (uint256 i = 0; i < len; ++i) {
             if (nodeOwners[i] == _nodeOwner) {
                 revert NodeOwnerAlreadyExists();
             }
-            if (compareBLS12_381PublicKey(nodes[nodeOwners[i]].validatorLatest.pubKey, _validatorPubKey)) {
+            if (_compareBLS12_381PublicKey(nodes[nodeOwners[i]].validatorLatest.pubKey, _validatorPubKey)) {
                 revert ValidatorPubKeyAlreadyExists();
             }
-            if (compareSecp256k1PublicKey(nodes[nodeOwners[i]].attesterLatest.pubKey, _attesterPubKey)) {
+            if (_compareSecp256k1PublicKey(nodes[nodeOwners[i]].attesterLatest.pubKey, _attesterPubKey)) {
                 revert AttesterPubKeyAlreadyExists();
             }
         }
@@ -222,15 +221,15 @@ contract ConsensusRegistry is Ownable2Step {
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner to be inactivated.
     function deactivate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
-        verifyNodeOwnerExists(_nodeOwner);
+        _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (ensureNodeRemoval(_nodeOwner, node)) {
+        if (_ensureNodeRemoval(_nodeOwner, node)) {
             return;
         }
 
-        ensureAttesterSnapshot(node);
+        _ensureAttesterSnapshot(node);
         node.attesterLatest.active = false;
-        ensureValidatorSnapshot(node);
+        _ensureValidatorSnapshot(node);
         node.validatorLatest.active = false;
 
         emit NodeDeactivated(_nodeOwner);
@@ -241,15 +240,15 @@ contract ConsensusRegistry is Ownable2Step {
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner to be activated.
     function activate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
-        verifyNodeOwnerExists(_nodeOwner);
+        _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (ensureNodeRemoval(_nodeOwner, node)) {
+        if (_ensureNodeRemoval(_nodeOwner, node)) {
             return;
         }
 
-        ensureAttesterSnapshot(node);
+        _ensureAttesterSnapshot(node);
         node.attesterLatest.active = true;
-        ensureValidatorSnapshot(node);
+        _ensureValidatorSnapshot(node);
         node.validatorLatest.active = true;
 
         emit NodeActivated(_nodeOwner);
@@ -260,12 +259,12 @@ contract ConsensusRegistry is Ownable2Step {
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner to be removed.
     function remove(address _nodeOwner) external onlyOwner {
-        verifyNodeOwnerExists(_nodeOwner);
+        _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
 
-        ensureAttesterSnapshot(node);
+        _ensureAttesterSnapshot(node);
         node.attesterLatest.pendingRemoval = true;
-        ensureValidatorSnapshot(node);
+        _ensureValidatorSnapshot(node);
         node.validatorLatest.pendingRemoval = true;
 
         emit NodeRemoved(_nodeOwner);
@@ -277,13 +276,13 @@ contract ConsensusRegistry is Ownable2Step {
     /// @param _nodeOwner The address of the node's owner whose validator weight will be changed.
     /// @param _weight The new validator weight to assign to the node.
     function changeValidatorWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
-        verifyNodeOwnerExists(_nodeOwner);
+        _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (ensureNodeRemoval(_nodeOwner, node)) {
+        if (_ensureNodeRemoval(_nodeOwner, node)) {
             return;
         }
 
-        ensureValidatorSnapshot(node);
+        _ensureValidatorSnapshot(node);
         node.validatorLatest.weight = _weight;
 
         emit NodeValidatorWeightChanged(_nodeOwner, _weight);
@@ -295,13 +294,13 @@ contract ConsensusRegistry is Ownable2Step {
     /// @param _nodeOwner The address of the node's owner whose attester weight will be changed.
     /// @param _weight The new attester weight to assign to the node.
     function changeAttesterWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
-        verifyNodeOwnerExists(_nodeOwner);
+        _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (ensureNodeRemoval(_nodeOwner, node)) {
+        if (_ensureNodeRemoval(_nodeOwner, node)) {
             return;
         }
 
-        ensureAttesterSnapshot(node);
+        _ensureAttesterSnapshot(node);
         node.attesterLatest.weight = _weight;
 
         emit NodeAttesterWeightChanged(_nodeOwner, _weight);
@@ -318,15 +317,15 @@ contract ConsensusRegistry is Ownable2Step {
         BLS12_381PublicKey calldata _pubKey,
         BLS12_381Signature calldata _pop
     ) external onlyOwnerOrNodeOwner(_nodeOwner) {
-        verifyInputBLS12_381PublicKey(_pubKey);
-        verifyInputBLS12_381Signature(_pop);
-        verifyNodeOwnerExists(_nodeOwner);
+        _verifyInputBLS12_381PublicKey(_pubKey);
+        _verifyInputBLS12_381Signature(_pop);
+        _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (ensureNodeRemoval(_nodeOwner, node)) {
+        if (_ensureNodeRemoval(_nodeOwner, node)) {
             return;
         }
 
-        ensureValidatorSnapshot(node);
+        _ensureValidatorSnapshot(node);
         node.validatorLatest.pubKey = _pubKey;
         node.validatorLatest.pop = _pop;
 
@@ -343,14 +342,14 @@ contract ConsensusRegistry is Ownable2Step {
         address _nodeOwner,
         Secp256k1PublicKey calldata _pubKey
     ) external onlyOwnerOrNodeOwner(_nodeOwner) {
-        verifyInputSecp256k1PublicKey(_pubKey);
-        verifyNodeOwnerExists(_nodeOwner);
+        _verifyInputSecp256k1PublicKey(_pubKey);
+        _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (ensureNodeRemoval(_nodeOwner, node)) {
+        if (_ensureNodeRemoval(_nodeOwner, node)) {
             return;
         }
 
-        ensureAttesterSnapshot(node);
+        _ensureAttesterSnapshot(node);
         node.attesterLatest.pubKey = _pubKey;
 
         emit NodeAttesterPubKeyChanged(_nodeOwner, _pubKey);
@@ -372,13 +371,16 @@ contract ConsensusRegistry is Ownable2Step {
         emit AttestersCommitted();
     }
 
+    function numNodes() public view returns (uint256) {
+        return nodeOwners.length;
+    }
 
-    function ensureNodeRemoval(address _nodeOwner, Node storage _node) internal returns (bool) {
+    function _ensureNodeRemoval(address _nodeOwner, Node storage _node) private returns (bool) {
         if (
             _node.attesterSnapshot.pendingRemoval &&
             _node.validatorSnapshot.pendingRemoval
         ) {
-            nodeOwners[nodeOwnerIdx(_nodeOwner)] = nodeOwners[nodeOwners.length - 1];
+            nodeOwners[_nodeOwnerIdx(_nodeOwner)] = nodeOwners[nodeOwners.length - 1];
             nodeOwners.pop();
             delete nodes[_nodeOwner];
 
@@ -387,14 +389,14 @@ contract ConsensusRegistry is Ownable2Step {
         return false;
     }
 
-    function ensureAttesterSnapshot(Node storage _node) internal {
+    function _ensureAttesterSnapshot(Node storage _node) private {
         if (_node.attesterLastUpdateCommit < attestersCommit) {
             _node.attesterSnapshot = _node.attesterLatest;
             _node.attesterLastUpdateCommit = attestersCommit;
         }
     }
 
-    function ensureValidatorSnapshot(Node storage _node) internal {
+    function _ensureValidatorSnapshot(Node storage _node) private {
         if (_node.validatorLastUpdateCommit < validatorsCommit) {
             _node.validatorSnapshot = _node.validatorLatest;
             _node.validatorLastUpdateCommit = validatorsCommit;
@@ -405,7 +407,7 @@ contract ConsensusRegistry is Ownable2Step {
     /// @dev Throws an error if the node owner is not found in the array.
     /// @param _nodeOwner The address of the node's owner to find in the `nodeOwners` array.
     /// @return The index of the node owner in the `nodeOwners` array.
-    function nodeOwnerIdx(address _nodeOwner) private view returns (uint256) {
+    function _nodeOwnerIdx(address _nodeOwner) private view returns (uint256) {
         uint256 len = nodeOwners.length;
         for (uint256 i = 0; i < len; ++i) {
             if (nodeOwners[i] == _nodeOwner) {
@@ -418,7 +420,7 @@ contract ConsensusRegistry is Ownable2Step {
     /// @notice Verifies that a node owner exists in the registry.
     /// @dev Throws an error if the node owner does not exist.
     /// @param _nodeOwner The address of the node's owner to verify.
-    function verifyNodeOwnerExists(address _nodeOwner) private view {
+    function _verifyNodeOwnerExists(address _nodeOwner) private view {
         BLS12_381PublicKey storage pubKey = nodes[_nodeOwner].validatorLatest.pubKey;
         if (
             pubKey.a == bytes32(0) &&
@@ -429,63 +431,59 @@ contract ConsensusRegistry is Ownable2Step {
         }
     }
 
-    function verifyInputAddress(address _nodeOwner) private pure {
+    function _verifyInputAddress(address _nodeOwner) private pure {
         if (_nodeOwner == address(0)) {
             revert InvalidInputNodeOwnerAddress();
         }
     }
 
-    function verifyInputBLS12_381PublicKey(BLS12_381PublicKey calldata _pubKey) private pure {
-        if (isEmptyBLS12_381PublicKey(_pubKey)) {
+    function _verifyInputBLS12_381PublicKey(BLS12_381PublicKey calldata _pubKey) private pure {
+        if (_isEmptyBLS12_381PublicKey(_pubKey)) {
             revert InvalidInputBLS12_381PublicKey();
         }
     }
 
-    function verifyInputBLS12_381Signature(BLS12_381Signature calldata _pop) private pure {
-        if (isEmptyBLS12_381Signature(_pop)) {
+    function _verifyInputBLS12_381Signature(BLS12_381Signature calldata _pop) private pure {
+        if (_isEmptyBLS12_381Signature(_pop)) {
             revert InvalidInputBLS12_381Signature();
         }
     }
 
-    function verifyInputSecp256k1PublicKey(Secp256k1PublicKey calldata _pubKey) private pure {
-        if (isEmptySecp256k1PublicKey(_pubKey)) {
+    function _verifyInputSecp256k1PublicKey(Secp256k1PublicKey calldata _pubKey) private pure {
+        if (_isEmptySecp256k1PublicKey(_pubKey)) {
             revert InvalidInputSecp256k1PublicKey();
         }
     }
 
-    function compareSecp256k1PublicKey(Secp256k1PublicKey storage x, Secp256k1PublicKey calldata y) private view returns (bool) {
+    function _compareSecp256k1PublicKey(Secp256k1PublicKey storage _x, Secp256k1PublicKey calldata _y) private view returns (bool) {
         return
-            x.a == y.a &&
-            x.b == y.b;
+            _x.a == _y.a &&
+            _x.b == _y.b;
     }
 
-    function compareBLS12_381PublicKey(BLS12_381PublicKey storage x, BLS12_381PublicKey calldata y) private view returns (bool) {
+    function _compareBLS12_381PublicKey(BLS12_381PublicKey storage _x, BLS12_381PublicKey calldata _y) private view returns (bool) {
         return
-            x.a == y.a &&
-            x.b == y.b &&
-            x.c == y.c;
+            _x.a == _y.a &&
+            _x.b == _y.b &&
+            _x.c == _y.c;
     }
 
-    function isEmptyBLS12_381PublicKey(BLS12_381PublicKey calldata _pubKey) private pure returns (bool) {
+    function _isEmptyBLS12_381PublicKey(BLS12_381PublicKey calldata _pubKey) private pure returns (bool) {
         return
             _pubKey.a == bytes32(0) &&
             _pubKey.b == bytes32(0) &&
             _pubKey.c == bytes32(0);
     }
 
-    function isEmptyBLS12_381Signature(BLS12_381Signature calldata _pop) private pure returns (bool) {
+    function _isEmptyBLS12_381Signature(BLS12_381Signature calldata _pop) private pure returns (bool) {
         return
             _pop.a == bytes32(0) &&
             _pop.b == bytes16(0);
     }
 
-    function isEmptySecp256k1PublicKey(Secp256k1PublicKey calldata _pubKey) private pure returns (bool) {
+    function _isEmptySecp256k1PublicKey(Secp256k1PublicKey calldata _pubKey) private pure returns (bool) {
         return
             _pubKey.a == bytes1(0) &&
             _pubKey.b == bytes32(0);
-    }
-
-    function numNodes() public view returns (uint256) {
-        return nodeOwners.length;
     }
 }
