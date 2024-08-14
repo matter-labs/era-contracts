@@ -7654,9 +7654,9 @@ zksync-ethers@^5.0.0:
   dependencies:
     ethers "~5.7.0"
 
-"zksync-ethers@https://github.com/zksync-sdk/zksync-ethers#ethers-v5-feat/bridgehub":
-  version "5.1.0"
-  resolved "https://github.com/zksync-sdk/zksync-ethers#28ccbe7d67b170c202b17475e06a82002e6e3acc"
+"zksync-ethers@https://github.com/zksync-sdk/zksync-ethers#v5.9.0":
+  version "5.9.0"
+  resolved "https://github.com/zksync-sdk/zksync-ethers#e07ba902f077a00cc3a450ea5dc9eac5b1dd9170"
   dependencies:
     ethers "~5.7.0"
 
