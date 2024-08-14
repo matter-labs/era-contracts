@@ -28,12 +28,18 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      - name: Build hardhat artifacts
+        run: yarn l1 build
+
       - name: Build artifacts
         working-directory: ./l1-contracts
         run: forge build
 
       - name: Build system-contract artifacts
         run: yarn sc build
+
+      - name: Build l2 artifacts
+        run: yarn l2 build
 
       - name: Create cache
         uses: actions/cache/save@v3
@@ -42,6 +48,9 @@ jobs:
           path: |
             l1-contracts/cache
             l1-contracts/out
+            l1-contracts/artifacts-zk
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
             system-contracts/artifacts-zk
             system-contracts/bootloader/build
             system-contracts/cache-zk
@@ -65,6 +74,9 @@ jobs:
           path: |
             l1-contracts/cache
             l1-contracts/out
+            l1-contracts/artifacts-zk
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
             system-contracts/artifacts-zk
             system-contracts/bootloader/build
             system-contracts/cache-zk

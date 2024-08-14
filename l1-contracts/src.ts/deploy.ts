@@ -16,6 +16,9 @@ import {
 import {
   deployViaCreate2 as deployViaCreate2Zk,
   BUILT_IN_ZKSYNC_CREATE2_FACTORY,
+  L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
+  L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
+  L2_STANDARD_TOKEN_PROXY_BYTECODE,
   // deployBytecodeViaCreate2OnPath,
   // L2_SHARED_BRIDGE_PATH,
 } from "./deploy-utils-zk";
@@ -48,7 +51,6 @@ import {
   // priorityTxMaxGasLimit,
 } from "./utils";
 import type { ChainAdminCall } from "./utils";
-import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 import { ProxyAdminFactory } from "../typechain/ProxyAdminFactory";
@@ -62,7 +64,7 @@ import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory"
 import type { FacetCut } from "./diamondCut";
 import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
-import { ChainAdminFactory, ERC20Factory, StateTransitionManagerFactory } from "../typechain";
+import { BridgehubFactory, ChainAdminFactory, ERC20Factory, StateTransitionManagerFactory } from "../typechain";
 
 import { IL1AssetRouterFactory } from "../typechain/IL1AssetRouterFactory";
 import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
@@ -209,7 +211,7 @@ export class Deployer {
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(
         ["uint256", "uint256", "address", "address"],
-        [eraChainId, getNumberFromEnv("ETH_CLIENT_CHAIN_ID"), this.addresses.Bridges.SharedBridgeProxy, ADDRESS_ONE]
+        [getNumberFromEnv("ETH_CLIENT_CHAIN_ID"), eraChainId, this.addresses.Bridges.SharedBridgeProxy, ADDRESS_ONE]
       ),
     };
     const ntvDeployment = {
@@ -218,8 +220,15 @@ export class Deployer {
       callConstructor: true,
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(
-        ["bytes32", "address"],
-        [l2TokenProxyBytecodeHash, this.addresses.Governance]
+        ["uint256", "address", "bytes32", "address", "address", "bool"],
+        [
+          getNumberFromEnv("ETH_CLIENT_CHAIN_ID"),
+          applyL1ToL2Alias(this.addresses.Governance),
+          l2TokenProxyBytecodeHash,
+          ethers.constants.AddressZero,
+          ethers.constants.AddressZero,
+          false,
+        ]
       ),
     };
 
@@ -1036,32 +1045,35 @@ export class Deployer {
         if (this.verbose) {
           console.log(`StateTransition System registered, gas used: ${receipt1.gasUsed.toString()}`);
         }
-      }
 
-      const stmDeploymentTracker = this.stmDeploymentTracker(this.deployWallet);
+        const stmDeploymentTracker = this.stmDeploymentTracker(this.deployWallet);
 
-      const l1AssetRouter = this.defaultSharedBridge(this.deployWallet);
-      const whitelistData = l1AssetRouter.interface.encodeFunctionData("setAssetDeploymentTracker", [
-        ethers.utils.hexZeroPad(this.addresses.StateTransition.StateTransitionProxy, 32),
-        stmDeploymentTracker.address,
-      ]);
-      const receipt2 = await this.executeUpgrade(l1AssetRouter.address, 0, whitelistData);
-      if (this.verbose) {
-        console.log("STM deployment tracker whitelisted in L1 Shared Bridge", receipt2.gasUsed.toString());
-        console.log(
-          `CONTRACTS_STM_ASSET_INFO=${await bridgehub.stmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
-        );
-      }
+        const l1AssetRouter = this.defaultSharedBridge(this.deployWallet);
+        const whitelistData = l1AssetRouter.interface.encodeFunctionData("setAssetDeploymentTracker", [
+          ethers.utils.hexZeroPad(this.addresses.StateTransition.StateTransitionProxy, 32),
+          stmDeploymentTracker.address,
+        ]);
+        const receipt2 = await this.executeUpgrade(l1AssetRouter.address, 0, whitelistData);
+        if (this.verbose) {
+          console.log("STM deployment tracker whitelisted in L1 Shared Bridge", receipt2.gasUsed.toString());
+          console.log(
+            `CONTRACTS_STM_ASSET_INFO=${await bridgehub.stmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
+          );
+        }
 
-      const data1 = stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL1", [
-        this.addresses.StateTransition.StateTransitionProxy,
-      ]);
-      const receipt3 = await this.executeUpgrade(this.addresses.Bridgehub.STMDeploymentTrackerProxy, 0, data1);
-      if (this.verbose) {
-        console.log("STM asset registered in L1 Shared Bridge via STM Deployment Tracker", receipt3.gasUsed.toString());
-        console.log(
-          `CONTRACTS_STM_ASSET_INFO=${await bridgehub.stmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
-        );
+        const data1 = stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL1", [
+          this.addresses.StateTransition.StateTransitionProxy,
+        ]);
+        const receipt3 = await this.executeUpgrade(this.addresses.Bridgehub.STMDeploymentTrackerProxy, 0, data1);
+        if (this.verbose) {
+          console.log(
+            "STM asset registered in L1 Shared Bridge via STM Deployment Tracker",
+            receipt3.gasUsed.toString()
+          );
+          console.log(
+            `CONTRACTS_STM_ASSET_INFO=${await bridgehub.stmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
+          );
+        }
       }
     }
   }
@@ -1194,6 +1206,14 @@ export class Deployer {
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
     const forceDeploymentsData = await this.genesisForceDeploymentsData();
     const initData = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes"], [initialDiamondCut, forceDeploymentsData]);
+    let factoryDeps = [];
+    if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
+      factoryDeps = [
+        L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
+        L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
+        L2_STANDARD_TOKEN_PROXY_BYTECODE,
+      ];
+    }
     // note the factory deps are provided at genesis
     const receipt = await this.executeDirectOrGovernance(
       useGovernance,
@@ -1206,7 +1226,7 @@ export class Deployer {
         Date.now(),
         admin,
         initData,
-        [],
+        factoryDeps,
       ],
       0,
       {
@@ -1468,7 +1488,7 @@ export class Deployer {
   }
 
   public bridgehubContract(signerOrProvider: Signer | providers.Provider) {
-    return IBridgehubFactory.connect(this.addresses.Bridgehub.BridgehubProxy, signerOrProvider);
+    return BridgehubFactory.connect(this.addresses.Bridgehub.BridgehubProxy, signerOrProvider);
   }
 
   public stateTransitionManagerContract(signerOrProvider: Signer | providers.Provider) {

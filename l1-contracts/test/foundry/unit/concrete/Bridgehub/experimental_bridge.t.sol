@@ -21,6 +21,9 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DE
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
+import {ISTMDeploymentTracker} from "contracts/bridgehub/ISTMDeploymentTracker.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
 

@@ -356,7 +356,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   const receipt2 = await deployer.executeUpgrade(
     stmDeploymentTracker.address,
     value,
-    stmDeploymentTracker.encodeFunctionData("registerSTMAssetOnL2SharedBridge", [
+    stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL2SharedBridge", [
       chainId,
       l1STM.address,
       value,
