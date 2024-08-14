@@ -121,8 +121,8 @@ interface IMailbox is IZkSyncHyperchainBase {
     /// @param factoryDeps An array of bytecodes that were shown in the L1 public data.
     /// Will be marked as known bytecodes in L2
     event NewPriorityRequest(
-        uint256 indexed txId,
-        bytes32 indexed txHash,
+        uint256 txId,
+        bytes32 txHash,
         uint64 expirationTimestamp,
         L2CanonicalTransaction transaction,
         bytes[] factoryDeps

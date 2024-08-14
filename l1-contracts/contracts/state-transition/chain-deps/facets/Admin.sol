@@ -22,9 +22,6 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setPendingAdmin(address _newPendingAdmin) external onlyAdmin {
-        if (_newPendingAdmin == address(0)) {
-            revert ZeroAddress();
-        }
         // Save previous value into the stack to put it into the event later
         address oldPendingAdmin = s.pendingAdmin;
         // Change pending admin
