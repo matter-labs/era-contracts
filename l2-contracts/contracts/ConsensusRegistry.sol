@@ -18,6 +18,10 @@ contract ConsensusRegistry is Ownable2Step {
     address[] public nodeOwners;
     // A map of node owners => nodes.
     mapping(address => Node) public nodes;
+    // A map for enabling efficient lookups when checking if a given attester public key exists.
+    mapping(bytes32 => bool) attesterPubKeyHashes;
+    // A map for enabling efficient lookups when checking if a given validator public key exists.
+    mapping(bytes32 => bool) validatorPubKeyHashes;
 
     uint256 validatorsCommit;
     uint256 attestersCommit;
@@ -102,11 +106,11 @@ contract ConsensusRegistry is Ownable2Step {
     }
 
     error UnauthorizedOnlyOwnerOrNodeOwner();
-    error NodeOwnerAlreadyExists();
+    error NodeOwnerExists();
     error NodeOwnerDoesNotExist();
     error NodeOwnerNotFound();
-    error ValidatorPubKeyAlreadyExists();
-    error AttesterPubKeyAlreadyExists();
+    error ValidatorPubKeyExists();
+    error AttesterPubKeyExists();
     error InvalidInputNodeOwnerAddress();
     error InvalidInputBLS12_381PublicKey();
     error InvalidInputBLS12_381Signature();
@@ -156,24 +160,21 @@ contract ConsensusRegistry is Ownable2Step {
         uint32 _attesterWeight,
         Secp256k1PublicKey calldata _attesterPubKey
     ) external onlyOwner {
+        // Verify input.
         _verifyInputAddress(_nodeOwner);
         _verifyInputBLS12_381PublicKey(_validatorPubKey);
         _verifyInputBLS12_381Signature(_validatorPoP);
         _verifyInputSecp256k1PublicKey(_attesterPubKey);
 
-        uint256 len = nodeOwners.length;
-        for (uint256 i = 0; i < len; ++i) {
-            if (nodeOwners[i] == _nodeOwner) {
-                revert NodeOwnerAlreadyExists();
-            }
-            if (_compareBLS12_381PublicKey(nodes[nodeOwners[i]].validatorLatest.pubKey, _validatorPubKey)) {
-                revert ValidatorPubKeyAlreadyExists();
-            }
-            if (_compareSecp256k1PublicKey(nodes[nodeOwners[i]].attesterLatest.pubKey, _attesterPubKey)) {
-                revert AttesterPubKeyAlreadyExists();
-            }
-        }
+        // Verify storage.
+        _verifyNodeOwnerDoesNotExist(_nodeOwner);
+        bytes32 attesterPubKeyHash = _hashAttesterPubKey(_attesterPubKey);
+        _verifyAttesterPubKeyDoesNotExist(attesterPubKeyHash);
+        bytes32 validatorPubKeyHash = _hashValidatorPubKey(_validatorPubKey);
+        _verifyValidatorPubKeyDoesNotExist(validatorPubKeyHash);
 
+        attesterPubKeyHashes[attesterPubKeyHash] = true;
+        validatorPubKeyHashes[validatorPubKeyHash] = true;
         nodeOwners.push(_nodeOwner);
         nodes[_nodeOwner] = Node({
             attesterLatest: AttesterAttr({
@@ -325,6 +326,11 @@ contract ConsensusRegistry is Ownable2Step {
             return;
         }
 
+        bytes32 prevHash = _hashValidatorPubKey(node.validatorLatest.pubKey);
+        delete validatorPubKeyHashes[prevHash];
+        bytes32 newHash = _hashValidatorPubKey(_pubKey);
+        validatorPubKeyHashes[newHash] = true;
+
         _ensureValidatorSnapshot(node);
         node.validatorLatest.pubKey = _pubKey;
         node.validatorLatest.pop = _pop;
@@ -348,6 +354,11 @@ contract ConsensusRegistry is Ownable2Step {
         if (_ensureNodeRemoval(_nodeOwner, node)) {
             return;
         }
+
+        bytes32 prevHash = _hashAttesterPubKey(node.attesterLatest.pubKey);
+        delete attesterPubKeyHashes[prevHash];
+        bytes32 newHash = _hashAttesterPubKey(_pubKey);
+        attesterPubKeyHashes[newHash] = true;
 
         _ensureAttesterSnapshot(node);
         node.attesterLatest.pubKey = _pubKey;
@@ -384,6 +395,9 @@ contract ConsensusRegistry is Ownable2Step {
             nodeOwners.pop();
             delete nodes[_nodeOwner];
 
+            delete attesterPubKeyHashes[_hashAttesterPubKey(_node.attesterLatest.pubKey)];
+            delete validatorPubKeyHashes[_hashValidatorPubKey(_node.validatorLatest.pubKey)];
+
             return true;
         }
         return false;
@@ -417,18 +431,58 @@ contract ConsensusRegistry is Ownable2Step {
         revert NodeOwnerNotFound();
     }
 
-    /// @notice Verifies that a node owner exists in the registry.
-    /// @dev Throws an error if the node owner does not exist.
-    /// @param _nodeOwner The address of the node's owner to verify.
-    function _verifyNodeOwnerExists(address _nodeOwner) private view {
+    function _isNodeOwnerExists(address _nodeOwner) private view returns (bool) {
         BLS12_381PublicKey storage pubKey = nodes[_nodeOwner].validatorLatest.pubKey;
         if (
             pubKey.a == bytes32(0) &&
             pubKey.b == bytes32(0) &&
             pubKey.c == bytes32(0)
         ) {
+            return false;
+        }
+        return true;
+    }
+
+    function _verifyNodeOwnerExists(address _nodeOwner) private view {
+        if (!_isNodeOwnerExists(_nodeOwner)) {
             revert NodeOwnerDoesNotExist();
         }
+    }
+
+    function _verifyNodeOwnerDoesNotExist(address _nodeOwner) private view {
+        if (_isNodeOwnerExists(_nodeOwner)) {
+            revert NodeOwnerExists();
+        }
+    }
+
+    function _hashAttesterPubKey(Secp256k1PublicKey storage _pubKey) private view returns (bytes32) {
+        return keccak256(abi.encode(
+            _pubKey.tag,
+            _pubKey.x
+        ));
+    }
+
+    function _hashAttesterPubKey(Secp256k1PublicKey calldata _pubKey) private pure returns (bytes32) {
+        return keccak256(abi.encode(
+            _pubKey.tag,
+            _pubKey.x
+        ));
+    }
+
+    function _hashValidatorPubKey(BLS12_381PublicKey storage _pubKey) private view returns (bytes32) {
+        return keccak256(abi.encode(
+            _pubKey.a,
+            _pubKey.b,
+            _pubKey.c
+        ));
+    }
+
+    function _hashValidatorPubKey(BLS12_381PublicKey calldata _pubKey) private pure returns (bytes32) {
+        return keccak256(abi.encode(
+            _pubKey.a,
+            _pubKey.b,
+            _pubKey.c
+        ));
     }
 
     function _verifyInputAddress(address _nodeOwner) private pure {
@@ -436,6 +490,19 @@ contract ConsensusRegistry is Ownable2Step {
             revert InvalidInputNodeOwnerAddress();
         }
     }
+
+    function _verifyAttesterPubKeyDoesNotExist(bytes32 _hash) private view {
+        if (attesterPubKeyHashes[_hash]) {
+            revert AttesterPubKeyExists();
+        }
+    }
+
+    function _verifyValidatorPubKeyDoesNotExist(bytes32 _hash) private {
+        if (validatorPubKeyHashes[_hash]) {
+            revert ValidatorPubKeyExists();
+        }
+    }
+
 
     function _verifyInputBLS12_381PublicKey(BLS12_381PublicKey calldata _pubKey) private pure {
         if (_isEmptyBLS12_381PublicKey(_pubKey)) {
@@ -453,19 +520,6 @@ contract ConsensusRegistry is Ownable2Step {
         if (_isEmptySecp256k1PublicKey(_pubKey)) {
             revert InvalidInputSecp256k1PublicKey();
         }
-    }
-
-    function _compareSecp256k1PublicKey(Secp256k1PublicKey storage _x, Secp256k1PublicKey calldata _y) private view returns (bool) {
-        return
-            _x.tag == _y.tag &&
-            _x.x == _y.x;
-    }
-
-    function _compareBLS12_381PublicKey(BLS12_381PublicKey storage _x, BLS12_381PublicKey calldata _y) private view returns (bool) {
-        return
-            _x.a == _y.a &&
-            _x.b == _y.b &&
-            _x.c == _y.c;
     }
 
     function _isEmptyBLS12_381PublicKey(BLS12_381PublicKey calldata _pubKey) private pure returns (bool) {
