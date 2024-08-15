@@ -40,10 +40,11 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
             bytes32(bytes20(l2LegacyBridge)),
             l2TxDataFinish
         );
-        // slither-disable-next-line unused-return, controlled-delegatecall, unchecked-low-level-calls
-        gatewayUpgradeAddress.delegatecall(
+        // slither-disable-next-line controlled-delegatecall
+        (bool success, ) = gatewayUpgradeAddress.delegatecall(
             abi.encodeWithSelector(IGatewayUpgrade.upgradeExternal.selector, proposedUpgrade)
         );
+        require(success, "GatewayUpgrade: upgrade failed");
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
