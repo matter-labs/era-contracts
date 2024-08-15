@@ -44,8 +44,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
 
     /// @notice Adds a new node to the registry.
     /// @dev Fails if node owner already exists.
-    /// @dev Fails if a validator with the same public key already exists.
-    /// @dev Fails if an attester with the same public key already exists.
+    /// @dev Fails if a validator/attester with the same public key already exists.
     /// @param _nodeOwner The address of the new node's owner.
     /// @param _validatorWeight The voting weight of the validator.
     /// @param _validatorPubKey The BLS12-381 public key of the validator.
