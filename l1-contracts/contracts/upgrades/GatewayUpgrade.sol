@@ -2,18 +2,24 @@
 
 pragma solidity 0.8.24;
 
-import {Diamond} from "../state-transition/libraries/Diamond.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
+import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {AdminFacet} from "../state-transition/chain-deps/facets/Admin.sol";
+import {PriorityQueue} from "../state-transition/libraries/PriorityQueue.sol";
+import {PriorityTree} from "../state-transition/libraries/PriorityTree.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This upgrade will be used to migrate Era to be part of the hyperchain ecosystem contracts.
-contract GatewayUpgrade is BaseZkSyncUpgrade, AdminFacet, ReentrancyGuard {
+contract GatewayUpgrade is BaseZkSyncUpgrade, AdminFacet, Initializable {
+    using PriorityQueue for PriorityQueue.Queue;
+    using PriorityTree for PriorityTree.Tree;
+
     /// @notice The owner of the contract.
     address public owner;
 
@@ -46,7 +52,11 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, AdminFacet, ReentrancyGuard {
 
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
         address l2LegacyBridge = l2LegacySharedBridge[s.chainId];
-        proposedUpgrade.l2ProtocolUpgradeTx.data = bytes.concat(l2TxDataStart, bytes32(l2LegacyBridge), l2TxDataFinish);
+        proposedUpgrade.l2ProtocolUpgradeTx.data = bytes.concat(
+            l2TxDataStart,
+            bytes32(bytes20(l2LegacyBridge)),
+            l2TxDataFinish
+        );
         this.upgradeExternal(proposedUpgrade);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
