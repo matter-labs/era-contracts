@@ -59,9 +59,9 @@ contract AccessControlRestriction is IRestriction, IAccessControlRestriction, Ac
             require(hasRole(DEFAULT_ADMIN_ROLE, _invoker), "AccessControlRestriction: Access denied");
         }
 
-        // Note, that since `DEFAULT_ADMIN_ROLE` is 0 and the default storage value for the 
+        // Note, that since `DEFAULT_ADMIN_ROLE` is 0 and the default storage value for the
         // `requiredRoles` and `requiredRolesForFallback` is 0, the default admin is by default a required
-        // role for all the functions. 
+        // role for all the functions.
         if (_call.data.length < 4) {
             require(
                 hasRole(requiredRolesForFallback[_call.target], _invoker),
