@@ -23,7 +23,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     IBridgehub public immutable override BRIDGE_HUB;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    IL1AssetRouter public immutable override SHARED_BRIDGE;
+    IL1AssetRouter public immutable override L1_ASSET_ROUTER;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -35,7 +35,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyOwnerViaRouter(address _prevMsgSender) {
         // solhint-disable-next-line gas-custom-errors
-        require(msg.sender == address(SHARED_BRIDGE) && _prevMsgSender == owner(), "STM DT: not owner via router");
+        require(msg.sender == address(L1_ASSET_ROUTER) && _prevMsgSender == owner(), "STM DT: not owner via router");
         _;
     }
 
@@ -44,7 +44,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     constructor(IBridgehub _bridgehub, IL1AssetRouter _sharedBridge) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
-        SHARED_BRIDGE = _sharedBridge;
+        L1_ASSET_ROUTER = _sharedBridge;
     }
 
     /// @notice used to initialize the contract
@@ -59,7 +59,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         // solhint-disable-next-line gas-custom-errors
 
         require(BRIDGE_HUB.stateTransitionManagerIsRegistered(_stmAddress), "STMDT: stm not registered");
-        SHARED_BRIDGE.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_stmAddress))), address(BRIDGE_HUB));
+        L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_stmAddress))), address(BRIDGE_HUB));
         BRIDGE_HUB.setAssetHandlerAddress(bytes32(uint256(uint160(_stmAddress))), _stmAddress);
     }
 

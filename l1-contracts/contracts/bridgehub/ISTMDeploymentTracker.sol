@@ -18,7 +18,7 @@ interface ISTMDeploymentTracker is IL1AssetDeploymentTracker {
 
     function BRIDGE_HUB() external view returns (IBridgehub);
 
-    function SHARED_BRIDGE() external view returns (IL1AssetRouter);
+    function L1_ASSET_ROUTER() external view returns (IL1AssetRouter);
 
     function registerSTMAssetOnL1(address _stmAddress) external;
 

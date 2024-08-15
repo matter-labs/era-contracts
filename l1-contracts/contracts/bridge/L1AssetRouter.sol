@@ -52,6 +52,15 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @dev The address of ZKsync Era diamond proxy contract.
     address internal immutable ERA_DIAMOND_PROXY;
 
+    /// @dev The encoding version used for new txs.
+    bytes1 internal constant LEGACY_ENCODING_VERSION = 0x00;
+
+    /// @dev The encoding version used for legacy txs.
+    bytes1 internal constant NEW_ENCODING_VERSION = 0x01;
+
+    /// @dev The encoding version used for txs that set the asset handler on the counterpart contract.
+    bytes1 internal constant SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION = 0x02;
+
     /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after Diamond proxy upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade Eth withdrawals. Withdrawals from batches older
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
@@ -277,15 +286,12 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
             IL2Bridge.setAssetHandlerAddress,
             (_assetId, _assetHandlerAddressOnCounterpart)
         );
-        /// Note these L1->L2 txs cannot be claimed as failed, but we still need to give them a unique txDataHash
-        bytes memory _transferData = abi.encode(_assetHandlerAddressOnCounterpart);
-        bytes32 dataHash = _encodeTxDataHash(0x02, _prevMsgSender, _assetId, _transferData);
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
             l2Contract: L2_ASSET_ROUTER_ADDR,
             l2Calldata: l2Calldata,
             factoryDeps: new bytes[](0),
-            txDataHash: dataHash
+            txDataHash: bytes32(0x00)
         });
     }
 
@@ -343,7 +349,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
 
         // The new encoding ensures that the calldata is collision-resistant with respect to the legacy format.
         // In the legacy calldata, the first input was the address, meaning the most significant byte was always `0x00`.
-        if (encodingVersion == 0x02) {
+        if (encodingVersion == SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION) {
             (bytes32 _assetId, address _assetHandlerAddressOnCounterpart) = abi.decode(_data[1:], (bytes32, address));
             return
                 _setAssetHandlerAddressOnCounterpart(
@@ -352,7 +358,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
                     _assetId,
                     _assetHandlerAddressOnCounterpart
                 );
-        } else if (encodingVersion == 0x01) {
+        } else if (encodingVersion == NEW_ENCODING_VERSION) {
             (assetId, transferData) = abi.decode(_data[1:], (bytes32, bytes));
             require(
                 assetHandlerAddress[assetId] != address(nativeTokenVault),
@@ -488,7 +494,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
             // If the dataHash matches the legacy transaction hash, skip the next step.
             // Otherwise, perform the check using the new transaction data hash encoding.
             if (!isLegacyTxDataHash) {
-                bytes32 txDataHash = _encodeTxDataHash(0x01, _depositSender, _assetId, _assetData);
+                bytes32 txDataHash = _encodeTxDataHash(NEW_ENCODING_VERSION, _depositSender, _assetId, _assetData);
                 require(dataHash == txDataHash, "L1AR: d.it not hap");
             }
         }
@@ -706,7 +712,9 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes memory _transferData,
         bytes32 _expectedTxDataHash
     ) internal view returns (bool isLegacyTxDataHash) {
-        try this.encodeTxDataHash(0x00, _prevMsgSender, _assetId, _transferData) returns (bytes32 txDataHash) {
+        try this.encodeTxDataHash(LEGACY_ENCODING_VERSION, _prevMsgSender, _assetId, _transferData) returns (
+            bytes32 txDataHash
+        ) {
             return txDataHash == _expectedTxDataHash;
         } catch {
             return false;
@@ -725,7 +733,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes32 _assetId,
         bytes memory _transferData
     ) internal view returns (bytes32 txDataHash) {
-        if (_encodingVersion == 0x00) {
+        if (_encodingVersion == LEGACY_ENCODING_VERSION) {
             (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
             txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(_assetId), depositAmount));
         } else {
