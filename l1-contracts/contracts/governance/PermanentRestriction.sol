@@ -117,7 +117,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         }
         require(allowedAdminImplementations[implementationCodeHash], "Unallowed implementation");
 
-        // Since the implementation is known to be corect (from the checks above), we 
+        // Since the implementation is known to be correct (from the checks above), we 
         // can safely trust the returned value from the call below
         require(IChainAdmin(newChainAdmin).isRestrictionActive(address(this)), "This restriction is permanent");
     }
