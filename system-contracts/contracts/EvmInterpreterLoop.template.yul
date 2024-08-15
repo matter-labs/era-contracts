@@ -814,26 +814,13 @@ for { } true { } {
         offset, sp := popStackItemWithoutCheck(sp)
         size, sp := popStackItemWithoutCheck(sp)
 
+        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+        checkMemOverflow(add(add(destOffset, MEM_OFFSET_INNER()), size), evmGasLeft)
+
         expandMemory(add(destOffset, size))
         expandMemory(add(offset, size))
 
-        let oldSize := mul(mload(MEM_OFFSET()),32)
-        if gt(add(oldSize,size),MAX_POSSIBLE_MEM()) {
-            revertWithGas(evmGasLeft)
-        }
-
-        for { let i := 0 } lt(i, size) { i := add(i, 1) } {
-            mstore8(
-                add(add(oldSize,MEM_OFFSET_INNER()), i),
-                shr(248,mload(add(add(offset,MEM_OFFSET_INNER()), i)))
-            )
-        }
-        for { let i := 0 } lt(i, size) { i := add(i, 1) } {
-            mstore8(
-                add(add(destOffset,MEM_OFFSET_INNER()), i),
-                shr(248,mload(add(add(oldSize,MEM_OFFSET_INNER()), i)))
-            )
-        }
+        mcopy(add(destOffset, MEM_OFFSET_INNER()), add(offset, MEM_OFFSET_INNER()), size)
         ip := add(ip, 1)
     }
     case 0x5F { // OP_PUSH0
