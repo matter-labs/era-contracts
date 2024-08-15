@@ -14,6 +14,8 @@ import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 import {IPermanentRestriction} from "./IPermanentRestriction.sol";
 
 /// @title PermanentRestriction contract
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @notice This contract should be used by chains that wish to guarantee that certain security
 /// properties are preserved forever.
 /// @dev To be deployed as a transparent upgradable proxy, owned by a trusted decentralized governance.
