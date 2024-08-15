@@ -275,7 +275,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     function commitValidators() external onlyOwner {
         validatorsCommit++;
 
-        emit ValidatorsCommitted();
+        emit ValidatorsCommitted(validatorsCommit);
     }
 
     /// @notice Adds a new commit to the attester committee.
@@ -286,7 +286,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     function commitAttesters() external onlyOwner {
         attestersCommit++;
 
-        emit AttestersCommitted();
+        emit AttestersCommitted(attestersCommit);
     }
 
     function numNodes() public view returns (uint256) {

@@ -98,8 +98,8 @@ interface IConsensusRegistry {
     event NodeAttesterWeightChanged(address indexed nodeOwner, uint32 newWeight);
     event NodeValidatorKeyChanged(address indexed nodeOwner, BLS12_381PublicKey newPubKey, BLS12_381Signature newPoP);
     event NodeAttesterKeyChanged(address indexed nodeOwner, Secp256k1PublicKey newPubKey);
-    event ValidatorsCommitted();
-    event AttestersCommitted();
+    event ValidatorsCommitted(uint256 commit);
+    event AttestersCommitted(uint256 commit);
 
     function add(
         address _nodeOwner,
