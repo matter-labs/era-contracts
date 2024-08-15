@@ -41,6 +41,7 @@ contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeploye
 
         _deployL1Contracts();
         _deployTokens();
+        _registerNewTokens(tokens);
 
         _deployEra();
         // _deployHyperchain(ETH_TOKEN_ADDRESS);

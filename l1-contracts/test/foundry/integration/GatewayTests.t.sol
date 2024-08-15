@@ -54,6 +54,7 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
 
         _deployL1Contracts();
         _deployTokens();
+        _registerNewTokens(tokens);
 
         _deployEra();
         _deployHyperchain(ETH_TOKEN_ADDRESS);

@@ -248,6 +248,67 @@ contract ExperimentalBridgeTest is Test {
         }
     }
 
+    function test_addAssetId(address randomAddress) public {
+        vm.startPrank(bridgeOwner);
+        bridgeHub.setAddresses(address(mockSharedBridge), ISTMDeploymentTracker(address(0)), IMessageRoot(address(0)));
+        vm.stopPrank();
+
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, testTokenAddress);
+        assertTrue(!bridgeHub.assetIdIsRegistered(assetId), "This random address is not registered as a token");
+
+        vm.prank(bridgeOwner);
+        bridgeHub.addTokenAssetId(assetId);
+
+        assertTrue(
+            bridgeHub.assetIdIsRegistered(assetId),
+            "after call from the bridgeowner, this randomAddress should be a registered token"
+        );
+
+        if (randomAddress != address(testTokenAddress)) {
+            // Testing to see if a random address can also be added or not
+            vm.prank(bridgeOwner);
+            assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(randomAddress));
+            bridgeHub.addTokenAssetId(assetId);
+            assertTrue(bridgeHub.assetIdIsRegistered(assetId));
+        }
+
+        // An already registered token cannot be registered again
+        vm.prank(bridgeOwner);
+        vm.expectRevert("BH: asset id already registered");
+        bridgeHub.addTokenAssetId(assetId);
+    }
+
+    function test_addAssetId_cannotBeCalledByRandomAddress(address randomAddress, address randomCaller) public {
+        vm.startPrank(bridgeOwner);
+        bridgeHub.setAddresses(address(mockSharedBridge), ISTMDeploymentTracker(address(0)), IMessageRoot(address(0)));
+        vm.stopPrank();
+
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, testTokenAddress);
+
+        if (randomCaller != bridgeOwner) {
+            vm.prank(randomCaller);
+            vm.expectRevert(bytes("Ownable: caller is not the owner"));
+            bridgeHub.addTokenAssetId(assetId);
+        }
+
+        assertTrue(!bridgeHub.assetIdIsRegistered(assetId), "This random address is not registered as a token");
+
+        vm.prank(bridgeOwner);
+        bridgeHub.addTokenAssetId(assetId);
+
+        assertTrue(
+            bridgeHub.assetIdIsRegistered(assetId),
+            "after call from the bridgeowner, this testTokenAddress should be a registered token"
+        );
+
+        // An already registered token cannot be registered again by randomCaller
+        if (randomCaller != bridgeOwner) {
+            vm.prank(bridgeOwner);
+            vm.expectRevert("BH: asset id already registered");
+            bridgeHub.addTokenAssetId(assetId);
+        }
+    }
+
     // function test_setSharedBridge(address randomAddress) public {
     //     assertTrue(
     //         bridgeHub.sharedBridge() == IL1AssetRouter(address(0)),

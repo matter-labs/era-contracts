@@ -8,6 +8,7 @@ import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
 import {GenerateForceDeploymentsData} from "deploy-scripts/GenerateForceDeploymentsData.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract L1ContractDeployer is Test {
     using stdStorage for StdStorage;
@@ -62,6 +63,20 @@ contract L1ContractDeployer is Test {
         // sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(1);
         // sharedBridge.setEraPostDiamondUpgradeFirstBatch(1);
         vm.stopPrank();
+    }
+
+    function _registerNewToken(address _tokenAddress) internal {
+        bytes32 tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _tokenAddress);
+        if (!bridgeHub.assetIdIsRegistered(tokenAssetId)) {
+            vm.prank(bridgehubOwnerAddress);
+            bridgeHub.addTokenAssetId(tokenAssetId);
+        }
+    }
+
+    function _registerNewTokens(address[] memory _tokens) internal {
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            _registerNewToken(_tokens[i]);
+        }
     }
 
     function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {

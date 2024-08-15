@@ -669,6 +669,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
 
         _deployL1Contracts();
         _deployTokens();
+        _registerNewTokens(tokens);
 
         _deployEra();
         _deployHyperchain(ETH_TOKEN_ADDRESS);
