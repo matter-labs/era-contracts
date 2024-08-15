@@ -3,7 +3,7 @@ import type { BigNumberish } from "ethers";
 import { Wallet } from "ethers";
 import * as ethers from "ethers";
 import * as hardhat from "hardhat";
-import { hashBytecode } from "zksync-ethers/build/src/utils";
+import { hashBytecode } from "zksync-ethers/build/utils";
 
 import type { AdminFacet, ExecutorFacet, GettersFacet, StateTransitionManager } from "../../typechain";
 import {

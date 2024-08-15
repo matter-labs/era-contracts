@@ -1,8 +1,8 @@
 import * as hardhat from "hardhat";
 import type { BigNumberish, BytesLike } from "ethers";
 import { BigNumber, ethers } from "ethers";
-import type { Address } from "zksync-ethers/build/src/types";
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-ethers/build/src/utils";
+import type { Address } from "zksync-ethers/build/types";
+import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-ethers/build/utils";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
