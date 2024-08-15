@@ -212,12 +212,14 @@ export class Deployer {
 
   public async deployChainAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2(
-      "ChainAdmin",
-      [this.ownerAddress, ethers.constants.AddressZero],
-      create2Salt,
-      ethTxOptions
-    );
+    // Firstly, we deploy the access control restriction for the chain admin
+    const accessControlRestriction = await this.deployViaCreate2("AccessControlRestriction", [0, this.ownerAddress], create2Salt, ethTxOptions);
+    if (this.verbose) {
+      console.log(`CONTRACTS_ACCESS_CONTROL_RESTRICTION_ADDR=${accessControlRestriction}`);
+    }
+
+    // Then we deploy the ChainAdmin contract itself
+    const contractAddress = await this.deployViaCreate2("ChainAdmin", [[accessControlRestriction]], create2Salt, ethTxOptions);
     if (this.verbose) {
       console.log(`CONTRACTS_CHAIN_ADMIN_ADDR=${contractAddress}`);
     }

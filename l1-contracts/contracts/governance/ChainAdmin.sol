@@ -90,7 +90,7 @@ contract ChainAdmin is IChainAdmin {
         // solhint-disable-next-line gas-custom-errors
         require(_calls.length > 0, "No calls provided");
         for (uint256 i = 0; i < _calls.length; ++i) {
-            require(_validateCall(_calls[i]), "Unallowed call");
+            _validateCall(_calls[i]);
 
             // slither-disable-next-line arbitrary-send-eth
             (bool success, bytes memory returnData) = _calls[i].target.call{value: _calls[i].value}(_calls[i].data);
@@ -118,7 +118,7 @@ contract ChainAdmin is IChainAdmin {
     
     /// @notice Function that returns the current admin can perform the call.
     /// @dev By default it always returns true, but can be overridden in derived contracts.
-    function _validateCall(Call calldata _call) internal view returns (bool) {
+    function _validateCall(Call calldata _call) internal view {
         address[] memory restrictions = getRestrictions();
 
         unchecked {
