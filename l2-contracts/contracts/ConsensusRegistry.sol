@@ -17,7 +17,9 @@ import {IConsensusRegistry} from "./interfaces/IConsensusRegistry.sol";
 contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     /// @dev An array to keep track of node owners.
     address[] public nodeOwners;
-    /// @dev A map of node owners => nodes.
+    /// @dev A mapping of node owner indices (index within the array of node owners) => node owners.
+    mapping(uint32 => address) public nodeOwnerIndices;
+    /// @dev A mapping of node owners => nodes.
     mapping(address => Node) public nodes;
     /// @dev A mapping for enabling efficient lookups when checking whether a given attester public key exists.
     mapping(bytes32 => bool) attesterPubKeyHashes;
@@ -73,9 +75,9 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         bytes32 validatorPubKeyHash = _hashValidatorPubKey(_validatorPubKey);
         _verifyValidatorPubKeyDoesNotExist(validatorPubKeyHash);
 
-        attesterPubKeyHashes[attesterPubKeyHash] = true;
-        validatorPubKeyHashes[validatorPubKeyHash] = true;
+        uint32 nodeOwnerIdx = uint32(nodeOwners.length);
         nodeOwners.push(_nodeOwner);
+        nodeOwnerIndices[nodeOwnerIdx] = _nodeOwner;
         nodes[_nodeOwner] = Node({
             attesterLatest: AttesterAttr({
             active: true,
@@ -104,8 +106,11 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
             pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
             pop: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
         }),
-            validatorLastUpdateCommit: validatorsCommit
+            validatorLastUpdateCommit: validatorsCommit,
+            nodeOwnerIdx: nodeOwnerIdx
         });
+        attesterPubKeyHashes[attesterPubKeyHash] = true;
+        validatorPubKeyHashes[validatorPubKeyHash] = true;
 
         emit NodeAdded(
             _nodeOwner,
@@ -296,10 +301,20 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
             _node.attesterSnapshot.pendingRemoval &&
             _node.validatorSnapshot.pendingRemoval
         ) {
-            nodeOwners[_nodeOwnerIdx(_nodeOwner)] = nodeOwners[nodeOwners.length - 1];
+            // Remove from array by swapping the last element (gas-efficient, not preserving order).
+            uint32 lastIdx = uint32(nodeOwners.length - 1);
+            nodeOwners[_node.nodeOwnerIdx] = nodeOwners[lastIdx];
             nodeOwners.pop();
-            delete nodes[_nodeOwner];
+            // Update the last element's node owner.
+            address lastIdxNodeOwner = nodeOwnerIndices[lastIdx];
+            Node storage lastIdxNode = nodes[lastIdxNodeOwner];
+            lastIdxNode.nodeOwnerIdx = _node.nodeOwnerIdx;
+            // Update the node owner indices mapping.
+            nodeOwnerIndices[_node.nodeOwnerIdx] = lastIdxNodeOwner;
+            delete nodeOwnerIndices[lastIdx];
 
+            // Delete from the remaining mapping.
+            delete nodes[_nodeOwner];
             delete attesterPubKeyHashes[_hashAttesterPubKey(_node.attesterLatest.pubKey)];
             delete validatorPubKeyHashes[_hashValidatorPubKey(_node.validatorLatest.pubKey)];
 
@@ -320,16 +335,6 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
             _node.validatorSnapshot = _node.validatorLatest;
             _node.validatorLastUpdateCommit = validatorsCommit;
         }
-    }
-
-    function _nodeOwnerIdx(address _nodeOwner) private view returns (uint256) {
-        uint256 len = nodeOwners.length;
-        for (uint256 i = 0; i < len; ++i) {
-            if (nodeOwners[i] == _nodeOwner) {
-                return i;
-            }
-        }
-        revert NodeOwnerNotFound();
     }
 
     function _isNodeOwnerExists(address _nodeOwner) private view returns (bool) {

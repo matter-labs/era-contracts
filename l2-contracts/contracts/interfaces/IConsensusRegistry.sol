@@ -16,6 +16,7 @@ interface IConsensusRegistry {
     /// @param validatorLastUpdateCommit The latest `validatorsCommit` where the node's validator attributes were updated.
     /// @param validatorLatest Validator attributes to read if `node.validatorLastUpdateCommit` < `validatorsCommit`.
     /// @param validatorSnapshot Validator attributes to read if `node.validatorLastUpdateCommit` == `validatorsCommit`.
+    /// @param nodeOwnerIdx Index of the node owner within the array of node owners.
     struct Node {
         uint256 attesterLastUpdateCommit;
         AttesterAttr attesterLatest;
@@ -23,6 +24,7 @@ interface IConsensusRegistry {
         uint256 validatorLastUpdateCommit;
         ValidatorAttr validatorLatest;
         ValidatorAttr validatorSnapshot;
+        uint32 nodeOwnerIdx;
     }
 
     /// @dev Represents the attester attributes of a consensus node.
