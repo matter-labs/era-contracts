@@ -60,6 +60,7 @@ contract RegisterHyperchainScript is Script {
         deployGovernance();
         deployChainAdmin();
         checkTokenAddress();
+        registerAssetIdOnBridgehub();
         registerTokenOnNTV();
         registerHyperchain();
         addValidators();
@@ -128,12 +129,33 @@ contract RegisterHyperchainScript is Script {
         console.log("Using base token address:", config.baseToken);
     }
 
+    function registerAssetIdOnBridgehub() internal {
+        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        Ownable ownable = Ownable(config.bridgehub);
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
+
+        if (bridgehub.assetIdIsRegistered(baseTokenAssetId)) {
+            console.log("Base token asset id already registered on Bridgehub");
+        } else {
+            bytes memory data = abi.encodeCall(bridgehub.addTokenAssetId, (baseTokenAssetId));
+            Utils.executeUpgrade({
+                _governor: ownable.owner(),
+                _salt: bytes32(config.bridgehubCreateNewChainSalt),
+                _target: config.bridgehub,
+                _data: data,
+                _value: 0,
+                _delay: 0
+            });
+            console.log("Base token asset id registered on Bridgehub");
+        }
+    }
+
     function registerTokenOnNTV() internal {
         IL1NativeTokenVault ntv = IL1NativeTokenVault(config.nativeTokenVault);
         // Ownable ownable = Ownable(config.nativeTokenVault);
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
-        config.baseTokenAssetId = assetId;
-        if (ntv.tokenAddress(assetId) != address(0)) {
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
+        config.baseTokenAssetId = baseTokenAssetId;
+        if (ntv.tokenAddress(baseTokenAssetId) != address(0)) {
             console.log("Token already registered on NTV");
         } else {
             // bytes memory data = abi.encodeCall(ntv.registerToken, (config.baseToken));

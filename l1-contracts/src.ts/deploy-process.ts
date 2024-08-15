@@ -13,7 +13,7 @@ import type { Deployer } from "./deploy";
 import { getTokens } from "./deploy-token";
 
 import { ADDRESS_ONE, L2_BRIDGEHUB_ADDRESS, L2_MESSAGE_ROOT_ADDRESS, isCurrentNetworkLocal } from "../src.ts/utils";
-import { encodeNTVAssetId, ETH_ADDRESS_IN_CONTRACTS } from "./utils";
+import { encodeNTVAssetId } from "./utils";
 
 export const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000";
 export const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
@@ -107,6 +107,11 @@ export async function registerHyperchain(
   const baseTokenAddress = baseTokenName
     ? testnetTokens.find((token: { symbol: string }) => token.symbol == baseTokenName).address
     : ADDRESS_ONE;
+
+  const baseTokenAssetId = encodeNTVAssetId(deployer.l1ChainId, ethers.utils.hexZeroPad(baseTokenAddress, 32));
+  if (!(await deployer.bridgehubContract(deployer.deployWallet).assetIdIsRegistered(baseTokenAssetId))) {
+    await deployer.registerTokenBridgehub(baseTokenAddress, useGovernance);
+  }
   await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
   await deployer.registerHyperchain(
     encodeNTVAssetId(deployer.l1ChainId, ethers.utils.hexZeroPad(baseTokenAddress, 32)),

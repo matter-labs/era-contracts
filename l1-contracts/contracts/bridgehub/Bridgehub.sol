@@ -41,16 +41,16 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     IL1AssetRouter public sharedBridge;
 
     /// @notice StateTransitionManagers that are registered, and ZKchains that use these STMs can use this bridgehub as settlement layer.
-    mapping(address _stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
+    mapping(address stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
 
     /// @notice we store registered tokens (for arbitrary base token)
-    mapping(address _baseToken => bool) public __DEPRECATED_tokenIsRegistered;
+    mapping(address baseToken => bool) public __DEPRECATED_tokenIsRegistered;
 
     /// @notice chainID => StateTransitionManager contract address, STM that is managing rules for a given ZKchain.
-    mapping(uint256 _chainId => address) public stateTransitionManager;
+    mapping(uint256 chainId => address) public stateTransitionManager;
 
     /// @notice chainID => baseToken contract address, token that is used as 'base token' by a given child chain.
-    mapping(uint256 _chainId => address) public __DEPRECATED_baseToken;
+    mapping(uint256 chainId => address) public __DEPRECATED_baseToken;
 
     /// @dev used to manage non critical updates
     address public admin;
@@ -64,7 +64,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     IMessageRoot public override messageRoot;
 
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
-    mapping(uint256 _chainId => bytes32) public baseTokenAssetId;
+    mapping(uint256 chainId => bytes32) public baseTokenAssetId;
 
     /// @notice The deployment tracker for the state transition managers.
     ISTMDeploymentTracker public stmDeployer;
@@ -79,6 +79,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev the Gateway will be one of the possible settlement layers. The L1 is also a settlement layer.
     /// @dev Sync layer chain is expected to have .. as the base token.
     mapping(uint256 chainId => bool isWhitelistedSettlementLayer) public whitelistedSettlementLayers;
+
+    /// @notice we store registered assetIds (for arbitrary base token)
+    mapping(bytes32 baseTokenAssetId => bool) public assetIdIsRegistered;
 
     modifier onlyOwnerOrAdmin() {
         require(msg.sender == admin || msg.sender == owner(), "BH: not owner or admin");
@@ -189,6 +192,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         emit StateTransitionManagerRemoved(_stateTransitionManager);
     }
 
+    /// @notice asset id can represent any token contract with the appropriate interface/functionality
+    /// @param _baseTokenAssetId asset id of base token to be registered
+    function addTokenAssetId(bytes32 _baseTokenAssetId) external onlyOwner {
+        require(!assetIdIsRegistered[_baseTokenAssetId], "BH: asset id already registered");
+        assetIdIsRegistered[_baseTokenAssetId] = true;
+
+        emit BaseTokenAssetIdRegistered(_baseTokenAssetId);
+    }
+
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, Shared bridge, and then we call this
     function setSharedBridge(address _sharedBridge) external onlyOwner {
@@ -258,6 +270,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(_chainId != block.chainid, "BH: chain id must not match current chainid");
 
         require(stateTransitionManagerIsRegistered[_stateTransitionManager], "BH: state transition not registered");
+        require(assetIdIsRegistered[_baseTokenAssetId], "BH: asset id not registered");
         require(address(sharedBridge) != address(0), "BH: shared bridge not set");
 
         require(stateTransitionManager[_chainId] == address(0), "BH: chainId already registered");

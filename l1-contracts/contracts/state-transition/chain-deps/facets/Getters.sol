@@ -67,9 +67,7 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getBaseToken() external view returns (address) {
-        IBridgehub bridgehub = IBridgehub(s.bridgehub);
-        bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(s.chainId);
-        return bridgehub.baseToken(baseTokenAssetId);
+        return IBridgehub(s.bridgehub).baseToken(s.baseTokenAssetId);
     }
 
     /// @inheritdoc IGetters

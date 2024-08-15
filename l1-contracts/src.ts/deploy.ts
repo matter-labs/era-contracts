@@ -49,6 +49,7 @@ import {
   readBytecode,
   applyL1ToL2Alias,
   // priorityTxMaxGasLimit,
+  encodeNTVAssetId,
 } from "./utils";
 import type { ChainAdminCall } from "./utils";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
@@ -944,6 +945,30 @@ export class Deployer {
     await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData1);
     if (this.verbose) {
       console.log("Shared bridge was registered in Bridgehub");
+    }
+
+    /// registering ETH as a valid token, with address 1.
+    const baseTokenAssetId = encodeNTVAssetId(this.l1ChainId, ethers.utils.hexZeroPad(ADDRESS_ONE, 32));
+    const upgradeData2 = bridgehub.interface.encodeFunctionData("addTokenAssetId", [baseTokenAssetId]);
+    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
+    if (this.verbose) {
+      console.log("ETH token asset id registered in Bridgehub");
+    }
+  }
+
+  public async registerTokenBridgehub(tokenAddress: string, useGovernance: boolean = false) {
+    const bridgehub = this.bridgehubContract(this.deployWallet);
+    const baseTokenAssetId = encodeNTVAssetId(this.l1ChainId, ethers.utils.hexZeroPad(tokenAddress, 32));
+    const receipt = await this.executeDirectOrGovernance(
+      useGovernance,
+      bridgehub,
+      "addTokenAssetId",
+      [baseTokenAssetId],
+      0
+    );
+
+    if (this.verbose) {
+      console.log(`Token ${tokenAddress} was registered, gas used: ${receipt.gasUsed.toString()}`);
     }
   }
 
