@@ -32,6 +32,7 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     /// @notice OpenZeppelin token represents `name` and `symbol` as storage variables and `decimals` as constant.
     uint8 private decimals_;
 
+    /// @notice The l2Bridge now is deprecated, use the L2AssetRouter and L2NativeTokenVault instead.
     /// @dev Address of the L2 bridge that is used as trustee who can mint/burn tokens
     address public override l2Bridge;
 
