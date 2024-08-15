@@ -57,20 +57,19 @@ contract ChainAdmin is IChainAdmin {
         return activeRestrictions.values();
     }
 
-    /// @notice Checks if the restriction is active.
-    function isRestrictionActive(address restriction) external view returns (bool) {
-        return activeRestrictions.contains(restriction);
+    /// @inheritdoc IChainAdmin
+    function isRestrictionActive(address _restriction) external view returns (bool) {
+        return activeRestrictions.contains(_restriction);
     }
 
-    /// @notice Adds a new restriction to the active restrictions set.
-    function addRestriction(address restriction) external onlySelf {
-        _addRestriction(restriction);
+    /// @inheritdoc IChainAdmin
+    function addRestriction(address _restriction) external onlySelf {
+        _addRestriction(_restriction);
     }
 
-    /// @notice Removes a restriction from the active restrictions set.
-    /// @dev Sometimes restrictions might need to enforce their permanence (e.g. if a chain should be a rollup forever).
-    function removeRestriction(address restriction) external onlySelf {
-        activeRestrictions.remove(restriction);
+    /// @inheritdoc IChainAdmin
+    function removeRestriction(address _restriction) external onlySelf {
+        activeRestrictions.remove(_restriction);
     }
 
     /// @notice Set the expected upgrade timestamp for a specific protocol version.

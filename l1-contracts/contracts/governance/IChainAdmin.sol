@@ -18,12 +18,15 @@ interface IChainAdmin {
     function getRestrictions() external view returns (address[] memory);
 
     /// @notice Checks if the restriction is active.
-    function isRestrictionActive(address) external view returns (bool);
+    /// @param _restriction The address of the restriction contract.
+    function isRestrictionActive(address _restriction) external view returns (bool);
 
     /// @notice Adds a new restriction to the active restrictions set.
-    function addRestriction(address restriction) external;
+    /// @param _restriction The address of the restriction contract.
+    function addRestriction(address _restriction) external;
 
     /// @notice Removes a restriction from the active restrictions set.
+    /// @param _restriction The address of the restriction contract.
     /// @dev Sometimes restrictions might need to enforce their permanence (e.g. if a chain should be a rollup forever).
-    function removeRestriction(address restriction) external;
+    function removeRestriction(address _restriction) external;
 }
