@@ -31,7 +31,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     address public immutable BRIDGE_HUB;
 
     /// @notice The map from chainId => hyperchain contract
-    EnumerableMap.UintToAddressMap internal DEPRACATED_hyperchainMap;
+    EnumerableMap.UintToAddressMap internal __DEPRECATED_hyperchainMap;
 
     /// @dev The batch zero hash, calculated at initialization
     bytes32 public storedBatchZero;
