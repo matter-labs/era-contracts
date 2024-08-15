@@ -7,13 +7,14 @@ import {IRestriction} from "./IRestriction.sol";
 import {Call} from "./Common.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The contract is designed to hold the `admin` role in ZKSync Chain (State Transition) contracts.
 /// The owner of the contract can perform any external calls and also save the information needed for
 /// the blockchain node to accept the protocol upgrade.
-contract ChainAdmin is IChainAdmin {
+contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Ensures that only the `ChainAdmin` contract itself can call the function.
@@ -24,7 +25,7 @@ contract ChainAdmin is IChainAdmin {
         _;
     }
 
-    constructor(address[] memory _initialRestrictions) {
+    constructor(address[] memory _initialRestrictions) reentrancyGuardInitializer {
         unchecked {
             for(uint256 i = 0; i < _initialRestrictions.length; ++i) {
                 _addRestriction(_initialRestrictions[i]);
@@ -85,7 +86,9 @@ contract ChainAdmin is IChainAdmin {
     /// @param _requireSuccess If true, reverts transaction on any call failure.
     /// @dev Intended for batch processing of contract interactions, managing gas efficiency and atomicity of operations.
     /// @dev Note, that this function lacks access control. It is expected that the access control is implemented in a separate restriction contract.
-    function multicall(Call[] calldata _calls, bool _requireSuccess) external payable {
+    /// @dev Even though all the validation from external modules is executed via `staticcall`, the function
+    /// is marked as `nonReentrant` to prevent reentrancy attacks in case the staticcall restriction is lifted in the future.
+    function multicall(Call[] calldata _calls, bool _requireSuccess) external payable nonReentrant {
         // solhint-disable-next-line gas-custom-errors
         require(_calls.length > 0, "No calls provided");
         for (uint256 i = 0; i < _calls.length; ++i) {
