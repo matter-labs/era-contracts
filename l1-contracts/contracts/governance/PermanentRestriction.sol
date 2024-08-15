@@ -28,7 +28,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     mapping(bytes32 implementationCodeHash => bool isAllowed) public allowedAdminImplementations;
 
     /// @notice The mapping of the allowed calls.
-    mapping(bytes4 selector => mapping(bytes allowedCalldata => bool isAllowed)) public allowedCalls;
+    mapping(bytes allowedCalldata => bool isAllowed) public allowedCalls;
 
     /// @notice The mapping of the validated selectors.
     mapping(bytes4 selector => bool isValidated) validatedSelectors;
@@ -54,10 +54,10 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @param _selector The selector of the function.
     /// @param _data The calldata for the function.
     /// @param _isAllowed The flag that indicates if the calldata is allowed.
-    function setAllowedData(bytes4 _selector, bytes calldata _data, bool _isAllowed) external onlyOwner {
-        allowedCalls[_selector][_data] = isAllowed;
+    function setAllowedData(bytes calldata _data, bool _isAllowed) external onlyOwner {
+        allowedCalls[_data] = _isAllowed;
 
-        emit AllowedDataChanged(_selector, _data, isAllowed);
+        emit AllowedDataChanged(_data, _isAllowed);
     }
 
     /// @notice Allows a certain selector to be validated.
@@ -104,7 +104,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
             return;
         }
 
-        require(allowedCalls[selector][_call.data], "not allowed");
+        require(allowedCalls[_call.data], "not allowed");
     }
 
     /// @notice Validates the correctness of the new admin.

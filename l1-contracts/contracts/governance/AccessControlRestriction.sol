@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.24;
 
+import {IAccessControlRestriction} from "./IAccessControlRestriction.sol";
 import {AccessControlDefaultAdminRules} from "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
-import {IChainAdmin} from "./IChainAdmin.sol";
 import {IRestriction} from "./IRestriction.sol";
 import {Call} from "./Common.sol";
 
@@ -16,7 +16,7 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 /// @dev It inherits from `AccessControlDefaultAdminRules` without overriding `_setRoleAdmin` functionaity. In other
 /// words, the `DEFAULT_ADMIN_ROLE` is the only role that can manage roles. This is done for simplicity.
 /// @dev An instance of this restriction should be deployed separately for each `ChainAdmin` contract.
-contract AccessControlRestriction is IRestriction, AccessControlDefaultAdminRules {
+contract AccessControlRestriction is IRestriction, IAccessControlRestriction, AccessControlDefaultAdminRules {
     /// @notice Required roles to call a specific functions.
     /// @dev Note, that the role 0 means the `DEFAULT_ADMIN_ROLE` from the `AccessControlDefaultAdminRules` contract.
     mapping(address target => mapping(bytes4 selector => bytes32 requiredRole)) public requiredRoles;
@@ -39,6 +39,8 @@ contract AccessControlRestriction is IRestriction, AccessControlDefaultAdminRule
         bytes32 _requiredRole
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         requiredRoles[_target][_selector] = _requiredRole;
+
+        emit RoleSet(_target, _selector, _requiredRole);
     }
 
     /// @notice Sets the required role for a fallback function call.
@@ -46,6 +48,8 @@ contract AccessControlRestriction is IRestriction, AccessControlDefaultAdminRule
     /// @param _requiredRole The required role.
     function setRequiredRoleForFallback(address _target, bytes32 _requiredRole) external onlyRole(DEFAULT_ADMIN_ROLE) {
         requiredRolesForFallback[_target] = _requiredRole;
+
+        emit FallbackRoleSet(_target, _requiredRole);
     }
 
     /// @inheritdoc IRestriction
@@ -55,6 +59,9 @@ contract AccessControlRestriction is IRestriction, AccessControlDefaultAdminRule
             require(hasRole(DEFAULT_ADMIN_ROLE, _invoker), "AccessControlRestriction: Access denied");
         }
 
+        // Note, that since `DEFAULT_ADMIN_ROLE` is 0 and the default storage value for the 
+        // `requiredRoles` and `requiredRolesForFallback` is 0, the default admin is by default a required
+        // role for all the functions. 
         if (_call.data.length < 4) {
             require(
                 hasRole(requiredRolesForFallback[_call.target], _invoker),

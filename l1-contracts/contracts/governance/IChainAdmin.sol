@@ -9,10 +9,16 @@ import {Call} from "./Common.sol";
 /// @custom:security-contact security@matterlabs.dev
 interface IChainAdmin {
     /// @notice Emitted when the expected upgrade timestamp for a specific protocol version is set.
-    event UpdateUpgradeTimestamp(uint256 indexed _protocolVersion, uint256 _upgradeTimestamp);
+    event UpdateUpgradeTimestamp(uint256 indexed protocolVersion, uint256 _upgradeTimestamp);
 
     /// @notice Emitted when the call is executed from the contract.
-    event CallExecuted(Call _call, bool success, bytes returnData);
+    event CallExecuted(Call call, bool success, bytes returnData);
+
+    /// @notice Emitted when a new restriction is added.
+    event RestrictionAdded(address indexed restriction);
+
+    /// @notice Emitted when a restriction is removed.
+    event RestrictionRemoved(address indexed restriction);
 
     /// @notice Returns the list of active restrictions.
     function getRestrictions() external view returns (address[] memory);
