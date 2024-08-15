@@ -155,6 +155,12 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
         finalizeDeposit(assetId, data);
     }
 
+    /// @notice Legacy withdraw.
+    /// @dev Finalizes the deposit and mint funds.
+    /// @param _l1Receiver The address of token receiver on L1.
+    /// @param _l2Token The address of token on L2.
+    /// @param _amount The amount of the token transferred.
+    /// @param _sender The original msg.sender.
     function withdrawLegacyBridge(
         address _l1Receiver,
         address _l2Token,
