@@ -13,7 +13,7 @@ import type { Deployer } from "./deploy";
 import { getTokens } from "./deploy-token";
 
 import { ADDRESS_ONE, L2_BRIDGEHUB_ADDRESS, L2_MESSAGE_ROOT_ADDRESS, isCurrentNetworkLocal } from "../src.ts/utils";
-import { encodeNTVAssetId } from "./utils";
+import { encodeNTVAssetId, ETH_ADDRESS_IN_CONTRACTS } from "./utils";
 
 export const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000";
 export const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";

@@ -13,7 +13,7 @@ import { IL1NativeTokenVaultFactory } from "../../typechain/IL1NativeTokenVaultF
 
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
-import { ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig, encodeNTVAssetId } from "../../src.ts/utils";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
 import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
@@ -69,15 +69,14 @@ describe("Custom base token chain and bridge tests", () => {
       deployer.addresses.Bridges.NativeTokenVaultProxy,
       deployWallet
     );
-    // register base token
-    await (await nativeTokenVault.registerToken(baseTokenAddress)).wait();
   });
 
-  // it("Should have correct base token", async () => {
-  //   // we should still be able to deploy the erc20 bridge
-  //   const baseTokenAddressInBridgehub = await bridgehub.baseToken(chainId);
-  //   expect(baseTokenAddress).equal(baseTokenAddressInBridgehub);
-  // });
+  it("Should have correct base token", async () => {
+    // we should still be able to deploy the erc20 bridge
+    const baseTokenAssetId = encodeNTVAssetId(deployer.l1ChainId, ethers.utils.hexZeroPad(baseTokenAddress, 32));
+    const baseTokenAddressInBridgehub = await bridgehub.baseToken(baseTokenAssetId);
+    expect(baseTokenAddress).equal(baseTokenAddressInBridgehub);
+  });
 
   it("Should not allow direct legacy deposits", async () => {
     const revertReason = await getCallRevertReason(

@@ -950,7 +950,8 @@ export class Deployer {
   public async registerTokenInNativeTokenVault(token: string) {
     const nativeTokenVault = this.nativeTokenVault(this.deployWallet);
 
-    nativeTokenVault.interface.encodeFunctionData("registerToken", [token]);
+    const data = nativeTokenVault.interface.encodeFunctionData("registerToken", [token]);
+    await this.executeUpgrade(this.addresses.Bridges.NativeTokenVaultProxy, 0, data);
     if (this.verbose) {
       console.log("Native token vault registered with ETH");
     }
