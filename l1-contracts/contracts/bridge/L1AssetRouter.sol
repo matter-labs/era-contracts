@@ -83,6 +83,7 @@ contract L1AssetRouter is
     IL1ERC20Bridge public override legacyBridge;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
+    // slither-disable-next-line uninitialized-state-variables
     mapping(uint256 chainId => address l2Bridge) public __DEPRECATED_l2BridgeAddress;
 
     /// @dev A mapping chainId => L2 deposit transaction hash => dataHash
@@ -212,6 +213,7 @@ contract L1AssetRouter is
     /// @notice Legacy function used for migration, do not use!
     /// @param _chainId The chain id on which the bridge is deployed.
     function l2BridgeAddress(uint256 _chainId) external view returns (address) {
+        // slither-disable-next-line uninitialized-state-variables
         return __DEPRECATED_l2BridgeAddress[_chainId];
     }
 
