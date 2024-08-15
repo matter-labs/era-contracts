@@ -26,6 +26,21 @@ contract AccessControlRestriction is IRestriction, AccessControlDefaultAdminRule
 
     constructor(uint48 initialDelay, address initialDefaultAdmin) AccessControlDefaultAdminRules(initialDelay, initialDefaultAdmin) {}
 
+    /// @notice Sets the required role for a specific function call.
+    /// @param _target The address of the contract.
+    /// @param _selector The selector of the function.
+    /// @param _requiredRole The required role.
+    function setRequiredRoleForCall(address _target, bytes4 _selector, bytes32 _requiredRole) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        requiredRoles[_target][_selector] = _requiredRole;
+    }
+
+    /// @notice Sets the required role for a fallback function call.
+    /// @param _target The address of the contract.
+    /// @param _requiredRole The required role.
+    function setRequiredRoleForFallback(address _target, bytes32 _requiredRole) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        requiredRolesForFallback[_target] = _requiredRole;
+    }
+
     /// @inheritdoc IRestriction
     function validateCall(
         Call calldata _call, 
