@@ -91,12 +91,13 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         return SemVer.unpackSemVer(SafeCast.toUint96(protocolVersion));
     }
 
-    /// @notice return the state transition chain contract for a chainId
+    /// @notice return the chain contract address for a chainId
     function getHyperchain(uint256 _chainId) public view returns (address) {
         return IBridgehub(BRIDGE_HUB).getHyperchain(_chainId);
     }
 
-    /// @notice return the state transition chain contract for a chainId
+    /// @notice return the chain contract address for a chainId
+    /// @notice Do not use! use getHyperchain instead. This will be removed.
     function getHyperchainLegacy(uint256 _chainId) public view returns (address chainAddress) {
         // slither-disable-next-line unused-return
         (, chainAddress) = __DEPRECATED_hyperchainMap.tryGet(_chainId);
