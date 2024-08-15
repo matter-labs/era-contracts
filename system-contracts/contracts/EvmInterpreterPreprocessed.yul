@@ -2167,11 +2167,11 @@ object "EVMInterpreter" {
             
                     offset, sp := popStackItem(sp, evmGasLeft)
             
+                    checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
                     checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
                     let expansionGas := expandMemory(add(offset, 32))
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
-                    checkOverflow(offset,MEM_OFFSET_INNER(), evmGasLeft)
                     let memValue := mload(add(MEM_OFFSET_INNER(), offset))
                     sp := pushStackItem(sp, memValue, evmGasLeft)
                     ip := add(ip, 1)
@@ -2185,11 +2185,11 @@ object "EVMInterpreter" {
                     offset, sp := popStackItemWithoutCheck(sp)
                     value, sp := popStackItemWithoutCheck(sp)
             
+                    checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
                     checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
                     let expansionGas := expandMemory(add(offset, 32))
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
-                    checkOverflow(offset,MEM_OFFSET_INNER(), evmGasLeft)
                     mstore(add(MEM_OFFSET_INNER(), offset), value)
                     ip := add(ip, 1)
                 }
@@ -2202,11 +2202,11 @@ object "EVMInterpreter" {
                     offset, sp := popStackItemWithoutCheck(sp)
                     value, sp := popStackItemWithoutCheck(sp)
             
+                    checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
                     checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
                     let expansionGas := expandMemory(add(offset, 1))
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
-                    checkOverflow(offset,MEM_OFFSET_INNER(), evmGasLeft)
                     mstore8(add(MEM_OFFSET_INNER(), offset), value)
                     ip := add(ip, 1)
                 }
@@ -5163,11 +5163,11 @@ object "EVMInterpreter" {
                 
                         offset, sp := popStackItem(sp, evmGasLeft)
                 
+                        checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
                         checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
                         let expansionGas := expandMemory(add(offset, 32))
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
-                        checkOverflow(offset,MEM_OFFSET_INNER(), evmGasLeft)
                         let memValue := mload(add(MEM_OFFSET_INNER(), offset))
                         sp := pushStackItem(sp, memValue, evmGasLeft)
                         ip := add(ip, 1)
@@ -5181,11 +5181,11 @@ object "EVMInterpreter" {
                         offset, sp := popStackItemWithoutCheck(sp)
                         value, sp := popStackItemWithoutCheck(sp)
                 
+                        checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
                         checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
                         let expansionGas := expandMemory(add(offset, 32))
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
-                        checkOverflow(offset,MEM_OFFSET_INNER(), evmGasLeft)
                         mstore(add(MEM_OFFSET_INNER(), offset), value)
                         ip := add(ip, 1)
                     }
@@ -5198,11 +5198,11 @@ object "EVMInterpreter" {
                         offset, sp := popStackItemWithoutCheck(sp)
                         value, sp := popStackItemWithoutCheck(sp)
                 
+                        checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
                         checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
                         let expansionGas := expandMemory(add(offset, 1))
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
-                        checkOverflow(offset,MEM_OFFSET_INNER(), evmGasLeft)
                         mstore8(add(MEM_OFFSET_INNER(), offset), value)
                         ip := add(ip, 1)
                     }
