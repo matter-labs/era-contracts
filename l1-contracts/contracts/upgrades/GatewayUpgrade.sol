@@ -40,6 +40,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
             bytes32(bytes20(l2LegacyBridge)),
             l2TxDataFinish
         );
+        // slither-disable-next-line unused-return, controlled-delegatecall, unchecked-low-level-calls
         gatewayUpgradeAddress.delegatecall(
             abi.encodeWithSelector(IGatewayUpgrade.upgradeExternal.selector, proposedUpgrade)
         );
