@@ -212,6 +212,7 @@ contract L1AssetRouter is
 
     /// @notice Legacy function used for migration, do not use!
     /// @param _chainId The chain id on which the bridge is deployed.
+    // slither-disable-next-line uninitialized-state-variables
     function l2BridgeAddress(uint256 _chainId) external view returns (address) {
         // slither-disable-next-line uninitialized-state-variables
         return __DEPRECATED_l2BridgeAddress[_chainId];
