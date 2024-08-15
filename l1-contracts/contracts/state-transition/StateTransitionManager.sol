@@ -96,7 +96,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         return IBridgehub(BRIDGE_HUB).getHyperchain(_chainId);
     }
 
-    /// @notice Returns the address of the hyperchain admin with the corresponding chainID
+    /// @notice Returns the address of the hyperchain admin with the corresponding chainID.
+    /// @notice Not related to the STM, but it is here for legacy reasons.
     /// @param _chainId the chainId of the chain
     function getChainAdmin(uint256 _chainId) external view override returns (address) {
         return IZkSyncHyperchain(getHyperchain(_chainId)).getAdmin();
@@ -380,7 +381,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // save data
         hyperchainAddress = address(hyperchainContract);
         emit NewHyperchain(_chainId, hyperchainAddress);
-        // _registerNewHyperchain(_chainId, hyperchainAddress);
     }
 
     /// @notice called by Bridgehub when a chain registers
