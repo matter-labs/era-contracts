@@ -70,6 +70,7 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
 
     /// @inheritdoc IChainAdmin
     function removeRestriction(address _restriction) external onlySelf {
+        // slither-disable-next-line unused-return
         activeRestrictions.remove(_restriction);
     }
 
@@ -133,6 +134,7 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @notice Adds a new restriction to the active restrictions set.
     /// @param _restriction The address of the restriction contract to be added.
     function _addRestriction(address _restriction) internal {
+        // slither-disable-next-line unused-return
         activeRestrictions.add(_restriction);
     }
 }
