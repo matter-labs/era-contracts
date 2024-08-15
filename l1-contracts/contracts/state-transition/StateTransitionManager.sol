@@ -96,6 +96,11 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         return IBridgehub(BRIDGE_HUB).getHyperchain(_chainId);
     }
 
+    /// @notice return the state transition chain contract for a chainId
+    function getHyperchainLegacy(uint256 _chainId) public view returns (address chainAddress) {
+        (, chainAddress) = __DEPRECATED_hyperchainMap.tryGet(_chainId);
+    }
+
     /// @notice Returns the address of the hyperchain admin with the corresponding chainID.
     /// @notice Not related to the STM, but it is here for legacy reasons.
     /// @param _chainId the chainId of the chain

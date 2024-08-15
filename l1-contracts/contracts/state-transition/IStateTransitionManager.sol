@@ -86,6 +86,8 @@ interface IStateTransitionManager {
 
     function getHyperchain(uint256 _chainId) external view returns (address);
 
+    function getHyperchainLegacy(uint256 _chainId) external view returns (address);
+
     function storedBatchZero() external view returns (bytes32);
 
     function initialCutHash() external view returns (bytes32);
