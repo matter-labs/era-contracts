@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import { Call } from "./Common.sol";
+import {Call} from "./Common.sol";
 
 /// @title Governance contract interface
 /// @author Matter Labs

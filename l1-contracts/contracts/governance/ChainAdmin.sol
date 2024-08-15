@@ -20,16 +20,16 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @notice Ensures that only the `ChainAdmin` contract itself can call the function.
     /// @dev All functions that require access-control should use `onlySelf` modifier, while the access control logic
     /// should be implemented in the restriction contracts.
-    modifier onlySelf {
+    modifier onlySelf() {
         require(msg.sender == address(this), "Only self");
         _;
     }
 
     constructor(address[] memory _initialRestrictions) reentrancyGuardInitializer {
         unchecked {
-            for(uint256 i = 0; i < _initialRestrictions.length; ++i) {
+            for (uint256 i = 0; i < _initialRestrictions.length; ++i) {
                 _addRestriction(_initialRestrictions[i]);
-            }   
+            }
         }
     }
 
@@ -51,7 +51,7 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     }
 
     /// @notice The set of active restrictions.
-    EnumerableSet.AddressSet internal activeRestrictions;    
+    EnumerableSet.AddressSet internal activeRestrictions;
 
     /// @notice Returns the list of active restrictions.
     function getRestrictions() public view returns (address[] memory) {
@@ -118,7 +118,7 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
 
     /// @dev Contract might receive/hold ETH as part of the maintenance process.
     receive() external payable {}
-    
+
     /// @notice Function that returns the current admin can perform the call.
     /// @dev By default it always returns true, but can be overridden in derived contracts.
     function _validateCall(Call calldata _call) internal view {
@@ -128,7 +128,7 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
             for (uint256 i = 0; i < restrictions.length; ++i) {
                 IRestriction(restrictions[i]).validateCall(_call, msg.sender);
             }
-        } 
+        }
     }
 
     /// @notice Adds a new restriction to the active restrictions set.

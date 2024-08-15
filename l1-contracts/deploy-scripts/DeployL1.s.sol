@@ -302,7 +302,10 @@ contract DeployL1Script is Script {
     }
 
     function deployChainAdmin() internal {
-        bytes memory accessControlRestrictionBytecode = abi.encodePacked(type(ChainAdmin).creationCode, abi.encode(uint256(0), config.ownerAddress));
+        bytes memory accessControlRestrictionBytecode = abi.encodePacked(
+            type(ChainAdmin).creationCode,
+            abi.encode(uint256(0), config.ownerAddress)
+        );
 
         address accessControlRestriction = deployViaCreate2(accessControlRestrictionBytecode);
         console.log("Access control restriction deployed at:", accessControlRestriction);

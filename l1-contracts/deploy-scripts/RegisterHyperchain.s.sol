@@ -13,7 +13,7 @@ import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZk
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol"; 
+import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {Utils} from "./Utils.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 

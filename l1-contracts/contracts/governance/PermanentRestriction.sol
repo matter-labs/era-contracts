@@ -4,23 +4,23 @@ pragma solidity 0.8.24;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
-import { Call } from "./Common.sol";
-import { IRestriction } from "./IRestriction.sol";
-import { IChainAdmin } from "./IChainAdmin.sol";
-import { IBridgehub } from "../bridgehub/IBridgehub.sol";
-import { IZkSyncHyperchain } from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import { IAdmin } from "../state-transition/chain-interfaces/IAdmin.sol";
+import {Call} from "./Common.sol";
+import {IRestriction} from "./IRestriction.sol";
+import {IChainAdmin} from "./IChainAdmin.sol";
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
-import { IPermanentRestriction } from "./IPermanentRestriction.sol";
+import {IPermanentRestriction} from "./IPermanentRestriction.sol";
 
 /// @title PermanentRestriction contract
-/// @notice This contract should be used by chains that wish to guarantee that certain security 
+/// @notice This contract should be used by chains that wish to guarantee that certain security
 /// properties are preserved forever.
-/// @dev To be deployed as a transparent upgradable proxy, owned by a trusted decentralized governance. 
+/// @dev To be deployed as a transparent upgradable proxy, owned by a trusted decentralized governance.
 /// @dev Once of the instances of such contract is to ensure that a ZkSyncHyperchain is a rollup forever.
 contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2Step {
     /// @notice The address of the Bridgehub contract.
-    IBridgehub immutable public BRIDGE_HUB;
+    IBridgehub public immutable BRIDGE_HUB;
 
     /// @notice The mapping of the allowed admin implementations.
     mapping(bytes32 implementationCodeHash => bool isAllowed) public allowedAdminImplementations;
@@ -57,7 +57,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
 
         emit AllowedDataChanged(_selector, _data, isAllowed);
     }
-    
+
     /// @notice Allows a certain selector to be validated.
     /// @param _selector The selector of the function.
     /// @param _isValidated The flag that indicates if the selector is validated.
@@ -79,7 +79,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @notice Validates the call as the chain admin
     /// @param _call The call data.
     function _validateAsChainAdmin(Call calldata _call) internal view {
-        if(!_isAdminOfAChain(_call.target)) {
+        if (!_isAdminOfAChain(_call.target)) {
             // We only validate calls related to being an admin of a chain
             return;
         }
@@ -101,7 +101,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
             // The selector is not validated, any data is allowed.
             return;
         }
-        
+
         require(allowedCalls[selector][_call.data], "not allowed");
     }
 
@@ -110,14 +110,14 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @dev Ensures that the admin has a whitelisted implementation and does not remove this restriction.
     function _validateNewAdmin(Call calldata _call) internal view {
         address newChainAdmin = abi.decode(_call.data[4:], (address));
-        
+
         bytes32 implementationCodeHash;
         assembly {
             implementationCodeHash := extcodehash(newChainAdmin)
         }
         require(allowedAdminImplementations[implementationCodeHash], "Unallowed implementation");
 
-        // Since the implementation is known to be correct (from the checks above), we 
+        // Since the implementation is known to be correct (from the checks above), we
         // can safely trust the returned value from the call below
         require(IChainAdmin(newChainAdmin).isRestrictionActive(address(this)), "This restriction is permanent");
     }
@@ -126,7 +126,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @param _call The call data.
     /// @dev Ensures that this restriction is not removed.
     function _validateRemoveRestriction(Call calldata _call) internal view {
-        if(_call.target != msg.sender) {
+        if (_call.target != msg.sender) {
             return;
         }
 
@@ -149,7 +149,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @notice Tries to compare the admin of a chain with the potential admin.
     /// @param _chain The address of the chain.
     /// @param _potentialAdmin The address of the potential admin.
-    /// @dev This function reverts if the `_chain` is not a ZkSyncHyperchain or the `_potentialAdmin` is not the 
+    /// @dev This function reverts if the `_chain` is not a ZkSyncHyperchain or the `_potentialAdmin` is not the
     /// admin of the chain.
     function tryCompareAdminOfAChain(address _chain, address _potentialAdmin) external view {
         require(_chain != address(0), "Address 0 is never a chain");
@@ -157,12 +157,12 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         // Unfortunately there is no easy way to double check that indeed the `_chain` is a ZkSyncHyperchain.
         // So we do the following:
         // - Query it for `chainId`. If it reverts, it is not a ZkSyncHyperchain.
-        // - Query the Bridgehub for the Hyperchain with the given `chainId`. 
+        // - Query the Bridgehub for the Hyperchain with the given `chainId`.
         // - We compare the corresponding addresses
         uint256 chainId = IZkSyncHyperchain(_chain).getChainId();
         require(BRIDGE_HUB.getHyperchain(chainId) == _chain, "Not a Hyperchain");
 
-        // Now, the chain is known to be a hyperchain, so it should implement the corresponding interface        
+        // Now, the chain is known to be a hyperchain, so it should implement the corresponding interface
         address admin = IZkSyncHyperchain(_chain).getAdmin();
         require(admin == _potentialAdmin, "Not an admin");
     }
