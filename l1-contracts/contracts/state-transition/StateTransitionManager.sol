@@ -98,6 +98,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @notice return the state transition chain contract for a chainId
     function getHyperchainLegacy(uint256 _chainId) public view returns (address chainAddress) {
+        // slither-disable-next-line unused-return
         (, chainAddress) = __DEPRECATED_hyperchainMap.tryGet(_chainId);
     }
 
