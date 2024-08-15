@@ -44,6 +44,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
         (bool success, ) = gatewayUpgradeAddress.delegatecall(
             abi.encodeWithSelector(IGatewayUpgrade.upgradeExternal.selector, proposedUpgrade)
         );
+        // solhint-disable-next-line gas-custom-errors
         require(success, "GatewayUpgrade: upgrade failed");
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
