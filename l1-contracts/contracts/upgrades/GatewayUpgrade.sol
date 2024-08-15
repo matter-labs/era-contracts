@@ -9,14 +9,13 @@ import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
-import {AdminFacet} from "../state-transition/chain-deps/facets/Admin.sol";
 import {PriorityQueue} from "../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../state-transition/libraries/PriorityTree.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This upgrade will be used to migrate Era to be part of the hyperchain ecosystem contracts.
-contract GatewayUpgrade is BaseZkSyncUpgrade, AdminFacet, Initializable {
+contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
