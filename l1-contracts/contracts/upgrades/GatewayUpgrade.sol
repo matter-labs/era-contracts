@@ -14,6 +14,9 @@ import {PriorityTree} from "../state-transition/libraries/PriorityTree.sol";
 
 import {IGatewayUpgrade} from "./IGatewayUpgrade.sol";
 import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
+
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This upgrade will be used to migrate Era to be part of the hyperchain ecosystem contracts.
@@ -21,27 +24,32 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
+    address public immutable THIS_ADDRESS;
+
+    constructor() {
+        THIS_ADDRESS = address(this);
+    }
+
     /// @notice The main function that will be called by the upgrade proxy.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
-        (address gatewayUpgradeAddress, bytes memory l2TxDataStart, bytes memory l2TxDataFinish) = abi.decode(
+        (bytes memory l2TxDataStart, bytes memory l2TxDataFinish) = abi.decode(
             _proposedUpgrade.postUpgradeCalldata,
-            (address, bytes, bytes)
+            (bytes, bytes)
         );
 
         s.baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, s.baseToken);
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
-        /// maybe set baseTokenAssetId in Bridgehub here
-
+        IBridgehub(s.bridgehub).setLegacyBaseTokenAssetId(s.chainId);
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
         address l2LegacyBridge = IL1SharedBridgeLegacy(s.baseTokenBridge).l2BridgeAddress(s.chainId);
         proposedUpgrade.l2ProtocolUpgradeTx.data = bytes.concat(
             l2TxDataStart,
-            bytes32(bytes20(l2LegacyBridge)),
+            bytes32(uint256(uint160(l2LegacyBridge))),
             l2TxDataFinish
         );
         // slither-disable-next-line controlled-delegatecall
-        (bool success, ) = gatewayUpgradeAddress.delegatecall(
+        (bool success, ) = THIS_ADDRESS.delegatecall(
             abi.encodeWithSelector(IGatewayUpgrade.upgradeExternal.selector, proposedUpgrade)
         );
         // solhint-disable-next-line gas-custom-errors
@@ -49,6 +57,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
+    /// @notice The function that will be called from this same contract, we need an external call to be able to modify _proposedUpgrade (memory/calldata).
     function upgradeExternal(ProposedUpgrade calldata _proposedUpgrade) external {
         // solhint-disable-next-line gas-custom-errors
         require(msg.sender == address(this), "GatewayUpgrade: upgradeExternal");
