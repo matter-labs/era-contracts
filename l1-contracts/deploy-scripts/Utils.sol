@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
 
+import {console2 as console} from "forge-std/Script.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
@@ -20,7 +21,7 @@ library Utils {
     // Create2Factory deterministic bytecode.
     // https://github.com/Arachnid/deterministic-deployment-proxy
     bytes internal constant CREATE2_FACTORY_BYTECODE =
-        hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
+    hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
 
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     uint256 internal constant MAX_PRIORITY_TX_GAS = 72000000;
@@ -116,7 +117,7 @@ library Utils {
      */
     function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
         string memory file = vm.readFile(
-            // solhint-disable-next-line func-named-parameters
+        // solhint-disable-next-line func-named-parameters
             string.concat(
                 "../system-contracts/artifacts-zk/contracts-preprocessed/",
                 filename,
@@ -262,6 +263,41 @@ library Utils {
 
         vm.broadcast();
         bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
+    }
+
+    function getL1L2TransactionCalldata(
+        bytes memory l2Calldata,
+        uint256 l2GasLimit,
+        bytes[] memory factoryDeps,
+        address dstAddress,
+        uint256 chainId,
+        address bridgehubAddress
+    ) internal returns (bytes memory) {
+        Bridgehub bridgehub = Bridgehub(bridgehubAddress);
+        uint256 gasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
+
+        uint256 requiredValueToDeploy = bridgehub.l2TransactionBaseCost(
+            chainId,
+            gasPrice,
+            l2GasLimit,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        ) * 2;
+
+        console.log("Required value to deploy:", requiredValueToDeploy);
+
+        L2TransactionRequestDirect memory l2TransactionRequestDirect = L2TransactionRequestDirect({
+            chainId: chainId,
+            mintValue: requiredValueToDeploy,
+            l2Contract: dstAddress,
+            l2Value: 0,
+            l2Calldata: l2Calldata,
+            l2GasLimit: l2GasLimit,
+            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            factoryDeps: factoryDeps,
+            refundRecipient: msg.sender
+        });
+
+        return abi.encodeCall(bridgehub.requestL2TransactionDirect, (l2TransactionRequestDirect));
     }
 
     /**

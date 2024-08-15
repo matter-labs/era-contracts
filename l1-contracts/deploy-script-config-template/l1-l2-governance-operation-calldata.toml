@@ -1,0 +1,12 @@
+l2_contract_addr = ""
+l2_contract_calldata = ""
+approve_tokens = 1
+
+[chain]
+chain_chain_id = 1
+base_token_addr = ""
+governance_addr = ""
+
+[deployed_addresses]
+bridgehub_proxy_addr = ""
+l1_shared_bridge_proxy_addr = ""
