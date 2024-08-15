@@ -55,15 +55,17 @@ describe("ValidatorTimelock tests", function () {
     const dummyExecutorContract = await dummyExecutorFactory.deploy();
     dummyExecutor = DummyExecutorFactory.connect(dummyExecutorContract.address, dummyExecutorContract.signer);
 
-    const dummyStateTransitionManagerFactory = await hardhat.ethers.getContractFactory("DummyStateTransitionManager");
-    const dummyStateTransitionManagerContract = await dummyStateTransitionManagerFactory.deploy();
+    const dummyStateTransitionManagerFactory = await hardhat.ethers.getContractFactory(
+      "DummyStateTransitionManagerForValidatorTimelock"
+    );
+    const dummyStateTransitionManagerContract = await dummyStateTransitionManagerFactory.deploy(
+      await owner.getAddress(),
+      dummyExecutor.address
+    );
     dummyStateTransitionManager = DummyStateTransitionManagerFactory.connect(
       dummyStateTransitionManagerContract.address,
       dummyStateTransitionManagerContract.signer
     );
-
-    const setSTtx = await dummyStateTransitionManager.setHyperchain(chainId, dummyExecutor.address);
-    await setSTtx.wait();
 
     const validatorTimelockFactory = await hardhat.ethers.getContractFactory("ValidatorTimelock");
     const validatorTimelockContract = await validatorTimelockFactory.deploy(await owner.getAddress(), 0, chainId);

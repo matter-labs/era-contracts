@@ -369,7 +369,7 @@ contract DeployL1Script is Script {
     function deployBridgehubContract() internal {
         bytes memory bridgeHubBytecode = abi.encodePacked(
             type(Bridgehub).creationCode,
-            abi.encode(config.l1ChainId, config.ownerAddress)
+            abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains))
         );
         address bridgehubImplementation = deployViaCreate2(bridgeHubBytecode);
         console.log("Bridgehub Implementation deployed at:", bridgehubImplementation);
@@ -474,8 +474,7 @@ contract DeployL1Script is Script {
     function deployStateTransitionManagerImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(StateTransitionManager).creationCode,
-            abi.encode(addresses.bridgehub.bridgehubProxy),
-            abi.encode(config.contracts.maxNumberOfChains)
+            abi.encode(addresses.bridgehub.bridgehubProxy)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("StateTransitionManagerImplementation deployed at:", contractAddress);

@@ -20,6 +20,8 @@ import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol"
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 
 contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -66,7 +68,25 @@ contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeploye
     // Check whether the sum of ETH deposits from tests, updated on each deposit and withdrawal,
     // equals the balance of L1Shared bridge.
     function test_initialDeployment() public {
-        require(1 == 1);
+        uint256 chainId = hyperchainIds[0];
+        IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
+        address newChainAddress = bridgehub.getHyperchain(chainId);
+        address admin = IZkSyncHyperchain(bridgehub.getHyperchain(chainId)).getAdmin();
+        IStateTransitionManager stm = IStateTransitionManager(bridgehub.stateTransitionManager(chainId));
+
+        assertNotEq(admin, address(0));
+        assertNotEq(newChainAddress, address(0));
+
+        address[] memory chainAddresses = bridgehub.getAllHyperchains();
+        assertEq(chainAddresses.length, 1);
+        assertEq(chainAddresses[0], newChainAddress);
+
+        uint256[] memory chainIds = bridgehub.getAllHyperchainChainIDs();
+        assertEq(chainIds.length, 1);
+        assertEq(chainIds[0], chainId);
+
+        uint256 protocolVersion = stm.getProtocolVersion(chainId);
+        assertEq(protocolVersion, 0);
     }
 
     // add this to be excluded from coverage report

@@ -196,8 +196,12 @@ export class Deployer {
       callConstructor: true,
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(
-        ["uint256", "address"],
-        [getNumberFromEnv("ETH_CLIENT_CHAIN_ID"), applyL1ToL2Alias(this.addresses.Governance)]
+        ["uint256", "address", "uint256"],
+        [
+          getNumberFromEnv("ETH_CLIENT_CHAIN_ID"),
+          applyL1ToL2Alias(this.addresses.Governance),
+          getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_HYPERCHAINS"),
+        ]
       ),
     };
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
@@ -419,7 +423,7 @@ export class Deployer {
     const l1ChainId = this.isZkMode() ? getNumberFromEnv("ETH_CLIENT_CHAIN_ID") : await this.deployWallet.getChainId();
     const contractAddress = await this.deployViaCreate2(
       "Bridgehub",
-      [l1ChainId, this.addresses.Governance],
+      [l1ChainId, this.addresses.Governance, getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_HYPERCHAINS")],
       create2Salt,
       ethTxOptions
     );
@@ -490,7 +494,7 @@ export class Deployer {
   ) {
     const contractAddress = await this.deployViaCreate2(
       "StateTransitionManager",
-      [this.addresses.Bridgehub.BridgehubProxy, getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_HYPERCHAINS")],
+      [this.addresses.Bridgehub.BridgehubProxy],
       create2Salt,
       {
         ...ethTxOptions,
