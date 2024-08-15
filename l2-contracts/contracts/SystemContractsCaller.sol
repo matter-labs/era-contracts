@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: MIT
 
-// solhint-disable one-contract-per-file
-
 pragma solidity ^0.8.20;
 
 import {MSG_VALUE_SYSTEM_CONTRACT} from "./L2ContractHelper.sol";
