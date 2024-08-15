@@ -17,8 +17,6 @@ import {IConsensusRegistry} from "./interfaces/IConsensusRegistry.sol";
 contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     /// @dev An array to keep track of node owners.
     address[] public nodeOwners;
-    /// @dev A mapping of node owner indices (index within the array of node owners) => node owners.
-    mapping(uint32 => address) public nodeOwnerIndices;
     /// @dev A mapping of node owners => nodes.
     mapping(address => Node) public nodes;
     /// @dev A mapping for enabling efficient lookups when checking whether a given attester public key exists.
@@ -77,7 +75,6 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
 
         uint32 nodeOwnerIdx = uint32(nodeOwners.length);
         nodeOwners.push(_nodeOwner);
-        nodeOwnerIndices[nodeOwnerIdx] = _nodeOwner;
         nodes[_nodeOwner] = Node({
             attesterLatest: AttesterAttr({
             active: true,
@@ -301,17 +298,12 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
             _node.attesterSnapshot.pendingRemoval &&
             _node.validatorSnapshot.pendingRemoval
         ) {
-            // Remove from array by swapping the last element (gas-efficient, not preserving order).
-            uint32 lastIdx = uint32(nodeOwners.length - 1);
-            nodeOwners[_node.nodeOwnerIdx] = nodeOwners[lastIdx];
+            // Remove from array by swapping the last node owner (gas-efficient, not preserving order).
+            address lastNodeOwner = nodeOwners[nodeOwners.length - 1];
+            nodeOwners[_node.nodeOwnerIdx] = lastNodeOwner;
             nodeOwners.pop();
-            // Update the last element's node owner.
-            address lastIdxNodeOwner = nodeOwnerIndices[lastIdx];
-            Node storage lastIdxNode = nodes[lastIdxNodeOwner];
-            lastIdxNode.nodeOwnerIdx = _node.nodeOwnerIdx;
-            // Update the node owner indices mapping.
-            nodeOwnerIndices[_node.nodeOwnerIdx] = lastIdxNodeOwner;
-            delete nodeOwnerIndices[lastIdx];
+            // Update the node owned by the last node owner.
+            nodes[lastNodeOwner].nodeOwnerIdx = _node.nodeOwnerIdx;
 
             // Delete from the remaining mapping.
             delete nodes[_nodeOwner];
