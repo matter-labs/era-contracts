@@ -175,6 +175,19 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         messageRoot = _messageRoot;
     }
 
+    /// @notice Used to set the legacy chain address for the upgrade.
+    /// @notice This has to be used after the BH but before the STM is upgraded.
+    /// @param _chainId The chainId of the legacy chain we are migrating.
+    function setLegacyChainAddress(uint256 _chainId) external onlyOwner {
+        address stm = stateTransitionManager[_chainId];
+        require(stm != address(0), "BH: chain not legacy");
+        require(!hyperchainMap.contains(_chainId), "BH: chain already migrated");
+        /// Note we have to do this before STM is upgraded.
+        address chain = IStateTransitionManager(stm).getHyperchain(_chainId);
+        require(chain != address(0), "BH: chain not legacy 2");
+        _registerNewHyperchain(_chainId, _legacyChainAddress);
+    }
+
     //// Registry
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
