@@ -47,7 +47,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
 
     /// @notice Initializes the bridge contract for later use.
     /// @param _l1ChainId The L1 chain id differs between mainnet and testnets.
-    /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
+    /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy fxor tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
     /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
     /// @param _l2TokenBeacon The address of the L2 token beacon for legacy chains.
@@ -114,9 +114,20 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
                 // Make sure that a NativeTokenVault sent the message
                 revert AssetIdMismatch(expectedAssetId, _assetId);
             }
-            address deployedToken = _deployL2Token(originToken, erc20Data);
-            if (deployedToken != expectedToken) {
-                revert AddressMismatch(expectedToken, deployedToken);
+            address l1LegacyToken;
+            if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
+                l1LegacyToken = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(expectedToken);
+            }
+            if (l1LegacyToken != address(0)) {
+                /// token is a legacy token, no need to deploy
+                if (l1LegacyToken != originToken) {
+                    revert AddressMismatch(originToken, l1LegacyToken);
+                }
+            } else {
+                address deployedToken = _deployL2Token(originToken, erc20Data);
+                if (deployedToken != expectedToken) {
+                    revert AddressMismatch(expectedToken, deployedToken);
+                }
             }
             tokenAddress[_assetId] = expectedToken;
             token = expectedToken;
