@@ -3,6 +3,8 @@
 pragma solidity 0.8.24;
 
 /// @notice The interface for the permanent restriction contract.
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IPermanentRestriction {
     /// @notice Emitted when the implementation is allowed or disallowed.
     event AdminImplementationAllowed(bytes32 indexed implementationHash, bool isAllowed);
