@@ -14,11 +14,16 @@ interface IChainAdmin {
     /// @notice Emitted when the call is executed from the contract.
     event CallExecuted(Call _call, bool success, bytes returnData);
 
+    /// @notice Returns the list of active restrictions.
     function getRestrictions() external view returns (address[] memory);
 
+    /// @notice Checks if the restriction is active.
     function isRestrictionActive(address) external view returns (bool);
 
+    /// @notice Adds a new restriction to the active restrictions set.
     function addRestriction(address restriction) external;
 
+    /// @notice Removes a restriction from the active restrictions set.
+    /// @dev Sometimes restrictions might need to enforce their permanence (e.g. if a chain should be a rollup forever).
     function removeRestriction(address restriction) external;
 }
