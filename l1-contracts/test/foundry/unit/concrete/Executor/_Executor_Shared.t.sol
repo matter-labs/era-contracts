@@ -157,10 +157,10 @@ contract ExecutorTest is Test {
 
         rollupL1DAValidator = new RollupL1DAValidator();
 
-        admin = new AdminFacet();
+        admin = new AdminFacet(block.chainid);
         getters = new GettersFacet();
         executor = new TestExecutor();
-        mailbox = new MailboxFacet(eraChainId);
+        mailbox = new MailboxFacet(eraChainId, block.chainid);
 
         DummyStateTransitionManager stateTransitionManager = new DummyStateTransitionManager();
         vm.mockCall(

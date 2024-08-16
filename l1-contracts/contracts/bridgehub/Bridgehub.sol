@@ -185,8 +185,18 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         messageRoot = _messageRoot;
     }
 
+    /// @notice Used for the upgrade to set the baseTokenAssetId previously stored as baseToken.
+    /// @param _chainId the chainId of the chain.
+    function setLegacyBaseTokenAssetId(uint256 _chainId) external {
+        if (baseTokenAssetId[_chainId] == bytes32(0)) {
+            return;
+        }
+        address token = baseToken[_chainId];
+        require(token != address(0), "BH: token not set");
+        baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(block.chainid, token);
+    }
+
     /// @notice Used to set the legacy chain address for the upgrade.
-    /// @notice This has to be used after the BH but before the STM is upgraded.
     /// @param _chainId The chainId of the legacy chain we are migrating.
     function setLegacyChainAddress(uint256 _chainId) external {
         address stm = stateTransitionManager[_chainId];
