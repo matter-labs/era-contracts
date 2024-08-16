@@ -14,7 +14,7 @@ import {Call} from "./Common.sol";
 /// @dev It inherits from `AccessControlDefaultAdminRules` without overriding `_setRoleAdmin` functionaity. In other
 /// words, the `DEFAULT_ADMIN_ROLE` is the only role that can manage roles. This is done for simplicity.
 /// @dev An instance of this restriction should be deployed separately for each `ChainAdmin` contract.
-/// @dev IMPORTANT: this function does not validate the ability of the invoker to use `msg.value`. Thus, 
+/// @dev IMPORTANT: this function does not validate the ability of the invoker to use `msg.value`. Thus,
 /// either all callers with access to functions should be trusted to not steal ETH from the `ChainAdmin` account
 /// or not ETH should be passively stored in `ChainAdmin` account.
 contract AccessControlRestriction is IRestriction, IAccessControlRestriction, AccessControlDefaultAdminRules {
@@ -59,12 +59,12 @@ contract AccessControlRestriction is IRestriction, IAccessControlRestriction, Ac
         // `requiredRoles` and `requiredRolesForFallback` is 0, the default admin is by default a required
         // role for all the functions.
         if (_call.data.length < 4) {
-            if(!hasRole(requiredRolesForFallback[_call.target], _invoker)) {
+            if (!hasRole(requiredRolesForFallback[_call.target], _invoker)) {
                 revert AccessToFallbackDenied(_call.target, _invoker);
             }
         } else {
             bytes4 selector = bytes4(_call.data[:4]);
-            if(!hasRole(requiredRoles[_call.target][selector], _invoker)) {
+            if (!hasRole(requiredRoles[_call.target][selector], _invoker)) {
                 revert AccessToFunctionDenied(_call.target, selector, _invoker);
             }
         }

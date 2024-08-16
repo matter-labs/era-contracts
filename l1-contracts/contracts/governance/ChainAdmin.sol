@@ -24,7 +24,7 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @dev All functions that require access-control should use `onlySelf` modifier, while the access control logic
     /// should be implemented in the restriction contracts.
     modifier onlySelf() {
-        if(msg.sender != address(this)) {
+        if (msg.sender != address(this)) {
             revert OnlySelfAllowed();
         }
         _;
@@ -62,7 +62,7 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
 
     /// @inheritdoc IChainAdmin
     function removeRestriction(address _restriction) external onlySelf {
-        if(!activeRestrictions.remove(_restriction)) {
+        if (!activeRestrictions.remove(_restriction)) {
             revert RestrictionWasNotPresent(_restriction);
         }
         emit RestrictionRemoved(_restriction);
@@ -120,7 +120,7 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @notice Adds a new restriction to the active restrictions set.
     /// @param _restriction The address of the restriction contract to be added.
     function _addRestriction(address _restriction) internal {
-        if(!activeRestrictions.add(_restriction)) {
+        if (!activeRestrictions.add(_restriction)) {
             revert RestrictionWasAlreadyPresent(_restriction);
         }
         emit RestrictionAdded(_restriction);

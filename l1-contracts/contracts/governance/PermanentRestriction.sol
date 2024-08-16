@@ -107,7 +107,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
             return;
         }
 
-        if(!allowedCalls[_call.data]) {
+        if (!allowedCalls[_call.data]) {
             revert CallNotAllowed(_call.data);
         }
     }
@@ -120,7 +120,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
 
         bytes32 implementationCodeHash = newChainAdmin.codehash;
 
-        if(!allowedAdminImplementations[implementationCodeHash]) {
+        if (!allowedAdminImplementations[implementationCodeHash]) {
             revert UnallowedImplementation(implementationCodeHash);
         }
 
