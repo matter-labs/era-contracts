@@ -57,7 +57,7 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub = Bridgehub(address(dummyBridgehub));
         address weth = makeAddr("WETH");
         mockSTM = new DummyStateTransitionManagerWBH(address(bridgeHub));
-        mockChainContract = new DummyHyperchain(address(bridgeHub), eraChainId);
+        mockChainContract = new DummyHyperchain(address(bridgeHub), eraChainId, block.chainid);
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
         ntv = new L1NativeTokenVault(weth, IL1AssetRouter(address(mockSharedBridge)));
