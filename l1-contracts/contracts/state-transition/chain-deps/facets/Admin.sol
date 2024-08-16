@@ -291,8 +291,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         } else if (_contractAlreadyDeployed) {
             require(s.settlementLayer != address(0), "Af: not migrated 2");
             s.priorityTree.checkGWReinit(_commitment.priorityTree);
-
-         } else {
+        } else {
             s.priorityTree.initFromCommitment(_commitment.priorityTree);
         }
 

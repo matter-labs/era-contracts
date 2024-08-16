@@ -607,7 +607,9 @@ contract L1AssetRouter is
         address l1AssetHandler = assetHandlerAddress[assetId];
         // slither-disable-next-line unused-return
         IL1AssetHandler(l1AssetHandler).bridgeMint(_chainId, assetId, transferData);
-        (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
+        if (l1AssetHandler == address(nativeTokenVault)) {
+            (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
+        }
 
         emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetId, amount);
     }

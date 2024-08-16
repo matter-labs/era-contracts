@@ -654,7 +654,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         address hyperchain = getHyperchain(_chainId);
         bool contractAlreadyDeployed = hyperchain != address(0);
-        if (!contractAlreadyDeployed) { 
+        if (!contractAlreadyDeployed) {
             hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(_chainId, _stmData);
             require(hyperchain != address(0), "BH: chain not registered");
             _registerNewHyperchain(_chainId, hyperchain);
