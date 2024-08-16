@@ -8,9 +8,6 @@ import {AccessControlDefaultAdminRules} from "@openzeppelin/contracts/access/Acc
 import {IRestriction} from "./IRestriction.sol";
 import {Call} from "./Common.sol";
 
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The Restriction that is designed to provide the access control logic for the `ChainAdmin` contract.

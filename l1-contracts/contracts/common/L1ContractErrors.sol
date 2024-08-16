@@ -12,5 +12,5 @@ error ChainZeroAddress();
 error NotAHyperchain(address chainAddress);
 error NotAnAdmin(address expected, address actual);
 error RemovingPermanentRestriction();
-error UnallowedImplementatioN(bytes32 imlementationHash);
+error UnallowedImplementation(bytes32 imlementationHash);
 error ZeroAddress();

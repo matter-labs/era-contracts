@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {CallNotAllowed, ChainZeroAddress, NotAHyperchain, NotAnAdmin, RemovingPermanentRestriction, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {CallNotAllowed, ChainZeroAddress, NotAHyperchain, NotAnAdmin, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation} from "../common/L1ContractErrors.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
@@ -124,7 +124,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         }
 
         if(!allowedAdminImplementations[implementationCodeHash]) {
-            revert UnallowedImplementatioN(implementationCodeHash);
+            revert UnallowedImplementation(implementationCodeHash);
         }
 
         // Since the implementation is known to be correct (from the checks above), we

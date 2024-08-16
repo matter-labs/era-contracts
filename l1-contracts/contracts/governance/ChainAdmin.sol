@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable gas-length-in-loops
+
 import {NoCallsProvided, OnlySelfAllowed, RestrictionWasNotPresent, RestrictionWasAlreadyPresent} from "../common/L1ContractErrors.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
 import {IRestriction} from "./IRestriction.sol";
@@ -85,7 +87,6 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
         if (_calls.length == 0) {
             revert NoCallsProvided();
         }
-        // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _calls.length; ++i) {
             _validateCall(_calls[i]);
 

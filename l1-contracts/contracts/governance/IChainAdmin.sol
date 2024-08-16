@@ -9,7 +9,7 @@ import {Call} from "./Common.sol";
 /// @custom:security-contact security@matterlabs.dev
 interface IChainAdmin {
     /// @notice Emitted when the expected upgrade timestamp for a specific protocol version is set.
-    event UpdateUpgradeTimestamp(uint256 indexed protocolVersion, uint256 _upgradeTimestamp);
+    event UpdateUpgradeTimestamp(uint256 indexed protocolVersion, uint256 upgradeTimestamp);
 
     /// @notice Emitted when the call is executed from the contract.
     event CallExecuted(Call call, bool success, bytes returnData);
