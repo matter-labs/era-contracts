@@ -94,6 +94,7 @@ interface IConsensusRegistry {
     event NodeDeactivated(address indexed nodeOwner);
     event NodeActivated(address indexed nodeOwner);
     event NodeRemoved(address indexed nodeOwner);
+    event NodeDeleted(address indexed nodeOwner);
     event NodeValidatorWeightChanged(address indexed nodeOwner, uint32 newWeight);
     event NodeAttesterWeightChanged(address indexed nodeOwner, uint32 newWeight);
     event NodeValidatorKeyChanged(address indexed nodeOwner, BLS12_381PublicKey newPubKey, BLS12_381Signature newPoP);

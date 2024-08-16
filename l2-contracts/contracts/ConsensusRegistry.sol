@@ -312,17 +312,19 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     }
 
     function _deleteNode(address _nodeOwner, Node storage _node) private {
-            // Delete from array by swapping the last node owner (gas-efficient, not preserving order).
-            address lastNodeOwner = nodeOwners[nodeOwners.length - 1];
-            nodeOwners[_node.nodeOwnerIdx] = lastNodeOwner;
-            nodeOwners.pop();
-            // Update the node owned by the last node owner.
-            nodes[lastNodeOwner].nodeOwnerIdx = _node.nodeOwnerIdx;
+        // Delete from array by swapping the last node owner (gas-efficient, not preserving order).
+        address lastNodeOwner = nodeOwners[nodeOwners.length - 1];
+        nodeOwners[_node.nodeOwnerIdx] = lastNodeOwner;
+        nodeOwners.pop();
+        // Update the node owned by the last node owner.
+        nodes[lastNodeOwner].nodeOwnerIdx = _node.nodeOwnerIdx;
 
-            // Delete from the remaining mapping.
-            delete nodes[_nodeOwner];
-            delete attesterPubKeyHashes[_hashAttesterPubKey(_node.attesterLatest.pubKey)];
-            delete validatorPubKeyHashes[_hashValidatorPubKey(_node.validatorLatest.pubKey)];
+        // Delete from the remaining mapping.
+        delete nodes[_nodeOwner];
+        delete attesterPubKeyHashes[_hashAttesterPubKey(_node.attesterLatest.pubKey)];
+        delete validatorPubKeyHashes[_hashValidatorPubKey(_node.validatorLatest.pubKey)];
+
+        emit NodeDeleted(_nodeOwner);
     }
 
     function _ensureAttesterSnapshot(Node storage _node) private {
