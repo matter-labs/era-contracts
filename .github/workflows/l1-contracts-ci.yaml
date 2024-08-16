@@ -32,7 +32,7 @@ jobs:
         run: yarn l2 build
 
       - name: Create cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v3
         with:
           key: artifacts-l1-${{ github.sha }}
           path: |
@@ -85,7 +85,7 @@ jobs:
         run: yarn
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v3
         with:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
@@ -115,7 +115,7 @@ jobs:
         run: yarn
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v3
         with:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
@@ -177,7 +177,7 @@ jobs:
         run: yarn
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v3
         with:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
