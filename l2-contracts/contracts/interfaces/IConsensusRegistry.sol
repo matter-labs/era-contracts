@@ -29,25 +29,25 @@ interface IConsensusRegistry {
 
     /// @dev Represents the attester attributes of a consensus node.
     /// @param active A flag stating if the attester is active.
-    /// @param pendingRemoval A flag stating if the attester is pending removal.
+    /// @param removed A flag stating if the attester has been removed (and is pending a deletion).
     /// @param weight Attester's voting weight.
     /// @param pubKey Attester's Secp256k1 public key.
     struct AttesterAttr {
         bool active;
-        bool pendingRemoval;
+        bool removed;
         uint32 weight;
         Secp256k1PublicKey pubKey;
     }
 
     /// @dev Represents the validator attributes of a consensus node.
     /// @param active A flag stating if the validator is active.
-    /// @param pendingRemoval A flag stating if the validator is pending removal.
+    /// @param removed A flag stating if the validator has been removed (and is pending a deletion).
     /// @param weight Validator's voting weight.
     /// @param pubKey Validator's BLS12-381 public key.
     /// @param pop Validator's Proof-of-possession (a signature over the public key).
     struct ValidatorAttr {
         bool active;
-        bool pendingRemoval;
+        bool removed;
         uint32 weight;
         BLS12_381PublicKey pubKey;
         BLS12_381Signature pop;

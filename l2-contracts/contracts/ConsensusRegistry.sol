@@ -77,27 +77,27 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         nodes[_nodeOwner] = Node({
             attesterLatest: AttesterAttr({
             active: true,
-            pendingRemoval: false,
+            removed: false,
             weight: _attesterWeight,
             pubKey: _attesterPubKey
         }),
             attesterSnapshot: AttesterAttr({
             active: false,
-            pendingRemoval: false,
+            removed: false,
             weight: 0,
             pubKey: Secp256k1PublicKey({tag: bytes1(0), x: bytes32(0)})
         }),
             attesterLastUpdateCommit: attestersCommit,
             validatorLatest: ValidatorAttr({
             active: true,
-            pendingRemoval: false,
+            removed: false,
             weight: _validatorWeight,
             pubKey: _validatorPubKey,
             pop: _validatorPoP
         }),
             validatorSnapshot: ValidatorAttr({
             active: false,
-            pendingRemoval: false,
+            removed: false,
             weight: 0,
             pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
             pop: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
@@ -125,8 +125,8 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     function deactivate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_isNodePendingRemoval(node)) {
-            _finalizeNodeRemoval(_nodeOwner, node);
+        if (_isNodePendingDeletion(node)) {
+            _deleteNode(_nodeOwner, node);
             return;
         }
 
@@ -145,8 +145,8 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     function activate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_isNodePendingRemoval(node)) {
-            _finalizeNodeRemoval(_nodeOwner, node);
+        if (_isNodePendingDeletion(node)) {
+            _deleteNode(_nodeOwner, node);
             return;
         }
 
@@ -165,11 +165,14 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     function remove(address _nodeOwner) external onlyOwner {
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-
+        if (_isNodePendingDeletion(node)) {
+            _deleteNode(_nodeOwner, node);
+            return;
+        }
         _ensureAttesterSnapshot(node);
-        node.attesterLatest.pendingRemoval = true;
+        node.attesterLatest.removed = true;
         _ensureValidatorSnapshot(node);
-        node.validatorLatest.pendingRemoval = true;
+        node.validatorLatest.removed = true;
 
         emit NodeRemoved(_nodeOwner);
     }
@@ -182,8 +185,8 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     function changeValidatorWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_isNodePendingRemoval(node)) {
-            _finalizeNodeRemoval(_nodeOwner, node);
+        if (_isNodePendingDeletion(node)) {
+            _deleteNode(_nodeOwner, node);
             return;
         }
 
@@ -201,8 +204,8 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     function changeAttesterWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_isNodePendingRemoval(node)) {
-            _finalizeNodeRemoval(_nodeOwner, node);
+        if (_isNodePendingDeletion(node)) {
+            _deleteNode(_nodeOwner, node);
             return;
         }
 
@@ -227,8 +230,8 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         _verifyInputBLS12_381Signature(_pop);
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_isNodePendingRemoval(node)) {
-            _finalizeNodeRemoval(_nodeOwner, node);
+        if (_isNodePendingDeletion(node)) {
+            _deleteNode(_nodeOwner, node);
             return;
         }
 
@@ -256,8 +259,8 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         _verifyInputSecp256k1PublicKey(_pubKey);
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_isNodePendingRemoval(node)) {
-            _finalizeNodeRemoval(_nodeOwner, node);
+        if (_isNodePendingDeletion(node)) {
+            _deleteNode(_nodeOwner, node);
             return;
         }
 
@@ -298,18 +301,18 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         return nodeOwners.length;
     }
 
-    function _isNodePendingRemoval(Node storage _node) private returns (bool) {
-        bool attesterPendingRemoval = (attestersCommit > _node.attesterLastUpdateCommit)
-            ? _node.attesterLatest.pendingRemoval
-            : _node.attesterSnapshot.pendingRemoval;
-        bool validatorPendingRemoval = (validatorsCommit > _node.validatorLastUpdateCommit)
-            ? _node.validatorLatest.pendingRemoval
-            : _node.validatorSnapshot.pendingRemoval;
-        return attesterPendingRemoval && validatorPendingRemoval;
+    function _isNodePendingDeletion(Node storage _node) private returns (bool) {
+        bool attesterRemoved = (attestersCommit > _node.attesterLastUpdateCommit)
+            ? _node.attesterLatest.removed
+            : _node.attesterSnapshot.removed;
+        bool validatorRemoved = (validatorsCommit > _node.validatorLastUpdateCommit)
+            ? _node.validatorLatest.removed
+            : _node.validatorSnapshot.removed;
+        return attesterRemoved && validatorRemoved;
     }
 
-    function _finalizeNodeRemoval(address _nodeOwner, Node storage _node) private {
-            // Remove from array by swapping the last node owner (gas-efficient, not preserving order).
+    function _deleteNode(address _nodeOwner, Node storage _node) private {
+            // Delete from array by swapping the last node owner (gas-efficient, not preserving order).
             address lastNodeOwner = nodeOwners[nodeOwners.length - 1];
             nodeOwners[_node.nodeOwnerIdx] = lastNodeOwner;
             nodeOwners.pop();
