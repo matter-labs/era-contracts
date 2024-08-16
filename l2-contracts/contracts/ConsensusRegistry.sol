@@ -125,7 +125,8 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     function deactivate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_finalizeNodeRemoval(_nodeOwner, node)) {
+        if (_isNodePendingRemoval(node)) {
+            _finalizeNodeRemoval(_nodeOwner, node);
             return;
         }
 
@@ -144,7 +145,8 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     function activate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_finalizeNodeRemoval(_nodeOwner, node)) {
+        if (_isNodePendingRemoval(node)) {
+            _finalizeNodeRemoval(_nodeOwner, node);
             return;
         }
 
@@ -180,7 +182,8 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     function changeValidatorWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_finalizeNodeRemoval(_nodeOwner, node)) {
+        if (_isNodePendingRemoval(node)) {
+            _finalizeNodeRemoval(_nodeOwner, node);
             return;
         }
 
@@ -198,7 +201,8 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     function changeAttesterWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_finalizeNodeRemoval(_nodeOwner, node)) {
+        if (_isNodePendingRemoval(node)) {
+            _finalizeNodeRemoval(_nodeOwner, node);
             return;
         }
 
@@ -223,7 +227,8 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         _verifyInputBLS12_381Signature(_pop);
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_finalizeNodeRemoval(_nodeOwner, node)) {
+        if (_isNodePendingRemoval(node)) {
+            _finalizeNodeRemoval(_nodeOwner, node);
             return;
         }
 
@@ -251,7 +256,8 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         _verifyInputSecp256k1PublicKey(_pubKey);
         _verifyNodeOwnerExists(_nodeOwner);
         Node storage node = nodes[_nodeOwner];
-        if (_finalizeNodeRemoval(_nodeOwner, node)) {
+        if (_isNodePendingRemoval(node)) {
+            _finalizeNodeRemoval(_nodeOwner, node);
             return;
         }
 
@@ -292,11 +298,17 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         return nodeOwners.length;
     }
 
-    function _finalizeNodeRemoval(address _nodeOwner, Node storage _node) private returns (bool) {
-        if (
-            _node.attesterSnapshot.pendingRemoval &&
-            _node.validatorSnapshot.pendingRemoval
-        ) {
+    function _isNodePendingRemoval(Node storage _node) private returns (bool) {
+        bool attesterPendingRemoval = (attestersCommit > _node.attesterLastUpdateCommit)
+            ? _node.attesterLatest.pendingRemoval
+            : _node.attesterSnapshot.pendingRemoval;
+        bool validatorPendingRemoval = (validatorsCommit > _node.validatorLastUpdateCommit)
+            ? _node.validatorLatest.pendingRemoval
+            : _node.validatorSnapshot.pendingRemoval;
+        return attesterPendingRemoval && validatorPendingRemoval;
+    }
+
+    function _finalizeNodeRemoval(address _nodeOwner, Node storage _node) private {
             // Remove from array by swapping the last node owner (gas-efficient, not preserving order).
             address lastNodeOwner = nodeOwners[nodeOwners.length - 1];
             nodeOwners[_node.nodeOwnerIdx] = lastNodeOwner;
@@ -308,10 +320,6 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
             delete nodes[_nodeOwner];
             delete attesterPubKeyHashes[_hashAttesterPubKey(_node.attesterLatest.pubKey)];
             delete validatorPubKeyHashes[_hashValidatorPubKey(_node.validatorLatest.pubKey)];
-
-            return true;
-        }
-        return false;
     }
 
     function _ensureAttesterSnapshot(Node storage _node) private {
