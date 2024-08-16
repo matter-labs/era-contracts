@@ -250,11 +250,6 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     ) external payable override onlyBridgehub {
         HyperchainCommitment memory _commitment = abi.decode(_data, (HyperchainCommitment));
 
-        if (_contractAlreadyDeployed) {
-            s.priorityTree.checkReinit(_commitment.priorityTree);
-            require(s.settlementLayer != address(0), "Af: not migrated");
-        }
-
         uint256 batchesExecuted = _commitment.totalBatchesExecuted;
         uint256 batchesVerified = _commitment.totalBatchesVerified;
         uint256 batchesCommitted = _commitment.totalBatchesCommitted;
@@ -291,7 +286,13 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
                 "Admin: not historical root"
             );
             require(_contractAlreadyDeployed, "Af: contract not deployed");
-        } else {
+            require(s.settlementLayer != address(0), "Af: not migrated");
+            s.priorityTree.checkL1Reinit(_commitment.priorityTree);
+        } else if (_contractAlreadyDeployed) {
+            require(s.settlementLayer != address(0), "Af: not migrated 2");
+            s.priorityTree.checkGWReinit(_commitment.priorityTree);
+
+         } else {
             s.priorityTree.initFromCommitment(_commitment.priorityTree);
         }
 

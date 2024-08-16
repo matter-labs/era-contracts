@@ -3,7 +3,6 @@ import { Command } from "commander";
 import * as hre from "hardhat";
 import { L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS } from "../../l1-contracts/src.ts/utils";
 
-export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2SharedBridge").abi;
 export const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
 
 async function main() {

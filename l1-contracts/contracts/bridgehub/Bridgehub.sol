@@ -89,7 +89,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev Sync layer chain is expected to have .. as the base token.
     mapping(uint256 chainId => bool isWhitelistedSettlementLayer) public whitelistedSettlementLayers;
 
-    bool private migrationPuased;
+    bool private migrationPaused;
 
     modifier onlyOwnerOrAdmin() {
         require(msg.sender == admin || msg.sender == owner(), "BH: not owner or admin");
@@ -118,7 +118,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     modifier whenMigrationsNotPaused() {
-        require(!migrationPuased, "BH: migrations paused");
+        require(!migrationPaused, "BH: migrations paused");
         _;
     }
 
@@ -654,12 +654,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         address hyperchain = getHyperchain(_chainId);
         bool contractAlreadyDeployed = hyperchain != address(0);
-        if (hyperchain == address(0)) {
+        if (!contractAlreadyDeployed) { 
             hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(_chainId, _stmData);
             require(hyperchain != address(0), "BH: chain not registered");
             _registerNewHyperchain(_chainId, hyperchain);
-            /// Question: why do we need addNewChainIfNeeded? Why is addNewChain not enough?
-            messageRoot.addNewChainIfNeeded(_chainId);
+            messageRoot.addNewChain(_chainId);
         }
 
         IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData, contractAlreadyDeployed);
@@ -692,11 +691,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice Pauses migration functions.
     function pauseMigration() external onlyOwner {
-        migrationPuased = true;
+        migrationPaused = true;
     }
 
     /// @notice Unpauses migration functions.
     function unpauseMigration() external onlyOwner {
-        migrationPuased = false;
+        migrationPaused = false;
     }
 }
