@@ -420,10 +420,9 @@ export class Deployer {
   }
 
   public async deployBridgehubImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const l1ChainId = this.isZkMode() ? getNumberFromEnv("ETH_CLIENT_CHAIN_ID") : await this.deployWallet.getChainId();
     const contractAddress = await this.deployViaCreate2(
       "Bridgehub",
-      [l1ChainId, this.addresses.Governance, getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_HYPERCHAINS")],
+      [await this.getL1ChainId(), this.addresses.Governance, getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_HYPERCHAINS")],
       create2Salt,
       ethTxOptions
     );
@@ -560,7 +559,7 @@ export class Deployer {
   }
 
   public async deployAdminFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const contractAddress = await this.deployViaCreate2("AdminFacet", [], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2("AdminFacet", [await this.getL1ChainId()], create2Salt, ethTxOptions);
 
     if (this.verbose) {
       console.log(`CONTRACTS_ADMIN_FACET_ADDR=${contractAddress}`);
@@ -571,7 +570,7 @@ export class Deployer {
 
   public async deployMailboxFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
-    const contractAddress = await this.deployViaCreate2("MailboxFacet", [eraChainId], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2("MailboxFacet", [eraChainId, await this.getL1ChainId()], create2Salt, ethTxOptions);
 
     if (this.verbose) {
       console.log(`Mailbox deployed with era chain id: ${eraChainId}`);
@@ -1544,5 +1543,10 @@ export class Deployer {
 
   public proxyAdminContract(signerOrProvider: Signer | providers.Provider) {
     return ProxyAdminFactory.connect(this.addresses.TransparentProxyAdmin, signerOrProvider);
+  }
+
+  private async getL1ChainId(): Promise<number> {
+    const l1ChainId = this.isZkMode() ? getNumberFromEnv("ETH_CLIENT_CHAIN_ID") : await this.deployWallet.getChainId();
+    return +l1ChainId;
   }
 }
