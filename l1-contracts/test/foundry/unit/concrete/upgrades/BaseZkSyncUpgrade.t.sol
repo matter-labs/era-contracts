@@ -5,7 +5,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "contracts/common/Config.sol";
+import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_MINOR_VERSION_DELTA} from "contracts/common/Config.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -36,24 +37,48 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
     // New protocol version is not greater than the current one
     function test_revertWhen_newProtocolVersionIsNotGreaterThanTheCurrentOne(
-        uint256 currentProtocolVersion,
-        uint256 newProtocolVersion
+        uint32 currentProtocolVersion,
+        uint32 newProtocolVersion
     ) public {
         vm.assume(newProtocolVersion <= currentProtocolVersion && newProtocolVersion > 0);
 
-        baseZkSyncUpgrade.setProtocolVersion(currentProtocolVersion);
+        uint256 semVerCurrentProtocolVersion = SemVer.packSemVer(0, currentProtocolVersion, 0);
+        uint256 semVerNewProtocolVersion = SemVer.packSemVer(0, newProtocolVersion, 0);
 
-        proposedUpgrade.newProtocolVersion = newProtocolVersion;
+        baseZkSyncUpgrade.setProtocolVersion(semVerCurrentProtocolVersion);
+
+        proposedUpgrade.newProtocolVersion = semVerNewProtocolVersion;
 
         vm.expectRevert(bytes("New protocol version is not greater than the current one"));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    // Protocol version difference is too big
-    function test_revertWhen_tooBigProtocolVersionDifference(uint256 newProtocolVersion) public {
-        vm.assume(newProtocolVersion > MAX_ALLOWED_PROTOCOL_VERSION_DELTA);
+    // Implementation requires that the major version is 0 at all times
+    function test_revertWhen_MajorVersionIsNotZero() public {
+        baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(1, 0, 0));
 
-        proposedUpgrade.newProtocolVersion = newProtocolVersion;
+        proposedUpgrade.newProtocolVersion = SemVer.packSemVer(1, 1, 0);
+
+        vm.expectRevert(bytes("Implementation requires that the major version is 0 at all times"));
+        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+    }
+
+    // Major must always be 0
+    function test_revertWhen_MajorMustAlwaysBeZero(uint32 newProtocolVersion) public {
+        vm.assume(newProtocolVersion > 0);
+
+        proposedUpgrade.newProtocolVersion = SemVer.packSemVer(1, newProtocolVersion, 0);
+
+        vm.expectRevert(bytes("Major must always be 0"));
+        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+    }
+
+    // Protocol version difference is too big
+    function test_revertWhen_tooBigProtocolVersionDifference(uint32 newProtocolVersion) public {
+        vm.assume(newProtocolVersion > MAX_ALLOWED_MINOR_VERSION_DELTA);
+        uint256 semVerNewProtocolVersion = SemVer.packSemVer(0, newProtocolVersion, 0);
+
+        proposedUpgrade.newProtocolVersion = semVerNewProtocolVersion;
 
         vm.expectRevert(bytes("Too big protocol version difference"));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
@@ -89,15 +114,17 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
     // The new protocol version should be included in the L2 system upgrade tx
     function test_revertWhen_NewProtocolVersionIsNotIncludedInL2SystemUpgradeTx(
-        uint256 newProtocolVersion,
-        uint256 nonce
+        uint32 newProtocolVersion,
+        uint32 nonce
     ) public {
         vm.assume(newProtocolVersion > 1);
         vm.assume(nonce != newProtocolVersion && nonce > 0);
 
-        baseZkSyncUpgrade.setProtocolVersion(newProtocolVersion - 1);
+        uint256 semVerNewProtocolVersion = SemVer.packSemVer(0, newProtocolVersion, 0);
 
-        proposedUpgrade.newProtocolVersion = newProtocolVersion;
+        baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, newProtocolVersion - 1, 0));
+
+        proposedUpgrade.newProtocolVersion = semVerNewProtocolVersion;
         proposedUpgrade.l2ProtocolUpgradeTx.nonce = nonce;
 
         vm.expectRevert(bytes("The new protocol version should be included in the L2 system upgrade tx"));
@@ -192,7 +219,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 
-    function test_SuccessUpdate() public {
+    function test_SuccessUpgrade() public {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
