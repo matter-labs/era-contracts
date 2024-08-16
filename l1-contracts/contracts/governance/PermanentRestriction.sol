@@ -33,7 +33,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     mapping(bytes allowedCalldata => bool isAllowed) public allowedCalls;
 
     /// @notice The mapping of the validated selectors.
-    mapping(bytes4 selector => bool isValidated) validatedSelectors;
+    mapping(bytes4 selector => bool isValidated) public validatedSelectors;
 
     constructor(address _initialOwner, IBridgehub _bridgehub) {
         BRIDGE_HUB = _bridgehub;
