@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+import {CallNotAllowed, ChainZeroAddress, NotAHyperchain, NotAnAdmin, RemovingPermanentRestriction, ZeroAddress} from "../common/L1ContractErrors.sol";
+
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 import {Call} from "./Common.sol";
@@ -37,7 +39,9 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         BRIDGE_HUB = _bridgehub;
 
         // solhint-disable-next-line gas-custom-errors, reason-string
-        require(_initialOwner != address(0), "Initial owner should be non zero address");
+        if (_initialOwner == address(0)) {
+            revert ZeroAddress();
+        }
         _transferOwnership(_initialOwner);
     }
 
@@ -104,7 +108,9 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
             return;
         }
 
-        require(allowedCalls[_call.data], "not allowed");
+        if(!allowedCalls[_call.data]) {
+            revert CallNotAllowed(_call.data);
+        }
     }
 
     /// @notice Validates the correctness of the new admin.
@@ -117,11 +123,16 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         assembly {
             implementationCodeHash := extcodehash(newChainAdmin)
         }
-        require(allowedAdminImplementations[implementationCodeHash], "Unallowed implementation");
+
+        if(!allowedAdminImplementations[implementationCodeHash]) {
+            revert UnallowedImplementatioN(implementationCodeHash);
+        }
 
         // Since the implementation is known to be correct (from the checks above), we
         // can safely trust the returned value from the call below
-        require(IChainAdmin(newChainAdmin).isRestrictionActive(address(this)), "This restriction is permanent");
+        if (!IChainAdmin(newChainAdmin).isRestrictionActive(address(this))) {
+            revert RemovingPermanentRestriction();
+        }
     }
 
     /// @notice Validates the removal of the restriction.
@@ -138,7 +149,9 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
 
         address removedRestriction = abi.decode(_call.data[4:], (address));
 
-        require(removedRestriction != address(this), "This restriction is permanent");
+        if (removedRestriction == address(this)) {
+            revert RemovingPermanentRestriction();
+        }
     }
 
     /// @notice Checks if the `msg.sender` is an admin of a certain ZkSyncHyperchain.
@@ -154,7 +167,9 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     /// @dev This function reverts if the `_chain` is not a ZkSyncHyperchain or the `_potentialAdmin` is not the
     /// admin of the chain.
     function tryCompareAdminOfAChain(address _chain, address _potentialAdmin) external view {
-        require(_chain != address(0), "Address 0 is never a chain");
+        if (_chain == address(0)) {
+            revert ChainZeroAddress();
+        }
 
         // Unfortunately there is no easy way to double check that indeed the `_chain` is a ZkSyncHyperchain.
         // So we do the following:
@@ -162,10 +177,14 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         // - Query the Bridgehub for the Hyperchain with the given `chainId`.
         // - We compare the corresponding addresses
         uint256 chainId = IZkSyncHyperchain(_chain).getChainId();
-        require(BRIDGE_HUB.getHyperchain(chainId) == _chain, "Not a Hyperchain");
+        if (BRIDGE_HUB.getHyperchain(chainId) != _chain) {
+            revert NotAHyperchain(_chain);
+        }
 
         // Now, the chain is known to be a hyperchain, so it should implement the corresponding interface
         address admin = IZkSyncHyperchain(_chain).getAdmin();
-        require(admin == _potentialAdmin, "Not an admin");
+        if (admin != _potentialAdmin) {
+            revert NotAnAdmin(admin, _potentialAdmin);
+        }
     }
 }

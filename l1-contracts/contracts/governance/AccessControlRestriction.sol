@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.24;
 
+import {AccessToFallbackDenied, AccessToFunctionDenied} from "../common/L1ContractErrors.sol";
 import {IAccessControlRestriction} from "./IAccessControlRestriction.sol";
 import {AccessControlDefaultAdminRules} from "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
 import {IRestriction} from "./IRestriction.sol";
@@ -16,6 +17,9 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 /// @dev It inherits from `AccessControlDefaultAdminRules` without overriding `_setRoleAdmin` functionaity. In other
 /// words, the `DEFAULT_ADMIN_ROLE` is the only role that can manage roles. This is done for simplicity.
 /// @dev An instance of this restriction should be deployed separately for each `ChainAdmin` contract.
+/// @dev IMPORTANT: this function does not validate the ability of the invoker to use `msg.value`. Thus, 
+/// either all callers with access to functions should be trusted to not steal ETH from the `ChainAdmin` account
+/// or not ETH should be passively stored in `ChainAdmin` account.
 contract AccessControlRestriction is IRestriction, IAccessControlRestriction, AccessControlDefaultAdminRules {
     /// @notice Required roles to call a specific functions.
     /// @dev Note, that the role 0 means the `DEFAULT_ADMIN_ROLE` from the `AccessControlDefaultAdminRules` contract.
@@ -54,25 +58,18 @@ contract AccessControlRestriction is IRestriction, IAccessControlRestriction, Ac
 
     /// @inheritdoc IRestriction
     function validateCall(Call calldata _call, address _invoker) external view {
-        // It is very rare that an admin needs to send value somewhere, so we require the invoker to have the DEFAULT_ADMIN_ROLE
-        if (_call.value != 0) {
-            require(hasRole(DEFAULT_ADMIN_ROLE, _invoker), "AccessControlRestriction: Access denied");
-        }
-
         // Note, that since `DEFAULT_ADMIN_ROLE` is 0 and the default storage value for the
         // `requiredRoles` and `requiredRolesForFallback` is 0, the default admin is by default a required
         // role for all the functions.
         if (_call.data.length < 4) {
-            require(
-                hasRole(requiredRolesForFallback[_call.target], _invoker),
-                "AccessControlRestriction: Fallback function is not allowed"
-            );
+            if(!hasRole(requiredRolesForFallback[_call.target], _invoker)) {
+                revert(AccessToFallbackDenied(_call.target, _invoker));
+            }
         } else {
             bytes4 selector = bytes4(_call.data[:4]);
-            require(
-                hasRole(requiredRoles[_call.target][selector], _invoker),
-                "AccessControlRestriction: Access denied"
-            );
+            if(!hasRole(requiredRoles[_call.target][selector], _invoker)) {
+                revert(AccessToFunctionDenied(_call.target, selector, _invoker));
+            }
         }
     }
 }

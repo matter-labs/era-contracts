@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.24;
 
+import {NoCallsProvided, OnlySelfAllowed, RestrictionWasNotPresent, RestrictionWasAlreadyPresent} from "../common/L1ContractErrors.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
 import {IRestriction} from "./IRestriction.sol";
 import {Call} from "./Common.sol";
@@ -21,7 +22,9 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @dev All functions that require access-control should use `onlySelf` modifier, while the access control logic
     /// should be implemented in the restriction contracts.
     modifier onlySelf() {
-        require(msg.sender == address(this), "Only self");
+        if(msg.sender != address(this)) {
+            revert OnlySelfAllowed();
+        }
         _;
     }
 
@@ -70,7 +73,9 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
 
     /// @inheritdoc IChainAdmin
     function removeRestriction(address _restriction) external onlySelf {
-        require(activeRestrictions.remove(_restriction), "restriction was not present");
+        if(!activeRestrictions.remove(_restriction)) {
+            revert RestrictionWasNotPresent();
+        }
         emit RestrictionRemoved(_restriction);
     }
 
@@ -90,8 +95,10 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @dev Even though all the validation from external modules is executed via `staticcall`, the function
     /// is marked as `nonReentrant` to prevent reentrancy attacks in case the staticcall restriction is lifted in the future.
     function multicall(Call[] calldata _calls, bool _requireSuccess) external payable nonReentrant {
-        // solhint-disable-next-line gas-custom-errors
-        require(_calls.length > 0, "No calls provided");
+        if (_calls.length == 0) {
+            revert NoCallsProvided();
+        }
+        // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _calls.length; ++i) {
             _validateCall(_calls[i]);
 
@@ -134,7 +141,9 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @notice Adds a new restriction to the active restrictions set.
     /// @param _restriction The address of the restriction contract to be added.
     function _addRestriction(address _restriction) internal {
-        require(activeRestrictions.add(_restriction), "restriction already present");
+        if(!activeRestrictions.add(_restriction)) {
+            revert RestrictionWasAlreadyPresent(_restriction);
+        }
         emit RestrictionAdded(_restriction);
     }
 }
