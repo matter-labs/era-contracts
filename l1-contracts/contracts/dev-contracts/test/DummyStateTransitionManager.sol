@@ -14,10 +14,12 @@ contract DummyStateTransitionManager is StateTransitionManager {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
+    address hyperchain;
+
     /// @notice Constructor
-    constructor() StateTransitionManager(address(0), type(uint256).max) {}
+    constructor() StateTransitionManager(address(0)) {}
 
     function setHyperchain(uint256 _chainId, address _hyperchain) external {
-        hyperchainMap.set(_chainId, _hyperchain);
+        hyperchain = _hyperchain;
     }
 }

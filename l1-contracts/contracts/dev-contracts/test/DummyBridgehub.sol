@@ -11,6 +11,8 @@ import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 contract DummyBridgehub {
     IMessageRoot public messageRoot;
 
+    address public hyperchain;
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
@@ -28,5 +30,13 @@ contract DummyBridgehub {
 
     function setMessageRoot(address _messageRoot) public {
         messageRoot = IMessageRoot(_messageRoot);
+    }
+
+    function setHyperchain(uint256, address _hyperchain) external {
+        hyperchain = _hyperchain;
+    }
+
+    function getHyperchain(uint256) external view returns (address) {
+        return address(0);
     }
 }
