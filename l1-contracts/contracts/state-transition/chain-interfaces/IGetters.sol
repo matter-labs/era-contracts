@@ -34,7 +34,7 @@ interface IGetters is IZkSyncHyperchainBase {
     function getBaseToken() external view returns (address);
 
     /// @return The chain id of the ZK Chain.
-    function getChainId() external view returns (uint256)
+    function getChainId() external view returns (uint256);
 
     /// @return The address of the base token bridge
     function getBaseTokenBridge() external view returns (address);
