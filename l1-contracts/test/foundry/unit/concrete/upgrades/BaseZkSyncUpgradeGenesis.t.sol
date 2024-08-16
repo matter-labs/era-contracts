@@ -5,7 +5,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {BaseZkSyncUpgradeGenesis} from "contracts/upgrades/BaseZkSyncUpgradeGenesis.sol";
 import {ProtocolVersionShouldBeGreater, ProtocolVersionDeltaTooLarge, PreviousUpgradeNotFinalized, PreviousUpgradeBatchNotCleared} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
-import {MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "contracts/common/Config.sol";
+import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "contracts/common/Config.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -34,31 +35,38 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
     }
 
     function test_revertWhen_ProtocolVersionShouldBeGreater(
-        uint256 currentProtocolVersion,
-        uint256 newProtocolVersion
+        uint32 currentProtocolVersion,
+        uint32 newProtocolVersion
     ) public {
-        baseZkSyncUpgrade.setProtocolVersion(currentProtocolVersion);
+        uint256 semVerCurrentProtocolVersion = SemVer.packSemVer(0, currentProtocolVersion, 0);
+        baseZkSyncUpgrade.setProtocolVersion(semVerCurrentProtocolVersion);
 
-        vm.assume(newProtocolVersion <= currentProtocolVersion && newProtocolVersion > 0);
+        vm.assume(newProtocolVersion < currentProtocolVersion && newProtocolVersion > 0);
 
-        proposedUpgrade.newProtocolVersion = newProtocolVersion;
+        uint256 semVerNewProtocolVersion = SemVer.packSemVer(0, newProtocolVersion, 0);
+        proposedUpgrade.newProtocolVersion = semVerNewProtocolVersion;
 
         vm.expectRevert(
-            abi.encodeWithSelector(ProtocolVersionShouldBeGreater.selector, currentProtocolVersion, newProtocolVersion)
+            abi.encodeWithSelector(
+                ProtocolVersionShouldBeGreater.selector,
+                semVerCurrentProtocolVersion,
+                semVerNewProtocolVersion
+            )
         );
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    function test_revertWhen_ProtocolVersionDeltaTooLarge(uint256 newProtocolVersion) public {
-        vm.assume(newProtocolVersion > MAX_ALLOWED_PROTOCOL_VERSION_DELTA);
+    function test_revertWhen_ProtocolVersionDeltaTooLarge(uint32 newProtocolVersion) public {
+        vm.assume(newProtocolVersion > MAX_ALLOWED_MINOR_VERSION_DELTA);
 
-        proposedUpgrade.newProtocolVersion = newProtocolVersion;
+        uint256 semVerNewProtocolVersion = SemVer.packSemVer(0, newProtocolVersion, 0);
+        proposedUpgrade.newProtocolVersion = semVerNewProtocolVersion;
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 ProtocolVersionDeltaTooLarge.selector,
                 newProtocolVersion,
-                MAX_ALLOWED_PROTOCOL_VERSION_DELTA
+                MAX_ALLOWED_MINOR_VERSION_DELTA
             )
         );
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
@@ -80,7 +88,7 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    function test_SuccessUpdate() public {
+    function test_SuccessUpgrade() public {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);

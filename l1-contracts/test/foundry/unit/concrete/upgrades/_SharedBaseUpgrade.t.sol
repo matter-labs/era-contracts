@@ -10,6 +10,7 @@ import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "co
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 import {ISystemContext} from "contracts/state-transition/l2-deps/ISystemContext.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 contract BaseUpgrade is Test {
     L2CanonicalTransaction l2CanonicalTransaction;
@@ -30,7 +31,7 @@ contract BaseUpgrade is Test {
         uint256[] memory uintEmptyArray = new uint256[](1);
         uintEmptyArray[0] = uint256(L2ContractHelper.hashL2Bytecode(bytesEmptyArray[0]));
 
-        protocolVersion = 1;
+        protocolVersion = SemVer.packSemVer(0, 1, 0);
         chainId = 1;
         bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (chainId));
 
@@ -52,7 +53,7 @@ contract BaseUpgrade is Test {
             maxFeePerGas: uint256(0),
             maxPriorityFeePerGas: uint256(0),
             paymaster: uint256(0),
-            nonce: protocolVersion,
+            nonce: 1,
             value: 0,
             reserved: [uint256(0), 0, 0, 0],
             data: systemContextCalldata,
@@ -69,9 +70,9 @@ contract BaseUpgrade is Test {
             defaultAccountHash: bytes32(0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019),
             verifier: verifier,
             verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(bytes("recursionNodeLevelVkHash")),
-                recursionLeafLevelVkHash: bytes32(bytes("recursionLeafLevelVkHash")),
-                recursionCircuitsSetVksHash: bytes32(bytes("recursionCircuitsSetVksHash"))
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
             }),
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: postUpgradeCalldata,
