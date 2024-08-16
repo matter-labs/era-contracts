@@ -29,7 +29,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
-    uint256 immutable public L1_CHAIN_ID;
+    uint256 internal immutable L1_CHAIN_ID;
 
     constructor(uint256 _l1ChainId) {
         L1_CHAIN_ID = _l1ChainId;

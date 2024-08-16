@@ -58,7 +58,7 @@ contract StateTransitionManagerTest is Test {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new AdminFacet()),
+                facet: address(new AdminFacet(block.chainid)),
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: Utils.getAdminSelectors()

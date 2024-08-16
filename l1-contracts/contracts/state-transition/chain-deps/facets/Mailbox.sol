@@ -46,7 +46,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
-    uint256 immutable public L1_CHAIN_ID;
+    uint256 internal immutable L1_CHAIN_ID;
 
     modifier onlyL1 {
         require(block.chainid == L1_CHAIN_ID, "MailboxFacet: not L1");
