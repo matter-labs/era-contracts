@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.18.0
           cache: yarn
@@ -51,7 +51,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.18.0
           cache: yarn
@@ -76,7 +76,7 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.18.0
           cache: yarn
@@ -85,7 +85,7 @@ jobs:
         run: yarn
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
@@ -106,7 +106,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.18.0
           cache: yarn
@@ -115,7 +115,7 @@ jobs:
         run: yarn
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
@@ -168,7 +168,7 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.18.0
           cache: yarn
@@ -177,7 +177,7 @@ jobs:
         run: yarn
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
@@ -208,7 +208,7 @@ jobs:
       # is why we use both in this way.
       - name: Post coverage report
         if: github.event_name == 'pull_request' # This action fails when ran outside of a pull request.
-        uses: romeovs/lcov-reporter-action@v0.3.1
+        uses: romeovs/lcov-reporter-action@v0.4.0
         with:
           delete-old-comments: true
           lcov-file: ./l1-contracts/lcov.info

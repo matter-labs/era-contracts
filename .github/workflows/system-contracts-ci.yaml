@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.18.0
           cache: yarn
@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.18.0
           cache: yarn
@@ -67,7 +67,7 @@ jobs:
           toolchain: nightly-2023-04-17
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
           key: artifacts-system-${{ github.sha }}
@@ -92,7 +92,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.18.0
           cache: yarn
@@ -106,7 +106,7 @@ jobs:
         run: yarn
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
           key: artifacts-system-${{ github.sha }}
@@ -133,7 +133,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.18.0
           cache: yarn
@@ -142,7 +142,7 @@ jobs:
         run: yarn
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
           key: artifacts-system-${{ github.sha }}
