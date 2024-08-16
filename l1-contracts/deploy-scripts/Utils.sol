@@ -287,11 +287,11 @@ library Utils {
     /**
      * @dev Read hardhat bytecodes
      */
-    function readHardhatBytecode(string memory artifactPath) internal view returns (bytes memory) {
+    function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, artifactPath);
         string memory json = vm.readFile(path);
-        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode");
+        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode.object");
         return bytecode;
     }
 
