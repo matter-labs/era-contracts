@@ -63,7 +63,7 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @inheritdoc IChainAdmin
     function removeRestriction(address _restriction) external onlySelf {
         if(!activeRestrictions.remove(_restriction)) {
-            revert RestrictionWasNotPresent();
+            revert RestrictionWasNotPresent(_restriction);
         }
         emit RestrictionRemoved(_restriction);
     }

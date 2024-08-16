@@ -60,12 +60,12 @@ contract AccessControlRestriction is IRestriction, IAccessControlRestriction, Ac
         // role for all the functions.
         if (_call.data.length < 4) {
             if(!hasRole(requiredRolesForFallback[_call.target], _invoker)) {
-                revert(AccessToFallbackDenied(_call.target, _invoker));
+                revert AccessToFallbackDenied(_call.target, _invoker);
             }
         } else {
             bytes4 selector = bytes4(_call.data[:4]);
             if(!hasRole(requiredRoles[_call.target][selector], _invoker)) {
-                revert(AccessToFunctionDenied(_call.target, selector, _invoker));
+                revert AccessToFunctionDenied(_call.target, selector, _invoker);
             }
         }
     }
