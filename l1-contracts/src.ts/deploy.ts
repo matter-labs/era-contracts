@@ -559,7 +559,12 @@ export class Deployer {
   }
 
   public async deployAdminFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const contractAddress = await this.deployViaCreate2("AdminFacet", [await this.getL1ChainId()], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2(
+      "AdminFacet",
+      [await this.getL1ChainId()],
+      create2Salt,
+      ethTxOptions
+    );
 
     if (this.verbose) {
       console.log(`CONTRACTS_ADMIN_FACET_ADDR=${contractAddress}`);
@@ -570,7 +575,12 @@ export class Deployer {
 
   public async deployMailboxFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
-    const contractAddress = await this.deployViaCreate2("MailboxFacet", [eraChainId, await this.getL1ChainId()], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2(
+      "MailboxFacet",
+      [eraChainId, await this.getL1ChainId()],
+      create2Salt,
+      ethTxOptions
+    );
 
     if (this.verbose) {
       console.log(`Mailbox deployed with era chain id: ${eraChainId}`);

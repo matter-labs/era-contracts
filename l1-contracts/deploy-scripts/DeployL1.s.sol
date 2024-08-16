@@ -452,7 +452,9 @@ contract DeployL1Script is Script {
         console.log("ExecutorFacet deployed at:", executorFacet);
         addresses.stateTransition.executorFacet = executorFacet;
 
-        address adminFacet = deployViaCreate2(abi.encodePacked(type(AdminFacet).creationCode, abi.encode(config.l1ChainId)));
+        address adminFacet = deployViaCreate2(
+            abi.encodePacked(type(AdminFacet).creationCode, abi.encode(config.l1ChainId))
+        );
         console.log("AdminFacet deployed at:", adminFacet);
         addresses.stateTransition.adminFacet = adminFacet;
 

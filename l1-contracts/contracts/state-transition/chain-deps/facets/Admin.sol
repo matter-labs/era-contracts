@@ -35,7 +35,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         L1_CHAIN_ID = _l1ChainId;
     }
 
-    modifier onlyL1 {
+    modifier onlyL1() {
         require(block.chainid == L1_CHAIN_ID, "AdminFacet: not L1");
         _;
     }
@@ -100,7 +100,10 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrStateTransitionManager onlyL1 {
+    function setTokenMultiplier(
+        uint128 _nominator,
+        uint128 _denominator
+    ) external onlyAdminOrStateTransitionManager onlyL1 {
         require(_denominator != 0, "AF: denominator 0");
         uint128 oldNominator = s.baseTokenGasPriceMultiplierNominator;
         uint128 oldDenominator = s.baseTokenGasPriceMultiplierDenominator;
