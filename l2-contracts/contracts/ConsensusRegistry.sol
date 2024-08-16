@@ -269,30 +269,76 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         emit NodeAttesterKeyChanged(_nodeOwner, _pubKey);
     }
 
-    /// @notice Adds a new commit to the validator committee.
-    /// @dev Implicitly updates the validator committee by affecting off-chain readers based on the current state of a node's validator attributes:
-    /// - If "validatorsCommit" > "node.validatorLastUpdateCommit", read "node.validatorLatest".
-    /// - If "validatorsCommit" == "node.validatorLastUpdateCommit", read "node.validatorSnapshot".
-    /// @dev Only callable by the contract owner.
-    function commitValidators() external onlyOwner {
-        validatorsCommit++;
-
-        emit ValidatorsCommitted(validatorsCommit);
-    }
-
     /// @notice Adds a new commit to the attester committee.
-    /// @dev Implicitly updates the attester committee by affecting off-chain readers based on the current state of a node's attester attributes:
+    /// @dev Implicitly updates the attester committee by affecting readers based on the current state of a node's attester attributes:
     /// - If "attestersCommit" > "node.attesterLastUpdateCommit", read "node.attesterLatest".
     /// - If "attestersCommit" == "node.attesterLastUpdateCommit", read "node.attesterSnapshot".
     /// @dev Only callable by the contract owner.
-    function commitAttesters() external onlyOwner {
+    function commitAttesterCommittee() external onlyOwner {
         attestersCommit++;
 
         emit AttestersCommitted(attestersCommit);
     }
 
-    function numNodes() public view returns (uint256) {
-        return nodeOwners.length;
+    /// @notice Adds a new commit to the validator committee.
+    /// @dev Implicitly updates the validator committee by affecting readers based on the current state of a node's validator attributes:
+    /// - If "validatorsCommit" > "node.validatorLastUpdateCommit", read "node.validatorLatest".
+    /// - If "validatorsCommit" == "node.validatorLastUpdateCommit", read "node.validatorSnapshot".
+    /// @dev Only callable by the contract owner.
+    function commitValidatorCommittee() external onlyOwner {
+        validatorsCommit++;
+
+        emit ValidatorsCommitted(validatorsCommit);
+    }
+
+    /// @notice Returns an array of `AttesterAttr` structs representing the current attester committee.
+    /// @dev Collects active and non-removed attesters based on the latest commit to the committee.
+    function getAttestersCommittee() public view returns (AttesterAttr[] memory) {
+        uint256 len = nodeOwners.length;
+        AttesterAttr[] memory committee = new AttesterAttr[](len);
+        uint256 count = 0;
+
+        for (uint256 i = 0; i < len; ++i) {
+            Node storage node = nodes[nodeOwners[i]];
+            AttesterAttr memory attester = attestersCommit > node.attesterLastUpdateCommit
+                ? node.attesterLatest
+                : node.attesterSnapshot;
+            if (attester.active && !attester.removed) {
+                committee[count] = attester;
+                count++;
+            }
+        }
+
+        // Resize the array.
+        assembly {
+            mstore(committee, count)
+        }
+        return committee;
+    }
+
+    /// @notice Returns an array of `ValidatorAttr` structs representing the current attester committee.
+    /// @dev Collects active and non-removed validators based on the latest commit to the committee.
+    function getValidatorsCommittee() public view returns (ValidatorAttr[] memory) {
+        uint256 len = nodeOwners.length;
+        ValidatorAttr[] memory committee = new ValidatorAttr[](len);
+        uint256 count = 0;
+
+        for (uint256 i = 0; i < len; ++i) {
+            Node storage node = nodes[nodeOwners[i]];
+            ValidatorAttr memory validator = validatorsCommit > node.validatorLastUpdateCommit
+                ? node.validatorLatest
+                : node.validatorSnapshot;
+            if (validator.active && !validator.removed) {
+                committee[count] = validator;
+                count++;
+            }
+        }
+
+        // Resize the array.
+        assembly {
+            mstore(committee, count)
+        }
+        return committee;
     }
 
     function _getNode(address _nodeOwner) private returns (Node storage, bool) {

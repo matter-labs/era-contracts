@@ -129,9 +129,11 @@ interface IConsensusRegistry {
 
     function changeAttesterKey(address _nodeOwner, Secp256k1PublicKey calldata _pubKey) external;
 
-    function commitValidators() external;
+    function commitAttesterCommittee() external;
 
-    function commitAttesters() external;
+    function commitValidatorCommittee() external;
 
-    function numNodes() external view returns (uint256);
+    function getAttestersCommittee() external view returns (AttesterAttr[] memory);
+
+    function getValidatorsCommittee() external view returns (ValidatorAttr[] memory);
 }
