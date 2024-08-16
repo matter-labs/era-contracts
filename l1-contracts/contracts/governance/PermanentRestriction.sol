@@ -118,10 +118,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     function _validateNewAdmin(Call calldata _call) internal view {
         address newChainAdmin = abi.decode(_call.data[4:], (address));
 
-        bytes32 implementationCodeHash;
-        assembly {
-            implementationCodeHash := extcodehash(newChainAdmin)
-        }
+        bytes32 implementationCodeHash = newChainAdmin.codehash;
 
         if(!allowedAdminImplementations[implementationCodeHash]) {
             revert UnallowedImplementation(implementationCodeHash);
