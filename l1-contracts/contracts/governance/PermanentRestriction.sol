@@ -33,7 +33,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     mapping(bytes allowedCalldata => bool isAllowed) public allowedCalls;
 
     /// @notice The mapping of the validated selectors.
-    mapping(bytes4 selector => bool isValidated) validatedSelectors;
+    mapping(bytes4 selector => bool isValidated) public validatedSelectors;
 
     constructor(address _initialOwner, IBridgehub _bridgehub) {
         BRIDGE_HUB = _bridgehub;
@@ -118,10 +118,7 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     function _validateNewAdmin(Call calldata _call) internal view {
         address newChainAdmin = abi.decode(_call.data[4:], (address));
 
-        bytes32 implementationCodeHash;
-        assembly {
-            implementationCodeHash := extcodehash(newChainAdmin)
-        }
+        bytes32 implementationCodeHash = newChainAdmin.codehash;
 
         if(!allowedAdminImplementations[implementationCodeHash]) {
             revert UnallowedImplementation(implementationCodeHash);
