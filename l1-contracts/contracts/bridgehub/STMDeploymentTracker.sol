@@ -23,7 +23,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     IBridgehub public immutable override BRIDGE_HUB;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    IL1AssetRouter public immutable override SHARED_BRIDGE;
+    IL1AssetRouter public immutable override L1_ASSET_ROUTER;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -32,12 +32,19 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         _;
     }
 
+    /// @notice Checks that the message sender is the bridgehub.
+    modifier onlyOwnerViaRouter(address _prevMsgSender) {
+        // solhint-disable-next-line gas-custom-errors
+        require(msg.sender == address(L1_ASSET_ROUTER) && _prevMsgSender == owner(), "STM DT: not owner via router");
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation on L1.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(IBridgehub _bridgehub, IL1AssetRouter _sharedBridge) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
-        SHARED_BRIDGE = _sharedBridge;
+        L1_ASSET_ROUTER = _sharedBridge;
     }
 
     /// @notice used to initialize the contract
@@ -52,7 +59,7 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         // solhint-disable-next-line gas-custom-errors
 
         require(BRIDGE_HUB.stateTransitionManagerIsRegistered(_stmAddress), "STMDT: stm not registered");
-        SHARED_BRIDGE.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_stmAddress))), address(BRIDGE_HUB));
+        L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_stmAddress))), address(BRIDGE_HUB));
         BRIDGE_HUB.setAssetHandlerAddress(bytes32(uint256(uint160(_stmAddress))), _stmAddress);
     }
 
@@ -91,31 +98,16 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     /// @dev Not used in this contract. In case the transaction fails, we can just re-try it.
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {}
 
-    // todo this has to be put in L1AssetRouter via TwoBridges for custom base tokens. Hard, because we have to have multiple msg types in bridgehubDeposit in the AssetRouter.
     /// @notice Used to register the stm asset in L2 AssetRouter.
-    /// @param _chainId the chainId of the chain
-    function registerSTMAssetOnL2SharedBridge(
-        uint256 _chainId,
-        address _stmL1Address,
-        uint256 _mintValue,
-        uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByteLimit,
-        address _refundRecipient
-    ) public payable onlyOwner {
-        bytes32 assetId;
-        {
-            assetId = getAssetId(_stmL1Address);
-        }
-        // slither-disable-next-line unused-return
-        SHARED_BRIDGE.setAssetHandlerAddressOnCounterPart{value: msg.value}({
-            _chainId: _chainId,
-            _mintValue: _mintValue,
-            _l2TxGasLimit: _l2TxGasLimit,
-            _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByteLimit,
-            _refundRecipient: _refundRecipient,
-            _assetId: assetId,
-            _assetAddressOnCounterPart: L2_BRIDGEHUB_ADDR
-        });
+    /// @param _prevMsgSender the address that called the Router
+    /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
+    function bridgeCheckCounterpartAddress(
+        uint256,
+        bytes32,
+        address _prevMsgSender,
+        address _assetHandlerAddressOnCounterpart
+    ) external view override onlyOwnerViaRouter(_prevMsgSender) {
+        require(_assetHandlerAddressOnCounterpart == L2_BRIDGEHUB_ADDR, "STMDT: wrong counter part");
     }
 
     function getAssetId(address _l1STM) public view override returns (bytes32) {

@@ -93,23 +93,23 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         sharedBridge.setNativeTokenVault(IL1NativeTokenVault(address(0)));
     }
 
-    function test_setAssetHandlerAddressOnCounterPart_notOwnerOrADT() public {
-        uint256 l2TxGasLimit = 100000;
-        uint256 l2TxGasPerPubdataByte = 100;
-        address refundRecipient = address(0);
+    // function test_setAssetHandlerAddressOnCounterpart_notOwnerOrADT() public {
+    //     uint256 l2TxGasLimit = 100000;
+    //     uint256 l2TxGasPerPubdataByte = 100;
+    //     address refundRecipient = address(0);
 
-        vm.prank(alice);
-        vm.expectRevert("L1AR: only ADT or owner");
-        sharedBridge.setAssetHandlerAddressOnCounterPart(
-            eraChainId,
-            mintValue,
-            l2TxGasLimit,
-            l2TxGasPerPubdataByte,
-            refundRecipient,
-            tokenAssetId,
-            address(token)
-        );
-    }
+    //     vm.prank(alice);
+    //     vm.expectRevert("L1AR: only ADT or owner");
+    //     sharedBridge.setAssetHandlerAddressOnCounterpart(
+    //         eraChainId,
+    //         mintValue,
+    //         l2TxGasLimit,
+    //         l2TxGasPerPubdataByte,
+    //         refundRecipient,
+    //         tokenAssetId,
+    //         address(token)
+    //     );
+    // }
 
     // function test_transferFundsToSharedBridge_Eth_CallFailed() public {
     //     vm.mockCall(address(nativeTokenVault), "0x", abi.encode(""));
