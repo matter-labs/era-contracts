@@ -445,8 +445,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     ) external view override onlyBridgehub returns (bytes memory stmForwardedBridgeMintData) {
         // Note that the `_diamondCut` here is not for the current chain, for the chain where the migration
         // happens. The correctness of it will be checked on the STM on the new settlement layer.
-        (address _newSettlmentLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
-        require(_newSettlmentLayerAdmin != address(0), "STM: admin zero");
+        (address _newSettlementLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
+        require(_newSettlementLayerAdmin != address(0), "STM: admin zero");
 
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
@@ -456,7 +456,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         return
             abi.encode(
                 IBridgehub(BRIDGE_HUB).baseToken(_chainId),
-                _newSettlmentLayerAdmin,
+                _newSettlementLayerAdmin,
                 protocolVersion,
                 _diamondCut
             );
