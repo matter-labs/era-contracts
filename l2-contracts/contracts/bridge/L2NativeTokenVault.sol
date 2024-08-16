@@ -114,9 +114,20 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
                 // Make sure that a NativeTokenVault sent the message
                 revert AssetIdMismatch(expectedAssetId, _assetId);
             }
-            address deployedToken = _deployL2Token(originToken, erc20Data);
-            if (deployedToken != expectedToken) {
-                revert AddressMismatch(expectedToken, deployedToken);
+            address l1LegacyToken;
+            if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
+                l1LegacyToken = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(expectedToken);
+            }
+            if (l1LegacyToken != address(0)) {
+                /// token is a legacy token, no need to deploy
+                if (l1LegacyToken != originToken) {
+                    revert AddressMismatch(originToken, l1LegacyToken);
+                }
+            } else {
+                address deployedToken = _deployL2Token(originToken, erc20Data);
+                if (deployedToken != expectedToken) {
+                    revert AddressMismatch(expectedToken, deployedToken);
+                }
             }
             tokenAddress[_assetId] = expectedToken;
             token = expectedToken;

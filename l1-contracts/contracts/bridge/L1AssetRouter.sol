@@ -16,6 +16,7 @@ import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
 import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
+import {IL1SharedBridgeLegacy} from "./interfaces/IL1SharedBridgeLegacy.sol";
 
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {L2Message, TxStatus} from "../common/Messaging.sol";
@@ -37,7 +38,13 @@ import {IL1AssetDeploymentTracker} from "../bridge/interfaces/IL1AssetDeployment
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Bridges assets between L1 and ZK chain, supporting both ETH and ERC20 tokens.
 /// @dev Designed for use with a proxy for upgradability.
-contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+contract L1AssetRouter is
+    IL1AssetRouter,
+    IL1SharedBridgeLegacy,
+    ReentrancyGuard,
+    Ownable2StepUpgradeable,
+    PausableUpgradeable
+{
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token on L1.
@@ -87,6 +94,7 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     IL1ERC20Bridge public override legacyBridge;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
+    // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => address l2Bridge) public __DEPRECATED_l2BridgeAddress;
 
     /// @dev A mapping chainId => L2 deposit transaction hash => dataHash
@@ -211,6 +219,14 @@ contract L1AssetRouter is IL1AssetRouter, ReentrancyGuard, Ownable2StepUpgradeab
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external {
         require(msg.sender == address(nativeTokenVault), "L1AR: not NTV");
         chainBalance[_chainId][_token] = 0;
+    }
+
+    /// @notice Legacy function used for migration, do not use!
+    /// @param _chainId The chain id on which the bridge is deployed.
+    // slither-disable-next-line uninitialized-state-variables
+    function l2BridgeAddress(uint256 _chainId) external view returns (address) {
+        // slither-disable-next-line uninitialized-state-variables
+        return __DEPRECATED_l2BridgeAddress[_chainId];
     }
 
     /// @notice Sets the L1ERC20Bridge contract address.
