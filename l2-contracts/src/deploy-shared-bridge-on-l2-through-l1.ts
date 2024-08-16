@@ -20,7 +20,7 @@ import {
 import { L2NativeTokenVaultFactory } from "../typechain";
 import { BridgehubFactory } from "../../l1-contracts/typechain";
 
-export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2SharedBridge").abi;
+export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2AssetRouter").abi;
 export const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
 
 export async function publishL2NativeTokenVaultDependencyBytecodesOnL2(
@@ -57,18 +57,18 @@ async function setL2TokenBeacon(deployer: Deployer, chainId: string, gasPrice: B
   if (deployer.verbose) {
     console.log("Setting L2 token beacon");
   }
-  const l2NTV = L2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, deployer.deployWallet);
+  // const l2NTV = L2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, deployer.deployWallet);
 
-  const receipt = await deployer.executeUpgradeOnL2(
-    chainId,
-    L2_NATIVE_TOKEN_VAULT_ADDRESS,
-    gasPrice,
-    l2NTV.interface.encodeFunctionData("configureL2TokenBeacon", [false, ethers.constants.AddressZero]),
-    priorityTxMaxGasLimit
-  );
-  if (deployer.verbose) {
-    console.log("Set L2Token Beacon, upgrade hash", receipt.transactionHash);
-  }
+  // const receipt = await deployer.executeUpgradeOnL2(
+  //   chainId,
+  //   L2_NATIVE_TOKEN_VAULT_ADDRESS,
+  //   gasPrice,
+  //   l2NTV.interface.encodeFunctionData("configureL2TokenBeacon", [false, ethers.constants.AddressZero]),
+  //   priorityTxMaxGasLimit
+  // );
+  // if (deployer.verbose) {
+  //   console.log("Set L2Token Beacon, upgrade hash", receipt.transactionHash);
+  // }
   const bridgehub = BridgehubFactory.connect(L2_BRIDGEHUB_ADDRESS, deployer.deployWallet);
   const receipt2 = await deployer.executeUpgradeOnL2(
     chainId,
