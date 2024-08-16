@@ -178,7 +178,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice Used for the upgrade to set the baseTokenAssetId previously stored as baseToken.
     /// @param _chainId the chainId of the chain.
     function setLegacyBaseTokenAssetId(uint256 _chainId) external {
-        require(baseTokenAssetId[_chainId] == bytes32(0), "BH: baseTokenAssetId already set");
+        if (baseTokenAssetId[_chainId] == bytes32(0)) {
+            return;
+        }
         address token = baseToken[_chainId];
         require(token != address(0), "BH: token not set");
         baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(block.chainid, token);
