@@ -89,6 +89,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev Sync layer chain is expected to have .. as the base token.
     mapping(uint256 chainId => bool isWhitelistedSettlementLayer) public whitelistedSettlementLayers;
 
+    bool private migrationPuased;
+
     modifier onlyOwnerOrAdmin() {
         require(msg.sender == admin || msg.sender == owner(), "BH: not owner or admin");
         _;
@@ -112,6 +114,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     modifier onlyAssetRouter() {
         require(msg.sender == address(sharedBridge), "BH: not asset router");
+        _;
+    }
+
+    modifier whenMigrationsNotPaused() {
+        require(!migrationPuased, "BH: migrations paused");
         _;
     }
 
@@ -592,7 +599,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override onlyAssetRouter returns (bytes memory bridgehubMintData) {
+    ) external payable override onlyAssetRouter whenMigrationsNotPaused returns (bytes memory bridgehubMintData) {
         require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
 
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainData) = abi.decode(_data, (uint256, bytes, bytes));
@@ -623,7 +630,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256, // originChainId
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
-    ) external payable override onlyAssetRouter returns (address l1Receiver) {
+    ) external payable override onlyAssetRouter whenMigrationsNotPaused returns (address l1Receiver) {
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainMintData) = abi.decode(
             _bridgehubMintData,
             (uint256, bytes, bytes)
@@ -634,15 +641,17 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         settlementLayer[_chainId] = block.chainid;
         stateTransitionManager[_chainId] = stm;
-        address hyperchain;
+        address hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(_chainId, _stmData);
         if (hyperchainMap.contains(_chainId)) {
+            require(hyperchain == address(0), "BH: deployed again");
             hyperchain = hyperchainMap.get(_chainId);
         } else {
-            hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(_chainId, _stmData);
+            require(hyperchain != address(0), "BH: chain not registered");
+            _registerNewHyperchain(_chainId, hyperchain);
+            /// Question: why do we need addNewChainIfNeeded? Why is addNewChain not enough?
+            messageRoot.addNewChainIfNeeded(_chainId);
         }
 
-        messageRoot.addNewChainIfNeeded(_chainId);
-        _registerNewHyperchain(_chainId, hyperchain);
         IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData);
         return address(0);
     }
@@ -656,7 +665,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _assetId,
         address _depositSender,
         bytes calldata _data
-    ) external payable override onlyAssetRouter onlyL1 {}
+    ) external payable override onlyAssetRouter whenMigrationsNotPaused {}
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE
@@ -670,5 +679,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    /// @notice Pauses migration functions.
+    function pauseMigration() external onlyOwner {
+        migrationPuased = true;
+    }
+
+    /// @notice Unpauses migration functions.
+    function unpauseMigration() external onlyOwner {
+        migrationPuased = false;
     }
 }

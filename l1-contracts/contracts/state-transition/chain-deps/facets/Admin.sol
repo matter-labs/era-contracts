@@ -260,6 +260,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
             s.storedBatchHashes[batchesExecuted + i] = _commitment.batchHashes[i];
         }
 
+        // if (block.chainId == L1_CHAIN_ID)
         s.priorityTree.initFromCommitment(_commitment.priorityTree);
 
         s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
