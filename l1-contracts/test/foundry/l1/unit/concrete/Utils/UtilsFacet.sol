@@ -165,7 +165,7 @@ contract UtilsFacet is ZKChainBase {
     function util_setBaseTokenGasPriceMultiplierNominator(uint128 _nominator) external {
         s.baseTokenGasPriceMultiplierNominator = _nominator;
     }
-    
+
     function util_setTotalBatchesCommitted(uint256 _totalBatchesCommitted) external {
         s.totalBatchesCommitted = _totalBatchesCommitted;
     }
