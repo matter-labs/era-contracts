@@ -1,0 +1,11 @@
+[profile.default]
+src = "contracts-preprocessed"
+out = "out"
+libs = ["lib"]
+evm_version = 'paris'
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+]
+[profile.default.zksync]
+zksolc = "1.5.0"

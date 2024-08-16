@@ -72,25 +72,23 @@ contract DeployL2Script is Script {
 
     function loadContracts() internal {
         //HACK: Meanwhile we are not integrated foundry zksync we use contracts that has been built using hardhat
-        contracts.l2StandardErc20FactoryBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
+        contracts.l2StandardErc20FactoryBytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/UpgradeableBeacon.sol/UpgradeableBeacon.json"
         );
-        contracts.beaconProxy = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
-        );
-        contracts.l2StandardErc20Bytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
+        contracts.beaconProxy = Utils.readFoundryBytecode("/../l2-contracts/zkout/BeaconProxy.sol/BeaconProxy.json");
+        contracts.l2StandardErc20Bytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/L2StandardERC20.sol/L2StandardERC20.json"
         );
 
-        contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/L2SharedBridge.sol/L2SharedBridge.json"
+        contracts.l2SharedBridgeBytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/L2SharedBridge.sol/L2SharedBridge.json"
         );
 
-        contracts.l2SharedBridgeProxyBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
+        contracts.l2SharedBridgeProxyBytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
         );
-        contracts.forceDeployUpgrader = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
+        contracts.forceDeployUpgrader = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
         );
     }
 

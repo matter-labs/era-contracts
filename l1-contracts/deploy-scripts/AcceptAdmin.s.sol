@@ -8,6 +8,7 @@ import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZk
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {Utils} from "./Utils.sol";
+import {stdToml} from "forge-std/StdToml.sol";
 
 contract AcceptAdmin is Script {
     using stdToml for string;

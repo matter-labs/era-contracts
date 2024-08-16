@@ -199,7 +199,7 @@ jobs:
       - name: Filter directories
         run: |
           sudo apt update && sudo apt install -y lcov
-          lcov --remove lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' --output-file lcov.info --rc lcov_branch_coverage=1
+          lcov --remove lcov.info 'test/*' 'contracts/dev-contracts/*' '../lib/forge-std/*' '../lib/murky/*' 'lib/*' '../lib/*' 'lib/' --output-file lcov.info --rc lcov_branch_coverage=1
 
       # This step posts a detailed coverage report as a comment and deletes previous comments on
       # each push. The below step is used to fail coverage if the specified coverage threshold is
