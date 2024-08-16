@@ -55,7 +55,6 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
     }
 
     /// @notice Allows a certain calldata for a selector to be used.
-    /// @param _selector The selector of the function.
     /// @param _data The calldata for the function.
     /// @param _isAllowed The flag that indicates if the calldata is allowed.
     function setAllowedData(bytes calldata _data, bool _isAllowed) external onlyOwner {

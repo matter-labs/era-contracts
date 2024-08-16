@@ -40,19 +40,6 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @dev Needed for the offchain node administration to know when to start building batches with the new protocol version.
     mapping(uint256 protocolVersion => uint256 upgradeTimestamp) public protocolVersionToUpgradeTimestamp;
 
-    /// @notice The address which can call `setTokenMultiplier` function to change the base token gas price in the Chain contract.
-    /// @dev The token base price can be changed quite often, so the private key for this role is supposed to be stored in the node
-    /// and used by the automated service in a way similar to the sequencer workflow.
-    address public tokenMultiplierSetter;
-
-    constructor(address _initialOwner, address _initialTokenMultiplierSetter) {
-        require(_initialOwner != address(0), "Initial owner should be non zero address");
-        _transferOwnership(_initialOwner);
-        // Can be zero if no one has this permission.
-        tokenMultiplierSetter = _initialTokenMultiplierSetter;
-        emit NewTokenMultiplierSetter(address(0), _initialTokenMultiplierSetter);
-    }
-
     /// @notice The set of active restrictions.
     EnumerableSet.AddressSet internal activeRestrictions;
 
@@ -112,15 +99,6 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
             }
             emit CallExecuted(_calls[i], success, returnData);
         }
-    }
-
-    /// @notice Sets the token multiplier in the specified Chain contract.
-    /// @param _chainContract The chain contract address where the token multiplier will be set.
-    /// @param _nominator The numerator part of the token multiplier.
-    /// @param _denominator The denominator part of the token multiplier.
-    function setTokenMultiplier(IAdmin _chainContract, uint128 _nominator, uint128 _denominator) external {
-        require(msg.sender == tokenMultiplierSetter, "Only the token multiplier setter can call this function");
-        _chainContract.setTokenMultiplier(_nominator, _denominator);
     }
 
     /// @dev Contract might receive/hold ETH as part of the maintenance process.
