@@ -453,7 +453,13 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address hyperchain = getHyperchain(_chainId);
         require(IZkSyncHyperchain(hyperchain).getProtocolVersion() == protocolVersion, "STM: outdated pv");
 
-        return abi.encode(IBridgehub(BRIDGE_HUB).baseToken(_chainId), _newSettlmentLayerAdmin, protocolVersion, _diamondCut);
+        return
+            abi.encode(
+                IBridgehub(BRIDGE_HUB).baseToken(_chainId),
+                _newSettlmentLayerAdmin,
+                protocolVersion,
+                _diamondCut
+            );
     }
 
     /// @notice Called by the bridgehub during the migration of a chain to the current settlement layer.
@@ -471,11 +477,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
         require(_protocolVersion == protocolVersion, "STM, outdated pv");
-        if (getHyperchain(_chainId) != address(0)) {
-            // Hyperchain already registered
-            chainAddress = address(0);
-            return;
-        }
         chainAddress = _deployNewChain({
             _chainId: _chainId,
             _baseToken: _baseToken,

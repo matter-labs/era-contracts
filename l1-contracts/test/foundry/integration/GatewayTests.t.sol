@@ -167,16 +167,23 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
     function finishMoveChain() public {
         IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
         IStateTransitionManager stm = IStateTransitionManager(l1Script.getSTM());
-        IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId));
+        IZkSyncHyperchain migratingChain = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId));
         bytes32 assetId = bridgehub.stmAssetIdFromChainId(migratingChainId);
 
+        vm.startBroadcast(address(stm));
+        bridgehub.registerSettlementLayer(gatewayChainId, true);
+        vm.stopBroadcast();
+
         bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
-        bytes memory chainData = abi.encode(AdminFacet(address(chain)).prepareChainCommitment());
+        bytes memory chainData = abi.encode(AdminFacet(address(migratingChain)).prepareChainCommitment());
         bytes memory stmData = abi.encode(address(1), msg.sender, stm.protocolVersion(), initialDiamondCut);
         bytes memory bridgehubMintData = abi.encode(mintChainId, stmData, chainData);
         vm.startBroadcast(address(bridgehub.sharedBridge()));
+        uint256 currentChainId = block.chainid;
+        vm.chainId(migratingChainId);
         bridgehub.bridgeMint(gatewayChainId, assetId, bridgehubMintData);
         vm.stopBroadcast();
+        vm.chainId(currentChainId);
     }
 
     // add this to be excluded from coverage report

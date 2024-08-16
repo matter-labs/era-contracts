@@ -640,7 +640,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256, // originChainId
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
-    ) external payable override onlyAssetRouter whenMigrationsNotPaused returns (address l1Receiver) {
+    ) external payable override onlyAssetRouter whenMigrationsNotPaused {
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainMintData) = abi.decode(
             _bridgehubMintData,
             (uint256, bytes, bytes)
@@ -651,19 +651,18 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         settlementLayer[_chainId] = block.chainid;
         stateTransitionManager[_chainId] = stm;
-        address hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(_chainId, _stmData);
-        if (hyperchainMap.contains(_chainId)) {
-            require(hyperchain == address(0), "BH: deployed again");
-            hyperchain = hyperchainMap.get(_chainId);
-        } else {
+
+        address hyperchain = getHyperchain(_chainId);
+        bool contractAlreadyDeployed = hyperchain != address(0);
+        if (hyperchain == address(0)) {
+            hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(_chainId, _stmData);
             require(hyperchain != address(0), "BH: chain not registered");
             _registerNewHyperchain(_chainId, hyperchain);
             /// Question: why do we need addNewChainIfNeeded? Why is addNewChain not enough?
             messageRoot.addNewChainIfNeeded(_chainId);
         }
 
-        IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData);
-        return address(0);
+        IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData, contractAlreadyDeployed);
     }
 
     /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
