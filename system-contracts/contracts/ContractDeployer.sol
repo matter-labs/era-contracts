@@ -534,5 +534,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         }
 
         require(evmCodeHash[_newAddress] != 0x0, "The code hash must be set after the constructor call");
+        emit ContractDeployed(_sender, evmCodeHash[_newAddress], _newAddress);
     }
 }

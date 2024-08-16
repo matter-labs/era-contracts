@@ -101,5 +101,7 @@ contract KnownCodesStorage is IKnownCodesStorage, ISystemContract {
                 sstore(hash, 1)
             }
         }
+
+        emit MarkedAsKnown(hash, getMarker(hash) == 0);
     }
 }
