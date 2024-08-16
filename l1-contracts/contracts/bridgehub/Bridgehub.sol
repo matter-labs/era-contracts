@@ -113,6 +113,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
+        whitelistedSettlementLayers[_l1ChainId] = true;
     }
 
     /// @notice used to initialize the contract
@@ -120,6 +121,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
+
+        whitelistedSettlementLayers[L1_CHAIN_ID] = true;
     }
 
     //// Initialization and registration
@@ -538,7 +541,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override onlyAssetRouter onlyL1 returns (bytes memory bridgehubMintData) {
+    ) external payable override onlyAssetRouter returns (bytes memory bridgehubMintData) {
         require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
 
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainData) = abi.decode(_data, (uint256, bytes, bytes));

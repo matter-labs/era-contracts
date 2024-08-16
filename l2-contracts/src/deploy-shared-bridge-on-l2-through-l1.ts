@@ -59,16 +59,16 @@ async function setL2TokenBeacon(deployer: Deployer, chainId: string, gasPrice: B
   }
   const l2NTV = L2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, deployer.deployWallet);
 
-  const receipt = await deployer.executeUpgradeOnL2(
-    chainId,
-    L2_NATIVE_TOKEN_VAULT_ADDRESS,
-    gasPrice,
-    l2NTV.interface.encodeFunctionData("configureL2TokenBeacon", [false, ethers.constants.AddressZero]),
-    priorityTxMaxGasLimit
-  );
-  if (deployer.verbose) {
-    console.log("Set L2Token Beacon, upgrade hash", receipt.transactionHash);
-  }
+  // const receipt = await deployer.executeUpgradeOnL2(
+  //   chainId,
+  //   L2_NATIVE_TOKEN_VAULT_ADDRESS,
+  //   gasPrice,
+  //   l2NTV.interface.encodeFunctionData("configureL2TokenBeacon", [false, ethers.constants.AddressZero]),
+  //   priorityTxMaxGasLimit
+  // );
+  // if (deployer.verbose) {
+  //   console.log("Set L2Token Beacon, upgrade hash", receipt.transactionHash);
+  // }
   const bridgehub = BridgehubFactory.connect(L2_BRIDGEHUB_ADDRESS, deployer.deployWallet);
   const receipt2 = await deployer.executeUpgradeOnL2(
     chainId,
@@ -140,7 +140,7 @@ async function main() {
         console.log("Initialization of the chain governance will be skipped");
       }
 
-      await deploySharedBridgeOnL2ThroughL1(deployer, chainId, gasPrice);
+      // await deploySharedBridgeOnL2ThroughL1(deployer, chainId, gasPrice);
     });
 
   await program.parseAsync(process.argv);
