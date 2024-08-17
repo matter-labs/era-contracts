@@ -188,7 +188,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, Ownable2StepUpgradeable {
     function l2TokenAddress(address _l1Token) public view override returns (address expectedToken) {
         bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         expectedToken = tokenAddress[expectedAssetId];
-        if(expectedToken == address(0)) {
+        if (expectedToken == address(0)) {
             expectedToken = calculateCreate2TokenAddress(_l1Token);
         }
     }

@@ -184,12 +184,7 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
         _withdrawLegacy(_l1Receiver, _l2Token, _amount, _sender);
     }
 
-    function _withdrawLegacy(
-        address _l1Receiver,
-        address _l2Token,
-        uint256 _amount,
-        address _sender
-    ) internal {
+    function _withdrawLegacy(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) internal {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, getL1TokenAddress(_l2Token));
         bytes memory data = abi.encode(_amount, _l1Receiver);
         _withdrawSender(assetId, data, _sender);
