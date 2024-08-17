@@ -29,7 +29,7 @@ interface IL2AssetRouter {
 
     function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 
-    function l1AssetRouter() external view returns (address);
+    function l1Bridge() external view returns (address);
 
     function withdrawLegacyBridge(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) external;
 }
