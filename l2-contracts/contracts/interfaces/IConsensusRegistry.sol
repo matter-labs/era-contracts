@@ -18,10 +18,10 @@ interface IConsensusRegistry {
     /// @param validatorSnapshot Validator attributes to read if `node.validatorLastUpdateCommit` == `validatorsCommit`.
     /// @param nodeOwnerIdx Index of the node owner within the array of node owners.
     struct Node {
-        uint256 attesterLastUpdateCommit;
+        uint32 attesterLastUpdateCommit;
         AttesterAttr attesterLatest;
         AttesterAttr attesterSnapshot;
-        uint256 validatorLastUpdateCommit;
+        uint32 validatorLastUpdateCommit;
         ValidatorAttr validatorLatest;
         ValidatorAttr validatorSnapshot;
         uint32 nodeOwnerIdx;
@@ -117,8 +117,8 @@ interface IConsensusRegistry {
     event NodeAttesterWeightChanged(address indexed nodeOwner, uint32 newWeight);
     event NodeValidatorKeyChanged(address indexed nodeOwner, BLS12_381PublicKey newPubKey, BLS12_381Signature newPoP);
     event NodeAttesterKeyChanged(address indexed nodeOwner, Secp256k1PublicKey newPubKey);
-    event ValidatorsCommitted(uint256 commit);
-    event AttestersCommitted(uint256 commit);
+    event ValidatorsCommitted(uint32 commit);
+    event AttestersCommitted(uint32 commit);
 
     function add(
         address _nodeOwner,

@@ -24,9 +24,9 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     /// @dev A mapping for enabling efficient lookups when checking whether a given validator public key exists.
     mapping(bytes32 => bool) public validatorPubKeyHashes;
     /// @dev Counter that increments with each new commit to the attester committee.
-    uint256 attestersCommit;
+    uint32 attestersCommit;
     /// @dev Counter that increments with each new commit to the validator committee.
-    uint256 validatorsCommit;
+    uint32 validatorsCommit;
 
     modifier onlyOwnerOrNodeOwner(address _nodeOwner) {
         if (owner() != msg.sender && _nodeOwner != msg.sender) {
