@@ -93,14 +93,14 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
             removed: false,
             weight: _validatorWeight,
             pubKey: _validatorPubKey,
-            pop: _validatorPoP
+            proofOfPossession: _validatorPoP
         }),
             validatorSnapshot: ValidatorAttr({
             active: false,
             removed: false,
             weight: 0,
             pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
-            pop: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
+            proofOfPossession: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
         }),
             validatorLastUpdateCommit: validatorsCommit,
             nodeOwnerIdx: nodeOwnerIdx
@@ -211,7 +211,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         emit NodeAttesterWeightChanged(_nodeOwner, _weight);
     }
 
-    /// @notice Changes the validator's public key and proof-of-possession (PoP) in the registry.
+    /// @notice Changes the validator's public key and proof-of-possession in the registry.
     /// @dev Only callable by the contract owner or the node owner.
     /// @dev Verifies that the node owner exists in the registry.
     /// @param _nodeOwner The address of the node's owner whose validator key and PoP will be changed.
@@ -237,7 +237,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
 
         _ensureValidatorSnapshot(node);
         node.validatorLatest.pubKey = _pubKey;
-        node.validatorLatest.pop = _pop;
+        node.validatorLatest.proofOfPossession = _pop;
 
         emit NodeValidatorKeyChanged(_nodeOwner, _pubKey, _pop);
     }
@@ -339,6 +339,10 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
             mstore(committee, count)
         }
         return committee;
+    }
+
+    function numNodes() public view returns (uint256) {
+        return nodeOwners.length;
     }
 
     function _getNode(address _nodeOwner) private returns (Node storage, bool) {

@@ -44,13 +44,13 @@ interface IConsensusRegistry {
     /// @param removed A flag stating if the validator has been removed (and is pending a deletion).
     /// @param weight Validator's voting weight.
     /// @param pubKey Validator's BLS12-381 public key.
-    /// @param pop Validator's Proof-of-possession (a signature over the public key).
+    /// @param proofOfPossession Validator's Proof-of-possession (a signature over the public key).
     struct ValidatorAttr {
         bool active;
         bool removed;
         uint32 weight;
         BLS12_381PublicKey pubKey;
-        BLS12_381Signature pop;
+        BLS12_381Signature proofOfPossession;
     }
 
     /// @dev Represents BLS12_381 public key.
