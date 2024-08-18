@@ -124,7 +124,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     /// @param _nodeOwner The address of the node's owner to be inactivated.
     function deactivate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNode(_nodeOwner);
+        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
             return;
         }
@@ -143,7 +143,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     /// @param _nodeOwner The address of the node's owner to be activated.
     function activate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNode(_nodeOwner);
+        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
             return;
         }
@@ -162,7 +162,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     /// @param _nodeOwner The address of the node's owner to be removed.
     function remove(address _nodeOwner) external onlyOwner {
         _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNode(_nodeOwner);
+        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
             return;
         }
@@ -182,7 +182,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     /// @param _weight The new validator weight to assign to the node.
     function changeValidatorWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
         _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNode(_nodeOwner);
+        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
             return;
         }
@@ -200,7 +200,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     /// @param _weight The new attester weight to assign to the node.
     function changeAttesterWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
         _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNode(_nodeOwner);
+        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
             return;
         }
@@ -225,7 +225,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         _verifyInputBLS12_381PublicKey(_pubKey);
         _verifyInputBLS12_381Signature(_pop);
         _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNode(_nodeOwner);
+        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
             return;
         }
@@ -253,7 +253,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     ) external onlyOwnerOrNodeOwner(_nodeOwner) {
         _verifyInputSecp256k1PublicKey(_pubKey);
         _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNode(_nodeOwner);
+        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
         if (deleted) {
             return;
         }
@@ -352,7 +352,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         return nodeOwners.length;
     }
 
-    function _getNode(address _nodeOwner) private returns (Node storage, bool) {
+    function _getNodeAndDeleteIfRequired(address _nodeOwner) private returns (Node storage, bool) {
         Node storage node = nodes[_nodeOwner];
         bool pendingDeletion = _isNodePendingDeletion(node);
         if (pendingDeletion) {
