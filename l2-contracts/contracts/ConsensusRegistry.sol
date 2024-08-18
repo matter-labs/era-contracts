@@ -3,7 +3,6 @@
 pragma solidity 0.8.20;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
 import {IConsensusRegistry} from "./interfaces/IConsensusRegistry.sol";
 
 /// @author Matter Labs
@@ -24,9 +23,9 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     /// @dev A mapping for enabling efficient lookups when checking whether a given validator public key exists.
     mapping(bytes32 => bool) public validatorPubKeyHashes;
     /// @dev Counter that increments with each new commit to the attester committee.
-    uint32 attestersCommit;
+    uint32 private attestersCommit;
     /// @dev Counter that increments with each new commit to the validator committee.
-    uint32 validatorsCommit;
+    uint32 private validatorsCommit;
 
     modifier onlyOwnerOrNodeOwner(address _nodeOwner) {
         if (owner() != msg.sender && _nodeOwner != msg.sender) {
@@ -76,46 +75,46 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         nodeOwners.push(_nodeOwner);
         nodes[_nodeOwner] = Node({
             attesterLatest: AttesterAttr({
-            active: true,
-            removed: false,
-            weight: _attesterWeight,
-            pubKey: _attesterPubKey
-        }),
+                active: true,
+                removed: false,
+                weight: _attesterWeight,
+                pubKey: _attesterPubKey
+            }),
             attesterSnapshot: AttesterAttr({
-            active: false,
-            removed: false,
-            weight: 0,
-            pubKey: Secp256k1PublicKey({tag: bytes1(0), x: bytes32(0)})
-        }),
+                active: false,
+                removed: false,
+                weight: 0,
+                pubKey: Secp256k1PublicKey({tag: bytes1(0), x: bytes32(0)})
+            }),
             attesterLastUpdateCommit: attestersCommit,
             validatorLatest: ValidatorAttr({
-            active: true,
-            removed: false,
-            weight: _validatorWeight,
-            pubKey: _validatorPubKey,
-            proofOfPossession: _validatorPoP
-        }),
+                active: true,
+                removed: false,
+                weight: _validatorWeight,
+                pubKey: _validatorPubKey,
+                proofOfPossession: _validatorPoP
+            }),
             validatorSnapshot: ValidatorAttr({
-            active: false,
-            removed: false,
-            weight: 0,
-            pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
-            proofOfPossession: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
-        }),
+                active: false,
+                removed: false,
+                weight: 0,
+                pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
+                proofOfPossession: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
+            }),
             validatorLastUpdateCommit: validatorsCommit,
             nodeOwnerIdx: nodeOwnerIdx
         });
         attesterPubKeyHashes[attesterPubKeyHash] = true;
         validatorPubKeyHashes[validatorPubKeyHash] = true;
 
-        emit NodeAdded(
-            _nodeOwner,
-            _validatorWeight,
-            _validatorPubKey,
-            _validatorPoP,
-            _attesterWeight,
-            _attesterPubKey
-        );
+        emit NodeAdded({
+            nodeOwner: _nodeOwner,
+            validatorWeight: _validatorWeight,
+            validatorPubKey: _validatorPubKey,
+            validatorPoP: _validatorPoP,
+            attesterWeight: _attesterWeight,
+            attesterPubKey: _attesterPubKey
+        });
     }
 
     /// @notice Deactivates a node, preventing it from participating in committees.
@@ -275,7 +274,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     /// - If "attestersCommit" == "node.attesterLastUpdateCommit", read "node.attesterSnapshot".
     /// @dev Only callable by the contract owner.
     function commitAttesterCommittee() external onlyOwner {
-        attestersCommit++;
+        ++attestersCommit;
 
         emit AttestersCommitted(attestersCommit);
     }
@@ -286,7 +285,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     /// - If "validatorsCommit" == "node.validatorLastUpdateCommit", read "node.validatorSnapshot".
     /// @dev Only callable by the contract owner.
     function commitValidatorCommittee() external onlyOwner {
-        validatorsCommit++;
+        ++validatorsCommit;
 
         emit ValidatorsCommitted(validatorsCommit);
     }
@@ -304,11 +303,8 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
                 ? node.attesterLatest
                 : node.attesterSnapshot;
             if (attester.active && !attester.removed) {
-                committee[count] = CommitteeAttester ({
-                    weight: attester.weight,
-                    pubKey: attester.pubKey
-                });
-                count++;
+                committee[count] = CommitteeAttester({weight: attester.weight, pubKey: attester.pubKey});
+                ++count;
             }
         }
 
@@ -332,12 +328,12 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
                 ? node.validatorLatest
                 : node.validatorSnapshot;
             if (validator.active && !validator.removed) {
-                committee[count] = CommitteeValidator ({
+                committee[count] = CommitteeValidator({
                     weight: validator.weight,
                     pubKey: validator.pubKey,
                     proofOfPossession: validator.proofOfPossession
                 });
-                count++;
+                ++count;
             }
         }
 
@@ -403,11 +399,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
 
     function _isNodeOwnerExists(address _nodeOwner) private view returns (bool) {
         BLS12_381PublicKey storage pubKey = nodes[_nodeOwner].validatorLatest.pubKey;
-        if (
-            pubKey.a == bytes32(0) &&
-            pubKey.b == bytes32(0) &&
-            pubKey.c == bytes32(0)
-        ) {
+        if (pubKey.a == bytes32(0) && pubKey.b == bytes32(0) && pubKey.c == bytes32(0)) {
             return false;
         }
         return true;
@@ -426,33 +418,19 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     }
 
     function _hashAttesterPubKey(Secp256k1PublicKey storage _pubKey) private view returns (bytes32) {
-        return keccak256(abi.encode(
-            _pubKey.tag,
-            _pubKey.x
-        ));
+        return keccak256(abi.encode(_pubKey.tag, _pubKey.x));
     }
 
     function _hashAttesterPubKey(Secp256k1PublicKey calldata _pubKey) private pure returns (bytes32) {
-        return keccak256(abi.encode(
-            _pubKey.tag,
-            _pubKey.x
-        ));
+        return keccak256(abi.encode(_pubKey.tag, _pubKey.x));
     }
 
     function _hashValidatorPubKey(BLS12_381PublicKey storage _pubKey) private view returns (bytes32) {
-        return keccak256(abi.encode(
-            _pubKey.a,
-            _pubKey.b,
-            _pubKey.c
-        ));
+        return keccak256(abi.encode(_pubKey.a, _pubKey.b, _pubKey.c));
     }
 
     function _hashValidatorPubKey(BLS12_381PublicKey calldata _pubKey) private pure returns (bytes32) {
-        return keccak256(abi.encode(
-            _pubKey.a,
-            _pubKey.b,
-            _pubKey.c
-        ));
+        return keccak256(abi.encode(_pubKey.a, _pubKey.b, _pubKey.c));
     }
 
     function _verifyInputAddress(address _nodeOwner) private pure {
@@ -473,7 +451,6 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         }
     }
 
-
     function _verifyInputBLS12_381PublicKey(BLS12_381PublicKey calldata _pubKey) private pure {
         if (_isEmptyBLS12_381PublicKey(_pubKey)) {
             revert InvalidInputBLS12_381PublicKey();
@@ -493,21 +470,14 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     }
 
     function _isEmptyBLS12_381PublicKey(BLS12_381PublicKey calldata _pubKey) private pure returns (bool) {
-        return
-            _pubKey.a == bytes32(0) &&
-            _pubKey.b == bytes32(0) &&
-            _pubKey.c == bytes32(0);
+        return _pubKey.a == bytes32(0) && _pubKey.b == bytes32(0) && _pubKey.c == bytes32(0);
     }
 
     function _isEmptyBLS12_381Signature(BLS12_381Signature calldata _pop) private pure returns (bool) {
-        return
-            _pop.a == bytes32(0) &&
-            _pop.b == bytes16(0);
+        return _pop.a == bytes32(0) && _pop.b == bytes16(0);
     }
 
     function _isEmptySecp256k1PublicKey(Secp256k1PublicKey calldata _pubKey) private pure returns (bool) {
-        return
-            _pubKey.tag == bytes1(0) &&
-            _pubKey.x == bytes32(0);
+        return _pubKey.tag == bytes1(0) && _pubKey.x == bytes32(0);
     }
 }

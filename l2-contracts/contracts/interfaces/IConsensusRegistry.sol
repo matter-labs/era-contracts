@@ -2,9 +2,6 @@
 
 pragma solidity 0.8.20;
 
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @title ConsensusRegistry contract interface
@@ -19,12 +16,12 @@ interface IConsensusRegistry {
     /// @param nodeOwnerIdx Index of the node owner within the array of node owners.
     struct Node {
         uint32 attesterLastUpdateCommit;
+        uint32 validatorLastUpdateCommit;
+        uint32 nodeOwnerIdx;
         AttesterAttr attesterLatest;
         AttesterAttr attesterSnapshot;
-        uint32 validatorLastUpdateCommit;
         ValidatorAttr validatorLatest;
         ValidatorAttr validatorSnapshot;
-        uint32 nodeOwnerIdx;
     }
 
     /// @dev Represents the attester attributes of a consensus node.
@@ -108,7 +105,14 @@ interface IConsensusRegistry {
     error InvalidInputBLS12_381Signature();
     error InvalidInputSecp256k1PublicKey();
 
-    event NodeAdded(address indexed nodeOwner, uint32 validatorWeight, BLS12_381PublicKey validatorPubKey, BLS12_381Signature validatorPoP, uint32 attesterWeight, Secp256k1PublicKey attesterPubKey);
+    event NodeAdded(
+        address indexed nodeOwner,
+        uint32 validatorWeight,
+        BLS12_381PublicKey validatorPubKey,
+        BLS12_381Signature validatorPoP,
+        uint32 attesterWeight,
+        Secp256k1PublicKey attesterPubKey
+    );
     event NodeDeactivated(address indexed nodeOwner);
     event NodeActivated(address indexed nodeOwner);
     event NodeRemoved(address indexed nodeOwner);
