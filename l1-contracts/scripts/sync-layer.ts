@@ -273,10 +273,10 @@ async function main() {
       const timelock = deployer.validatorTimelock(deployer.deployWallet);
 
       for (const operator of operators) {
-        if(await timelock.validators(currentChainId, operator)) {
+        if (await timelock.validators(currentChainId, operator)) {
           continue;
         }
-        
+
         await deployer.deployWallet.sendTransaction({
           to: operator,
           value: ethers.utils.parseEther("5"),
