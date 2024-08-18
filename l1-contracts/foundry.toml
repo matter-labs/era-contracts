@@ -5,6 +5,7 @@ libs = ['node_modules', 'lib']
 remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+    "murky=lib/murky/src/",
     "l2-contracts/=../l2-contracts/contracts/"
 ]
 allow_paths = ["../l2-contracts/contracts"]
@@ -12,6 +13,8 @@ fs_permissions = [
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
     { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed" },
     { access = "read", path = "../l2-contracts/artifacts-zk/" },
+    { access = "read", path = "../l2-contracts/zkout/" },
+    { access = "read", path = "../system-contracts/zkout/" },
     { access = "read", path = "./script-config" },
     { access = "read-write", path = "./script-out" },
     { access = "read", path = "./out" }
