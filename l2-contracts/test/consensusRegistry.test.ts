@@ -38,21 +38,8 @@ describe("ConsensusRegistry", function () {
         // Prepare the node list.
         const numNodes = 10;
         for (let i = 0; i < numNodes; i++) {
-            const node = {
-                ownerKey: new Wallet(Wallet.createRandom().privateKey, provider),
-                validatorKey: Wallet.createRandom(),
-                attesterKey: Wallet.createRandom(),
-            };
-
-            const nodeEntry = {
-                ownerAddr: node.ownerKey.address,
-                validatorWeight: i,
-                validatorPubKey: deriveValidatorPubKey(node.validatorKey),
-                validatorPoP: deriveValidatorPoP(node.validatorKey),
-                attesterWeight: i,
-                attesterPubKey: deriveAttesterPubKey(node.attesterKey)
-            };
-
+            const node = makeRandomNode(provider)
+            const nodeEntry = makeRandomNodeEntry(node, i);
             nodes.push(node);
             nodeEntries.push(nodeEntry);
         }
@@ -84,10 +71,10 @@ describe("ConsensusRegistry", function () {
             ).wait();
         }
 
-        expect(await registry["numNodes()"]()).to.equal(nodes.length);
+        expect(await registry.numNodes()).to.equal(nodes.length);
 
         for (let i = 0; i < nodes.length; i++) {
-            const nodeOwner = await registry["nodeOwners(uint256)"](i);
+            const nodeOwner = await registry.nodeOwners(i);
             expect(nodeOwner).to.equal(nodeEntries[i].ownerAddr);
             const node = await registry.nodes(nodeOwner);
             expect(node.attesterLastUpdateCommit).to.equal(0);
@@ -106,6 +93,8 @@ describe("ConsensusRegistry", function () {
             expect(node.validatorLatest.pubKey.a).to.equal(nodeEntries[i].validatorPubKey.a);
             expect(node.validatorLatest.pubKey.b).to.equal(nodeEntries[i].validatorPubKey.b);
             expect(node.validatorLatest.pubKey.c).to.equal(nodeEntries[i].validatorPubKey.c);
+            expect(node.validatorLatest.proofOfPossession.a).to.equal(nodeEntries[i].validatorPoP.a);
+            expect(node.validatorLatest.proofOfPossession.b).to.equal(nodeEntries[i].validatorPoP.b);
 
             // 'Snapshot' is expected to have zero values.
             expect(node.attesterSnapshot.active).to.equal(false);
@@ -137,75 +126,319 @@ describe("ConsensusRegistry", function () {
         ).to.be.reverted;
     });
 
-
-
     it("Should allow owner to deactivate", async function () {
-      const nodeOwner = nodeEntries[0].ownerAddr;
-      expect((await registry.nodes(nodeOwner)).validatorLatest.active).to.equal(true);
+        const nodeOwner = nodeEntries[0].ownerAddr;
+        expect((await registry.nodes(nodeOwner)).validatorLatest.active).to.equal(true);
 
-      await (await registry.connect(owner).deactivate(nodeOwner, { gasLimit })).wait();
+        await (await registry.connect(owner).deactivate(nodeOwner, {gasLimit})).wait();
         expect((await registry.nodes(nodeOwner)).validatorLatest.active).to.equal(false);
 
-      // Restore state.
-      await (await registry.connect(owner).activate(nodeOwner, { gasLimit })).wait();
+        // Restore state.
+        await (await registry.connect(owner).activate(nodeOwner, {gasLimit})).wait();
     });
 
     it("Should not allow nonOwner, nonNodeOwner to deactivate", async function () {
-      const nodeOwner = nodeEntries[0].ownerAddr;
-      await expect(registry.connect(nonOwner).deactivate(nodeOwner, { gasLimit })).to.be.reverted;
+        const nodeOwner = nodeEntries[0].ownerAddr;
+        await expect(registry.connect(nonOwner).deactivate(nodeOwner, {gasLimit})).to.be.reverted;
     });
 
     it("Should change validator weight", async function () {
-      const nodeEntry = nodeEntries[0];
-      expect((await registry.nodes(nodeEntry.ownerAddr)).validatorLatest.weight).to.equal(nodeEntry.validatorWeight);
+        const entry = nodeEntries[0];
+        expect((await registry.nodes(entry.ownerAddr)).validatorLatest.weight).to.equal(entry.validatorWeight);
 
-      const baseWeight = nodeEntry.validatorWeight;
-      const newWeight = getRandomNumber(100, 1000);
-      await (await registry.changeValidatorWeight(nodeEntry.ownerAddr, newWeight, { gasLimit })).wait();
-      expect((await registry.nodes(nodeEntry.ownerAddr)).validatorLatest.weight).to.equal(newWeight);
-      expect((await registry.nodes(nodeEntry.ownerAddr)).attesterLatest.weight).to.equal(nodeEntry.attesterWeight);
+        const baseWeight = entry.validatorWeight;
+        const newWeight = getRandomNumber(100, 1000);
+        await (await registry.changeValidatorWeight(entry.ownerAddr, newWeight, {gasLimit})).wait();
+        expect((await registry.nodes(entry.ownerAddr)).validatorLatest.weight).to.equal(newWeight);
+        expect((await registry.nodes(entry.ownerAddr)).attesterLatest.weight).to.equal(entry.attesterWeight);
 
-      // Restore state.
-      await (await registry.changeValidatorWeight(nodeEntry.ownerAddr, baseWeight, { gasLimit })).wait();
+        // Restore state.
+        await (await registry.changeValidatorWeight(entry.ownerAddr, baseWeight, {gasLimit})).wait();
     });
 
     it("Should not allow nodeOwner to change validator weight", async function () {
-      const node = nodes[0];
-      await expect(registry.connect(node.ownerKey).changeValidatorWeight(node.ownerKey.address, 0, { gasLimit })).to.be
-        .reverted;
+        const node = nodes[0];
+        await expect(registry.connect(node.ownerKey).changeValidatorWeight(node.ownerKey.address, 0, {gasLimit})).to.be
+            .reverted;
     });
 
     it("Should not allow nonOwner to change validator weight", async function () {
-      const node = nodes[0];
-      await expect(registry.connect(nonOwner).changeValidatorWeight(node.ownerKey.address, 0, { gasLimit })).to.be
-        .reverted;
+        const node = nodes[0];
+        await expect(registry.connect(nonOwner).changeValidatorWeight(node.ownerKey.address, 0, {gasLimit})).to.be
+            .reverted;
     });
 
     it("Should change attester weight", async function () {
-      const nodeEntry = nodeEntries[0];
-      expect((await registry.nodes(nodeEntry.ownerAddr)).attesterLatest.weight).to.equal(nodeEntry.attesterWeight);
+        const entry = nodeEntries[0];
+        expect((await registry.nodes(entry.ownerAddr)).attesterLatest.weight).to.equal(entry.attesterWeight);
 
-      const baseWeight = nodeEntry.attesterWeight;
-      const newWeight = getRandomNumber(100, 1000);
-      await (await registry.changeAttesterWeight(nodeEntry.ownerAddr, newWeight, { gasLimit })).wait();
-      expect((await registry.nodes(nodeEntry.ownerAddr)).attesterLatest.weight).to.equal(newWeight);
-      expect((await registry.nodes(nodeEntry.ownerAddr)).validatorLatest.weight).to.equal(nodeEntry.validatorWeight);
+        const baseWeight = entry.attesterWeight;
+        const newWeight = getRandomNumber(100, 1000);
+        await (await registry.changeAttesterWeight(entry.ownerAddr, newWeight, {gasLimit})).wait();
+        expect((await registry.nodes(entry.ownerAddr)).attesterLatest.weight).to.equal(newWeight);
+        expect((await registry.nodes(entry.ownerAddr)).validatorLatest.weight).to.equal(entry.validatorWeight);
 
-      // Restore state.
-      await (await registry.changeAttesterWeight(nodeEntry.ownerAddr, baseWeight, { gasLimit })).wait();
+        // Restore state.
+        await (await registry.changeAttesterWeight(entry.ownerAddr, baseWeight, {gasLimit})).wait();
     });
 
     it("Should not allow nodeOwner to change attester weight", async function () {
-      const node = nodes[0];
-      await expect(registry.connect(node.ownerKey).changeAttesterWeight(node.ownerKey.address, 0, { gasLimit })).to.be
-        .reverted;
+        const node = nodes[0];
+        await expect(registry.connect(node.ownerKey).changeAttesterWeight(node.ownerKey.address, 0, {gasLimit})).to.be
+            .reverted;
     });
 
     it("Should not allow nonOwner to change attester weight", async function () {
-      const node = nodes[0];
-      await expect(registry.connect(nonOwner).changeAttesterWeight(node.ownerKey.address, 0, { gasLimit })).to.be
-        .reverted;
+        const node = nodes[0];
+        await expect(registry.connect(nonOwner).changeAttesterWeight(node.ownerKey.address, 0, {gasLimit})).to.be
+            .reverted;
     });
+
+    it("Should not allow to add a node with a validator public key which already exist", async function () {
+        const newEntry = makeRandomNodeEntry(makeRandomNode(), 0)
+        await expect(registry.add(
+            newEntry.ownerAddr,
+            newEntry.validatorWeight,
+            nodeEntries[0].validatorPubKey,
+            newEntry.validatorPoP,
+            newEntry.attesterWeight,
+            newEntry.attesterPubKey,
+            {gasLimit}
+        )).to.be
+            .reverted;
+    });
+
+    it("Should not allow to add a node with an attester public key which already exist", async function () {
+        const newEntry = makeRandomNodeEntry(makeRandomNode(), 0)
+        await expect(registry.add(
+            newEntry.ownerAddr,
+            newEntry.validatorWeight,
+            newEntry.validatorPubKey,
+            newEntry.validatorPoP,
+            newEntry.attesterWeight,
+            nodeEntries[0].attesterPubKey,
+            {gasLimit}
+        )).to.be
+            .reverted;
+    });
+
+    it("Should return attester committee once committed to", async function () {
+        // Verify that committee was not committed to.
+        expect((await registry.getAttesterCommittee()).length).to.equal(0);
+
+        // Commit.
+        await (await registry.commitAttesterCommittee({gasLimit})).wait();
+
+        // Read committee.
+        const attesterCommittee = await registry.getAttesterCommittee();
+        expect(attesterCommittee.length).to.equal(nodes.length);
+        for (let i = 0; i < attesterCommittee.length; i++) {
+            const entry = nodeEntries[i];
+            const attester = attesterCommittee[i];
+            expect(attester.weight).to.equal(entry.attesterWeight);
+            expect(attester.pubKey.tag).to.equal(entry.attesterPubKey.tag);
+            expect(attester.pubKey.x).to.equal(entry.attesterPubKey.x);
+        }
+    });
+
+    it("Should return validator committee once committed to", async function () {
+        // Verify that committee was not committed to.
+        expect((await registry.getValidatorCommittee()).length).to.equal(0);
+
+        // Commit.
+        await (await registry.commitValidatorCommittee({gasLimit})).wait();
+
+        // Read committee.
+        const validatorCommittee = await registry.getValidatorCommittee();
+        expect(validatorCommittee.length).to.equal(nodes.length);
+        for (let i = 0; i < validatorCommittee.length; i++) {
+            const entry = nodeEntries[i];
+            const validator = validatorCommittee[i];
+            expect(validator.weight).to.equal(entry.validatorWeight);
+            expect(validator.pubKey.a).to.equal(entry.validatorPubKey.a);
+            expect(validator.pubKey.b).to.equal(entry.validatorPubKey.b);
+            expect(validator.pubKey.c).to.equal(entry.validatorPubKey.c);
+            expect(validator.proofOfPossession.a).to.equal(entry.validatorPoP.a);
+            expect(validator.proofOfPossession.b).to.equal(entry.validatorPoP.b);
+        }
+    });
+
+    it("Should not include inactive nodes in attester and validator committees when committed to", async function () {
+        const idx = nodeEntries.length - 1;
+        const entry = nodeEntries[idx];
+
+        // Deactivate attribute.
+        await (await registry.deactivate(entry.ownerAddr, {gasLimit})).wait();
+
+        // Verify no change.
+        expect((await registry.getAttesterCommittee()).length).to.equal(nodes.length);
+        expect((await registry.getValidatorCommittee()).length).to.equal(nodes.length);
+
+        // Commit attester committee and verify.
+        await (await registry.commitAttesterCommittee({gasLimit})).wait();
+        expect((await registry.getAttesterCommittee()).length).to.equal(nodes.length - 1);
+        expect((await registry.getValidatorCommittee()).length).to.equal(nodes.length);
+
+        // Commit validator committee and verify.
+        await (await registry.commitValidatorCommittee({gasLimit})).wait();
+        expect((await registry.getAttesterCommittee()).length).to.equal(nodes.length - 1);
+        expect((await registry.getValidatorCommittee()).length).to.equal(nodes.length - 1);
+
+        // Restore state.
+        await (await registry.activate(entry.ownerAddr, {gasLimit})).wait();
+        await (await registry.commitAttesterCommittee({gasLimit})).wait();
+        await (await registry.commitValidatorCommittee({gasLimit})).wait();
+    });
+
+    it("Should not include removed nodes in attester and validator committees when committed to", async function () {
+        const idx = nodeEntries.length - 1;
+        const entry = nodeEntries[idx];
+
+        // Remove node.
+        await (await registry.remove(entry.ownerAddr, {gasLimit})).wait();
+
+        // Verify no change.
+        expect((await registry.getAttesterCommittee()).length).to.equal(nodes.length);
+        expect((await registry.getValidatorCommittee()).length).to.equal(nodes.length);
+
+        // Commit attester committee and verify.
+        await (await registry.commitAttesterCommittee({gasLimit})).wait();
+        expect((await registry.getAttesterCommittee()).length).to.equal(nodes.length - 1);
+        expect((await registry.getValidatorCommittee()).length).to.equal(nodes.length);
+
+        // Commit validator committee and verify.
+        await (await registry.commitValidatorCommittee({gasLimit})).wait();
+        expect((await registry.getAttesterCommittee()).length).to.equal(nodes.length - 1);
+        expect((await registry.getValidatorCommittee()).length).to.equal(nodes.length - 1);
+
+        // Restore state.
+        await (await registry.remove(entry.ownerAddr, {gasLimit})).wait();
+        await (
+            await registry.add(
+                entry.ownerAddr,
+                entry.validatorWeight,
+                entry.validatorPubKey,
+                entry.validatorPoP,
+                entry.attesterWeight,
+                entry.attesterPubKey
+            )
+        ).wait();
+        await (await registry.commitAttesterCommittee({gasLimit})).wait();
+        await (await registry.commitValidatorCommittee({gasLimit})).wait();
+    });
+
+    it("Should not include node attribute change in attester committee before committed to", async function () {
+        const idx = nodeEntries.length - 1;
+        const entry = nodeEntries[idx];
+
+        // Change attribute.
+        await (await registry.changeAttesterWeight(entry.ownerAddr, entry.attesterWeight + 1, {gasLimit})).wait();
+
+        // Verify no change.
+        const attester = (await registry.getAttesterCommittee())[idx];
+        expect(attester.weight).to.equal(entry.attesterWeight);
+
+        // Commit.
+        await (await registry.commitAttesterCommittee({gasLimit})).wait();
+
+        // Verify change.
+        const committedAttester = (await registry.getAttesterCommittee())[idx];
+        expect(committedAttester.weight).to.equal(entry.attesterWeight + 1);
+
+        // Restore state.
+        await (await registry.changeAttesterWeight(entry.ownerAddr, entry.attesterWeight, {gasLimit})).wait();
+        await (await registry.commitAttesterCommittee({gasLimit})).wait();
+    });
+
+    it("Should not include node attribute change in validator committee before committed to", async function () {
+        const idx = nodeEntries.length - 1;
+        const entry = nodeEntries[idx];
+
+        // Change attribute.
+        await (await registry.changeValidatorWeight(entry.ownerAddr, entry.attesterWeight + 1, {gasLimit})).wait();
+
+        // Verify no change.
+        const validator = (await registry.getValidatorCommittee())[idx];
+        expect(validator.weight).to.equal(entry.validatorWeight);
+
+        // Commit.
+        await (await registry.commitValidatorCommittee({gasLimit})).wait();
+
+        // Verify change.
+        const committedValidator = (await registry.getValidatorCommittee())[idx];
+        expect(committedValidator.weight).to.equal(entry.validatorWeight + 1);
+
+        // Restore state.
+        await (await registry.changeValidatorWeight(entry.ownerAddr, entry.validatorWeight, {gasLimit})).wait();
+        await (await registry.commitValidatorCommittee({gasLimit})).wait();
+    });
+
+    it("Should finalize node removal by fully deleting it from storage", async function () {
+        const idx = nodeEntries.length - 1;
+        const entry = nodeEntries[idx];
+
+        // Remove.
+        expect((await registry.nodes(entry.ownerAddr)).attesterLatest.removed).to.equal(false);
+        expect((await registry.nodes(entry.ownerAddr)).validatorLatest.removed).to.equal(false);
+        await (await registry.remove(entry.ownerAddr, {gasLimit})).wait();
+        expect((await registry.nodes(entry.ownerAddr)).attesterLatest.removed).to.equal(true);
+        expect((await registry.nodes(entry.ownerAddr)).validatorLatest.removed).to.equal(true);
+
+        // Commit committees.
+        await (await registry.commitAttesterCommittee({gasLimit})).wait();
+        await (await registry.commitValidatorCommittee({gasLimit})).wait();
+
+        // Verify node was not yet deleted.
+        expect(await registry.numNodes()).to.equal(nodes.length);
+        const attesterPubKeyHash = hashAttesterPubKey(entry.attesterPubKey);
+        expect(await registry.attesterPubKeyHashes(attesterPubKeyHash)).to.be.equal(true);
+        const validatorPubKeyHash = hashValidatorPubKey(entry.validatorPubKey);
+        expect(await registry.validatorPubKeyHashes(validatorPubKeyHash)).to.be.equal(true);
+
+        // Trigger node deletion.
+        await (await registry.remove(entry.ownerAddr, {gasLimit})).wait();
+
+        // Verify the deletion.
+        expect(await registry.numNodes()).to.equal(nodes.length - 1);
+        expect(await registry.attesterPubKeyHashes(attesterPubKeyHash)).to.be.equal(false);
+        expect(await registry.validatorPubKeyHashes(attesterPubKeyHash)).to.be.equal(false);
+        const node = await registry.nodes(entry.ownerAddr, {gasLimit});
+        expect(ethers.utils.arrayify(node.attesterLatest.pubKey.tag)).to.deep.equal(new Uint8Array(1));
+        expect(ethers.utils.arrayify(node.attesterLatest.pubKey.x)).to.deep.equal(new Uint8Array(32));
+
+        // Restore state.
+        await (
+            await registry.add(
+                entry.ownerAddr,
+                entry.validatorWeight,
+                entry.validatorPubKey,
+                entry.validatorPoP,
+                entry.attesterWeight,
+                entry.attesterPubKey
+            )
+        ).wait();
+        await (await registry.commitAttesterCommittee({gasLimit})).wait();
+        await (await registry.commitValidatorCommittee({gasLimit})).wait();
+    });
+
+    function makeRandomNode() {
+        return {
+            ownerKey: new Wallet(Wallet.createRandom().privateKey, provider),
+            validatorKey: Wallet.createRandom(),
+            attesterKey: Wallet.createRandom(),
+        };
+    }
+
+    function makeRandomNodeEntry(node: any, weight: number) {
+        return {
+            ownerAddr: node.ownerKey.address,
+            validatorWeight: weight,
+            validatorPubKey: deriveValidatorPubKey(node.validatorKey),
+            validatorPoP: deriveValidatorPoP(node.validatorKey),
+            attesterWeight: weight,
+            attesterPubKey: deriveAttesterPubKey(node.attesterKey)
+        };
+    }
 });
 
 function getRandomNumber(min, max) {
@@ -235,4 +468,18 @@ function deriveAttesterPubKey(wallet: Wallet) {
         tag: ethers.utils.hexlify(ethers.utils.randomBytes(1)),
         x: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
     }
+}
+
+function hashAttesterPubKey(attesterPubKey) {
+    return ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(
+        ['bytes1', 'bytes32'],
+        [attesterPubKey.tag, attesterPubKey.x]
+    ));
+}
+
+function hashValidatorPubKey(validatorPubKey) {
+    return ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(
+        ['bytes32', 'bytes32', 'bytes32'],
+        [validatorPubKey.a, validatorPubKey.b, validatorPubKey.c]
+    ));
 }

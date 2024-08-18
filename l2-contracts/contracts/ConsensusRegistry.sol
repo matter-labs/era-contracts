@@ -20,9 +20,9 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
     /// @dev A mapping of node owners => nodes.
     mapping(address => Node) public nodes;
     /// @dev A mapping for enabling efficient lookups when checking whether a given attester public key exists.
-    mapping(bytes32 => bool) attesterPubKeyHashes;
+    mapping(bytes32 => bool) public attesterPubKeyHashes;
     /// @dev A mapping for enabling efficient lookups when checking whether a given validator public key exists.
-    mapping(bytes32 => bool) validatorPubKeyHashes;
+    mapping(bytes32 => bool) public validatorPubKeyHashes;
     /// @dev Counter that increments with each new commit to the attester committee.
     uint256 attestersCommit;
     /// @dev Counter that increments with each new commit to the validator committee.
@@ -293,9 +293,9 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
 
     /// @notice Returns an array of `AttesterAttr` structs representing the current attester committee.
     /// @dev Collects active and non-removed attesters based on the latest commit to the committee.
-    function getAttestersCommittee() public view returns (AttesterAttr[] memory) {
+    function getAttesterCommittee() public view returns (CommitteeAttester[] memory) {
         uint256 len = nodeOwners.length;
-        AttesterAttr[] memory committee = new AttesterAttr[](len);
+        CommitteeAttester[] memory committee = new CommitteeAttester[](len);
         uint256 count = 0;
 
         for (uint256 i = 0; i < len; ++i) {
@@ -304,7 +304,10 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
                 ? node.attesterLatest
                 : node.attesterSnapshot;
             if (attester.active && !attester.removed) {
-                committee[count] = attester;
+                committee[count] = CommitteeAttester ({
+                    weight: attester.weight,
+                    pubKey: attester.pubKey
+                });
                 count++;
             }
         }
@@ -318,9 +321,9 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
 
     /// @notice Returns an array of `ValidatorAttr` structs representing the current attester committee.
     /// @dev Collects active and non-removed validators based on the latest commit to the committee.
-    function getValidatorsCommittee() public view returns (ValidatorAttr[] memory) {
+    function getValidatorCommittee() public view returns (CommitteeValidator[] memory) {
         uint256 len = nodeOwners.length;
-        ValidatorAttr[] memory committee = new ValidatorAttr[](len);
+        CommitteeValidator[] memory committee = new CommitteeValidator[](len);
         uint256 count = 0;
 
         for (uint256 i = 0; i < len; ++i) {
@@ -329,7 +332,11 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
                 ? node.validatorLatest
                 : node.validatorSnapshot;
             if (validator.active && !validator.removed) {
-                committee[count] = validator;
+                committee[count] = CommitteeValidator ({
+                    weight: validator.weight,
+                    pubKey: validator.pubKey,
+                    proofOfPossession: validator.proofOfPossession
+                });
                 count++;
             }
         }
@@ -373,9 +380,9 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         nodes[lastNodeOwner].nodeOwnerIdx = _node.nodeOwnerIdx;
 
         // Delete from the remaining mapping.
-        delete nodes[_nodeOwner];
         delete attesterPubKeyHashes[_hashAttesterPubKey(_node.attesterLatest.pubKey)];
         delete validatorPubKeyHashes[_hashValidatorPubKey(_node.validatorLatest.pubKey)];
+        delete nodes[_nodeOwner];
 
         emit NodeDeleted(_nodeOwner);
     }

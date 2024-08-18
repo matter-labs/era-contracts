@@ -39,6 +39,14 @@ interface IConsensusRegistry {
         Secp256k1PublicKey pubKey;
     }
 
+    /// @dev Represents an attester within a committee.
+    /// @param weight Attester's voting weight.
+    /// @param pubKey Attester's Secp256k1 public key.
+    struct CommitteeAttester {
+        uint32 weight;
+        Secp256k1PublicKey pubKey;
+    }
+
     /// @dev Represents the validator attributes of a consensus node.
     /// @param active A flag stating if the validator is active.
     /// @param removed A flag stating if the validator has been removed (and is pending a deletion).
@@ -48,6 +56,16 @@ interface IConsensusRegistry {
     struct ValidatorAttr {
         bool active;
         bool removed;
+        uint32 weight;
+        BLS12_381PublicKey pubKey;
+        BLS12_381Signature proofOfPossession;
+    }
+
+    /// @dev Represents a validator within a committee.
+    /// @param weight Validator's voting weight.
+    /// @param pubKey Validator's BLS12-381 public key.
+    /// @param proofOfPossession Validator's Proof-of-possession (a signature over the public key).
+    struct CommitteeValidator {
         uint32 weight;
         BLS12_381PublicKey pubKey;
         BLS12_381Signature proofOfPossession;
@@ -133,7 +151,7 @@ interface IConsensusRegistry {
 
     function commitValidatorCommittee() external;
 
-    function getAttestersCommittee() external view returns (AttesterAttr[] memory);
+    function getAttesterCommittee() external view returns (CommitteeAttester[] memory);
 
-    function getValidatorsCommittee() external view returns (ValidatorAttr[] memory);
+    function getValidatorCommittee() external view returns (CommitteeValidator[] memory);
 }
