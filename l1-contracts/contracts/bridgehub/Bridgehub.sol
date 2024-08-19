@@ -286,7 +286,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
     ) external onlyOwnerOrAdmin nonReentrant whenNotPaused onlyL1 returns (uint256) {
-        require(L1_CHAIN_ID == block.chainid, "BH: New chain registration only allowed on L1");
         require(_chainId != 0, "BH: chainId cannot be 0");
         require(_chainId <= type(uint48).max, "BH: chainId too large");
         require(_chainId != block.chainid, "BH: chain id must not match current chainid");

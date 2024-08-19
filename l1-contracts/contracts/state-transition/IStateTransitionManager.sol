@@ -121,8 +121,6 @@ interface IStateTransitionManager {
         bytes[] calldata _factoryDeps
     ) external returns (address);
 
-    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external;
-
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,

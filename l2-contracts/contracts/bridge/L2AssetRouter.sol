@@ -13,7 +13,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, L2_NATIVE_TOKEN_VAULT} from "../L2ContractHelper.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
-import {EmptyAddress, InvalidCaller} from "../L2ContractErrors.sol";
+import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero} from "../L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -155,6 +155,19 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
         finalizeDeposit(assetId, data);
     }
 
+    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
+    /// where tokens would be unlocked
+    /// @dev A compatibility method to support legacy functionality for the SDK.
+    /// @param _l1Receiver The account address that should receive funds on L1
+    /// @param _l2Token The L2 token address which is withdrawn
+    /// @param _amount The total amount of tokens to be withdrawn
+    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
+        if (_amount == 0) {
+            revert AmountMustBeGreaterThanZero();
+        }
+        _withdrawLegacy(_l1Receiver, _l2Token, _amount, msg.sender);
+    }
+
     /// @notice Legacy withdraw.
     /// @dev Finalizes the deposit and mint funds.
     /// @param _l1Receiver The address of token receiver on L1.
@@ -167,6 +180,10 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
         uint256 _amount,
         address _sender
     ) external onlyLegacyBridge {
+        _withdrawLegacy(_l1Receiver, _l2Token, _amount, _sender);
+    }
+
+    function _withdrawLegacy(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) internal {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, getL1TokenAddress(_l2Token));
         bytes memory data = abi.encode(_amount, _l1Receiver);
         _withdrawSender(assetId, data, _sender);
@@ -186,6 +203,24 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
     /// @param _l1Token The address of token on L1.
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view returns (address) {
-        return L2_NATIVE_TOKEN_VAULT.l2TokenAddress(_l1Token);
+        address currentlyDeployedAddress = L2_NATIVE_TOKEN_VAULT.l2TokenAddress(_l1Token);
+
+        if (currentlyDeployedAddress != address(0)) {
+            return currentlyDeployedAddress;
+        }
+
+        // For backwards compatibility, the bridge smust return the address of the token even if it
+        // has not been deployed yet.
+        return L2_NATIVE_TOKEN_VAULT.calculateCreate2TokenAddress(_l1Token);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Legacy functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Returns the address of the L1 asset router.
+    /// @dev The old name is kept for backward compatibility.
+    function l1Bridge() external view returns (address) {
+        return l1AssetRouter;
     }
 }
