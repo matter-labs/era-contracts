@@ -57,18 +57,6 @@ async function setL2TokenBeacon(deployer: Deployer, chainId: string, gasPrice: B
   if (deployer.verbose) {
     console.log("Setting L2 token beacon");
   }
-  // const l2NTV = L2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, deployer.deployWallet);
-
-  // const receipt = await deployer.executeUpgradeOnL2(
-  //   chainId,
-  //   L2_NATIVE_TOKEN_VAULT_ADDRESS,
-  //   gasPrice,
-  //   l2NTV.interface.encodeFunctionData("configureL2TokenBeacon", [false, ethers.constants.AddressZero]),
-  //   priorityTxMaxGasLimit
-  // );
-  // if (deployer.verbose) {
-  //   console.log("Set L2Token Beacon, upgrade hash", receipt.transactionHash);
-  // }
   const bridgehub = BridgehubFactory.connect(L2_BRIDGEHUB_ADDRESS, deployer.deployWallet);
   const receipt2 = await deployer.executeUpgradeOnL2(
     chainId,
