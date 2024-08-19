@@ -13,7 +13,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
-import {IERC20} from 'forge-std/interfaces/IERC20.sol';
+import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {Utils} from "./Utils.sol";
 
 /**
