@@ -1,10 +1,11 @@
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import * as hre from "hardhat";
-import { Provider, Wallet } from "zksync-web3";
+import { Provider, Wallet } from "zksync-ethers";
 import type { ConsensusRegistry } from "../typechain";
 import { ConsensusRegistryFactory } from "../typechain";
 import { expect } from "chai";
 import { ethers } from "ethers";
+import { Interface } from "ethers/lib/utils";
 
 const richAccount = {
   address: "0x36615Cf349d7F6344891B1e7CA7C72883F5dc049",
@@ -12,6 +13,9 @@ const richAccount = {
 };
 
 const gasLimit = 100_000_000;
+
+const CONSENSUS_REGISTRY_ARTIFACT = hre.artifacts.readArtifactSync("ConsensusRegistry");
+const CONSENSUS_REGISTRY_INTERFACE = new Interface(CONSENSUS_REGISTRY_ARTIFACT.abi);
 
 describe("ConsensusRegistry", function () {
   const provider = new Provider(hre.config.networks.localhost.url);
@@ -24,8 +28,15 @@ describe("ConsensusRegistry", function () {
   before("Initialize", async function () {
     // Deploy.
     const deployer = new Deployer(hre, owner);
-    const registryInstance = await deployer.deploy(await deployer.loadArtifact("ConsensusRegistry"), [owner.address]);
-    registry = ConsensusRegistryFactory.connect(registryInstance.address, owner);
+    const registryInstance = await deployer.deploy(await deployer.loadArtifact("ConsensusRegistry"), []);
+    const proxyAdmin = await deployer.deploy(await deployer.loadArtifact("ProxyAdmin"), []);
+    const proxyInitializationParams = CONSENSUS_REGISTRY_INTERFACE.encodeFunctionData("initialize", [owner.address]);
+    const proxyInstance = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
+      registryInstance.address,
+      proxyAdmin.address,
+      proxyInitializationParams,
+    ]);
+    registry = ConsensusRegistryFactory.connect(proxyInstance.address, owner);
 
     // Fund nonOwner.
     await (

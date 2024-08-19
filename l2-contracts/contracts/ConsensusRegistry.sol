@@ -3,6 +3,7 @@
 pragma solidity 0.8.20;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IConsensusRegistry} from "./interfaces/IConsensusRegistry.sol";
 
 /// @author Matter Labs
@@ -14,7 +15,7 @@ import {IConsensusRegistry} from "./interfaces/IConsensusRegistry.sol";
 /// the rotation of validator and attester committees, which represent a subset of nodes
 /// expected to actively participate in the consensus process during a specific time window.
 /// @dev Designed for use with a proxy for upgradability.
-contract ConsensusRegistry is IConsensusRegistry, Ownable2StepUpgradeable {
+contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpgradeable {
     /// @dev An array to keep track of node owners.
     address[] public nodeOwners;
     /// @dev A mapping of node owners => nodes.
@@ -35,7 +36,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2StepUpgradeable {
         _;
     }
 
-    constructor(address _initialOwner) {
+    function initialize(address _initialOwner) external initializer {
         if (_initialOwner == address(0)) {
             revert InvalidInputNodeOwnerAddress();
         }
