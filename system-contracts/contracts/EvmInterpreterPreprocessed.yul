@@ -182,7 +182,7 @@ object "EVMInterpreter" {
             evmGasLeft := chargeGas(evmGas, 3)
             let tempSp := sub(sp, mul(0x20, position))
         
-            if or(iszero(lt(tempSp, BYTECODE_OFFSET())), lt(tempSp, STACK_OFFSET()))  {
+            if lt(tempSp, STACK_OFFSET())  {
                 revertWithGas(evmGasLeft)
             }
         
@@ -2662,8 +2662,9 @@ object "EVMInterpreter" {
                     sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 32)
                 }
-                case 0x80 { // OP_DUP1 
-                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 1, stackHead)
+                case 0x80 { // OP_DUP1
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                    sp, stackHead := pushStackItem(sp, stackHead, evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x81 { // OP_DUP2
@@ -3150,7 +3151,7 @@ object "EVMInterpreter" {
                 evmGasLeft := chargeGas(evmGas, 3)
                 let tempSp := sub(sp, mul(0x20, position))
             
-                if or(iszero(lt(tempSp, BYTECODE_OFFSET())), lt(tempSp, STACK_OFFSET()))  {
+                if lt(tempSp, STACK_OFFSET())  {
                     revertWithGas(evmGasLeft)
                 }
             
@@ -5630,8 +5631,9 @@ object "EVMInterpreter" {
                         sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 32)
                     }
-                    case 0x80 { // OP_DUP1 
-                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 1, stackHead)
+                    case 0x80 { // OP_DUP1
+                        evmGasLeft := chargeGas(evmGasLeft, 3)
+                        sp, stackHead := pushStackItem(sp, stackHead, evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x81 { // OP_DUP2

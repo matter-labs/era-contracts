@@ -108,7 +108,7 @@ function swapStackItem(sp, evmGas, position, oldStackHead) ->  evmGasLeft, stack
     evmGasLeft := chargeGas(evmGas, 3)
     let tempSp := sub(sp, mul(0x20, position))
 
-    if or(iszero(lt(tempSp, BYTECODE_OFFSET())), lt(tempSp, STACK_OFFSET()))  {
+    if lt(tempSp, STACK_OFFSET())  {
         revertWithGas(evmGasLeft)
     }
 
