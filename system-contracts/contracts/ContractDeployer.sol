@@ -386,7 +386,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     }
 
     function convertToConstructorEVMInput(bytes calldata _input) internal pure returns (bytes memory) {
-        // With how the contracts work, the calldata to the constuctor must be an ABI-encoded `bytes`.
+        // With how the contracts work, the calldata to the constructor must be an ABI-encoded `bytes`.
         // This means that it should also contain offset as well as length
         uint256 _fullLength = _input.length;
         bytes memory extendedInput = new bytes(_input.length + 64);

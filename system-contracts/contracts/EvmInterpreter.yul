@@ -444,7 +444,7 @@ object "EVMInterpreter" {
         // The gas cost mentioned here is purely the cost of the contract, 
         // and does not consider the cost of the call itself nor the instructions 
         // to put the parameters in memory. 
-        // Take into account MEM_OFFSET_INNER() when passing the argsOfsset
+        // Take into account MEM_OFFSET_INNER() when passing the argsOffset
         function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
             switch addr
                 case 0x01 { // ecRecover
@@ -763,7 +763,7 @@ object "EVMInterpreter" {
         
         function ensureAcceptableMemLocation(location) {
             if gt(location,MAX_POSSIBLE_MEM()) {
-                revert(0,0) // Check if this is whats needed
+                revert(0,0) // Check if this is what's needed
             }
         }
         
@@ -1014,7 +1014,7 @@ object "EVMInterpreter" {
             if _isEVM(addr) {
                 _pushEVMFrame(gasToPass, true)
                 // TODO Check the following comment from zkSync .sol.
-                // We can not just pass all gas here to prevert overflow of zkEVM gas counter
+                // We can not just pass all gas here to prevent overflow of zkEVM gas counter
                 success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
         
                 frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
@@ -1211,7 +1211,7 @@ object "EVMInterpreter" {
         
             _pushEVMFrame(gasToPass, isStatic)
             let success := delegatecall(
-                // We can not just pass all gas here to prevert overflow of zkEVM gas counter
+                // We can not just pass all gas here to prevent overflow of zkEVM gas counter
                 EVM_GAS_STIPEND(),
                 addr,
                 add(MEM_OFFSET_INNER(), argsOffset),
@@ -1273,7 +1273,7 @@ object "EVMInterpreter" {
             if _calleeIsEVM {
                 _pushEVMFrame(_calleeGas, true)
                 // TODO Check the following comment from zkSync .sol.
-                // We can not just pass all gas here to prevert overflow of zkEVM gas counter
+                // We can not just pass all gas here to prevent overflow of zkEVM gas counter
                 success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
         
                 _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
@@ -2036,7 +2036,7 @@ object "EVMInterpreter" {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
             
-                    // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
+                    // TODO: check, the .sol uses extcodesize directly, but it doesn't seem to work
                     // if a contract is created it works, but if the address is a zkSync's contract
                     // what happens?
                     // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)
@@ -3439,7 +3439,7 @@ object "EVMInterpreter" {
             // The gas cost mentioned here is purely the cost of the contract, 
             // and does not consider the cost of the call itself nor the instructions 
             // to put the parameters in memory. 
-            // Take into account MEM_OFFSET_INNER() when passing the argsOfsset
+            // Take into account MEM_OFFSET_INNER() when passing the argsOffset
             function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
                 switch addr
                     case 0x01 { // ecRecover
@@ -3758,7 +3758,7 @@ object "EVMInterpreter" {
             
             function ensureAcceptableMemLocation(location) {
                 if gt(location,MAX_POSSIBLE_MEM()) {
-                    revert(0,0) // Check if this is whats needed
+                    revert(0,0) // Check if this is what's needed
                 }
             }
             
@@ -4009,7 +4009,7 @@ object "EVMInterpreter" {
                 if _isEVM(addr) {
                     _pushEVMFrame(gasToPass, true)
                     // TODO Check the following comment from zkSync .sol.
-                    // We can not just pass all gas here to prevert overflow of zkEVM gas counter
+                    // We can not just pass all gas here to prevent overflow of zkEVM gas counter
                     success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
             
                     frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
@@ -4206,7 +4206,7 @@ object "EVMInterpreter" {
             
                 _pushEVMFrame(gasToPass, isStatic)
                 let success := delegatecall(
-                    // We can not just pass all gas here to prevert overflow of zkEVM gas counter
+                    // We can not just pass all gas here to prevent overflow of zkEVM gas counter
                     EVM_GAS_STIPEND(),
                     addr,
                     add(MEM_OFFSET_INNER(), argsOffset),
@@ -4268,7 +4268,7 @@ object "EVMInterpreter" {
                 if _calleeIsEVM {
                     _pushEVMFrame(_calleeGas, true)
                     // TODO Check the following comment from zkSync .sol.
-                    // We can not just pass all gas here to prevert overflow of zkEVM gas counter
+                    // We can not just pass all gas here to prevent overflow of zkEVM gas counter
                     success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
             
                     _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
@@ -5031,7 +5031,7 @@ object "EVMInterpreter" {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
                         }
                 
-                        // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
+                        // TODO: check, the .sol uses extcodesize directly, but it doesn't seem to work
                         // if a contract is created it works, but if the address is a zkSync's contract
                         // what happens?
                         // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)

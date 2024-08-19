@@ -12,7 +12,7 @@ uint160 constant PRECOMPILES_END = 0xffff;
 uint256 constant INF_PASS_GAS = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
 contract EvmGasManager {
-    // We need strust to use `storage` pointers
+    // We need trust to use `storage` pointers
     struct WarmAccountInfo {
         bool isWarm;
     }
@@ -115,7 +115,7 @@ contract EvmGasManager {
     The flow is the following:
     When conducting call:
         1. caller calls to an EVM contract pushEVMFrame with the corresponding gas
-        2. callee calls consumeEvmFrame to get the gas & make sure that subsequent callee wont be able to read it.
+        2. callee calls consumeEvmFrame to get the gas & make sure that subsequent callee won't be able to read it.
         3. callee sets the return gas
         4. callee calls popEVMFrame to return the gas to the caller & remove the frame
     */
