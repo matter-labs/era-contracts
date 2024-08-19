@@ -232,8 +232,8 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         bytes32 prevHash = _hashValidatorPubKey(node.validatorLatest.pubKey);
         delete validatorPubKeyHashes[prevHash];
         bytes32 newHash = _hashValidatorPubKey(_pubKey);
+        _verifyValidatorPubKeyDoesNotExist(newHash);
         validatorPubKeyHashes[newHash] = true;
-
         _ensureValidatorSnapshot(node);
         node.validatorLatest.pubKey = _pubKey;
         node.validatorLatest.proofOfPossession = _pop;
