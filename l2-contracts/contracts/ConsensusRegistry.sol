@@ -13,6 +13,7 @@ import {IConsensusRegistry} from "./interfaces/IConsensusRegistry.sol";
 /// each playing a distinct role in the consensus process. This contract facilitates
 /// the rotation of validator and attester committees, which represent a subset of nodes
 /// expected to actively participate in the consensus process during a specific time window.
+/// @dev Designed for use with a proxy for upgradability.
 contract ConsensusRegistry is IConsensusRegistry, Ownable2StepUpgradeable {
     /// @dev An array to keep track of node owners.
     address[] public nodeOwners;
