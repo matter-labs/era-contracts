@@ -2,22 +2,14 @@ import { Command } from "commander";
 import type { BigNumberish } from "ethers";
 import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { provider, publishBytecodeFromL1, priorityTxMaxGasLimit } from "./utils";
+import { provider, publishBytecodeFromL1 } from "./utils";
 
 import { ethTestConfig } from "./deploy-utils";
 
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import * as hre from "hardhat";
-import {
-  ADDRESS_ONE,
-  L2_ASSET_ROUTER_ADDRESS,
-  L2_BRIDGEHUB_ADDRESS,
-  L2_MESSAGE_ROOT_ADDRESS,
-  L2_NATIVE_TOKEN_VAULT_ADDRESS,
-} from "../../l1-contracts/src.ts/utils";
-
-import { BridgehubFactory } from "../../l1-contracts/typechain";
+import { L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS } from "../../l1-contracts/src.ts/utils";
 
 export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2AssetRouter").abi;
 export const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;

@@ -359,6 +359,12 @@ library SystemContractHelper {
         }
     }
 
+    /// @notice Performs a `mimicCall` to an address.
+    /// @param _to The address to call.
+    /// @param _whoToMimic The address to mimic.
+    /// @param _data The data to pass to the call.
+    /// @return success Whether the call was successful.
+    /// @return returndata The return data of the call.
     function mimicCall(
         address _to,
         address _whoToMimic,
@@ -371,17 +377,17 @@ library SystemContractHelper {
             dataStart := add(_data, 0x20)
         }
 
-        uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
-            0,
-            0,
-            dataStart,
-            dataLength,
-            uint32(gasleft()),
-            0,
-            CalldataForwardingMode.UseHeap,
-            false,
-            false
-        );
+        uint256 farCallAbi = SystemContractsCaller.getFarCallABI({
+            dataOffset: 0,
+            memoryPage: 0,
+            dataStart: dataStart,
+            dataLength: dataLength,
+            gasPassed: uint32(gasleft()),
+            shardId: 0,
+            forwardingMode: CalldataForwardingMode.UseHeap,
+            isConstructorCall: false,
+            isSystemCall: false
+        });
 
         address callAddr = MIMIC_CALL_CALL_ADDRESS;
         uint256 rtSize;
