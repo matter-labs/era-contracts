@@ -205,8 +205,8 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view returns (address) {
         address currentlyDeployedAddress = L2_NATIVE_TOKEN_VAULT.l2TokenAddress(_l1Token);
-        
-        if(currentlyDeployedAddress != address(0)) {
+
+        if (currentlyDeployedAddress != address(0)) {
             return currentlyDeployedAddress;
         }
 
