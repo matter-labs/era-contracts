@@ -31,7 +31,7 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
 
     /// @notice The address of the L1 asset router counterpart.
     /// @dev Note that the name is kept from the previous versions for backwards compatibility.
-    address public override l1Bridge;
+    address public override l1AssetRouter;
 
     /// @dev A mapping of asset ID to asset handler address
     mapping(bytes32 assetId => address assetHandlerAddress) public override assetHandlerAddress;
@@ -39,7 +39,7 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
     /// @notice Checks that the message sender is the L1 Asset Router.
     modifier onlyL1AssetRouter() {
         // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-        if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge) {
+        if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1AssetRouter) {
             revert InvalidCaller(msg.sender);
         }
         _;
@@ -63,7 +63,7 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
             revert EmptyAddress();
         }
 
-        l1Bridge = _l1AssetRouter;
+        l1AssetRouter = _l1AssetRouter;
 
         _disableInitializers();
     }
@@ -204,6 +204,24 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
     /// @param _l1Token The address of token on L1.
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view returns (address) {
-        return L2_NATIVE_TOKEN_VAULT.l2TokenAddress(_l1Token);
+        address currentlyDeployedAddress = L2_NATIVE_TOKEN_VAULT.l2TokenAddress(_l1Token);
+        
+        if(currentlyDeployedAddress != address(0)) {
+            return currentlyDeployedAddress;
+        }
+
+        // For backwards compatibility, the bridge smust return the address of the token even if it
+        // has not been deployed yet.
+        return L2_NATIVE_TOKEN_VAULT.calculateCreate2TokenAddress(_l1Token);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Legacy functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Returns the address of the L1 asset router.
+    /// @dev The old name is kept for backward compatibility.
+    function l1Bridge() external view override returns (address) {
+        return l1AssetRouter;
     }
 }
