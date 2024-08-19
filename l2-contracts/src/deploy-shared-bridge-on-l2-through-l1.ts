@@ -52,30 +52,8 @@ export async function publishL2NativeTokenVaultDependencyBytecodesOnL2(
   }
 }
 
-async function setL2TokenBeacon(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
-  if (deployer.verbose) {
-    console.log("Setting L2 token beacon");
-  }
-  const bridgehub = BridgehubFactory.connect(L2_BRIDGEHUB_ADDRESS, deployer.deployWallet);
-  const receipt2 = await deployer.executeUpgradeOnL2(
-    chainId,
-    L2_BRIDGEHUB_ADDRESS,
-    gasPrice,
-    bridgehub.interface.encodeFunctionData("setAddresses", [
-      L2_ASSET_ROUTER_ADDRESS,
-      ADDRESS_ONE,
-      L2_MESSAGE_ROOT_ADDRESS,
-    ]),
-    priorityTxMaxGasLimit
-  );
-  if (deployer.verbose) {
-    console.log("Set addresses in BH, upgrade hash", receipt2.transactionHash);
-  }
-}
-
 export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainId: string, gasPrice: BigNumberish) {
   await publishL2NativeTokenVaultDependencyBytecodesOnL2(deployer, chainId, gasPrice);
-  await setL2TokenBeacon(deployer, chainId, gasPrice);
   if (deployer.verbose) {
     console.log(`CONTRACTS_L2_NATIVE_TOKEN_VAULT_IMPL_ADDR=${L2_NATIVE_TOKEN_VAULT_ADDRESS}`);
     console.log(`CONTRACTS_L2_NATIVE_TOKEN_VAULT_PROXY_ADDR=${L2_NATIVE_TOKEN_VAULT_ADDRESS}`);

@@ -18,5 +18,7 @@ struct ForceDeployment {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL2GenesisUpgrade {
-    function genesisUpgrade(uint256 _chainId, bytes calldata _forceDeploymentsData) external payable;
+    event UpgradeComplete(uint256 _chainId);
+
+    function genesisUpgrade(uint256 _chainId, address _stmDeployer, bytes calldata _forceDeploymentsData) external payable;
 }
