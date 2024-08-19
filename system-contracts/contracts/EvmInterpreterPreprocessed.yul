@@ -113,7 +113,7 @@ object "EVMInterpreter" {
         }
         
         function STACK_OFFSET() -> offset {
-            offset := add(LAST_RETURNDATA_SIZE_OFFSET(), 32)
+            offset := add(LAST_RETURNDATA_SIZE_OFFSET(), 64)
         }
         
         function BYTECODE_OFFSET() -> offset {
@@ -165,71 +165,62 @@ object "EVMInterpreter" {
             value := shr(mul(8,sub(32,length)),mload(start))
         }
         
-        function dupStackItem(sp, evmGas, position) -> newSp, evmGasLeft {
+        function dupStackItem(sp, evmGas, position, oldStackHead) -> newSp, evmGasLeft, stackHead {
             evmGasLeft := chargeGas(evmGas, 3)
             let tempSp := sub(sp, mul(0x20, sub(position, 1)))
         
-            if or(gt(tempSp, BYTECODE_OFFSET()), eq(tempSp, BYTECODE_OFFSET())) {
+            if or(iszero(lt(tempSp, BYTECODE_OFFSET())), lt(tempSp, STACK_OFFSET()))  {
                 revertWithGas(evmGasLeft)
             }
         
-            if lt(tempSp, STACK_OFFSET()) {
-                revertWithGas(evmGasLeft)
-            }
-        
-            let dup := mload(tempSp)                    
-        
+            mstore(sp, oldStackHead)
+            stackHead := mload(tempSp)
             newSp := add(sp, 0x20)
-            mstore(newSp, dup)
         }
         
-        function swapStackItem(sp, evmGas, position) ->  evmGasLeft {
+        function swapStackItem(sp, evmGas, position, oldStackHead) ->  evmGasLeft, stackHead {
             evmGasLeft := chargeGas(evmGas, 3)
             let tempSp := sub(sp, mul(0x20, position))
         
-            if or(gt(tempSp, BYTECODE_OFFSET()), eq(tempSp, BYTECODE_OFFSET())) {
+            if or(iszero(lt(tempSp, BYTECODE_OFFSET())), lt(tempSp, STACK_OFFSET()))  {
                 revertWithGas(evmGasLeft)
             }
         
-            if lt(tempSp, STACK_OFFSET()) {
-                revertWithGas(evmGasLeft)
-            }
-        
-        
-            let s2 := mload(sp)
-            let s1 := mload(tempSp)                    
-        
-            mstore(sp, s1)
-            mstore(tempSp, s2)
+            stackHead := mload(tempSp)                    
+            mstore(tempSp, oldStackHead)
         }
         
-        function popStackItem(sp, evmGasLeft) -> a, newSp {
+        function popStackItem(sp, evmGasLeft, oldStackHead) -> a, newSp, stackHead {
             // We can not return any error here, because it would break compatibility
             if lt(sp, STACK_OFFSET()) {
                 revertWithGas(evmGasLeft)
             }
         
-            a := mload(sp)
+            a := oldStackHead
             newSp := sub(sp, 0x20)
+            stackHead := mload(newSp)
         }
         
-        function pushStackItem(sp, item, evmGasLeft) -> newSp {
-            if or(gt(sp, BYTECODE_OFFSET()), eq(sp, BYTECODE_OFFSET())) {
+        function pushStackItem(sp, item, evmGasLeft, oldStackHead) -> newSp, stackHead {
+            if iszero(lt(sp, BYTECODE_OFFSET())) {
                 revertWithGas(evmGasLeft)
             }
         
+            mstore(sp, oldStackHead)
+            stackHead := item
             newSp := add(sp, 0x20)
-            mstore(newSp, item)
         }
         
-        function popStackItemWithoutCheck(sp) -> a, newSp {
-            a := mload(sp)
+        function popStackItemWithoutCheck(sp, oldStackHead) -> a, newSp, stackHead {
+            a := oldStackHead
             newSp := sub(sp, 0x20)
+            stackHead := mload(newSp)
         }
         
-        function pushStackItemWithoutCheck(sp, item) -> newSp {
+        function pushStackItemWithoutCheck(sp, item, oldStackHead) -> newSp, stackHead {
+            mstore(sp, oldStackHead)
+            stackHead := item
             newSp := add(sp, 0x20)
-            mstore(newSp, item)
         }
         
         function popStackCheck(sp, evmGasLeft, numInputs) {
@@ -976,16 +967,15 @@ object "EVMInterpreter" {
             mstore(lastRtSzOffset, returndatasize())
         }
         
-        function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
+        function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> extraCost, sp, stackHead {
             let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
         
             popStackCheck(oldSp, evmGasLeft, 6)
-            gasToPass, sp := popStackItemWithoutCheck(oldSp)
-            addr, sp := popStackItemWithoutCheck(sp)
-            argsOffset, sp := popStackItemWithoutCheck(sp)
-            argsSize, sp := popStackItemWithoutCheck(sp)
-            retOffset, sp := popStackItemWithoutCheck(sp)
-            retSize, sp := popStackItemWithoutCheck(sp)
+            gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+            addr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
+            argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
         
             addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
         
@@ -1038,7 +1028,7 @@ object "EVMInterpreter" {
         
             extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
             extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
-            sp := pushStackItem(sp, success, evmGasLeft)
+            stackHead := success
         }
         function capGas(evmGasLeft,oldGasToPass) -> gasToPass {
             let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
@@ -1099,17 +1089,16 @@ object "EVMInterpreter" {
             }
         }
         
-        function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
+        function performCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> extraCost, sp, stackHead {
             let gasToPass,addr,value,argsOffset,argsSize,retOffset,retSize
         
             popStackCheck(oldSp, evmGasLeft, 7)
-            gasToPass, sp := popStackItemWithoutCheck(oldSp)
-            addr, sp := popStackItemWithoutCheck(sp)
-            value, sp := popStackItemWithoutCheck(sp)
-            argsOffset, sp := popStackItemWithoutCheck(sp)
-            argsSize, sp := popStackItemWithoutCheck(sp)
-            retOffset, sp := popStackItemWithoutCheck(sp)
-            retSize, sp := popStackItemWithoutCheck(sp)
+            gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+            addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
         
             addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
         
@@ -1162,22 +1151,21 @@ object "EVMInterpreter" {
         
             extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
             extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
-            sp := pushStackItem(sp,success, evmGasLeft) 
+            stackHead := success
         }
         
-        function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost {
+        function delegateCall(oldSp, oldIsStatic, evmGasLeft, oldStackHead) -> sp, isStatic, extraCost, stackHead {
             let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
         
             sp := oldSp
             isStatic := oldIsStatic
         
             popStackCheck(sp, evmGasLeft, 6)
-            gasToPass, sp := popStackItemWithoutCheck(sp)
-            addr, sp := popStackItemWithoutCheck(sp)
-            argsOffset, sp := popStackItemWithoutCheck(sp)
-            argsSize, sp := popStackItemWithoutCheck(sp)
-            retOffset, sp := popStackItemWithoutCheck(sp)
-            retSize, sp := popStackItemWithoutCheck(sp)
+            gasToPass, sp, stackHead := popStackItemWithoutCheck(sp, oldStackHead)
+            addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
         
             // addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
         
@@ -1226,7 +1214,7 @@ object "EVMInterpreter" {
         
             extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
             extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
-            sp := pushStackItem(sp, success, evmGasLeft)
+            stackHead := success
         }
         
         function getMessageCallGas (
@@ -1326,7 +1314,7 @@ object "EVMInterpreter" {
             gasLeft := mload(0)
         }
         
-        function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, evmGasLeft {
+        function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeftOld, oldStackHead) -> result, evmGasLeft, stackHead {
             pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
         
             _eraseReturndataPointer()
@@ -1339,10 +1327,10 @@ object "EVMInterpreter" {
         
             offset := add(MEM_OFFSET_INNER(), offset)
         
-            sp := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeftOld)
-            sp := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeftOld)
-            sp := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeftOld)
-            sp := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeftOld)
+            sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeftOld, oldStackHead)
+            sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeftOld, stackHead)
+            sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeftOld, stackHead)
+            sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeftOld, stackHead)
         
             // Selector
             mstore(sub(offset, 0x80), 0x5b16a23c)
@@ -1387,25 +1375,25 @@ object "EVMInterpreter" {
             let back
         
             popStackCheck(sp, evmGasLeft, 4)
-            back, sp := popStackItemWithoutCheck(sp)
+            back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             mstore(sub(offset, 0x20), back)
-            back, sp := popStackItemWithoutCheck(sp)
+            back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             mstore(sub(offset, 0x40), back)
-            back, sp := popStackItemWithoutCheck(sp)
+            back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             mstore(sub(offset, 0x60), back)
-            back, sp := popStackItemWithoutCheck(sp)
+            back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             mstore(sub(offset, 0x80), back)
         }
         
-        function performExtCodeCopy(evmGas,oldSp) -> evmGasLeft, sp {
+        function performExtCodeCopy(evmGas,oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
             evmGasLeft := chargeGas(evmGas, 100)
         
             let addr, dest, offset, len
             popStackCheck(oldSp, evmGasLeft, 4)
-            addr, sp := popStackItemWithoutCheck(oldSp)
-            dest, sp := popStackItemWithoutCheck(sp)
-            offset, sp := popStackItemWithoutCheck(sp)
-            len, sp := popStackItemWithoutCheck(sp)
+            addr, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+            dest, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         
             // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
             // minimum_word_size = (size + 31) / 32
@@ -1437,7 +1425,7 @@ object "EVMInterpreter" {
             }
         }
         
-        function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
+        function performCreate(evmGas,oldSp,isStatic, oldStackHead) -> evmGasLeft, sp, stackHead {
             evmGasLeft := chargeGas(evmGas, 32000)
         
             if isStatic {
@@ -1447,9 +1435,8 @@ object "EVMInterpreter" {
             let value, offset, size
         
             popStackCheck(oldSp, evmGasLeft, 3)
-            value, sp := popStackItemWithoutCheck(oldSp)
-            offset, sp := popStackItemWithoutCheck(sp)
-            size, sp := popStackItemWithoutCheck(sp)
+            value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+            offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
         
             checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
         
@@ -1476,14 +1463,14 @@ object "EVMInterpreter" {
             let addr := getNewAddress(address())
         
             let result
-            result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
+            result, evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft, stackHead)
         
             switch result
-                case 0 { sp := pushStackItem(sp, 0, evmGasLeft) }
-                default { sp := pushStackItem(sp, addr, evmGasLeft) }
+                case 0 { stackHead := 0 }
+                default { stackHead := addr }
         }
         
-        function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp, result, addr{
+        function performCreate2(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp, result, addr, stackHead {
             evmGasLeft := chargeGas(evmGas, 32000)
         
             if isStatic {
@@ -1493,10 +1480,10 @@ object "EVMInterpreter" {
             let value, offset, size, salt
         
             popStackCheck(oldSp, evmGasLeft, 4)
-            value, sp := popStackItemWithoutCheck(oldSp)
-            offset, sp := popStackItemWithoutCheck(sp)
-            size, sp := popStackItemWithoutCheck(sp)
-            salt, sp := popStackItemWithoutCheck(sp)
+            value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+            offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+            salt, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         
             checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
         
@@ -1533,7 +1520,7 @@ object "EVMInterpreter" {
                 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
             )
         
-            result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
+            result, evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft, stackHead)
         }
         
 
@@ -1552,6 +1539,7 @@ object "EVMInterpreter" {
             // actual yul/evm instruction.
             let ip := add(BYTECODE_OFFSET(), 32)
             let opcode
+            let stackHead
             
             let maxAcceptablePos := add(add(BYTECODE_OFFSET(), mload(BYTECODE_OFFSET())), 31)
             
@@ -1565,85 +1553,74 @@ object "EVMInterpreter" {
                 case 0x01 { // OP_ADD
                     evmGasLeft := chargeGas(evmGasLeft, 3)
             
-                    let a, b
+                    popStackCheck(sp, evmGasLeft, 2)
+                    let a
+                    a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
-            
-                    sp := pushStackItemWithoutCheck(sp, add(a, b))
+                    stackHead := add(a, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x02 { // OP_MUL
                     evmGasLeft := chargeGas(evmGasLeft, 5)
             
-                    let a, b
-            
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
-            
-                    sp := pushStackItemWithoutCheck(sp, mul(a, b))
+                    let a
+                    a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    stackHead := mul(a, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x03 { // OP_SUB
                     evmGasLeft := chargeGas(evmGasLeft, 3)
             
-                    let a, b
+                    let a
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
+                    a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, sub(a, b))
+                    stackHead := sub(a, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x04 { // OP_DIV
                     evmGasLeft := chargeGas(evmGasLeft, 5)
             
-                    let a, b
+                    let a
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
+                    a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    stackHead := div(a, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, div(a, b))
                     ip := add(ip, 1)
                 }
                 case 0x05 { // OP_SDIV
                     evmGasLeft := chargeGas(evmGasLeft, 5)
             
-                    let a, b
+                    let a
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
+                    a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    stackHead := sdiv(a, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, sdiv(a, b))
                     ip := add(ip, 1)
                 }
                 case 0x06 { // OP_MOD
                     evmGasLeft := chargeGas(evmGasLeft, 5)
             
-                    let a, b
+                    let a
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
-            
-                    sp := pushStackItemWithoutCheck(sp, mod(a, b))
+                    a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    stackHead := mod(a, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x07 { // OP_SMOD
                     evmGasLeft := chargeGas(evmGasLeft, 5)
             
-                    let a, b
+                    let a
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
+                    a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    stackHead := smod(a, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, smod(a, b))
                     ip := add(ip, 1)
                 }
                 case 0x08 { // OP_ADDMOD
@@ -1652,11 +1629,10 @@ object "EVMInterpreter" {
                     let a, b, N
             
                     popPushStackCheck(sp, evmGasLeft, 3)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
-                    N, sp := popStackItemWithoutCheck(sp)
+                    a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    b, sp, N := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, addmod(a, b, N))
+                    stackHead := addmod(a, b, N)
                     ip := add(ip, 1)
                 }
                 case 0x09 { // OP_MULMOD
@@ -1665,11 +1641,10 @@ object "EVMInterpreter" {
                     let a, b, N
             
                     popStackCheck(sp, evmGasLeft, 3)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
-                    N, sp := popStackItemWithoutCheck(sp)
+                    a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    b, sp, N := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItem(sp, mulmod(a, b, N), evmGasLeft)
+                    stackHead := mulmod(a, b, N)
                     ip := add(ip, 1)
                 }
                 case 0x0A { // OP_EXP
@@ -1678,10 +1653,9 @@ object "EVMInterpreter" {
                     let a, exponent
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    exponent, sp := popStackItemWithoutCheck(sp)
+                    a, sp, exponent := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, exp(a, exponent))
+                    stackHead := exp(a, exponent)
             
                     let to_charge := 0
                     for {} gt(exponent,0) {} { // while exponent > 0
@@ -1697,10 +1671,9 @@ object "EVMInterpreter" {
                     let b, x
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    b, sp := popStackItemWithoutCheck(sp)
-                    x, sp := popStackItemWithoutCheck(sp)
+                    b, sp, x := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, signextend(b, x))
+                    stackHead := signextend(b, x)
                     ip := add(ip, 1)
                 }
                 case 0x10 { // OP_LT
@@ -1709,10 +1682,9 @@ object "EVMInterpreter" {
                     let a, b
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
+                    a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, lt(a, b))
+                    stackHead := lt(a, b)
                     ip := add(ip, 1)
                 }
                 case 0x11 { // OP_GT
@@ -1721,10 +1693,9 @@ object "EVMInterpreter" {
                     let a, b
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
+                    a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, gt(a, b))
+                    stackHead:= gt(a, b)
                     ip := add(ip, 1)
                 }
                 case 0x12 { // OP_SLT
@@ -1733,10 +1704,9 @@ object "EVMInterpreter" {
                     let a, b
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
+                    a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, slt(a, b))
+                    stackHead := slt(a, b)
                     ip := add(ip, 1)
                 }
                 case 0x13 { // OP_SGT
@@ -1745,10 +1715,9 @@ object "EVMInterpreter" {
                     let a, b
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
+                    a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, sgt(a, b))
+                    stackHead := sgt(a, b)
                     ip := add(ip, 1)
                 }
                 case 0x14 { // OP_EQ
@@ -1757,10 +1726,9 @@ object "EVMInterpreter" {
                     let a, b
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
+                    a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, eq(a, b))
+                    stackHead := eq(a, b)
                     ip := add(ip, 1)
                 }
                 case 0x15 { // OP_ISZERO
@@ -1769,9 +1737,7 @@ object "EVMInterpreter" {
                     let a
             
                     popPushStackCheck(sp, evmGasLeft, 1)
-                    a, sp := popStackItemWithoutCheck(sp)
-            
-                    sp := pushStackItemWithoutCheck(sp, iszero(a))
+                    stackHead := iszero(stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x16 { // OP_AND
@@ -1780,10 +1746,9 @@ object "EVMInterpreter" {
                     let a, b
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
+                    a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, and(a,b))
+                    stackHead := and(a,b)
                     ip := add(ip, 1)
                 }
                 case 0x17 { // OP_OR
@@ -1792,10 +1757,9 @@ object "EVMInterpreter" {
                     let a, b
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
+                    a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, or(a,b))
+                    stackHead := or(a,b)
                     ip := add(ip, 1)
                 }
                 case 0x18 { // OP_XOR
@@ -1804,21 +1768,20 @@ object "EVMInterpreter" {
                     let a, b
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    a, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
+                    a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, xor(a, b))
+                    stackHead := xor(a, b)
                     ip := add(ip, 1)
                 }
                 case 0x19 { // OP_NOT
                     evmGasLeft := chargeGas(evmGasLeft, 3)
             
-                    let a
+                    if lt(sp, STACK_OFFSET()) {
+                        revertWithGas(evmGasLeft)
+                    }
             
-                    popPushStackCheck(sp, evmGasLeft, 1)
-                    a, sp := popStackItemWithoutCheck(sp)
+                    stackHead := not(stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, not(a))
                     ip := add(ip, 1)
                 }
                 case 0x1A { // OP_BYTE
@@ -1827,10 +1790,9 @@ object "EVMInterpreter" {
                     let i, x
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    i, sp := popStackItemWithoutCheck(sp)
-                    x, sp := popStackItemWithoutCheck(sp)
+                    i, sp, x := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, byte(i, x))
+                    stackHead := byte(i, x)
                     ip := add(ip, 1)
                 }
                 case 0x1B { // OP_SHL
@@ -1839,10 +1801,9 @@ object "EVMInterpreter" {
                     let shift, value
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    shift, sp := popStackItemWithoutCheck(sp)
-                    value, sp := popStackItemWithoutCheck(sp)
+                    shift, sp, value := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, shl(shift, value))
+                    stackHead := shl(shift, value)
                     ip := add(ip, 1)
                 }
                 case 0x1C { // OP_SHR
@@ -1851,10 +1812,9 @@ object "EVMInterpreter" {
                     let shift, value
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    shift, sp := popStackItemWithoutCheck(sp)
-                    value, sp := popStackItemWithoutCheck(sp)
+                    shift, sp, value := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, shr(shift, value))
+                    stackHead := shr(shift, value)
                     ip := add(ip, 1)
                 }
                 case 0x1D { // OP_SAR
@@ -1863,10 +1823,9 @@ object "EVMInterpreter" {
                     let shift, value
             
                     popPushStackCheck(sp, evmGasLeft, 2)
-                    shift, sp := popStackItemWithoutCheck(sp)
-                    value, sp := popStackItemWithoutCheck(sp)
+                    shift, sp, value := popStackItemWithoutCheck(sp, stackHead)
             
-                    sp := pushStackItemWithoutCheck(sp, sar(shift, value))
+                    stackHead := sar(shift, value)
                     ip := add(ip, 1)
                 }
                 case 0x20 { // OP_KECCAK256
@@ -1875,8 +1834,7 @@ object "EVMInterpreter" {
                     let offset, size
             
                     popStackCheck(sp, evmGasLeft, 2)
-                    offset, sp := popStackItemWithoutCheck(sp)
-                    size, sp := popStackItemWithoutCheck(sp)
+                    offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
             
                     checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
                     checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
@@ -1889,13 +1847,13 @@ object "EVMInterpreter" {
                     let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(add(offset, size)))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                    sp := pushStackItem(sp, keccak, evmGasLeft)
+                    stackHead := keccak
                     ip := add(ip, 1)
                 }
                 case 0x30 { // OP_ADDRESS
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
-                    sp := pushStackItem(sp, address(), evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, address(), evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x31 { // OP_BALANCE
@@ -1903,49 +1861,53 @@ object "EVMInterpreter" {
             
                     let addr
             
-                    addr, sp := popStackItem(sp, evmGasLeft)
+                    if lt(sp, STACK_OFFSET()) {
+                        revertWithGas(evmGasLeft)
+                    }
+            
+                    addr := stackHead
                     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
             
-                    sp := pushStackItem(sp, balance(addr), evmGasLeft)
+                    stackHead := balance(addr)
                     ip := add(ip, 1)
                 }
                 case 0x32 { // OP_ORIGIN
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
-                    sp := pushStackItem(sp, origin(), evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, origin(), evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x33 { // OP_CALLER
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
-                    sp := pushStackItem(sp, caller(), evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, caller(), evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x34 { // OP_CALLVALUE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
-                    sp := pushStackItem(sp, callvalue(), evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, callvalue(), evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x35 { // OP_CALLDATALOAD
                     evmGasLeft := chargeGas(evmGasLeft, 3)
+                    
+                    if iszero(lt(sp, BYTECODE_OFFSET())) {
+                        revertWithGas(evmGasLeft)
+                    }
+                    let i := stackHead
             
-                    let i
-            
-                    popPushStackCheck(sp, evmGasLeft, 1)
-                    i, sp := popStackItemWithoutCheck(sp)
-            
-                    sp := pushStackItemWithoutCheck(sp, calldataload(i))
+                    stackHead := calldataload(i)
                     ip := add(ip, 1)
                 }
                 case 0x36 { // OP_CALLDATASIZE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
-                    sp := pushStackItem(sp, calldatasize(), evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, calldatasize(), evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x37 { // OP_CALLDATACOPY
@@ -1954,9 +1916,9 @@ object "EVMInterpreter" {
                     let destOffset, offset, size
             
                     popStackCheck(sp, evmGasLeft, 3)
-                    destOffset, sp := popStackItemWithoutCheck(sp)
-                    offset, sp := popStackItemWithoutCheck(sp)
-                    size, sp := popStackItemWithoutCheck(sp)
+                    destOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    offset, sp, stackHead:= popStackItemWithoutCheck(sp, stackHead)
+                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     checkMultipleOverflow(offset,size,MEM_OFFSET_INNER(), evmGasLeft)
                     checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER(), evmGasLeft)
@@ -1983,7 +1945,7 @@ object "EVMInterpreter" {
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
                     let bytecodeLen := mload(BYTECODE_OFFSET())
-                    sp := pushStackItem(sp, bytecodeLen, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, bytecodeLen, evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x39 { // OP_CODECOPY
@@ -1993,9 +1955,9 @@ object "EVMInterpreter" {
                     let dst, offset, len
             
                     popStackCheck(sp, evmGasLeft, 3)
-                    dst, sp := popStackItemWithoutCheck(sp)
-                    offset, sp := popStackItemWithoutCheck(sp)
-                    len, sp := popStackItemWithoutCheck(sp)
+                    dst, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                     // minimum_word_size = (size + 31) / 32
@@ -2023,14 +1985,16 @@ object "EVMInterpreter" {
                 case 0x3A { // OP_GASPRICE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
-                    sp := pushStackItem(sp, gasprice(), evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, gasprice(), evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x3B { // OP_EXTCODESIZE
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
-                    let addr
-                    addr, sp := popStackItem(sp, evmGasLeft)
+                    if lt(sp, STACK_OFFSET()) {
+                        revertWithGas(evmGasLeft)
+                    }
+                    let addr := stackHead
             
                     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -2043,19 +2007,19 @@ object "EVMInterpreter" {
                     // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)
             
                     switch _isEVM(addr) 
-                        case 0  { sp := pushStackItem(sp, extcodesize(addr), evmGasLeft) }
-                        default { sp := pushStackItem(sp, _fetchDeployedCodeLen(addr), evmGasLeft) }
+                        case 0  { stackHead := extcodesize(addr) }
+                        default { stackHead := _fetchDeployedCodeLen(addr) }
                     ip := add(ip, 1)
                 }
                 case 0x3C { // OP_EXTCODECOPY
-                    evmGasLeft, sp := performExtCodeCopy(evmGasLeft, sp)
+                    evmGasLeft, sp, stackHead := performExtCodeCopy(evmGasLeft, sp, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x3D { // OP_RETURNDATASIZE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
                     let rdz := mload(LAST_RETURNDATA_SIZE_OFFSET())
-                    sp := pushStackItem(sp, rdz, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, rdz, evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x3E { // OP_RETURNDATACOPY
@@ -2063,9 +2027,9 @@ object "EVMInterpreter" {
             
                     let dest, offset, len
                     popStackCheck(sp, evmGasLeft, 3)
-                    dest, sp := popStackItemWithoutCheck(sp)
-                    offset, sp := popStackItemWithoutCheck(sp)
-                    len, sp := popStackItemWithoutCheck(sp)
+                    dest, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     // TODO: check if these conditions are met
                     // The addition offset + size overflows.
@@ -2087,8 +2051,11 @@ object "EVMInterpreter" {
                 case 0x3F { // OP_EXTCODEHASH
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
-                    let addr
-                    addr, sp := popStackItem(sp, evmGasLeft)
+                    if lt(sp, STACK_OFFSET()) {
+                        revertWithGas(evmGasLeft)
+                    }
+            
+                    let addr := stackHead
                     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
                     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -2097,59 +2064,59 @@ object "EVMInterpreter" {
             
                     ip := add(ip, 1)
                     if iszero(addr) {
-                        sp := pushStackItem(sp, 0, evmGasLeft)
+                        stackHead := 0
                         continue
                     }
-                    sp := pushStackItem(sp, extcodehash(addr), evmGasLeft)
+                    stackHead := extcodehash(addr)
                 }
                 case 0x40 { // OP_BLOCKHASH
                     evmGasLeft := chargeGas(evmGasLeft, 20)
             
-                    let blockNumber
-                    popPushStackCheck(sp, evmGasLeft, 1)
-                    blockNumber, sp := popStackItemWithoutCheck(sp)
-            
-                    sp := pushStackItemWithoutCheck(sp, blockhash(blockNumber))
+                    if iszero(lt(sp, BYTECODE_OFFSET())) {
+                        revertWithGas(evmGasLeft)
+                    }
+                    let blockNumber := stackHead
+                    stackHead := blockhash(blockNumber)
                     ip := add(ip, 1)
                 }
                 case 0x41 { // OP_COINBASE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    sp := pushStackItem(sp, coinbase(), evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, coinbase(), evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x42 { // OP_TIMESTAMP
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    sp := pushStackItem(sp, timestamp(), evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, timestamp(), evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x43 { // OP_NUMBER
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    sp := pushStackItem(sp, number(), evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, number(), evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x44 { // OP_PREVRANDAO
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    sp := pushStackItem(sp, prevrandao(), evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, prevrandao(), evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x45 { // OP_GASLIMIT
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    sp := pushStackItem(sp, gaslimit(), evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, gaslimit(), evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x46 { // OP_CHAINID
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    sp := pushStackItem(sp, chainid(), evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, chainid(), evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x47 { // OP_SELFBALANCE
                     evmGasLeft := chargeGas(evmGasLeft, 5)
-                    sp := pushStackItem(sp, selfbalance(), evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, selfbalance(), evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x48 { // OP_BASEFEE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-                    sp := pushStackItem(sp, basefee(), evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, basefee(), evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x50 { // OP_POP
@@ -2157,23 +2124,24 @@ object "EVMInterpreter" {
             
                     let _y
             
-                    _y, sp := popStackItem(sp, evmGasLeft)
+                    _y, sp, stackHead := popStackItem(sp, evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x51 { // OP_MLOAD
                     evmGasLeft := chargeGas(evmGasLeft, 3)
             
-                    let offset
+                    if lt(sp, STACK_OFFSET()) {
+                        revertWithGas(evmGasLeft)
+                    }
             
-                    offset, sp := popStackItem(sp, evmGasLeft)
+                    let offset := stackHead
             
                     checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
                     checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
                     let expansionGas := expandMemory(add(offset, 32))
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
-                    let memValue := mload(add(MEM_OFFSET_INNER(), offset))
-                    sp := pushStackItem(sp, memValue, evmGasLeft)
+                    stackHead := mload(add(MEM_OFFSET_INNER(), offset))
                     ip := add(ip, 1)
                 }
                 case 0x52 { // OP_MSTORE
@@ -2182,8 +2150,8 @@ object "EVMInterpreter" {
                     let offset, value
             
                     popStackCheck(sp, evmGasLeft, 2)
-                    offset, sp := popStackItemWithoutCheck(sp)
-                    value, sp := popStackItemWithoutCheck(sp)
+                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
                     checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
@@ -2199,8 +2167,8 @@ object "EVMInterpreter" {
                     let offset, value
             
                     popStackCheck(sp, evmGasLeft, 2)
-                    offset, sp := popStackItemWithoutCheck(sp)
-                    value, sp := popStackItemWithoutCheck(sp)
+                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
                     checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
@@ -2216,7 +2184,10 @@ object "EVMInterpreter" {
             
                     let key, value, isWarm
             
-                    key, sp := popStackItem(sp, evmGasLeft)
+                    if lt(sp, STACK_OFFSET()) {
+                        revertWithGas(evmGasLeft)
+                    }
+                    key := stackHead
             
                     let wasWarm := isSlotWarm(key)
             
@@ -2230,7 +2201,7 @@ object "EVMInterpreter" {
                         let _wasW, _orgV := warmSlot(key, value)
                     }
             
-                    sp := pushStackItem(sp,value, evmGasLeft)
+                    stackHead := value
                     ip := add(ip, 1)
                 }
                 case 0x55 { // OP_SSTORE
@@ -2243,8 +2214,8 @@ object "EVMInterpreter" {
                     let key, value, gasSpent
             
                     popStackCheck(sp, evmGasLeft, 2)
-                    key, sp := popStackItemWithoutCheck(sp)
-                    value, sp := popStackItemWithoutCheck(sp)
+                    key, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     ip := add(ip, 1)
                     {
@@ -2281,7 +2252,7 @@ object "EVMInterpreter" {
             
                     let counter
             
-                    counter, sp := popStackItem(sp, evmGasLeft)
+                    counter, sp, stackHead := popStackItem(sp, evmGasLeft, stackHead)
             
                     ip := add(add(BYTECODE_OFFSET(), 32), counter)
             
@@ -2297,8 +2268,8 @@ object "EVMInterpreter" {
                     let counter, b
             
                     popStackCheck(sp, evmGasLeft, 2)
-                    counter, sp := popStackItemWithoutCheck(sp)
-                    b, sp := popStackItemWithoutCheck(sp)
+                    counter, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    b, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     if iszero(b) {
                         ip := add(ip, 1)
@@ -2318,7 +2289,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
             
                     // PC = ip - 32 (bytecode size) - 1 (current instruction)
-                    sp := pushStackItem(sp, sub(sub(ip, BYTECODE_OFFSET()), 33), evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, sub(sub(ip, BYTECODE_OFFSET()), 33), evmGasLeft, stackHead)
                 }
                 case 0x59 { // OP_MSIZE
                     evmGasLeft := chargeGas(evmGasLeft,2)
@@ -2327,13 +2298,13 @@ object "EVMInterpreter" {
             
                     size := mload(MEM_OFFSET())
                     size := shl(5,size)
-                    sp := pushStackItem(sp,size, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp,size, evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x5A { // OP_GAS
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
-                    sp := pushStackItem(sp, evmGasLeft, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, evmGasLeft, evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x5B { // OP_JUMPDEST
@@ -2343,11 +2314,12 @@ object "EVMInterpreter" {
                 case 0x5C { // OP_TLOAD
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
-                    let key
-                    popPushStackCheck(sp, evmGasLeft, 1)
-                    key, sp := popStackItemWithoutCheck(sp)
+                    if lt(sp, STACK_OFFSET()) {
+                        revertWithGas(evmGasLeft)
+                    }
+                    let key := stackHead
             
-                    sp := pushStackItemWithoutCheck(sp, tload(key))
+                    stackHead := tload(key)
                     ip := add(ip, 1)
                 }
                 case 0x5D { // OP_TSTORE
@@ -2359,8 +2331,8 @@ object "EVMInterpreter" {
             
                     let key, value
                     popStackCheck(sp, evmGasLeft, 2)
-                    key, sp := popStackItemWithoutCheck(sp)
-                    value, sp := popStackItemWithoutCheck(sp)
+                    key, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     tstore(key, value)
                     ip := add(ip, 1)
@@ -2368,9 +2340,9 @@ object "EVMInterpreter" {
                 case 0x5E { // OP_MCOPY
                     let destOffset, offset, size
                     popStackCheck(sp, evmGasLeft, 3)
-                    destOffset, sp := popStackItemWithoutCheck(sp)
-                    offset, sp := popStackItemWithoutCheck(sp)
-                    size, sp := popStackItemWithoutCheck(sp)
+                    destOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     expandMemory(add(destOffset, size))
                     expandMemory(add(offset, size))
@@ -2399,7 +2371,7 @@ object "EVMInterpreter" {
             
                     let value := 0
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x60 { // OP_PUSH1
@@ -2408,7 +2380,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,1)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x61 { // OP_PUSH2
@@ -2417,7 +2389,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,2)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 2)
                 }     
                 case 0x62 { // OP_PUSH3
@@ -2426,7 +2398,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,3)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 3)
                 }
                 case 0x63 { // OP_PUSH4
@@ -2435,7 +2407,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,4)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 4)
                 }
                 case 0x64 { // OP_PUSH5
@@ -2444,7 +2416,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,5)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 5)
                 }
                 case 0x65 { // OP_PUSH6
@@ -2453,7 +2425,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,6)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 6)
                 }
                 case 0x66 { // OP_PUSH7
@@ -2462,7 +2434,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,7)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 7)
                 }
                 case 0x67 { // OP_PUSH8
@@ -2471,7 +2443,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,8)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 8)
                 }
                 case 0x68 { // OP_PUSH9
@@ -2480,7 +2452,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,9)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 9)
                 }
                 case 0x69 { // OP_PUSH10
@@ -2489,7 +2461,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,10)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 10)
                 }
                 case 0x6A { // OP_PUSH11
@@ -2498,7 +2470,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,11)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 11)
                 }
                 case 0x6B { // OP_PUSH12
@@ -2507,7 +2479,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,12)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 12)
                 }
                 case 0x6C { // OP_PUSH13
@@ -2516,7 +2488,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,13)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 13)
                 }
                 case 0x6D { // OP_PUSH14
@@ -2525,7 +2497,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,14)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 14)
                 }
                 case 0x6E { // OP_PUSH15
@@ -2534,7 +2506,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,15)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 15)
                 }
                 case 0x6F { // OP_PUSH16
@@ -2543,7 +2515,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,16)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 16)
                 }
                 case 0x70 { // OP_PUSH17
@@ -2552,7 +2524,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,17)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 17)
                 }
                 case 0x71 { // OP_PUSH18
@@ -2561,7 +2533,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,18)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 18)
                 }
                 case 0x72 { // OP_PUSH19
@@ -2570,7 +2542,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,19)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 19)
                 }
                 case 0x73 { // OP_PUSH20
@@ -2579,7 +2551,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,20)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 20)
                 }
                 case 0x74 { // OP_PUSH21
@@ -2588,7 +2560,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,21)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 21)
                 }
                 case 0x75 { // OP_PUSH22
@@ -2597,7 +2569,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,22)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 22)
                 }
                 case 0x76 { // OP_PUSH23
@@ -2606,7 +2578,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,23)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 23)
                 }
                 case 0x77 { // OP_PUSH24
@@ -2615,7 +2587,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,24)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 24)
                 }
                 case 0x78 { // OP_PUSH25
@@ -2624,7 +2596,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,25)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 25)
                 }
                 case 0x79 { // OP_PUSH26
@@ -2633,7 +2605,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,26)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 26)
                 }
                 case 0x7A { // OP_PUSH27
@@ -2642,7 +2614,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,27)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 27)
                 }
                 case 0x7B { // OP_PUSH28
@@ -2651,7 +2623,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,28)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 28)
                 }
                 case 0x7C { // OP_PUSH29
@@ -2660,7 +2632,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,29)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 29)
                 }
                 case 0x7D { // OP_PUSH30
@@ -2669,7 +2641,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,30)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 30)
                 }
                 case 0x7E { // OP_PUSH31
@@ -2678,7 +2650,7 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,31)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 31)
                 }
                 case 0x7F { // OP_PUSH32
@@ -2687,135 +2659,135 @@ object "EVMInterpreter" {
                     ip := add(ip, 1)
                     let value := readBytes(ip,maxAcceptablePos,32)
             
-                    sp := pushStackItem(sp, value, evmGasLeft)
+                    sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                     ip := add(ip, 32)
                 }
                 case 0x80 { // OP_DUP1 
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 1)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 1, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x81 { // OP_DUP2
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 2)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 2, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x82 { // OP_DUP3
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 3)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 3, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x83 { // OP_DUP4    
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 4)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 4, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x84 { // OP_DUP5
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 5)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 5, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x85 { // OP_DUP6
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 6)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 6, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x86 { // OP_DUP7    
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 7)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 7, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x87 { // OP_DUP8
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 8)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 8, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x88 { // OP_DUP9
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 9)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 9, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x89 { // OP_DUP10   
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 10)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 10, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x8A { // OP_DUP11
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 11)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 11, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x8B { // OP_DUP12
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 12)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 12, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x8C { // OP_DUP13
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 13)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 13, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x8D { // OP_DUP14
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 14)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 14, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x8E { // OP_DUP15
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 15)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 15, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x8F { // OP_DUP16
-                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 16)
+                    sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 16, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x90 { // OP_SWAP1 
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 1)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 1, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x91 { // OP_SWAP2
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 2)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 2, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x92 { // OP_SWAP3
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 3)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 3, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x93 { // OP_SWAP4    
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 4)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 4, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x94 { // OP_SWAP5
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 5)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 5, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x95 { // OP_SWAP6
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 6)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 6, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x96 { // OP_SWAP7    
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 7)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 7, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x97 { // OP_SWAP8
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 8)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 8, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x98 { // OP_SWAP9
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 9)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 9, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x99 { // OP_SWAP10   
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 10)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 10, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x9A { // OP_SWAP11
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 11)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 11, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x9B { // OP_SWAP12
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 12)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 12, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x9C { // OP_SWAP13
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 13)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 13, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x9D { // OP_SWAP14
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 14)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 14, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x9E { // OP_SWAP15
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 15)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 15, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0x9F { // OP_SWAP16
-                    evmGasLeft := swapStackItem(sp, evmGasLeft, 16)
+                    evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 16, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0xA0 { // OP_LOG0
@@ -2827,8 +2799,8 @@ object "EVMInterpreter" {
             
                     let offset, size
                     popStackCheck(sp, evmGasLeft, 2)
-                    offset, sp := popStackItemWithoutCheck(sp)
-                    size, sp := popStackItemWithoutCheck(sp)
+                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
@@ -2849,9 +2821,9 @@ object "EVMInterpreter" {
             
                     let offset, size, topic1
                     popStackCheck(sp, evmGasLeft, 3)
-                    offset, sp := popStackItemWithoutCheck(sp)
-                    size, sp := popStackItemWithoutCheck(sp)
-                    topic1, sp := popStackItemWithoutCheck(sp)
+                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
@@ -2872,8 +2844,8 @@ object "EVMInterpreter" {
             
                     let offset, size
                     popStackCheck(sp, evmGasLeft, 2)
-                    offset, sp := popStackItemWithoutCheck(sp)
-                    size, sp := popStackItemWithoutCheck(sp)
+                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
@@ -2886,8 +2858,8 @@ object "EVMInterpreter" {
                     {
                         let topic1, topic2
                         popStackCheck(sp, evmGasLeft, 2)
-                        topic1, sp := popStackItemWithoutCheck(sp)
-                        topic2, sp := popStackItemWithoutCheck(sp)
+                        topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         log2(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2)
                     }
                     ip := add(ip, 1)
@@ -2901,8 +2873,8 @@ object "EVMInterpreter" {
             
                     let offset, size
                     popStackCheck(sp, evmGasLeft, 2)
-                    offset, sp := popStackItemWithoutCheck(sp)
-                    size, sp := popStackItemWithoutCheck(sp)
+                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
             
@@ -2916,9 +2888,9 @@ object "EVMInterpreter" {
                     {
                         let topic1, topic2, topic3
                         popStackCheck(sp, evmGasLeft, 3)
-                        topic1, sp := popStackItemWithoutCheck(sp)
-                        topic2, sp := popStackItemWithoutCheck(sp)
-                        topic3, sp := popStackItemWithoutCheck(sp)
+                        topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         log3(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2, topic3)
                     }     
                     ip := add(ip, 1)
@@ -2932,8 +2904,8 @@ object "EVMInterpreter" {
             
                     let offset, size
                     popStackCheck(sp, evmGasLeft, 2)
-                    offset, sp := popStackItemWithoutCheck(sp)
-                    size, sp := popStackItemWithoutCheck(sp)
+                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
@@ -2946,16 +2918,16 @@ object "EVMInterpreter" {
                     {
                         let topic1, topic2, topic3, topic4
                         popStackCheck(sp, evmGasLeft, 4)
-                        topic1, sp := popStackItemWithoutCheck(sp)
-                        topic2, sp := popStackItemWithoutCheck(sp)
-                        topic3, sp := popStackItemWithoutCheck(sp)
-                        topic4, sp := popStackItemWithoutCheck(sp)
+                        topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        topic4, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         log4(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2, topic3, topic4)
                     }     
                     ip := add(ip, 1)
                 }
                 case 0xF0 { // OP_CREATE
-                    evmGasLeft, sp := performCreate(evmGasLeft, sp, isStatic)
+                    evmGasLeft, sp, stackHead := performCreate(evmGasLeft, sp, isStatic, stackHead)
                     ip := add(ip, 1)
                 }
                 case 0xF1 { // OP_CALL
@@ -2964,7 +2936,7 @@ object "EVMInterpreter" {
                     let gasUsed
             
                     // A function was implemented in order to avoid stack depth errors.
-                    gasUsed, sp := performCall(sp, evmGasLeft, isStatic)
+                    gasUsed, sp, stackHead := performCall(sp, evmGasLeft, isStatic, stackHead)
             
                     // Check if the following is ok
                     evmGasLeft := chargeGas(evmGasLeft, gasUsed)
@@ -2974,8 +2946,8 @@ object "EVMInterpreter" {
                     let offset,size
             
                     popStackCheck(sp, evmGasLeft, 2)
-                    offset, sp := popStackItemWithoutCheck(sp)
-                    size, sp := popStackItemWithoutCheck(sp)
+                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     checkOverflow(offset,size, evmGasLeft)
                     evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
@@ -2989,24 +2961,24 @@ object "EVMInterpreter" {
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
                     let gasUsed
-                    sp, isStatic, gasUsed := delegateCall(sp, isStatic, evmGasLeft)
+                    sp, isStatic, gasUsed, stackHead := delegateCall(sp, isStatic, evmGasLeft, stackHead)
             
                     evmGasLeft := chargeGas(evmGasLeft, gasUsed)
                     ip := add(ip, 1)
                 }
                 case 0xF5 { // OP_CREATE2
                     let result, addr
-                    evmGasLeft, sp, result, addr := performCreate2(evmGasLeft, sp, isStatic)
+                    evmGasLeft, sp, result, addr, stackHead := performCreate2(evmGasLeft, sp, isStatic, stackHead)
                     switch result
-                    case 0 { sp := pushStackItem(sp, 0, evmGasLeft) }
-                    default { sp := pushStackItem(sp, addr, evmGasLeft) }
+                    case 0 { sp, stackHead := pushStackItem(sp, 0, evmGasLeft, stackHead) }
+                    default { sp, stackHead := pushStackItem(sp, addr, evmGasLeft, stackHead) }
                     ip := add(ip, 1)
                 }
                 case 0xFA { // OP_STATICCALL
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
                     let gasUsed
-                    gasUsed, sp := performStaticCall(sp,evmGasLeft)
+                    gasUsed, sp, stackHead := performStaticCall(sp,evmGasLeft, stackHead)
                     evmGasLeft := chargeGas(evmGasLeft,gasUsed)
                     ip := add(ip, 1)
                 }
@@ -3014,8 +2986,8 @@ object "EVMInterpreter" {
                     let offset,size
             
                     popStackCheck(sp, evmGasLeft, 2)
-                    offset, sp := popStackItemWithoutCheck(sp)
-                    size, sp := popStackItemWithoutCheck(sp)
+                    offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                    size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     ensureAcceptableMemLocation(offset)
                     ensureAcceptableMemLocation(size)
@@ -3109,7 +3081,7 @@ object "EVMInterpreter" {
             }
             
             function STACK_OFFSET() -> offset {
-                offset := add(LAST_RETURNDATA_SIZE_OFFSET(), 32)
+                offset := add(LAST_RETURNDATA_SIZE_OFFSET(), 64)
             }
             
             function BYTECODE_OFFSET() -> offset {
@@ -3161,71 +3133,62 @@ object "EVMInterpreter" {
                 value := shr(mul(8,sub(32,length)),mload(start))
             }
             
-            function dupStackItem(sp, evmGas, position) -> newSp, evmGasLeft {
+            function dupStackItem(sp, evmGas, position, oldStackHead) -> newSp, evmGasLeft, stackHead {
                 evmGasLeft := chargeGas(evmGas, 3)
                 let tempSp := sub(sp, mul(0x20, sub(position, 1)))
             
-                if or(gt(tempSp, BYTECODE_OFFSET()), eq(tempSp, BYTECODE_OFFSET())) {
+                if or(iszero(lt(tempSp, BYTECODE_OFFSET())), lt(tempSp, STACK_OFFSET()))  {
                     revertWithGas(evmGasLeft)
                 }
             
-                if lt(tempSp, STACK_OFFSET()) {
-                    revertWithGas(evmGasLeft)
-                }
-            
-                let dup := mload(tempSp)                    
-            
+                mstore(sp, oldStackHead)
+                stackHead := mload(tempSp)
                 newSp := add(sp, 0x20)
-                mstore(newSp, dup)
             }
             
-            function swapStackItem(sp, evmGas, position) ->  evmGasLeft {
+            function swapStackItem(sp, evmGas, position, oldStackHead) ->  evmGasLeft, stackHead {
                 evmGasLeft := chargeGas(evmGas, 3)
                 let tempSp := sub(sp, mul(0x20, position))
             
-                if or(gt(tempSp, BYTECODE_OFFSET()), eq(tempSp, BYTECODE_OFFSET())) {
+                if or(iszero(lt(tempSp, BYTECODE_OFFSET())), lt(tempSp, STACK_OFFSET()))  {
                     revertWithGas(evmGasLeft)
                 }
             
-                if lt(tempSp, STACK_OFFSET()) {
-                    revertWithGas(evmGasLeft)
-                }
-            
-            
-                let s2 := mload(sp)
-                let s1 := mload(tempSp)                    
-            
-                mstore(sp, s1)
-                mstore(tempSp, s2)
+                stackHead := mload(tempSp)                    
+                mstore(tempSp, oldStackHead)
             }
             
-            function popStackItem(sp, evmGasLeft) -> a, newSp {
+            function popStackItem(sp, evmGasLeft, oldStackHead) -> a, newSp, stackHead {
                 // We can not return any error here, because it would break compatibility
                 if lt(sp, STACK_OFFSET()) {
                     revertWithGas(evmGasLeft)
                 }
             
-                a := mload(sp)
+                a := oldStackHead
                 newSp := sub(sp, 0x20)
+                stackHead := mload(newSp)
             }
             
-            function pushStackItem(sp, item, evmGasLeft) -> newSp {
-                if or(gt(sp, BYTECODE_OFFSET()), eq(sp, BYTECODE_OFFSET())) {
+            function pushStackItem(sp, item, evmGasLeft, oldStackHead) -> newSp, stackHead {
+                if iszero(lt(sp, BYTECODE_OFFSET())) {
                     revertWithGas(evmGasLeft)
                 }
             
+                mstore(sp, oldStackHead)
+                stackHead := item
                 newSp := add(sp, 0x20)
-                mstore(newSp, item)
             }
             
-            function popStackItemWithoutCheck(sp) -> a, newSp {
-                a := mload(sp)
+            function popStackItemWithoutCheck(sp, oldStackHead) -> a, newSp, stackHead {
+                a := oldStackHead
                 newSp := sub(sp, 0x20)
+                stackHead := mload(newSp)
             }
             
-            function pushStackItemWithoutCheck(sp, item) -> newSp {
+            function pushStackItemWithoutCheck(sp, item, oldStackHead) -> newSp, stackHead {
+                mstore(sp, oldStackHead)
+                stackHead := item
                 newSp := add(sp, 0x20)
-                mstore(newSp, item)
             }
             
             function popStackCheck(sp, evmGasLeft, numInputs) {
@@ -3972,16 +3935,15 @@ object "EVMInterpreter" {
                 mstore(lastRtSzOffset, returndatasize())
             }
             
-            function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
+            function performStaticCall(oldSp, evmGasLeft, oldStackHead) -> extraCost, sp, stackHead {
                 let gasToPass,addr, argsOffset, argsSize, retOffset, retSize
             
                 popStackCheck(oldSp, evmGasLeft, 6)
-                gasToPass, sp := popStackItemWithoutCheck(oldSp)
-                addr, sp := popStackItemWithoutCheck(sp)
-                argsOffset, sp := popStackItemWithoutCheck(sp)
-                argsSize, sp := popStackItemWithoutCheck(sp)
-                retOffset, sp := popStackItemWithoutCheck(sp)
-                retSize, sp := popStackItemWithoutCheck(sp)
+                gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+                addr, sp, stackHead  := popStackItemWithoutCheck(sp, stackHead)
+                argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
             
                 addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
@@ -4034,7 +3996,7 @@ object "EVMInterpreter" {
             
                 extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
                 extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
-                sp := pushStackItem(sp, success, evmGasLeft)
+                stackHead := success
             }
             function capGas(evmGasLeft,oldGasToPass) -> gasToPass {
                 let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
@@ -4095,17 +4057,16 @@ object "EVMInterpreter" {
                 }
             }
             
-            function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
+            function performCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> extraCost, sp, stackHead {
                 let gasToPass,addr,value,argsOffset,argsSize,retOffset,retSize
             
                 popStackCheck(oldSp, evmGasLeft, 7)
-                gasToPass, sp := popStackItemWithoutCheck(oldSp)
-                addr, sp := popStackItemWithoutCheck(sp)
-                value, sp := popStackItemWithoutCheck(sp)
-                argsOffset, sp := popStackItemWithoutCheck(sp)
-                argsSize, sp := popStackItemWithoutCheck(sp)
-                retOffset, sp := popStackItemWithoutCheck(sp)
-                retSize, sp := popStackItemWithoutCheck(sp)
+                gasToPass, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+                addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
             
                 addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
@@ -4158,22 +4119,21 @@ object "EVMInterpreter" {
             
                 extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
                 extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
-                sp := pushStackItem(sp,success, evmGasLeft) 
+                stackHead := success
             }
             
-            function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost {
+            function delegateCall(oldSp, oldIsStatic, evmGasLeft, oldStackHead) -> sp, isStatic, extraCost, stackHead {
                 let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
             
                 sp := oldSp
                 isStatic := oldIsStatic
             
                 popStackCheck(sp, evmGasLeft, 6)
-                gasToPass, sp := popStackItemWithoutCheck(sp)
-                addr, sp := popStackItemWithoutCheck(sp)
-                argsOffset, sp := popStackItemWithoutCheck(sp)
-                argsSize, sp := popStackItemWithoutCheck(sp)
-                retOffset, sp := popStackItemWithoutCheck(sp)
-                retSize, sp := popStackItemWithoutCheck(sp)
+                gasToPass, sp, stackHead := popStackItemWithoutCheck(sp, oldStackHead)
+                addr, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                argsOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                argsSize, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                retOffset, sp, retSize := popStackItemWithoutCheck(sp, stackHead)
             
                 // addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
@@ -4222,7 +4182,7 @@ object "EVMInterpreter" {
             
                 extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
                 extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
-                sp := pushStackItem(sp, success, evmGasLeft)
+                stackHead := success
             }
             
             function getMessageCallGas (
@@ -4322,7 +4282,7 @@ object "EVMInterpreter" {
                 gasLeft := mload(0)
             }
             
-            function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, evmGasLeft {
+            function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeftOld, oldStackHead) -> result, evmGasLeft, stackHead {
                 pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
             
                 _eraseReturndataPointer()
@@ -4335,10 +4295,10 @@ object "EVMInterpreter" {
             
                 offset := add(MEM_OFFSET_INNER(), offset)
             
-                sp := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeftOld)
-                sp := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeftOld)
-                sp := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeftOld)
-                sp := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeftOld)
+                sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeftOld, oldStackHead)
+                sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeftOld, stackHead)
+                sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeftOld, stackHead)
+                sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeftOld, stackHead)
             
                 // Selector
                 mstore(sub(offset, 0x80), 0x5b16a23c)
@@ -4383,25 +4343,25 @@ object "EVMInterpreter" {
                 let back
             
                 popStackCheck(sp, evmGasLeft, 4)
-                back, sp := popStackItemWithoutCheck(sp)
+                back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 mstore(sub(offset, 0x20), back)
-                back, sp := popStackItemWithoutCheck(sp)
+                back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 mstore(sub(offset, 0x40), back)
-                back, sp := popStackItemWithoutCheck(sp)
+                back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 mstore(sub(offset, 0x60), back)
-                back, sp := popStackItemWithoutCheck(sp)
+                back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 mstore(sub(offset, 0x80), back)
             }
             
-            function performExtCodeCopy(evmGas,oldSp) -> evmGasLeft, sp {
+            function performExtCodeCopy(evmGas,oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
                 evmGasLeft := chargeGas(evmGas, 100)
             
                 let addr, dest, offset, len
                 popStackCheck(oldSp, evmGasLeft, 4)
-                addr, sp := popStackItemWithoutCheck(oldSp)
-                dest, sp := popStackItemWithoutCheck(sp)
-                offset, sp := popStackItemWithoutCheck(sp)
-                len, sp := popStackItemWithoutCheck(sp)
+                addr, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+                dest, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                 // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
                 // minimum_word_size = (size + 31) / 32
@@ -4433,7 +4393,7 @@ object "EVMInterpreter" {
                 }
             }
             
-            function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
+            function performCreate(evmGas,oldSp,isStatic, oldStackHead) -> evmGasLeft, sp, stackHead {
                 evmGasLeft := chargeGas(evmGas, 32000)
             
                 if isStatic {
@@ -4443,9 +4403,8 @@ object "EVMInterpreter" {
                 let value, offset, size
             
                 popStackCheck(oldSp, evmGasLeft, 3)
-                value, sp := popStackItemWithoutCheck(oldSp)
-                offset, sp := popStackItemWithoutCheck(sp)
-                size, sp := popStackItemWithoutCheck(sp)
+                value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+                offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
             
                 checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
             
@@ -4472,14 +4431,14 @@ object "EVMInterpreter" {
                 let addr := getNewAddress(address())
             
                 let result
-                result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
+                result, evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft, stackHead)
             
                 switch result
-                    case 0 { sp := pushStackItem(sp, 0, evmGasLeft) }
-                    default { sp := pushStackItem(sp, addr, evmGasLeft) }
+                    case 0 { stackHead := 0 }
+                    default { stackHead := addr }
             }
             
-            function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp, result, addr{
+            function performCreate2(evmGas, oldSp, isStatic, oldStackHead) -> evmGasLeft, sp, result, addr, stackHead {
                 evmGasLeft := chargeGas(evmGas, 32000)
             
                 if isStatic {
@@ -4489,10 +4448,10 @@ object "EVMInterpreter" {
                 let value, offset, size, salt
             
                 popStackCheck(oldSp, evmGasLeft, 4)
-                value, sp := popStackItemWithoutCheck(oldSp)
-                offset, sp := popStackItemWithoutCheck(sp)
-                size, sp := popStackItemWithoutCheck(sp)
-                salt, sp := popStackItemWithoutCheck(sp)
+                value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
+                offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                salt, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                 checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
             
@@ -4529,7 +4488,7 @@ object "EVMInterpreter" {
                     0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
                 )
             
-                result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
+                result, evmGasLeft, stackHead := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft, stackHead)
             }
             
 
@@ -4548,6 +4507,7 @@ object "EVMInterpreter" {
                 // actual yul/evm instruction.
                 let ip := add(BYTECODE_OFFSET(), 32)
                 let opcode
+                let stackHead
                 
                 let maxAcceptablePos := add(add(BYTECODE_OFFSET(), mload(BYTECODE_OFFSET())), 31)
                 
@@ -4561,85 +4521,74 @@ object "EVMInterpreter" {
                     case 0x01 { // OP_ADD
                         evmGasLeft := chargeGas(evmGasLeft, 3)
                 
-                        let a, b
+                        popStackCheck(sp, evmGasLeft, 2)
+                        let a
+                        a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
-                
-                        sp := pushStackItemWithoutCheck(sp, add(a, b))
+                        stackHead := add(a, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x02 { // OP_MUL
                         evmGasLeft := chargeGas(evmGasLeft, 5)
                 
-                        let a, b
-                
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
-                
-                        sp := pushStackItemWithoutCheck(sp, mul(a, b))
+                        let a
+                        a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        stackHead := mul(a, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x03 { // OP_SUB
                         evmGasLeft := chargeGas(evmGasLeft, 3)
                 
-                        let a, b
+                        let a
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
+                        a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, sub(a, b))
+                        stackHead := sub(a, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x04 { // OP_DIV
                         evmGasLeft := chargeGas(evmGasLeft, 5)
                 
-                        let a, b
+                        let a
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
+                        a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        stackHead := div(a, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, div(a, b))
                         ip := add(ip, 1)
                     }
                     case 0x05 { // OP_SDIV
                         evmGasLeft := chargeGas(evmGasLeft, 5)
                 
-                        let a, b
+                        let a
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
+                        a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        stackHead := sdiv(a, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, sdiv(a, b))
                         ip := add(ip, 1)
                     }
                     case 0x06 { // OP_MOD
                         evmGasLeft := chargeGas(evmGasLeft, 5)
                 
-                        let a, b
+                        let a
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
-                
-                        sp := pushStackItemWithoutCheck(sp, mod(a, b))
+                        a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        stackHead := mod(a, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x07 { // OP_SMOD
                         evmGasLeft := chargeGas(evmGasLeft, 5)
                 
-                        let a, b
+                        let a
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
+                        a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        stackHead := smod(a, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, smod(a, b))
                         ip := add(ip, 1)
                     }
                     case 0x08 { // OP_ADDMOD
@@ -4648,11 +4597,10 @@ object "EVMInterpreter" {
                         let a, b, N
                 
                         popPushStackCheck(sp, evmGasLeft, 3)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
-                        N, sp := popStackItemWithoutCheck(sp)
+                        a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        b, sp, N := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, addmod(a, b, N))
+                        stackHead := addmod(a, b, N)
                         ip := add(ip, 1)
                     }
                     case 0x09 { // OP_MULMOD
@@ -4661,11 +4609,10 @@ object "EVMInterpreter" {
                         let a, b, N
                 
                         popStackCheck(sp, evmGasLeft, 3)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
-                        N, sp := popStackItemWithoutCheck(sp)
+                        a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        b, sp, N := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItem(sp, mulmod(a, b, N), evmGasLeft)
+                        stackHead := mulmod(a, b, N)
                         ip := add(ip, 1)
                     }
                     case 0x0A { // OP_EXP
@@ -4674,10 +4621,9 @@ object "EVMInterpreter" {
                         let a, exponent
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        exponent, sp := popStackItemWithoutCheck(sp)
+                        a, sp, exponent := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, exp(a, exponent))
+                        stackHead := exp(a, exponent)
                 
                         let to_charge := 0
                         for {} gt(exponent,0) {} { // while exponent > 0
@@ -4693,10 +4639,9 @@ object "EVMInterpreter" {
                         let b, x
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        b, sp := popStackItemWithoutCheck(sp)
-                        x, sp := popStackItemWithoutCheck(sp)
+                        b, sp, x := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, signextend(b, x))
+                        stackHead := signextend(b, x)
                         ip := add(ip, 1)
                     }
                     case 0x10 { // OP_LT
@@ -4705,10 +4650,9 @@ object "EVMInterpreter" {
                         let a, b
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
+                        a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, lt(a, b))
+                        stackHead := lt(a, b)
                         ip := add(ip, 1)
                     }
                     case 0x11 { // OP_GT
@@ -4717,10 +4661,9 @@ object "EVMInterpreter" {
                         let a, b
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
+                        a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, gt(a, b))
+                        stackHead:= gt(a, b)
                         ip := add(ip, 1)
                     }
                     case 0x12 { // OP_SLT
@@ -4729,10 +4672,9 @@ object "EVMInterpreter" {
                         let a, b
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
+                        a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, slt(a, b))
+                        stackHead := slt(a, b)
                         ip := add(ip, 1)
                     }
                     case 0x13 { // OP_SGT
@@ -4741,10 +4683,9 @@ object "EVMInterpreter" {
                         let a, b
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
+                        a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, sgt(a, b))
+                        stackHead := sgt(a, b)
                         ip := add(ip, 1)
                     }
                     case 0x14 { // OP_EQ
@@ -4753,10 +4694,9 @@ object "EVMInterpreter" {
                         let a, b
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
+                        a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, eq(a, b))
+                        stackHead := eq(a, b)
                         ip := add(ip, 1)
                     }
                     case 0x15 { // OP_ISZERO
@@ -4765,9 +4705,7 @@ object "EVMInterpreter" {
                         let a
                 
                         popPushStackCheck(sp, evmGasLeft, 1)
-                        a, sp := popStackItemWithoutCheck(sp)
-                
-                        sp := pushStackItemWithoutCheck(sp, iszero(a))
+                        stackHead := iszero(stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x16 { // OP_AND
@@ -4776,10 +4714,9 @@ object "EVMInterpreter" {
                         let a, b
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
+                        a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, and(a,b))
+                        stackHead := and(a,b)
                         ip := add(ip, 1)
                     }
                     case 0x17 { // OP_OR
@@ -4788,10 +4725,9 @@ object "EVMInterpreter" {
                         let a, b
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
+                        a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, or(a,b))
+                        stackHead := or(a,b)
                         ip := add(ip, 1)
                     }
                     case 0x18 { // OP_XOR
@@ -4800,21 +4736,20 @@ object "EVMInterpreter" {
                         let a, b
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        a, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
+                        a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, xor(a, b))
+                        stackHead := xor(a, b)
                         ip := add(ip, 1)
                     }
                     case 0x19 { // OP_NOT
                         evmGasLeft := chargeGas(evmGasLeft, 3)
                 
-                        let a
+                        if lt(sp, STACK_OFFSET()) {
+                            revertWithGas(evmGasLeft)
+                        }
                 
-                        popPushStackCheck(sp, evmGasLeft, 1)
-                        a, sp := popStackItemWithoutCheck(sp)
+                        stackHead := not(stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, not(a))
                         ip := add(ip, 1)
                     }
                     case 0x1A { // OP_BYTE
@@ -4823,10 +4758,9 @@ object "EVMInterpreter" {
                         let i, x
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        i, sp := popStackItemWithoutCheck(sp)
-                        x, sp := popStackItemWithoutCheck(sp)
+                        i, sp, x := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, byte(i, x))
+                        stackHead := byte(i, x)
                         ip := add(ip, 1)
                     }
                     case 0x1B { // OP_SHL
@@ -4835,10 +4769,9 @@ object "EVMInterpreter" {
                         let shift, value
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        shift, sp := popStackItemWithoutCheck(sp)
-                        value, sp := popStackItemWithoutCheck(sp)
+                        shift, sp, value := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, shl(shift, value))
+                        stackHead := shl(shift, value)
                         ip := add(ip, 1)
                     }
                     case 0x1C { // OP_SHR
@@ -4847,10 +4780,9 @@ object "EVMInterpreter" {
                         let shift, value
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        shift, sp := popStackItemWithoutCheck(sp)
-                        value, sp := popStackItemWithoutCheck(sp)
+                        shift, sp, value := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, shr(shift, value))
+                        stackHead := shr(shift, value)
                         ip := add(ip, 1)
                     }
                     case 0x1D { // OP_SAR
@@ -4859,10 +4791,9 @@ object "EVMInterpreter" {
                         let shift, value
                 
                         popPushStackCheck(sp, evmGasLeft, 2)
-                        shift, sp := popStackItemWithoutCheck(sp)
-                        value, sp := popStackItemWithoutCheck(sp)
+                        shift, sp, value := popStackItemWithoutCheck(sp, stackHead)
                 
-                        sp := pushStackItemWithoutCheck(sp, sar(shift, value))
+                        stackHead := sar(shift, value)
                         ip := add(ip, 1)
                     }
                     case 0x20 { // OP_KECCAK256
@@ -4871,8 +4802,7 @@ object "EVMInterpreter" {
                         let offset, size
                 
                         popStackCheck(sp, evmGasLeft, 2)
-                        offset, sp := popStackItemWithoutCheck(sp)
-                        size, sp := popStackItemWithoutCheck(sp)
+                        offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
                 
                         checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
                         checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
@@ -4885,13 +4815,13 @@ object "EVMInterpreter" {
                         let dynamicGas := add(mul(6, shr(5, add(size, 31))), expandMemory(add(offset, size)))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
-                        sp := pushStackItem(sp, keccak, evmGasLeft)
+                        stackHead := keccak
                         ip := add(ip, 1)
                     }
                     case 0x30 { // OP_ADDRESS
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
-                        sp := pushStackItem(sp, address(), evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, address(), evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x31 { // OP_BALANCE
@@ -4899,49 +4829,53 @@ object "EVMInterpreter" {
                 
                         let addr
                 
-                        addr, sp := popStackItem(sp, evmGasLeft)
+                        if lt(sp, STACK_OFFSET()) {
+                            revertWithGas(evmGasLeft)
+                        }
+                
+                        addr := stackHead
                         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
                 
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
                         }
                 
-                        sp := pushStackItem(sp, balance(addr), evmGasLeft)
+                        stackHead := balance(addr)
                         ip := add(ip, 1)
                     }
                     case 0x32 { // OP_ORIGIN
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
-                        sp := pushStackItem(sp, origin(), evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, origin(), evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x33 { // OP_CALLER
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
-                        sp := pushStackItem(sp, caller(), evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, caller(), evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x34 { // OP_CALLVALUE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
-                        sp := pushStackItem(sp, callvalue(), evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, callvalue(), evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x35 { // OP_CALLDATALOAD
                         evmGasLeft := chargeGas(evmGasLeft, 3)
+                        
+                        if iszero(lt(sp, BYTECODE_OFFSET())) {
+                            revertWithGas(evmGasLeft)
+                        }
+                        let i := stackHead
                 
-                        let i
-                
-                        popPushStackCheck(sp, evmGasLeft, 1)
-                        i, sp := popStackItemWithoutCheck(sp)
-                
-                        sp := pushStackItemWithoutCheck(sp, calldataload(i))
+                        stackHead := calldataload(i)
                         ip := add(ip, 1)
                     }
                     case 0x36 { // OP_CALLDATASIZE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
-                        sp := pushStackItem(sp, calldatasize(), evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, calldatasize(), evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x37 { // OP_CALLDATACOPY
@@ -4950,9 +4884,9 @@ object "EVMInterpreter" {
                         let destOffset, offset, size
                 
                         popStackCheck(sp, evmGasLeft, 3)
-                        destOffset, sp := popStackItemWithoutCheck(sp)
-                        offset, sp := popStackItemWithoutCheck(sp)
-                        size, sp := popStackItemWithoutCheck(sp)
+                        destOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        offset, sp, stackHead:= popStackItemWithoutCheck(sp, stackHead)
+                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         checkMultipleOverflow(offset,size,MEM_OFFSET_INNER(), evmGasLeft)
                         checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER(), evmGasLeft)
@@ -4979,7 +4913,7 @@ object "EVMInterpreter" {
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
                         let bytecodeLen := mload(BYTECODE_OFFSET())
-                        sp := pushStackItem(sp, bytecodeLen, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, bytecodeLen, evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x39 { // OP_CODECOPY
@@ -4989,9 +4923,9 @@ object "EVMInterpreter" {
                         let dst, offset, len
                 
                         popStackCheck(sp, evmGasLeft, 3)
-                        dst, sp := popStackItemWithoutCheck(sp)
-                        offset, sp := popStackItemWithoutCheck(sp)
-                        len, sp := popStackItemWithoutCheck(sp)
+                        dst, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
                         // minimum_word_size = (size + 31) / 32
@@ -5019,14 +4953,16 @@ object "EVMInterpreter" {
                     case 0x3A { // OP_GASPRICE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
-                        sp := pushStackItem(sp, gasprice(), evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, gasprice(), evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x3B { // OP_EXTCODESIZE
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
-                        let addr
-                        addr, sp := popStackItem(sp, evmGasLeft)
+                        if lt(sp, STACK_OFFSET()) {
+                            revertWithGas(evmGasLeft)
+                        }
+                        let addr := stackHead
                 
                         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -5039,19 +4975,19 @@ object "EVMInterpreter" {
                         // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)
                 
                         switch _isEVM(addr) 
-                            case 0  { sp := pushStackItem(sp, extcodesize(addr), evmGasLeft) }
-                            default { sp := pushStackItem(sp, _fetchDeployedCodeLen(addr), evmGasLeft) }
+                            case 0  { stackHead := extcodesize(addr) }
+                            default { stackHead := _fetchDeployedCodeLen(addr) }
                         ip := add(ip, 1)
                     }
                     case 0x3C { // OP_EXTCODECOPY
-                        evmGasLeft, sp := performExtCodeCopy(evmGasLeft, sp)
+                        evmGasLeft, sp, stackHead := performExtCodeCopy(evmGasLeft, sp, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x3D { // OP_RETURNDATASIZE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
                         let rdz := mload(LAST_RETURNDATA_SIZE_OFFSET())
-                        sp := pushStackItem(sp, rdz, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, rdz, evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x3E { // OP_RETURNDATACOPY
@@ -5059,9 +4995,9 @@ object "EVMInterpreter" {
                 
                         let dest, offset, len
                         popStackCheck(sp, evmGasLeft, 3)
-                        dest, sp := popStackItemWithoutCheck(sp)
-                        offset, sp := popStackItemWithoutCheck(sp)
-                        len, sp := popStackItemWithoutCheck(sp)
+                        dest, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         // TODO: check if these conditions are met
                         // The addition offset + size overflows.
@@ -5083,8 +5019,11 @@ object "EVMInterpreter" {
                     case 0x3F { // OP_EXTCODEHASH
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
-                        let addr
-                        addr, sp := popStackItem(sp, evmGasLeft)
+                        if lt(sp, STACK_OFFSET()) {
+                            revertWithGas(evmGasLeft)
+                        }
+                
+                        let addr := stackHead
                         addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
                 
                         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -5093,59 +5032,59 @@ object "EVMInterpreter" {
                 
                         ip := add(ip, 1)
                         if iszero(addr) {
-                            sp := pushStackItem(sp, 0, evmGasLeft)
+                            stackHead := 0
                             continue
                         }
-                        sp := pushStackItem(sp, extcodehash(addr), evmGasLeft)
+                        stackHead := extcodehash(addr)
                     }
                     case 0x40 { // OP_BLOCKHASH
                         evmGasLeft := chargeGas(evmGasLeft, 20)
                 
-                        let blockNumber
-                        popPushStackCheck(sp, evmGasLeft, 1)
-                        blockNumber, sp := popStackItemWithoutCheck(sp)
-                
-                        sp := pushStackItemWithoutCheck(sp, blockhash(blockNumber))
+                        if iszero(lt(sp, BYTECODE_OFFSET())) {
+                            revertWithGas(evmGasLeft)
+                        }
+                        let blockNumber := stackHead
+                        stackHead := blockhash(blockNumber)
                         ip := add(ip, 1)
                     }
                     case 0x41 { // OP_COINBASE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        sp := pushStackItem(sp, coinbase(), evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, coinbase(), evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x42 { // OP_TIMESTAMP
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        sp := pushStackItem(sp, timestamp(), evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, timestamp(), evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x43 { // OP_NUMBER
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        sp := pushStackItem(sp, number(), evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, number(), evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x44 { // OP_PREVRANDAO
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        sp := pushStackItem(sp, prevrandao(), evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, prevrandao(), evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x45 { // OP_GASLIMIT
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        sp := pushStackItem(sp, gaslimit(), evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, gaslimit(), evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x46 { // OP_CHAINID
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        sp := pushStackItem(sp, chainid(), evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, chainid(), evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x47 { // OP_SELFBALANCE
                         evmGasLeft := chargeGas(evmGasLeft, 5)
-                        sp := pushStackItem(sp, selfbalance(), evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, selfbalance(), evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x48 { // OP_BASEFEE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                        sp := pushStackItem(sp, basefee(), evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, basefee(), evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x50 { // OP_POP
@@ -5153,23 +5092,24 @@ object "EVMInterpreter" {
                 
                         let _y
                 
-                        _y, sp := popStackItem(sp, evmGasLeft)
+                        _y, sp, stackHead := popStackItem(sp, evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x51 { // OP_MLOAD
                         evmGasLeft := chargeGas(evmGasLeft, 3)
                 
-                        let offset
+                        if lt(sp, STACK_OFFSET()) {
+                            revertWithGas(evmGasLeft)
+                        }
                 
-                        offset, sp := popStackItem(sp, evmGasLeft)
+                        let offset := stackHead
                 
                         checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
                         checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
                         let expansionGas := expandMemory(add(offset, 32))
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
-                        let memValue := mload(add(MEM_OFFSET_INNER(), offset))
-                        sp := pushStackItem(sp, memValue, evmGasLeft)
+                        stackHead := mload(add(MEM_OFFSET_INNER(), offset))
                         ip := add(ip, 1)
                     }
                     case 0x52 { // OP_MSTORE
@@ -5178,8 +5118,8 @@ object "EVMInterpreter" {
                         let offset, value
                 
                         popStackCheck(sp, evmGasLeft, 2)
-                        offset, sp := popStackItemWithoutCheck(sp)
-                        value, sp := popStackItemWithoutCheck(sp)
+                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
                         checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
@@ -5195,8 +5135,8 @@ object "EVMInterpreter" {
                         let offset, value
                 
                         popStackCheck(sp, evmGasLeft, 2)
-                        offset, sp := popStackItemWithoutCheck(sp)
-                        value, sp := popStackItemWithoutCheck(sp)
+                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
                         checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
@@ -5212,7 +5152,10 @@ object "EVMInterpreter" {
                 
                         let key, value, isWarm
                 
-                        key, sp := popStackItem(sp, evmGasLeft)
+                        if lt(sp, STACK_OFFSET()) {
+                            revertWithGas(evmGasLeft)
+                        }
+                        key := stackHead
                 
                         let wasWarm := isSlotWarm(key)
                 
@@ -5226,7 +5169,7 @@ object "EVMInterpreter" {
                             let _wasW, _orgV := warmSlot(key, value)
                         }
                 
-                        sp := pushStackItem(sp,value, evmGasLeft)
+                        stackHead := value
                         ip := add(ip, 1)
                     }
                     case 0x55 { // OP_SSTORE
@@ -5239,8 +5182,8 @@ object "EVMInterpreter" {
                         let key, value, gasSpent
                 
                         popStackCheck(sp, evmGasLeft, 2)
-                        key, sp := popStackItemWithoutCheck(sp)
-                        value, sp := popStackItemWithoutCheck(sp)
+                        key, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         ip := add(ip, 1)
                         {
@@ -5277,7 +5220,7 @@ object "EVMInterpreter" {
                 
                         let counter
                 
-                        counter, sp := popStackItem(sp, evmGasLeft)
+                        counter, sp, stackHead := popStackItem(sp, evmGasLeft, stackHead)
                 
                         ip := add(add(BYTECODE_OFFSET(), 32), counter)
                 
@@ -5293,8 +5236,8 @@ object "EVMInterpreter" {
                         let counter, b
                 
                         popStackCheck(sp, evmGasLeft, 2)
-                        counter, sp := popStackItemWithoutCheck(sp)
-                        b, sp := popStackItemWithoutCheck(sp)
+                        counter, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        b, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         if iszero(b) {
                             ip := add(ip, 1)
@@ -5314,7 +5257,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                 
                         // PC = ip - 32 (bytecode size) - 1 (current instruction)
-                        sp := pushStackItem(sp, sub(sub(ip, BYTECODE_OFFSET()), 33), evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, sub(sub(ip, BYTECODE_OFFSET()), 33), evmGasLeft, stackHead)
                     }
                     case 0x59 { // OP_MSIZE
                         evmGasLeft := chargeGas(evmGasLeft,2)
@@ -5323,13 +5266,13 @@ object "EVMInterpreter" {
                 
                         size := mload(MEM_OFFSET())
                         size := shl(5,size)
-                        sp := pushStackItem(sp,size, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp,size, evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x5A { // OP_GAS
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
-                        sp := pushStackItem(sp, evmGasLeft, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, evmGasLeft, evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x5B { // OP_JUMPDEST
@@ -5339,11 +5282,12 @@ object "EVMInterpreter" {
                     case 0x5C { // OP_TLOAD
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
-                        let key
-                        popPushStackCheck(sp, evmGasLeft, 1)
-                        key, sp := popStackItemWithoutCheck(sp)
+                        if lt(sp, STACK_OFFSET()) {
+                            revertWithGas(evmGasLeft)
+                        }
+                        let key := stackHead
                 
-                        sp := pushStackItemWithoutCheck(sp, tload(key))
+                        stackHead := tload(key)
                         ip := add(ip, 1)
                     }
                     case 0x5D { // OP_TSTORE
@@ -5355,8 +5299,8 @@ object "EVMInterpreter" {
                 
                         let key, value
                         popStackCheck(sp, evmGasLeft, 2)
-                        key, sp := popStackItemWithoutCheck(sp)
-                        value, sp := popStackItemWithoutCheck(sp)
+                        key, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         tstore(key, value)
                         ip := add(ip, 1)
@@ -5364,9 +5308,9 @@ object "EVMInterpreter" {
                     case 0x5E { // OP_MCOPY
                         let destOffset, offset, size
                         popStackCheck(sp, evmGasLeft, 3)
-                        destOffset, sp := popStackItemWithoutCheck(sp)
-                        offset, sp := popStackItemWithoutCheck(sp)
-                        size, sp := popStackItemWithoutCheck(sp)
+                        destOffset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         expandMemory(add(destOffset, size))
                         expandMemory(add(offset, size))
@@ -5395,7 +5339,7 @@ object "EVMInterpreter" {
                 
                         let value := 0
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x60 { // OP_PUSH1
@@ -5404,7 +5348,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,1)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x61 { // OP_PUSH2
@@ -5413,7 +5357,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,2)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 2)
                     }     
                     case 0x62 { // OP_PUSH3
@@ -5422,7 +5366,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,3)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 3)
                     }
                     case 0x63 { // OP_PUSH4
@@ -5431,7 +5375,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,4)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 4)
                     }
                     case 0x64 { // OP_PUSH5
@@ -5440,7 +5384,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,5)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 5)
                     }
                     case 0x65 { // OP_PUSH6
@@ -5449,7 +5393,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,6)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 6)
                     }
                     case 0x66 { // OP_PUSH7
@@ -5458,7 +5402,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,7)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 7)
                     }
                     case 0x67 { // OP_PUSH8
@@ -5467,7 +5411,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,8)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 8)
                     }
                     case 0x68 { // OP_PUSH9
@@ -5476,7 +5420,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,9)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 9)
                     }
                     case 0x69 { // OP_PUSH10
@@ -5485,7 +5429,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,10)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 10)
                     }
                     case 0x6A { // OP_PUSH11
@@ -5494,7 +5438,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,11)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 11)
                     }
                     case 0x6B { // OP_PUSH12
@@ -5503,7 +5447,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,12)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 12)
                     }
                     case 0x6C { // OP_PUSH13
@@ -5512,7 +5456,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,13)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 13)
                     }
                     case 0x6D { // OP_PUSH14
@@ -5521,7 +5465,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,14)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 14)
                     }
                     case 0x6E { // OP_PUSH15
@@ -5530,7 +5474,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,15)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 15)
                     }
                     case 0x6F { // OP_PUSH16
@@ -5539,7 +5483,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,16)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 16)
                     }
                     case 0x70 { // OP_PUSH17
@@ -5548,7 +5492,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,17)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 17)
                     }
                     case 0x71 { // OP_PUSH18
@@ -5557,7 +5501,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,18)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 18)
                     }
                     case 0x72 { // OP_PUSH19
@@ -5566,7 +5510,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,19)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 19)
                     }
                     case 0x73 { // OP_PUSH20
@@ -5575,7 +5519,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,20)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 20)
                     }
                     case 0x74 { // OP_PUSH21
@@ -5584,7 +5528,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,21)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 21)
                     }
                     case 0x75 { // OP_PUSH22
@@ -5593,7 +5537,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,22)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 22)
                     }
                     case 0x76 { // OP_PUSH23
@@ -5602,7 +5546,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,23)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 23)
                     }
                     case 0x77 { // OP_PUSH24
@@ -5611,7 +5555,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,24)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 24)
                     }
                     case 0x78 { // OP_PUSH25
@@ -5620,7 +5564,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,25)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 25)
                     }
                     case 0x79 { // OP_PUSH26
@@ -5629,7 +5573,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,26)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 26)
                     }
                     case 0x7A { // OP_PUSH27
@@ -5638,7 +5582,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,27)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 27)
                     }
                     case 0x7B { // OP_PUSH28
@@ -5647,7 +5591,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,28)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 28)
                     }
                     case 0x7C { // OP_PUSH29
@@ -5656,7 +5600,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,29)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 29)
                     }
                     case 0x7D { // OP_PUSH30
@@ -5665,7 +5609,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,30)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 30)
                     }
                     case 0x7E { // OP_PUSH31
@@ -5674,7 +5618,7 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,31)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 31)
                     }
                     case 0x7F { // OP_PUSH32
@@ -5683,135 +5627,135 @@ object "EVMInterpreter" {
                         ip := add(ip, 1)
                         let value := readBytes(ip,maxAcceptablePos,32)
                 
-                        sp := pushStackItem(sp, value, evmGasLeft)
+                        sp, stackHead := pushStackItem(sp, value, evmGasLeft, stackHead)
                         ip := add(ip, 32)
                     }
                     case 0x80 { // OP_DUP1 
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 1)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 1, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x81 { // OP_DUP2
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 2)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 2, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x82 { // OP_DUP3
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 3)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 3, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x83 { // OP_DUP4    
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 4)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 4, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x84 { // OP_DUP5
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 5)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 5, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x85 { // OP_DUP6
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 6)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 6, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x86 { // OP_DUP7    
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 7)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 7, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x87 { // OP_DUP8
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 8)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 8, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x88 { // OP_DUP9
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 9)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 9, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x89 { // OP_DUP10   
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 10)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 10, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x8A { // OP_DUP11
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 11)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 11, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x8B { // OP_DUP12
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 12)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 12, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x8C { // OP_DUP13
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 13)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 13, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x8D { // OP_DUP14
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 14)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 14, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x8E { // OP_DUP15
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 15)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 15, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x8F { // OP_DUP16
-                        sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 16)
+                        sp, evmGasLeft, stackHead := dupStackItem(sp, evmGasLeft, 16, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x90 { // OP_SWAP1 
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 1)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 1, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x91 { // OP_SWAP2
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 2)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 2, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x92 { // OP_SWAP3
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 3)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 3, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x93 { // OP_SWAP4    
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 4)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 4, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x94 { // OP_SWAP5
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 5)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 5, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x95 { // OP_SWAP6
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 6)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 6, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x96 { // OP_SWAP7    
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 7)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 7, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x97 { // OP_SWAP8
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 8)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 8, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x98 { // OP_SWAP9
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 9)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 9, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x99 { // OP_SWAP10   
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 10)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 10, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x9A { // OP_SWAP11
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 11)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 11, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x9B { // OP_SWAP12
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 12)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 12, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x9C { // OP_SWAP13
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 13)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 13, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x9D { // OP_SWAP14
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 14)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 14, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x9E { // OP_SWAP15
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 15)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 15, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0x9F { // OP_SWAP16
-                        evmGasLeft := swapStackItem(sp, evmGasLeft, 16)
+                        evmGasLeft, stackHead := swapStackItem(sp, evmGasLeft, 16, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0xA0 { // OP_LOG0
@@ -5823,8 +5767,8 @@ object "EVMInterpreter" {
                 
                         let offset, size
                         popStackCheck(sp, evmGasLeft, 2)
-                        offset, sp := popStackItemWithoutCheck(sp)
-                        size, sp := popStackItemWithoutCheck(sp)
+                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
                         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
@@ -5845,9 +5789,9 @@ object "EVMInterpreter" {
                 
                         let offset, size, topic1
                         popStackCheck(sp, evmGasLeft, 3)
-                        offset, sp := popStackItemWithoutCheck(sp)
-                        size, sp := popStackItemWithoutCheck(sp)
-                        topic1, sp := popStackItemWithoutCheck(sp)
+                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
                         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
@@ -5868,8 +5812,8 @@ object "EVMInterpreter" {
                 
                         let offset, size
                         popStackCheck(sp, evmGasLeft, 2)
-                        offset, sp := popStackItemWithoutCheck(sp)
-                        size, sp := popStackItemWithoutCheck(sp)
+                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
                         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
@@ -5882,8 +5826,8 @@ object "EVMInterpreter" {
                         {
                             let topic1, topic2
                             popStackCheck(sp, evmGasLeft, 2)
-                            topic1, sp := popStackItemWithoutCheck(sp)
-                            topic2, sp := popStackItemWithoutCheck(sp)
+                            topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                            topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                             log2(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2)
                         }
                         ip := add(ip, 1)
@@ -5897,8 +5841,8 @@ object "EVMInterpreter" {
                 
                         let offset, size
                         popStackCheck(sp, evmGasLeft, 2)
-                        offset, sp := popStackItemWithoutCheck(sp)
-                        size, sp := popStackItemWithoutCheck(sp)
+                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
                 
@@ -5912,9 +5856,9 @@ object "EVMInterpreter" {
                         {
                             let topic1, topic2, topic3
                             popStackCheck(sp, evmGasLeft, 3)
-                            topic1, sp := popStackItemWithoutCheck(sp)
-                            topic2, sp := popStackItemWithoutCheck(sp)
-                            topic3, sp := popStackItemWithoutCheck(sp)
+                            topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                            topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                            topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                             log3(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2, topic3)
                         }     
                         ip := add(ip, 1)
@@ -5928,8 +5872,8 @@ object "EVMInterpreter" {
                 
                         let offset, size
                         popStackCheck(sp, evmGasLeft, 2)
-                        offset, sp := popStackItemWithoutCheck(sp)
-                        size, sp := popStackItemWithoutCheck(sp)
+                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
                         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
@@ -5942,16 +5886,16 @@ object "EVMInterpreter" {
                         {
                             let topic1, topic2, topic3, topic4
                             popStackCheck(sp, evmGasLeft, 4)
-                            topic1, sp := popStackItemWithoutCheck(sp)
-                            topic2, sp := popStackItemWithoutCheck(sp)
-                            topic3, sp := popStackItemWithoutCheck(sp)
-                            topic4, sp := popStackItemWithoutCheck(sp)
+                            topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                            topic2, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                            topic3, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                            topic4, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                             log4(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2, topic3, topic4)
                         }     
                         ip := add(ip, 1)
                     }
                     case 0xF0 { // OP_CREATE
-                        evmGasLeft, sp := performCreate(evmGasLeft, sp, isStatic)
+                        evmGasLeft, sp, stackHead := performCreate(evmGasLeft, sp, isStatic, stackHead)
                         ip := add(ip, 1)
                     }
                     case 0xF1 { // OP_CALL
@@ -5960,7 +5904,7 @@ object "EVMInterpreter" {
                         let gasUsed
                 
                         // A function was implemented in order to avoid stack depth errors.
-                        gasUsed, sp := performCall(sp, evmGasLeft, isStatic)
+                        gasUsed, sp, stackHead := performCall(sp, evmGasLeft, isStatic, stackHead)
                 
                         // Check if the following is ok
                         evmGasLeft := chargeGas(evmGasLeft, gasUsed)
@@ -5970,8 +5914,8 @@ object "EVMInterpreter" {
                         let offset,size
                 
                         popStackCheck(sp, evmGasLeft, 2)
-                        offset, sp := popStackItemWithoutCheck(sp)
-                        size, sp := popStackItemWithoutCheck(sp)
+                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         checkOverflow(offset,size, evmGasLeft)
                         evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
@@ -5985,24 +5929,24 @@ object "EVMInterpreter" {
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
                         let gasUsed
-                        sp, isStatic, gasUsed := delegateCall(sp, isStatic, evmGasLeft)
+                        sp, isStatic, gasUsed, stackHead := delegateCall(sp, isStatic, evmGasLeft, stackHead)
                 
                         evmGasLeft := chargeGas(evmGasLeft, gasUsed)
                         ip := add(ip, 1)
                     }
                     case 0xF5 { // OP_CREATE2
                         let result, addr
-                        evmGasLeft, sp, result, addr := performCreate2(evmGasLeft, sp, isStatic)
+                        evmGasLeft, sp, result, addr, stackHead := performCreate2(evmGasLeft, sp, isStatic, stackHead)
                         switch result
-                        case 0 { sp := pushStackItem(sp, 0, evmGasLeft) }
-                        default { sp := pushStackItem(sp, addr, evmGasLeft) }
+                        case 0 { sp, stackHead := pushStackItem(sp, 0, evmGasLeft, stackHead) }
+                        default { sp, stackHead := pushStackItem(sp, addr, evmGasLeft, stackHead) }
                         ip := add(ip, 1)
                     }
                     case 0xFA { // OP_STATICCALL
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
                         let gasUsed
-                        gasUsed, sp := performStaticCall(sp,evmGasLeft)
+                        gasUsed, sp, stackHead := performStaticCall(sp,evmGasLeft, stackHead)
                         evmGasLeft := chargeGas(evmGasLeft,gasUsed)
                         ip := add(ip, 1)
                     }
@@ -6010,8 +5954,8 @@ object "EVMInterpreter" {
                         let offset,size
                 
                         popStackCheck(sp, evmGasLeft, 2)
-                        offset, sp := popStackItemWithoutCheck(sp)
-                        size, sp := popStackItemWithoutCheck(sp)
+                        offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
+                        size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         ensureAcceptableMemLocation(offset)
                         ensureAcceptableMemLocation(size)
