@@ -45,7 +45,7 @@ describe("Diamond proxy tests", function () {
     diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
 
     const adminFactory = await hardhat.ethers.getContractFactory("AdminFacet");
-    const adminContract = await adminFactory.deploy();
+    const adminContract = await adminFactory.deploy(await owner.getChainId());
     adminFacet = AdminFacetFactory.connect(adminContract.address, adminContract.signer);
 
     const gettersFacetFactory = await hardhat.ethers.getContractFactory("GettersFacet");
@@ -53,7 +53,7 @@ describe("Diamond proxy tests", function () {
     gettersFacet = GettersFacetFactory.connect(gettersFacetContract.address, gettersFacetContract.signer);
 
     const mailboxFacetFactory = await hardhat.ethers.getContractFactory("MailboxFacet");
-    const mailboxFacetContract = await mailboxFacetFactory.deploy(chainId);
+    const mailboxFacetContract = await mailboxFacetFactory.deploy(chainId, await owner.getChainId());
     mailboxFacet = MailboxFacetFactory.connect(mailboxFacetContract.address, mailboxFacetContract.signer);
 
     const executorFactory = await hardhat.ethers.getContractFactory("ExecutorFacet");

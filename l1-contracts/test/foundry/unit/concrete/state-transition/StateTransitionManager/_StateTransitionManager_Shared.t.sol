@@ -44,7 +44,7 @@ contract StateTransitionManagerTest is Test {
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(bridgehub);
-        stateTransitionManager = new StateTransitionManager(address(IBridgehub(address(bridgehub))), type(uint256).max);
+        stateTransitionManager = new StateTransitionManager(address(IBridgehub(address(bridgehub))));
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new GenesisUpgrade();
 
@@ -58,7 +58,7 @@ contract StateTransitionManagerTest is Test {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new AdminFacet()),
+                facet: address(new AdminFacet(block.chainid)),
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: Utils.getAdminSelectors()
@@ -130,18 +130,19 @@ contract StateTransitionManagerTest is Test {
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }
 
-    function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal {
+    function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
         vm.stopPrank();
         vm.startPrank(bridgehub);
 
-        chainContractAddress.createNewChain({
-            _chainId: chainId,
-            _baseToken: baseToken,
-            _sharedBridge: sharedBridge,
-            _admin: newChainAdmin,
-            _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
-            _factoryDeps: new bytes[](0)
-        });
+        return
+            chainContractAddress.createNewChain({
+                _chainId: chainId,
+                _baseToken: baseToken,
+                _sharedBridge: sharedBridge,
+                _admin: newChainAdmin,
+                _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
+                _factoryDeps: new bytes[](0)
+            });
     }
 
     // add this to be excluded from coverage report

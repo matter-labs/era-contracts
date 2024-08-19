@@ -157,7 +157,7 @@ contract DummySharedBridge {
     }
 
     /// @dev Used to set the assedAddress for a given assetId.
-    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external {
+    function setAssetHandlerAddressThisChain(bytes32 _additionalData, address _assetHandlerAddress) external {
         address sender = msg.sender == address(nativeTokenVault) ? L2_NATIVE_TOKEN_VAULT_ADDRESS : msg.sender;
         bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData));
         assetHandlerAddress[assetId] = _assetHandlerAddress;

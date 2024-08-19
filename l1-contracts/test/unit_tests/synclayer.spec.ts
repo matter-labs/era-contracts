@@ -11,12 +11,17 @@ import {
   defaultDeployerForTests,
   registerHyperchainWithBridgeRegistration,
 } from "../../src.ts/deploy-test-process";
-import { ethTestConfig, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, priorityTxMaxGasLimit } from "../../src.ts/utils";
+import {
+  ethTestConfig,
+  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  priorityTxMaxGasLimit,
+  L2_BRIDGEHUB_ADDRESS,
+} from "../../src.ts/utils";
 import { SYSTEM_CONFIG } from "../../scripts/utils";
 
 import type { Deployer } from "../../src.ts/deploy";
 
-describe("Synclayer", function () {
+describe("Gateway", function () {
   let bridgehub: Bridgehub;
   // let stateTransition: StateTransitionManager;
   let owner: ethers.Signer;
@@ -76,7 +81,7 @@ describe("Synclayer", function () {
 
   it("Check start move chain to synclayer", async () => {
     const gasPrice = await owner.provider.getGasPrice();
-    await migratingDeployer.moveChainToGateway(gatewayDeployer.chainId.toString(), gasPrice, false);
+    await migratingDeployer.moveChainToGateway(gatewayDeployer.chainId.toString(), gasPrice);
     expect(await bridgehub.settlementLayer(migratingDeployer.chainId)).to.equal(gatewayDeployer.chainId);
   });
 
@@ -86,18 +91,30 @@ describe("Synclayer", function () {
     const value = (
       await bridgehub.l2TransactionBaseCost(chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
     ).mul(10);
-    // const baseTokenAddress = await bridgehub.baseToken(chainId);
-    // const ethIsBaseToken = baseTokenAddress == ADDRESS_ONE;
+
     const stmDeploymentTracker = migratingDeployer.stmDeploymentTracker(migratingDeployer.deployWallet);
-    const calldata = stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL2SharedBridge", [
-      chainId,
-      gatewayDeployer.addresses.StateTransition.StateTransitionProxy,
+    const assetRouter = migratingDeployer.defaultSharedBridge(migratingDeployer.deployWallet);
+    const assetId = await bridgehub.stmAssetIdFromChainId(chainId);
+
+    await migratingDeployer.executeUpgrade(
+      bridgehub.address,
       value,
-      priorityTxMaxGasLimit,
-      SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-      gatewayDeployer.deployWallet.address,
-    ]);
-    await migratingDeployer.executeUpgrade(stmDeploymentTracker.address, value, calldata);
+      bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
+        {
+          chainId,
+          mintValue: value,
+          l2Value: 0,
+          l2GasLimit: priorityTxMaxGasLimit,
+          l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+          refundRecipient: migratingDeployer.deployWallet.address,
+          secondBridgeAddress: assetRouter.address,
+          secondBridgeValue: 0,
+          secondBridgeCalldata:
+            "0x02" +
+            ethers.utils.defaultAbiCoder.encode(["bytes32", "address"], [assetId, L2_BRIDGEHUB_ADDRESS]).slice(2),
+        },
+      ])
+    );
     await migratingDeployer.executeUpgrade(
       bridgehub.address,
       value,

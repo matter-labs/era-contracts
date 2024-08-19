@@ -27,6 +27,19 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "AdminFacet";
 
+    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
+    /// L1 that is at the most base layer.
+    uint256 internal immutable L1_CHAIN_ID;
+
+    constructor(uint256 _l1ChainId) {
+        L1_CHAIN_ID = _l1ChainId;
+    }
+
+    modifier onlyL1() {
+        require(block.chainid == L1_CHAIN_ID, "AdminFacet: not L1");
+        _;
+    }
+
     /// @inheritdoc IAdmin
     function setPendingAdmin(address _newPendingAdmin) external onlyAdmin {
         // Save previous value into the stack to put it into the event later
@@ -72,7 +85,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function changeFeeParams(FeeParams calldata _newFeeParams) external onlyAdminOrStateTransitionManager {
+    function changeFeeParams(FeeParams calldata _newFeeParams) external onlyAdminOrStateTransitionManager onlyL1 {
         // Double checking that the new fee params are valid, i.e.
         // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
         require(_newFeeParams.maxPubdataPerBatch >= _newFeeParams.priorityTxMaxPubdata, "n6");
@@ -87,7 +100,10 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrStateTransitionManager {
+    function setTokenMultiplier(
+        uint128 _nominator,
+        uint128 _denominator
+    ) external onlyAdminOrStateTransitionManager onlyL1 {
         require(_denominator != 0, "AF: denominator 0");
         uint128 oldNominator = s.baseTokenGasPriceMultiplierNominator;
         uint128 oldDenominator = s.baseTokenGasPriceMultiplierDenominator;
@@ -99,14 +115,14 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin {
+    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin onlyL1 {
         require(s.totalBatchesCommitted == 0, "AdminFacet: set validium only after genesis"); // Validium mode can be set only before the first batch is processed
         s.feeParams.pubdataPricingMode = _pricingMode;
         emit ValidiumModeStatusUpdate(_pricingMode);
     }
 
     /// @inheritdoc IAdmin
-    function setTransactionFilterer(address _transactionFilterer) external onlyAdmin {
+    function setTransactionFilterer(address _transactionFilterer) external onlyAdmin onlyL1 {
         address oldTransactionFilterer = s.transactionFilterer;
         s.transactionFilterer = _transactionFilterer;
         emit NewTransactionFilterer(oldTransactionFilterer, _transactionFilterer);
@@ -214,19 +230,17 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         address _prevMsgSender,
         bytes calldata
     ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
-        // (address _newSettlementLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
         require(s.settlementLayer == address(0), "Af: already migrated");
         require(_prevMsgSender == s.admin, "Af: not chainAdmin");
         IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
 
-        // address chainBaseToken = hyperchain.getBaseToken();
         uint256 currentProtocolVersion = s.protocolVersion;
         uint256 protocolVersion = stm.protocolVersion();
 
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
 
         s.settlementLayer = _settlementLayer;
-        chainBridgeMintData = abi.encode(_prepareChainCommitment());
+        chainBridgeMintData = abi.encode(prepareChainCommitment());
     }
 
     /// @inheritdoc IAdmin
@@ -292,8 +306,10 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         s.settlementLayer = address(0);
     }
 
-    // todo make internal. For now useful for testing
-    function _prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {
+    /// @notice Returns the commitment for a chain.
+    /// @dev Note, that this is a getter method helpful for debugging and should not be relied upon by clients.
+    /// @return commitment The commitment for the chain.
+    function prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {
         require(s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex, "PQ not ready");
 
         commitment.totalBatchesCommitted = s.totalBatchesCommitted;
@@ -324,11 +340,6 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         }
 
         commitment.batchHashes = batchHashes;
-    }
-
-    /// @inheritdoc IAdmin
-    function readChainCommitment() external view override returns (bytes memory commitment) {
-        return abi.encode(_prepareChainCommitment());
     }
 
     // function recoverFromFailedMigrationToGateway(

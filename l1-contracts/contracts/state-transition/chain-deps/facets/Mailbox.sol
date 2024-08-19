@@ -22,7 +22,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, VIRTUAL_SENDER_ALIASED_ZERO_ADDRESS} from "../../../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../../common/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/interfaces/IL1AssetRouter.sol";
@@ -44,8 +44,18 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     /// @dev Era's chainID
     uint256 internal immutable ERA_CHAIN_ID;
 
-    constructor(uint256 _eraChainId) {
+    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
+    /// L1 that is at the most base layer.
+    uint256 internal immutable L1_CHAIN_ID;
+
+    modifier onlyL1() {
+        require(block.chainid == L1_CHAIN_ID, "MailboxFacet: not L1");
+        _;
+    }
+
+    constructor(uint256 _eraChainId, uint256 _l1ChainId) {
         ERA_CHAIN_ID = _eraChainId;
+        L1_CHAIN_ID = _l1ChainId;
     }
 
     /// @inheritdoc IMailbox
@@ -297,7 +307,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external override returns (bytes32 canonicalTxHash) {
+    ) external override onlyL1 returns (bytes32 canonicalTxHash) {
         require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId), "Mailbox SL: not SL");
         require(
             IStateTransitionManager(s.stateTransitionManager).getHyperchain(_chainId) == msg.sender,
@@ -339,7 +349,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         return
             BridgehubL2TransactionRequest({
                 /// There is no sender for the wrapping, we use a virtual address.
-                sender: VIRTUAL_SENDER_ALIASED_ZERO_ADDRESS,
+                sender: SETTLEMENT_LAYER_RELAY_SENDER,
                 contractL2: L2_BRIDGEHUB_ADDR,
                 mintValue: 0,
                 l2Value: 0,
@@ -531,7 +541,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external nonReentrant {
+    ) external nonReentrant onlyL1 {
         require(s.chainId == ERA_CHAIN_ID, "Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
         IL1AssetRouter(s.baseTokenBridge).finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
@@ -552,7 +562,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
         address _refundRecipient
-    ) external payable returns (bytes32 canonicalTxHash) {
+    ) external payable onlyL1 returns (bytes32 canonicalTxHash) {
         require(s.chainId == ERA_CHAIN_ID, "Mailbox: legacy interface only available for Era");
         canonicalTxHash = _requestL2TransactionSender(
             BridgehubL2TransactionRequest({
