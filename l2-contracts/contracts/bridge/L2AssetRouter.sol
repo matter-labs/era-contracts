@@ -220,7 +220,7 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
 
     /// @notice Returns the address of the L1 asset router.
     /// @dev The old name is kept for backward compatibility.
-    function l1Bridge() external view override returns (address) {
+    function l1Bridge() external view returns (address) {
         return l1AssetRouter;
     }
 }
