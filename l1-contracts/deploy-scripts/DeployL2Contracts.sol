@@ -82,15 +82,15 @@ contract DeployL2Script is Script {
             "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
         );
 
-        contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/L2SharedBridge.sol/L2SharedBridge.json"
+        contracts.l2SharedBridgeBytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/L2SharedBridge.sol/L2SharedBridge.json"
         );
 
         contracts.l2SharedBridgeProxyBytecode = Utils.readHardhatBytecode(
             "/../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
         );
-        contracts.forceDeployUpgrader = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
+        contracts.forceDeployUpgrader = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
         );
     }
 
