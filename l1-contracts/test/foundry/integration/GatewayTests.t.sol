@@ -201,7 +201,7 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
             abi.encode(true)
         );
 
-        // Set Deposit Hapened
+        // Set Deposit Happened
         vm.startBroadcast(address(bridgeHub));
         assetRouter.bridgehubConfirmL2Transaction({
             _chainId: migratingChainId,
