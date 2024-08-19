@@ -1901,7 +1901,7 @@ object "EVMInterpreter" {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
             
-                    sp := pushStackItem(sp, balance(addr), evmGasLeft)
+                    sp := pushStackItemWithoutCheck(sp, balance(addr))
                     ip := add(ip, 1)
                 }
                 case 0x32 { // OP_ORIGIN
@@ -2034,8 +2034,8 @@ object "EVMInterpreter" {
                     // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)
             
                     switch _isEVM(addr) 
-                        case 0  { sp := pushStackItem(sp, extcodesize(addr), evmGasLeft) }
-                        default { sp := pushStackItem(sp, _fetchDeployedCodeLen(addr), evmGasLeft) }
+                        case 0  { sp := pushStackItemWithoutCheck(sp, extcodesize(addr)) }
+                        default { sp := pushStackItemWithoutCheck(sp, _fetchDeployedCodeLen(addr)) }
                     ip := add(ip, 1)
                 }
                 case 0x3C { // OP_EXTCODECOPY
@@ -2088,10 +2088,10 @@ object "EVMInterpreter" {
             
                     ip := add(ip, 1)
                     if iszero(addr) {
-                        sp := pushStackItem(sp, 0, evmGasLeft)
+                        sp := pushStackItemWithoutCheck(sp, 0)
                         continue
                     }
-                    sp := pushStackItem(sp, extcodehash(addr), evmGasLeft)
+                    sp := pushStackItemWithoutCheck(sp, extcodehash(addr))
                 }
                 case 0x40 { // OP_BLOCKHASH
                     evmGasLeft := chargeGas(evmGasLeft, 20)
@@ -2164,7 +2164,7 @@ object "EVMInterpreter" {
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
                     let memValue := mload(add(MEM_OFFSET_INNER(), offset))
-                    sp := pushStackItem(sp, memValue, evmGasLeft)
+                    sp := pushStackItemWithoutCheck(sp, memValue)
                     ip := add(ip, 1)
                 }
                 case 0x52 { // OP_MSTORE
@@ -2221,7 +2221,7 @@ object "EVMInterpreter" {
                         let _wasW, _orgV := warmSlot(key, value)
                     }
             
-                    sp := pushStackItem(sp,value, evmGasLeft)
+                    sp := pushStackItemWithoutCheck(sp,value)
                     ip := add(ip, 1)
                 }
                 case 0x55 { // OP_SSTORE
@@ -4888,7 +4888,7 @@ object "EVMInterpreter" {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
                         }
                 
-                        sp := pushStackItem(sp, balance(addr), evmGasLeft)
+                        sp := pushStackItemWithoutCheck(sp, balance(addr))
                         ip := add(ip, 1)
                     }
                     case 0x32 { // OP_ORIGIN
@@ -5021,8 +5021,8 @@ object "EVMInterpreter" {
                         // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)
                 
                         switch _isEVM(addr) 
-                            case 0  { sp := pushStackItem(sp, extcodesize(addr), evmGasLeft) }
-                            default { sp := pushStackItem(sp, _fetchDeployedCodeLen(addr), evmGasLeft) }
+                            case 0  { sp := pushStackItemWithoutCheck(sp, extcodesize(addr)) }
+                            default { sp := pushStackItemWithoutCheck(sp, _fetchDeployedCodeLen(addr)) }
                         ip := add(ip, 1)
                     }
                     case 0x3C { // OP_EXTCODECOPY
@@ -5075,10 +5075,10 @@ object "EVMInterpreter" {
                 
                         ip := add(ip, 1)
                         if iszero(addr) {
-                            sp := pushStackItem(sp, 0, evmGasLeft)
+                            sp := pushStackItemWithoutCheck(sp, 0)
                             continue
                         }
-                        sp := pushStackItem(sp, extcodehash(addr), evmGasLeft)
+                        sp := pushStackItemWithoutCheck(sp, extcodehash(addr))
                     }
                     case 0x40 { // OP_BLOCKHASH
                         evmGasLeft := chargeGas(evmGasLeft, 20)
@@ -5151,7 +5151,7 @@ object "EVMInterpreter" {
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
                         let memValue := mload(add(MEM_OFFSET_INNER(), offset))
-                        sp := pushStackItem(sp, memValue, evmGasLeft)
+                        sp := pushStackItemWithoutCheck(sp, memValue)
                         ip := add(ip, 1)
                     }
                     case 0x52 { // OP_MSTORE
@@ -5208,7 +5208,7 @@ object "EVMInterpreter" {
                             let _wasW, _orgV := warmSlot(key, value)
                         }
                 
-                        sp := pushStackItem(sp,value, evmGasLeft)
+                        sp := pushStackItemWithoutCheck(sp,value)
                         ip := add(ip, 1)
                     }
                     case 0x55 { // OP_SSTORE
