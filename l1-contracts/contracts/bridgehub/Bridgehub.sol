@@ -11,7 +11,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
-import {IL1NativeTokenVault} from "../bridge/interfaces/IL1NativeTokenVault.sol";
+import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
@@ -186,7 +186,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (baseTokenAssetId[_chainId] == bytes32(0)) {
             return;
         }
-        address token = baseToken[_chainId];
+        address token = __DEPRECATED_baseToken[_chainId];
         require(token != address(0), "BH: token not set");
         baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(block.chainid, token);
     }
@@ -234,14 +234,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         assetIdIsRegistered[_baseTokenAssetId] = true;
 
         emit BaseTokenAssetIdRegistered(_baseTokenAssetId);
-    }
-
-    /// @notice To set shared bridge, only Owner. Not done in initialize, as
-    /// the order of deployment is Bridgehub, Shared bridge, and then we call this
-    function setSharedBridge(address _sharedBridge) external onlyOwner {
-        sharedBridge = IL1AssetRouter(_sharedBridge);
-
-        emit SharedBridgeUpdated(_sharedBridge);
     }
 
     /// @notice Used to register a chain as a settlement layer.
@@ -340,10 +332,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                              Getters
     //////////////////////////////////////////////////////////////*/
 
+    // Asset Handlers' token address function, which takes assetId as input and return the token address
+    function tokenAddress(bytes32 _baseTokenAssetId) public view returns (address) {
+        return baseToken(_baseTokenAssetId);
+    }
+
     // baseToken function, which takes assetId as input, reads assetHandler from AR, and tokenAddress from AH
     function baseToken(bytes32 _baseTokenAssetId) public view returns (address) {
-        address assetHandlerAddress = sharedBridge.assetHandlerAddress(_baseTokenAssetId);
-        return IL1NativeTokenVault(assetHandlerAddress).tokenAddress(_baseTokenAssetId);
+        IL1AssetHandler assetHandlerAddress = IL1AssetHandler(sharedBridge.assetHandlerAddress(_baseTokenAssetId));
+        return assetHandlerAddress.tokenAddress(_baseTokenAssetId);
     }
 
     /// @notice Returns all the registered hyperchain addresses

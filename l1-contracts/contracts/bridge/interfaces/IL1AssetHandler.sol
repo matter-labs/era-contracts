@@ -54,4 +54,7 @@ interface IL1AssetHandler {
         address _depositSender,
         bytes calldata _data
     ) external payable;
+
+    /// @notice Used to get the token address of an assetId
+    function tokenAddress(bytes32 _assetId) external view returns (address);
 }

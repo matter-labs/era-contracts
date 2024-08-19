@@ -3,12 +3,13 @@
 pragma solidity 0.8.24;
 
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
+import {IL1AssetHandler} from "./IL1AssetHandler.sol";
 
 /// @title L1 Native token vault contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The NTV is an Asset Handler for the L1AssetRouter to handle native tokens
-interface IL1NativeTokenVault {
+interface IL1NativeTokenVault is IL1AssetHandler {
     /// @notice The L1AssetRouter contract
     function L1_SHARED_BRIDGE() external view returns (IL1AssetRouter);
 
@@ -23,7 +24,4 @@ interface IL1NativeTokenVault {
 
     /// @notice Used the get token balance for specific ZK chain in shared bridge
     function chainBalance(uint256 _chainId, address _l1Token) external view returns (uint256);
-
-    /// @notice Used to get the token address of an assetId
-    function tokenAddress(bytes32 _assetId) external view returns (address);
 }

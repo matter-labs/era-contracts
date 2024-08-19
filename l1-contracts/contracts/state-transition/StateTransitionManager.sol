@@ -399,7 +399,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         (bytes memory _diamondCut, bytes memory _forceDeploymentData) = abi.decode(_initData, (bytes, bytes));
 
         // solhint-disable-next-line func-named-parameters
-        hyperchainAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut);
+        hyperchainAddress = _deployNewChain(_chainId, _baseTokenAssetId, _sharedBridge, _admin, _diamondCut);
 
         {
             // check input

@@ -164,8 +164,6 @@ interface IBridgehub is IL1AssetHandler {
 
     event BaseTokenAssetIdRegistered(bytes32 indexed assetId);
 
-    event SharedBridgeUpdated(address indexed sharedBridge);
-
     function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
 
     function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external;
