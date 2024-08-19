@@ -742,6 +742,10 @@ for { } true { } {
         if iszero(eq(nextOpcode, 0x5B)) {
             revertWithGas(evmGasLeft)
         }
+
+        // execute JUMPDEST immediately
+        evmGasLeft := chargeGas(evmGasLeft, 1)
+        ip := add(ip, 1)
     }
     case 0x57 { // OP_JUMPI
         evmGasLeft := chargeGas(evmGasLeft, 10)
@@ -764,6 +768,10 @@ for { } true { } {
         if iszero(eq(nextOpcode, 0x5B)) {
             revertWithGas(evmGasLeft)
         }
+
+        // execute JUMPDEST immediately
+        evmGasLeft := chargeGas(evmGasLeft, 1)
+        ip := add(ip, 1)
     }
     case 0x58 { // OP_PC
         evmGasLeft := chargeGas(evmGasLeft, 2)
