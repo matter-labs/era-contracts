@@ -157,7 +157,7 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked
-    /// @dev A compatibilty method to support legacy functionality for the SDK.
+    /// @dev A compatibility method to support legacy functionality for the SDK.
     /// @param _l1Receiver The account address that should receive funds on L1
     /// @param _l2Token The L2 token address which is withdrawn
     /// @param _amount The total amount of tokens to be withdrawn
