@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {IConsensusRegistry} from "./interfaces/IConsensusRegistry.sol";
 
 /// @author Matter Labs
