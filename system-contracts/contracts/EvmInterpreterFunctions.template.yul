@@ -164,15 +164,6 @@ function popStackCheck(sp, evmGasLeft, numInputs) {
     }
 }
 
-function popPushStackCheck(sp, evmGasLeft, numInputs) {
-    let popCheck := lt(sub(sp, mul(0x20, sub(numInputs, 1))), STACK_OFFSET())
-    let pushOffset := sub(sp, mul(0x20, numInputs))
-    let pushCheck := or(gt(pushOffset, BYTECODE_OFFSET()), eq(pushOffset, BYTECODE_OFFSET()))
-    if or(popCheck, pushCheck) {
-        revertWithGas(evmGasLeft)
-    }
-}
-
 function getCodeAddress() -> addr {
     addr := verbatim_0i_1o("code_source")
 }
