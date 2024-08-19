@@ -170,7 +170,6 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         gatewayScript.registerGateway();
         gatewayScript.moveChainToGateway();
 
-
         // Setup
         IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
         address chainAdmin = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId)).getAdmin();
@@ -187,7 +186,7 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
 
         // Mock Call for Msg Inclusion
         vm.mockCall(
-            address(bridgehub), 
+            address(bridgehub),
             abi.encodeWithSelector(
                 IBridgehub.proveL1ToL2TransactionStatus.selector,
                 migratingChainId,
