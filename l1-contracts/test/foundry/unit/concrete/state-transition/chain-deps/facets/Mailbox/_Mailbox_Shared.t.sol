@@ -39,7 +39,7 @@ contract MailboxTest is Test {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new MailboxFacet(eraChainId)),
+            facet: address(new MailboxFacet(eraChainId, block.chainid)),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: getMailboxSelectors()

@@ -15,6 +15,7 @@ import {
   ADDRESS_ONE,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   priorityTxMaxGasLimit,
+  L2_BRIDGEHUB_ADDRESS,
 } from "../src.ts/utils";
 
 import { Wallet as ZkWallet, Provider as ZkProvider, utils as zkUtils } from "zksync-ethers";
@@ -272,6 +273,10 @@ async function main() {
       const timelock = deployer.validatorTimelock(deployer.deployWallet);
 
       for (const operator of operators) {
+        if (await timelock.validators(currentChainId, operator)) {
+          continue;
+        }
+
         await deployer.deployWallet.sendTransaction({
           to: operator,
           value: ethers.utils.parseEther("5"),
@@ -286,13 +291,7 @@ async function main() {
       );
       deployer.addresses.Bridgehub.BridgehubProxy = getAddressFromEnv("GATEWAY_BRIDGEHUB_PROXY_ADDR");
 
-      // FIXME? Do we want to
-      console.log("Setting default token multiplier");
-
       const hyperchain = deployer.stateTransitionContract(deployer.deployWallet);
-
-      console.log("The default ones token multiplier");
-      await (await hyperchain.setTokenMultiplier(1, 1)).wait();
 
       console.log("Setting SL DA validators");
       // This logic should be distinctive between Validium and Rollup
@@ -309,11 +308,9 @@ async function main() {
 async function registerSLContractsOnL1(deployer: Deployer) {
   /// STM asset info
   /// l2Bridgehub in L1Bridghub
-  const bridgehubOnGateway = getAddressFromEnv("GATEWAY_BRIDGEHUB_PROXY_ADDR");
 
   const chainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
 
-  console.log(`Bridghub on Gateway: ${bridgehubOnGateway}`);
   console.log(`Gateway chain Id: ${chainId}`);
 
   const l1STM = deployer.stateTransitionManagerContract(deployer.deployWallet);
@@ -329,12 +326,6 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   );
 
   console.log("Registering Bridgehub counter part on the Gateway", receipt1.transactionHash);
-  // await deployer.executeUpgrade(
-  //   l1Bridgehub.address, // kl todo fix. The BH has the counterpart, the BH needs to be deployed on L2, and the STM needs to be registered in the L2 BH.
-  //   0,
-  //   l1Bridgehub.interface.encodeFunctionData("registerCounterpart", [chainId, bridgehubOnGateway])
-  // );
-  // console.log("Gateway registration completed in L1 Bridgehub");
 
   const gasPrice = (await deployer.deployWallet.provider.getGasPrice()).mul(GAS_MULTIPLIER);
   const value = (
@@ -352,17 +343,26 @@ async function registerSLContractsOnL1(deployer: Deployer) {
     );
   }
   const stmDeploymentTracker = deployer.stmDeploymentTracker(deployer.deployWallet);
+  const assetRouter = deployer.defaultSharedBridge(deployer.deployWallet);
+  const assetId = await l1Bridgehub.stmAssetIdFromChainId(chainId);
 
   const receipt2 = await deployer.executeUpgrade(
-    stmDeploymentTracker.address,
-    value,
-    stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL2SharedBridge", [
-      chainId,
-      l1STM.address,
-      value,
-      priorityTxMaxGasLimit,
-      SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
-      deployer.deployWallet.address,
+    l1Bridgehub.address,
+    ethIsBaseToken ? value : 0,
+    l1Bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
+      {
+        chainId,
+        mintValue: value,
+        l2Value: 0,
+        l2GasLimit: priorityTxMaxGasLimit,
+        l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+        refundRecipient: deployer.deployWallet.address,
+        secondBridgeAddress: assetRouter.address,
+        secondBridgeValue: 0,
+        secondBridgeCalldata:
+          "0x02" +
+          ethers.utils.defaultAbiCoder.encode(["bytes32", "address"], [assetId, L2_BRIDGEHUB_ADDRESS]).slice(2),
+      },
     ])
   );
   const l2TxHash = zkUtils.getL2HashFromPriorityOp(receipt2, gatewayAddress);

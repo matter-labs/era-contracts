@@ -234,12 +234,6 @@ export async function initialEraTestnetDeploymentProcess(
   );
   await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZkSyncHyperchainDiamondCut());
 
-  const stateTransitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
-  const registerData = stateTransitionManager.interface.encodeFunctionData("registerAlreadyDeployedHyperchain", [
-    deployer.chainId,
-    deployer.addresses.StateTransition.DiamondProxy,
-  ]);
-  await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, registerData);
   await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString(), true);
   return deployer;
 }

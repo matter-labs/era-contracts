@@ -8,6 +8,7 @@ import {ERC1967Upgrade} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Upgra
 
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 import {EmptyAddress, Unauthorized, NonSequentialVersion, Unimplemented} from "../L2ContractErrors.sol";
+import {L2_NATIVE_TOKEN_VAULT} from "../L2ContractHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -31,14 +32,15 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     /// @notice OpenZeppelin token represents `name` and `symbol` as storage variables and `decimals` as constant.
     uint8 private decimals_;
 
+    /// @notice The l2Bridge now is deprecated, use the L2AssetRouter and L2NativeTokenVault instead.
     /// @dev Address of the L2 bridge that is used as trustee who can mint/burn tokens
     address public override l2Bridge;
 
     /// @dev Address of the L1 token that can be deposited to mint this L2 token
     address public override l1Address;
 
-    modifier onlyBridge() {
-        if (msg.sender != l2Bridge) {
+    modifier onlyNTV() {
+        if (msg.sender != address(L2_NATIVE_TOKEN_VAULT)) {
             revert Unauthorized();
         }
         _;
@@ -151,7 +153,7 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     /// @param _to The account that will receive the created tokens.
     /// @param _amount The amount that will be created.
     /// @notice Should be called by bridge after depositing tokens from L1.
-    function bridgeMint(address _to, uint256 _amount) external override onlyBridge {
+    function bridgeMint(address _to, uint256 _amount) external override onlyNTV {
         _mint(_to, _amount);
         emit BridgeMint(_to, _amount);
     }
@@ -160,7 +162,7 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     /// @param _from The account from which tokens will be burned.
     /// @param _amount The amount that will be burned.
     /// @notice Should be called by bridge before withdrawing tokens to L1.
-    function bridgeBurn(address _from, uint256 _amount) external override onlyBridge {
+    function bridgeBurn(address _from, uint256 _amount) external override onlyNTV {
         _burn(_from, _amount);
         emit BridgeBurn(_from, _amount);
     }

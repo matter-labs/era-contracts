@@ -13,6 +13,7 @@ import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "c
 import {DummyStateTransitionManagerWBH} from "contracts/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
 import {DummyHyperchain} from "contracts/dev-contracts/test/DummyHyperchain.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
+import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubSetter.sol";
 import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 
@@ -28,6 +29,7 @@ contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
 
     Bridgehub bridgeHub;
+    DummyBridgehubSetter dummyBridgehub;
     address public bridgeOwner;
     address public testTokenAddress;
     DummyStateTransitionManagerWBH mockSTM;
@@ -40,6 +42,8 @@ contract ExperimentalBridgeTest is Test {
 
     uint256 eraChainId;
 
+    bytes32 private constant LOCK_FLAG_ADDRESS = 0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4;
+
     bytes32 ETH_TOKEN_ASSET_ID =
         keccak256(
             abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
@@ -49,10 +53,11 @@ contract ExperimentalBridgeTest is Test {
         eraChainId = 9;
         uint256 l1ChainId = 1;
         bridgeOwner = makeAddr("BRIDGE_OWNER");
-        bridgeHub = new Bridgehub(l1ChainId, bridgeOwner);
+        dummyBridgehub = new DummyBridgehubSetter(l1ChainId, bridgeOwner, type(uint256).max);
+        bridgeHub = Bridgehub(address(dummyBridgehub));
         address weth = makeAddr("WETH");
         mockSTM = new DummyStateTransitionManagerWBH(address(bridgeHub));
-        mockChainContract = new DummyHyperchain(address(bridgeHub), eraChainId);
+        mockChainContract = new DummyHyperchain(address(bridgeHub), eraChainId, block.chainid);
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
         ntv = new L1NativeTokenVault(weth, IL1AssetRouter(address(mockSharedBridge)));
@@ -72,11 +77,7 @@ contract ExperimentalBridgeTest is Test {
         vm.expectRevert(bytes("1B"));
         bridgeHub.initialize(bridgeOwner);
 
-        vm.store(
-            address(mockChainContract),
-            0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4,
-            bytes32(uint256(1))
-        );
+        vm.store(address(mockChainContract), LOCK_FLAG_ADDRESS, bytes32(uint256(1)));
         bytes32 bridgehubLocation = bytes32(uint256(36));
         vm.store(address(mockChainContract), bridgehubLocation, bytes32(uint256(uint160(address(bridgeHub)))));
         bytes32 baseTokenGasPriceNominatorLocation = bytes32(uint256(40));
@@ -950,12 +951,8 @@ contract ExperimentalBridgeTest is Test {
         // So, perhaps we will have to manually set the values in the stateTransitionManager mapping via a foundry cheatcode
         assertTrue(!(bridgeHub.stateTransitionManager(mockChainId) == address(mockSTM)));
 
-        stdstore.target(address(bridgeHub)).sig("stateTransitionManager(uint256)").with_key(mockChainId).checked_write(
-            address(mockSTM)
-        );
-
-        // Now in the StateTransitionManager that has been set for our mockChainId, we set the hyperchain contract as our mockChainContract
-        mockSTM.setHyperchain(mockChainId, address(mockChainContract));
+        dummyBridgehub.setSTM(mockChainId, address(mockSTM));
+        dummyBridgehub.setHyperchain(mockChainId, address(mockChainContract));
     }
 
     function _setUpBaseTokenForChainId(uint256 mockChainId, bool tokenIsETH) internal {

@@ -84,11 +84,9 @@ interface IStateTransitionManager {
 
     function acceptAdmin() external;
 
-    function getAllHyperchains() external view returns (address[] memory);
-
-    function getAllHyperchainChainIDs() external view returns (uint256[] memory);
-
     function getHyperchain(uint256 _chainId) external view returns (address);
+
+    function getHyperchainLegacy(uint256 _chainId) external view returns (address);
 
     function storedBatchZero() external view returns (bytes32);
 
@@ -103,6 +101,8 @@ interface IStateTransitionManager {
     function protocolVersionDeadline(uint256 _protocolVersion) external view returns (uint256);
 
     function protocolVersionIsActive(uint256 _protocolVersion) external view returns (bool);
+
+    function getProtocolVersion(uint256 _chainId) external view returns (uint256);
 
     function initialize(StateTransitionManagerInitializeData calldata _initializeData) external;
 
@@ -119,9 +119,7 @@ interface IStateTransitionManager {
         address _admin,
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
-    ) external;
-
-    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external;
+    ) external returns (address);
 
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,

@@ -369,7 +369,7 @@ contract DeployL1Script is Script {
     function deployBridgehubContract() internal {
         bytes memory bridgeHubBytecode = abi.encodePacked(
             type(Bridgehub).creationCode,
-            abi.encode(config.l1ChainId, config.ownerAddress)
+            abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains))
         );
         address bridgehubImplementation = deployViaCreate2(bridgeHubBytecode);
         console.log("Bridgehub Implementation deployed at:", bridgehubImplementation);
@@ -452,12 +452,14 @@ contract DeployL1Script is Script {
         console.log("ExecutorFacet deployed at:", executorFacet);
         addresses.stateTransition.executorFacet = executorFacet;
 
-        address adminFacet = deployViaCreate2(type(AdminFacet).creationCode);
+        address adminFacet = deployViaCreate2(
+            abi.encodePacked(type(AdminFacet).creationCode, abi.encode(config.l1ChainId))
+        );
         console.log("AdminFacet deployed at:", adminFacet);
         addresses.stateTransition.adminFacet = adminFacet;
 
         address mailboxFacet = deployViaCreate2(
-            abi.encodePacked(type(MailboxFacet).creationCode, abi.encode(config.eraChainId))
+            abi.encodePacked(type(MailboxFacet).creationCode, abi.encode(config.eraChainId, config.l1ChainId))
         );
         console.log("MailboxFacet deployed at:", mailboxFacet);
         addresses.stateTransition.mailboxFacet = mailboxFacet;
@@ -474,8 +476,7 @@ contract DeployL1Script is Script {
     function deployStateTransitionManagerImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(StateTransitionManager).creationCode,
-            abi.encode(addresses.bridgehub.bridgehubProxy),
-            abi.encode(config.contracts.maxNumberOfChains)
+            abi.encode(addresses.bridgehub.bridgehubProxy)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("StateTransitionManagerImplementation deployed at:", contractAddress);

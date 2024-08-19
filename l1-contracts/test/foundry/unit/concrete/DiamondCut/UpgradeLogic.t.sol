@@ -51,7 +51,7 @@ contract UpgradeLogicTest is DiamondCutTest {
 
         diamondCutTestContract = new DiamondCutTestContract();
         diamondInit = new DiamondInit();
-        adminFacet = new AdminFacet();
+        adminFacet = new AdminFacet(block.chainid);
         gettersFacet = new GettersFacet();
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
