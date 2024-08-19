@@ -13,7 +13,11 @@ import {IL2GenesisUpgrade} from "./interfaces/IL2GenesisUpgrade.sol";
 /// @author Matter Labs
 /// @notice The contract that can be used for deterministic contract deployment.
 contract L2GenesisUpgrade is IL2GenesisUpgrade {
-    function genesisUpgrade(uint256 _chainId, address _stmDeployer, bytes calldata _forceDeploymentsData) external payable {
+    function genesisUpgrade(
+        uint256 _chainId,
+        address _stmDeployer,
+        bytes calldata _forceDeploymentsData
+    ) external payable {
         // solhint-disable-next-line gas-custom-errors
         require(_chainId != 0, "Invalid chainId");
         ISystemContext(SYSTEM_CONTEXT_CONTRACT).setChainId(_chainId);
@@ -27,14 +31,17 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
 
         address bridgehubOwner = L2_BRIDDGE_HUB.owner();
 
-        bytes memory data = abi.encodeCall(L2_BRIDDGE_HUB.setAddresses, (
-            L2_ASSET_ROUTER,
-            _stmDeployer,
-            address(L2_MESSAGE_ROOT)
-        ));
+        bytes memory data = abi.encodeCall(
+            L2_BRIDDGE_HUB.setAddresses,
+            (L2_ASSET_ROUTER, _stmDeployer, address(L2_MESSAGE_ROOT))
+        );
 
-        (bool success, bytes memory returnData) = SystemContractHelper.mimicCall(address(L2_BRIDDGE_HUB), bridgehubOwner, data);
-        if(!success) {
+        (bool success, bytes memory returnData) = SystemContractHelper.mimicCall(
+            address(L2_BRIDDGE_HUB),
+            bridgehubOwner,
+            data
+        );
+        if (!success) {
             // Progapatate revert reason
             assembly {
                 revert(add(returnData, 0x20), returndatasize())

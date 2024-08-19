@@ -407,7 +407,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             require(forceDeploymentHash == initialForceDeploymentHash, "STM: initial force deployment mismatch");
         }
         // genesis upgrade, deploys some contracts, sets chainId
-        IAdmin(hyperchainAddress).genesisUpgrade(l1GenesisUpgrade, address(IBridgehub(BRIDGE_HUB).stmDeployer()), _forceDeploymentData, _factoryDeps);
+        IAdmin(hyperchainAddress).genesisUpgrade(
+            l1GenesisUpgrade,
+            address(IBridgehub(BRIDGE_HUB).stmDeployer()),
+            _forceDeploymentData,
+            _factoryDeps
+        );
     }
 
     /// @param _chainId the chainId of the chain

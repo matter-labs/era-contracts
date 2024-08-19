@@ -359,7 +359,11 @@ library SystemContractHelper {
         }
     }
 
-    function mimicCall(address _to, address _whoToMimic, bytes memory _data) internal returns (bool success, bytes memory returndata) {
+    function mimicCall(
+        address _to,
+        address _whoToMimic,
+        bytes memory _data
+    ) internal returns (bool success, bytes memory returndata) {
         // In zkSync, no memory-related values can exceed uint32, so it is safe to convert here
         uint32 dataStart;
         uint32 dataLength = uint32(_data.length);
