@@ -361,17 +361,17 @@ library SystemContractHelper {
 
     function mimicCall(address _to, address _whoToMimic, bytes memory _data) internal returns (bool success, bytes memory returndata) {
         // In zkSync, no memory-related values can exceed uint32, so it is safe to convert here
-        uint32 offset;
-        uint32 length = uint32(_data.length);
+        uint32 dataStart;
+        uint32 dataLength = uint32(_data.length);
         assembly {
-            offset := add(_data, 0x20)
+            dataStart := add(_data, 0x20)
         }
 
         uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
-            offset,
             0,
             0,
-            length,
+            dataStart,
+            dataLength,
             uint32(gasleft()),
             0,
             CalldataForwardingMode.UseHeap,
@@ -382,7 +382,7 @@ library SystemContractHelper {
         address callAddr = MIMIC_CALL_CALL_ADDRESS;
         uint256 rtSize;
         assembly {
-            success := call(_to, callAddr, 0, farCallAbi, _whoToMimic,0,0 )
+            success := call(_to, callAddr, 0, farCallAbi, _whoToMimic, 0, 0)
             rtSize := returndatasize()
         }
 
