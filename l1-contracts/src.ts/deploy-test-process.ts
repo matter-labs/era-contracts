@@ -333,7 +333,10 @@ export class EraDeployer extends Deployer {
         protocolVersion: CONTRACTS_GENESIS_PROTOCOL_VERSION,
         admin: this.ownerAddress,
         validatorTimelock: ADDRESS_ONE,
-        baseTokenAssetId: encodeNTVAssetId(31337, ethers.utils.hexZeroPad(ETH_ADDRESS_IN_CONTRACTS, 32)),
+        baseTokenAssetId: encodeNTVAssetId(
+          parseInt(process.env.CONTRACTS_ETH_CHAIN_ID),
+          ethers.utils.hexZeroPad(ETH_ADDRESS_IN_CONTRACTS, 32)
+        ),
         baseTokenBridge: this.addresses.Bridges.SharedBridgeProxy,
         storedBatchZero,
         verifier: this.addresses.StateTransition.Verifier,

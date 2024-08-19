@@ -333,12 +333,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                              Getters
     //////////////////////////////////////////////////////////////*/
 
-    // Asset Handlers' token address function, which takes assetId as input and return the token address
+    /// @notice Asset Handlers' token address function, which takes assetId as input and return the token address
     function tokenAddress(bytes32 _baseTokenAssetId) public view returns (address) {
         return baseToken(_baseTokenAssetId);
     }
 
-    // baseToken function, which takes assetId as input, reads assetHandler from AR, and tokenAddress from AH
+    /// @notice baseToken function, which takes assetId as input, reads assetHandler from AR, and tokenAddress from AH
     function baseToken(bytes32 _baseTokenAssetId) public view returns (address) {
         IL1AssetHandler assetHandlerAddress = IL1AssetHandler(sharedBridge.assetHandlerAddress(_baseTokenAssetId));
         return assetHandlerAddress.tokenAddress(_baseTokenAssetId);
