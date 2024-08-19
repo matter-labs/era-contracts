@@ -275,11 +275,22 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function forwardedBridgeClaimFailedBurn(
-        uint256 _chainId,
-        bytes32 _assetInfo,
+        uint256 /* _chainId */,
+        bytes32 /* _assetInfo */,
         address _prevMsgSender,
-        bytes calldata _data
-    ) external payable override onlyBridgehub {}
+        bytes calldata /* _data */
+    ) external payable override onlyBridgehub {
+        require(s.settlementLayer != address(0), "Af: not migrated");
+        require(_prevMsgSender == s.admin, "Af: not chainAdmin");
+        IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
+
+        uint256 currentProtocolVersion = s.protocolVersion;
+        uint256 protocolVersion = stm.protocolVersion();
+
+        require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
+
+        s.settlementLayer = address(0);
+    }
 
     // todo make internal. For now useful for testing
     function _prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {

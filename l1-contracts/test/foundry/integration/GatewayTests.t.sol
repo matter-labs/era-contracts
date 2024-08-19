@@ -23,12 +23,14 @@ import {L2Message} from "contracts/common/Messaging.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {TxStatus} from "contracts/common/Messaging.sol";
 
 contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -161,6 +163,65 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         vm.chainId(12345);
         vm.startBroadcast(AddressAliasHelper.applyL1ToL2Alias(address(0)));
         bridgehub.forwardTransactionOnGateway(mintChainId, tx, new bytes[](0), bytes32(0), 0);
+        vm.stopBroadcast();
+    }
+
+    function test_recoverFromFailedChainMigration() public {
+        gatewayScript.registerGateway();
+        gatewayScript.moveChainToGateway();
+
+
+        // Setup
+        IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
+        address chainAdmin = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId)).getAdmin();
+        IL1AssetRouter assetRouter = bridgehub.sharedBridge();
+        bytes32 assetId = bridgehub.stmAssetIdFromChainId(migratingChainId);
+        bytes32 l2TxHash = keccak256("l2TxHash");
+        uint256 l2BatchNumber = 5;
+        uint256 l2MessageIndex = 0;
+        uint16 l2TxNumberInBatch = 0;
+        bytes32[] memory merkleProof = new bytes32[](1);
+        TxStatus status = TxStatus.Failure;
+        bytes memory transferData = abi.encode(1, address(0));
+        bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(chainAdmin, assetId, transferData)));
+
+        // Mock Call for Msg Inclusion
+        vm.mockCall(
+            address(bridgehub), 
+            abi.encodeWithSelector(
+                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                migratingChainId,
+                l2TxHash,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2TxNumberInBatch,
+                merkleProof,
+                status
+            ),
+            abi.encode(true)
+        );
+
+        // Set Deposit Hapened
+        vm.startBroadcast(address(bridgeHub));
+        assetRouter.bridgehubConfirmL2Transaction({
+            _chainId: migratingChainId,
+            _txDataHash: txDataHash,
+            _txHash: l2TxHash
+        });
+        vm.stopBroadcast();
+
+        vm.startBroadcast();
+        assetRouter.bridgeRecoverFailedTransfer({
+            _chainId: migratingChainId,
+            _depositSender: chainAdmin,
+            _assetId: assetId,
+            _assetData: transferData,
+            _l2TxHash: l2TxHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _merkleProof: merkleProof
+        });
         vm.stopBroadcast();
     }
 
