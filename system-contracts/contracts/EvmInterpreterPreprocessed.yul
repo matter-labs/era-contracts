@@ -1553,7 +1553,7 @@ object "EVMInterpreter" {
                 case 0x01 { // OP_ADD
                     evmGasLeft := chargeGas(evmGasLeft, 3)
             
-                    popStackCheck(sp, evmGasLeft, 2)
+                    popPushStackCheck(sp, evmGasLeft, 2)
                     let a
                     a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
@@ -4522,7 +4522,7 @@ object "EVMInterpreter" {
                     case 0x01 { // OP_ADD
                         evmGasLeft := chargeGas(evmGasLeft, 3)
                 
-                        popStackCheck(sp, evmGasLeft, 2)
+                        popPushStackCheck(sp, evmGasLeft, 2)
                         let a
                         a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
