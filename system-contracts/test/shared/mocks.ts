@@ -40,9 +40,9 @@ const TEST_SYSTEM_CONTRACTS_MOCKS = {
   PubdataChunkPublisher: TEST_PUBDATA_CHUNK_PUBLISHER_ADDRESS,
   // We use `IBridgehub` name, since this is the name of the file in the system-contracts folder.
   // The contract itself is present in a different one.
-  // For bridgehub we mock the real address for simplicity. 
+  // For bridgehub we mock the real address for simplicity.
   // In case of need, it can be ported to use the test address.
-  IBridgehub: REAL_BRIDGEHUB_ADDRESS
+  IBridgehub: REAL_BRIDGEHUB_ADDRESS,
 };
 
 // Deploys mocks, and cleans previous call results during deployments.
