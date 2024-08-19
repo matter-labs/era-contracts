@@ -29,8 +29,7 @@ contract L2AssetRouter is IL2AssetRouter, Initializable {
     /// @dev The address of the L2 legacy shared bridge.
     address public immutable L2_LEGACY_SHARED_BRIDGE;
 
-    /// @notice The address of the L1 asset router counterpart.
-    /// @dev Note that the name is kept from the previous versions for backwards compatibility.
+    /// @dev The address of the L1 asset router counterpart.
     address public override l1AssetRouter;
 
     /// @dev A mapping of asset ID to asset handler address
