@@ -25,3 +25,7 @@ system-contracts/contracts-preprocessed
 
 # gas-bound-caller
 gas-bound-caller/contracts/test-contracts
+
+lib/*
+l2-contracts/lib
+system-contracts/lib
