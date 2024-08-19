@@ -260,6 +260,7 @@ contract ConsensusRegistry is IConsensusRegistry, Ownable2Step {
         bytes32 prevHash = _hashAttesterPubKey(node.attesterLatest.pubKey);
         delete attesterPubKeyHashes[prevHash];
         bytes32 newHash = _hashAttesterPubKey(_pubKey);
+        _verifyAttesterPubKeyDoesNotExist(newHash);
         attesterPubKeyHashes[newHash] = true;
 
         _ensureAttesterSnapshot(node);
