@@ -58,6 +58,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     mapping(uint256 chainId => address) public stateTransitionManager;
 
     /// @notice chainID => baseToken contract address, token that is used as 'base token' by a given child chain.
+    // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => address) public __DEPRECATED_baseToken;
 
     /// @dev used to manage non critical updates
