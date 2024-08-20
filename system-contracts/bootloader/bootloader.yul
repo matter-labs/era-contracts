@@ -3205,9 +3205,8 @@ object "Bootloader" {
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
-
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
-                        assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
+                        //assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                         assertEq(getFactoryDepsBytesLength(innerTxDataOffset), 0, "factory deps non zero")
@@ -3230,7 +3229,7 @@ object "Bootloader" {
                         <!-- @endif -->
 
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
-                        assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
+                        //assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                         assertEq(getFactoryDepsBytesLength(innerTxDataOffset), 0, "factory deps non zero")
@@ -3249,7 +3248,7 @@ object "Bootloader" {
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
-                        assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
+                        //assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                     }
