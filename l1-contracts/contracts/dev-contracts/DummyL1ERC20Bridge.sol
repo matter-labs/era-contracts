@@ -9,8 +9,9 @@ import {IL1NativeTokenVault} from "../bridge/interfaces/IL1NativeTokenVault.sol"
 contract DummyL1ERC20Bridge is L1ERC20Bridge {
     constructor(
         IL1AssetRouter _l1SharedBridge,
-        IL1NativeTokenVault _l1NativeTokenVault
-    ) L1ERC20Bridge(_l1SharedBridge, _l1NativeTokenVault, 1) {}
+        IL1NativeTokenVault _l1NativeTokenVault,
+        uint256 _eraChainId
+    ) L1ERC20Bridge(_l1SharedBridge, _l1NativeTokenVault, _eraChainId) {}
 
     function setValues(address _l2SharedBridge, address _l2TokenBeacon, bytes32 _l2TokenProxyBytecodeHash) external {
         l2Bridge = _l2SharedBridge;

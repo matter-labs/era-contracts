@@ -66,6 +66,7 @@ interface IAdmin is IZkSyncHyperchainBase {
 
     function genesisUpgrade(
         address _l1GenesisUpgrade,
+        address _stmDeployer,
         bytes calldata _forceDeploymentData,
         bytes[] calldata _factoryDeps
     ) external;

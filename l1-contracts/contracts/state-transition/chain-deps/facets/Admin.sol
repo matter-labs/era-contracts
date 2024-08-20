@@ -180,6 +180,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
     function genesisUpgrade(
         address _l1GenesisUpgrade,
+        address _stmDeployer,
         bytes calldata _forceDeploymentData,
         bytes[] calldata _factoryDeps
     ) external onlyStateTransitionManager {
@@ -189,7 +190,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
             initAddress: _l1GenesisUpgrade,
             initCalldata: abi.encodeCall(
                 IL1GenesisUpgrade.genesisUpgrade,
-                (_l1GenesisUpgrade, s.chainId, s.protocolVersion, _forceDeploymentData, _factoryDeps)
+                (_l1GenesisUpgrade, s.chainId, s.protocolVersion, _stmDeployer, _forceDeploymentData, _factoryDeps)
             )
         });
 
