@@ -98,7 +98,6 @@ contract ExperimentalBridgeTest is Test {
         address mockL1WethAddress = makeAddr("Weth");
         address eraDiamondProxy = makeAddr("eraDiamondProxy");
 
-
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
         ntv = new L1NativeTokenVault(weth, IL1AssetRouter(address(mockSharedBridge)));
@@ -110,7 +109,6 @@ contract ExperimentalBridgeTest is Test {
         ntv.registerToken(ETH_TOKEN_ADDRESS);
         ntv.registerToken(address(testToken));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(testToken));
-
 
         // sharedBridge = new L1AssetRouter(mockL1WethAddress, bridgeHub, eraChainId, eraDiamondProxy);
         // address defaultOwner = sharedBridge.owner();
@@ -372,7 +370,10 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub.addTokenAssetId(assetId);
     }
 
-    function test_addAssetId_cannotBeCalledByRandomAddress(address randomCaller, uint256 randomValue) public useRandomToken(randomValue) {
+    function test_addAssetId_cannotBeCalledByRandomAddress(
+        address randomCaller,
+        uint256 randomValue
+    ) public useRandomToken(randomValue) {
         vm.startPrank(bridgeOwner);
         bridgeHub.setAddresses(address(mockSharedBridge), ISTMDeploymentTracker(address(0)), IMessageRoot(address(0)));
         vm.stopPrank();
@@ -697,32 +698,32 @@ contract ExperimentalBridgeTest is Test {
     //     mockSTM.setHyperchain(chainId, address(mockChainContract));
     //     assertTrue(mockSTM.getHyperchain(chainId) == address(mockChainContract));
 
-        // vm.startPrank(deployerAddress);
-        // vm.mockCall(
-        //     address(mockSTM),
-        //     // solhint-disable-next-line func-named-parameters
-        //     abi.encodeWithSelector(
-        //         mockSTM.createNewChain.selector,
-        //         chainId,
-        //         address(testToken),
-        //         sharedBridgeAddress,
-        //         admin,
-        //         _newChainInitData
-        //     ),
-        //     bytes("")
-        // );
+    // vm.startPrank(deployerAddress);
+    // vm.mockCall(
+    //     address(mockSTM),
+    //     // solhint-disable-next-line func-named-parameters
+    //     abi.encodeWithSelector(
+    //         mockSTM.createNewChain.selector,
+    //         chainId,
+    //         address(testToken),
+    //         sharedBridgeAddress,
+    //         admin,
+    //         _newChainInitData
+    //     ),
+    //     bytes("")
+    // );
 
-        // vm.expectEmit(true, true, true, true, address(bridgeHub));
-        // emit NewChain(chainId, address(mockSTM), admin);
+    // vm.expectEmit(true, true, true, true, address(bridgeHub));
+    // emit NewChain(chainId, address(mockSTM), admin);
 
-        // newChainId = bridgeHub.createNewChain({
-        //     _chainId: chainId,
-        //     _stateTransitionManager: address(mockSTM),
-        //     _baseToken: address(testToken),
-        //     _salt: uint256(chainId * 2),
-        //     _admin: admin,
-        //     _initData: _newChainInitData
-        // });
+    // newChainId = bridgeHub.createNewChain({
+    //     _chainId: chainId,
+    //     _stateTransitionManager: address(mockSTM),
+    //     _baseToken: address(testToken),
+    //     _salt: uint256(chainId * 2),
+    //     _admin: admin,
+    //     _initData: _newChainInitData
+    // });
 
     //     vm.stopPrank();
     //     vm.clearMockedCalls();
@@ -946,15 +947,15 @@ contract ExperimentalBridgeTest is Test {
 
     //     l2TxnReqDirect.chainId = _setUpHyperchainForChainId(l2TxnReqDirect.chainId);
 
-        // assertTrue(!(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS));
-        // _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, true, address(0));
-        // assertTrue(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS);
+    // assertTrue(!(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS));
+    // _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, true, address(0));
+    // assertTrue(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS);
 
-        // _setUpSharedBridge();
-        // _setUpSharedBridgeL2(mockChainId);
+    // _setUpSharedBridge();
+    // _setUpSharedBridgeL2(mockChainId);
 
-        // assertTrue(bridgeHub.getHyperchain(l2TxnReqDirect.chainId) == address(mockChainContract));
-        // bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+    // assertTrue(bridgeHub.getHyperchain(l2TxnReqDirect.chainId) == address(mockChainContract));
+    // bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
 
     //     vm.mockCall(
     //         address(mockChainContract),
@@ -1079,9 +1080,9 @@ contract ExperimentalBridgeTest is Test {
     //         mockRefundRecipient: mockRefundRecipient
     //     });
 
-        // _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, false, address(testToken));
-        // _setUpSharedBridge();
-        // _setUpSharedBridgeL2(mockChainId);
+    // _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, false, address(testToken));
+    // _setUpSharedBridge();
+    // _setUpSharedBridgeL2(mockChainId);
 
     //     _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, false);
     //     _setUpSharedBridge();
@@ -1095,22 +1096,22 @@ contract ExperimentalBridgeTest is Test {
     //         abi.encode(canonicalHash)
     //     );
 
-        // gasPrice = bound(gasPrice, 1_000, 50_000_000);
-        // vm.txGasPrice(gasPrice * 1 gwei);
+    // gasPrice = bound(gasPrice, 1_000, 50_000_000);
+    // vm.txGasPrice(gasPrice * 1 gwei);
 
-        // vm.deal(randomCaller, 1 ether);
-        // vm.prank(randomCaller);
-        // vm.expectRevert("Bridgehub: non-eth bridge with msg.value");
-        // bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
+    // vm.deal(randomCaller, 1 ether);
+    // vm.prank(randomCaller);
+    // vm.expectRevert("Bridgehub: non-eth bridge with msg.value");
+    // bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
 
     //     vm.prank(randomCaller);
     //     vm.expectRevert("BH: non-eth bridge with msg.value");
     //     bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
 
-        // vm.prank(randomCaller);
-        // testToken.transfer(address(this), l2TxnReqDirect.mintValue);
-        // assertEq(testToken.balanceOf(address(this)), l2TxnReqDirect.mintValue);
-        // testToken.approve(sharedBridgeAddress, l2TxnReqDirect.mintValue);
+    // vm.prank(randomCaller);
+    // testToken.transfer(address(this), l2TxnReqDirect.mintValue);
+    // assertEq(testToken.balanceOf(address(this)), l2TxnReqDirect.mintValue);
+    // testToken.approve(sharedBridgeAddress, l2TxnReqDirect.mintValue);
 
     // vm.prank(randomCaller);
     // testToken.transfer(address(this), l2TxnReqDirect.mintValue);

@@ -29,10 +29,10 @@ import {
   EMPTY_STRING_KECCAK,
   isCurrentNetworkLocal,
   ETH_ADDRESS_IN_CONTRACTS,
+  encodeNTVAssetId,
 } from "./utils";
 import { diamondCut, getCurrentFacetCutsForAdd, facetCut, Action } from "./diamondCut";
 import { CONTRACTS_GENESIS_PROTOCOL_VERSION } from "../test/unit_tests/utils";
-import { encodeNTVAssetId } from "./utils";
 
 import { DummyAdminFacetNoOverlapFactory } from "../typechain";
 

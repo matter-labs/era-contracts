@@ -297,8 +297,8 @@ contract MailboxL2LogsProve is MailboxTest {
         result = new bytes32[](logProof.length + 1);
 
         result[0] = bytes32(bytes.concat(bytes1(0x01), bytes1(uint8(logProof.length)), bytes30(0x00)));
-        for(uint256 i = 0; i < logProof.length; i++) {
+        for (uint256 i = 0; i < logProof.length; i++) {
             result[i + 1] = logProof[i];
         }
-    } 
+    }
 }

@@ -35,11 +35,7 @@ contract L1Erc20BridgeTest is Test {
         alice = makeAddr("alice");
 
         uint256 eraChainId = 9;
-        bridge = new L1ERC20Bridge(
-            IL1AssetRouter(sharedBridgeAddress),
-            IL1NativeTokenVault(address(1)),
-            eraChainId
-        );
+        bridge = new L1ERC20Bridge(IL1AssetRouter(sharedBridgeAddress), IL1NativeTokenVault(address(1)), eraChainId);
 
         address weth = makeAddr("weth");
         L1NativeTokenVault ntv = new L1NativeTokenVault(weth, IL1AssetRouter(sharedBridgeAddress));

@@ -13,7 +13,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IL2Bridge} from "../../bridge/interfaces/IL2Bridge.sol";
 import {IL2BridgeLegacy} from "../../bridge/interfaces/IL2BridgeLegacy.sol";
 
-
 contract DummySharedBridge is PausableUpgradeable {
     using SafeERC20 for IERC20;
 
@@ -152,7 +151,6 @@ contract DummySharedBridge is PausableUpgradeable {
     ) external payable whenNotPaused {
         // Dummy bridge supports only working with ETH for simplicity.
         require(msg.value == _amount, "L1AR: msg.value not equal to amount");
-
 
         if (!hyperbridgingEnabled[_chainId]) {
             chainBalance[_chainId][address(1)] += _amount;

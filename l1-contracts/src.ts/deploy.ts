@@ -1371,7 +1371,7 @@ export class Deployer {
     const multicallTx = await chainAdmin.multicall(calls, requireSuccess, { value: totalValue });
     return await multicallTx.wait();
   }
-  
+
   public async setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress: string) {
     const chainAdmin = ChainAdminFactory.connect(this.addresses.ChainAdmin, this.deployWallet);
 
