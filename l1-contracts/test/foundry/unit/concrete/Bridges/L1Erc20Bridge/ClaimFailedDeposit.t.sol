@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
+import {EmptyDeposit} from "contracts/common/L1ContractErrors.sol";
 
 contract ClaimFailedDepositTest is L1Erc20BridgeTest {
     using stdStorage for StdStorage;
@@ -12,7 +13,7 @@ contract ClaimFailedDepositTest is L1Erc20BridgeTest {
     event ClaimedFailedDeposit(address indexed to, address indexed l1Token, uint256 amount);
 
     function test_RevertWhen_ClaimAmountIsZero() public {
-        vm.expectRevert(bytes("2T"));
+        vm.expectRevert(EmptyDeposit.selector);
         bytes32[] memory merkleProof;
 
         bridge.claimFailedDeposit({

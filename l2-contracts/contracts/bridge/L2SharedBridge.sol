@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.20;
 
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
+import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
@@ -15,7 +15,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
-import {EmptyAddress, EmptyBytes32, InvalidCaller, AddressMismatch, AmountMustBeGreaterThanZero, DeployFailed} from "../L2ContractErrors.sol";
+import {ZeroAddress, EmptyBytes32, Unauthorized, AddressMismatch, AmountMustBeGreaterThanZero, DeployFailed} from "../errors/L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -60,7 +60,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         address _aliasedOwner
     ) external reinitializer(2) {
         if (_l1SharedBridge == address(0)) {
-            revert EmptyAddress();
+            revert ZeroAddress();
         }
 
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
@@ -68,7 +68,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         }
 
         if (_aliasedOwner == address(0)) {
-            revert EmptyAddress();
+            revert ZeroAddress();
         }
 
         l1SharedBridge = _l1SharedBridge;
@@ -80,7 +80,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
             l2TokenBeacon.transferOwnership(_aliasedOwner);
         } else {
             if (_l1Bridge == address(0)) {
-                revert EmptyAddress();
+                revert ZeroAddress();
             }
             l1Bridge = _l1Bridge;
             // l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
@@ -105,7 +105,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
             AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
             AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge
         ) {
-            revert InvalidCaller(msg.sender);
+            revert Unauthorized(msg.sender);
         }
 
         address expectedL2Token = l2TokenAddress(_l1Token);
@@ -151,7 +151,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
 
         address l1Token = l1TokenAddress[_l2Token];
         if (l1Token == address(0)) {
-            revert EmptyAddress();
+            revert ZeroAddress();
         }
 
         bytes memory message = _getL1WithdrawMessage(_l1Receiver, l1Token, _amount);

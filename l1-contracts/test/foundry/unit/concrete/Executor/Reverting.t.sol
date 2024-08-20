@@ -8,6 +8,7 @@ import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {RevertedBatchNotAfterNewLastBatch} from "contracts/common/L1ContractErrors.sol";
 
 contract RevertingTest is ExecutorTest {
     function setUp() public {
@@ -55,7 +56,7 @@ contract RevertingTest is ExecutorTest {
 
     function test_RevertWhen_RevertingMoreBatchesThanAlreadyCommitted() public {
         vm.prank(validator);
-        vm.expectRevert(bytes.concat("v1"));
+        vm.expectRevert(RevertedBatchNotAfterNewLastBatch.selector);
         executor.revertBatches(10);
     }
 

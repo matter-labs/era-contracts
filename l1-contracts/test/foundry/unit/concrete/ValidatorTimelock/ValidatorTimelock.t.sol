@@ -6,6 +6,7 @@ import {Utils} from "../Utils/Utils.sol";
 import {ValidatorTimelock, IExecutor} from "contracts/state-transition/ValidatorTimelock.sol";
 import {DummyStateTransitionManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyStateTransitionManagerForValidatorTimelock.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
+import {Unauthorized, TimeNotReached} from "contracts/common/L1ContractErrors.sol";
 
 contract ValidatorTimelockTest is Test {
     /// @notice A new validator has been added.
@@ -270,7 +271,7 @@ contract ValidatorTimelockTest is Test {
     function test_RevertWhen_addValidatorNotAdmin() public {
         assert(validator.validators(chainId, bob) == false);
 
-        vm.expectRevert("ValidatorTimelock: only chain admin");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
         validator.addValidator(chainId, bob);
 
         assert(validator.validators(chainId, bob) == false);
@@ -279,7 +280,7 @@ contract ValidatorTimelockTest is Test {
     function test_RevertWhen_removeValidatorNotAdmin() public {
         assert(validator.validators(chainId, alice) == true);
 
-        vm.expectRevert("ValidatorTimelock: only chain admin");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
         validator.removeValidator(chainId, alice);
 
         assert(validator.validators(chainId, alice) == true);
@@ -309,7 +310,7 @@ contract ValidatorTimelockTest is Test {
         batchesToCommit[0] = batchToCommit;
 
         vm.prank(bob);
-        vm.expectRevert(bytes("ValidatorTimelock: only validator"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bob));
         validator.commitBatches(storedBatch, batchesToCommit);
     }
 
@@ -319,12 +320,12 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_RevertWhen_revertBatchesNotValidator() public {
-        vm.expectRevert("ValidatorTimelock: only validator");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
         validator.revertBatches(lastBatchNumber);
     }
 
     function test_RevertWhen_revertBatchesSharedBridgeNotValidator() public {
-        vm.expectRevert("ValidatorTimelock: only validator");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
         validator.revertBatchesSharedBridge(chainId, lastBatchNumber);
     }
 
@@ -336,7 +337,7 @@ contract ValidatorTimelockTest is Test {
         IExecutor.StoredBatchInfo[] memory batchesToProve = new IExecutor.StoredBatchInfo[](1);
         batchesToProve[0] = batchToProve;
 
-        vm.expectRevert("ValidatorTimelock: only validator");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
         validator.proveBatches(prevBatch, batchesToProve, proof);
     }
 
@@ -349,7 +350,7 @@ contract ValidatorTimelockTest is Test {
         batchesToProve[0] = batchToProve;
 
         vm.prank(bob);
-        vm.expectRevert("ValidatorTimelock: only validator");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bob));
         validator.proveBatchesSharedBridge(chainId, prevBatch, batchesToProve, proof);
     }
 
@@ -360,7 +361,7 @@ contract ValidatorTimelockTest is Test {
         storedBatches[0] = storedBatch;
 
         vm.prank(bob);
-        vm.expectRevert("ValidatorTimelock: only validator");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bob));
         validator.executeBatches(storedBatches);
     }
 
@@ -371,7 +372,7 @@ contract ValidatorTimelockTest is Test {
         storedBatches[0] = storedBatch;
 
         vm.prank(bob);
-        vm.expectRevert("ValidatorTimelock: only validator");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bob));
         validator.executeBatchesSharedBridge(chainId, storedBatches);
     }
 
@@ -400,7 +401,9 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(dan);
         vm.warp(timestamp + executionDelay - 1);
-        vm.expectRevert(bytes("5c"));
+        vm.expectRevert(
+            abi.encodeWithSelector(TimeNotReached.selector, timestamp + executionDelay, timestamp + executionDelay - 1)
+        );
         validator.executeBatches(storedBatches);
     }
 
@@ -429,7 +432,9 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(alice);
         vm.warp(timestamp + executionDelay - 1);
-        vm.expectRevert(bytes("5c"));
+        vm.expectRevert(
+            abi.encodeWithSelector(TimeNotReached.selector, timestamp + executionDelay, timestamp + executionDelay - 1)
+        );
         validator.executeBatchesSharedBridge(chainId, storedBatches);
     }
 }

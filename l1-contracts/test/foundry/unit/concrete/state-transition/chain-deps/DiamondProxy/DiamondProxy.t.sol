@@ -12,6 +12,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {ZkSyncHyperchainBase} from "contracts/state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {FacetIsFrozen, ValueMismatch, InvalidSelector} from "contracts/common/L1ContractErrors.sol";
 
 contract TestFacet is ZkSyncHyperchainBase {
     function func() public pure returns (bool) {
@@ -59,7 +60,7 @@ contract DiamondProxyTest is Test {
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
-        vm.expectRevert(abi.encodePacked("pr"));
+        vm.expectRevert(bytes("pr"));
         new DiamondProxy(block.chainid + 1, diamondCutData);
     }
 
@@ -107,7 +108,7 @@ contract DiamondProxyTest is Test {
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
         TestFacet testFacet = TestFacet(address(diamondProxy));
 
-        vm.expectRevert(abi.encodePacked("F"));
+        vm.expectRevert(bytes("F"));
         testFacet.func();
     }
 
@@ -126,7 +127,7 @@ contract DiamondProxyTest is Test {
 
         utilsFacet.util_setIsFrozen(true);
 
-        vm.expectRevert(abi.encodePacked("q1"));
+        vm.expectRevert(bytes("q1"));
         testFacet.func();
     }
 

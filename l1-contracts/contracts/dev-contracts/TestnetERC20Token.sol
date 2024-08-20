@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20} from "@openzeppelin/contracts-v4/token/ERC20/ERC20.sol";
 
 contract TestnetERC20Token is ERC20 {
     // add this to be excluded from coverage report
