@@ -1,5 +1,5 @@
 {
-  "filter_paths": "(contracts/dev-contracts|lib|node_modules|../lib|../node_modules)",
+  "filter_paths": "(contracts/dev-contracts|lib|node_modules)",
   "detectors_to_exclude": "assembly,solc-version,low-level-calls,conformance-to-solidity-naming-conventions,incorrect-equality,uninitialized-local",
   "exclude_dependencies": true,
   "compile_force_framework": "foundry",
