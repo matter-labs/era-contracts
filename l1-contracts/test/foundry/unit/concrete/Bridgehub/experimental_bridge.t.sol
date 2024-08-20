@@ -17,6 +17,7 @@ import {L2TransactionRequestTwoBridgesInner} from "contracts/bridgehub/IBridgehu
 import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
+import {ZeroChainId, AddressTooLow, ChainIdTooBig, WrongMagicValue, SharedBridgeNotSet, TokenNotRegistered, BridgeHubAlreadyRegistered, MsgValueMismatch, SlotOccupied, STMAlreadyRegistered, TokenAlreadyRegistered, Unauthorized, NonEmptyMsgValue, STMNotRegistered, InvalidChainId} from "contracts/common/L1ContractErrors.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -94,7 +95,7 @@ contract ExperimentalBridgeTest is Test {
         defaultOwner = bridgeHub.owner();
 
         // Now, the `reentrancyGuardInitializer` should prevent anyone from calling `initialize` since we have called the constructor of the contract
-        vm.expectRevert(bytes("1B"));
+        vm.expectRevert(SlotOccupied.selector);
         bridgeHub.initialize(bridgeOwner);
 
         vm.store(
@@ -123,6 +124,8 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function test_newPendingAdminReplacesPrevious(address randomDeployer, address otherRandomDeployer) public {
+        vm.assume(randomDeployer != address(0));
+        vm.assume(otherRandomDeployer != address(0));
         assertEq(address(0), bridgeHub.admin());
         vm.assume(randomDeployer != otherRandomDeployer);
 
@@ -139,13 +142,15 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function test_onlyPendingAdminCanAccept(address randomDeployer, address otherRandomDeployer) public {
+        vm.assume(randomDeployer != address(0));
+        vm.assume(otherRandomDeployer != address(0));
         assertEq(address(0), bridgeHub.admin());
         vm.assume(randomDeployer != otherRandomDeployer);
 
         vm.prank(bridgeHub.owner());
         bridgeHub.setPendingAdmin(randomDeployer);
 
-        vm.expectRevert(bytes("n42"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, otherRandomDeployer));
         vm.prank(otherRandomDeployer);
         bridgeHub.acceptAdmin();
 
@@ -153,6 +158,7 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function test_onlyOwnerCanSetDeployer(address randomDeployer) public {
+        vm.assume(randomDeployer != address(0));
         assertEq(address(0), bridgeHub.admin());
 
         vm.prank(bridgeHub.owner());
@@ -166,7 +172,7 @@ contract ExperimentalBridgeTest is Test {
     function test_randomCallerCannotSetDeployer(address randomCaller, address randomDeployer) public {
         if (randomCaller != bridgeHub.owner() && randomCaller != bridgeHub.admin()) {
             vm.prank(randomCaller);
-            vm.expectRevert(bytes("Bridgehub: not owner or admin"));
+            vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
             bridgeHub.setPendingAdmin(randomDeployer);
 
             // The deployer shouldn't have changed.
@@ -175,6 +181,7 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function test_addStateTransitionManager(address randomAddressWithoutTheCorrectInterface) public {
+        vm.assume(randomAddressWithoutTheCorrectInterface != address(0));
         bool isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(!isSTMRegistered);
 
@@ -186,7 +193,7 @@ contract ExperimentalBridgeTest is Test {
 
         // An address that has already been registered, cannot be registered again (at least not before calling `removeStateTransitionManager`).
         vm.prank(bridgeOwner);
-        vm.expectRevert(bytes("Bridgehub: state transition already registered"));
+        vm.expectRevert(STMAlreadyRegistered.selector);
         bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
 
         isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
@@ -197,6 +204,7 @@ contract ExperimentalBridgeTest is Test {
         address randomCaller,
         address randomAddressWithoutTheCorrectInterface
     ) public {
+        vm.assume(randomAddressWithoutTheCorrectInterface != address(0));
         bool isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(!isSTMRegistered);
 
@@ -215,7 +223,7 @@ contract ExperimentalBridgeTest is Test {
 
         // An address that has already been registered, cannot be registered again (at least not before calling `removeStateTransitionManager`).
         vm.prank(bridgeOwner);
-        vm.expectRevert(bytes("Bridgehub: state transition already registered"));
+        vm.expectRevert(STMAlreadyRegistered.selector);
         bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
 
         // Definitely not by a random caller
@@ -230,12 +238,13 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function test_removeStateTransitionManager(address randomAddressWithoutTheCorrectInterface) public {
+        vm.assume(randomAddressWithoutTheCorrectInterface != address(0));
         bool isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(!isSTMRegistered);
 
         // A non-existent STM cannot be removed
         vm.prank(bridgeOwner);
-        vm.expectRevert(bytes("Bridgehub: state transition not registered yet"));
+        vm.expectRevert(STMNotRegistered.selector);
         bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
 
         // Let's first register our particular stateTransitionManager
@@ -254,7 +263,7 @@ contract ExperimentalBridgeTest is Test {
 
         // An already removed STM cannot be removed again
         vm.prank(bridgeOwner);
-        vm.expectRevert(bytes("Bridgehub: state transition not registered yet"));
+        vm.expectRevert(STMNotRegistered.selector);
         bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
     }
 
@@ -262,6 +271,7 @@ contract ExperimentalBridgeTest is Test {
         address randomAddressWithoutTheCorrectInterface,
         address randomCaller
     ) public {
+        vm.assume(randomAddressWithoutTheCorrectInterface != address(0));
         bool isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(!isSTMRegistered);
 
@@ -274,7 +284,7 @@ contract ExperimentalBridgeTest is Test {
 
         // A non-existent STM cannot be removed
         vm.prank(bridgeOwner);
-        vm.expectRevert(bytes("Bridgehub: state transition not registered yet"));
+        vm.expectRevert(STMNotRegistered.selector);
         bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
 
         // Let's first register our particular stateTransitionManager
@@ -293,7 +303,7 @@ contract ExperimentalBridgeTest is Test {
 
         // An already removed STM cannot be removed again
         vm.prank(bridgeOwner);
-        vm.expectRevert(bytes("Bridgehub: state transition not registered yet"));
+        vm.expectRevert(STMNotRegistered.selector);
         bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
 
         // Not possible by a randomcaller as well
@@ -325,7 +335,7 @@ contract ExperimentalBridgeTest is Test {
 
         // An already registered token cannot be registered again
         vm.prank(bridgeOwner);
-        vm.expectRevert("Bridgehub: token already registered");
+        vm.expectRevert(abi.encodeWithSelector(TokenAlreadyRegistered.selector, address(randomAddress)));
         bridgeHub.addToken(randomAddress);
     }
 
@@ -361,12 +371,13 @@ contract ExperimentalBridgeTest is Test {
         // An already registered token cannot be registered again by randomCaller
         if (randomCaller != bridgeOwner) {
             vm.prank(bridgeOwner);
-            vm.expectRevert("Bridgehub: token already registered");
+            vm.expectRevert(abi.encodeWithSelector(TokenAlreadyRegistered.selector, address(randomAddress)));
             bridgeHub.addToken(randomAddress);
         }
     }
 
     function test_setSharedBridge(address randomAddress) public {
+        vm.assume(randomAddress != address(0));
         assertTrue(
             bridgeHub.sharedBridge() == IL1SharedBridge(address(0)),
             "This random address is not registered as sharedBridge"
@@ -382,6 +393,7 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function test_setSharedBridge_cannotBeCalledByRandomAddress(address randomCaller, address randomAddress) public {
+        vm.assume(randomAddress != address(0));
         if (randomCaller != bridgeOwner) {
             vm.prank(randomCaller);
             vm.expectRevert(bytes("Ownable: caller is not the owner"));
@@ -435,7 +447,7 @@ contract ExperimentalBridgeTest is Test {
         vm.prank(bridgeOwner);
         bridgeHub.unpause();
 
-        vm.expectRevert("Bridgehub: state transition not registered");
+        vm.expectRevert(STMNotRegistered.selector);
         vm.prank(deployerAddress);
         bridgeHub.createNewChain({
             _chainId: 1,
@@ -462,7 +474,7 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub.acceptAdmin();
 
         chainId = bound(chainId, 1, type(uint48).max);
-        vm.expectRevert("Bridgehub: state transition not registered");
+        vm.expectRevert(STMNotRegistered.selector);
         vm.prank(deployerAddress);
         bridgeHub.createNewChain({
             _chainId: chainId,
@@ -489,7 +501,7 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub.acceptAdmin();
 
         chainId = bound(chainId, type(uint48).max + uint256(1), type(uint256).max);
-        vm.expectRevert("Bridgehub: chainId too large");
+        vm.expectRevert(ChainIdTooBig.selector);
         vm.prank(deployerAddress);
         bridgeHub.createNewChain({
             _chainId: chainId,
@@ -501,7 +513,7 @@ contract ExperimentalBridgeTest is Test {
         });
 
         chainId = 0;
-        vm.expectRevert("Bridgehub: chainId cannot be 0");
+        vm.expectRevert(ZeroChainId.selector);
         vm.prank(deployerAddress);
         bridgeHub.createNewChain({
             _chainId: chainId,
@@ -531,7 +543,7 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub.addStateTransitionManager(address(mockSTM));
         vm.stopPrank();
 
-        vm.expectRevert("Bridgehub: token not registered");
+        vm.expectRevert(abi.encodeWithSelector(TokenNotRegistered.selector, address(testToken)));
         vm.prank(deployerAddress);
         bridgeHub.createNewChain({
             _chainId: chainId,
@@ -562,7 +574,7 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub.addToken(address(testToken));
         vm.stopPrank();
 
-        vm.expectRevert("Bridgehub: weth bridge not set");
+        vm.expectRevert(SharedBridgeNotSet.selector);
         vm.prank(deployerAddress);
         bridgeHub.createNewChain({
             _chainId: chainId,
@@ -597,7 +609,7 @@ contract ExperimentalBridgeTest is Test {
             address(mockSTM)
         );
 
-        vm.expectRevert("Bridgehub: chainId already registered");
+        vm.expectRevert(BridgeHubAlreadyRegistered.selector);
         vm.prank(deployerAddress);
         bridgeHub.createNewChain({
             _chainId: chainId,
@@ -636,7 +648,7 @@ contract ExperimentalBridgeTest is Test {
 
         if (randomCaller != deployerAddress && randomCaller != bridgeOwner) {
             vm.prank(randomCaller);
-            vm.expectRevert(bytes("Bridgehub: not owner or admin"));
+            vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
             bridgeHub.createNewChain({
                 _chainId: chainId,
                 _stateTransitionManager: address(mockSTM),
@@ -958,7 +970,7 @@ contract ExperimentalBridgeTest is Test {
         });
 
         vm.deal(randomCaller, msgValue);
-        vm.expectRevert("Bridgehub: msg.value mismatch 1");
+        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, mockMintValue, msgValue));
         vm.prank(randomCaller);
         bridgeHub.requestL2TransactionDirect{value: msgValue}(l2TxnReqDirect);
     }
@@ -1055,7 +1067,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.deal(randomCaller, 1 ether);
         vm.prank(randomCaller);
-        vm.expectRevert("Bridgehub: non-eth bridge with msg.value");
+        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, 0, randomCaller.balance));
         bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
 
         // Now, let's call the same function with zero msg.value
@@ -1125,7 +1137,7 @@ contract ExperimentalBridgeTest is Test {
                 abi.encode(request)
             );
 
-            vm.expectRevert("Bridgehub: magic value mismatch");
+            vm.expectRevert(abi.encodeWithSelector(WrongMagicValue.selector, TWO_BRIDGES_MAGIC_VALUE, magicValue));
             vm.prank(randomCaller);
             bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
         }
@@ -1204,7 +1216,7 @@ contract ExperimentalBridgeTest is Test {
         );
 
         l2TxnReq2BridgeOut.secondBridgeAddress = address(secondBridgeAddressValue);
-        vm.expectRevert("Bridgehub: second bridge address too low");
+        vm.expectRevert(abi.encodeWithSelector(AddressTooLow.selector, secondBridgeAddress));
         vm.prank(randomCaller);
         bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
     }
@@ -1277,7 +1289,7 @@ contract ExperimentalBridgeTest is Test {
         testToken.mint(randomCaller, l2TxnReq2BridgeOut.mintValue);
         vm.startPrank(randomCaller);
         testToken.approve(sharedBridgeAddress, l2TxnReq2BridgeOut.mintValue);
-        vm.expectRevert("Bridgehub: msg.value mismatch 3");
+        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, l2TxnReq2BridgeOut.secondBridgeValue, 0));
         bridgeHub.requestL2TransactionTwoBridges(l2TxnReq2BridgeOut);
         vm.stopPrank();
     }
@@ -1321,17 +1333,21 @@ contract ExperimentalBridgeTest is Test {
 
         mockChainContract.setBridgeHubAddress(address(bridgeHub));
 
-        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+        {
+            bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
 
-        vm.mockCall(
-            address(mockChainContract),
-            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
-            abi.encode(canonicalHash)
-        );
+            vm.mockCall(
+                address(mockChainContract),
+                abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
+                abi.encode(canonicalHash)
+            );
+        }
 
         if (msgValue != secondBridgeValue) {
             vm.deal(randomCaller, msgValue);
-            vm.expectRevert("Bridgehub: msg.value mismatch 3");
+            vm.expectRevert(
+                abi.encodeWithSelector(MsgValueMismatch.selector, l2TxnReq2BridgeOut.secondBridgeValue, msgValue)
+            );
             vm.prank(randomCaller);
             bridgeHub.requestL2TransactionTwoBridges{value: msgValue}(l2TxnReq2BridgeOut);
         }

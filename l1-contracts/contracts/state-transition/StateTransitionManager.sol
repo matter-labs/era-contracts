@@ -2,10 +2,8 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors, reason-string
-
-import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
@@ -19,11 +17,12 @@ import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
 import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
+import {Unauthorized, ZeroAddress, HashMismatch, HyperchainLimitReached, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
 /// @title State Transition Manager contract
@@ -82,13 +81,17 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
-        require(msg.sender == BRIDGE_HUB, "STM: only bridgehub");
+        if (msg.sender != BRIDGE_HUB) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     /// @notice the admin can call, for non-critical updates
     modifier onlyOwnerOrAdmin() {
-        require(msg.sender == admin || msg.sender == owner(), "STM: not owner or admin");
+        if (msg.sender != admin && msg.sender != owner()) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
@@ -104,7 +107,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         chainAddresses = new address[](keys.length);
         uint256 keysLength = keys.length;
         for (uint256 i = 0; i < keysLength; ++i) {
-            chainAddresses[i] = hyperchainMap.get(i);
+            chainAddresses[i] = hyperchainMap.get(keys[i]);
         }
     }
 
@@ -128,7 +131,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function initialize(
         StateTransitionManagerInitializeData calldata _initializeData
     ) external reentrancyGuardInitializer {
-        require(_initializeData.owner != address(0), "STM: owner zero");
+        if (_initializeData.owner == address(0)) {
+            revert ZeroAddress();
+        }
         _transferOwnership(_initializeData.owner);
 
         protocolVersion = _initializeData.protocolVersion;
@@ -141,13 +146,18 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters
     function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal {
-        require(_chainCreationParams.genesisUpgrade != address(0), "STM: genesisUpgrade zero");
-        require(_chainCreationParams.genesisBatchHash != bytes32(0), "STM: genesisBatchHash zero");
-        require(
-            _chainCreationParams.genesisIndexRepeatedStorageChanges != uint64(0),
-            "STM: genesisIndexRepeatedStorageChanges zero"
-        );
-        require(_chainCreationParams.genesisBatchCommitment != bytes32(0), "STM: genesisBatchCommitment zero");
+        if (_chainCreationParams.genesisUpgrade == address(0)) {
+            revert GenesisUpgradeZero();
+        }
+        if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
+            revert GenesisBatchHashZero();
+        }
+        if (_chainCreationParams.genesisIndexRepeatedStorageChanges == uint64(0)) {
+            revert GenesisIndexStorageZero();
+        }
+        if (_chainCreationParams.genesisBatchCommitment == bytes32(0)) {
+            revert GenesisBatchCommitmentZero();
+        }
 
         genesisUpgrade = _chainCreationParams.genesisUpgrade;
 
@@ -197,7 +207,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
     function acceptAdmin() external {
         address currentPendingAdmin = pendingAdmin;
-        require(msg.sender == currentPendingAdmin, "n42"); // Only proposed by current admin address can claim the admin rights
+        // Only proposed by current admin address can claim the admin rights
+        if (msg.sender != currentPendingAdmin) {
+            revert Unauthorized(msg.sender);
+        }
 
         address previousAdmin = admin;
         admin = currentPendingAdmin;
@@ -371,7 +384,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @param _chainId the chain's id
     /// @param _hyperchain the chain's contract address
     function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external onlyOwner {
-        require(_hyperchain != address(0), "STM: hyperchain zero");
+        if (_hyperchain == address(0)) {
+            revert ZeroAddress();
+        }
 
         _registerNewHyperchain(_chainId, _hyperchain);
     }
@@ -399,7 +414,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         // check input
         bytes32 cutHashInput = keccak256(_diamondCut);
-        require(cutHashInput == initialCutHash, "STM: initial cutHash mismatch");
+        if (cutHashInput != initialCutHash) {
+            revert HashMismatch(initialCutHash, cutHashInput);
+        }
 
         // construct init data
         bytes memory initData;
@@ -410,12 +427,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             bytes32(_chainId),
             bytes32(uint256(uint160(BRIDGE_HUB))),
             bytes32(uint256(uint160(address(this)))),
-            bytes32(uint256(protocolVersion)),
+            bytes32(protocolVersion),
             bytes32(uint256(uint160(_admin))),
             bytes32(uint256(uint160(validatorTimelock))),
             bytes32(uint256(uint160(_baseToken))),
             bytes32(uint256(uint160(_sharedBridge))),
-            bytes32(storedBatchZero),
+            storedBatchZero,
             diamondCut.initCalldata
         );
 
@@ -436,7 +453,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function _registerNewHyperchain(uint256 _chainId, address _hyperchain) internal {
         // slither-disable-next-line unused-return
         hyperchainMap.set(_chainId, _hyperchain);
-        require(hyperchainMap.length() <= MAX_NUMBER_OF_HYPERCHAINS, "STM: Hyperchain limit reached");
+        if (hyperchainMap.length() > MAX_NUMBER_OF_HYPERCHAINS) {
+            revert HyperchainLimitReached();
+        }
         emit NewHyperchain(_chainId, _hyperchain);
     }
 }

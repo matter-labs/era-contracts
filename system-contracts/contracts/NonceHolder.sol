@@ -4,9 +4,9 @@ pragma solidity 0.8.20;
 
 import {INonceHolder} from "./interfaces/INonceHolder.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {DEPLOYER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./Constants.sol";
-import {NonceIncreaseError, ZeroNonceError, NonceJumpError, ValuesNotEqual, NonceAlreadyUsed, NonceNotUsed, Unauthorized} from "./SystemContractErrors.sol";
+import {NonceIncreaseError, ZeroNonceError, NonceJumpError, ValueMismatch, NonceAlreadyUsed, NonceNotUsed, Unauthorized} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -25,7 +25,7 @@ import {NonceIncreaseError, ZeroNonceError, NonceJumpError, ValuesNotEqual, Nonc
  * @dev The behavior of some of the methods depends on the nonce ordering of the account. Nonce ordering is a mere suggestion and all the checks that are present
  * here serve more as a help to users to prevent from doing mistakes, rather than any invariants.
  */
-contract NonceHolder is INonceHolder, ISystemContract {
+contract NonceHolder is INonceHolder, SystemContractBase {
     uint256 private constant DEPLOY_NONCE_MULTIPLIER = 2 ** 128;
     /// The minNonce can be increased by 2^32 at a time to prevent it from
     /// overflowing beyond 2**128.
@@ -120,7 +120,7 @@ contract NonceHolder is INonceHolder, ISystemContract {
 
         (, uint256 oldMinNonce) = _splitRawNonce(oldRawNonce);
         if (oldMinNonce != _expectedNonce) {
-            revert ValuesNotEqual(_expectedNonce, oldMinNonce);
+            revert ValueMismatch(_expectedNonce, oldMinNonce);
         }
 
         unchecked {

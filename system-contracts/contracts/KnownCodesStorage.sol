@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {IKnownCodesStorage} from "./interfaces/IKnownCodesStorage.sol";
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {COMPRESSOR_CONTRACT, L1_MESSENGER_CONTRACT, DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
 import {Unauthorized, MalformedBytecode, BytecodeError} from "./SystemContractErrors.sol";
@@ -16,7 +16,7 @@ import {Unauthorized, MalformedBytecode, BytecodeError} from "./SystemContractEr
  * the second byte denotes whether the contract is constructed, and the next two bytes denote the length in 32-byte words.
  * And then the next 28 bytes is the truncated hash.
  */
-contract KnownCodesStorage is IKnownCodesStorage, ISystemContract {
+contract KnownCodesStorage is IKnownCodesStorage, SystemContractBase {
     modifier onlyCompressor() {
         if (msg.sender != address(COMPRESSOR_CONTRACT)) {
             revert Unauthorized(msg.sender);

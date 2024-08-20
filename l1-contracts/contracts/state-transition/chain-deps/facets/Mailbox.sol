@@ -2,9 +2,7 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
@@ -21,6 +19,8 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, ETH_TOKEN_ADDRESS, L1_GAS_PER_PUBDATA
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 
 import {IL1SharedBridge} from "../../../bridge/interfaces/IL1SharedBridge.sol";
+
+import {OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -44,7 +44,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
     /// @inheritdoc IMailbox
     function transferEthToSharedBridge() external onlyBaseTokenBridge {
-        require(s.chainId == ERA_CHAIN_ID, "Mailbox: transferEthToSharedBridge only available for Era on mailbox");
+        if (s.chainId != ERA_CHAIN_ID) {
+            revert OnlyEraSupported();
+        }
 
         uint256 amount = address(this).balance;
         address baseTokenBridgeAddress = s.baseTokenBridge;
@@ -115,7 +117,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         L2Log memory _log,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        require(_batchNumber <= s.totalBatchesExecuted, "xx");
+        if (_batchNumber > s.totalBatchesExecuted) {
+            revert BatchNotExecuted(_batchNumber);
+        }
 
         bytes32 hashedLog = keccak256(
             // solhint-disable-next-line func-named-parameters
@@ -123,7 +127,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         );
         // Check that hashed log is not the default one,
         // otherwise it means that the value is out of range of sent L2 -> L1 logs
-        require(hashedLog != L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, "tw");
+        if (hashedLog == L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH) {
+            revert HashedLogIsDefault();
+        }
 
         // It is ok to not check length of `_proof` array, as length
         // of leaf preimage (which is `L2_TO_L1_LOG_SERIALIZE_SIZE`) is not
@@ -164,7 +170,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     /// @return The price of L2 gas in the base token
     function _deriveL2GasPrice(uint256 _l1GasPrice, uint256 _gasPerPubdata) internal view returns (uint256) {
         FeeParams memory feeParams = s.feeParams;
-        require(s.baseTokenGasPriceMultiplierDenominator > 0, "Mailbox: baseTokenGasPriceDenominator not set");
+        if (s.baseTokenGasPriceMultiplierDenominator == 0) {
+            revert BaseTokenGasPriceDenominatorNotSet();
+        }
         uint256 l1GasPriceConverted = (_l1GasPrice * s.baseTokenGasPriceMultiplierNominator) /
             s.baseTokenGasPriceMultiplierDenominator;
         uint256 pubdataPriceBaseToken;
@@ -193,7 +201,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
-        require(s.chainId == ERA_CHAIN_ID, "Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
+        if (s.chainId != ERA_CHAIN_ID) {
+            revert OnlyEraSupported();
+        }
         IL1SharedBridge(s.baseTokenBridge).finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
             _l2BatchNumber: _l2BatchNumber,
@@ -214,7 +224,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash) {
-        require(s.chainId == ERA_CHAIN_ID, "Mailbox: legacy interface only available for Era");
+        if (s.chainId != ERA_CHAIN_ID) {
+            revert OnlyEraSupported();
+        }
         canonicalTxHash = _requestL2TransactionSender(
             BridgehubL2TransactionRequest({
                 sender: msg.sender,
@@ -241,17 +253,18 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         // Check that the transaction is allowed by the filterer (if the filterer is set).
         if (s.transactionFilterer != address(0)) {
-            require(
-                ITransactionFilterer(s.transactionFilterer).isTransactionAllowed({
+            if (
+                !ITransactionFilterer(s.transactionFilterer).isTransactionAllowed({
                     sender: _request.sender,
                     contractL2: _request.contractL2,
                     mintValue: _request.mintValue,
                     l2Value: _request.l2Value,
                     l2Calldata: _request.l2Calldata,
                     refundRecipient: _request.refundRecipient
-                }),
-                "tf"
-            );
+                })
+            ) {
+                revert TransactionNotAllowed();
+            }
         }
 
         // Enforcing that `_request.l2GasPerPubdataByteLimit` equals to a certain constant number. This is needed
@@ -259,7 +272,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         // VERY IMPORTANT: nobody should rely on this constant to be fixed and every contract should give their users the ability to provide the
         // ability to provide `_request.l2GasPerPubdataByteLimit` for each independent transaction.
         // CHANGING THIS CONSTANT SHOULD BE A CLIENT-SIDE CHANGE.
-        require(_request.l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");
+        if (_request.l2GasPerPubdataByteLimit != REQUIRED_L2_GAS_PRICE_PER_PUBDATA) {
+            revert GasPerPubdataMismatch();
+        }
 
         WritePriorityOpParams memory params;
         params.request = _request;
@@ -270,13 +285,17 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
         BridgehubL2TransactionRequest memory request = _params.request;
 
-        require(request.factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
+        if (request.factoryDeps.length > MAX_NEW_FACTORY_DEPS) {
+            revert TooManyFactoryDeps();
+        }
         _params.txId = s.priorityQueue.getTotalPriorityTxs();
 
         // Checking that the user provided enough ether to pay for the transaction.
         _params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, request.l2GasPerPubdataByteLimit);
         uint256 baseCost = _params.l2GasPrice * request.l2GasLimit;
-        require(request.mintValue >= baseCost + request.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
+        if (request.mintValue < baseCost + request.l2Value) {
+            revert MsgValueTooLow(baseCost + request.l2Value, request.mintValue);
+        }
 
         request.refundRecipient = AddressAliasHelper.actualRefundRecipient(request.refundRecipient, request.sender);
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
@@ -286,6 +305,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         if (request.sender != tx.origin) {
             request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
         }
+        // solhint-enable avoid-tx-origin
 
         // populate missing fields
         _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast

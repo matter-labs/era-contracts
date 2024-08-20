@@ -1144,12 +1144,12 @@
   resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-waffle/-/hardhat-waffle-2.0.6.tgz#d11cb063a5f61a77806053e54009c40ddee49a54"
   integrity sha512-+Wz0hwmJGSI17B+BhU/qFRZ1l6/xMW82QGXE/Gi+WTmwgJrQefuBs1lIf7hzQ1hLk6hpkvb/zwcNkpVKRYTQYg==
 
-"@openzeppelin/contracts-upgradeable@4.9.5":
+"@openzeppelin/contracts-upgradeable-v4@npm:@openzeppelin/contracts-upgradeable@4.9.5":
   version "4.9.5"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts-upgradeable/-/contracts-upgradeable-4.9.5.tgz#572b5da102fc9be1d73f34968e0ca56765969812"
   integrity sha512-f7L1//4sLlflAN7fVzJLoRedrf5Na3Oal5PZfIq55NFcVZ90EpV1q5xOvL4lFvg3MNICSDr2hH0JUBxwlxcoPg==
 
-"@openzeppelin/contracts@4.9.5":
+"@openzeppelin/contracts-v4@npm:@openzeppelin/contracts@4.9.5":
   version "4.9.5"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.9.5.tgz#1eed23d4844c861a1835b5d33507c1017fa98de8"
   integrity sha512-ZK+W5mVhRppff9BE6YdR8CC52C8zAvsVAiWhEtQ5+oNxFE6h1WdeWo+FJSF8KKvtxxVYZ7MTP/5KoVpAU3aSWg==
@@ -2723,9 +2723,9 @@ cookie@^0.4.1:
   integrity sha512-aSWTXFzaKWkvHO1Ny/s+ePFpvKsPnjc551iI41v3ny/ow6tBG5Vd+FuqGNhh1LxOmVzOlGUriIlOaokOvhaStA==
 
 core-js-pure@^3.0.1:
-  version "3.38.0"
-  resolved "https://registry.yarnpkg.com/core-js-pure/-/core-js-pure-3.38.0.tgz#bc802cd152e33d5b0ec733b656c71cb847cac701"
-  integrity sha512-8balb/HAXo06aHP58mZMtXgD8vcnXz9tUDePgqBgJgKdmTlMt+jw3ujqniuBDQXMvTzxnMpxHFeuSM3g1jWQuQ==
+  version "3.38.1"
+  resolved "https://registry.yarnpkg.com/core-js-pure/-/core-js-pure-3.38.1.tgz#e8534062a54b7221344884ba9b52474be495ada3"
+  integrity sha512-BY8Etc1FZqdw1glX0XNOq2FDwfrg/VGqoZOZCdaL+UmdaqDwQwYXkMJT4t6In+zfEfOJDcM9T0KdbBeJg8KKCQ==
 
 core-js@^2.4.0:
   version "2.6.12"

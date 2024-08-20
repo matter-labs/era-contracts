@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.20;
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
 
 import {MSG_VALUE_SYSTEM_CONTRACT, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT} from "../Constants.sol";
 import {Utils} from "./Utils.sol";
@@ -84,7 +84,7 @@ library SystemContractsCaller {
         assembly {
             dataStart := add(data, 0x20)
         }
-        uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
+        uint32 dataLength = Utils.safeCastToU32(data.length);
 
         uint256 farCallAbi = SystemContractsCaller.getFarCallABI({
             dataOffset: 0,

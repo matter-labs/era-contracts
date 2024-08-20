@@ -113,7 +113,9 @@ async function extractInitCode(data: string) {
 async function extractProxyInitializationData(contract: ethers.Contract, data: string) {
   const initCode = await extractInitCode(data);
 
-  const artifact = await hardhat.artifacts.readArtifact("TransparentUpgradeableProxy");
+  const artifact = await hardhat.artifacts.readArtifact(
+    "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy"
+  );
 
   // Deployment tx is a concatenation of the init code and the constructor data
   // constructor has the following type `constructor(address _logic, address admin_, bytes memory _data)`
@@ -456,9 +458,11 @@ async function checkLegacyBridge() {
 }
 
 async function checkProxyAdmin() {
-  await checkIdenticalBytecode(proxyAdmin, "ProxyAdmin");
+  await checkIdenticalBytecode(proxyAdmin, "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin");
 
-  const artifact = await hardhat.artifacts.readArtifact("ProxyAdmin");
+  const artifact = await hardhat.artifacts.readArtifact(
+    "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin"
+  );
   const contract = new ethers.Contract(proxyAdmin, artifact.abi, l1Provider);
 
   const currentOwner = await contract.owner();
