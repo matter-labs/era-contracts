@@ -21,10 +21,7 @@ object "EVMInterpreter" {
             // This error should never be triggered
             // require(offset > 100, "Offset too small");
 
-            mstore8(sub(offset, 100), 0xd9)
-            mstore8(sub(offset, 99), 0xeb)
-            mstore8(sub(offset, 98), 0x76)
-            mstore8(sub(offset, 97), 0xb2)
+            mstore(sub(offset, 100), 0xD9EB76B200000000000000000000000000000000000000000000000000000000)
             mstore(sub(offset, 96), gasLeft)
             mstore(sub(offset, 64), 0x40)
             mstore(sub(offset, 32), len)
@@ -229,15 +226,6 @@ object "EVMInterpreter" {
             }
         }
         
-        function popPushStackCheck(sp, evmGasLeft, numInputs) {
-            let popCheck := lt(sub(sp, mul(0x20, sub(numInputs, 1))), STACK_OFFSET())
-            let pushOffset := sub(sp, mul(0x20, numInputs))
-            let pushCheck := or(gt(pushOffset, BYTECODE_OFFSET()), eq(pushOffset, BYTECODE_OFFSET()))
-            if or(popCheck, pushCheck) {
-                revertWithGas(evmGasLeft)
-            }
-        }
-        
         function getCodeAddress() -> addr {
             addr := verbatim_0i_1o("code_source")
         }
@@ -267,11 +255,7 @@ object "EVMInterpreter" {
         }
         
         function _getRawCodeHash(account) -> hash {
-            // TODO: Unhardcode this selector
-            mstore8(0, 0x4d)
-            mstore8(1, 0xe2)
-            mstore8(2, 0xe4)
-            mstore8(3, 0x68)
+            mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
             mstore(4, account)
         
             let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -286,12 +270,7 @@ object "EVMInterpreter" {
         
         function _getCodeHash(account) -> hash {
             // function getCodeHash(uint256 _input) external view override returns (bytes32)
-            // 0xe03fe177
-            // TODO: Unhardcode this selector
-            mstore8(0, 0xe0)
-            mstore8(1, 0x3f)
-            mstore8(2, 0xe1)
-            mstore8(3, 0x77)
+            mstore(0, 0xE03FE17700000000000000000000000000000000000000000000000000000000)
             mstore(4, account)
         
             let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -375,11 +354,7 @@ object "EVMInterpreter" {
         
         function consumeEvmFrame() -> passGas, isStatic, callerEVM {
             // function consumeEvmFrame() external returns (uint256 passGas, bool isStatic)
-            // TODO: Unhardcode selector
-            mstore8(0, 0x04)
-            mstore8(1, 0xc1)
-            mstore8(2, 0x4e)
-            mstore8(3, 0x9e)
+            mstore(0, 0x04C14E9E00000000000000000000000000000000000000000000000000000000)
         
             let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 64)
         
@@ -624,11 +599,7 @@ object "EVMInterpreter" {
         }
         
         function isSlotWarm(key) -> isWarm {
-            // TODO: Unhardcode this selector 0x482d2e74
-            mstore8(0, 0x48)
-            mstore8(1, 0x2d)
-            mstore8(2, 0x2e)
-            mstore8(3, 0x74)
+            mstore(0, 0x482D2E7400000000000000000000000000000000000000000000000000000000)
             mstore(4, key)
         
             let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
@@ -642,11 +613,7 @@ object "EVMInterpreter" {
         }
         
         function warmSlot(key,currentValue) -> isWarm, originalValue {
-            // TODO: Unhardcode this selector 0xbdf78160
-            mstore8(0, 0xbd)
-            mstore8(1, 0xf7)
-            mstore8(2, 0x81)
-            mstore8(3, 0x60)
+            mstore(0, 0xBDF7816000000000000000000000000000000000000000000000000000000000)
             mstore(4, key)
             mstore(36,currentValue)
         
@@ -739,10 +706,7 @@ object "EVMInterpreter" {
         }
         
         function incrementNonce(addr) {
-            mstore8(0, 0x30)
-            mstore8(1, 0x63)
-            mstore8(2, 0x95)
-            mstore8(3, 0xc6)
+            mstore(0, 0x306395C600000000000000000000000000000000000000000000000000000000)
             mstore(4, addr)
         
             let result := call(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 0, 36, 0, 0)
@@ -774,11 +738,7 @@ object "EVMInterpreter" {
         }
         
         function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
-            // TODO: Unhardcode this selector 0x8db2ba78
-            mstore8(0, 0x8d)
-            mstore8(1, 0xb2)
-            mstore8(2, 0xba)
-            mstore8(3, 0x78)
+            mstore(0, 0x8DB2BA7800000000000000000000000000000000000000000000000000000000)
             mstore(4, addr)
         
             let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
@@ -792,10 +752,7 @@ object "EVMInterpreter" {
         }
         
         function getNonce(addr) -> nonce {
-            mstore8(0, 0xfb)
-            mstore8(1, 0x1a)
-            mstore8(2, 0x9a)
-            mstore8(3, 0x57)
+            mstore(0, 0xFB1A9A5700000000000000000000000000000000000000000000000000000000)
             mstore(4, addr)
         
             let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -808,10 +765,7 @@ object "EVMInterpreter" {
         }
         
         function getRawNonce(addr) -> nonce {
-            mstore8(0, 0x5a)
-            mstore8(1, 0xa9)
-            mstore8(2, 0xb6)
-            mstore8(3, 0xb5)
+            mstore(0, 0x5AA9B6B500000000000000000000000000000000000000000000000000000000)
             mstore(4, addr)
         
             let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -830,10 +784,7 @@ object "EVMInterpreter" {
             //      address(SYSTEM_CONTRACTS_OFFSET + 0x02)
             // );
         
-            mstore8(0, 0x8c)
-            mstore8(1, 0x04)
-            mstore8(2, 0x04)
-            mstore8(3, 0x77)
+            mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
             mstore(4, _addr)
         
             let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -848,12 +799,8 @@ object "EVMInterpreter" {
         
         function _pushEVMFrame(_passGas, _isStatic) {
             // function pushEVMFrame(uint256 _passGas, bool _isStatic) external
-            let selector := 0xead77156
         
-            mstore8(0, 0xea)
-            mstore8(1, 0xd7)
-            mstore8(2, 0x71)
-            mstore8(3, 0x56)
+            mstore(0, 0xEAD7715600000000000000000000000000000000000000000000000000000000)
             mstore(4, _passGas)
             mstore(36, _isStatic)
         
@@ -866,13 +813,8 @@ object "EVMInterpreter" {
         
         function _popEVMFrame() {
             // function popEVMFrame() external
-            // 0xe467d2f0
-            let selector := 0xe467d2f0
         
-            mstore8(0, 0xe4)
-            mstore8(1, 0x67)
-            mstore8(2, 0xd2)
-            mstore8(3, 0xf0)
+            mstore(0, 0xE467D2F000000000000000000000000000000000000000000000000000000000)
         
             let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 0)
             if iszero(success) {
@@ -1297,12 +1239,7 @@ object "EVMInterpreter" {
         }
         
         function _fetchConstructorReturnGas() -> gasLeft {
-            //selector is 0x24e5ab4a
-        
-            mstore8(0, 0x24)
-            mstore8(1, 0xe5)
-            mstore8(2, 0xab)
-            mstore8(3, 0x4a)
+            mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
         
             let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 32)
         
@@ -1385,6 +1322,45 @@ object "EVMInterpreter" {
             mstore(sub(offset, 0x80), back)
         }
         
+        function $llvm_AlwaysInline_llvm$_copyRest(dest, val, len) {
+            let rest_bits := shl(3, len)
+            let upper_bits := sub(256, rest_bits)
+            let val_mask := shl(upper_bits, MAX_UINT())
+            let val_masked := and(val, val_mask)
+            let dst_val := mload(dest)
+            let dst_mask := shr(rest_bits, MAX_UINT())
+            let dst_masked := and(dst_val, dst_mask)
+            mstore(dest, or(val_masked, dst_masked))
+        }
+        
+        function $llvm_AlwaysInline_llvm$_memcpy(dest, src, len) {
+            let dest_addr := dest
+            let src_addr := src
+            let dest_end := add(dest, and(len, sub(0, 32)))
+            for { } lt(dest_addr, dest_end) {} {
+                mstore(dest_addr, mload(src_addr))
+                dest_addr := add(dest_addr, 32)
+                src_addr := add(src_addr, 32)
+            }
+        
+            let rest_len := and(len, 31)
+            if rest_len {
+                $llvm_AlwaysInline_llvm$_copyRest(dest_addr, mload(src_addr), rest_len)
+            }
+        }
+        
+        function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
+            let dest_end := add(dest, and(len, sub(0, 32)))
+            for {let i := dest} lt(i, dest_end) { i := add(i, 32) } {
+                mstore(i, 0)
+            }
+        
+            let rest_len := and(len, 31)
+            if rest_len {
+                $llvm_AlwaysInline_llvm$_copyRest(dest_end, 0, rest_len)
+            }
+        }
+        
         function performExtCodeCopy(evmGas,oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
             evmGasLeft := chargeGas(evmGas, 100)
         
@@ -1407,17 +1383,7 @@ object "EVMInterpreter" {
             }
             evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
         
-        
-            let len_32 := shr(5, len)
-            for {let i := 0} lt(i, len_32) { i := add(i, 1) } {
-                mstore(add(dest,shl(5,i)),0)
-            }
-        
-            let size_32 := shl(5,len_32)
-            let rest_32 := sub(len, size_32)
-            for {let i := 0} lt(i, rest_32) { i := add(i, 1) } {
-                mstore8(add(dest,add(size_32,i)),0)
-            }
+            $llvm_AlwaysInline_llvm$_memsetToZero(dest, len)
         
             // Gets the code from the addr
             if and(iszero(iszero(_getRawCodeHash(addr))),gt(len,0)) {
@@ -1509,7 +1475,7 @@ object "EVMInterpreter" {
         
             {
                 let hashedBytecode := keccak256(add(MEM_OFFSET_INNER(), offset), size)
-                mstore8(0, 0xFF)
+                mstore(0, 0xFF00000000000000000000000000000000000000000000000000000000000000)
                 mstore(0x01, shl(0x60, address()))
                 mstore(0x15, salt)
                 mstore(0x35, hashedBytecode)
@@ -1553,7 +1519,7 @@ object "EVMInterpreter" {
                 case 0x01 { // OP_ADD
                     evmGasLeft := chargeGas(evmGasLeft, 3)
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     let a
                     a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
@@ -1563,7 +1529,7 @@ object "EVMInterpreter" {
                 case 0x02 { // OP_MUL
                     evmGasLeft := chargeGas(evmGasLeft, 5)
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     let a
                     a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     stackHead := mul(a, stackHead)
@@ -1574,7 +1540,7 @@ object "EVMInterpreter" {
             
                     let a
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
                     stackHead := sub(a, stackHead)
@@ -1585,7 +1551,7 @@ object "EVMInterpreter" {
             
                     let a
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     stackHead := div(a, stackHead)
             
@@ -1596,7 +1562,7 @@ object "EVMInterpreter" {
             
                     let a
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     stackHead := sdiv(a, stackHead)
             
@@ -1607,9 +1573,10 @@ object "EVMInterpreter" {
             
                     let a
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     stackHead := mod(a, stackHead)
+            
                     ip := add(ip, 1)
                 }
                 case 0x07 { // OP_SMOD
@@ -1617,7 +1584,7 @@ object "EVMInterpreter" {
             
                     let a
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     stackHead := smod(a, stackHead)
             
@@ -1628,7 +1595,7 @@ object "EVMInterpreter" {
             
                     let a, b, N
             
-                    popPushStackCheck(sp, evmGasLeft, 3)
+                    popStackCheck(sp, evmGasLeft, 3)
                     a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     b, sp, N := popStackItemWithoutCheck(sp, stackHead)
             
@@ -1652,7 +1619,7 @@ object "EVMInterpreter" {
             
                     let a, exponent
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp, exponent := popStackItemWithoutCheck(sp, stackHead)
             
                     stackHead := exp(a, exponent)
@@ -1670,7 +1637,7 @@ object "EVMInterpreter" {
             
                     let b, x
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     b, sp, x := popStackItemWithoutCheck(sp, stackHead)
             
                     stackHead := signextend(b, x)
@@ -1681,7 +1648,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
                     stackHead := lt(a, b)
@@ -1692,7 +1659,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
                     stackHead:= gt(a, b)
@@ -1703,7 +1670,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
                     stackHead := slt(a, b)
@@ -1714,7 +1681,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
                     stackHead := sgt(a, b)
@@ -1725,7 +1692,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
                     stackHead := eq(a, b)
@@ -1736,8 +1703,9 @@ object "EVMInterpreter" {
             
                     let a
             
-                    popPushStackCheck(sp, evmGasLeft, 1)
+                    popStackCheck(sp, evmGasLeft, 1)
                     stackHead := iszero(stackHead)
+            
                     ip := add(ip, 1)
                 }
                 case 0x16 { // OP_AND
@@ -1745,7 +1713,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
                     stackHead := and(a,b)
@@ -1756,7 +1724,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
                     stackHead := or(a,b)
@@ -1767,7 +1735,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp, b := popStackItemWithoutCheck(sp, stackHead)
             
                     stackHead := xor(a, b)
@@ -1789,7 +1757,7 @@ object "EVMInterpreter" {
             
                     let i, x
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     i, sp, x := popStackItemWithoutCheck(sp, stackHead)
             
                     stackHead := byte(i, x)
@@ -1800,7 +1768,7 @@ object "EVMInterpreter" {
             
                     let shift, value
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     shift, sp, value := popStackItemWithoutCheck(sp, stackHead)
             
                     stackHead := shl(shift, value)
@@ -1811,7 +1779,7 @@ object "EVMInterpreter" {
             
                     let shift, value
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     shift, sp, value := popStackItemWithoutCheck(sp, stackHead)
             
                     stackHead := shr(shift, value)
@@ -1822,7 +1790,7 @@ object "EVMInterpreter" {
             
                     let shift, value
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     shift, sp, value := popStackItemWithoutCheck(sp, stackHead)
             
                     stackHead := sar(shift, value)
@@ -1902,6 +1870,7 @@ object "EVMInterpreter" {
                     let i := stackHead
             
                     stackHead := calldataload(i)
+            
                     ip := add(ip, 1)
                 }
                 case 0x36 { // OP_CALLDATASIZE
@@ -1924,12 +1893,7 @@ object "EVMInterpreter" {
                     checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER(), evmGasLeft)
             
                     if or(gt(add(add(offset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM()), gt(add(add(destOffset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM())) {
-                        for { let i := 0 } lt(i, size) { i := add(i, 1) } {
-                            mstore8(
-                                add(add(destOffset, MEM_OFFSET_INNER()), i),
-                                0
-                            )
-                        }
+                        $llvm_AlwaysInline_llvm$_memsetToZero(add(destOffset, MEM_OFFSET_INNER()), size)
                     }
             
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
@@ -1974,12 +1938,7 @@ object "EVMInterpreter" {
                         revertWithGas(evmGasLeft)
                     }
             
-                    for { let i := 0 } lt(i, len) { i := add(i, 1) } {
-                        mstore8(
-                            add(dst, i),
-                            shr(248, mload(add(offset, i)))
-                        )
-                    }
+                    $llvm_AlwaysInline_llvm$_memcpy(dst, offset, len)
                     ip := add(ip, 1)
                 }
                 case 0x3A { // OP_GASPRICE
@@ -2077,6 +2036,7 @@ object "EVMInterpreter" {
                     }
                     let blockNumber := stackHead
                     stackHead := blockhash(blockNumber)
+            
                     ip := add(ip, 1)
                 }
                 case 0x41 { // OP_COINBASE
@@ -2142,6 +2102,7 @@ object "EVMInterpreter" {
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
                     stackHead := mload(add(MEM_OFFSET_INNER(), offset))
+            
                     ip := add(ip, 1)
                 }
                 case 0x52 { // OP_MSTORE
@@ -2202,6 +2163,7 @@ object "EVMInterpreter" {
                     }
             
                     stackHead := value
+            
                     ip := add(ip, 1)
                 }
                 case 0x55 { // OP_SSTORE
@@ -2261,6 +2223,10 @@ object "EVMInterpreter" {
                     if iszero(eq(nextOpcode, 0x5B)) {
                         revertWithGas(evmGasLeft)
                     }
+            
+                    // execute JUMPDEST immediately
+                    evmGasLeft := chargeGas(evmGasLeft, 1)
+                    ip := add(ip, 1)
                 }
                 case 0x57 { // OP_JUMPI
                     evmGasLeft := chargeGas(evmGasLeft, 10)
@@ -2283,6 +2249,10 @@ object "EVMInterpreter" {
                     if iszero(eq(nextOpcode, 0x5B)) {
                         revertWithGas(evmGasLeft)
                     }
+            
+                    // execute JUMPDEST immediately
+                    evmGasLeft := chargeGas(evmGasLeft, 1)
+                    ip := add(ip, 1)
                 }
                 case 0x58 { // OP_PC
                     evmGasLeft := chargeGas(evmGasLeft, 2)
@@ -2344,26 +2314,13 @@ object "EVMInterpreter" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
+                    checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                    checkMemOverflow(add(add(destOffset, MEM_OFFSET_INNER()), size), evmGasLeft)
+            
                     expandMemory(add(destOffset, size))
                     expandMemory(add(offset, size))
             
-                    let oldSize := mul(mload(MEM_OFFSET()),32)
-                    if gt(add(oldSize,size),MAX_POSSIBLE_MEM()) {
-                        revertWithGas(evmGasLeft)
-                    }
-            
-                    for { let i := 0 } lt(i, size) { i := add(i, 1) } {
-                        mstore8(
-                            add(add(oldSize,MEM_OFFSET_INNER()), i),
-                            shr(248,mload(add(add(offset,MEM_OFFSET_INNER()), i)))
-                        )
-                    }
-                    for { let i := 0 } lt(i, size) { i := add(i, 1) } {
-                        mstore8(
-                            add(add(destOffset,MEM_OFFSET_INNER()), i),
-                            shr(248,mload(add(add(oldSize,MEM_OFFSET_INNER()), i)))
-                        )
-                    }
+                    mcopy(add(destOffset, MEM_OFFSET_INNER()), add(offset, MEM_OFFSET_INNER()), size)
                     ip := add(ip, 1)
                 }
                 case 0x5F { // OP_PUSH0
@@ -3198,15 +3155,6 @@ object "EVMInterpreter" {
                 }
             }
             
-            function popPushStackCheck(sp, evmGasLeft, numInputs) {
-                let popCheck := lt(sub(sp, mul(0x20, sub(numInputs, 1))), STACK_OFFSET())
-                let pushOffset := sub(sp, mul(0x20, numInputs))
-                let pushCheck := or(gt(pushOffset, BYTECODE_OFFSET()), eq(pushOffset, BYTECODE_OFFSET()))
-                if or(popCheck, pushCheck) {
-                    revertWithGas(evmGasLeft)
-                }
-            }
-            
             function getCodeAddress() -> addr {
                 addr := verbatim_0i_1o("code_source")
             }
@@ -3236,11 +3184,7 @@ object "EVMInterpreter" {
             }
             
             function _getRawCodeHash(account) -> hash {
-                // TODO: Unhardcode this selector
-                mstore8(0, 0x4d)
-                mstore8(1, 0xe2)
-                mstore8(2, 0xe4)
-                mstore8(3, 0x68)
+                mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
                 mstore(4, account)
             
                 let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -3255,12 +3199,7 @@ object "EVMInterpreter" {
             
             function _getCodeHash(account) -> hash {
                 // function getCodeHash(uint256 _input) external view override returns (bytes32)
-                // 0xe03fe177
-                // TODO: Unhardcode this selector
-                mstore8(0, 0xe0)
-                mstore8(1, 0x3f)
-                mstore8(2, 0xe1)
-                mstore8(3, 0x77)
+                mstore(0, 0xE03FE17700000000000000000000000000000000000000000000000000000000)
                 mstore(4, account)
             
                 let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -3344,11 +3283,7 @@ object "EVMInterpreter" {
             
             function consumeEvmFrame() -> passGas, isStatic, callerEVM {
                 // function consumeEvmFrame() external returns (uint256 passGas, bool isStatic)
-                // TODO: Unhardcode selector
-                mstore8(0, 0x04)
-                mstore8(1, 0xc1)
-                mstore8(2, 0x4e)
-                mstore8(3, 0x9e)
+                mstore(0, 0x04C14E9E00000000000000000000000000000000000000000000000000000000)
             
                 let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 64)
             
@@ -3593,11 +3528,7 @@ object "EVMInterpreter" {
             }
             
             function isSlotWarm(key) -> isWarm {
-                // TODO: Unhardcode this selector 0x482d2e74
-                mstore8(0, 0x48)
-                mstore8(1, 0x2d)
-                mstore8(2, 0x2e)
-                mstore8(3, 0x74)
+                mstore(0, 0x482D2E7400000000000000000000000000000000000000000000000000000000)
                 mstore(4, key)
             
                 let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
@@ -3611,11 +3542,7 @@ object "EVMInterpreter" {
             }
             
             function warmSlot(key,currentValue) -> isWarm, originalValue {
-                // TODO: Unhardcode this selector 0xbdf78160
-                mstore8(0, 0xbd)
-                mstore8(1, 0xf7)
-                mstore8(2, 0x81)
-                mstore8(3, 0x60)
+                mstore(0, 0xBDF7816000000000000000000000000000000000000000000000000000000000)
                 mstore(4, key)
                 mstore(36,currentValue)
             
@@ -3708,10 +3635,7 @@ object "EVMInterpreter" {
             }
             
             function incrementNonce(addr) {
-                mstore8(0, 0x30)
-                mstore8(1, 0x63)
-                mstore8(2, 0x95)
-                mstore8(3, 0xc6)
+                mstore(0, 0x306395C600000000000000000000000000000000000000000000000000000000)
                 mstore(4, addr)
             
                 let result := call(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 0, 36, 0, 0)
@@ -3743,11 +3667,7 @@ object "EVMInterpreter" {
             }
             
             function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
-                // TODO: Unhardcode this selector 0x8db2ba78
-                mstore8(0, 0x8d)
-                mstore8(1, 0xb2)
-                mstore8(2, 0xba)
-                mstore8(3, 0x78)
+                mstore(0, 0x8DB2BA7800000000000000000000000000000000000000000000000000000000)
                 mstore(4, addr)
             
                 let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
@@ -3761,10 +3681,7 @@ object "EVMInterpreter" {
             }
             
             function getNonce(addr) -> nonce {
-                mstore8(0, 0xfb)
-                mstore8(1, 0x1a)
-                mstore8(2, 0x9a)
-                mstore8(3, 0x57)
+                mstore(0, 0xFB1A9A5700000000000000000000000000000000000000000000000000000000)
                 mstore(4, addr)
             
                 let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -3777,10 +3694,7 @@ object "EVMInterpreter" {
             }
             
             function getRawNonce(addr) -> nonce {
-                mstore8(0, 0x5a)
-                mstore8(1, 0xa9)
-                mstore8(2, 0xb6)
-                mstore8(3, 0xb5)
+                mstore(0, 0x5AA9B6B500000000000000000000000000000000000000000000000000000000)
                 mstore(4, addr)
             
                 let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -3799,10 +3713,7 @@ object "EVMInterpreter" {
                 //      address(SYSTEM_CONTRACTS_OFFSET + 0x02)
                 // );
             
-                mstore8(0, 0x8c)
-                mstore8(1, 0x04)
-                mstore8(2, 0x04)
-                mstore8(3, 0x77)
+                mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
                 mstore(4, _addr)
             
                 let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -3817,12 +3728,8 @@ object "EVMInterpreter" {
             
             function _pushEVMFrame(_passGas, _isStatic) {
                 // function pushEVMFrame(uint256 _passGas, bool _isStatic) external
-                let selector := 0xead77156
             
-                mstore8(0, 0xea)
-                mstore8(1, 0xd7)
-                mstore8(2, 0x71)
-                mstore8(3, 0x56)
+                mstore(0, 0xEAD7715600000000000000000000000000000000000000000000000000000000)
                 mstore(4, _passGas)
                 mstore(36, _isStatic)
             
@@ -3835,13 +3742,8 @@ object "EVMInterpreter" {
             
             function _popEVMFrame() {
                 // function popEVMFrame() external
-                // 0xe467d2f0
-                let selector := 0xe467d2f0
             
-                mstore8(0, 0xe4)
-                mstore8(1, 0x67)
-                mstore8(2, 0xd2)
-                mstore8(3, 0xf0)
+                mstore(0, 0xE467D2F000000000000000000000000000000000000000000000000000000000)
             
                 let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 0)
                 if iszero(success) {
@@ -4266,12 +4168,7 @@ object "EVMInterpreter" {
             }
             
             function _fetchConstructorReturnGas() -> gasLeft {
-                //selector is 0x24e5ab4a
-            
-                mstore8(0, 0x24)
-                mstore8(1, 0xe5)
-                mstore8(2, 0xab)
-                mstore8(3, 0x4a)
+                mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
             
                 let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 32)
             
@@ -4354,6 +4251,45 @@ object "EVMInterpreter" {
                 mstore(sub(offset, 0x80), back)
             }
             
+            function $llvm_AlwaysInline_llvm$_copyRest(dest, val, len) {
+                let rest_bits := shl(3, len)
+                let upper_bits := sub(256, rest_bits)
+                let val_mask := shl(upper_bits, MAX_UINT())
+                let val_masked := and(val, val_mask)
+                let dst_val := mload(dest)
+                let dst_mask := shr(rest_bits, MAX_UINT())
+                let dst_masked := and(dst_val, dst_mask)
+                mstore(dest, or(val_masked, dst_masked))
+            }
+            
+            function $llvm_AlwaysInline_llvm$_memcpy(dest, src, len) {
+                let dest_addr := dest
+                let src_addr := src
+                let dest_end := add(dest, and(len, sub(0, 32)))
+                for { } lt(dest_addr, dest_end) {} {
+                    mstore(dest_addr, mload(src_addr))
+                    dest_addr := add(dest_addr, 32)
+                    src_addr := add(src_addr, 32)
+                }
+            
+                let rest_len := and(len, 31)
+                if rest_len {
+                    $llvm_AlwaysInline_llvm$_copyRest(dest_addr, mload(src_addr), rest_len)
+                }
+            }
+            
+            function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
+                let dest_end := add(dest, and(len, sub(0, 32)))
+                for {let i := dest} lt(i, dest_end) { i := add(i, 32) } {
+                    mstore(i, 0)
+                }
+            
+                let rest_len := and(len, 31)
+                if rest_len {
+                    $llvm_AlwaysInline_llvm$_copyRest(dest_end, 0, rest_len)
+                }
+            }
+            
             function performExtCodeCopy(evmGas,oldSp, oldStackHead) -> evmGasLeft, sp, stackHead {
                 evmGasLeft := chargeGas(evmGas, 100)
             
@@ -4376,17 +4312,7 @@ object "EVMInterpreter" {
                 }
                 evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-            
-                let len_32 := shr(5, len)
-                for {let i := 0} lt(i, len_32) { i := add(i, 1) } {
-                    mstore(add(dest,shl(5,i)),0)
-                }
-            
-                let size_32 := shl(5,len_32)
-                let rest_32 := sub(len, size_32)
-                for {let i := 0} lt(i, rest_32) { i := add(i, 1) } {
-                    mstore8(add(dest,add(size_32,i)),0)
-                }
+                $llvm_AlwaysInline_llvm$_memsetToZero(dest, len)
             
                 // Gets the code from the addr
                 if and(iszero(iszero(_getRawCodeHash(addr))),gt(len,0)) {
@@ -4478,7 +4404,7 @@ object "EVMInterpreter" {
             
                 {
                     let hashedBytecode := keccak256(add(MEM_OFFSET_INNER(), offset), size)
-                    mstore8(0, 0xFF)
+                    mstore(0, 0xFF00000000000000000000000000000000000000000000000000000000000000)
                     mstore(0x01, shl(0x60, address()))
                     mstore(0x15, salt)
                     mstore(0x35, hashedBytecode)
@@ -4522,7 +4448,7 @@ object "EVMInterpreter" {
                     case 0x01 { // OP_ADD
                         evmGasLeft := chargeGas(evmGasLeft, 3)
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         let a
                         a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
@@ -4532,7 +4458,7 @@ object "EVMInterpreter" {
                     case 0x02 { // OP_MUL
                         evmGasLeft := chargeGas(evmGasLeft, 5)
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         let a
                         a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         stackHead := mul(a, stackHead)
@@ -4543,7 +4469,7 @@ object "EVMInterpreter" {
                 
                         let a
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
                         stackHead := sub(a, stackHead)
@@ -4554,7 +4480,7 @@ object "EVMInterpreter" {
                 
                         let a
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         stackHead := div(a, stackHead)
                 
@@ -4565,7 +4491,7 @@ object "EVMInterpreter" {
                 
                         let a
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         stackHead := sdiv(a, stackHead)
                 
@@ -4576,9 +4502,10 @@ object "EVMInterpreter" {
                 
                         let a
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         stackHead := mod(a, stackHead)
+                
                         ip := add(ip, 1)
                     }
                     case 0x07 { // OP_SMOD
@@ -4586,7 +4513,7 @@ object "EVMInterpreter" {
                 
                         let a
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         stackHead := smod(a, stackHead)
                 
@@ -4597,7 +4524,7 @@ object "EVMInterpreter" {
                 
                         let a, b, N
                 
-                        popPushStackCheck(sp, evmGasLeft, 3)
+                        popStackCheck(sp, evmGasLeft, 3)
                         a, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         b, sp, N := popStackItemWithoutCheck(sp, stackHead)
                 
@@ -4621,7 +4548,7 @@ object "EVMInterpreter" {
                 
                         let a, exponent
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp, exponent := popStackItemWithoutCheck(sp, stackHead)
                 
                         stackHead := exp(a, exponent)
@@ -4639,7 +4566,7 @@ object "EVMInterpreter" {
                 
                         let b, x
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         b, sp, x := popStackItemWithoutCheck(sp, stackHead)
                 
                         stackHead := signextend(b, x)
@@ -4650,7 +4577,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
                         stackHead := lt(a, b)
@@ -4661,7 +4588,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
                         stackHead:= gt(a, b)
@@ -4672,7 +4599,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
                         stackHead := slt(a, b)
@@ -4683,7 +4610,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
                         stackHead := sgt(a, b)
@@ -4694,7 +4621,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
                         stackHead := eq(a, b)
@@ -4705,8 +4632,9 @@ object "EVMInterpreter" {
                 
                         let a
                 
-                        popPushStackCheck(sp, evmGasLeft, 1)
+                        popStackCheck(sp, evmGasLeft, 1)
                         stackHead := iszero(stackHead)
+                
                         ip := add(ip, 1)
                     }
                     case 0x16 { // OP_AND
@@ -4714,7 +4642,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
                         stackHead := and(a,b)
@@ -4725,7 +4653,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
                         stackHead := or(a,b)
@@ -4736,7 +4664,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp, b := popStackItemWithoutCheck(sp, stackHead)
                 
                         stackHead := xor(a, b)
@@ -4758,7 +4686,7 @@ object "EVMInterpreter" {
                 
                         let i, x
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         i, sp, x := popStackItemWithoutCheck(sp, stackHead)
                 
                         stackHead := byte(i, x)
@@ -4769,7 +4697,7 @@ object "EVMInterpreter" {
                 
                         let shift, value
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         shift, sp, value := popStackItemWithoutCheck(sp, stackHead)
                 
                         stackHead := shl(shift, value)
@@ -4780,7 +4708,7 @@ object "EVMInterpreter" {
                 
                         let shift, value
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         shift, sp, value := popStackItemWithoutCheck(sp, stackHead)
                 
                         stackHead := shr(shift, value)
@@ -4791,7 +4719,7 @@ object "EVMInterpreter" {
                 
                         let shift, value
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         shift, sp, value := popStackItemWithoutCheck(sp, stackHead)
                 
                         stackHead := sar(shift, value)
@@ -4871,6 +4799,7 @@ object "EVMInterpreter" {
                         let i := stackHead
                 
                         stackHead := calldataload(i)
+                
                         ip := add(ip, 1)
                     }
                     case 0x36 { // OP_CALLDATASIZE
@@ -4893,12 +4822,7 @@ object "EVMInterpreter" {
                         checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER(), evmGasLeft)
                 
                         if or(gt(add(add(offset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM()), gt(add(add(destOffset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM())) {
-                            for { let i := 0 } lt(i, size) { i := add(i, 1) } {
-                                mstore8(
-                                    add(add(destOffset, MEM_OFFSET_INNER()), i),
-                                    0
-                                )
-                            }
+                            $llvm_AlwaysInline_llvm$_memsetToZero(add(destOffset, MEM_OFFSET_INNER()), size)
                         }
                 
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
@@ -4943,12 +4867,7 @@ object "EVMInterpreter" {
                             revertWithGas(evmGasLeft)
                         }
                 
-                        for { let i := 0 } lt(i, len) { i := add(i, 1) } {
-                            mstore8(
-                                add(dst, i),
-                                shr(248, mload(add(offset, i)))
-                            )
-                        }
+                        $llvm_AlwaysInline_llvm$_memcpy(dst, offset, len)
                         ip := add(ip, 1)
                     }
                     case 0x3A { // OP_GASPRICE
@@ -5046,6 +4965,7 @@ object "EVMInterpreter" {
                         }
                         let blockNumber := stackHead
                         stackHead := blockhash(blockNumber)
+                
                         ip := add(ip, 1)
                     }
                     case 0x41 { // OP_COINBASE
@@ -5111,6 +5031,7 @@ object "EVMInterpreter" {
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
                         stackHead := mload(add(MEM_OFFSET_INNER(), offset))
+                
                         ip := add(ip, 1)
                     }
                     case 0x52 { // OP_MSTORE
@@ -5171,6 +5092,7 @@ object "EVMInterpreter" {
                         }
                 
                         stackHead := value
+                
                         ip := add(ip, 1)
                     }
                     case 0x55 { // OP_SSTORE
@@ -5230,6 +5152,10 @@ object "EVMInterpreter" {
                         if iszero(eq(nextOpcode, 0x5B)) {
                             revertWithGas(evmGasLeft)
                         }
+                
+                        // execute JUMPDEST immediately
+                        evmGasLeft := chargeGas(evmGasLeft, 1)
+                        ip := add(ip, 1)
                     }
                     case 0x57 { // OP_JUMPI
                         evmGasLeft := chargeGas(evmGasLeft, 10)
@@ -5252,6 +5178,10 @@ object "EVMInterpreter" {
                         if iszero(eq(nextOpcode, 0x5B)) {
                             revertWithGas(evmGasLeft)
                         }
+                
+                        // execute JUMPDEST immediately
+                        evmGasLeft := chargeGas(evmGasLeft, 1)
+                        ip := add(ip, 1)
                     }
                     case 0x58 { // OP_PC
                         evmGasLeft := chargeGas(evmGasLeft, 2)
@@ -5313,26 +5243,13 @@ object "EVMInterpreter" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
+                        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                        checkMemOverflow(add(add(destOffset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                
                         expandMemory(add(destOffset, size))
                         expandMemory(add(offset, size))
                 
-                        let oldSize := mul(mload(MEM_OFFSET()),32)
-                        if gt(add(oldSize,size),MAX_POSSIBLE_MEM()) {
-                            revertWithGas(evmGasLeft)
-                        }
-                
-                        for { let i := 0 } lt(i, size) { i := add(i, 1) } {
-                            mstore8(
-                                add(add(oldSize,MEM_OFFSET_INNER()), i),
-                                shr(248,mload(add(add(offset,MEM_OFFSET_INNER()), i)))
-                            )
-                        }
-                        for { let i := 0 } lt(i, size) { i := add(i, 1) } {
-                            mstore8(
-                                add(add(destOffset,MEM_OFFSET_INNER()), i),
-                                shr(248,mload(add(add(oldSize,MEM_OFFSET_INNER()), i)))
-                            )
-                        }
+                        mcopy(add(destOffset, MEM_OFFSET_INNER()), add(offset, MEM_OFFSET_INNER()), size)
                         ip := add(ip, 1)
                     }
                     case 0x5F { // OP_PUSH0
