@@ -19,7 +19,7 @@ for { } true { } {
 
         let a, b
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
 
@@ -31,7 +31,7 @@ for { } true { } {
 
         let a, b
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
 
@@ -43,7 +43,7 @@ for { } true { } {
 
         let a, b
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
 
@@ -55,7 +55,7 @@ for { } true { } {
 
         let a, b
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
 
@@ -67,7 +67,7 @@ for { } true { } {
 
         let a, b
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
 
@@ -79,7 +79,7 @@ for { } true { } {
 
         let a, b
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
 
@@ -91,7 +91,7 @@ for { } true { } {
 
         let a, b
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
 
@@ -103,7 +103,7 @@ for { } true { } {
 
         let a, b, N
 
-        popPushStackCheck(sp, evmGasLeft, 3)
+        popStackCheck(sp, evmGasLeft, 3)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
         N, sp := popStackItemWithoutCheck(sp)
@@ -129,7 +129,7 @@ for { } true { } {
 
         let a, exponent
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         exponent, sp := popStackItemWithoutCheck(sp)
 
@@ -148,7 +148,7 @@ for { } true { } {
 
         let b, x
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         b, sp := popStackItemWithoutCheck(sp)
         x, sp := popStackItemWithoutCheck(sp)
 
@@ -160,7 +160,7 @@ for { } true { } {
 
         let a, b
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
 
@@ -172,7 +172,7 @@ for { } true { } {
 
         let a, b
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
 
@@ -184,7 +184,7 @@ for { } true { } {
 
         let a, b
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
 
@@ -196,7 +196,7 @@ for { } true { } {
 
         let a, b
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
 
@@ -208,7 +208,7 @@ for { } true { } {
 
         let a, b
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
 
@@ -220,7 +220,7 @@ for { } true { } {
 
         let a
 
-        popPushStackCheck(sp, evmGasLeft, 1)
+        popStackCheck(sp, evmGasLeft, 1)
         a, sp := popStackItemWithoutCheck(sp)
 
         sp := pushStackItemWithoutCheck(sp, iszero(a))
@@ -231,7 +231,7 @@ for { } true { } {
 
         let a, b
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
 
@@ -243,7 +243,7 @@ for { } true { } {
 
         let a, b
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
 
@@ -255,7 +255,7 @@ for { } true { } {
 
         let a, b
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         a, sp := popStackItemWithoutCheck(sp)
         b, sp := popStackItemWithoutCheck(sp)
 
@@ -267,7 +267,7 @@ for { } true { } {
 
         let a
 
-        popPushStackCheck(sp, evmGasLeft, 1)
+        popStackCheck(sp, evmGasLeft, 1)
         a, sp := popStackItemWithoutCheck(sp)
 
         sp := pushStackItemWithoutCheck(sp, not(a))
@@ -278,7 +278,7 @@ for { } true { } {
 
         let i, x
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         i, sp := popStackItemWithoutCheck(sp)
         x, sp := popStackItemWithoutCheck(sp)
 
@@ -290,7 +290,7 @@ for { } true { } {
 
         let shift, value
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         shift, sp := popStackItemWithoutCheck(sp)
         value, sp := popStackItemWithoutCheck(sp)
 
@@ -302,7 +302,7 @@ for { } true { } {
 
         let shift, value
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         shift, sp := popStackItemWithoutCheck(sp)
         value, sp := popStackItemWithoutCheck(sp)
 
@@ -314,7 +314,7 @@ for { } true { } {
 
         let shift, value
 
-        popPushStackCheck(sp, evmGasLeft, 2)
+        popStackCheck(sp, evmGasLeft, 2)
         shift, sp := popStackItemWithoutCheck(sp)
         value, sp := popStackItemWithoutCheck(sp)
 
@@ -362,7 +362,7 @@ for { } true { } {
             evmGasLeft := chargeGas(evmGasLeft, 2500)
         }
 
-        sp := pushStackItem(sp, balance(addr), evmGasLeft)
+        sp := pushStackItemWithoutCheck(sp, balance(addr))
         ip := add(ip, 1)
     }
     case 0x32 { // OP_ORIGIN
@@ -388,7 +388,7 @@ for { } true { } {
 
         let i
 
-        popPushStackCheck(sp, evmGasLeft, 1)
+        popStackCheck(sp, evmGasLeft, 1)
         i, sp := popStackItemWithoutCheck(sp)
 
         sp := pushStackItemWithoutCheck(sp, calldataload(i))
@@ -495,8 +495,8 @@ for { } true { } {
         // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)
 
         switch _isEVM(addr) 
-            case 0  { sp := pushStackItem(sp, extcodesize(addr), evmGasLeft) }
-            default { sp := pushStackItem(sp, _fetchDeployedCodeLen(addr), evmGasLeft) }
+            case 0  { sp := pushStackItemWithoutCheck(sp, extcodesize(addr)) }
+            default { sp := pushStackItemWithoutCheck(sp, _fetchDeployedCodeLen(addr)) }
         ip := add(ip, 1)
     }
     case 0x3C { // OP_EXTCODECOPY
@@ -549,16 +549,16 @@ for { } true { } {
 
         ip := add(ip, 1)
         if iszero(addr) {
-            sp := pushStackItem(sp, 0, evmGasLeft)
+            sp := pushStackItemWithoutCheck(sp, 0)
             continue
         }
-        sp := pushStackItem(sp, extcodehash(addr), evmGasLeft)
+        sp := pushStackItemWithoutCheck(sp, extcodehash(addr))
     }
     case 0x40 { // OP_BLOCKHASH
         evmGasLeft := chargeGas(evmGasLeft, 20)
 
         let blockNumber
-        popPushStackCheck(sp, evmGasLeft, 1)
+        popStackCheck(sp, evmGasLeft, 1)
         blockNumber, sp := popStackItemWithoutCheck(sp)
 
         sp := pushStackItemWithoutCheck(sp, blockhash(blockNumber))
@@ -625,7 +625,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
         let memValue := mload(add(MEM_OFFSET_INNER(), offset))
-        sp := pushStackItem(sp, memValue, evmGasLeft)
+        sp := pushStackItemWithoutCheck(sp, memValue)
         ip := add(ip, 1)
     }
     case 0x52 { // OP_MSTORE
@@ -682,7 +682,7 @@ for { } true { } {
             let _wasW, _orgV := warmSlot(key, value)
         }
 
-        sp := pushStackItem(sp,value, evmGasLeft)
+        sp := pushStackItemWithoutCheck(sp,value)
         ip := add(ip, 1)
     }
     case 0x55 { // OP_SSTORE
@@ -804,7 +804,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 100)
 
         let key
-        popPushStackCheck(sp, evmGasLeft, 1)
+        popStackCheck(sp, evmGasLeft, 1)
         key, sp := popStackItemWithoutCheck(sp)
 
         sp := pushStackItemWithoutCheck(sp, tload(key))

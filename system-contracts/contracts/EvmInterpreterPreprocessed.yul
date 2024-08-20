@@ -238,15 +238,6 @@ object "EVMInterpreter" {
             }
         }
         
-        function popPushStackCheck(sp, evmGasLeft, numInputs) {
-            let popCheck := lt(sub(sp, mul(0x20, sub(numInputs, 1))), STACK_OFFSET())
-            let pushOffset := sub(sp, mul(0x20, numInputs))
-            let pushCheck := or(gt(pushOffset, BYTECODE_OFFSET()), eq(pushOffset, BYTECODE_OFFSET()))
-            if or(popCheck, pushCheck) {
-                revertWithGas(evmGasLeft)
-            }
-        }
-        
         function getCodeAddress() -> addr {
             addr := verbatim_0i_1o("code_source")
         }
@@ -1567,7 +1558,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
             
@@ -1579,7 +1570,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
             
@@ -1591,7 +1582,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
             
@@ -1603,7 +1594,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
             
@@ -1615,7 +1606,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
             
@@ -1627,7 +1618,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
             
@@ -1639,7 +1630,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
             
@@ -1651,7 +1642,7 @@ object "EVMInterpreter" {
             
                     let a, b, N
             
-                    popPushStackCheck(sp, evmGasLeft, 3)
+                    popStackCheck(sp, evmGasLeft, 3)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
                     N, sp := popStackItemWithoutCheck(sp)
@@ -1677,7 +1668,7 @@ object "EVMInterpreter" {
             
                     let a, exponent
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     exponent, sp := popStackItemWithoutCheck(sp)
             
@@ -1696,7 +1687,7 @@ object "EVMInterpreter" {
             
                     let b, x
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     b, sp := popStackItemWithoutCheck(sp)
                     x, sp := popStackItemWithoutCheck(sp)
             
@@ -1708,7 +1699,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
             
@@ -1720,7 +1711,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
             
@@ -1732,7 +1723,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
             
@@ -1744,7 +1735,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
             
@@ -1756,7 +1747,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
             
@@ -1768,7 +1759,7 @@ object "EVMInterpreter" {
             
                     let a
             
-                    popPushStackCheck(sp, evmGasLeft, 1)
+                    popStackCheck(sp, evmGasLeft, 1)
                     a, sp := popStackItemWithoutCheck(sp)
             
                     sp := pushStackItemWithoutCheck(sp, iszero(a))
@@ -1779,7 +1770,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
             
@@ -1791,7 +1782,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
             
@@ -1803,7 +1794,7 @@ object "EVMInterpreter" {
             
                     let a, b
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     a, sp := popStackItemWithoutCheck(sp)
                     b, sp := popStackItemWithoutCheck(sp)
             
@@ -1815,7 +1806,7 @@ object "EVMInterpreter" {
             
                     let a
             
-                    popPushStackCheck(sp, evmGasLeft, 1)
+                    popStackCheck(sp, evmGasLeft, 1)
                     a, sp := popStackItemWithoutCheck(sp)
             
                     sp := pushStackItemWithoutCheck(sp, not(a))
@@ -1826,7 +1817,7 @@ object "EVMInterpreter" {
             
                     let i, x
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     i, sp := popStackItemWithoutCheck(sp)
                     x, sp := popStackItemWithoutCheck(sp)
             
@@ -1838,7 +1829,7 @@ object "EVMInterpreter" {
             
                     let shift, value
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     shift, sp := popStackItemWithoutCheck(sp)
                     value, sp := popStackItemWithoutCheck(sp)
             
@@ -1850,7 +1841,7 @@ object "EVMInterpreter" {
             
                     let shift, value
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     shift, sp := popStackItemWithoutCheck(sp)
                     value, sp := popStackItemWithoutCheck(sp)
             
@@ -1862,7 +1853,7 @@ object "EVMInterpreter" {
             
                     let shift, value
             
-                    popPushStackCheck(sp, evmGasLeft, 2)
+                    popStackCheck(sp, evmGasLeft, 2)
                     shift, sp := popStackItemWithoutCheck(sp)
                     value, sp := popStackItemWithoutCheck(sp)
             
@@ -1910,7 +1901,7 @@ object "EVMInterpreter" {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
             
-                    sp := pushStackItem(sp, balance(addr), evmGasLeft)
+                    sp := pushStackItemWithoutCheck(sp, balance(addr))
                     ip := add(ip, 1)
                 }
                 case 0x32 { // OP_ORIGIN
@@ -1936,7 +1927,7 @@ object "EVMInterpreter" {
             
                     let i
             
-                    popPushStackCheck(sp, evmGasLeft, 1)
+                    popStackCheck(sp, evmGasLeft, 1)
                     i, sp := popStackItemWithoutCheck(sp)
             
                     sp := pushStackItemWithoutCheck(sp, calldataload(i))
@@ -2043,8 +2034,8 @@ object "EVMInterpreter" {
                     // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)
             
                     switch _isEVM(addr) 
-                        case 0  { sp := pushStackItem(sp, extcodesize(addr), evmGasLeft) }
-                        default { sp := pushStackItem(sp, _fetchDeployedCodeLen(addr), evmGasLeft) }
+                        case 0  { sp := pushStackItemWithoutCheck(sp, extcodesize(addr)) }
+                        default { sp := pushStackItemWithoutCheck(sp, _fetchDeployedCodeLen(addr)) }
                     ip := add(ip, 1)
                 }
                 case 0x3C { // OP_EXTCODECOPY
@@ -2097,16 +2088,16 @@ object "EVMInterpreter" {
             
                     ip := add(ip, 1)
                     if iszero(addr) {
-                        sp := pushStackItem(sp, 0, evmGasLeft)
+                        sp := pushStackItemWithoutCheck(sp, 0)
                         continue
                     }
-                    sp := pushStackItem(sp, extcodehash(addr), evmGasLeft)
+                    sp := pushStackItemWithoutCheck(sp, extcodehash(addr))
                 }
                 case 0x40 { // OP_BLOCKHASH
                     evmGasLeft := chargeGas(evmGasLeft, 20)
             
                     let blockNumber
-                    popPushStackCheck(sp, evmGasLeft, 1)
+                    popStackCheck(sp, evmGasLeft, 1)
                     blockNumber, sp := popStackItemWithoutCheck(sp)
             
                     sp := pushStackItemWithoutCheck(sp, blockhash(blockNumber))
@@ -2173,7 +2164,7 @@ object "EVMInterpreter" {
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
                     let memValue := mload(add(MEM_OFFSET_INNER(), offset))
-                    sp := pushStackItem(sp, memValue, evmGasLeft)
+                    sp := pushStackItemWithoutCheck(sp, memValue)
                     ip := add(ip, 1)
                 }
                 case 0x52 { // OP_MSTORE
@@ -2230,7 +2221,7 @@ object "EVMInterpreter" {
                         let _wasW, _orgV := warmSlot(key, value)
                     }
             
-                    sp := pushStackItem(sp,value, evmGasLeft)
+                    sp := pushStackItemWithoutCheck(sp,value)
                     ip := add(ip, 1)
                 }
                 case 0x55 { // OP_SSTORE
@@ -2352,7 +2343,7 @@ object "EVMInterpreter" {
                     evmGasLeft := chargeGas(evmGasLeft, 100)
             
                     let key
-                    popPushStackCheck(sp, evmGasLeft, 1)
+                    popStackCheck(sp, evmGasLeft, 1)
                     key, sp := popStackItemWithoutCheck(sp)
             
                     sp := pushStackItemWithoutCheck(sp, tload(key))
@@ -3238,15 +3229,6 @@ object "EVMInterpreter" {
             
             function popStackCheck(sp, evmGasLeft, numInputs) {
                 if lt(sub(sp, mul(0x20, sub(numInputs, 1))), STACK_OFFSET()) {
-                    revertWithGas(evmGasLeft)
-                }
-            }
-            
-            function popPushStackCheck(sp, evmGasLeft, numInputs) {
-                let popCheck := lt(sub(sp, mul(0x20, sub(numInputs, 1))), STACK_OFFSET())
-                let pushOffset := sub(sp, mul(0x20, numInputs))
-                let pushCheck := or(gt(pushOffset, BYTECODE_OFFSET()), eq(pushOffset, BYTECODE_OFFSET()))
-                if or(popCheck, pushCheck) {
                     revertWithGas(evmGasLeft)
                 }
             }
@@ -4571,7 +4553,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                 
@@ -4583,7 +4565,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                 
@@ -4595,7 +4577,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                 
@@ -4607,7 +4589,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                 
@@ -4619,7 +4601,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                 
@@ -4631,7 +4613,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                 
@@ -4643,7 +4625,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                 
@@ -4655,7 +4637,7 @@ object "EVMInterpreter" {
                 
                         let a, b, N
                 
-                        popPushStackCheck(sp, evmGasLeft, 3)
+                        popStackCheck(sp, evmGasLeft, 3)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                         N, sp := popStackItemWithoutCheck(sp)
@@ -4681,7 +4663,7 @@ object "EVMInterpreter" {
                 
                         let a, exponent
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         exponent, sp := popStackItemWithoutCheck(sp)
                 
@@ -4700,7 +4682,7 @@ object "EVMInterpreter" {
                 
                         let b, x
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         b, sp := popStackItemWithoutCheck(sp)
                         x, sp := popStackItemWithoutCheck(sp)
                 
@@ -4712,7 +4694,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                 
@@ -4724,7 +4706,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                 
@@ -4736,7 +4718,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                 
@@ -4748,7 +4730,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                 
@@ -4760,7 +4742,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                 
@@ -4772,7 +4754,7 @@ object "EVMInterpreter" {
                 
                         let a
                 
-                        popPushStackCheck(sp, evmGasLeft, 1)
+                        popStackCheck(sp, evmGasLeft, 1)
                         a, sp := popStackItemWithoutCheck(sp)
                 
                         sp := pushStackItemWithoutCheck(sp, iszero(a))
@@ -4783,7 +4765,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                 
@@ -4795,7 +4777,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                 
@@ -4807,7 +4789,7 @@ object "EVMInterpreter" {
                 
                         let a, b
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         a, sp := popStackItemWithoutCheck(sp)
                         b, sp := popStackItemWithoutCheck(sp)
                 
@@ -4819,7 +4801,7 @@ object "EVMInterpreter" {
                 
                         let a
                 
-                        popPushStackCheck(sp, evmGasLeft, 1)
+                        popStackCheck(sp, evmGasLeft, 1)
                         a, sp := popStackItemWithoutCheck(sp)
                 
                         sp := pushStackItemWithoutCheck(sp, not(a))
@@ -4830,7 +4812,7 @@ object "EVMInterpreter" {
                 
                         let i, x
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         i, sp := popStackItemWithoutCheck(sp)
                         x, sp := popStackItemWithoutCheck(sp)
                 
@@ -4842,7 +4824,7 @@ object "EVMInterpreter" {
                 
                         let shift, value
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         shift, sp := popStackItemWithoutCheck(sp)
                         value, sp := popStackItemWithoutCheck(sp)
                 
@@ -4854,7 +4836,7 @@ object "EVMInterpreter" {
                 
                         let shift, value
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         shift, sp := popStackItemWithoutCheck(sp)
                         value, sp := popStackItemWithoutCheck(sp)
                 
@@ -4866,7 +4848,7 @@ object "EVMInterpreter" {
                 
                         let shift, value
                 
-                        popPushStackCheck(sp, evmGasLeft, 2)
+                        popStackCheck(sp, evmGasLeft, 2)
                         shift, sp := popStackItemWithoutCheck(sp)
                         value, sp := popStackItemWithoutCheck(sp)
                 
@@ -4914,7 +4896,7 @@ object "EVMInterpreter" {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
                         }
                 
-                        sp := pushStackItem(sp, balance(addr), evmGasLeft)
+                        sp := pushStackItemWithoutCheck(sp, balance(addr))
                         ip := add(ip, 1)
                     }
                     case 0x32 { // OP_ORIGIN
@@ -4940,7 +4922,7 @@ object "EVMInterpreter" {
                 
                         let i
                 
-                        popPushStackCheck(sp, evmGasLeft, 1)
+                        popStackCheck(sp, evmGasLeft, 1)
                         i, sp := popStackItemWithoutCheck(sp)
                 
                         sp := pushStackItemWithoutCheck(sp, calldataload(i))
@@ -5047,8 +5029,8 @@ object "EVMInterpreter" {
                         // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)
                 
                         switch _isEVM(addr) 
-                            case 0  { sp := pushStackItem(sp, extcodesize(addr), evmGasLeft) }
-                            default { sp := pushStackItem(sp, _fetchDeployedCodeLen(addr), evmGasLeft) }
+                            case 0  { sp := pushStackItemWithoutCheck(sp, extcodesize(addr)) }
+                            default { sp := pushStackItemWithoutCheck(sp, _fetchDeployedCodeLen(addr)) }
                         ip := add(ip, 1)
                     }
                     case 0x3C { // OP_EXTCODECOPY
@@ -5101,16 +5083,16 @@ object "EVMInterpreter" {
                 
                         ip := add(ip, 1)
                         if iszero(addr) {
-                            sp := pushStackItem(sp, 0, evmGasLeft)
+                            sp := pushStackItemWithoutCheck(sp, 0)
                             continue
                         }
-                        sp := pushStackItem(sp, extcodehash(addr), evmGasLeft)
+                        sp := pushStackItemWithoutCheck(sp, extcodehash(addr))
                     }
                     case 0x40 { // OP_BLOCKHASH
                         evmGasLeft := chargeGas(evmGasLeft, 20)
                 
                         let blockNumber
-                        popPushStackCheck(sp, evmGasLeft, 1)
+                        popStackCheck(sp, evmGasLeft, 1)
                         blockNumber, sp := popStackItemWithoutCheck(sp)
                 
                         sp := pushStackItemWithoutCheck(sp, blockhash(blockNumber))
@@ -5177,7 +5159,7 @@ object "EVMInterpreter" {
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
                         let memValue := mload(add(MEM_OFFSET_INNER(), offset))
-                        sp := pushStackItem(sp, memValue, evmGasLeft)
+                        sp := pushStackItemWithoutCheck(sp, memValue)
                         ip := add(ip, 1)
                     }
                     case 0x52 { // OP_MSTORE
@@ -5234,7 +5216,7 @@ object "EVMInterpreter" {
                             let _wasW, _orgV := warmSlot(key, value)
                         }
                 
-                        sp := pushStackItem(sp,value, evmGasLeft)
+                        sp := pushStackItemWithoutCheck(sp,value)
                         ip := add(ip, 1)
                     }
                     case 0x55 { // OP_SSTORE
@@ -5356,7 +5338,7 @@ object "EVMInterpreter" {
                         evmGasLeft := chargeGas(evmGasLeft, 100)
                 
                         let key
-                        popPushStackCheck(sp, evmGasLeft, 1)
+                        popStackCheck(sp, evmGasLeft, 1)
                         key, sp := popStackItemWithoutCheck(sp)
                 
                         sp := pushStackItemWithoutCheck(sp, tload(key))
