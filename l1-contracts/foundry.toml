@@ -5,8 +5,6 @@ libs = ['node_modules', '../lib']
 remappings = [
     "@openzeppelin/contracts-v4/=../lib/openzeppelin-contracts-v4/contracts/",
     "@openzeppelin/contracts-upgradeable-v4/=../lib/openzeppelin-contracts-upgradeable-v4/contracts/",
-    "@openzeppelin/contracts/=../lib/openzeppelin-contracts/contracts/",
-    "@openzeppelin/contracts-upgradeable/=../lib/openzeppelin-contracts-upgradeable/contracts/",
     "murky=../lib/murky/src/",
     "l2-contracts/=../l2-contracts/contracts/"
 ]
