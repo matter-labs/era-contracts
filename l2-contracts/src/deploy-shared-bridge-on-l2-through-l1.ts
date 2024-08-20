@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { provider, publishBytecodeFromL1 } from "./utils";
+import { provider } from "./utils";
 
 import { ethTestConfig } from "./deploy-utils";
 
@@ -27,7 +27,7 @@ async function main() {
     .option("--erc20-bridge <erc20-bridge>")
     .option("--skip-initialize-chain-governance <skip-initialize-chain-governance>")
     .action(async (cmd) => {
-      const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
+      // const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(

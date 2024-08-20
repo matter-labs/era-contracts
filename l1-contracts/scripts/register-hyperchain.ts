@@ -2,7 +2,7 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
 import { Command } from "commander";
-import { Wallet, utils } from "ethers";
+import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
