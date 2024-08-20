@@ -57,8 +57,6 @@ object "EVMInterpreter" {
 
         function validateCorrectBytecode(offset, len, gasToReturn) -> returnGas {
             if len {
-                // let firstByte := shr(mload(offset), 248)
-                // FIXME: Check this.
                 let firstByte := shr(248, mload(offset))
                 if eq(firstByte, 0xEF) {
                     revert(0, 0)
@@ -147,7 +145,6 @@ object "EVMInterpreter" {
         
         // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
         function readIP(ip,maxAcceptablePos) -> opcode {
-            // TODO: Why not do this at the beginning once instead of every time?
             if gt(ip, maxAcceptablePos) {
                 revert(0, 0)
             }
@@ -294,7 +291,6 @@ object "EVMInterpreter" {
         
         function getIsStaticFromCallFlags() -> isStatic {
             isStatic := verbatim_0i_1o("get_global::call_flags")
-            // TODO: make it a constnat
             isStatic := iszero(iszero(and(isStatic, 0x04)))
         }
         
@@ -833,7 +829,6 @@ object "EVMInterpreter" {
         }
         
         // Each evm gas is 5 zkEVM one
-        // FIXME: change this variable to reflect real ergs : gas ratio
         function GAS_DIVISOR() -> gas_div { gas_div := 5 }
         function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
         function OVERHEAD() -> overhead { overhead := 2000 }
@@ -955,8 +950,6 @@ object "EVMInterpreter" {
             let success
             if _isEVM(addr) {
                 _pushEVMFrame(gasToPass, true)
-                // TODO Check the following comment from zkSync .sol.
-                // We can not just pass all gas here to prevert overflow of zkEVM gas counter
                 success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
         
                 frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
@@ -1157,13 +1150,6 @@ object "EVMInterpreter" {
             }
             gasToPass := capGas(evmGasLeft,gasToPass)
         
-            // TODO: Do this
-            // if warmAccount(addr) {
-            //     extraCost = GAS_WARM_ACCESS;
-            // } else {
-            //     extraCost = GAS_COLD_ACCOUNT_ACCESS;
-            // }
-        
             _pushEVMFrame(gasToPass, isStatic)
             let success := delegatecall(
                 // We can not just pass all gas here to prevert overflow of zkEVM gas counter
@@ -1233,8 +1219,6 @@ object "EVMInterpreter" {
         ) ->  success, _gasLeft {
             if _calleeIsEVM {
                 _pushEVMFrame(_calleeGas, true)
-                // TODO Check the following comment from zkSync .sol.
-                // We can not just pass all gas here to prevert overflow of zkEVM gas counter
                 success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
         
                 _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
@@ -2012,11 +1996,6 @@ object "EVMInterpreter" {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
             
-                    // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
-                    // if a contract is created it works, but if the address is a zkSync's contract
-                    // what happens?
-                    // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)
-            
                     switch _isEVM(addr) 
                         case 0  { sp := pushStackItemWithoutCheck(sp, extcodesize(addr)) }
                         default { sp := pushStackItemWithoutCheck(sp, _fetchDeployedCodeLen(addr)) }
@@ -2042,9 +2021,6 @@ object "EVMInterpreter" {
                     offset, sp := popStackItemWithoutCheck(sp)
                     len, sp := popStackItemWithoutCheck(sp)
             
-                    // TODO: check if these conditions are met
-                    // The addition offset + size overflows.
-                    // offset + size is larger than RETURNDATASIZE.
                     checkOverflow(offset,len, evmGasLeft)
                     if gt(add(offset, len), mload(LAST_RETURNDATA_SIZE_OFFSET())) {
                         revertWithGas(evmGasLeft)
@@ -3116,7 +3092,6 @@ object "EVMInterpreter" {
             
             // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
             function readIP(ip,maxAcceptablePos) -> opcode {
-                // TODO: Why not do this at the beginning once instead of every time?
                 if gt(ip, maxAcceptablePos) {
                     revert(0, 0)
                 }
@@ -3263,7 +3238,6 @@ object "EVMInterpreter" {
             
             function getIsStaticFromCallFlags() -> isStatic {
                 isStatic := verbatim_0i_1o("get_global::call_flags")
-                // TODO: make it a constnat
                 isStatic := iszero(iszero(and(isStatic, 0x04)))
             }
             
@@ -3802,7 +3776,6 @@ object "EVMInterpreter" {
             }
             
             // Each evm gas is 5 zkEVM one
-            // FIXME: change this variable to reflect real ergs : gas ratio
             function GAS_DIVISOR() -> gas_div { gas_div := 5 }
             function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
             function OVERHEAD() -> overhead { overhead := 2000 }
@@ -3924,8 +3897,6 @@ object "EVMInterpreter" {
                 let success
                 if _isEVM(addr) {
                     _pushEVMFrame(gasToPass, true)
-                    // TODO Check the following comment from zkSync .sol.
-                    // We can not just pass all gas here to prevert overflow of zkEVM gas counter
                     success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
             
                     frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
@@ -4126,13 +4097,6 @@ object "EVMInterpreter" {
                 }
                 gasToPass := capGas(evmGasLeft,gasToPass)
             
-                // TODO: Do this
-                // if warmAccount(addr) {
-                //     extraCost = GAS_WARM_ACCESS;
-                // } else {
-                //     extraCost = GAS_COLD_ACCOUNT_ACCESS;
-                // }
-            
                 _pushEVMFrame(gasToPass, isStatic)
                 let success := delegatecall(
                     // We can not just pass all gas here to prevert overflow of zkEVM gas counter
@@ -4202,8 +4166,6 @@ object "EVMInterpreter" {
             ) ->  success, _gasLeft {
                 if _calleeIsEVM {
                     _pushEVMFrame(_calleeGas, true)
-                    // TODO Check the following comment from zkSync .sol.
-                    // We can not just pass all gas here to prevert overflow of zkEVM gas counter
                     success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
             
                     _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
@@ -4981,11 +4943,6 @@ object "EVMInterpreter" {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
                         }
                 
-                        // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
-                        // if a contract is created it works, but if the address is a zkSync's contract
-                        // what happens?
-                        // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)
-                
                         switch _isEVM(addr) 
                             case 0  { sp := pushStackItemWithoutCheck(sp, extcodesize(addr)) }
                             default { sp := pushStackItemWithoutCheck(sp, _fetchDeployedCodeLen(addr)) }
@@ -5011,9 +4968,6 @@ object "EVMInterpreter" {
                         offset, sp := popStackItemWithoutCheck(sp)
                         len, sp := popStackItemWithoutCheck(sp)
                 
-                        // TODO: check if these conditions are met
-                        // The addition offset + size overflows.
-                        // offset + size is larger than RETURNDATASIZE.
                         checkOverflow(offset,len, evmGasLeft)
                         if gt(add(offset, len), mload(LAST_RETURNDATA_SIZE_OFFSET())) {
                             revertWithGas(evmGasLeft)
