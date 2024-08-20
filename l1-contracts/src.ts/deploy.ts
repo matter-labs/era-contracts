@@ -370,7 +370,12 @@ export class Deployer {
 
   public async deployChainAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("ChainAdmin", [this.ownerAddress], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2(
+      "ChainAdmin",
+      [this.ownerAddress, ethers.constants.AddressZero],
+      create2Salt,
+      ethTxOptions
+    );
     if (this.verbose) {
       console.log(`CONTRACTS_CHAIN_ADMIN_ADDR=${contractAddress}`);
     }
@@ -1367,6 +1372,17 @@ export class Deployer {
     return await multicallTx.wait();
   }
 
+  public async setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress: string) {
+    const chainAdmin = ChainAdminFactory.connect(this.addresses.ChainAdmin, this.deployWallet);
+
+    const receipt = await (await chainAdmin.setTokenMultiplierSetter(tokenMultiplierSetterAddress)).wait();
+    if (this.verbose) {
+      console.log(
+        `Token multiplier setter set as ${tokenMultiplierSetterAddress}, gas used: ${receipt.gasUsed.toString()}`
+      );
+    }
+  }
+
   public async transferAdminFromDeployerToChainAdmin() {
     const stm = this.stateTransitionManagerContract(this.deployWallet);
     const diamondProxyAddress = await stm.getHyperchain(this.chainId);
@@ -1377,13 +1393,6 @@ export class Deployer {
       console.log(`ChainAdmin set as pending admin, gas used: ${receipt.gasUsed.toString()}`);
     }
 
-    // await this.executeUpgrade(
-    //   hyperchain.address,
-    //   0,
-    //   hyperchain.interface.encodeFunctionData("acceptAdmin"),
-    //   null,
-    //   false
-    // );
     const acceptAdminData = hyperchain.interface.encodeFunctionData("acceptAdmin");
     await this.executeChainAdminMulticall([
       {
