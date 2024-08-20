@@ -96,7 +96,7 @@ describe("Diamond proxy tests", function () {
         verifierParams: dummyVerifierParams,
         l2BootloaderBytecodeHash: "0x0100000000000000000000000000000000000000000000000000000000000000",
         l2DefaultAccountBytecodeHash: "0x0100000000000000000000000000000000000000000000000000000000000000",
-        // TODO: SIMULATOR CODE HASH
+        l2EvmSimulatorBytecodeHash: "0x0100000000000000000000000000000000000000000000000000000000000000",
         priorityTxMaxGasLimit: 500000, // priority tx max L2 gas limit
         feeParams: defaultFeeParams(),
         blobVersionedHashRetriever: "0x0000000000000000000000000000000000000001",
