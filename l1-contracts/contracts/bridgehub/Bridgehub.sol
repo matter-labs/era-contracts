@@ -258,6 +258,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // TODO(EVM-703): This logic should be revised once interchain communication is implemented.
 
         address sender = L1_CHAIN_ID == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);
+        // This method can be accessed by STMDeployer only
+        require(sender == address(stmDeployer), "BH: not stm deployer");
+
         bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
         stmAssetIdToAddress[assetInfo] = _assetAddress;
         emit AssetRegistered(assetInfo, _assetAddress, _additionalData, msg.sender);
