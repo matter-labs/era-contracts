@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {BOOTLOADER_FORMAL_ADDRESS, SystemLogKey} from "./Constants.sol";
@@ -14,7 +14,7 @@ import {BOOTLOADER_FORMAL_ADDRESS, SystemLogKey} from "./Constants.sol";
  * @notice Contract that stores some of the context variables, that may be either
  * block-scoped, tx-scoped or system-wide.
  */
-contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContract {
+contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContractBase {
     /// @notice The number of latest L2 blocks to store.
     /// @dev EVM requires us to be able to query the hashes of previous 256 blocks.
     /// We could either:

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+// solhint-disable one-contract-per-file
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
 import {MSG_VALUE_SYSTEM_CONTRACT} from "./L2ContractHelper.sol";
@@ -46,7 +48,7 @@ library SystemContractsCaller {
         assembly {
             dataStart := add(data, 0x20)
         }
-        uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
+        uint32 dataLength = Utils.safeCastToU32(data.length);
 
         uint256 farCallAbi = getFarCallABI({
             dataOffset: 0,
