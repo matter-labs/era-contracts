@@ -23,6 +23,7 @@ contract ChainAdmin is IChainAdmin, Ownable2Step {
     address public tokenMultiplierSetter;
 
     constructor(address _initialOwner, address _initialTokenMultiplierSetter) {
+        // solhint-disable-next-line gas-custom-errors, reason-string
         require(_initialOwner != address(0), "Initial owner should be non zero address");
         _transferOwnership(_initialOwner);
         // Can be zero if no one has this permission.
@@ -50,7 +51,9 @@ contract ChainAdmin is IChainAdmin, Ownable2Step {
     /// @param _requireSuccess If true, reverts transaction on any call failure.
     /// @dev Intended for batch processing of contract interactions, managing gas efficiency and atomicity of operations.
     function multicall(Call[] calldata _calls, bool _requireSuccess) external payable onlyOwner {
+        // solhint-disable-next-line gas-custom-errors
         require(_calls.length > 0, "No calls provided");
+        // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _calls.length; ++i) {
             // slither-disable-next-line arbitrary-send-eth
             (bool success, bytes memory returnData) = _calls[i].target.call{value: _calls[i].value}(_calls[i].data);
@@ -69,6 +72,7 @@ contract ChainAdmin is IChainAdmin, Ownable2Step {
     /// @param _nominator The numerator part of the token multiplier.
     /// @param _denominator The denominator part of the token multiplier.
     function setTokenMultiplier(IAdmin _chainContract, uint128 _nominator, uint128 _denominator) external {
+        // solhint-disable-next-line gas-custom-errors, reason-string
         require(msg.sender == tokenMultiplierSetter, "Only the token multiplier setter can call this function");
         _chainContract.setTokenMultiplier(_nominator, _denominator);
     }

@@ -134,6 +134,9 @@ contract DeployErc20Script is Script {
                     abi.encodeWithSignature("mint(address,uint256)", additionalAddressesForMinting[i], mint)
                 );
                 console.log("Minting to:", additionalAddressesForMinting[i]);
+                if (!success) {
+                    revert MintFailed();
+                }
             }
         }
 

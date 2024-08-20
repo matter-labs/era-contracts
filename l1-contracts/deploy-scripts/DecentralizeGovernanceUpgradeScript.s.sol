@@ -17,8 +17,10 @@ contract DecentralizeGovernanceUpgradeScript is Script {
         Governance _governance,
         address _newStmImpl
     ) public {
-        require(_proxyAdmin.getProxyAdmin(_stmProxy) == address(_proxyAdmin));
-        require(_proxyAdmin.owner() == address(_governance));
+        // solhint-disable-next-line gas-custom-errors
+        require(_proxyAdmin.getProxyAdmin(_stmProxy) == address(_proxyAdmin), "Proxy admin incorrect");
+        // solhint-disable-next-line gas-custom-errors
+        require(_proxyAdmin.owner() == address(_governance), "Proxy admin owner incorrect");
 
         bytes memory proxyAdminUpgradeData = abi.encodeCall(ProxyAdmin.upgrade, (_stmProxy, _newStmImpl));
 
