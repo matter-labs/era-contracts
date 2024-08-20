@@ -3,7 +3,7 @@ import "@nomiclabs/hardhat-ethers";
 import { ethers } from "ethers";
 import { SingletonFactoryFactory } from "../typechain";
 
-import { getAddressFromEnv } from "./utils";
+import { encodeNTVAssetId, getAddressFromEnv, getNumberFromEnv } from "./utils";
 
 export async function deployViaCreate2(
   deployWallet: ethers.Wallet,
@@ -133,6 +133,7 @@ export interface DeployedAddresses {
     NativeTokenVaultImplementation: string;
     NativeTokenVaultProxy: string;
   };
+  BaseTokenAssetId: string;
   BaseToken: string;
   TransparentProxyAdmin: string;
   L2ProxyAdmin: string;
@@ -147,6 +148,15 @@ export interface DeployedAddresses {
 }
 
 export function deployedAddressesFromEnv(): DeployedAddresses {
+  let baseTokenAssetId = "0";
+  try {
+    baseTokenAssetId = getAddressFromEnv("CONTRACTS_BASE_TOKEN_ASSET_ID");
+  } catch (error) {
+    baseTokenAssetId = encodeNTVAssetId(
+      parseInt(getNumberFromEnv("ETH_CLIENT_CHAIN_ID")),
+      ethers.utils.hexZeroPad(getAddressFromEnv("CONTRACTS_BASE_TOKEN_ADDR"), 32)
+    );
+  }
   return {
     Bridgehub: {
       BridgehubProxy: getAddressFromEnv("CONTRACTS_BRIDGEHUB_PROXY_ADDR"),
@@ -186,6 +196,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     ValidiumL1DAValidator: getAddressFromEnv("CONTRACTS_L1_VALIDIUM_DA_VALIDATOR"),
     RelayedSLDAValidator: getAddressFromEnv("CONTRACTS_L1_RELAYED_SL_DA_VALIDATOR"),
     BaseToken: getAddressFromEnv("CONTRACTS_BASE_TOKEN_ADDR"),
+    BaseTokenAssetId: baseTokenAssetId,
     TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),
     L2ProxyAdmin: getAddressFromEnv("CONTRACTS_L2_PROXY_ADMIN_ADDR"),
     Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
