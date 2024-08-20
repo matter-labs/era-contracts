@@ -216,7 +216,7 @@ describe("Shared Bridge tests", () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 10, 0, 0, l2ToL1message, dummyProof)
     );
-    expect(revertReason).equal("local root is 0");
+    expect(revertReason).equal("xx");
   });
 
   it("Should revert on finalizing a withdrawal with wrong length of proof", async () => {

@@ -193,7 +193,7 @@ describe("Legacy Era tests", function () {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(10, 0, 0, l2ToL1message, dummyProof)
     );
-    expect(revertReason).equal("local root is 0");
+    expect(revertReason).equal("xx");
   });
 
   it("Should revert on finalizing a withdrawal with wrong proof", async () => {

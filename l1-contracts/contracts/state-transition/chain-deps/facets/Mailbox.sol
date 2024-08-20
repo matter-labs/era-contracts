@@ -146,6 +146,15 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         }
     }
 
+    /// @notice Extracts slice until the end of the array.
+    /// @dev It is used in one place in order to circumvent the stack too deep error.
+    function extractSliceUntilEnd(
+        bytes32[] calldata _proof,
+        uint256 _start
+    ) internal pure returns (bytes32[] memory slice) {
+        slice = extractSlice(_proof, _start, _proof.length);
+    }
+
     /// @inheritdoc IMailbox
     function proveL2LeafInclusion(
         uint256 _batchNumber,
@@ -162,8 +171,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        // FIXME: maybe support legacy interface
-
         uint256 ptr = 0;
         bytes32 chainIdLeaf;
         {
@@ -177,9 +184,12 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             );
             ptr += logLeafProofLen;
 
-            // Note that this logic works only for chains that do not migrate away from the synclayer back to L1.
-            // Support for chains that migrate back to L1 will be added in the future.
-            if (s.settlementLayer == address(0)) {
+            // If the `batchLeafProofLen` is 0, then we assume that this is L1 contract of the top-level
+            // in the aggregation, i.e. the batch root is stored here on L1.
+            if (batchLeafProofLen == 0) {
+                // Double checking that the batch has been executed.
+                require(_batchNumber <= s.totalBatchesExecuted, "xx");
+
                 bytes32 correctBatchRoot = s.l2LogsRootHashes[_batchNumber];
                 require(correctBatchRoot != bytes32(0), "local root is 0");
                 return correctBatchRoot == batchSettlementRoot;
@@ -205,6 +215,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
         uint256 settlementLayerBatchNumber;
         uint256 settlementLayerBatchRootMask;
+        address settlementLayerAddress;
 
         // Preventing stack too deep error
         {
@@ -213,14 +224,27 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             ++ptr;
             settlementLayerBatchNumber = uint256(settlementLayerPackedBatchInfo >> 128);
             settlementLayerBatchRootMask = uint256(settlementLayerPackedBatchInfo & ((1 << 128) - 1));
+
+            uint256 settlementLayerChainId = uint256(_proof[ptr]);
+            ++ptr;
+
+            // Assuming that `settlementLayerChainId` is an honest chain, the `chainIdLeaf` should belong 
+            // to a chain's message root only if the chain has indeed executed its batch on top of it.
+            // 
+            // We trust all chains from the same STM.
+            // Note that the logic below will stop working in case the STM of the `settlementLayerChainId` is 
+            // changed, so it is the responsibility of the STM to ensure that gateways never leave.
+            require(IBridgehub(s.bridgehub).stateTransitionManager(settlementLayerChainId) == s.stateTransitionManager, "Mailbox: wrong STM");
+
+            settlementLayerAddress = IBridgehub(s.bridgehub).getHyperchain(settlementLayerChainId);
         }
 
         return
-            IMailbox(s.settlementLayer).proveL2LeafInclusion(
+            IMailbox(settlementLayerAddress).proveL2LeafInclusion(
                 settlementLayerBatchNumber,
                 settlementLayerBatchRootMask,
                 chainIdLeaf,
-                extractSlice(_proof, ptr, _proof.length)
+                extractSliceUntilEnd(_proof, ptr)
             );
     }
 
@@ -231,8 +255,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         L2Log memory _log,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        // require(_batchNumber <= s.totalBatchesExecuted, "xx");
-
         bytes32 hashedLog = keccak256(
             // solhint-disable-next-line func-named-parameters
             abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
