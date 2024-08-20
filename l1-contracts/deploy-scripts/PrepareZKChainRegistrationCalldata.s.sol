@@ -84,8 +84,11 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
     }
 
     struct ContractsBytecodes {
+        // Default bytecode of the ERC-20 on L2 (BeaconProxy)
         bytes beaconProxy;
+        // Bytecode of the L2 shared bridge
         bytes l2SharedBridgeBytecode;
+        // Bytecode of the L2 shared bridge proxy (TransparentUpgradeableProxy)
         bytes l2SharedBridgeProxyBytecode;
     }
 
@@ -166,6 +169,8 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
             return;
         }
 
+        // Does not prevent registering a non-ERC-20 contract as a token
+        // But calling the ERC-20 methods here on non-ERC-20 will fail without a readable revert message
         if (config.baseToken.code.length == 0) {
             revert("Token address is an EOA");
         }
