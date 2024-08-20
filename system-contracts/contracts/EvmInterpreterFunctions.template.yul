@@ -193,11 +193,7 @@ function ptrShrinkIntoActive(_dest) {
 }
 
 function _getRawCodeHash(account) -> hash {
-    // TODO: Unhardcode this selector
-    mstore8(0, 0x4d)
-    mstore8(1, 0xe2)
-    mstore8(2, 0xe4)
-    mstore8(3, 0x68)
+    mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
     mstore(4, account)
 
     let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -212,12 +208,7 @@ function _getRawCodeHash(account) -> hash {
 
 function _getCodeHash(account) -> hash {
     // function getCodeHash(uint256 _input) external view override returns (bytes32)
-    // 0xe03fe177
-    // TODO: Unhardcode this selector
-    mstore8(0, 0xe0)
-    mstore8(1, 0x3f)
-    mstore8(2, 0xe1)
-    mstore8(3, 0x77)
+    mstore(0, 0xE03FE17700000000000000000000000000000000000000000000000000000000)
     mstore(4, account)
 
     let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -301,11 +292,7 @@ function getDeployedBytecode() {
 
 function consumeEvmFrame() -> passGas, isStatic, callerEVM {
     // function consumeEvmFrame() external returns (uint256 passGas, bool isStatic)
-    // TODO: Unhardcode selector
-    mstore8(0, 0x04)
-    mstore8(1, 0xc1)
-    mstore8(2, 0x4e)
-    mstore8(3, 0x9e)
+    mstore(0, 0x04C14E9E00000000000000000000000000000000000000000000000000000000)
 
     let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 64)
 
@@ -550,11 +537,7 @@ function printString(value) {
 }
 
 function isSlotWarm(key) -> isWarm {
-    // TODO: Unhardcode this selector 0x482d2e74
-    mstore8(0, 0x48)
-    mstore8(1, 0x2d)
-    mstore8(2, 0x2e)
-    mstore8(3, 0x74)
+    mstore(0, 0x482D2E7400000000000000000000000000000000000000000000000000000000)
     mstore(4, key)
 
     let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
@@ -568,11 +551,7 @@ function isSlotWarm(key) -> isWarm {
 }
 
 function warmSlot(key,currentValue) -> isWarm, originalValue {
-    // TODO: Unhardcode this selector 0xbdf78160
-    mstore8(0, 0xbd)
-    mstore8(1, 0xf7)
-    mstore8(2, 0x81)
-    mstore8(3, 0x60)
+    mstore(0, 0xBDF7816000000000000000000000000000000000000000000000000000000000)
     mstore(4, key)
     mstore(36,currentValue)
 
@@ -665,10 +644,7 @@ function getNewAddress(addr) -> newAddr {
 }
 
 function incrementNonce(addr) {
-    mstore8(0, 0x30)
-    mstore8(1, 0x63)
-    mstore8(2, 0x95)
-    mstore8(3, 0xc6)
+    mstore(0, 0x306395C600000000000000000000000000000000000000000000000000000000)
     mstore(4, addr)
 
     let result := call(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 0, 36, 0, 0)
@@ -700,11 +676,7 @@ function addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft) -> newOffset,newS
 }
 
 function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
-    // TODO: Unhardcode this selector 0x8db2ba78
-    mstore8(0, 0x8d)
-    mstore8(1, 0xb2)
-    mstore8(2, 0xba)
-    mstore8(3, 0x78)
+    mstore(0, 0x8DB2BA7800000000000000000000000000000000000000000000000000000000)
     mstore(4, addr)
 
     let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
@@ -718,10 +690,7 @@ function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
 }
 
 function getNonce(addr) -> nonce {
-    mstore8(0, 0xfb)
-    mstore8(1, 0x1a)
-    mstore8(2, 0x9a)
-    mstore8(3, 0x57)
+    mstore(0, 0xFB1A9A5700000000000000000000000000000000000000000000000000000000)
     mstore(4, addr)
 
     let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -734,10 +703,7 @@ function getNonce(addr) -> nonce {
 }
 
 function getRawNonce(addr) -> nonce {
-    mstore8(0, 0x5a)
-    mstore8(1, 0xa9)
-    mstore8(2, 0xb6)
-    mstore8(3, 0xb5)
+    mstore(0, 0x5AA9B6B500000000000000000000000000000000000000000000000000000000)
     mstore(4, addr)
 
     let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -756,10 +722,7 @@ function _isEVM(_addr) -> isEVM {
     //      address(SYSTEM_CONTRACTS_OFFSET + 0x02)
     // );
 
-    mstore8(0, 0x8c)
-    mstore8(1, 0x04)
-    mstore8(2, 0x04)
-    mstore8(3, 0x77)
+    mstore(0, 0x8C04047700000000000000000000000000000000000000000000000000000000)
     mstore(4, _addr)
 
     let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
@@ -774,12 +737,8 @@ function _isEVM(_addr) -> isEVM {
 
 function _pushEVMFrame(_passGas, _isStatic) {
     // function pushEVMFrame(uint256 _passGas, bool _isStatic) external
-    let selector := 0xead77156
 
-    mstore8(0, 0xea)
-    mstore8(1, 0xd7)
-    mstore8(2, 0x71)
-    mstore8(3, 0x56)
+    mstore(0, 0xEAD7715600000000000000000000000000000000000000000000000000000000)
     mstore(4, _passGas)
     mstore(36, _isStatic)
 
@@ -792,13 +751,8 @@ function _pushEVMFrame(_passGas, _isStatic) {
 
 function _popEVMFrame() {
     // function popEVMFrame() external
-    // 0xe467d2f0
-    let selector := 0xe467d2f0
 
-    mstore8(0, 0xe4)
-    mstore8(1, 0x67)
-    mstore8(2, 0xd2)
-    mstore8(3, 0xf0)
+    mstore(0, 0xE467D2F000000000000000000000000000000000000000000000000000000000)
 
     let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 0)
     if iszero(success) {
@@ -1226,12 +1180,7 @@ function isAddrEmpty(addr) -> isEmpty {
 }
 
 function _fetchConstructorReturnGas() -> gasLeft {
-    //selector is 0x24e5ab4a
-
-    mstore8(0, 0x24)
-    mstore8(1, 0xe5)
-    mstore8(2, 0xab)
-    mstore8(3, 0x4a)
+    mstore(0, 0x24E5AB4A00000000000000000000000000000000000000000000000000000000)
 
     let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 32)
 
@@ -1314,6 +1263,45 @@ function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGa
     mstore(sub(offset, 0x80), back)
 }
 
+function $llvm_AlwaysInline_llvm$_copyRest(dest, val, len) {
+    let rest_bits := shl(3, len)
+    let upper_bits := sub(256, rest_bits)
+    let val_mask := shl(upper_bits, MAX_UINT())
+    let val_masked := and(val, val_mask)
+    let dst_val := mload(dest)
+    let dst_mask := shr(rest_bits, MAX_UINT())
+    let dst_masked := and(dst_val, dst_mask)
+    mstore(dest, or(val_masked, dst_masked))
+}
+
+function $llvm_AlwaysInline_llvm$_memcpy(dest, src, len) {
+    let dest_addr := dest
+    let src_addr := src
+    let dest_end := add(dest, and(len, sub(0, 32)))
+    for { } lt(dest_addr, dest_end) {} {
+        mstore(dest_addr, mload(src_addr))
+        dest_addr := add(dest_addr, 32)
+        src_addr := add(src_addr, 32)
+    }
+
+    let rest_len := and(len, 31)
+    if rest_len {
+        $llvm_AlwaysInline_llvm$_copyRest(dest_addr, mload(src_addr), rest_len)
+    }
+}
+
+function $llvm_AlwaysInline_llvm$_memsetToZero(dest,len) {
+    let dest_end := add(dest, and(len, sub(0, 32)))
+    for {let i := dest} lt(i, dest_end) { i := add(i, 32) } {
+        mstore(i, 0)
+    }
+
+    let rest_len := and(len, 31)
+    if rest_len {
+        $llvm_AlwaysInline_llvm$_copyRest(dest_end, 0, rest_len)
+    }
+}
+
 function performExtCodeCopy(evmGas,oldSp) -> evmGasLeft, sp {
     evmGasLeft := chargeGas(evmGas, 100)
 
@@ -1336,17 +1324,7 @@ function performExtCodeCopy(evmGas,oldSp) -> evmGasLeft, sp {
     }
     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-
-    let len_32 := shr(5, len)
-    for {let i := 0} lt(i, len_32) { i := add(i, 1) } {
-        mstore(add(dest,shl(5,i)),0)
-    }
-
-    let size_32 := shl(5,len_32)
-    let rest_32 := sub(len, size_32)
-    for {let i := 0} lt(i, rest_32) { i := add(i, 1) } {
-        mstore8(add(dest,add(size_32,i)),0)
-    }
+    $llvm_AlwaysInline_llvm$_memsetToZero(dest, len)
 
     // Gets the code from the addr
     if and(iszero(iszero(_getRawCodeHash(addr))),gt(len,0)) {
@@ -1439,7 +1417,7 @@ function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp, result, addr
 
     {
         let hashedBytecode := keccak256(add(MEM_OFFSET_INNER(), offset), size)
-        mstore8(0, 0xFF)
+        mstore(0, 0xFF00000000000000000000000000000000000000000000000000000000000000)
         mstore(0x01, shl(0x60, address()))
         mstore(0x15, salt)
         mstore(0x35, hashedBytecode)

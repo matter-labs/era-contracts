@@ -414,12 +414,7 @@ for { } true { } {
         checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER(), evmGasLeft)
 
         if or(gt(add(add(offset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM()), gt(add(add(destOffset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM())) {
-            for { let i := 0 } lt(i, size) { i := add(i, 1) } {
-                mstore8(
-                    add(add(destOffset, MEM_OFFSET_INNER()), i),
-                    0
-                )
-            }
+            $llvm_AlwaysInline_llvm$_memsetToZero(add(destOffset, MEM_OFFSET_INNER()), size)
         }
 
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
@@ -464,12 +459,7 @@ for { } true { } {
             revertWithGas(evmGasLeft)
         }
 
-        for { let i := 0 } lt(i, len) { i := add(i, 1) } {
-            mstore8(
-                add(dst, i),
-                shr(248, mload(add(offset, i)))
-            )
-        }
+        $llvm_AlwaysInline_llvm$_memcpy(dst, offset, len)
         ip := add(ip, 1)
     }
     case 0x3A { // OP_GASPRICE
@@ -832,26 +822,13 @@ for { } true { } {
         offset, sp := popStackItemWithoutCheck(sp)
         size, sp := popStackItemWithoutCheck(sp)
 
+        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+        checkMemOverflow(add(add(destOffset, MEM_OFFSET_INNER()), size), evmGasLeft)
+
         expandMemory(add(destOffset, size))
         expandMemory(add(offset, size))
 
-        let oldSize := mul(mload(MEM_OFFSET()),32)
-        if gt(add(oldSize,size),MAX_POSSIBLE_MEM()) {
-            revertWithGas(evmGasLeft)
-        }
-
-        for { let i := 0 } lt(i, size) { i := add(i, 1) } {
-            mstore8(
-                add(add(oldSize,MEM_OFFSET_INNER()), i),
-                shr(248,mload(add(add(offset,MEM_OFFSET_INNER()), i)))
-            )
-        }
-        for { let i := 0 } lt(i, size) { i := add(i, 1) } {
-            mstore8(
-                add(add(destOffset,MEM_OFFSET_INNER()), i),
-                shr(248,mload(add(add(oldSize,MEM_OFFSET_INNER()), i)))
-            )
-        }
+        mcopy(add(destOffset, MEM_OFFSET_INNER()), add(offset, MEM_OFFSET_INNER()), size)
         ip := add(ip, 1)
     }
     case 0x5F { // OP_PUSH0
