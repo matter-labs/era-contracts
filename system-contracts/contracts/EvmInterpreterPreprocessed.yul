@@ -978,8 +978,15 @@ object "EVMInterpreter" {
                 }
             }
         
-            extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
-            extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
+            let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+            switch iszero(precompileCost)
+            case 1 {
+                extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
+            }
+            default {
+                extraCost := add(extraCost, precompileCost)
+            }
+        
             sp := pushStackItem(sp, success, evmGasLeft)
         }
         function capGas(evmGasLeft,oldGasToPass) -> gasToPass {
@@ -1102,8 +1109,14 @@ object "EVMInterpreter" {
                 isStatic
             )
         
-            extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
-            extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
+            let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+            switch iszero(precompileCost)
+            case 1 {
+                extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
+            }
+            default {
+                extraCost := add(extraCost, precompileCost)
+            }
             sp := pushStackItem(sp,success, evmGasLeft) 
         }
         
@@ -1166,8 +1179,14 @@ object "EVMInterpreter" {
         
             _popEVMFrame()
         
-            extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
-            extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
+            let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+            switch iszero(precompileCost)
+            case 1 {
+                extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
+            }
+            default {
+                extraCost := add(extraCost, precompileCost)
+            }
             sp := pushStackItem(sp, success, evmGasLeft)
         }
         
@@ -3928,8 +3947,15 @@ object "EVMInterpreter" {
                     }
                 }
             
-                extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
-                extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
+                let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+                switch iszero(precompileCost)
+                case 1 {
+                    extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
+                }
+                default {
+                    extraCost := add(extraCost, precompileCost)
+                }
+            
                 sp := pushStackItem(sp, success, evmGasLeft)
             }
             function capGas(evmGasLeft,oldGasToPass) -> gasToPass {
@@ -4052,8 +4078,14 @@ object "EVMInterpreter" {
                     isStatic
                 )
             
-                extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
-                extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
+                let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+                switch iszero(precompileCost)
+                case 1 {
+                    extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
+                }
+                default {
+                    extraCost := add(extraCost, precompileCost)
+                }
                 sp := pushStackItem(sp,success, evmGasLeft) 
             }
             
@@ -4116,8 +4148,14 @@ object "EVMInterpreter" {
             
                 _popEVMFrame()
             
-                extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
-                extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
+                let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
+                switch iszero(precompileCost)
+                case 1 {
+                    extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
+                }
+                default {
+                    extraCost := add(extraCost, precompileCost)
+                }
                 sp := pushStackItem(sp, success, evmGasLeft)
             }
             
