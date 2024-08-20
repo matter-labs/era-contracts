@@ -15,6 +15,7 @@ import {Utils} from "../Utils/Utils.sol";
 import {InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
     DiamondProxy private diamondProxy;
@@ -81,7 +82,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             protocolVersion: 0,
             admin: admin,
             validatorTimelock: makeAddr("validatorTimelock"),
-            baseToken: makeAddr("baseToken"),
+            baseTokenAssetId: DataEncoding.encodeNTVAssetId(1, (makeAddr("baseToken"))),
             baseTokenBridge: makeAddr("baseTokenBridge"),
             storedBatchZero: bytes32(0),
             // genesisBatchHash: 0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,

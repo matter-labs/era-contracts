@@ -21,6 +21,7 @@ import {L2Message} from "contracts/common/Messaging.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -99,7 +100,8 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
     // use base token as main token
     // watch out, do not use with ETH
     modifier useBaseToken() {
-        currentToken = TestnetERC20Token(getHyperchainBaseToken(currentChainId));
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(currentChainId, currentTokenAddress);
+        currentToken = TestnetERC20Token(getHyperchainBaseToken(baseTokenAssetId));
         currentTokenAddress = address(currentToken);
         _;
     }
@@ -614,7 +616,8 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         uint256 tokenIndexSeed,
         uint256 l2Value
     ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) useERC20Token(tokenIndexSeed) {
-        address chainBaseToken = getHyperchainBaseToken(currentChainId);
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(currentChainId, currentTokenAddress);
+        address chainBaseToken = getHyperchainBaseToken(baseTokenAssetId);
 
         if (chainBaseToken == ETH_TOKEN_ADDRESS) {
             depositERC20ToEthChain(l2Value, currentTokenAddress);
@@ -632,7 +635,8 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         uint256 chainIndexSeed,
         uint256 amountToWithdraw
     ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) {
-        address token = getHyperchainBaseToken(currentChainId);
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(currentChainId, currentTokenAddress);
+        address token = getHyperchainBaseToken(baseTokenAssetId);
 
         if (token != ETH_TOKEN_ADDRESS) {
             withdrawERC20Token(amountToWithdraw, token);

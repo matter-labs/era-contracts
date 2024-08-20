@@ -28,6 +28,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
 import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
@@ -193,7 +194,7 @@ contract ExecutorTest is Test {
             protocolVersion: 0,
             admin: owner,
             validatorTimelock: validator,
-            baseToken: ETH_TOKEN_ADDRESS,
+            baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
             baseTokenBridge: address(sharedBridge),
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
             verifier: IVerifier(testnetVerifier), // verifier

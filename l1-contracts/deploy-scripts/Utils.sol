@@ -253,7 +253,8 @@ library Utils {
             refundRecipient: msg.sender
         });
 
-        address baseTokenAddress = bridgehub.baseToken(chainId);
+        bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(chainId);
+        address baseTokenAddress = bridgehub.baseToken(baseTokenAssetId);
         if (ADDRESS_ONE != baseTokenAddress) {
             IERC20 baseToken = IERC20(baseTokenAddress);
             vm.broadcast();

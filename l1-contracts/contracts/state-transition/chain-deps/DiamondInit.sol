@@ -8,7 +8,6 @@ import {Diamond} from "../libraries/Diamond.sol";
 import {ZkSyncHyperchainBase} from "./facets/ZkSyncHyperchainBase.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
 import {InitializeData, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
 
@@ -32,14 +31,14 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
         require(_initializeData.priorityTxMaxGasLimit <= MAX_GAS_PER_TRANSACTION, "vu");
         require(_initializeData.bridgehub != address(0), "DiamondInit: b0");
         require(_initializeData.stateTransitionManager != address(0), "DiamondInit: stm0");
-        require(_initializeData.baseToken != address(0), "DiamondInit: bt0");
+        require(_initializeData.baseTokenAssetId != bytes32(0), "DiamondInit: bt0");
         require(_initializeData.baseTokenBridge != address(0), "DiamondInit: btb0");
         require(_initializeData.blobVersionedHashRetriever != address(0), "DiamondInit: bvhr0");
 
         s.chainId = _initializeData.chainId;
         s.bridgehub = _initializeData.bridgehub;
         s.stateTransitionManager = _initializeData.stateTransitionManager;
-        s.baseToken = _initializeData.baseToken;
+        s.baseTokenAssetId = _initializeData.baseTokenAssetId;
         s.baseTokenBridge = _initializeData.baseTokenBridge;
         s.protocolVersion = _initializeData.protocolVersion;
 
@@ -55,8 +54,6 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
         s.feeParams = _initializeData.feeParams;
         s.blobVersionedHashRetriever = _initializeData.blobVersionedHashRetriever;
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
-
-        s.baseTokenAssetId = IBridgehub(_initializeData.bridgehub).baseTokenAssetId(_initializeData.chainId);
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
