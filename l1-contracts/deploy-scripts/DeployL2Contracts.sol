@@ -43,6 +43,7 @@ contract DeployL2Script is Script {
         deployFactoryDeps();
         deploySharedBridge();
         deploySharedBridgeProxy();
+        initializeChain();
         deployForceDeployer();
 
         saveOutput();
@@ -55,6 +56,7 @@ contract DeployL2Script is Script {
         deployFactoryDeps();
         deploySharedBridge();
         deploySharedBridgeProxy();
+        initializeChain();
 
         saveOutput();
     }
@@ -181,6 +183,19 @@ contract DeployL2Script is Script {
             chainId: config.chainId,
             bridgehubAddress: config.bridgehubAddress,
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
+    }
+
+    function initializeChain() internal {
+        L1SharedBridge bridge = L1SharedBridge(config.l1SharedBridgeProxy);
+
+        Utils.executeUpgrade({
+            _governor: bridge.owner(),
+            _salt: bytes32(0),
+            _target: config.l1SharedBridgeProxy,
+            _data: abi.encodeCall(bridge.initializeChainGovernance, (config.chainId, config.l2SharedBridgeProxy)),
+            _value: 0,
+            _delay: 0
         });
     }
 }
