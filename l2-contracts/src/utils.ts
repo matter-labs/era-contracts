@@ -143,27 +143,6 @@ export async function create2DeployFromL1(
   );
 }
 
-export async function create2DeployFromL2(
-  wallet: ethers.Wallet,
-  bytecode: ethers.BytesLike,
-  constructor: ethers.BytesLike,
-  create2Salt: ethers.BytesLike,
-  extraFactoryDeps?: ethers.BytesLike[]
-) {
-  const deployerSystemContracts = new Interface(artifacts.readArtifactSync("IContractDeployer").abi);
-  const bytecodeHash = hashL2Bytecode(bytecode);
-  const calldata = deployerSystemContracts.encodeFunctionData("create2", [create2Salt, bytecodeHash, constructor]);
-
-  const factoryDeps = extraFactoryDeps ? [bytecode, ...extraFactoryDeps] : [bytecode];
-  return await wallet.call({
-    to: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
-    data: calldata,
-    customData: {
-      factoryDeps,
-    },
-  });
-}
-
 export async function publishBytecodeFromL1(
   chainId: ethers.BigNumberish,
   wallet: ethers.Wallet,
