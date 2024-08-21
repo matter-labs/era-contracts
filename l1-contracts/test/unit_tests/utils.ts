@@ -10,7 +10,7 @@ import type { IMailbox } from "../../typechain/IMailbox";
 import type { ExecutorFacet } from "../../typechain";
 
 import type { FeeParams, L2CanonicalTransaction } from "../../src.ts/utils";
-import { ADDRESS_ONE, PubdataPricingMode, EMPTY_STRING_KECCAK, encodeNTVAssetId } from "../../src.ts/utils";
+import { ADDRESS_ONE, PubdataPricingMode, EMPTY_STRING_KECCAK } from "../../src.ts/utils";
 import { packSemver } from "../../scripts/utils";
 import { keccak256 } from "ethers/lib/utils";
 
@@ -369,8 +369,7 @@ export async function depositERC20(
   const gasPrice = await bridge.provider.getGasPrice();
   const gasPerPubdata = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
   const neededValue = await bridgehubContract.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
-  const baseTokenAssetId = encodeNTVAssetId(l1ChainId, ethers.utils.hexZeroPad(ADDRESS_ONE, 32));
-  const ethIsBaseToken = (await bridgehubContract.baseToken(baseTokenAssetId)) == ADDRESS_ONE;
+  const ethIsBaseToken = (await bridgehubContract.baseToken(chainId)) == ADDRESS_ONE;
 
   const deposit = await bridge["deposit(address,address,uint256,uint256,uint256,address)"](
     l2Receiver,

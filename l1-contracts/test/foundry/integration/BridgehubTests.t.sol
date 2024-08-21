@@ -100,8 +100,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
     // use base token as main token
     // watch out, do not use with ETH
     modifier useBaseToken() {
-        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(currentChainId, currentTokenAddress);
-        currentToken = TestnetERC20Token(getHyperchainBaseToken(baseTokenAssetId));
+        currentToken = TestnetERC20Token(getHyperchainBaseToken(currentChainId));
         currentTokenAddress = address(currentToken);
         _;
     }
@@ -616,8 +615,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         uint256 tokenIndexSeed,
         uint256 l2Value
     ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) useERC20Token(tokenIndexSeed) {
-        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(currentChainId, currentTokenAddress);
-        address chainBaseToken = getHyperchainBaseToken(baseTokenAssetId);
+        address chainBaseToken = getHyperchainBaseToken(currentChainId);
 
         if (chainBaseToken == ETH_TOKEN_ADDRESS) {
             depositERC20ToEthChain(l2Value, currentTokenAddress);
@@ -635,8 +633,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         uint256 chainIndexSeed,
         uint256 amountToWithdraw
     ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) {
-        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(currentChainId, currentTokenAddress);
-        address token = getHyperchainBaseToken(baseTokenAssetId);
+        address token = getHyperchainBaseToken(currentChainId);
 
         if (token != ETH_TOKEN_ADDRESS) {
             withdrawERC20Token(amountToWithdraw, token);
