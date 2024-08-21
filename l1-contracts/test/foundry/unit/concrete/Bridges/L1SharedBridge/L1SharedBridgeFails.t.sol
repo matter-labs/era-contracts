@@ -19,12 +19,14 @@ import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVau
 import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {L2WithdrawalMessageWrongLength, InsufficientChainBalance, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, L2BridgeNotDeployed, DepositIncorrectAmount, InvalidProof, NoFundsTransferred, InsufficientFunds, DepositDoesNotExist, WithdrawalAlreadyFinalized, InsufficientFunds, MalformedMessage, InvalidSelector, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 
 /// We are testing all the specified revert and require cases.
 contract L1AssetRouterFailTest is L1AssetRouterTest {
+    using stdStorage for StdStorage;
+
     function test_initialize_wrongOwner() public {
         vm.expectRevert(ZeroAddress.selector);
         new TransparentUpgradeableProxy(
@@ -156,7 +158,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.deal(bridgehubAddress, amount);
         vm.prank(bridgehubAddress);
         vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, amount, uint256(0)));
-        sharedBridge.bridgehubDepositBaseToken(chainId, alice, ETH_TOKEN_ADDRESS, amount);
+        sharedBridge.bridgehubDepositBaseToken(chainId, ETH_TOKEN_ASSET_ID, alice , amount);
     }
     
     function test_bridgehubDepositBaseToken_ErcWrongMsgValue() public {
@@ -166,7 +168,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         token.approve(address(sharedBridge), amount);
         vm.prank(bridgehubAddress);
         vm.expectRevert(NonEmptyMsgValue.selector);
-        sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, alice, address(token), amount);
+        sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, tokenAssetId, alice, amount);
     }
 
     function test_bridgehubDepositBaseToken_ercWrongErcDepositAmount() public {
@@ -176,7 +178,6 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.expectRevert(message);
         vm.prank(bridgehubAddress);
         sharedBridge.bridgehubDepositBaseToken(chainId, tokenAssetId, alice, amount);
-    }
     }
 
     function test_bridgehubDeposit_Erc_weth() public {

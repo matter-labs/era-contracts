@@ -65,6 +65,6 @@ contract AuthorizationTest is ExecutorTest {
         vm.prank(randomSigner);
 
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomSigner));
-        executor.executeBatches(storedBatchInfoArray);
+        executor.executeBatches(storedBatchInfoArray, Utils.generatePriorityOps(storedBatchInfoArray.length));
     }
 }

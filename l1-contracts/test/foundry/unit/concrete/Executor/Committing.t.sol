@@ -814,7 +814,7 @@ contract CommittingTest is ExecutorTest {
 
         IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].pubdataCommitments = pubdataCommitment;
+        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
         vm.prank(validator);
 

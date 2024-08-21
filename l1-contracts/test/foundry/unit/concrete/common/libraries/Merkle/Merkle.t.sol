@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 import {MerkleTreeNoSort} from "./MerkleTreeNoSort.sol";
+import {MerklePathEmpty, MerkleIndexOutOfBounds } from "contracts/common/L1ContractErrors.sol";
 
 contract MerkleTestTest is Test {
     MerkleTreeNoSort merkleTree;
@@ -60,7 +61,7 @@ contract MerkleTestTest is Test {
         bytes32 leaf = elements[0];
         bytes32[] memory proof;
 
-        vm.expectRevert(bytes("xc"));
+        vm.expectRevert(MerklePathEmpty.selector);
         merkleTest.calculateRoot(proof, 0, leaf);
     }
 
@@ -68,7 +69,7 @@ contract MerkleTestTest is Test {
         bytes32 leaf = elements[0];
         bytes32[] memory proof = merkleTree.getProof(elements, 0);
 
-        vm.expectRevert(bytes("px"));
+        vm.expectRevert(MerkleIndexOutOfBounds.selector);
         merkleTest.calculateRoot(proof, 2 ** 255, leaf);
     }
 
@@ -105,7 +106,7 @@ contract MerkleTestTest is Test {
         bytes32[] memory left;
         bytes32[] memory right;
 
-        vm.expectRevert(bytes("Merkle: empty paths"));
+        vm.expectRevert(MerklePathEmpty.selector);
         merkleTest.calculateRoot(left, right, 10, leaves);
     }
 

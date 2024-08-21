@@ -10,6 +10,8 @@ import {CalldataDA} from "./CalldataDA.sol";
 
 import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE, POINT_EVALUATION_PRECOMPILE_ADDR} from "./DAUtils.sol";
 
+import {PubdataCommitmentsEmpty, PubdataCommitmentsTooBig, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed } from "./DAContractsErrors.sol";
+
 uint256 constant BLOBS_SUPPORTED = 6;
 
 contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
@@ -73,10 +75,10 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         // This is mostly a sanity check and it is not strictly required.
         for (uint256 i = 0; i < _maxBlobsSupported; ++i) {
             if (
-                (_blobHashes[i] == bytes32(0) && blobCommitments[i] != bytes32(0)) ||
-                (_blobHashes[i] != bytes32(0) && blobCommitments[i] == bytes32(0))
+                (blobsLinearHashes[i] == bytes32(0) && blobCommitments[i] != bytes32(0)) ||
+                (blobsLinearHashes[i] != bytes32(0) && blobCommitments[i] == bytes32(0))
             ) {
-                revert BlobHashCommitmentError(i, _blobHashes[i] == bytes32(0), blobCommitments[i] == bytes32(0));
+                revert BlobHashCommitmentError(i, blobsLinearHashes[i] == bytes32(0), blobCommitments[i] == bytes32(0));
             }
         }
 
@@ -93,7 +95,7 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         bytes32 blobVersionedHash = _getBlobVersionedHash(_index);
 
         if (blobVersionedHash == bytes32(0)) {
-            revert EmptyBlobVersionHash(versionedHashIndex);
+            revert EmptyBlobVersionHash(_index);
         }
 
         // First 16 bytes is the opening point. While we get the point as 16 bytes, the point evaluation precompile

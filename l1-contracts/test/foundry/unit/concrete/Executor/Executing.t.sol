@@ -104,7 +104,7 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(NonSequentialBatch.selector);
-        executor.executeBatches(storedBatchInfoArray);
+        executor.executeBatches(storedBatchInfoArray, Utils.generatePriorityOps(storedBatchInfoArray.length));
     }
 
     function test_RevertWhen_ExecutingBlockWithWrongData() public {
@@ -122,7 +122,7 @@ contract ExecutingTest is ExecutorTest {
                 keccak256(abi.encode(wrongNewStoredBatchInfo))
             )
         );
-        executor.executeBatches(storedBatchInfoArray);
+        executor.executeBatches(storedBatchInfoArray, Utils.generatePriorityOps(storedBatchInfoArray.length));
     }
 
     function test_RevertWhen_ExecutingRevertedBlockWithoutCommittingAndProvingAgain() public {
@@ -134,7 +134,7 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(CantExecuteUnprovenBatches.selector);
-        executor.executeBatches(storedBatchInfoArray);
+        executor.executeBatches(storedBatchInfoArray, Utils.generatePriorityOps(storedBatchInfoArray.length));
     }
 
     function test_RevertWhen_ExecutingUnavailablePriorityOperationHash() public {
@@ -192,7 +192,7 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(QueueIsEmpty.selector);
-        executor.executeBatches(correctNewStoredBatchInfoArray);
+        executor.executeBatches(correctNewStoredBatchInfoArray, Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length));
     }
 
     function test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash() public {
@@ -270,7 +270,7 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(PriorityOperationsRollingHashMismatch.selector);
-        executor.executeBatches(correctNewStoredBatchInfoArray);
+        executor.executeBatches(correctNewStoredBatchInfoArray, Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length));
     }
 
     function test_RevertWhen_CommittingBlockWithWrongPreviousBatchHash() public {
