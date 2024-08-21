@@ -606,7 +606,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
                 s.zkPorterIsAvailable,
                 s.l2BootloaderBytecodeHash,
                 l2DefaultAccountBytecodeHash,
-                // VM 1.5.0 requires us to pass the EVM simulator code hash. For now it is the same as the default account.
                 l2EvmSimulatorBytecodeHash
             );
     }

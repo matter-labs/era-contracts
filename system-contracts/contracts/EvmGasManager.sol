@@ -20,7 +20,7 @@ contract EvmGasManager {
         uint256 originalValue;
     }
 
-    // We dont care about the size, since none of it will be stored/pub;ushed anywya
+    // We dont care about the size, since none of it will be stored/published anyway.
     struct EVMStackFrameInfo {
         bool isStatic;
         uint256 passGas;

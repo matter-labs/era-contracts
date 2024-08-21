@@ -52,7 +52,7 @@ object "EVMInterpreter" {
                 blobLen := add(blobLen, sub(32, mod(blobLen, 32)))
             }
 
-            // Not it is divisible by 32, but we must make sure that the number of 32 byte words is odd
+            // Now it is divisible by 32, but we must make sure that the number of 32 byte words is odd
             if iszero(eq(mod(blobLen, 64), 32)) {
                 blobLen := add(blobLen, 32)
             }
