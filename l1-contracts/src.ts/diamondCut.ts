@@ -35,7 +35,7 @@ export interface InitializeData {
   allowList: BigNumberish;
   l2BootloaderBytecodeHash: string;
   l2DefaultAccountBytecodeHash: string;
-  l2EvmSimulatorBytecodeHash: string,
+  l2EvmSimulatorBytecodeHash: string;
   priorityTxMaxGasLimit: BigNumberish;
 }
 

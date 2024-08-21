@@ -158,14 +158,14 @@ class ZkSyncDeployer {
     return await zkSync.getL2BootloaderBytecodeHash();
   }
 
-    // Returns the current default evm simulator bytecode on zkSync
+  // Returns the current default evm simulator bytecode on zkSync
   async currentEvmSimulatorBytecode(): Promise<string> {
     const zkSync = await this.deployer.zkWallet.getMainContract();
     return await zkSync.getL2EvmSimulatorBytecodeHash();
   }
 
-   // If needed, appends the evm simulator bytecode to the upgrade
-   async checkShouldUpgradeEvmSimulator(evmSimulatorBytecode: string) {
+  // If needed, appends the evm simulator bytecode to the upgrade
+  async checkShouldUpgradeEvmSimulator(evmSimulatorBytecode: string) {
     const bytecodeHash = ethers.utils.hexlify(hashBytecode(evmSimulatorBytecode));
     const currentEvmSimulatorBytecode = ethers.utils.hexlify(await this.currentEvmSimulatorBytecode());
 

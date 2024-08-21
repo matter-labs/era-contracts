@@ -72,9 +72,7 @@ export function readSystemContractsBytecode(fileName: string) {
 
 export function readEvmSimulatorbytecode() {
   const systemContractsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/system-contracts");
-  return fs.readFileSync(
-    `${systemContractsPath}/contracts-preprocessed/artifacts/EvmInterpreter.yul.zbin`
-  );
+  return fs.readFileSync(`${systemContractsPath}/contracts-preprocessed/artifacts/EvmInterpreter.yul.zbin`);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

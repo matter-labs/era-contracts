@@ -81,7 +81,7 @@ export class Deployer {
     L2_DEFAULT_ACCOUNT_BYTECODE_HASH = config.defaultAccountBytecodeHash
       ? config.defaultAccountBytecodeHash
       : hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
-    L2_EVM_SIMULATOR_BYTECODE_HASH = config.evmSimulatorBytecodeHash 
+    L2_EVM_SIMULATOR_BYTECODE_HASH = config.evmSimulatorBytecodeHash
       ? config.evmSimulatorBytecodeHash
       : hexlify(hashL2Bytecode(readEvmSimulatorbytecode()));
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;

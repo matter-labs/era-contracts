@@ -82,7 +82,12 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
         _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
-        _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash, _proposedUpgrade.evmSimulatorHash, isPatchOnly);
+        _setBaseSystemContracts(
+            _proposedUpgrade.bootloaderHash,
+            _proposedUpgrade.defaultAccountHash,
+            _proposedUpgrade.evmSimulatorHash,
+            isPatchOnly
+        );
 
         txHash = _setL2SystemContractUpgrade(
             _proposedUpgrade.l2ProtocolUpgradeTx,
@@ -208,7 +213,12 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
     /// @param _bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
     /// @param _defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
     /// @param _patchOnly Whether only the patch part of the protocol version semver has changed.
-    function _setBaseSystemContracts(bytes32 _bootloaderHash, bytes32 _defaultAccountHash, bytes32 _evmSimulatorHash, bool _patchOnly) internal {
+    function _setBaseSystemContracts(
+        bytes32 _bootloaderHash,
+        bytes32 _defaultAccountHash,
+        bytes32 _evmSimulatorHash,
+        bool _patchOnly
+    ) internal {
         _setL2BootloaderBytecodeHash(_bootloaderHash, _patchOnly);
         _setL2DefaultAccountBytecodeHash(_defaultAccountHash, _patchOnly);
         _setL2EvmSimulatorBytecodeHash(_evmSimulatorHash, _patchOnly);

@@ -502,7 +502,7 @@ describe.only("L2 upgrade test", function () {
     expect(upgradeEvents[3].args.newBytecodeHash).to.eq(bootloaderHash);
 
     expect(upgradeEvents[4].name).to.eq("NewL2DefaultAccountBytecodeHash");
-    
+
     expect(upgradeEvents[4].args.previousBytecodeHash).to.eq(L2_DEFAULT_ACCOUNT_BYTECODE_HASH);
     expect(upgradeEvents[4].args.newBytecodeHash).to.eq(defaultAccountHash);
   });

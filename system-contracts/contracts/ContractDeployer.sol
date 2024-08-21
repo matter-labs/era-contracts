@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+// solhint-disable reason-string, gas-custom-errors, func-named-parameters
+
+pragma solidity ^0.8.20;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
-import {CREATE2_EVM_PREFIX, CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, KECCAK256_SYSTEM_CONTRACT} from "./Constants.sol";
+import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT} from "./Constants.sol";
 
 import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue} from "./SystemContractErrors.sol";
-
-import {RLPEncoder} from "./libraries/RLPEncoder.sol";
 
 /**
  * @author Matter Labs
@@ -352,7 +352,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         // Unfortunately we can not provide revert reason as it would break EVM compatibility
         require(NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(_newAddress) == 0x0);
         require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getCodeHash(uint256(uint160(_newAddress))) == 0x0);
-        _performDeployOnAddressEVM(_newAddress, AccountAbstractionVersion.None, _initCode, false);
+        _performDeployOnAddressEVM(_newAddress, AccountAbstractionVersion.None, _initCode);
     }
 
     /// @notice Deploy a certain bytecode on the address.
@@ -410,8 +410,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     function _performDeployOnAddressEVM(
         address _newAddress,
         AccountAbstractionVersion _aaVersion,
-        bytes calldata _input,
-        bool _callConstructor
+        bytes calldata _input
     ) internal {
         AccountInfo memory newAccountInfo;
         newAccountInfo.supportedAAVersion = _aaVersion;
