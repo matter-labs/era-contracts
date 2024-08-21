@@ -164,6 +164,12 @@ function popStackCheck(sp, evmGasLeft, numInputs) {
     }
 }
 
+function pushStackCheck(sp, evmGasLeft, numInputs) {
+    if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_OFFSET())) {
+        revertWithGas(evmGasLeft)
+    }
+}
+
 function getCodeAddress() -> addr {
     addr := verbatim_0i_1o("code_source")
 }
@@ -1232,10 +1238,11 @@ function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGa
 
     offset := add(MEM_OFFSET_INNER(), offset)
 
-    sp := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeftOld)
-    sp := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeftOld)
-    sp := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeftOld)
-    sp := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeftOld)
+    pushStackCheck(sp, evmGasLeftOld, 4)
+    sp := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x80)))
+    sp := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x60)))
+    sp := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x40)))
+    sp := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x20)))
 
     // Selector
     mstore(sub(offset, 0x80), 0x5b16a23c)
@@ -1279,7 +1286,7 @@ function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGa
 
     let back
 
-    popStackCheck(sp, evmGasLeft, 4)
+    // skipping check since we pushed exactly 4 items earlier
     back, sp := popStackItemWithoutCheck(sp)
     mstore(sub(offset, 0x20), back)
     back, sp := popStackItemWithoutCheck(sp)
