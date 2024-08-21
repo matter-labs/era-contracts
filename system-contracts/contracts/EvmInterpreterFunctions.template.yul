@@ -594,29 +594,34 @@ function getNewAddress(addr) -> newAddr {
     if iszero(nonce) {
         nonceEncoded := 128
     }
-    // The nonce has 4 bytes
-    if gt(nonce, 0xFFFFFF) {
-        nonceEncoded := shl(32, 0x84)
+    switch gt(nonce, 0xFFFF)
+    case 1 {
+        switch gt(nonce, 0xFFFFFF)
+        case 1 {
+            // The nonce has 4 bytes
+            nonceEncoded := shl(32, 0x84)
+            nonceEncodedLength := 5
+        }
+        default {
+            // The nonce has 3 bytes
+            nonceEncoded := shl(24, 0x83)
+            nonceEncodedLength := 4
+        }
         nonceEncoded := add(nonceEncoded, nonce)
-        nonceEncodedLength := 5
     }
-    // The nonce has 3 bytes
-    if and(gt(nonce, 0xFFFF), lt(nonce, 0x1000000)) {
-        nonceEncoded := shl(24, 0x83)
-        nonceEncoded := add(nonceEncoded, nonce)
-        nonceEncodedLength := 4
-    }
-    // The nonce has 2 bytes
-    if and(gt(nonce, 0xFF), lt(nonce, 0x10000)) {
-        nonceEncoded := shl(16, 0x82)
-        nonceEncoded := add(nonceEncoded, nonce)
-        nonceEncodedLength := 3
-    }
-    // The nonce has 1 byte and it's in [0x80, 0xFF]
-    if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
-        nonceEncoded := shl(8, 0x81)
-        nonceEncoded := add(nonceEncoded, nonce)
-        nonceEncodedLength := 2
+    default {
+        // The nonce has 2 bytes
+        if gt(nonce, 0xFF) {
+            nonceEncoded := shl(16, 0x82)
+            nonceEncoded := add(nonceEncoded, nonce)
+            nonceEncodedLength := 3
+        }
+        // The nonce has 1 byte and it's in [0x80, 0xFF]
+        if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
+            nonceEncoded := shl(8, 0x81)
+            nonceEncoded := add(nonceEncoded, nonce)
+            nonceEncodedLength := 2
+        }
     }
 
     listLength := add(21, nonceEncodedLength)
