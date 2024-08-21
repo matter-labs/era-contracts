@@ -210,7 +210,7 @@ library Utils {
     }
 
     function getGettersSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](29);
+        bytes4[] memory selectors = new bytes4[](30);
         selectors[0] = GettersFacet.getVerifier.selector;
         selectors[1] = GettersFacet.getAdmin.selector;
         selectors[2] = GettersFacet.getPendingAdmin.selector;
@@ -258,7 +258,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](41);
+        bytes4[] memory selectors = new bytes4[](43);
         selectors[0] = UtilsFacet.util_setChainId.selector;
         selectors[1] = UtilsFacet.util_getChainId.selector;
         selectors[2] = UtilsFacet.util_setBridgehub.selector;
