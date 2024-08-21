@@ -10,7 +10,6 @@ import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import * as hre from "hardhat";
 import { L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS } from "../../l1-contracts/src.ts/utils";
 
-// export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2AssetRouter").abi;
 export const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
 
 async function main() {
@@ -27,7 +26,6 @@ async function main() {
     .option("--erc20-bridge <erc20-bridge>")
     .option("--skip-initialize-chain-governance <skip-initialize-chain-governance>")
     .action(async (cmd) => {
-      // const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(
