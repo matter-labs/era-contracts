@@ -91,7 +91,14 @@ contract EvmGasManager {
     }
 
     function isSlotWarm(uint256 _slot) external view returns (bool) {
-        return tloadWarmSlot(msg.sender, _slot).warm;
+        SlotInfo storage ptr = warmSlots[msg.sender][_slot];
+        bool isWarm;
+
+        assembly {
+            isWarm := tload(ptr.slot)
+        }
+
+        return isWarm;
     }
 
     function warmSlot(uint256 _slot, uint256 _currentValue) external payable onlySystemEvm returns (bool, uint256) {
