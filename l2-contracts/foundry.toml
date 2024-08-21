@@ -1,13 +1,14 @@
 [profile.default]
 src = "contracts"
 out = "out"
-libs = ["lib"]
+libs = ["node_modules", "../lib"]
+test = "test/foundry"
+solc_version = "0.8.20"
 cache_path = "cache-forge"
 evm_version = "paris"
+ignored_error_codes = ["missing-receive-ether", "code-size"]
+ignored_warnings_from = ["test", "contracts/dev-contracts"]
 remappings = [
-    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
-    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+    "forge-std/=../lib/forge-std/src/",
+    "foundry-test/=test/foundry/",
 ]
-
-[profile.default.zksync]
-zksolc = "1.5.0"
