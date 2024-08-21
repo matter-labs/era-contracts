@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+// solhint-disable reason-string, gas-custom-errors
+
 pragma solidity 0.8.20;
 
 import {INonceHolder} from "./interfaces/INonceHolder.sol";

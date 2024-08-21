@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: MIT
+
+// solhint-disable reason-string, gas-custom-errors
+
 pragma solidity ^0.8.0;
 
 import {ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./Constants.sol";

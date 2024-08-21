@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: MIT
+
+// solhint-disable func-named-parameters
+
 // We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 

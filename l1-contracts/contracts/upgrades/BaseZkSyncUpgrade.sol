@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 
+// solhint-disable reason-string, gas-custom-errors
+
 pragma solidity 0.8.24;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
