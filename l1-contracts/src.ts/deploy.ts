@@ -125,7 +125,7 @@ export class Deployer {
       : hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
     this.chainId = parseInt(process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID!);
-    this.l1ChainId = parseInt(config.l1ChainId) || getL1ChainId();
+    this.l1ChainId = parseInt(config.l1ChainId) || this.getL1ChainId();
     this.deployedLogPrefix = config.deployedLogPrefix ?? "CONTRACTS";
   }
 

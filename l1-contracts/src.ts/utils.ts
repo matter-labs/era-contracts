@@ -105,9 +105,6 @@ export function computeL2Create2Address(
 }
 
 export function encodeNTVAssetId(chainId: number, tokenAddress: BytesLike) {
-  console.log("chainId", chainId);
-  console.log("L2_NATIVE_TOKEN_VAULT_ADDRESS", L2_NATIVE_TOKEN_VAULT_ADDRESS);
-  console.log("tokenAddress", tokenAddress);
   return ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
       ["uint256", "address", "bytes32"],
