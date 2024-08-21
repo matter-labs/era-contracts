@@ -122,6 +122,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         _;
     }
 
+    /// @notice Checks that the message sender is either the owner or admin.
     modifier onlyOwnerOrAdmin() {
         require(msg.sender == owner() || msg.sender == admin, "ShB not owner or admin");
         _;
