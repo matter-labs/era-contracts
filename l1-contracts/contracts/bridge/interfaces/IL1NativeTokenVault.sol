@@ -25,4 +25,7 @@ interface IL1NativeTokenVault is IL1AssetHandler, IL1BaseTokenAssetHandler {
 
     /// @notice Used the get token balance for specific ZK chain in shared bridge
     function chainBalance(uint256 _chainId, address _l1Token) external view returns (uint256);
+
+    /// @dev Shows the assetId for a given chain and token address
+    function getAssetId(uint256 _chainId, address _l1Token) external pure returns (bytes32);
 }
