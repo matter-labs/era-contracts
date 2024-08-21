@@ -232,10 +232,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             // to a chain's message root only if the chain has indeed executed its batch on top of it.
             //
             // We trust all chains whitelisted by the Bridgehub governance.
-            require(
-                IBridgehub(s.bridgehub).whitelistedSettlementLayers(settlementLayerChainId),
-                "Mailbox: wrong STM"
-            );
+            require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(settlementLayerChainId), "Mailbox: wrong STM");
 
             settlementLayerAddress = IBridgehub(s.bridgehub).getHyperchain(settlementLayerChainId);
         }
