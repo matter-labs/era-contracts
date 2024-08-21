@@ -231,11 +231,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             // Assuming that `settlementLayerChainId` is an honest chain, the `chainIdLeaf` should belong
             // to a chain's message root only if the chain has indeed executed its batch on top of it.
             //
-            // We trust all chains from the same STM.
-            // Note that the logic below will stop working in case the STM of the `settlementLayerChainId` is
-            // changed, so it is the responsibility of the STM to ensure that gateways never leave.
+            // We trust all chains whitelisted by the Bridgehub governance.
             require(
-                IBridgehub(s.bridgehub).stateTransitionManager(settlementLayerChainId) == s.stateTransitionManager,
+                IBridgehub(s.bridgehub).whitelistedSettlementLayers(settlementLayerChainId),
                 "Mailbox: wrong STM"
             );
 

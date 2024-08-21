@@ -243,7 +243,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function registerSettlementLayer(
         uint256 _newSettlementLayerChainId,
         bool _isWhitelisted
-    ) external onlyChainSTM(_newSettlementLayerChainId) onlyL1 {
+    ) external onlyOwner onlyL1 {
         whitelistedSettlementLayers[_newSettlementLayerChainId] = _isWhitelisted;
         emit SettlementLayerRegistered(_newSettlementLayerChainId, _isWhitelisted);
     }
