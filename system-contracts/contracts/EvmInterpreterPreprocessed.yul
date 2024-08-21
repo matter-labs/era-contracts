@@ -662,32 +662,35 @@ object "EVMInterpreter" {
         
             nonceEncoded := nonce
             nonceEncodedLength := 1
-            if iszero(nonce) {
+            switch nonce 
+            case 0 {
                 nonceEncoded := 128
             }
-            // The nonce has 4 bytes
-            if gt(nonce, 0xFFFFFF) {
-                nonceEncoded := shl(32, 0x84)
-                nonceEncoded := add(nonceEncoded, nonce)
-                nonceEncodedLength := 5
-            }
-            // The nonce has 3 bytes
-            if and(gt(nonce, 0xFFFF), lt(nonce, 0x1000000)) {
-                nonceEncoded := shl(24, 0x83)
-                nonceEncoded := add(nonceEncoded, nonce)
-                nonceEncodedLength := 4
-            }
-            // The nonce has 2 bytes
-            if and(gt(nonce, 0xFF), lt(nonce, 0x10000)) {
-                nonceEncoded := shl(16, 0x82)
-                nonceEncoded := add(nonceEncoded, nonce)
-                nonceEncodedLength := 3
-            }
-            // The nonce has 1 byte and it's in [0x80, 0xFF]
-            if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
-                nonceEncoded := shl(8, 0x81)
-                nonceEncoded := add(nonceEncoded, nonce)
-                nonceEncodedLength := 2
+            default {
+                // The nonce has 4 bytes
+                if gt(nonce, 0xFFFFFF) {
+                    nonceEncoded := shl(32, 0x84)
+                    nonceEncoded := add(nonceEncoded, nonce)
+                    nonceEncodedLength := 5
+                }
+                // The nonce has 3 bytes
+                if and(gt(nonce, 0xFFFF), lt(nonce, 0x1000000)) {
+                    nonceEncoded := shl(24, 0x83)
+                    nonceEncoded := add(nonceEncoded, nonce)
+                    nonceEncodedLength := 4
+                }
+                // The nonce has 2 bytes
+                if and(gt(nonce, 0xFF), lt(nonce, 0x10000)) {
+                    nonceEncoded := shl(16, 0x82)
+                    nonceEncoded := add(nonceEncoded, nonce)
+                    nonceEncodedLength := 3
+                }
+                // The nonce has 1 byte and it's in [0x80, 0xFF]
+                if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
+                    nonceEncoded := shl(8, 0x81)
+                    nonceEncoded := add(nonceEncoded, nonce)
+                    nonceEncodedLength := 2
+                }
             }
         
             listLength := add(21, nonceEncodedLength)
@@ -953,18 +956,9 @@ object "EVMInterpreter" {
         
             let frameGasLeft
             let success
-            if _isEVM(addr) {
-                _pushEVMFrame(gasToPass, true)
-                // TODO Check the following comment from zkSync .sol.
-                // We can not just pass all gas here to prevert overflow of zkEVM gas counter
-                success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
-        
-                frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
-                _popEVMFrame()
-            }
-        
-            // zkEVM native
-            if iszero(_isEVM(addr)) {
+            switch _isEVM(addr)
+            case 0 {
+                // zkEVM native
                 gasToPass := _getZkEVMGas(gasToPass, addr)
                 let zkevmGasBefore := gas()
                 success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, add(MEM_OFFSET_INNER(), retOffset), retSize)
@@ -976,6 +970,15 @@ object "EVMInterpreter" {
                 if gt(gasToPass, gasUsed) {
                     frameGasLeft := sub(gasToPass, gasUsed)
                 }
+            }
+            default {
+                _pushEVMFrame(gasToPass, true)
+                // TODO Check the following comment from zkSync .sol.
+                // We can not just pass all gas here to prevert overflow of zkEVM gas counter
+                success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
+        
+                frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
+                _popEVMFrame()
             }
         
             let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
@@ -1011,7 +1014,31 @@ object "EVMInterpreter" {
         function _performCall(addr,gasToPass,value,argsOffset,argsSize,retOffset,retSize,isStatic) -> success, frameGasLeft, gasToPassNew{
             gasToPassNew := gasToPass
             let is_evm := _isEVM(addr)
-            if isStatic {
+        
+            switch isStatic
+            case 0 {
+                switch is_evm
+                case 0 {
+                    // zkEVM native
+                    gasToPassNew := _getZkEVMGas(gasToPassNew, addr)
+                    let zkevmGasBefore := gas()
+                    success := call(gasToPassNew, addr, value, argsOffset, argsSize, retOffset, retSize)
+                    _saveReturndataAfterZkEVMCall()
+                    let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
+            
+                    frameGasLeft := 0
+                    if gt(gasToPassNew, gasUsed) {
+                        frameGasLeft := sub(gasToPassNew, gasUsed)
+                    }
+                }
+                default {
+                    _pushEVMFrame(gasToPassNew, isStatic)
+                    success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
+                    frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+                    _popEVMFrame()
+                }
+            }
+            default {
                 if value {
                     revertWithGas(gasToPassNew)
                 }
@@ -1024,27 +1051,6 @@ object "EVMInterpreter" {
                     retOffset,
                     retSize
                 )
-            }
-        
-            if and(is_evm, iszero(isStatic)) {
-                _pushEVMFrame(gasToPassNew, isStatic)
-                success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
-                frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-                _popEVMFrame()
-            }
-        
-            // zkEVM native
-            if and(iszero(is_evm), iszero(isStatic)) {
-                gasToPassNew := _getZkEVMGas(gasToPassNew, addr)
-                let zkevmGasBefore := gas()
-                success := call(gasToPassNew, addr, value, argsOffset, argsSize, retOffset, retSize)
-                _saveReturndataAfterZkEVMCall()
-                let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
-        
-                frameGasLeft := 0
-                if gt(gasToPassNew, gasUsed) {
-                    frameGasLeft := sub(gasToPassNew, gasUsed)
-                }
             }
         }
         
@@ -1231,18 +1237,9 @@ object "EVMInterpreter" {
             _outputOffset,
             _outputLen
         ) ->  success, _gasLeft {
-            if _calleeIsEVM {
-                _pushEVMFrame(_calleeGas, true)
-                // TODO Check the following comment from zkSync .sol.
-                // We can not just pass all gas here to prevert overflow of zkEVM gas counter
-                success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
-        
-                _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
-                _popEVMFrame()
-            }
-        
-            // zkEVM native
-            if iszero(_calleeIsEVM) {
+            switch _calleeIsEVM
+            case 0 {
+                // zkEVM native
                 _calleeGas := _getZkEVMGas(_calleeGas, _callee)
                 let zkevmGasBefore := gas()
                 success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen)
@@ -1255,6 +1252,15 @@ object "EVMInterpreter" {
                 if gt(_calleeGas, gasUsed) {
                     _gasLeft := sub(_calleeGas, gasUsed)
                 }
+            }
+            default {
+                _pushEVMFrame(_calleeGas, true)
+                // TODO Check the following comment from zkSync .sol.
+                // We can not just pass all gas here to prevert overflow of zkEVM gas counter
+                success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
+        
+                _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
+                _popEVMFrame()
             }
         }
         
@@ -3631,32 +3637,35 @@ object "EVMInterpreter" {
             
                 nonceEncoded := nonce
                 nonceEncodedLength := 1
-                if iszero(nonce) {
+                switch nonce 
+                case 0 {
                     nonceEncoded := 128
                 }
-                // The nonce has 4 bytes
-                if gt(nonce, 0xFFFFFF) {
-                    nonceEncoded := shl(32, 0x84)
-                    nonceEncoded := add(nonceEncoded, nonce)
-                    nonceEncodedLength := 5
-                }
-                // The nonce has 3 bytes
-                if and(gt(nonce, 0xFFFF), lt(nonce, 0x1000000)) {
-                    nonceEncoded := shl(24, 0x83)
-                    nonceEncoded := add(nonceEncoded, nonce)
-                    nonceEncodedLength := 4
-                }
-                // The nonce has 2 bytes
-                if and(gt(nonce, 0xFF), lt(nonce, 0x10000)) {
-                    nonceEncoded := shl(16, 0x82)
-                    nonceEncoded := add(nonceEncoded, nonce)
-                    nonceEncodedLength := 3
-                }
-                // The nonce has 1 byte and it's in [0x80, 0xFF]
-                if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
-                    nonceEncoded := shl(8, 0x81)
-                    nonceEncoded := add(nonceEncoded, nonce)
-                    nonceEncodedLength := 2
+                default {
+                    // The nonce has 4 bytes
+                    if gt(nonce, 0xFFFFFF) {
+                        nonceEncoded := shl(32, 0x84)
+                        nonceEncoded := add(nonceEncoded, nonce)
+                        nonceEncodedLength := 5
+                    }
+                    // The nonce has 3 bytes
+                    if and(gt(nonce, 0xFFFF), lt(nonce, 0x1000000)) {
+                        nonceEncoded := shl(24, 0x83)
+                        nonceEncoded := add(nonceEncoded, nonce)
+                        nonceEncodedLength := 4
+                    }
+                    // The nonce has 2 bytes
+                    if and(gt(nonce, 0xFF), lt(nonce, 0x10000)) {
+                        nonceEncoded := shl(16, 0x82)
+                        nonceEncoded := add(nonceEncoded, nonce)
+                        nonceEncodedLength := 3
+                    }
+                    // The nonce has 1 byte and it's in [0x80, 0xFF]
+                    if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
+                        nonceEncoded := shl(8, 0x81)
+                        nonceEncoded := add(nonceEncoded, nonce)
+                        nonceEncodedLength := 2
+                    }
                 }
             
                 listLength := add(21, nonceEncodedLength)
@@ -3922,18 +3931,9 @@ object "EVMInterpreter" {
             
                 let frameGasLeft
                 let success
-                if _isEVM(addr) {
-                    _pushEVMFrame(gasToPass, true)
-                    // TODO Check the following comment from zkSync .sol.
-                    // We can not just pass all gas here to prevert overflow of zkEVM gas counter
-                    success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
-            
-                    frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
-                    _popEVMFrame()
-                }
-            
-                // zkEVM native
-                if iszero(_isEVM(addr)) {
+                switch _isEVM(addr)
+                case 0 {
+                    // zkEVM native
                     gasToPass := _getZkEVMGas(gasToPass, addr)
                     let zkevmGasBefore := gas()
                     success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, add(MEM_OFFSET_INNER(), retOffset), retSize)
@@ -3945,6 +3945,15 @@ object "EVMInterpreter" {
                     if gt(gasToPass, gasUsed) {
                         frameGasLeft := sub(gasToPass, gasUsed)
                     }
+                }
+                default {
+                    _pushEVMFrame(gasToPass, true)
+                    // TODO Check the following comment from zkSync .sol.
+                    // We can not just pass all gas here to prevert overflow of zkEVM gas counter
+                    success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
+            
+                    frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
+                    _popEVMFrame()
                 }
             
                 let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
@@ -3980,7 +3989,31 @@ object "EVMInterpreter" {
             function _performCall(addr,gasToPass,value,argsOffset,argsSize,retOffset,retSize,isStatic) -> success, frameGasLeft, gasToPassNew{
                 gasToPassNew := gasToPass
                 let is_evm := _isEVM(addr)
-                if isStatic {
+            
+                switch isStatic
+                case 0 {
+                    switch is_evm
+                    case 0 {
+                        // zkEVM native
+                        gasToPassNew := _getZkEVMGas(gasToPassNew, addr)
+                        let zkevmGasBefore := gas()
+                        success := call(gasToPassNew, addr, value, argsOffset, argsSize, retOffset, retSize)
+                        _saveReturndataAfterZkEVMCall()
+                        let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
+                
+                        frameGasLeft := 0
+                        if gt(gasToPassNew, gasUsed) {
+                            frameGasLeft := sub(gasToPassNew, gasUsed)
+                        }
+                    }
+                    default {
+                        _pushEVMFrame(gasToPassNew, isStatic)
+                        success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
+                        frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+                        _popEVMFrame()
+                    }
+                }
+                default {
                     if value {
                         revertWithGas(gasToPassNew)
                     }
@@ -3993,27 +4026,6 @@ object "EVMInterpreter" {
                         retOffset,
                         retSize
                     )
-                }
-            
-                if and(is_evm, iszero(isStatic)) {
-                    _pushEVMFrame(gasToPassNew, isStatic)
-                    success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
-                    frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-                    _popEVMFrame()
-                }
-            
-                // zkEVM native
-                if and(iszero(is_evm), iszero(isStatic)) {
-                    gasToPassNew := _getZkEVMGas(gasToPassNew, addr)
-                    let zkevmGasBefore := gas()
-                    success := call(gasToPassNew, addr, value, argsOffset, argsSize, retOffset, retSize)
-                    _saveReturndataAfterZkEVMCall()
-                    let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
-            
-                    frameGasLeft := 0
-                    if gt(gasToPassNew, gasUsed) {
-                        frameGasLeft := sub(gasToPassNew, gasUsed)
-                    }
                 }
             }
             
@@ -4200,18 +4212,9 @@ object "EVMInterpreter" {
                 _outputOffset,
                 _outputLen
             ) ->  success, _gasLeft {
-                if _calleeIsEVM {
-                    _pushEVMFrame(_calleeGas, true)
-                    // TODO Check the following comment from zkSync .sol.
-                    // We can not just pass all gas here to prevert overflow of zkEVM gas counter
-                    success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
-            
-                    _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
-                    _popEVMFrame()
-                }
-            
-                // zkEVM native
-                if iszero(_calleeIsEVM) {
+                switch _calleeIsEVM
+                case 0 {
+                    // zkEVM native
                     _calleeGas := _getZkEVMGas(_calleeGas, _callee)
                     let zkevmGasBefore := gas()
                     success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen)
@@ -4224,6 +4227,15 @@ object "EVMInterpreter" {
                     if gt(_calleeGas, gasUsed) {
                         _gasLeft := sub(_calleeGas, gasUsed)
                     }
+                }
+                default {
+                    _pushEVMFrame(_calleeGas, true)
+                    // TODO Check the following comment from zkSync .sol.
+                    // We can not just pass all gas here to prevert overflow of zkEVM gas counter
+                    success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
+            
+                    _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
+                    _popEVMFrame()
                 }
             }
             

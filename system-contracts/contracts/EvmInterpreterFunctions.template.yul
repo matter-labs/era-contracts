@@ -882,18 +882,9 @@ function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
 
     let frameGasLeft
     let success
-    if _isEVM(addr) {
-        _pushEVMFrame(gasToPass, true)
-        // TODO Check the following comment from zkSync .sol.
-        // We can not just pass all gas here to prevert overflow of zkEVM gas counter
-        success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
-
-        frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
-        _popEVMFrame()
-    }
-
-    // zkEVM native
-    if iszero(_isEVM(addr)) {
+    switch _isEVM(addr)
+    case 0 {
+        // zkEVM native
         gasToPass := _getZkEVMGas(gasToPass, addr)
         let zkevmGasBefore := gas()
         success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, add(MEM_OFFSET_INNER(), retOffset), retSize)
@@ -905,6 +896,15 @@ function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
         if gt(gasToPass, gasUsed) {
             frameGasLeft := sub(gasToPass, gasUsed)
         }
+    }
+    default {
+        _pushEVMFrame(gasToPass, true)
+        // TODO Check the following comment from zkSync .sol.
+        // We can not just pass all gas here to prevert overflow of zkEVM gas counter
+        success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
+
+        frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
+        _popEVMFrame()
     }
 
     let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
@@ -940,7 +940,31 @@ function getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize) -> maxExpa
 function _performCall(addr,gasToPass,value,argsOffset,argsSize,retOffset,retSize,isStatic) -> success, frameGasLeft, gasToPassNew{
     gasToPassNew := gasToPass
     let is_evm := _isEVM(addr)
-    if isStatic {
+
+    switch isStatic
+    case 0 {
+        switch is_evm
+        case 0 {
+            // zkEVM native
+            gasToPassNew := _getZkEVMGas(gasToPassNew, addr)
+            let zkevmGasBefore := gas()
+            success := call(gasToPassNew, addr, value, argsOffset, argsSize, retOffset, retSize)
+            _saveReturndataAfterZkEVMCall()
+            let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
+    
+            frameGasLeft := 0
+            if gt(gasToPassNew, gasUsed) {
+                frameGasLeft := sub(gasToPassNew, gasUsed)
+            }
+        }
+        default {
+            _pushEVMFrame(gasToPassNew, isStatic)
+            success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
+            frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+            _popEVMFrame()
+        }
+    }
+    default {
         if value {
             revertWithGas(gasToPassNew)
         }
@@ -953,27 +977,6 @@ function _performCall(addr,gasToPass,value,argsOffset,argsSize,retOffset,retSize
             retOffset,
             retSize
         )
-    }
-
-    if and(is_evm, iszero(isStatic)) {
-        _pushEVMFrame(gasToPassNew, isStatic)
-        success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
-        frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-        _popEVMFrame()
-    }
-
-    // zkEVM native
-    if and(iszero(is_evm), iszero(isStatic)) {
-        gasToPassNew := _getZkEVMGas(gasToPassNew, addr)
-        let zkevmGasBefore := gas()
-        success := call(gasToPassNew, addr, value, argsOffset, argsSize, retOffset, retSize)
-        _saveReturndataAfterZkEVMCall()
-        let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
-
-        frameGasLeft := 0
-        if gt(gasToPassNew, gasUsed) {
-            frameGasLeft := sub(gasToPassNew, gasUsed)
-        }
     }
 }
 
@@ -1160,18 +1163,9 @@ function _performStaticCall(
     _outputOffset,
     _outputLen
 ) ->  success, _gasLeft {
-    if _calleeIsEVM {
-        _pushEVMFrame(_calleeGas, true)
-        // TODO Check the following comment from zkSync .sol.
-        // We can not just pass all gas here to prevert overflow of zkEVM gas counter
-        success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
-
-        _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
-        _popEVMFrame()
-    }
-
-    // zkEVM native
-    if iszero(_calleeIsEVM) {
+    switch _calleeIsEVM
+    case 0 {
+        // zkEVM native
         _calleeGas := _getZkEVMGas(_calleeGas, _callee)
         let zkevmGasBefore := gas()
         success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen)
@@ -1184,6 +1178,15 @@ function _performStaticCall(
         if gt(_calleeGas, gasUsed) {
             _gasLeft := sub(_calleeGas, gasUsed)
         }
+    }
+    default {
+        _pushEVMFrame(_calleeGas, true)
+        // TODO Check the following comment from zkSync .sol.
+        // We can not just pass all gas here to prevert overflow of zkEVM gas counter
+        success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
+
+        _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
+        _popEVMFrame()
     }
 }
 
