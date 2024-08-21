@@ -11,7 +11,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
-import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
+import {IL1BaseTokenAssetHandler} from "../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
@@ -336,15 +336,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                              Getters
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Asset Handlers' token address function, which takes assetId as input and return the token address
-    function tokenAddress(bytes32 _baseTokenAssetId) public view returns (address) {
-        return baseToken(_baseTokenAssetId);
-    }
-
     /// @notice baseToken function, which takes assetId as input, reads assetHandler from AR, and tokenAddress from AH
-    function baseToken(bytes32 _baseTokenAssetId) public view returns (address) {
-        IL1AssetHandler assetHandlerAddress = IL1AssetHandler(sharedBridge.assetHandlerAddress(_baseTokenAssetId));
-        return assetHandlerAddress.tokenAddress(_baseTokenAssetId);
+    function baseToken(uint256 _chainId) public view returns (address) {
+        bytes32 baseTokenAssetId = baseTokenAssetId[_chainId];
+        IL1BaseTokenAssetHandler assetHandlerAddress = IL1BaseTokenAssetHandler(
+            sharedBridge.assetHandlerAddress(baseTokenAssetId)
+        );
+        return assetHandlerAddress.tokenAddress(baseTokenAssetId);
     }
 
     /// @notice Returns all the registered hyperchain addresses
