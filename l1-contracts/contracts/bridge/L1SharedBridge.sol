@@ -153,7 +153,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @inheritdoc IL1SharedBridge
     /// @dev Please note, if the owner wants to enforce the admin change it must execute both `setPendingAdmin` and
     /// `acceptAdmin` atomically. Otherwise `admin` can set different pending admin and so fail to accept the admin rights.
-    function setPendingAdmin(address _newPendingAdmin) external onlyOwnerOrAdmin  {
+    function setPendingAdmin(address _newPendingAdmin) external onlyOwnerOrAdmin {
         // Save previous value into the stack to put it into the event later
         address oldPendingAdmin = pendingAdmin;
         // Change pending admin
