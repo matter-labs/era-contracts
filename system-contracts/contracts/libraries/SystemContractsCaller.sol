@@ -37,10 +37,6 @@ address constant PTR_PACK_INTO_ACTIVE_CALL_ADDRESS = address((1 << 16) - 25);
 address constant MULTIPLICATION_HIGH_ADDRESS = address((1 << 16) - 26);
 address constant GET_EXTRA_ABI_DATA_ADDRESS = address((1 << 16) - 27);
 
-address constant PTR_DATA_LOAD = address((1 << 16) - 28);
-address constant PTR_DATA_COPY = address((1 << 16) - 29);
-address constant PTR_DATA_SIZE = address((1 << 16) - 30);
-
 // All the offsets are in bits
 uint256 constant META_PUBDATA_PUBLISHED_OFFSET = 0 * 8;
 uint256 constant META_HEAP_SIZE_OFFSET = 8 * 8;
