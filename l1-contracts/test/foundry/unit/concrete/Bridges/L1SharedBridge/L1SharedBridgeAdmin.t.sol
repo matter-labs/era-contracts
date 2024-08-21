@@ -6,7 +6,7 @@ import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
 /// We are testing all the specified revert and require cases.
 contract L1SharedBridgeAdminTest is L1SharedBridgeTest {
     uint256 internal randomChainId = 123456;
-    
+
     function testAdminCanInitializeChainGovernance() public {
         address randomL2Bridge = makeAddr("randomL2Bridge");
 
