@@ -11,7 +11,8 @@ import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER, L2_NATIVE_TOKEN_VAULT, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
-import {ZeroAddress, EmptyBytes32, Unauthorized, AddressMismatch, AmountMustBeGreaterThanZero, DeployFailed} from "../errors/L2ContractErrors.sol";
+import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
+import {InvalidCaller, ZeroAddress, EmptyBytes32, Unauthorized, AddressMismatch, AmountMustBeGreaterThanZero, DeployFailed} from "../errors/L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

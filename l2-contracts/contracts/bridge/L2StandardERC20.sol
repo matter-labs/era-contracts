@@ -40,7 +40,7 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     address public override l1Address;
     
     modifier onlyNTV() {
-        if (msg.sender != L2_NATIVE_TOKEN_VAULT) {
+        if (msg.sender != address(L2_NATIVE_TOKEN_VAULT)) {
             revert Unauthorized(msg.sender);
         }
         _;

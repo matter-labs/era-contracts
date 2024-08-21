@@ -31,7 +31,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2S
 
     modifier onlyBridge() {
         if (msg.sender != l2Bridge) {
-            revert Unauthorized();
+            revert Unauthorized(msg.sender);
         }
         _;
     }
