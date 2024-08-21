@@ -350,7 +350,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
     function _evmDeployOnAddress(address _newAddress, bytes calldata _initCode) internal {
         // Unfortunately we can not provide revert reason as it would break EVM compatibility
-        // TODO: maybe it is redundant
+        require(NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(_newAddress) == 0x0);
         require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getCodeHash(uint256(uint160(_newAddress))) == 0x0);
         _performDeployOnAddressEVM(_newAddress, AccountAbstractionVersion.None, _initCode, false);
     }
