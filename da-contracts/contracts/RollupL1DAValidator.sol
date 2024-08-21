@@ -129,7 +129,9 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         // 144 bytes for commitment data
         // 32 bytes for the prepublished commitment. If it is non-zero, it means that it is expected that
         // such commitment was published before. Otherwise, it is expected that it is published in this transaction
-        require(_operatorDAInput.length == _blobsProvided * BLOB_DA_INPUT_SIZE, "bd");
+        if (_operatorDAInput.length != _blobsProvided * BLOB_DA_INPUT_SIZE) {
+            revert InvalidPubdataCommitmentsSize();
+        }
 
         uint256 versionedHashIndex = 0;
 

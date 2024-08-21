@@ -577,7 +577,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) external payable onlyL1 returns (bytes32 canonicalTxHash) {
-        require(s.chainId == ERA_CHAIN_ID, "Mailbox: legacy interface only available for Era");
+        if (s.chainId != ERA_CHAIN_ID) {
+            revert OnlyEraSupported();
+        }
         canonicalTxHash = _requestL2TransactionSender(
             BridgehubL2TransactionRequest({
                 sender: msg.sender,

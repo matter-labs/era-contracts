@@ -193,10 +193,14 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
                 }
                 logOutput.numberOfLayer1Txs = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)) {
-                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "vk");
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
                 require(s.l2DAValidator == address(uint160(uint256(logValue))), "lo");
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
-                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lp2");
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
                 logOutput.l2DAValidatorOutputHash = logValue;
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
                 if (logSender != L2_BOOTLOADER_ADDRESS) {
@@ -674,8 +678,8 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     ) internal pure returns (bytes32[] memory blobAuxOutputWords) {
         // These invariants should be checked by the caller of this function, but we double check
         // just in case.
-        if (_blobCommitments.length != MAX_NUMBER_OF_BLOBS || _blobHashes.length != MAX_NUMBER_OF_BLOBS) {
-            revert InvalidNumberOfBlobs(MAX_NUMBER_OF_BLOBS, _blobCommitments.length, _blobHashes.length);
+        if (_blobCommitments.length != TOTAL_BLOBS_IN_COMMITMENT || _blobHashes.length != TOTAL_BLOBS_IN_COMMITMENT) {
+            revert InvalidNumberOfBlobs(TOTAL_BLOBS_IN_COMMITMENT, _blobCommitments.length, _blobHashes.length);
         }
 
         // for each blob we have:
@@ -688,7 +692,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         blobAuxOutputWords = new bytes32[](2 * TOTAL_BLOBS_IN_COMMITMENT);
 
-        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; ++i) {
+        for (uint256 i = 0; i < TOTAL_BLOBS_IN_COMMITMENT; ++i) {
             blobAuxOutputWords[i * 2] = _blobHashes[i];
             blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
         }

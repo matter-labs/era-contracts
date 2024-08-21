@@ -365,15 +365,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         {
             // check input
             bytes32 cutHashInput = keccak256(_diamondCut);
-            require(cutHashInput == initialCutHash, "STM: initial cutHash mismatch");
+            if (cutHashInput != initialCutHash) {
+                revert HashMismatch(initialCutHash, cutHashInput);
+            }
         }
-        // bytes memory mandatoryInitData;
-        // {
-        //     // solhint-disable-next-line func-named-parameters
-        //     mandatoryInitData = bytes.concat(
-
-        //     );
-        // }
 
         // construct init data
         bytes memory initData;

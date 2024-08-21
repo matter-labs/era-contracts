@@ -34,7 +34,7 @@ import {BridgeHelper} from "./BridgeHelper.sol";
 
 import {IL1AssetDeploymentTracker} from "../bridge/interfaces/IL1AssetDeploymentTracker.sol";
 
-import {Unauthorized, ZeroAddress, SharedBridgeValueAlreadySet, SharedBridgeKey, NoFundsTransferred, ZeroBalance, ValueMismatch, TokensWithFeesNotSupported, NonEmptyMsgValue, L2BridgeNotSet, TokenNotSupported, DepositIncorrectAmount, EmptyDeposit, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, InsufficientChainBalance, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, WithdrawFailed, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeBalanceMismatch, SharedBridgeValueNotSet} from "../common/L1ContractErrors.sol";
+import {AssetIdNotSupported, Unauthorized, ZeroAddress, SharedBridgeValueAlreadySet, SharedBridgeKey, NoFundsTransferred, ZeroBalance, ValueMismatch, TokensWithFeesNotSupported, NonEmptyMsgValue, L2BridgeNotSet, TokenNotSupported, DepositIncorrectAmount, EmptyDeposit, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, InsufficientChainBalance, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, WithdrawFailed, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeBalanceMismatch, SharedBridgeValueNotSet} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -396,7 +396,9 @@ contract L1AssetRouter is
             (assetId, transferData) = _handleLegacyData(_data, _prevMsgSender);
         }
 
-        require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, "L1AR: baseToken deposit not supported");
+        if (BRIDGE_HUB.baseTokenAssetId(_chainId) == assetId) {
+            revert AssetIdNotSupported(assetId);
+        }
 
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
@@ -527,7 +529,9 @@ contract L1AssetRouter is
             // Otherwise, perform the check using the new transaction data hash encoding.
             if (!isLegacyTxDataHash) {
                 bytes32 txDataHash = _encodeTxDataHash(NEW_ENCODING_VERSION, _depositSender, _assetId, _assetData);
-                require(dataHash == txDataHash, "L1AR: d.it not hap");
+                if(dataHash != txDataHash) {
+                    revert DepositDoesNotExist();
+                }
             }
         }
         delete depositHappened[_chainId][_l2TxHash];
