@@ -48,6 +48,7 @@ import {
   compileInitialCutHash,
   readBytecode,
   applyL1ToL2Alias,
+  HYPERCHAIN_COMMITMENT_ABI_STRING,
   // priorityTxMaxGasLimit,
 } from "./utils";
 import type { ChainAdminCall } from "./utils";
@@ -1115,7 +1116,10 @@ export class Deployer {
   // Main function to move the current chain (that is hooked to l1), on top of the syncLayer chain.
   public async moveChainToGateway(gatewayChainId: string, gasPrice: BigNumberish) {
     const adminFacet = AdminFacetFactory.connect(this.addresses.StateTransition.DiamondProxy, this.deployWallet);
-    const chainData = adminFacet.prepareChainCommitment();
+    const chainData = ethers.utils.defaultAbiCoder.encode(
+      [HYPERCHAIN_COMMITMENT_ABI_STRING],
+      [await adminFacet.prepareChainCommitment()]
+    );
     const bridgehub = this.bridgehubContract(this.deployWallet);
     // Just some large gas limit that should always be enough
     const l2GasLimit = ethers.BigNumber.from(72_000_000);
