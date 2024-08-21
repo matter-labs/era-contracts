@@ -16,6 +16,7 @@ import path from "path";
 import { spawn as _spawn } from "child_process";
 import { createHash } from "crypto";
 import { CompilerDownloader } from "hardhat/internal/solidity/compiler/downloader";
+import fetch from "node-fetch";
 
 export type HttpMethod = "POST" | "GET";
 
@@ -326,5 +327,48 @@ export async function isFolderEmpty(folderPath: string): Promise<boolean> {
   } catch (error) {
     console.error("No target folder with artifacts.");
     return true; // Return true if an error, as folder doesn't exist.
+  }
+}
+/**
+ * Performs an API call to the Contract verification API.
+ *
+ * @param endpoint API endpoint to call.
+ * @param queryParams Parameters for a query string.
+ * @param requestBody Request body. If provided, a POST request would be met and body would be encoded to JSON.
+ * @returns API response parsed as a JSON.
+ */
+export async function query(
+  method: HttpMethod,
+  endpoint: string,
+  queryParams?: { [key: string]: string },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  requestBody?: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
+  const url = new URL(endpoint);
+  // Iterate through query params and add them to URL.
+  if (queryParams) {
+    Object.entries(queryParams).forEach(([key, value]) => url.searchParams.set(key, value));
+  }
+
+  const init = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  };
+  if (requestBody) {
+    init.body = JSON.stringify(requestBody);
+  }
+
+  const response = await fetch(url, init);
+  try {
+    return await response.json();
+  } catch (e) {
+    throw {
+      error: "Could not decode JSON in response",
+      status: `${response.status} ${response.statusText}`,
+    };
   }
 }

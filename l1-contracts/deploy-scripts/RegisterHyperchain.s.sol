@@ -34,6 +34,7 @@ contract RegisterHyperchainScript is Script {
         address validatorSenderOperatorCommitEth;
         address validatorSenderOperatorBlobsEth;
         address baseToken;
+        bytes32 baseTokenAssetId;
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
         address bridgehub;
@@ -59,7 +60,7 @@ contract RegisterHyperchainScript is Script {
         deployGovernance();
         deployChainAdmin();
         checkTokenAddress();
-        registerTokenOnBridgehub();
+        registerAssetIdOnBridgehub();
         registerTokenOnNTV();
         registerHyperchain();
         addValidators();
@@ -128,14 +129,15 @@ contract RegisterHyperchainScript is Script {
         console.log("Using base token address:", config.baseToken);
     }
 
-    function registerTokenOnBridgehub() internal {
+    function registerAssetIdOnBridgehub() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         Ownable ownable = Ownable(config.bridgehub);
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
 
-        if (bridgehub.tokenIsRegistered(config.baseToken)) {
-            console.log("Token already registered on Bridgehub");
+        if (bridgehub.assetIdIsRegistered(baseTokenAssetId)) {
+            console.log("Base token asset id already registered on Bridgehub");
         } else {
-            bytes memory data = abi.encodeCall(bridgehub.addToken, (config.baseToken));
+            bytes memory data = abi.encodeCall(bridgehub.addTokenAssetId, (baseTokenAssetId));
             Utils.executeUpgrade({
                 _governor: ownable.owner(),
                 _salt: bytes32(config.bridgehubCreateNewChainSalt),
@@ -144,15 +146,16 @@ contract RegisterHyperchainScript is Script {
                 _value: 0,
                 _delay: 0
             });
-            console.log("Token registered on Bridgehub");
+            console.log("Base token asset id registered on Bridgehub");
         }
     }
 
     function registerTokenOnNTV() internal {
         IL1NativeTokenVault ntv = IL1NativeTokenVault(config.nativeTokenVault);
         // Ownable ownable = Ownable(config.nativeTokenVault);
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
-        if (ntv.tokenAddress(assetId) != address(0)) {
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
+        config.baseTokenAssetId = baseTokenAssetId;
+        if (ntv.tokenAddress(baseTokenAssetId) != address(0)) {
             console.log("Token already registered on NTV");
         } else {
             // bytes memory data = abi.encodeCall(ntv.registerToken, (config.baseToken));
@@ -174,7 +177,7 @@ contract RegisterHyperchainScript is Script {
 
     function deployChainAdmin() internal {
         vm.broadcast();
-        ChainAdmin chainAdmin = new ChainAdmin(config.ownerAddress);
+        ChainAdmin chainAdmin = new ChainAdmin(config.ownerAddress, address(0));
         console.log("ChainAdmin deployed at:", address(chainAdmin));
         config.chainAdmin = address(chainAdmin);
     }
@@ -189,7 +192,7 @@ contract RegisterHyperchainScript is Script {
             (
                 config.chainChainId,
                 config.stateTransitionProxy,
-                config.baseToken,
+                config.baseTokenAssetId,
                 config.bridgehubCreateNewChainSalt,
                 msg.sender,
                 abi.encode(config.diamondCutData, config.forceDeployments),

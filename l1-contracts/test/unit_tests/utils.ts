@@ -359,6 +359,7 @@ export async function depositERC20(
   bridge: IL1ERC20Bridge,
   bridgehubContract: IBridgehub,
   chainId: string,
+  l1ChainId: number,
   l2Receiver: string,
   l1Token: string,
   amount: ethers.BigNumber,

@@ -351,7 +351,10 @@ contract DeployL1Script is Script {
     }
 
     function deployChainAdmin() internal {
-        bytes memory bytecode = abi.encodePacked(type(ChainAdmin).creationCode, abi.encode(config.ownerAddress));
+        bytes memory bytecode = abi.encodePacked(
+            type(ChainAdmin).creationCode,
+            abi.encode(config.ownerAddress, address(0))
+        );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("ChainAdmin deployed at:", contractAddress);
         addresses.chainAdmin = contractAddress;
@@ -553,7 +556,7 @@ contract DeployL1Script is Script {
         });
 
         StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
-            owner: config.ownerAddress,
+            owner: msg.sender,
             validatorTimelock: addresses.validatorTimelock,
             chainCreationParams: chainCreationParams,
             protocolVersion: config.contracts.latestProtocolVersion
@@ -667,7 +670,7 @@ contract DeployL1Script is Script {
     function registerSharedBridge() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         vm.startBroadcast(msg.sender);
-        bridgehub.addToken(ADDRESS_ONE);
+        bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         // bridgehub.setSharedBridge(addresses.bridges.sharedBridgeProxy);
         bridgehub.setAddresses(
             addresses.bridges.sharedBridgeProxy,
@@ -754,8 +757,10 @@ contract DeployL1Script is Script {
         L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses.governance);
 
-        vm.stopBroadcast();
+        StateTransitionManager stm = StateTransitionManager(addresses.stateTransition.stateTransitionProxy);
+        stm.transferOwnership(addresses.governance);
 
+        vm.stopBroadcast();
         console.log("Owners updated");
     }
 

@@ -73,7 +73,7 @@ describe("Custom base token chain and bridge tests", () => {
 
   it("Should have correct base token", async () => {
     // we should still be able to deploy the erc20 bridge
-    const baseTokenAddressInBridgehub = await bridgehub.baseToken(chainId);
+    const baseTokenAddressInBridgehub = await bridgehub.baseToken(deployer.chainId);
     expect(baseTokenAddress).equal(baseTokenAddressInBridgehub);
   });
 

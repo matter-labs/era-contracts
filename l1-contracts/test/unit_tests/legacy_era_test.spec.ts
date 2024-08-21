@@ -162,6 +162,7 @@ describe("Legacy Era tests", function () {
       l1ERC20Bridge.connect(randomSigner),
       bridgehub,
       chainId,
+      deployer.l1ChainId,
       depositorAddress,
       erc20TestToken.address,
       ethers.utils.parseUnits("800", 18),

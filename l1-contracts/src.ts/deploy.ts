@@ -49,6 +49,8 @@ import {
   readBytecode,
   applyL1ToL2Alias,
   // priorityTxMaxGasLimit,
+  encodeNTVAssetId,
+  ETH_ADDRESS_IN_CONTRACTS,
 } from "./utils";
 import type { ChainAdminCall } from "./utils";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
@@ -87,6 +89,7 @@ export interface DeployerConfig {
   defaultAccountBytecodeHash?: string;
   deployedLogPrefix?: string;
   l1Deployer?: Deployer;
+  l1ChainId?: string;
 }
 
 export interface Operation {
@@ -102,6 +105,7 @@ export class Deployer {
   public deployWallet: Wallet | ZkWallet;
   public verbose: boolean;
   public chainId: number;
+  public l1ChainId: number;
   public ownerAddress: string;
   public deployedLogPrefix: string;
 
@@ -121,6 +125,7 @@ export class Deployer {
       : hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
     this.chainId = parseInt(process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID!);
+    this.l1ChainId = parseInt(config.l1ChainId || getNumberFromEnv("ETH_CLIENT_CHAIN_ID"));
     this.deployedLogPrefix = config.deployedLogPrefix ?? "CONTRACTS";
   }
 
@@ -366,7 +371,12 @@ export class Deployer {
 
   public async deployChainAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("ChainAdmin", [this.ownerAddress], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2(
+      "ChainAdmin",
+      [this.ownerAddress, ethers.constants.AddressZero],
+      create2Salt,
+      ethTxOptions
+    );
     if (this.verbose) {
       console.log(`CONTRACTS_CHAIN_ADMIN_ADDR=${contractAddress}`);
     }
@@ -957,10 +967,27 @@ export class Deployer {
     }
 
     /// registering ETH as a valid token, with address 1.
-    const upgradeData2 = bridgehub.interface.encodeFunctionData("addToken", [ADDRESS_ONE]);
+    const baseTokenAssetId = encodeNTVAssetId(this.l1ChainId, ETH_ADDRESS_IN_CONTRACTS);
+    const upgradeData2 = bridgehub.interface.encodeFunctionData("addTokenAssetId", [baseTokenAssetId]);
     await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
     if (this.verbose) {
-      console.log("ETH token registered in Bridgehub");
+      console.log("ETH token asset id registered in Bridgehub");
+    }
+  }
+
+  public async registerTokenBridgehub(tokenAddress: string, useGovernance: boolean = false) {
+    const bridgehub = this.bridgehubContract(this.deployWallet);
+    const baseTokenAssetId = encodeNTVAssetId(this.l1ChainId, tokenAddress);
+    const receipt = await this.executeDirectOrGovernance(
+      useGovernance,
+      bridgehub,
+      "addTokenAssetId",
+      [baseTokenAssetId],
+      0
+    );
+
+    if (this.verbose) {
+      console.log(`Token ${tokenAddress} was registered, gas used: ${receipt.gasUsed.toString()}`);
     }
   }
 
@@ -970,7 +997,7 @@ export class Deployer {
     const data = nativeTokenVault.interface.encodeFunctionData("registerToken", [token]);
     await this.executeUpgrade(this.addresses.Bridges.NativeTokenVaultProxy, 0, data);
     if (this.verbose) {
-      console.log("Native token vault registered with ETH");
+      console.log("Native token vault registered with token", token);
     }
   }
 
@@ -1033,7 +1060,6 @@ export class Deployer {
     nonce?
   ) {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
-
     await this.deployStateTransitionDiamondFacets(create2Salt, gasPrice, nonce);
     await this.deployStateTransitionManagerImplementation(create2Salt, { gasPrice });
     await this.deployStateTransitionManagerProxy(create2Salt, { gasPrice }, extraFacets);
@@ -1200,7 +1226,7 @@ export class Deployer {
   }
 
   public async registerHyperchain(
-    baseTokenAddress: string,
+    baseTokenAssetId: string,
     validiumMode: boolean,
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,
@@ -1215,6 +1241,8 @@ export class Deployer {
 
     const bridgehub = this.bridgehubContract(this.deployWallet);
     const stateTransitionManager = this.stateTransitionManagerContract(this.deployWallet);
+    const ntv = this.nativeTokenVault(this.deployWallet);
+    const baseTokenAddress = await ntv.tokenAddress(baseTokenAssetId);
 
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const alreadyRegisteredInSTM =
@@ -1241,7 +1269,7 @@ export class Deployer {
       [
         inputChainId,
         this.addresses.StateTransition.StateTransitionProxy,
-        baseTokenAddress,
+        baseTokenAssetId,
         Date.now(),
         admin,
         initData,
@@ -1263,6 +1291,7 @@ export class Deployer {
     }
 
     this.addresses.BaseToken = baseTokenAddress;
+    this.addresses.BaseTokenAssetId = baseTokenAssetId;
 
     if (this.verbose) {
       console.log(`Hyperchain registered, gas used: ${receipt.gasUsed.toString()} and ${receipt.gasUsed.toString()}`);
@@ -1347,6 +1376,17 @@ export class Deployer {
     return await multicallTx.wait();
   }
 
+  public async setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress: string) {
+    const chainAdmin = ChainAdminFactory.connect(this.addresses.ChainAdmin, this.deployWallet);
+
+    const receipt = await (await chainAdmin.setTokenMultiplierSetter(tokenMultiplierSetterAddress)).wait();
+    if (this.verbose) {
+      console.log(
+        `Token multiplier setter set as ${tokenMultiplierSetterAddress}, gas used: ${receipt.gasUsed.toString()}`
+      );
+    }
+  }
+
   public async transferAdminFromDeployerToChainAdmin() {
     const stm = this.stateTransitionManagerContract(this.deployWallet);
     const diamondProxyAddress = await stm.getHyperchain(this.chainId);
@@ -1357,13 +1397,6 @@ export class Deployer {
       console.log(`ChainAdmin set as pending admin, gas used: ${receipt.gasUsed.toString()}`);
     }
 
-    // await this.executeUpgrade(
-    //   hyperchain.address,
-    //   0,
-    //   hyperchain.interface.encodeFunctionData("acceptAdmin"),
-    //   null,
-    //   false
-    // );
     const acceptAdminData = hyperchain.interface.encodeFunctionData("acceptAdmin");
     await this.executeChainAdminMulticall([
       {
@@ -1375,15 +1408,6 @@ export class Deployer {
 
     if (this.verbose) {
       console.log("Pending admin successfully accepted");
-    }
-  }
-
-  public async registerTokenBridgehub(tokenAddress: string, useGovernance: boolean = false) {
-    const bridgehub = this.bridgehubContract(this.deployWallet);
-    const receipt = await this.executeDirectOrGovernance(useGovernance, bridgehub, "addToken", [tokenAddress], 0);
-
-    if (this.verbose) {
-      console.log(`Token ${tokenAddress} was registered, gas used: ${receipt.gasUsed.toString()}`);
     }
   }
 

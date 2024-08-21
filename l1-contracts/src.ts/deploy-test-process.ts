@@ -29,6 +29,7 @@ import {
   EMPTY_STRING_KECCAK,
   isCurrentNetworkLocal,
   ETH_ADDRESS_IN_CONTRACTS,
+  encodeNTVAssetId,
 } from "./utils";
 import { diamondCut, getCurrentFacetCutsForAdd, facetCut, Action } from "./diamondCut";
 import { CONTRACTS_GENESIS_PROTOCOL_VERSION } from "../test/unit_tests/utils";
@@ -50,6 +51,7 @@ export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
   // process.env.CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH = "1";
   process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
   process.env.CONTRACTS_ERA_CHAIN_ID = "270";
+  process.env.CONTRACTS_ETH_CHAIN_ID = "31337";
   process.env.CONTRACTS_ERA_DIAMOND_PROXY_ADDR = ADDRESS_ONE;
   // CONTRACTS_ERA_DIAMOND_PROXY_ADDR;
   process.env.CONTRACTS_L2_SHARED_BRIDGE_ADDR = ADDRESS_ONE;
@@ -67,6 +69,7 @@ export async function defaultDeployerForTests(deployWallet: Wallet, ownerAddress
     addresses: addressConfig,
     bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
     defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+    l1ChainId: process.env.CONTRACTS_ETH_CHAIN_ID,
   });
 }
 
@@ -78,6 +81,7 @@ export async function defaultEraDeployerForTests(deployWallet: Wallet, ownerAddr
     addresses: addressConfig,
     bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
     defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+    l1ChainId: process.env.CONTRACTS_ETH_CHAIN_ID,
   });
   const l2_rpc_addr = "http://localhost:3050";
   const web3Provider = new zkethers.Provider(l2_rpc_addr);
@@ -329,7 +333,10 @@ export class EraDeployer extends Deployer {
         protocolVersion: CONTRACTS_GENESIS_PROTOCOL_VERSION,
         admin: this.ownerAddress,
         validatorTimelock: ADDRESS_ONE,
-        baseToken: ETH_ADDRESS_IN_CONTRACTS,
+        baseTokenAssetId: encodeNTVAssetId(
+          parseInt(process.env.CONTRACTS_ETH_CHAIN_ID),
+          ethers.utils.hexZeroPad(ETH_ADDRESS_IN_CONTRACTS, 32)
+        ),
         baseTokenBridge: this.addresses.Bridges.SharedBridgeProxy,
         storedBatchZero,
         verifier: this.addresses.StateTransition.Verifier,

@@ -10,6 +10,7 @@ import { BigNumber, ethers } from "ethers";
 import { utils } from "zksync-ethers";
 import type { FacetCut } from "../src.ts/diamondCut";
 import { getCurrentFacetCutsForAdd } from "../src.ts/diamondCut";
+import { encodeNTVAssetId } from "../src.ts/utils";
 
 // Things that still have to be manually double checked:
 // 1. Contracts must be verified.
@@ -52,6 +53,7 @@ const initialOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438";
 const expectedOwner = "0x71d84c3404a6ae258E6471d4934B96a2033F9438"; //process.env.CONTRACTS_GOVERNANCE_ADDR!;
 const expectedDelay = "75600";
 const eraChainId = process.env.CONTRACTS_ERA_CHAIN_ID!;
+const l1ChainId = process.env.CONTRACTS_ETH_CHAIN_ID!;
 const expectedSalt = "0x0000000000000000000000000000000000000000000000000000000000000001";
 const expectedHyperchainAddr = "0x32400084c286cf3e17e7b677ea9583e60a000324";
 const maxNumberOfHyperchains = 100;
@@ -344,7 +346,11 @@ async function checkBridgehub() {
     throw new Error("Bridgehub stateTransitionManager is not registered");
   }
 
-  const tokenIsRegistered = await contract.tokenIsRegistered(utils.ETH_ADDRESS_IN_CONTRACTS);
+  const baseTokenAssetId = encodeNTVAssetId(
+    parseInt(l1ChainId),
+    ethers.utils.hexZeroPad(utils.ETH_ADDRESS_IN_CONTRACTS, 32)
+  );
+  const tokenIsRegistered = contract.assetIdIsRegistered(baseTokenAssetId);
   if (!tokenIsRegistered) {
     throw new Error("Bridgehub token is not registered");
   }

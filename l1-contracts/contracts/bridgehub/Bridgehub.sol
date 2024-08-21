@@ -11,6 +11,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
+import {IL1BaseTokenAssetHandler} from "../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
@@ -48,15 +49,17 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     IL1AssetRouter public sharedBridge;
 
     /// @notice StateTransitionManagers that are registered, and ZKchains that use these STMs can use this bridgehub as settlement layer.
-    mapping(address _stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
+    mapping(address stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
+
     /// @notice we store registered tokens (for arbitrary base token)
-    mapping(address _baseToken => bool) public tokenIsRegistered;
+    mapping(address baseToken => bool) public __DEPRECATED_tokenIsRegistered;
 
     /// @notice chainID => StateTransitionManager contract address, STM that is managing rules for a given ZKchain.
-    mapping(uint256 _chainId => address) public stateTransitionManager;
+    mapping(uint256 chainId => address) public stateTransitionManager;
 
     /// @notice chainID => baseToken contract address, token that is used as 'base token' by a given child chain.
-    mapping(uint256 _chainId => address) public baseToken;
+    // slither-disable-next-line uninitialized-state
+    mapping(uint256 chainId => address) public __DEPRECATED_baseToken;
 
     /// @dev used to manage non critical updates
     address public admin;
@@ -73,7 +76,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     IMessageRoot public override messageRoot;
 
     /// @notice Mapping from chain id to encoding of the base token used for deposits / withdrawals
-    mapping(uint256 _chainId => bytes32) public baseTokenAssetId;
+    mapping(uint256 chainId => bytes32) public baseTokenAssetId;
 
     /// @notice The deployment tracker for the state transition managers.
     ISTMDeploymentTracker public stmDeployer;
@@ -88,6 +91,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev the Gateway will be one of the possible settlement layers. The L1 is also a settlement layer.
     /// @dev Sync layer chain is expected to have .. as the base token.
     mapping(uint256 chainId => bool isWhitelistedSettlementLayer) public whitelistedSettlementLayers;
+
+    /// @notice we store registered assetIds (for arbitrary base token)
+    mapping(bytes32 baseTokenAssetId => bool) public assetIdIsRegistered;
 
     modifier onlyOwnerOrAdmin() {
         require(msg.sender == admin || msg.sender == owner(), "BH: not owner or admin");
@@ -181,7 +187,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (baseTokenAssetId[_chainId] == bytes32(0)) {
             return;
         }
-        address token = baseToken[_chainId];
+        address token = __DEPRECATED_baseToken[_chainId];
         require(token != address(0), "BH: token not set");
         baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(block.chainid, token);
     }
@@ -222,13 +228,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         emit StateTransitionManagerRemoved(_stateTransitionManager);
     }
 
-    /// @notice token can be any contract with the appropriate interface/functionality
-    /// @param _token address of base token to be registered
-    function addToken(address _token) external onlyOwner {
-        require(!tokenIsRegistered[_token], "BH: token already registered");
-        tokenIsRegistered[_token] = true;
+    /// @notice asset id can represent any token contract with the appropriate interface/functionality
+    /// @param _baseTokenAssetId asset id of base token to be registered
+    function addTokenAssetId(bytes32 _baseTokenAssetId) external onlyOwner {
+        require(!assetIdIsRegistered[_baseTokenAssetId], "BH: asset id already registered");
+        assetIdIsRegistered[_baseTokenAssetId] = true;
 
-        emit TokenRegistered(_token);
+        emit BaseTokenAssetIdRegistered(_baseTokenAssetId);
     }
 
     /// @notice Used to register a chain as a settlement layer.
@@ -274,7 +280,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice for Eth the baseToken address is 1
     /// @param _chainId the chainId of the chain
     /// @param _stateTransitionManager the state transition manager address
-    /// @param _baseToken the base token of the chain
+    /// @param _baseTokenAssetId the base token asset id of the chain
     /// @param _salt the salt for the chainId, currently not used
     /// @param _admin the admin of the chain
     /// @param _initData the fixed initialization data for the chain
@@ -282,7 +288,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function createNewChain(
         uint256 _chainId,
         address _stateTransitionManager,
-        address _baseToken,
+        bytes32 _baseTokenAssetId,
         // solhint-disable-next-line no-unused-vars
         uint256 _salt,
         address _admin,
@@ -294,21 +300,19 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(_chainId != block.chainid, "BH: chain id must not match current chainid");
 
         require(stateTransitionManagerIsRegistered[_stateTransitionManager], "BH: state transition not registered");
-        require(tokenIsRegistered[_baseToken], "BH: token not registered");
+        require(assetIdIsRegistered[_baseTokenAssetId], "BH: asset id not registered");
         require(address(sharedBridge) != address(0), "BH: shared bridge not set");
 
         require(stateTransitionManager[_chainId] == address(0), "BH: chainId already registered");
 
         stateTransitionManager[_chainId] = _stateTransitionManager;
-        baseToken[_chainId] = _baseToken;
 
-        /// For now all base tokens have to use the NTV.
-        baseTokenAssetId[_chainId] = DataEncoding.encodeNTVAssetId(block.chainid, _baseToken);
+        baseTokenAssetId[_chainId] = _baseTokenAssetId;
         settlementLayer[_chainId] = block.chainid;
 
         address chainAddress = IStateTransitionManager(_stateTransitionManager).createNewChain({
             _chainId: _chainId,
-            _baseToken: _baseToken,
+            _baseTokenAssetId: _baseTokenAssetId,
             _sharedBridge: address(sharedBridge),
             _admin: _admin,
             _initData: _initData,
@@ -331,6 +335,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /*//////////////////////////////////////////////////////////////
                              Getters
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice baseToken function, which takes assetId as input, reads assetHandler from AR, and tokenAddress from AH
+    function baseToken(uint256 _chainId) public view returns (address) {
+        bytes32 baseTokenAssetId = baseTokenAssetId[_chainId];
+        IL1BaseTokenAssetHandler assetHandlerAddress = IL1BaseTokenAssetHandler(
+            sharedBridge.assetHandlerAddress(baseTokenAssetId)
+        );
+        return assetHandlerAddress.tokenAddress(baseTokenAssetId);
+    }
 
     /// @notice Returns all the registered hyperchain addresses
     function getAllHyperchains() public view override returns (address[] memory chainAddresses) {
