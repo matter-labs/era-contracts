@@ -66,7 +66,7 @@ async function main() {
     .option("--validium-mode")
     .option("--base-token-name <base-token-name>")
     .option("--base-token-address <base-token-address>")
-    .option("--use-governance <use-governance>")
+    .option("--use-governance")
     .option("--token-multiplier-setter-address <token-multiplier-setter-address>")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
