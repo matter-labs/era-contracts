@@ -313,14 +313,13 @@ async function registerSLContractsOnL1(deployer: Deployer) {
 
   console.log(`Gateway chain Id: ${chainId}`);
 
-  const l1STM = deployer.stateTransitionManagerContract(deployer.deployWallet);
   const l1Bridgehub = deployer.bridgehubContract(deployer.deployWallet);
   console.log(deployer.addresses.StateTransition.StateTransitionProxy);
   const gatewayAddress = await l1STM.getHyperchain(chainId);
   // this script only works when owner is the deployer
   console.log("Registering Gateway chain id on the STM");
   const receipt1 = await deployer.executeUpgrade(
-    l1STM.address,
+    l1Bridgehub.address,
     0,
     l1Bridgehub.interface.encodeFunctionData("registerSettlementLayer", [chainId, true])
   );
