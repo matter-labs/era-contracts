@@ -13,7 +13,7 @@ import { IL1NativeTokenVaultFactory } from "../../typechain/IL1NativeTokenVaultF
 
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
-import { ethTestConfig, encodeNTVAssetId } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/utils";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
 import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
