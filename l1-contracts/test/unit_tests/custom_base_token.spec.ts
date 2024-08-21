@@ -149,7 +149,7 @@ describe("Custom base token chain and bridge tests", () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [])
     );
-    expect(revertReason).contains("MalformedMessage");
+    expect(revertReason).contains("L2WithdrawalMessageWrongLength");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {

@@ -161,7 +161,7 @@ describe("Shared Bridge tests", () => {
         .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [ethers.constants.HashZero])
     );
-    expect(revertReason).contains("MalformedMessage");
+    expect(revertReason).contains("L2WithdrawalMessageWrongLength");
   });
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
@@ -177,7 +177,7 @@ describe("Shared Bridge tests", () => {
           [ethers.constants.HashZero]
         )
     );
-    expect(revertReason).contains("MalformedMessage");
+    expect(revertReason).contains("L2WithdrawalMessageWrongLength");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {
@@ -217,7 +217,7 @@ describe("Shared Bridge tests", () => {
         .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [ethers.constants.HashZero])
     );
-    expect(revertReason).contains("MalformedMessage");
+    expect(revertReason).contains("L2WithdrawalMessageWrongLength");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function signature", async () => {
