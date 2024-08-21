@@ -1016,8 +1016,8 @@ object "Bootloader" {
             /// @param resultPtr The pointer at which the result of the execution of this transaction
             /// @param transactionIndex The index of the transaction
             /// @param gasPerPubdata The price per pubdata to be used
-            /// @param isPriorityOp Whether the transaction is a priority one
-            /// @param isL2Tx Whether the transaction is an L1->L2 or an L2->L2 tx
+            /// @param isPriorityOp Whether the transaction is a priority or upgrade transaction // todo unify with isL1Tx
+            /// @param isL1Tx Whether the transaction is an L1->L2 or an L2->L2 tx
             function processXChainTx(
                 txDataOffset,
                 resultPtr,
