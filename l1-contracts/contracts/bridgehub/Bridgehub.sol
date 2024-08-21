@@ -94,7 +94,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice we store registered assetIds (for arbitrary base token)
     mapping(bytes32 baseTokenAssetId => bool) public assetIdIsRegistered;
-    
+
     /// @notice used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
 

@@ -142,7 +142,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit ClaimedFailedDepositSharedBridge({
+        emit ClaimedFailedDepositAssetRouter({
             chainId: chainId,
             to: alice,
             assetId: tokenAssetId,
@@ -184,7 +184,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit ClaimedFailedDepositSharedBridge({
+        emit ClaimedFailedDepositAssetRouter({
             chainId: chainId,
             to: alice,
             assetId: ETH_TOKEN_ASSET_ID,
@@ -227,7 +227,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit ClaimedFailedDepositSharedBridge({
+        emit ClaimedFailedDepositAssetRouter({
             chainId: chainId,
             to: alice,
             assetId: ETH_TOKEN_ASSET_ID,
@@ -270,7 +270,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit WithdrawalFinalizedSharedBridge(chainId, alice, ETH_TOKEN_ASSET_ID, amount);
+        emit WithdrawalFinalizedAssetRouter(chainId, ETH_TOKEN_ASSET_ID, message);
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
@@ -310,7 +310,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit WithdrawalFinalizedSharedBridge(chainId, alice, tokenAssetId, amount);
+        emit WithdrawalFinalizedAssetRouter(chainId, tokenAssetId, message);
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
@@ -355,7 +355,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit WithdrawalFinalizedSharedBridge(chainId, alice, ETH_TOKEN_ASSET_ID, amount);
+        emit WithdrawalFinalizedAssetRouter(chainId, ETH_TOKEN_ASSET_ID, message);
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
@@ -397,7 +397,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit WithdrawalFinalizedSharedBridge(chainId, alice, tokenAssetId, amount);
+        emit WithdrawalFinalizedAssetRouter(chainId, tokenAssetId, message);
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
@@ -442,7 +442,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit WithdrawalFinalizedSharedBridge(chainId, alice, tokenAssetId, amount);
+        emit WithdrawalFinalizedAssetRouter(chainId, tokenAssetId, message);
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,

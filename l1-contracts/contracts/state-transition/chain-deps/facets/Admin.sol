@@ -256,7 +256,6 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         uint256 currentProtocolVersion = s.protocolVersion;
         uint256 protocolVersion = stm.protocolVersion();
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
-        require(currentProtocolVersion == _commitment.protocolVersion, "Af: protocolVersion mismatch");
 
         uint256 batchesExecuted = _commitment.totalBatchesExecuted;
         uint256 batchesVerified = _commitment.totalBatchesVerified;

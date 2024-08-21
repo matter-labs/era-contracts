@@ -170,7 +170,7 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         IZkSyncHyperchain migratingChain = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId));
         bytes32 assetId = bridgehub.stmAssetIdFromChainId(migratingChainId);
 
-        vm.startBroadcast(address(stm));
+        vm.startBroadcast(Ownable(address(bridgehub)).owner());
         bridgehub.registerSettlementLayer(gatewayChainId, true);
         vm.stopBroadcast();
 

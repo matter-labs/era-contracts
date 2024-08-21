@@ -81,8 +81,8 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         );
 
         // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit WithdrawalFinalizedSharedBridge(eraChainId, alice, ETH_TOKEN_ASSET_ID, amount);
+        vm.expectEmit(true, true, true, false, address(sharedBridge));
+        emit WithdrawalFinalizedAssetRouter(eraChainId, ETH_TOKEN_ASSET_ID, message);
         vm.prank(l1ERC20BridgeAddress);
         sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
             _l2BatchNumber: l2BatchNumber,
@@ -130,8 +130,8 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
             bytes32(uint256(uint160(address(nativeTokenVault))))
         );
         // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit WithdrawalFinalizedSharedBridge(eraChainId, alice, tokenAssetId, amount);
+        vm.expectEmit(true, true, false, false, address(sharedBridge));
+        emit WithdrawalFinalizedAssetRouter(eraChainId, tokenAssetId, message);
         vm.prank(l1ERC20BridgeAddress);
         sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
             _l2BatchNumber: l2BatchNumber,
@@ -184,7 +184,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit ClaimedFailedDepositSharedBridge(eraChainId, alice, (tokenAssetId), abi.encode(bytes32(0)));
+        emit ClaimedFailedDepositAssetRouter(eraChainId, alice, (tokenAssetId), abi.encode(bytes32(0)));
         vm.prank(l1ERC20BridgeAddress);
 
         sharedBridge.claimFailedDeposit({
