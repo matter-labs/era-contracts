@@ -59,7 +59,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
 
     function test_bridgehubDeposit_Eth_l2BridgeNotDeployed() public {
         vm.prank(owner);
-        sharedBridge.initializeChainGovernance(chainId, address(0));
+        sharedBridge.reinitializeChainGovernance(chainId, address(0));
         vm.deal(bridgehubAddress, amount);
         vm.prank(bridgehubAddress);
         vm.mockCall(
@@ -551,7 +551,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         address refundRecipient = address(0);
 
         vm.prank(owner);
-        sharedBridge.initializeChainGovernance(eraChainId, address(0));
+        sharedBridge.reinitializeChainGovernance(eraChainId, address(0));
 
         vm.expectRevert("ShB b. n dep");
         vm.prank(l1ERC20BridgeAddress);

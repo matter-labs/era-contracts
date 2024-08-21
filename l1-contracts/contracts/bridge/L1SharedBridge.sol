@@ -244,7 +244,21 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev Initializes the l2Bridge address by governance for a specific chain.
+    /// @param _chainId The chain ID for which the l2Bridge address is being initialized.
+    /// @param _l2BridgeAddress The address of the L2 bridge contract.
     function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwnerOrAdmin {
+        require(l2BridgeAddress[_chainId] == address(0), "ShB: l2 bridge already set");
+        require(_l2BridgeAddress != address(0), "ShB: l2 bridge 0");
+        l2BridgeAddress[_chainId] = _l2BridgeAddress;
+    }
+
+    /// @dev Reinitializes the l2Bridge address by governance for a specific chain.
+    /// @dev Only accessible to the owner of the bridge to prevent malicious admin from changing the bridge address for
+    /// an existing chain.
+    /// @param _chainId The chain ID for which the l2Bridge address is being initialized.
+    /// @param _l2BridgeAddress The address of the L2 bridge contract.
+    function reinitializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwner {
+        require(l2BridgeAddress[_chainId] != address(0), "ShB: l2 bridge not yet set");
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
     }
 
