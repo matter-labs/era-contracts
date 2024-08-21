@@ -64,7 +64,13 @@ import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory"
 import type { FacetCut } from "./diamondCut";
 import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
-import { AdminFacetFactory, BridgehubFactory, ChainAdminFactory, ERC20Factory, StateTransitionManagerFactory } from "../typechain";
+import {
+  AdminFacetFactory,
+  BridgehubFactory,
+  ChainAdminFactory,
+  ERC20Factory,
+  StateTransitionManagerFactory,
+} from "../typechain";
 
 import { IL1AssetRouterFactory } from "../typechain/IL1AssetRouterFactory";
 import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
@@ -1108,7 +1114,6 @@ export class Deployer {
 
   // Main function to move the current chain (that is hooked to l1), on top of the syncLayer chain.
   public async moveChainToGateway(gatewayChainId: string, gasPrice: BigNumberish) {
-    
     const adminFacet = AdminFacetFactory.connect(this.addresses.StateTransition.AdminFacet, this.deployWallet);
     const chainData = adminFacet.prepareChainCommitment();
     const bridgehub = this.bridgehubContract(this.deployWallet);
