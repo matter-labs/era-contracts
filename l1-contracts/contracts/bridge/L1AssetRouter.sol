@@ -523,7 +523,7 @@ contract L1AssetRouter is
             _assetData
         );
 
-        emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetId, _assetData);
+        emit ClaimedFailedDepositAssetRouter(_chainId, _depositSender, _assetId, _assetData);
     }
 
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
@@ -610,8 +610,7 @@ contract L1AssetRouter is
         if (l1AssetHandler == address(nativeTokenVault)) {
             (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
         }
-
-        emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetId, amount);
+        emit WithdrawalFinalizedAssetRouter(_chainId, assetId, transferData);
     }
 
     /// @notice Decodes the transfer input for legacy data and transfers allowance to NTV

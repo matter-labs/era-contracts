@@ -89,7 +89,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev Sync layer chain is expected to have .. as the base token.
     mapping(uint256 chainId => bool isWhitelistedSettlementLayer) public whitelistedSettlementLayers;
 
-    bool private migrationPaused;
+    /// @notice used to pause the migrations of chains. Used for upgrades.
+    bool public migrationPaused;
 
     modifier onlyOwnerOrAdmin() {
         require(msg.sender == admin || msg.sender == owner(), "BH: not owner or admin");

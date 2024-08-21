@@ -250,6 +250,13 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     ) external payable override onlyBridgehub {
         HyperchainCommitment memory _commitment = abi.decode(_data, (HyperchainCommitment));
 
+        IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
+
+        uint256 currentProtocolVersion = s.protocolVersion;
+        uint256 protocolVersion = stm.protocolVersion();
+        require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
+        require(currentProtocolVersion == _commitment.protocolVersion, "Af: protocolVersion mismatch");
+
         uint256 batchesExecuted = _commitment.totalBatchesExecuted;
         uint256 batchesVerified = _commitment.totalBatchesVerified;
         uint256 batchesCommitted = _commitment.totalBatchesCommitted;
@@ -291,6 +298,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         } else if (_contractAlreadyDeployed) {
             require(s.settlementLayer != address(0), "Af: not migrated 2");
             s.priorityTree.checkGWReinit(_commitment.priorityTree);
+            s.priorityTree.initFromCommitment(_commitment.priorityTree);
         } else {
             s.priorityTree.initFromCommitment(_commitment.priorityTree);
         }

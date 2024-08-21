@@ -89,6 +89,8 @@ interface IBridgehub is IL1AssetHandler {
 
     function getAllHyperchainChainIDs() external view returns (uint256[] memory);
 
+    function migrationPaused() external view returns (bool);
+
     /// Mailbox forwarder
 
     function proveL2MessageInclusion(
