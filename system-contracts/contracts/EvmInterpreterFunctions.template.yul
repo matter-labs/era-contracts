@@ -478,6 +478,13 @@ function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
         }
 }
 
+function checkMemOverflowByOffset(offset, evmGasLeft) {
+    if gt(offset, MAX_POSSIBLE_MEM()) {
+        mstore(0, evmGasLeft)
+        revert(0, 32)
+    }
+}
+
 function checkMemOverflow(location, evmGasLeft) {
     if gt(location, MAX_MEMORY_FRAME()) {
         mstore(0, evmGasLeft)
@@ -871,11 +878,11 @@ function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
 
     addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
-    checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER(), evmGasLeft)
-    checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER(), evmGasLeft)
+    checkOverflow(argsOffset,argsSize, evmGasLeft)
+    checkOverflow(retOffset, retSize, evmGasLeft)
 
-    checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()), evmGasLeft)
-    checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()), evmGasLeft)
+    checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+    checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
 
     extraCost := 0
     if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -1079,11 +1086,11 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
 
     // addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
 
-    checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER(), evmGasLeft)
-    checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER(), evmGasLeft)
+    checkOverflow(argsOffset, argsSize, evmGasLeft)
+    checkOverflow(retOffset, retSize, evmGasLeft)
 
-    checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()), evmGasLeft)
-    checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()), evmGasLeft)
+    checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+    checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
 
     if iszero(_isEVM(addr)) {
         revertWithGas(evmGasLeft)
@@ -1380,9 +1387,8 @@ function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
     offset, sp := popStackItemWithoutCheck(sp)
     size, sp := popStackItemWithoutCheck(sp)
 
-    checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
-
-    checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
+    checkOverflow(offset, size, evmGasLeft)
+    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
 
     if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
         revertWithGas(evmGasLeft)
@@ -1427,9 +1433,8 @@ function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp, result, addr
     size, sp := popStackItemWithoutCheck(sp)
     salt, sp := popStackItemWithoutCheck(sp)
 
-    checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
-
-    checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
+    checkOverflow(offset, size, evmGasLeft)
+    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
 
     if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
         revertWithGas(evmGasLeft)

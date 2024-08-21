@@ -549,6 +549,13 @@ object "EVMInterpreter" {
                 }
         }
         
+        function checkMemOverflowByOffset(offset, evmGasLeft) {
+            if gt(offset, MAX_POSSIBLE_MEM()) {
+                mstore(0, evmGasLeft)
+                revert(0, 32)
+            }
+        }
+        
         function checkMemOverflow(location, evmGasLeft) {
             if gt(location, MAX_MEMORY_FRAME()) {
                 mstore(0, evmGasLeft)
@@ -942,11 +949,11 @@ object "EVMInterpreter" {
         
             addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
         
-            checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER(), evmGasLeft)
-            checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER(), evmGasLeft)
+            checkOverflow(argsOffset,argsSize, evmGasLeft)
+            checkOverflow(retOffset, retSize, evmGasLeft)
         
-            checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()), evmGasLeft)
-            checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()), evmGasLeft)
+            checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+            checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
         
             extraCost := 0
             if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -1150,11 +1157,11 @@ object "EVMInterpreter" {
         
             // addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
         
-            checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER(), evmGasLeft)
-            checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER(), evmGasLeft)
+            checkOverflow(argsOffset, argsSize, evmGasLeft)
+            checkOverflow(retOffset, retSize, evmGasLeft)
         
-            checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()), evmGasLeft)
-            checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()), evmGasLeft)
+            checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+            checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
         
             if iszero(_isEVM(addr)) {
                 revertWithGas(evmGasLeft)
@@ -1451,9 +1458,8 @@ object "EVMInterpreter" {
             offset, sp := popStackItemWithoutCheck(sp)
             size, sp := popStackItemWithoutCheck(sp)
         
-            checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
-        
-            checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
+            checkOverflow(offset, size, evmGasLeft)
+            checkMemOverflowByOffset(add(offset, size), evmGasLeft)
         
             if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
                 revertWithGas(evmGasLeft)
@@ -1498,9 +1504,8 @@ object "EVMInterpreter" {
             size, sp := popStackItemWithoutCheck(sp)
             salt, sp := popStackItemWithoutCheck(sp)
         
-            checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
-        
-            checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
+            checkOverflow(offset, size, evmGasLeft)
+            checkMemOverflowByOffset(add(offset, size), evmGasLeft)
         
             if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
                 revertWithGas(evmGasLeft)
@@ -1878,8 +1883,8 @@ object "EVMInterpreter" {
                     offset, sp := popStackItemWithoutCheck(sp)
                     size, sp := popStackItemWithoutCheck(sp)
             
-                    checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
+                    checkOverflow(offset, size, evmGasLeft)
+                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
                     let keccak := keccak256(add(MEM_OFFSET_INNER(), offset), size)
             
                     // When an offset is first accessed (either read or write), memory may trigger 
@@ -1961,6 +1966,7 @@ object "EVMInterpreter" {
                     checkMultipleOverflow(offset,size,MEM_OFFSET_INNER(), evmGasLeft)
                     checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER(), evmGasLeft)
             
+                    // TODO invalid?
                     if or(gt(add(add(offset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM()), gt(add(add(destOffset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM())) {
                         $llvm_AlwaysInline_llvm$_memsetToZero(add(destOffset, MEM_OFFSET_INNER()), size)
                     }
@@ -2067,7 +2073,7 @@ object "EVMInterpreter" {
             
                     // minimum_word_size = (size + 31) / 32
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
-                    checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                    checkMemOverflowByOffset(offset, evmGasLeft)
                     let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(add(dest, len)))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
@@ -2157,8 +2163,7 @@ object "EVMInterpreter" {
             
                     offset, sp := popStackItem(sp, evmGasLeft)
             
-                    checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                    checkMemOverflowByOffset(offset, evmGasLeft)
                     let expansionGas := expandMemory(add(offset, 32))
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
@@ -2175,8 +2180,7 @@ object "EVMInterpreter" {
                     offset, sp := popStackItemWithoutCheck(sp)
                     value, sp := popStackItemWithoutCheck(sp)
             
-                    checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                    checkMemOverflowByOffset(offset, evmGasLeft)
                     let expansionGas := expandMemory(add(offset, 32))
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
@@ -2192,8 +2196,7 @@ object "EVMInterpreter" {
                     offset, sp := popStackItemWithoutCheck(sp)
                     value, sp := popStackItemWithoutCheck(sp)
             
-                    checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                    checkMemOverflowByOffset(offset, evmGasLeft)
                     let expansionGas := expandMemory(add(offset, 1))
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
@@ -2370,8 +2373,9 @@ object "EVMInterpreter" {
                     offset, sp := popStackItemWithoutCheck(sp)
                     size, sp := popStackItemWithoutCheck(sp)
             
-                    checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
-                    checkMemOverflow(add(add(destOffset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                    // TODO overflow checks
+                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                    checkMemOverflowByOffset(add(destOffset, size), evmGasLeft)
             
                     expandMemory(add(destOffset, size))
                     expandMemory(add(offset, size))
@@ -2815,8 +2819,8 @@ object "EVMInterpreter" {
                     offset, sp := popStackItemWithoutCheck(sp)
                     size, sp := popStackItemWithoutCheck(sp)
             
-                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                    checkOverflow(offset, size, evmGasLeft)
+                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                     let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -2838,8 +2842,8 @@ object "EVMInterpreter" {
                     size, sp := popStackItemWithoutCheck(sp)
                     topic1, sp := popStackItemWithoutCheck(sp)
             
-                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                    checkOverflow(offset, size, evmGasLeft)
+                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                     let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -2860,8 +2864,8 @@ object "EVMInterpreter" {
                     offset, sp := popStackItemWithoutCheck(sp)
                     size, sp := popStackItemWithoutCheck(sp)
             
-                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                    checkOverflow(offset, size, evmGasLeft)
+                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                     let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -2889,9 +2893,8 @@ object "EVMInterpreter" {
                     offset, sp := popStackItemWithoutCheck(sp)
                     size, sp := popStackItemWithoutCheck(sp)
             
-                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-            
-                    checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                    checkOverflow(offset, size, evmGasLeft)
+                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                     let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -2920,8 +2923,8 @@ object "EVMInterpreter" {
                     offset, sp := popStackItemWithoutCheck(sp)
                     size, sp := popStackItemWithoutCheck(sp)
             
-                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                    checkOverflow(offset, size, evmGasLeft)
+                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                     let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -3002,6 +3005,7 @@ object "EVMInterpreter" {
                     offset, sp := popStackItemWithoutCheck(sp)
                     size, sp := popStackItemWithoutCheck(sp)
             
+                    // TODO invalid?
                     ensureAcceptableMemLocation(offset)
                     ensureAcceptableMemLocation(size)
                     evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
@@ -3533,6 +3537,13 @@ object "EVMInterpreter" {
                     }
             }
             
+            function checkMemOverflowByOffset(offset, evmGasLeft) {
+                if gt(offset, MAX_POSSIBLE_MEM()) {
+                    mstore(0, evmGasLeft)
+                    revert(0, 32)
+                }
+            }
+            
             function checkMemOverflow(location, evmGasLeft) {
                 if gt(location, MAX_MEMORY_FRAME()) {
                     mstore(0, evmGasLeft)
@@ -3926,11 +3937,11 @@ object "EVMInterpreter" {
             
                 addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
-                checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER(), evmGasLeft)
-                checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER(), evmGasLeft)
+                checkOverflow(argsOffset,argsSize, evmGasLeft)
+                checkOverflow(retOffset, retSize, evmGasLeft)
             
-                checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()), evmGasLeft)
-                checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()), evmGasLeft)
+                checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+                checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
             
                 extraCost := 0
                 if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -4134,11 +4145,11 @@ object "EVMInterpreter" {
             
                 // addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
-                checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER(), evmGasLeft)
-                checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER(), evmGasLeft)
+                checkOverflow(argsOffset, argsSize, evmGasLeft)
+                checkOverflow(retOffset, retSize, evmGasLeft)
             
-                checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()), evmGasLeft)
-                checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()), evmGasLeft)
+                checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+                checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
             
                 if iszero(_isEVM(addr)) {
                     revertWithGas(evmGasLeft)
@@ -4435,9 +4446,8 @@ object "EVMInterpreter" {
                 offset, sp := popStackItemWithoutCheck(sp)
                 size, sp := popStackItemWithoutCheck(sp)
             
-                checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
-            
-                checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
+                checkOverflow(offset, size, evmGasLeft)
+                checkMemOverflowByOffset(add(offset, size), evmGasLeft)
             
                 if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
                     revertWithGas(evmGasLeft)
@@ -4482,9 +4492,8 @@ object "EVMInterpreter" {
                 size, sp := popStackItemWithoutCheck(sp)
                 salt, sp := popStackItemWithoutCheck(sp)
             
-                checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
-            
-                checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
+                checkOverflow(offset, size, evmGasLeft)
+                checkMemOverflowByOffset(add(offset, size), evmGasLeft)
             
                 if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
                     revertWithGas(evmGasLeft)
@@ -4862,8 +4871,8 @@ object "EVMInterpreter" {
                         offset, sp := popStackItemWithoutCheck(sp)
                         size, sp := popStackItemWithoutCheck(sp)
                 
-                        checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
+                        checkOverflow(offset, size, evmGasLeft)
+                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
                         let keccak := keccak256(add(MEM_OFFSET_INNER(), offset), size)
                 
                         // When an offset is first accessed (either read or write), memory may trigger 
@@ -4945,6 +4954,7 @@ object "EVMInterpreter" {
                         checkMultipleOverflow(offset,size,MEM_OFFSET_INNER(), evmGasLeft)
                         checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER(), evmGasLeft)
                 
+                        // TODO invalid?
                         if or(gt(add(add(offset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM()), gt(add(add(destOffset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM())) {
                             $llvm_AlwaysInline_llvm$_memsetToZero(add(destOffset, MEM_OFFSET_INNER()), size)
                         }
@@ -5051,7 +5061,7 @@ object "EVMInterpreter" {
                 
                         // minimum_word_size = (size + 31) / 32
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
-                        checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                        checkMemOverflowByOffset(offset, evmGasLeft)
                         let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(add(dest, len)))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
@@ -5141,8 +5151,7 @@ object "EVMInterpreter" {
                 
                         offset, sp := popStackItem(sp, evmGasLeft)
                 
-                        checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                        checkMemOverflowByOffset(offset, evmGasLeft)
                         let expansionGas := expandMemory(add(offset, 32))
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
@@ -5159,8 +5168,7 @@ object "EVMInterpreter" {
                         offset, sp := popStackItemWithoutCheck(sp)
                         value, sp := popStackItemWithoutCheck(sp)
                 
-                        checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                        checkMemOverflowByOffset(offset, evmGasLeft)
                         let expansionGas := expandMemory(add(offset, 32))
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
@@ -5176,8 +5184,7 @@ object "EVMInterpreter" {
                         offset, sp := popStackItemWithoutCheck(sp)
                         value, sp := popStackItemWithoutCheck(sp)
                 
-                        checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                        checkMemOverflowByOffset(offset, evmGasLeft)
                         let expansionGas := expandMemory(add(offset, 1))
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
@@ -5354,8 +5361,9 @@ object "EVMInterpreter" {
                         offset, sp := popStackItemWithoutCheck(sp)
                         size, sp := popStackItemWithoutCheck(sp)
                 
-                        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
-                        checkMemOverflow(add(add(destOffset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                        // TODO overflow checks
+                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                        checkMemOverflowByOffset(add(destOffset, size), evmGasLeft)
                 
                         expandMemory(add(destOffset, size))
                         expandMemory(add(offset, size))
@@ -5799,8 +5807,8 @@ object "EVMInterpreter" {
                         offset, sp := popStackItemWithoutCheck(sp)
                         size, sp := popStackItemWithoutCheck(sp)
                 
-                        checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                        checkOverflow(offset, size, evmGasLeft)
+                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -5822,8 +5830,8 @@ object "EVMInterpreter" {
                         size, sp := popStackItemWithoutCheck(sp)
                         topic1, sp := popStackItemWithoutCheck(sp)
                 
-                        checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                        checkOverflow(offset, size, evmGasLeft)
+                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -5844,8 +5852,8 @@ object "EVMInterpreter" {
                         offset, sp := popStackItemWithoutCheck(sp)
                         size, sp := popStackItemWithoutCheck(sp)
                 
-                        checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                        checkOverflow(offset, size, evmGasLeft)
+                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -5873,9 +5881,8 @@ object "EVMInterpreter" {
                         offset, sp := popStackItemWithoutCheck(sp)
                         size, sp := popStackItemWithoutCheck(sp)
                 
-                        checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                
-                        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                        checkOverflow(offset, size, evmGasLeft)
+                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -5904,8 +5911,8 @@ object "EVMInterpreter" {
                         offset, sp := popStackItemWithoutCheck(sp)
                         size, sp := popStackItemWithoutCheck(sp)
                 
-                        checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                        checkOverflow(offset, size, evmGasLeft)
+                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -5986,6 +5993,7 @@ object "EVMInterpreter" {
                         offset, sp := popStackItemWithoutCheck(sp)
                         size, sp := popStackItemWithoutCheck(sp)
                 
+                        // TODO invalid?
                         ensureAcceptableMemLocation(offset)
                         ensureAcceptableMemLocation(size)
                         evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
