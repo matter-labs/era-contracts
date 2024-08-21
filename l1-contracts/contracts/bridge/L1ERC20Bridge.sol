@@ -220,7 +220,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             revert TokensWithFeesNotSupported();
         }
 
-        txHash = SHARED_BRIDGE.depositLegacyErc20Bridge{value: msg.value}({
+        l2TxHash = SHARED_BRIDGE.depositLegacyErc20Bridge{value: msg.value}({
             _prevMsgSender: msg.sender,
             _l2Receiver: _l2Receiver,
             _l1Token: _l1Token,

@@ -58,17 +58,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         L1_CHAIN_ID = _l1ChainId;
     }
 
-    /// @inheritdoc IMailbox
-    function transferEthToSharedBridge() external onlyBaseTokenBridge {
-        if (s.chainId != ERA_CHAIN_ID) {
-            revert OnlyEraSupported();
-        }
-
-        uint256 amount = address(this).balance;
-        address baseTokenBridgeAddress = s.baseTokenBridge;
-        IL1SharedBridge(baseTokenBridgeAddress).receiveEth{value: amount}(ERA_CHAIN_ID);
-    }
-
     /// @notice when requesting transactions through the bridgehub
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request

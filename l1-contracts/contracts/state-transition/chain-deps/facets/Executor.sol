@@ -378,9 +378,34 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         if (_hashStoredBatchInfo(_storedBatch) != s.storedBatchHashes[currentBatchNumber]) {
             revert BatchHashMismatch(s.storedBatchHashes[currentBatchNumber], _hashStoredBatchInfo(_storedBatch));
         }
-        if (priorityOperationsHash != _storedBatch.priorityOperationsHash) {
+        if (_priorityOperationsHash != _storedBatch.priorityOperationsHash) {
             revert PriorityOperationsRollingHashMismatch();
         }
+    }
+
+    /// @dev Executes one batch
+    /// @dev 1. Processes all pending operations (Complete priority requests)
+    /// @dev 2. Finalizes batch on Ethereum
+    /// @dev _executedBatchIdx is an index in the array of the batches that we want to execute together
+    function _executeOneBatch(StoredBatchInfo memory _storedBatch, uint256 _executedBatchIdx) internal {
+        bytes32 priorityOperationsHash = _collectOperationsFromPriorityQueue(_storedBatch.numberOfLayer1Txs);
+        _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash);
+
+        uint256 currentBatchNumber = _storedBatch.batchNumber;
+
+        // Save root hash of L2 -> L1 logs tree
+        s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
+
+        // Once the batch is executed, we include its message to the message root.
+        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+        messageRootContract.addChainBatchRoot(s.chainId, currentBatchNumber, _storedBatch.l2LogsTreeRoot);
+
+        // IBridgehub bridgehub = IBridgehub(s.bridgehub);
+        // bridgehub.messageRoot().addChainBatchRoot(
+        //     s.chainId,
+        //     _storedBatch.l2LogsTreeRoot,
+        //     block.chainid != bridgehub.L1_CHAIN_ID()
+        // );
     }
 
     /// @notice Executes one batch

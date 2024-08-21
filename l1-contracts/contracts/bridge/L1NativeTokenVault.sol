@@ -4,11 +4,11 @@ pragma solidity 0.8.24;
 
 // solhint-disable reason-string, gas-custom-errors
 
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
@@ -17,6 +17,8 @@ import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {BridgeHelper} from "./BridgeHelper.sol";
+
+import {Unauthorized, ZeroAddress, SharedBridgeValueAlreadySet, SharedBridgeKey, NoFundsTransferred, ZeroBalance, ValueMismatch, TokensWithFeesNotSupported, NonEmptyMsgValue, L2BridgeNotSet, TokenNotSupported, DepositIncorrectAmount, EmptyDeposit, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, InsufficientChainBalance, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, WithdrawFailed, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeBalanceMismatch, SharedBridgeValueNotSet} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -101,7 +103,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
     /// @notice Allows the bridge to register a token address for the vault.
     /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
     function registerToken(address _l1Token) external {
-        require(_l1Token != L1_WETH_TOKEN, "NTV: WETH deposit not supported");
+        if (_l1Token == L1_WETH_TOKEN) {
+            revert TokenNotSupported(L1_WETH_TOKEN);
+        }
         require(_l1Token == ETH_TOKEN_ADDRESS || _l1Token.code.length > 0, "NTV: empty token");
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
         L1_SHARED_BRIDGE.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_l1Token))), address(this));
@@ -119,7 +123,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
         uint256 amount;
         (amount, l1Receiver) = abi.decode(_data, (uint256, address));
         // Check that the chain has sufficient balance
-        require(chainBalance[_chainId][l1Token] >= amount, "NTV: not enough funds"); // not enough funds
+        if (chainBalance[_chainId][l1Token] < amount) {
+            revert InsufficientChainBalance();
+        }
         chainBalance[_chainId][l1Token] -= amount;
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
@@ -128,7 +134,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
             assembly {
                 callSuccess := call(gas(), l1Receiver, amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "NTV: withdrawal failed, no funds or cannot transfer to receiver");
+            if (!callSuccess) {
+                revert WithdrawFailed();
+            }
         } else {
             // Withdraw funds
             IERC20(l1Token).safeTransfer(l1Receiver, amount);
@@ -159,14 +167,22 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
                 _depositAmount = amount;
             }
 
-            require(_depositAmount == amount, "L1NTV: msg.value not equal to amount");
+            if (_depositAmount != amount) {
+                revert ValueMismatch(amount, msg.value);
+            }
         } else {
             // The Bridgehub also checks this, but we want to be sure
-            require(msg.value == 0, "NTV m.v > 0 b d.it");
+            if (msg.value != 0) {
+                revert NonEmptyMsgValue();
+            }
+
             amount = _depositAmount;
 
             uint256 expectedDepositAmount = _depositFunds(_prevMsgSender, IERC20(l1Token), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
-            require(expectedDepositAmount == _depositAmount, "5T"); // The token has non-standard transfer logic
+            // The token has non-standard transfer logic
+            if (amount != expectedDepositAmount) {
+                revert TokensWithFeesNotSupported();
+            }
         }
         require(amount != 0, "6T"); // empty deposit amount
 
@@ -198,10 +214,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
     ) external payable override onlyBridge whenNotPaused {
         (uint256 _amount, ) = abi.decode(_data, (uint256, address));
         address l1Token = tokenAddress[_assetId];
-        require(_amount > 0, "y1");
+        if (_amount == 0) {
+            revert NoFundsTransferred();
+        }
 
         // check that the chain has sufficient balance
-        require(chainBalance[_chainId][l1Token] >= _amount, "NTV: not enough funds 2");
+        if (chainBalance[_chainId][l1Token] < _amount) {
+            revert InsufficientChainBalance();
+        }
         chainBalance[_chainId][l1Token] -= _amount;
 
         if (l1Token == ETH_TOKEN_ADDRESS) {

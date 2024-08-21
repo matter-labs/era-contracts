@@ -343,7 +343,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @notice deploys a full set of chains contracts
     /// @param _chainId the chain's id
-    /// @param _baseToken the base token address used to pay for gas fees
+    /// @param _baseTokenAssetId the base token asset id used to pay for gas fees
     /// @param _sharedBridge the shared bridge address, used as base token bridge
     /// @param _admin the chain's admin address
     /// @param _diamondCut the diamond cut data that initializes the chains Diamond Proxy
@@ -389,7 +389,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             bytes32(uint256(uint160(validatorTimelock))),
             _baseTokenAssetId,
             bytes32(uint256(uint160(_sharedBridge))),
-            storedBatchZero
+            storedBatchZero,
             diamondCut.initCalldata
         );
 

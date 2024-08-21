@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 // solhint-disable gas-custom-errors
 
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
+import {MerklePathEmpty, MerklePathOutOfBounds, MerkleIndexOutOfBounds} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -23,9 +24,7 @@ library Merkle {
         bytes32 _itemHash
     ) internal pure returns (bytes32) {
         uint256 pathLength = _path.length;
-        require(pathLength > 0, "xc");
-        require(pathLength < 256, "bt");
-        require(_index < (1 << pathLength), "px");
+        _validatePathLengthForSingleProof(_index, pathLength);
 
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < pathLength; i = i.uncheckedInc()) {
@@ -50,10 +49,8 @@ library Merkle {
         bytes32 _itemHash
     ) internal pure returns (bytes32) {
         uint256 pathLength = _path.length;
-        require(pathLength > 0, "xc");
-        require(pathLength < 256, "bt");
-        require(_index < (1 << pathLength), "px");
-
+        _validatePathLengthForSingleProof(_index, pathLength);
+    
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < pathLength; i = i.uncheckedInc()) {
             currentHash = (_index % 2 == 0)
@@ -80,7 +77,9 @@ library Merkle {
     ) internal pure returns (bytes32) {
         uint256 pathLength = _startPath.length;
         require(pathLength == _endPath.length, "Merkle: path length mismatch");
-        require(pathLength < 256, "Merkle: path too long");
+        if (pathLength >= 256) {
+            revert MerklePathOutOfBounds();
+        }
         uint256 levelLen = _itemHashes.length;
         // Edge case: we want to be able to prove an element in a single-node tree.
         require(pathLength > 0 || (_startIndex == 0 && levelLen == 1), "Merkle: empty paths");
@@ -113,6 +112,18 @@ library Merkle {
             mstore(0x00, _lhs)
             mstore(0x20, _rhs)
             result := keccak256(0x00, 0x40)
+        }
+    }
+
+    function _validatePathLengthForSingleProof(uint256 _index, uint256 _pathLength) private pure {
+        if (_pathLength == 0) {
+            revert MerklePathEmpty();
+        }
+        if (_pathLength >= 256) {
+            revert MerklePathOutOfBounds();
+        }
+        if (_index >= (1 << _pathLength)) {
+            revert MerkleIndexOutOfBounds();
         }
     }
 }

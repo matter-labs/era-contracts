@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
 import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 import {EmptyDeposit, ValueMismatch, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
