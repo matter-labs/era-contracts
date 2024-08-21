@@ -14,6 +14,7 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
 import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
+import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -217,12 +218,12 @@ contract L1AssetRouterTest is Test {
 
         vm.mockCall(
             address(nativeTokenVault),
-            abi.encodeWithSelector(IL1AssetHandler.tokenAddress.selector, tokenAssetId),
+            abi.encodeWithSelector(IL1BaseTokenAssetHandler.tokenAddress.selector, tokenAssetId),
             abi.encode(address(token))
         );
         vm.mockCall(
             address(nativeTokenVault),
-            abi.encodeWithSelector(IL1AssetHandler.tokenAddress.selector, ETH_TOKEN_ASSET_ID),
+            abi.encodeWithSelector(IL1BaseTokenAssetHandler.tokenAddress.selector, ETH_TOKEN_ASSET_ID),
             abi.encode(address(ETH_TOKEN_ADDRESS))
         );
     }
