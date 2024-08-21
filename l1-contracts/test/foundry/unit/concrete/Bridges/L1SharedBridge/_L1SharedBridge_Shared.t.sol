@@ -5,7 +5,7 @@ import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";

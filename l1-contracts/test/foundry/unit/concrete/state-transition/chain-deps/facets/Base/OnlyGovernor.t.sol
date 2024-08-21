@@ -2,14 +2,14 @@
 
 pragma solidity 0.8.24;
 
-import {ZkSyncHyperchainBaseTest, ERROR_ONLY_ADMIN} from "./_Base_Shared.t.sol";
+import {ZkSyncHyperchainBaseTest} from "./_Base_Shared.t.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract OnlyAdminTest is ZkSyncHyperchainBaseTest {
     function test_revertWhen_calledByNonAdmin() public {
         address nonAdmin = makeAddr("nonAdmin");
 
-        vm.expectRevert(ERROR_ONLY_ADMIN);
-
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonAdmin));
         vm.startPrank(nonAdmin);
         testBaseFacet.functionWithOnlyAdminModifier();
     }

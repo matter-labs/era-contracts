@@ -8,6 +8,7 @@ import "forge-std/Test.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L1_GAS_PER_PUBDATA_BYTE, L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/common/Config.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
+import {BatchNotExecuted, HashedLogIsDefault} from "contracts/common/L1ContractErrors.sol";
 import {MurkyBase} from "murky/common/MurkyBase.sol";
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 import {TxStatus} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -52,7 +53,7 @@ contract MailboxL2LogsProve is MailboxTest {
     //     L2Message memory message = L2Message({txNumberInBatch: 0, sender: sender, data: data});
     //     bytes32[] memory proof = new bytes32[](0);
 
-    //     vm.expectRevert(bytes("xx"));
+    //     vm.expectRevert(abi.encodeWithSelector(BatchNotExecuted.selector, batchNumber + 1));
     //     mailboxFacet.proveL2MessageInclusion({
     //         _batchNumber: batchNumber + 1,
     //         _index: 0,
@@ -228,7 +229,7 @@ contract MailboxL2LogsProve is MailboxTest {
         bytes32[] memory fullProof = _appendProofMetadata(secondLogProof);
 
         // Prove log inclusion reverts
-        vm.expectRevert(bytes("tw"));
+        vm.expectRevert(HashedLogIsDefault.selector);
         mailboxFacet.proveL2LogInclusion({
             _batchNumber: batchNumber,
             _index: secondLogIndex,
