@@ -13,7 +13,7 @@ import { IL1NativeTokenVaultFactory } from "../../typechain/IL1NativeTokenVaultF
 
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
-import { ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig, encodeNTVAssetId } from "../../src.ts/utils";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
 import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
@@ -73,7 +73,8 @@ describe("Custom base token chain and bridge tests", () => {
 
   it("Should have correct base token", async () => {
     // we should still be able to deploy the erc20 bridge
-    const baseTokenAddressInBridgehub = await bridgehub.baseToken(chainId);
+    const baseTokenAssetId = encodeNTVAssetId(deployer.l1ChainId, ethers.utils.hexZeroPad(baseTokenAddress, 32));
+    const baseTokenAddressInBridgehub = await bridgehub.baseToken(baseTokenAssetId);
     expect(baseTokenAddress).equal(baseTokenAddressInBridgehub);
   });
 

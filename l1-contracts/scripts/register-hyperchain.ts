@@ -2,13 +2,13 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
 import { Command } from "commander";
-import { Wallet } from "ethers";
+import { Wallet, utils } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
 import { Deployer } from "../src.ts/deploy";
 import { GAS_MULTIPLIER, web3Provider } from "./utils";
-import { ADDRESS_ONE } from "../src.ts/utils";
+import { ADDRESS_ONE, encodeNTVAssetId } from "../src.ts/utils";
 import { getTokens } from "../src.ts/deploy-token";
 
 const ETH_TOKEN_ADDRESS = ADDRESS_ONE;
@@ -66,7 +66,8 @@ async function main() {
     .option("--validium-mode")
     .option("--base-token-name <base-token-name>")
     .option("--base-token-address <base-token-address>")
-    .option("--use-governance")
+    .option("--use-governance <use-governance>")
+    .option("--token-multiplier-setter-address <token-multiplier-setter-address>")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -91,13 +92,15 @@ async function main() {
         deployWallet,
         ownerAddress,
         verbose: true,
+        l1ChainId: process.env.CONTRACTS_ETH_CHAIN_ID || "31337",
       });
 
       const baseTokenAddress = await chooseBaseTokenAddress(cmd.baseTokenName, cmd.baseTokenAddress);
       await checkTokenAddress(baseTokenAddress);
       console.log(`Using base token address: ${baseTokenAddress}`);
       console.log(deployer.addresses.Bridgehub.BridgehubProxy);
-      if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
+      const baseTokenAssetId = encodeNTVAssetId(deployer.l1ChainId, utils.hexZeroPad(baseTokenAddress, 32));
+      if (!(await deployer.bridgehubContract(deployWallet).assetIdIsRegistered(baseTokenAssetId))) {
         await deployer.registerTokenBridgehub(baseTokenAddress, cmd.useGovernance);
       }
       await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
@@ -111,6 +114,12 @@ async function main() {
         null,
         cmd.useGovernance
       );
+
+      const tokenMultiplierSetterAddress = cmd.tokenMultiplierSetterAddress || "";
+      if (tokenMultiplierSetterAddress != "") {
+        console.log(`Using token multiplier setter address: ${tokenMultiplierSetterAddress}`);
+        await deployer.setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress);
+      }
       await deployer.transferAdminFromDeployerToChainAdmin();
     });
 

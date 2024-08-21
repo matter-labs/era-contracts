@@ -114,14 +114,12 @@ interface IStateTransitionManager {
 
     function createNewChain(
         uint256 _chainId,
-        address _baseToken,
+        bytes32 _baseTokenAssetId,
         address _sharedBridge,
         address _admin,
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
     ) external returns (address);
-
-    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external;
 
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,

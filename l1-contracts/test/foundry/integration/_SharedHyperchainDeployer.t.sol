@@ -118,8 +118,8 @@ contract HyperchainDeployer is L1ContractDeployer {
         return bridgeHub.getHyperchain(_chainId);
     }
 
-    function getHyperchainBaseToken(uint256 _chainId) public view returns (address) {
-        return bridgeHub.baseToken(_chainId);
+    function getHyperchainBaseToken(bytes32 _baseTokenAssetId) public view returns (address) {
+        return bridgeHub.baseToken(_baseTokenAssetId);
     }
 
     function acceptPendingAdmin() public {

@@ -8,6 +8,8 @@ import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 
+/// @title DummyBridgehub
+/// @notice A test smart contract that allows to set State Transition Manager for a given chain
 contract DummyBridgehub {
     IMessageRoot public messageRoot;
 

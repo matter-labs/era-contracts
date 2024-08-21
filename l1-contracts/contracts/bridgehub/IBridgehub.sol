@@ -73,9 +73,9 @@ interface IBridgehub is IL1AssetHandler {
 
     function stateTransitionManager(uint256 _chainId) external view returns (address);
 
-    function tokenIsRegistered(address _baseToken) external view returns (bool);
+    function assetIdIsRegistered(bytes32 _baseTokenAssetId) external view returns (bool);
 
-    function baseToken(uint256 _chainId) external view returns (address);
+    function baseToken(bytes32 _baseTokenAssetId) external view returns (address);
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
@@ -139,7 +139,7 @@ interface IBridgehub is IL1AssetHandler {
     function createNewChain(
         uint256 _chainId,
         address _stateTransitionManager,
-        address _baseToken,
+        bytes32 _baseTokenAssetId,
         uint256 _salt,
         address _admin,
         bytes calldata _initData,
@@ -150,7 +150,7 @@ interface IBridgehub is IL1AssetHandler {
 
     function removeStateTransitionManager(address _stateTransitionManager) external;
 
-    function addToken(address _token) external;
+    function addTokenAssetId(bytes32 _baseTokenAssetId) external;
 
     function setAddresses(
         address _sharedBridge,
@@ -164,9 +164,7 @@ interface IBridgehub is IL1AssetHandler {
 
     event StateTransitionManagerRemoved(address indexed stateTransitionManager);
 
-    event TokenRegistered(address indexed token);
-
-    event SharedBridgeUpdated(address indexed sharedBridge);
+    event BaseTokenAssetIdRegistered(bytes32 indexed assetId);
 
     function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
 

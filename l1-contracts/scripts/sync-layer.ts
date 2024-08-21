@@ -273,6 +273,10 @@ async function main() {
       const timelock = deployer.validatorTimelock(deployer.deployWallet);
 
       for (const operator of operators) {
+        if (await timelock.validators(currentChainId, operator)) {
+          continue;
+        }
+
         await deployer.deployWallet.sendTransaction({
           to: operator,
           value: ethers.utils.parseEther("5"),
@@ -287,13 +291,7 @@ async function main() {
       );
       deployer.addresses.Bridgehub.BridgehubProxy = getAddressFromEnv("GATEWAY_BRIDGEHUB_PROXY_ADDR");
 
-      // FIXME? Do we want to
-      console.log("Setting default token multiplier");
-
       const hyperchain = deployer.stateTransitionContract(deployer.deployWallet);
-
-      console.log("The default ones token multiplier");
-      await (await hyperchain.setTokenMultiplier(1, 1)).wait();
 
       console.log("Setting SL DA validators");
       // This logic should be distinctive between Validium and Rollup
@@ -315,14 +313,13 @@ async function registerSLContractsOnL1(deployer: Deployer) {
 
   console.log(`Gateway chain Id: ${chainId}`);
 
-  const l1STM = deployer.stateTransitionManagerContract(deployer.deployWallet);
   const l1Bridgehub = deployer.bridgehubContract(deployer.deployWallet);
   console.log(deployer.addresses.StateTransition.StateTransitionProxy);
   const gatewayAddress = await l1STM.getHyperchain(chainId);
   // this script only works when owner is the deployer
   console.log("Registering Gateway chain id on the STM");
   const receipt1 = await deployer.executeUpgrade(
-    l1STM.address,
+    l1Bridgehub.address,
     0,
     l1Bridgehub.interface.encodeFunctionData("registerSettlementLayer", [chainId, true])
   );
@@ -351,7 +348,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   const receipt2 = await deployer.executeUpgrade(
     l1Bridgehub.address,
     ethIsBaseToken ? value : 0,
-    l1Bridgehub.encodeFunctionData("requestL2TransactionTwoBridges", [
+    l1Bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
       {
         chainId,
         mintValue: value,
@@ -363,7 +360,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
         secondBridgeValue: 0,
         secondBridgeCalldata:
           "0x02" +
-          ethers.utils.defaultAbiCoder.encode(["address", "address"], [assetId, L2_BRIDGEHUB_ADDRESS]).slice(2),
+          ethers.utils.defaultAbiCoder.encode(["bytes32", "address"], [assetId, L2_BRIDGEHUB_ADDRESS]).slice(2),
       },
     ])
   );

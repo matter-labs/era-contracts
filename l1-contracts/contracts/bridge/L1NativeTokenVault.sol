@@ -12,7 +12,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
-
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
@@ -23,7 +22,7 @@ import {BridgeHelper} from "./BridgeHelper.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the ZK chains.
 /// @dev Designed for use with a proxy for upgradability.
-contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, Ownable2StepUpgradeable, PausableUpgradeable {
+contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token on L1.
