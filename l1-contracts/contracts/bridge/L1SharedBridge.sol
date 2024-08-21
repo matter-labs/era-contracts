@@ -89,6 +89,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// NOTE: this function may be removed in the future, don't rely on it!
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 
+    /// @dev Admin has the ability to register new chains within the shared bridge.
+    address public admin;
+
+    /// @dev The pending admin, i.e. the candidate to the admin role.
+    address public pendingAdmin;
+
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
         require(msg.sender == address(BRIDGE_HUB), "ShB not BH");
@@ -116,6 +122,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         _;
     }
 
+    /// @notice Checks that the message sender is either the owner or admin.
+    modifier onlyOwnerOrAdmin() {
+        require(msg.sender == owner() || msg.sender == admin, "ShB not owner or admin");
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
@@ -137,6 +149,31 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     function initialize(address _owner) external reentrancyGuardInitializer initializer {
         require(_owner != address(0), "ShB owner 0");
         _transferOwnership(_owner);
+    }
+
+    /// @inheritdoc IL1SharedBridge
+    /// @dev Please note, if the owner wants to enforce the admin change it must execute both `setPendingAdmin` and
+    /// `acceptAdmin` atomically. Otherwise `admin` can set different pending admin and so fail to accept the admin rights.
+    function setPendingAdmin(address _newPendingAdmin) external onlyOwnerOrAdmin {
+        // Save previous value into the stack to put it into the event later
+        address oldPendingAdmin = pendingAdmin;
+        // Change pending admin
+        pendingAdmin = _newPendingAdmin;
+        emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
+    }
+
+    /// @inheritdoc IL1SharedBridge
+    /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
+    function acceptAdmin() external {
+        address currentPendingAdmin = pendingAdmin;
+        require(msg.sender == currentPendingAdmin, "ShB not pending admin"); // Only proposed by current admin address can claim the admin rights
+
+        address previousAdmin = admin;
+        admin = currentPendingAdmin;
+        delete pendingAdmin;
+
+        emit NewPendingAdmin(currentPendingAdmin, address(0));
+        emit NewAdmin(previousAdmin, currentPendingAdmin);
     }
 
     /// @dev This sets the first post diamond upgrade batch for era, used to check old eth withdrawals
@@ -207,7 +244,21 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev Initializes the l2Bridge address by governance for a specific chain.
-    function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwner {
+    /// @param _chainId The chain ID for which the l2Bridge address is being initialized.
+    /// @param _l2BridgeAddress The address of the L2 bridge contract.
+    function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwnerOrAdmin {
+        require(l2BridgeAddress[_chainId] == address(0), "ShB: l2 bridge already set");
+        require(_l2BridgeAddress != address(0), "ShB: l2 bridge 0");
+        l2BridgeAddress[_chainId] = _l2BridgeAddress;
+    }
+
+    /// @dev Reinitializes the l2Bridge address by governance for a specific chain.
+    /// @dev Only accessible to the owner of the bridge to prevent malicious admin from changing the bridge address for
+    /// an existing chain.
+    /// @param _chainId The chain ID for which the l2Bridge address is being initialized.
+    /// @param _l2BridgeAddress The address of the L2 bridge contract.
+    function reinitializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwner {
+        require(l2BridgeAddress[_chainId] != address(0), "ShB: l2 bridge not yet set");
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
     }
 
