@@ -23,6 +23,7 @@ import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 
 contract GatewayScript is Script {
     using stdToml for string;
@@ -155,7 +156,7 @@ contract GatewayScript is Script {
         bytes32 stmAssetId = bridgehub.stmAssetIdFromChainId(config.chainChainId);
         bytes memory diamondCutData = config.diamondCutData; // todo replace with config.zkDiamondCutData;
         bytes memory stmData = abi.encode(newAdmin, diamondCutData);
-        bytes memory chainData = abi.encode(address(1));
+        bytes memory chainData = abi.encode(AdminFacet(address(chain)).prepareChainCommitment());
         bytes memory bridgehubData = abi.encode(config.chainChainId, stmData, chainData);
         bytes memory routerData = bytes.concat(bytes1(0x01), abi.encode(stmAssetId, bridgehubData));
 

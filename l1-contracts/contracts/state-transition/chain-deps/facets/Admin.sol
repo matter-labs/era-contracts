@@ -228,16 +228,16 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     function forwardedBridgeBurn(
         address _settlementLayer,
         address _prevMsgSender,
-        bytes calldata
+        bytes calldata _data
     ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
         require(s.settlementLayer == address(0), "Af: already migrated");
         require(_prevMsgSender == s.admin, "Af: not chainAdmin");
-        IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
+
+        HyperchainCommitment memory chainCommitment = abi.decode(_data, (HyperchainCommitment));
 
         uint256 currentProtocolVersion = s.protocolVersion;
-        uint256 protocolVersion = stm.protocolVersion();
 
-        require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
+        require(currentProtocolVersion == chainCommitment.protocolVersion, "STM: protocolVersion not up to date");
 
         s.settlementLayer = _settlementLayer;
         chainBridgeMintData = abi.encode(prepareChainCommitment());
@@ -292,16 +292,20 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         uint256 /* _chainId */,
         bytes32 /* _assetInfo */,
         address _prevMsgSender,
-        bytes calldata /* _data */
+        bytes calldata _data
     ) external payable override onlyBridgehub {
+        (, , , , /* depositAmount */ /* l2Receiver */ /* chainId */ /* stmData */ bytes memory _chainData) = abi.decode(
+            _data,
+            (uint256, address, uint256, bytes, bytes)
+        );
+        HyperchainCommitment memory chainCommitment = abi.decode(_chainData, (HyperchainCommitment));
+
         require(s.settlementLayer != address(0), "Af: not migrated");
         require(_prevMsgSender == s.admin, "Af: not chainAdmin");
-        IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
 
         uint256 currentProtocolVersion = s.protocolVersion;
-        uint256 protocolVersion = stm.protocolVersion();
 
-        require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
+        require(currentProtocolVersion == chainCommitment.protocolVersion, "STM: protocolVersion not up to date");
 
         s.settlementLayer = address(0);
     }
@@ -318,6 +322,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         commitment.l2SystemContractsUpgradeBatchNumber = s.l2SystemContractsUpgradeBatchNumber;
         commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         commitment.priorityTree = s.priorityTree.getCommitment();
+        commitment.protocolVersion = s.protocolVersion;
 
         // just in case
         require(

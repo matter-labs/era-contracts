@@ -168,7 +168,7 @@ interface IStateTransitionManager {
     function bridgeClaimFailedBurn(
         uint256 _chainId,
         bytes32 _assetInfo,
-        address _prevMsgSender,
+        address _depositSender,
         bytes calldata _data
     ) external;
 }

@@ -656,7 +656,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
     /// @param _chainId the chainId of the chain
     /// @param _assetId the assetId of the chain's STM
-    /// @param _data the data for the recovery
+    /// @param _data the data for the recovery. The structure for this data is:
+    ///              depositAmount || l2Receiver || chainId || stmData || chainData
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
@@ -668,7 +669,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         IStateTransitionManager(stateTransitionManager[_chainId]).bridgeClaimFailedBurn({
             _chainId: _chainId,
             _assetInfo: _assetId,
-            _prevMsgSender: _depositSender,
+            _depositSender: _depositSender,
             _data: _data
         });
 

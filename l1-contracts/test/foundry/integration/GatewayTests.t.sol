@@ -172,16 +172,25 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
 
         // Setup
         IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
+        IStateTransitionManager stm = IStateTransitionManager(l1Script.getSTM());
+        bytes32 assetId = bridgehub.stmAssetIdFromChainId(migratingChainId);
+        bytes memory transferData;
+
+        {
+            IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId));
+            bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
+            bytes memory chainData = abi.encode(AdminFacet(address(chain)).prepareChainCommitment());
+            bytes memory stmData = abi.encode(address(1), msg.sender, stm.protocolVersion(), initialDiamondCut);
+            transferData = abi.encode(uint256(1), address(0), migratingChainId, stmData, chainData);
+        }
+
         address chainAdmin = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId)).getAdmin();
         IL1AssetRouter assetRouter = bridgehub.sharedBridge();
-        bytes32 assetId = bridgehub.stmAssetIdFromChainId(migratingChainId);
         bytes32 l2TxHash = keccak256("l2TxHash");
         uint256 l2BatchNumber = 5;
         uint256 l2MessageIndex = 0;
         uint16 l2TxNumberInBatch = 0;
         bytes32[] memory merkleProof = new bytes32[](1);
-        TxStatus status = TxStatus.Failure;
-        bytes memory transferData = abi.encode(1, address(0));
         bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(chainAdmin, assetId, transferData)));
 
         // Mock Call for Msg Inclusion
@@ -195,7 +204,7 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
                 l2MessageIndex,
                 l2TxNumberInBatch,
                 merkleProof,
-                status
+                TxStatus.Failure
             ),
             abi.encode(true)
         );
