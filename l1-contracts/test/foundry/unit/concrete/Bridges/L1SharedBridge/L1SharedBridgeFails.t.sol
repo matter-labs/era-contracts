@@ -21,7 +21,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         vm.expectRevert("ShB owner 0");
         new TransparentUpgradeableProxy(
             address(sharedBridgeImpl),
-            admin,
+            proxyAdmin,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(L1SharedBridge.initialize.selector, address(0), eraPostUpgradeFirstBatch)
         );
