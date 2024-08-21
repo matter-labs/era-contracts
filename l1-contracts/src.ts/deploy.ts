@@ -64,7 +64,7 @@ import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory"
 import type { FacetCut } from "./diamondCut";
 import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
-import { BridgehubFactory, ChainAdminFactory, ERC20Factory, StateTransitionManagerFactory } from "../typechain";
+import { AdminFacetFactory, BridgehubFactory, ChainAdminFactory, ERC20Factory, StateTransitionManagerFactory } from "../typechain";
 
 import { IL1AssetRouterFactory } from "../typechain/IL1AssetRouterFactory";
 import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
@@ -1108,6 +1108,9 @@ export class Deployer {
 
   // Main function to move the current chain (that is hooked to l1), on top of the syncLayer chain.
   public async moveChainToGateway(gatewayChainId: string, gasPrice: BigNumberish) {
+    
+    const adminFacet = AdminFacetFactory.connect(this.addresses.StateTransition.AdminFacet, this.deployWallet);
+    const chainData = adminFacet.prepareChainCommitment();
     const bridgehub = this.bridgehubContract(this.deployWallet);
     // Just some large gas limit that should always be enough
     const l2GasLimit = ethers.BigNumber.from(72_000_000);
@@ -1121,7 +1124,6 @@ export class Deployer {
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
     const stmData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [newAdmin, initialDiamondCut]);
-    const chainData = new ethers.utils.AbiCoder().encode(["uint256"], [ADDRESS_ONE]); // empty for now
     const bridgehubData = new ethers.utils.AbiCoder().encode(
       ["uint256", "bytes", "bytes"],
       [this.chainId, stmData, chainData]
