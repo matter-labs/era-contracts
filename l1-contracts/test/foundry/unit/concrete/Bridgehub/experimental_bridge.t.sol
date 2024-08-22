@@ -51,9 +51,7 @@ contract ExperimentalBridgeTest is Test {
     bytes32 private constant LOCK_FLAG_ADDRESS = 0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4;
 
     bytes32 ETH_TOKEN_ASSET_ID =
-        keccak256(
-            abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
-        );
+        keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS)))));
 
     TestnetERC20Token testToken6;
     TestnetERC20Token testToken8;
