@@ -121,8 +121,8 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
 
     /// @dev Gets the aggregated root of all chains.
     function getAggregatedRoot() external view returns (bytes32) {
-        if (sharedTree._nodes.length == 0) {
-            return bytes32(0);
+        if (chainCount == 0) {
+            return SHARED_ROOT_TREE_EMPTY_HASH;
         }
         return sharedTree.root();
     }
