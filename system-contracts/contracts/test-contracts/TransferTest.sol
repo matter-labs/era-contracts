@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.20;
 
 contract TransferTest {
     function transfer(address payable to, uint256 amount, bool warmUpRecipient) public payable {

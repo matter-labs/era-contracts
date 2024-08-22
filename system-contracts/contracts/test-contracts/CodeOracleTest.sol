@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.20;
 
 address constant REAL_CODE_ORACLE_ADDR = 0x0000000000000000000000000000000000008011;
 
