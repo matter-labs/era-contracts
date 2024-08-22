@@ -97,6 +97,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice we store registered assetIds (for arbitrary base token)
     mapping(bytes32 baseTokenAssetId => bool) public assetIdIsRegistered;
 
+    /// @notice chain balance STM address
+    address public chainBalanceSTM;
+
+    /// @notice chain balance address
+    mapping(uint256 chainId => address) public chainBalanceAddress;
+
     modifier onlyOwnerOrAdmin() {
         require(msg.sender == admin || msg.sender == owner(), "BH: not owner or admin");
         _;
