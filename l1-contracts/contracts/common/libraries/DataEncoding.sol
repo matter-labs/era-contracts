@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../L2ContractAddresses.sol";
 
 /**
  * @author Matter Labs
@@ -77,7 +77,7 @@ library DataEncoding {
     /// @param _assetData The asset data that has to be encoded.
     /// @return The encoded asset data.
     function encodeNTVAssetId(uint256 _chainId, bytes32 _assetData) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_chainId, L2_NATIVE_TOKEN_VAULT_ADDRESS, _assetData));
+        return keccak256(abi.encode(_chainId, L2_NATIVE_TOKEN_VAULT_ADDR, _assetData));
     }
 
     /// @notice Encodes the asset data by combining chain id, NTV as asset deployment tracker and asset data.
@@ -85,6 +85,6 @@ library DataEncoding {
     /// @param _tokenAddress The address of token that has to be encoded (asset data is the address itself).
     /// @return The encoded asset data.
     function encodeNTVAssetId(uint256 _chainId, address _tokenAddress) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_chainId, L2_NATIVE_TOKEN_VAULT_ADDRESS, _tokenAddress));
+        return keccak256(abi.encode(_chainId, L2_NATIVE_TOKEN_VAULT_ADDR, _tokenAddress));
     }
 }

@@ -8,7 +8,7 @@ import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.so
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {IL1NativeTokenVault} from "../../bridge/L1NativeTokenVault.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../../common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IL2Bridge} from "../../bridge/interfaces/IL2Bridge.sol";
 import {IL2BridgeLegacy} from "../../bridge/interfaces/IL2BridgeLegacy.sol";
@@ -217,7 +217,7 @@ contract DummySharedBridge is PausableUpgradeable {
 
     /// @dev Used to set the assedAddress for a given assetId.
     function setAssetHandlerAddressThisChain(bytes32 _additionalData, address _assetHandlerAddress) external {
-        address sender = msg.sender == address(nativeTokenVault) ? L2_NATIVE_TOKEN_VAULT_ADDRESS : msg.sender;
+        address sender = msg.sender == address(nativeTokenVault) ? L2_NATIVE_TOKEN_VAULT_ADDR : msg.sender;
         bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData));
         assetHandlerAddress[assetId] = _assetHandlerAddress;
         // assetDeploymentTracker[assetId] = sender;

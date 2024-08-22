@@ -4,7 +4,7 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "./Utils.sol";
-import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT} from "contracts/common/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_MESSAGE_ROOT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ForceDeployment} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
@@ -114,7 +114,7 @@ contract GenerateForceDeploymentsData is Script {
 
         forceDeployments[2] = ForceDeployment({
             bytecodeHash: keccak256(contracts.l2NtvBytecode),
-            newAddress: L2_NATIVE_TOKEN_VAULT_ADDRESS,
+            newAddress: L2_NATIVE_TOKEN_VAULT_ADDR,
             callConstructor: true,
             value: 0,
             // solhint-disable-next-line func-named-parameters
@@ -130,11 +130,11 @@ contract GenerateForceDeploymentsData is Script {
 
         forceDeployments[3] = ForceDeployment({
             bytecodeHash: keccak256(contracts.messageRootBytecode),
-            newAddress: L2_MESSAGE_ROOT,
+            newAddress: L2_MESSAGE_ROOT_ADDR,
             callConstructor: true,
             value: 0,
             // solhint-disable-next-line func-named-parameters
-            input: L2_BRIDGEHUB_ADDR
+            input: abi.encode(L2_BRIDGEHUB_ADDR)
         });
 
         config.forceDeploymentsData = abi.encode(forceDeployments);

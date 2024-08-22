@@ -47,4 +47,7 @@ address constant L2_ASSET_ROUTER_ADDR = address(0x10003);
 /// @dev An l2 system contract address, used in the assetId calculation for native assets.
 /// This is needed for automatic bridging, i.e. without deploying the AssetHandler contract,
 /// if the assetId can be calculated with this address then it is in fact an NTV asset
-address constant L2_NATIVE_TOKEN_VAULT_ADDRESS = address(0x10004);
+address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(0x10004);
+
+/// @dev the address of the l2 asse3t router.
+address constant L2_MESSAGE_ROOT_ADDR = address(0x10005);
