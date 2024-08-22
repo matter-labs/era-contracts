@@ -25,7 +25,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDG
 
 import {IL1AssetRouter} from "../../../bridge/interfaces/IL1AssetRouter.sol";
 
-import {OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow} from "../../../common/L1ContractErrors.sol";
+import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -171,6 +171,10 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
+        if (_proof.length == 0) {
+            revert MerklePathEmpty();
+        }
+
         uint256 ptr = 0;
         bytes32 chainIdLeaf;
         {
