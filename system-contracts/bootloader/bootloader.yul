@@ -1892,7 +1892,7 @@ object "Bootloader" {
                 debugLog("from", from)
                 debugLog("gasPrice", gasPrice)
 
-                // We assume that addresses of smart contracts on zkSync and Ethereum
+                // We assume that addresses of smart contracts on ZKsync and Ethereum
                 // never overlap, so no need to check whether `from` is an EOA here.
                 debugLog("setting tx origin", from)
 
@@ -2609,7 +2609,7 @@ object "Bootloader" {
             }
 
             ///
-            /// zkSync-specific utilities:
+            /// ZKsync-specific utilities:
             ///
 
             /// @dev Returns an ABI that can be used for low-level
