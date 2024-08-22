@@ -17,6 +17,10 @@ contract EvmGasManager {
         bool isWarm;
     }
 
+    struct AccountInfo {
+        bool isEVM;
+    }
+    
     struct SlotInfo {
         bool warm;
         uint256 originalValue;
@@ -28,10 +32,6 @@ contract EvmGasManager {
         uint256 passGas;
     }
 
-    struct AccountInfo {
-        bool isEVM;
-    }
-
     // The following storage variables are not used anywhere explicitly and are just used to obtain the storage pointers
     // to use the transient storage with.
     mapping(address => WarmAccountInfo) private warmAccounts;
@@ -39,50 +39,8 @@ contract EvmGasManager {
     EVMStackFrameInfo[] private evmStackFrames;
     mapping(address => AccountInfo) private isAccountEVM;
 
-    function tstoreWarmAccount(address account, bool isWarm) internal {
-        WarmAccountInfo storage ptr = warmAccounts[account];
-
-        assembly {
-            tstore(ptr.slot, isWarm)
-        }
-    }
-
-    function tloadWarmAccount(address account) internal returns (bool isWarm) {
-        WarmAccountInfo storage ptr = warmAccounts[account];
-
-        assembly {
-            isWarm := tload(ptr.slot)
-        }
-    }
-
-    function tstoreWarmSlot(address _account, uint256 _key, SlotInfo memory info) internal {
-        SlotInfo storage ptr = warmSlots[_account][_key];
-
-        bool warm = info.warm;
-        uint256 originalValue = info.originalValue;
-
-        assembly {
-            tstore(ptr.slot, warm)
-            tstore(add(ptr.slot, 1), originalValue)
-        }
-    }
-
-    function tloadWarmSlot(address _account, uint256 _key) internal view returns (SlotInfo memory info) {
-        SlotInfo storage ptr = warmSlots[_account][_key];
-
-        bool isWarm;
-        uint256 originalValue;
-
-        assembly {
-            isWarm := tload(ptr.slot)
-            originalValue := tload(add(ptr.slot, 1))
-        }
-
-        info.warm = isWarm;
-        info.originalValue = originalValue;
-    }
-
     modifier onlySystemEvm() {
+        // cache use is safe since we do not support SELFDESTRUCT
         AccountInfo storage ptr = isAccountEVM[msg.sender];
         bool isEVM;
         assembly {
@@ -108,27 +66,46 @@ contract EvmGasManager {
     function warmAccount(address account) external payable onlySystemEvm returns (bool wasWarm) {
         if (uint160(account) < PRECOMPILES_END) return true;
 
-        wasWarm = tloadWarmAccount(account);
-        if (!wasWarm) tstoreWarmAccount(account, true);
-    }
+        WarmAccountInfo storage ptr = warmAccounts[account];
 
-    function isSlotWarm(uint256 _slot) external view returns (bool) {
-        return tloadWarmSlot(msg.sender, _slot).warm;
-    }
-
-    function warmSlot(uint256 _slot, uint256 _currentValue) external payable onlySystemEvm returns (bool, uint256) {
-        SlotInfo memory info = tloadWarmSlot(msg.sender, _slot);
-
-        if (info.warm) {
-            return (true, info.originalValue);
+        assembly {
+            wasWarm := tload(ptr.slot)
         }
 
-        info.warm = true;
-        info.originalValue = _currentValue;
+        if (!wasWarm) {
+            assembly {
+                tstore(ptr.slot, 1)
+            }
+        }
+    }
 
-        tstoreWarmSlot(msg.sender, _slot, info);
+    function isSlotWarm(uint256 _slot) external view returns (bool isWarm) {
+        SlotInfo storage ptr = warmSlots[msg.sender][_slot];
 
-        return (false, _currentValue);
+        assembly {
+            isWarm := tload(ptr.slot)
+        }
+    }
+
+    function warmSlot(uint256 _slot, uint256 _currentValue) external payable onlySystemEvm returns (bool isWarm, uint256 originalValue) {
+        SlotInfo storage ptr = warmSlots[msg.sender][_slot];
+
+        assembly {
+            isWarm := tload(ptr.slot)
+        }
+
+        if (isWarm) {
+            assembly {
+                originalValue := tload(add(ptr.slot, 1))
+            }
+        } else {
+            originalValue = _currentValue;
+
+            assembly {
+                tstore(ptr.slot, 1)
+                tstore(add(ptr.slot, 1), originalValue)
+            }
+        }
     }
 
     /*
