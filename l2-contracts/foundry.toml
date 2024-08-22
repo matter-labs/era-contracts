@@ -11,9 +11,13 @@ ignored_error_codes = ["missing-receive-ether", "code-size"]
 ignored_warnings_from = ["test", "contracts/dev-contracts"]
 remappings = [
     "forge-std/=lib/forge-std/src/",
-    "foundry-test/=test/foundry/",
+    "foundry-test/=test/foundry/"
 ]
 fs_permissions = [
     { access = "read", path = "zkout" },
+    { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
+    { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed" }
 ]
 
+[profile.default.zksync] 
+enable_eravm_extensions = true
