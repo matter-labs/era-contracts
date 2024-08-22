@@ -3,49 +3,49 @@
     "contractName": "AccountCodeStorage",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/AccountCodeStorage.sol/AccountCodeStorage.json",
     "sourceCodePath": "contracts-preprocessed/AccountCodeStorage.sol",
-    "bytecodeHash": "0x0100005d64619baff70736b321ae7fc72e6d9f724347b8f122c73ef89d159863",
-    "sourceCodeHash": "0x5d544ebe1b1d4f99fe4410c9be644cd0b407109e30f632e968b484bf2d456994"
+    "bytecodeHash": "0x0100005d385d1fb32be13f7c8748e88765ff3f1eb518e2406470ad380b53a2fc",
+    "sourceCodeHash": "0xc861a384939be0b103ad23666880370afc23ce9a642e412f80f0b3582a89902d"
   },
   {
     "contractName": "BootloaderUtilities",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/BootloaderUtilities.sol/BootloaderUtilities.json",
     "sourceCodePath": "contracts-preprocessed/BootloaderUtilities.sol",
-    "bytecodeHash": "0x010007c7288dc176003cc849cf9f416a3044acfb8dc5a765f913aeddeeaa9049",
-    "sourceCodeHash": "0x26060f33c7c63bd1f8a1a2f3b368b97ef8dd939bc53e95090f2c556248b99dce"
+    "bytecodeHash": "0x010007c788938e611381724c5d4796076ba5410cf71caaecc599a38e0ca98b01",
+    "sourceCodeHash": "0x9d2b7376c4cd9b143ddd5dfe001a9faae99b9125ccd45f2915c3ce0099643ed9"
   },
   {
     "contractName": "ComplexUpgrader",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/ComplexUpgrader.sol/ComplexUpgrader.json",
     "sourceCodePath": "contracts-preprocessed/ComplexUpgrader.sol",
-    "bytecodeHash": "0x0100004d0baa3ea2154890efb215a755bb7dc83b1d4ce3d006b7ee915fb3a69c",
+    "bytecodeHash": "0x0100004d6d16b95dde28122fb471a60e8d2aa7733949aebab0b2b9f2ca7320ed",
     "sourceCodeHash": "0xdde7c49a94cc3cd34c3e7ced1b5ba45e4740df68d26243871edbe393e7298f7a"
   },
   {
     "contractName": "Compressor",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/Compressor.sol/Compressor.json",
     "sourceCodePath": "contracts-preprocessed/Compressor.sol",
-    "bytecodeHash": "0x0100014f56e04fc62384e7b4fcd95886169e81e0baeecb53fd1ed9220302dcf5",
+    "bytecodeHash": "0x0100014f2ce590b007133dccdbee0a9371adc2723c275cc788da976b7aa150fa",
     "sourceCodeHash": "0x11646629bb325ba0f343b8d9c99ee60ac847db28841e25e16df8f3d1dd442c7e"
   },
   {
     "contractName": "ContractDeployer",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/ContractDeployer.sol/ContractDeployer.json",
     "sourceCodePath": "contracts-preprocessed/ContractDeployer.sol",
-    "bytecodeHash": "0x010004e5ae40ac1d3e2a5341f3e9ff1e6f389cc318d34bf6cd3ddb8f24db7b96",
-    "sourceCodeHash": "0x73056341b4db6b90b6486b36a67b775f857d75641d5759ef7cfa549e1eef5569"
+    "bytecodeHash": "0x010004e59de74a9f8a1adbab5ed0e10c0b7ccd37c4cf88418742d7d68c723bc0",
+    "sourceCodeHash": "0x8effe1fc252532f18ca6e5dd3aea2cec3739eb30ecfb34ede4c965273da891d9"
   },
   {
     "contractName": "Create2Factory",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/Create2Factory.sol/Create2Factory.json",
     "sourceCodePath": "contracts-preprocessed/Create2Factory.sol",
-    "bytecodeHash": "0x010000494b831ba9201da08e9996cb88bc85cec3344ff9b17c0d374921cb393e",
+    "bytecodeHash": "0x01000049cad4f885eb87d29bf5795efe2e77f8a6682be4f9130a8a2862a0d1ed",
     "sourceCodeHash": "0x217e65f55c8add77982171da65e0db8cc10141ba75159af582973b332a4e098a"
   },
   {
     "contractName": "DefaultAccount",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/DefaultAccount.sol/DefaultAccount.json",
     "sourceCodePath": "contracts-preprocessed/DefaultAccount.sol",
-    "bytecodeHash": "0x0100055d5f308aa35d8b308207f095412dbeac7b09c8bb1845640b1069391255",
+    "bytecodeHash": "0x0100055daaeb48a5081042c0fd9d165cc50b788a2f01e936b72085284ff39586",
     "sourceCodeHash": "0xeb5ac8fc83e1c8619db058a9b6973958bd6ed1b6f4938f8f4541d702f12e085d"
   },
   {
@@ -59,56 +59,56 @@
     "contractName": "ImmutableSimulator",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/ImmutableSimulator.sol/ImmutableSimulator.json",
     "sourceCodePath": "contracts-preprocessed/ImmutableSimulator.sol",
-    "bytecodeHash": "0x0100003b4921070b396b98a09369b50a1885e964bcd7bd472954ade597435df9",
+    "bytecodeHash": "0x0100003b27e219c5e901ae9f772033503f9efd6c70f8fadc6670b0772af7f2e4",
     "sourceCodeHash": "0x4212e99cbc1722887cfb5b4cb967f278ac8642834786f0e3c6f3b324a9316815"
   },
   {
     "contractName": "KnownCodesStorage",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/KnownCodesStorage.sol/KnownCodesStorage.json",
     "sourceCodePath": "contracts-preprocessed/KnownCodesStorage.sol",
-    "bytecodeHash": "0x0100006f7cae202a327bc851d670b261ccb186f8914551d3faea3b9f9bf673ba",
+    "bytecodeHash": "0x0100006ff0723a0c3f51380d9d213ed4b8bc30cd069c79e10f27450bdc7e8950",
     "sourceCodeHash": "0x579950be3bcde43a5a4b1f62d8083b10b974bb3e29a3d0108c0bb65235fb15e9"
   },
   {
     "contractName": "L1Messenger",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/L1Messenger.sol/L1Messenger.json",
     "sourceCodePath": "contracts-preprocessed/L1Messenger.sol",
-    "bytecodeHash": "0x01000295b3a3343d055aefa650a194f3b8463226d71824c5e46fa3ab0c03b09b",
+    "bytecodeHash": "0x01000295c9b0a6c2f98a0a21e66059ee327e3faede72bc04253df750d0638fc4",
     "sourceCodeHash": "0xf54fae4c1a4bcd0c59e86e3138a5bc3607c9475e14abd0bdc3fcac9ff6b193c5"
   },
   {
     "contractName": "L2BaseToken",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/L2BaseToken.sol/L2BaseToken.json",
     "sourceCodePath": "contracts-preprocessed/L2BaseToken.sol",
-    "bytecodeHash": "0x01000105ed9165628c35526f34a6849d4d292fb49ce0747fea77049e5af7aa8d",
+    "bytecodeHash": "0x01000105f938bbe8b6a3e5bc49dcb8be5bf33968ac2ad0721c016a1b9217f05f",
     "sourceCodeHash": "0xc9211efcd2b050fbd8a1b6f119eadb61e9a861eea680acc3bbbcae4273f38877"
   },
   {
     "contractName": "MsgValueSimulator",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/MsgValueSimulator.sol/MsgValueSimulator.json",
     "sourceCodePath": "contracts-preprocessed/MsgValueSimulator.sol",
-    "bytecodeHash": "0x0100005dabca233a79399af9da2828d2f37cfd1af346aa34904aefeb93142977",
+    "bytecodeHash": "0x0100005d7e74ba08e5ea82fc6811759109da1fa52a6a256de27cbae2db6443fd",
     "sourceCodeHash": "0x2f1ff8df1edb1d3240b62e8ae0e21ed3cce0be12940464d2dbe051d09645ff5f"
   },
   {
     "contractName": "NonceHolder",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/NonceHolder.sol/NonceHolder.json",
     "sourceCodePath": "contracts-preprocessed/NonceHolder.sol",
-    "bytecodeHash": "0x010000db81f4d732c5f4ca60920dff4b849f330d7f4a61ec61f35df5849d417e",
+    "bytecodeHash": "0x010000dbde94cc7f9076cd1f23029521b13f04248246b053bbe46eb5ad9ca37b",
     "sourceCodeHash": "0x32f2f4794ded4d9756b460213d3aea39afece6f4f10e10e2b524c4a5bd92497d"
   },
   {
     "contractName": "PubdataChunkPublisher",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/PubdataChunkPublisher.sol/PubdataChunkPublisher.json",
     "sourceCodePath": "contracts-preprocessed/PubdataChunkPublisher.sol",
-    "bytecodeHash": "0x0100004772e57643de06b7513a4a823ca2996f954544fc5351feb161f1cd9039",
+    "bytecodeHash": "0x0100004747b61753c1eb7baf755dabb1a90d7f360501dbac815baba5e4196c76",
     "sourceCodeHash": "0xc4d42950e01529cb4594ec4637b4b07c993a7f4be17e2afe209439b8511d3de3"
   },
   {
     "contractName": "SystemContext",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/SystemContext.sol/SystemContext.json",
     "sourceCodePath": "contracts-preprocessed/SystemContext.sol",
-    "bytecodeHash": "0x010001a57a8eb66307a7f54e37a90a83b54b8776a5c1ccd503bb6474aa3de620",
+    "bytecodeHash": "0x010001a52dc068a0b34b89057e30d7b355031a19e8c673cebdd783ec0f136a84",
     "sourceCodeHash": "0x2d075dace38e50e046c723a1bd71b7cc4b8cd3fba20dccdcf3c4ed26b0bcb7b2"
   },
   {
@@ -178,35 +178,35 @@
     "contractName": "bootloader_test",
     "bytecodePath": "bootloader/build/artifacts/bootloader_test.yul.zbin",
     "sourceCodePath": "bootloader/build/bootloader_test.yul",
-    "bytecodeHash": "0x010003cb3b017071d5d91d0ad424d9e5a31fa6199e80282fa6c85c8af1de0cef",
-    "sourceCodeHash": "0xeb3ae62b4739a5275c2459336923b005e367eb4292583fc20bde95fc08fea585"
+    "bytecodeHash": "0x010003cbfb52bc795e083b07a80bcaa9c670468e2a9dda4ea5c14c227607fa35",
+    "sourceCodeHash": "0x10822c7b018c12e1fb7f465055aef68f5c3fe063740c4fc0c0572ceb79f4f8fb"
   },
   {
     "contractName": "fee_estimate",
     "bytecodePath": "bootloader/build/artifacts/fee_estimate.yul.zbin",
     "sourceCodePath": "bootloader/build/fee_estimate.yul",
-    "bytecodeHash": "0x0100094f3e9b6fdb0b38fce9c15d336e2e4c9896608562978026ce20faa26d4c",
-    "sourceCodeHash": "0x2ee776cfab86d04d8d847b2e592b6ef6b2fb8ca39e369848d552490aa5a12ece"
+    "bytecodeHash": "0x0100094fe430053e1dc4a58606794ab904e9965fbb17de80d5b888f973c3b78e",
+    "sourceCodeHash": "0x1d3fbf4fe064484dd40744204cb35e704d2413e3ab5721010052569d50d4ccac"
   },
   {
     "contractName": "gas_test",
     "bytecodePath": "bootloader/build/artifacts/gas_test.yul.zbin",
     "sourceCodePath": "bootloader/build/gas_test.yul",
-    "bytecodeHash": "0x010008d53b584b41e2cb3aa15f79a6eb4273280ce19a7fd5127c0d79c14890f9",
-    "sourceCodeHash": "0xb85c3e6c03b00d751c328cb9447d56b29bf030ae7e2064c35cc2d0cbc4610997"
+    "bytecodeHash": "0x010008d5dbfea3a73047fcd927f0e16b2c381185e34e87ae0d38ca0c6cd0910e",
+    "sourceCodeHash": "0x8a66d29ed3c24e75da0361e1c9cb8b6e9ef43206ee49057a26573050b973883d"
   },
   {
     "contractName": "playground_batch",
     "bytecodePath": "bootloader/build/artifacts/playground_batch.yul.zbin",
     "sourceCodePath": "bootloader/build/playground_batch.yul",
-    "bytecodeHash": "0x010009558349dded3878c1aa4ba39f63b93757abce048d43dde53e732f5d6568",
-    "sourceCodeHash": "0xbb36c241de8fd9e15b9f3225c42122c3f15b11a4b320fdc0ea69e5b1e108f151"
+    "bytecodeHash": "0x01000955095fcc6eeb939df1631ecb4f2b44e0b0cd9f4b1ef3bf5d2aa4fe5f20",
+    "sourceCodeHash": "0x5096dd47dc900ebb3c34330a5ccc946c64fdca8094b0a187f35610bedfa116eb"
   },
   {
     "contractName": "proved_batch",
     "bytecodePath": "bootloader/build/artifacts/proved_batch.yul.zbin",
     "sourceCodePath": "bootloader/build/proved_batch.yul",
-    "bytecodeHash": "0x010008e5dbc05eb7cc68eb07d04f104fec42b84bdecb78bd985c2d361d359817",
-    "sourceCodeHash": "0x6d8bf101d643f47d98fb2ebf895e5beb378a4ae510a99b3687d3ac2f1fc9763c"
+    "bytecodeHash": "0x010008e5302d4b6db21fe582e4ce42435f77d772722fee0084c9105533d379ea",
+    "sourceCodeHash": "0x3cdd7445f92522a7df4b4fb5b5f613b52fec0295285c2490ff560ede27dc34d7"
   }
 ]
