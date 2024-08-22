@@ -333,7 +333,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         //     revert TokenNotRegistered(_baseToken);
         // }
         require(assetIdIsRegistered[_baseTokenAssetId], "BH: asset id not registered");
-        
+
         if (address(sharedBridge) == address(0)) {
             revert SharedBridgeNotSet();
         }
@@ -437,7 +437,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                     revert MsgValueMismatch(0, msg.value);
                 }
             }
-
 
             // slither-disable-next-line arbitrary-send-eth
             sharedBridge.bridgehubDepositBaseToken{value: msg.value}(

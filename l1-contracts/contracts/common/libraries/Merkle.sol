@@ -50,7 +50,7 @@ library Merkle {
     ) internal pure returns (bytes32) {
         uint256 pathLength = _path.length;
         _validatePathLengthForSingleProof(_index, pathLength);
-    
+
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < pathLength; i = i.uncheckedInc()) {
             currentHash = (_index % 2 == 0)

@@ -38,7 +38,7 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
 
     /// @dev Address of the L1 token that can be deposited to mint this L2 token
     address public override l1Address;
-    
+
     modifier onlyNTV() {
         if (msg.sender != address(L2_NATIVE_TOKEN_VAULT)) {
             revert Unauthorized(msg.sender);

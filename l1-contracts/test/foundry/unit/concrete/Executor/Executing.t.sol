@@ -192,7 +192,10 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(QueueIsEmpty.selector);
-        executor.executeBatches(correctNewStoredBatchInfoArray, Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length));
+        executor.executeBatches(
+            correctNewStoredBatchInfoArray,
+            Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length)
+        );
     }
 
     function test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash() public {
@@ -270,7 +273,10 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(PriorityOperationsRollingHashMismatch.selector);
-        executor.executeBatches(correctNewStoredBatchInfoArray, Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length));
+        executor.executeBatches(
+            correctNewStoredBatchInfoArray,
+            Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length)
+        );
     }
 
     function test_RevertWhen_CommittingBlockWithWrongPreviousBatchHash() public {

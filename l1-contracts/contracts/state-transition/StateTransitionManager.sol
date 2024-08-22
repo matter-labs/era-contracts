@@ -375,7 +375,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         /// all together 4+9*32=292 bytes for the selector + mandatory data
         // solhint-disable-next-line func-named-parameters
         initData = bytes.concat(
-            IDiamondInit.initialize.selector, 
+            IDiamondInit.initialize.selector,
             bytes32(_chainId),
             bytes32(uint256(uint160(BRIDGE_HUB))),
             bytes32(uint256(uint160(address(this)))),

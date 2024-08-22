@@ -53,11 +53,17 @@ describe("ERC20Bridge", function () {
 
     // While we formally don't need to deploy the token and the beacon proxy, it is a neat way to have the bytecode published
     const l2TokenImplAddress = await deployer.deploy(await deployer.loadArtifact("L2StandardERC20"));
-    const l2Erc20TokenBeacon = await deployer.deploy(await deployer.loadArtifact("@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon"), [
-      l2TokenImplAddress.address,
-    ]);
-    await deployer.deploy(await deployer.loadArtifact("@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol:BeaconProxy"), [l2Erc20TokenBeacon.address, "0x"]);
-    const beaconProxyBytecodeHash = hashBytecode((await deployer.loadArtifact("@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol:BeaconProxy")).bytecode);
+    const l2Erc20TokenBeacon = await deployer.deploy(
+      await deployer.loadArtifact("@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon"),
+      [l2TokenImplAddress.address]
+    );
+    await deployer.deploy(
+      await deployer.loadArtifact("@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol:BeaconProxy"),
+      [l2Erc20TokenBeacon.address, "0x"]
+    );
+    const beaconProxyBytecodeHash = hashBytecode(
+      (await deployer.loadArtifact("@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol:BeaconProxy")).bytecode
+    );
     let constructorArgs = ethers.utils.defaultAbiCoder.encode(
       ["uint256", "uint256", "address", "address"],
       /// note in real deployment we have to transfer ownership of standard deployer here

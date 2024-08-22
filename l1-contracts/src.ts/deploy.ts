@@ -390,7 +390,6 @@ export class Deployer {
     // Note: we cannot deploy using Create2, as the owner of the ProxyAdmin is msg.sender
     let proxyAdmin;
     let rec;
-    
 
     if (this.isZkMode()) {
       // @ts-ignore

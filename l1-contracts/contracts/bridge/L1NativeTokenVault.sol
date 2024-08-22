@@ -184,7 +184,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
                 revert TokensWithFeesNotSupported();
             }
         }
-        if(amount == 0) {
+        if (amount == 0) {
             // empty deposit amount
             revert EmptyDeposit();
         }

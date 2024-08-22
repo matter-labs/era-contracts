@@ -158,7 +158,6 @@ contract L1AssetRouter is
         _;
     }
 
-
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
@@ -529,7 +528,7 @@ contract L1AssetRouter is
             // Otherwise, perform the check using the new transaction data hash encoding.
             if (!isLegacyTxDataHash) {
                 bytes32 txDataHash = _encodeTxDataHash(NEW_ENCODING_VERSION, _depositSender, _assetId, _assetData);
-                if(dataHash != txDataHash) {
+                if (dataHash != txDataHash) {
                     revert DepositDoesNotExist();
                 }
             }

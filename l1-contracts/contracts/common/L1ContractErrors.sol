@@ -306,7 +306,6 @@ error ZeroBalance();
 // 0xc84885d4
 error ZeroChainId();
 
-
 error AssetIdNotSupported(bytes32 assetId);
 
 enum SharedBridgeKey {

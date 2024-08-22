@@ -22,7 +22,6 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {AddressAlreadyUsed, WithdrawFailed, Unauthorized, AssetIdNotSupported, SharedBridgeKey, SharedBridgeValueNotSet, L2WithdrawalMessageWrongLength, InsufficientChainBalance, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, L2BridgeNotDeployed, DepositIncorrectAmount, InvalidProof, NoFundsTransferred, InsufficientFunds, DepositDoesNotExist, WithdrawalAlreadyFinalized, InsufficientFunds, MalformedMessage, InvalidSelector, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
-
 /// We are testing all the specified revert and require cases.
 contract L1AssetRouterFailTest is L1AssetRouterTest {
     using stdStorage for StdStorage;
@@ -161,7 +160,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     //     vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, amount, uint256(1)));
     //     sharedBridge.bridgehubDepositBaseToken(chainId, ETH_TOKEN_ASSET_ID, alice, amount);
     // }
-    
+
     function test_bridgehubDepositBaseToken_ErcWrongMsgValue() public {
         vm.deal(bridgehubAddress, amount);
         token.mint(alice, amount);
@@ -309,7 +308,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             ),
             abi.encode(true)
         );
-        
+
         vm.expectRevert("NTV: claimFailedDeposit failed, no funds or cannot transfer to receiver");
         sharedBridge.bridgeRecoverFailedTransfer({
             _chainId: chainId,
@@ -348,7 +347,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert(abi.encodeWithSelector(SharedBridgeValueNotSet.selector, SharedBridgeKey.LegacyBridgeLastDepositBatch));
+        vm.expectRevert(
+            abi.encodeWithSelector(SharedBridgeValueNotSet.selector, SharedBridgeKey.LegacyBridgeLastDepositBatch)
+        );
         sharedBridge.bridgeRecoverFailedTransfer({
             _chainId: eraChainId,
             _depositSender: alice,
@@ -579,7 +580,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             address(token),
             amount
         );
-        vm.expectRevert(abi.encodeWithSelector(SharedBridgeValueNotSet.selector, SharedBridgeKey.PostUpgradeFirstBatch));
+        vm.expectRevert(
+            abi.encodeWithSelector(SharedBridgeValueNotSet.selector, SharedBridgeKey.PostUpgradeFirstBatch)
+        );
 
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
