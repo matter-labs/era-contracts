@@ -35,11 +35,9 @@ contract EvmGasManager {
 
     modifier onlySystemEvm() {
         // cache use is safe since we do not support SELFDESTRUCT
-        uint256 slot = IS_ACCOUNT_EVM_PREFIX;
-        address _sender = msg.sender;
+        uint256 slot = IS_ACCOUNT_EVM_PREFIX | uint256(uint160(msg.sender));
         bool isEVM;
         assembly {
-            slot := add(slot, _sender)
             isEVM := tload(slot)
         }
 
@@ -135,13 +133,13 @@ contract EvmGasManager {
     function consumeEvmFrame() external returns (uint256 passGas, bool isStatic) {
         if (evmStackFrames.length == 0) return (INF_PASS_GAS, false);
 
-        EVMStackFrameInfo memory frameInfo = evmStackFrames[evmStackFrames.length - 1];
+        EVMStackFrameInfo storage frameInfo = evmStackFrames[evmStackFrames.length - 1];
 
         passGas = frameInfo.passGas;
         isStatic = frameInfo.isStatic;
 
         // Mark as used
-        evmStackFrames[evmStackFrames.length - 1].passGas = INF_PASS_GAS;
+        frameInfo.passGas = INF_PASS_GAS;
     }
 
     function popEVMFrame() external {
