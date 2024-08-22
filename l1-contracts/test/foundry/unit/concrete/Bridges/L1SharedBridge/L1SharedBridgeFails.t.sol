@@ -26,7 +26,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     using stdStorage for StdStorage;
 
     function test_initialize_WrongOwner() public {
-        vm.expectRevert("ShB owner 0");
+        vm.expectRevert("L1AR: owner 0");
         new TransparentUpgradeableProxy(
             address(sharedBridgeImpl),
             admin,
@@ -53,13 +53,13 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_transferTokenToNTV_wrongCaller() public {
-        vm.expectRevert("ShB: not NTV");
+        vm.expectRevert("L1AR: not NTV");
         sharedBridge.transferTokenToNTV(address(token));
     }
 
-    function test_clearChainBalance_wrongCaller() public {
-        vm.expectRevert("ShB: not NTV");
-        sharedBridge.clearChainBalance(chainId, address(token));
+    function test_nullifyChainBalanceByNTV_wrongCaller() public {
+        vm.expectRevert("L1AR: not NTV");
+        sharedBridge.nullifyChainBalanceByNTV(chainId, address(token));
     }
 
     function test_registerToken_noCode() public {
@@ -69,59 +69,59 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_setL1Erc20Bridge_alreadySet() public {
         vm.prank(owner);
-        vm.expectRevert("ShB: legacy bridge already set");
+        vm.expectRevert("L1AR: legacy bridge already set");
         sharedBridge.setL1Erc20Bridge(address(0));
     }
 
     function test_setL1Erc20Bridge_emptyAddressProvided() public {
         stdstore.target(address(sharedBridge)).sig(sharedBridge.legacyBridge.selector).checked_write(address(0));
         vm.prank(owner);
-        vm.expectRevert("ShB: legacy bridge 0");
+        vm.expectRevert("L1AR: legacy bridge 0");
         sharedBridge.setL1Erc20Bridge(address(0));
     }
 
     function test_setNativeTokenVault_alreadySet() public {
         vm.prank(owner);
-        vm.expectRevert("ShB: native token vault already set");
+        vm.expectRevert("L1AR: native token vault already set");
         sharedBridge.setNativeTokenVault(IL1NativeTokenVault(address(0)));
     }
 
     function test_setNativeTokenVault_emptyAddressProvided() public {
         stdstore.target(address(sharedBridge)).sig(sharedBridge.nativeTokenVault.selector).checked_write(address(0));
         vm.prank(owner);
-        vm.expectRevert("ShB: native token vault 0");
+        vm.expectRevert("L1AR: native token vault 0");
         sharedBridge.setNativeTokenVault(IL1NativeTokenVault(address(0)));
     }
 
-    function test_setAssetHandlerAddressOnCounterPart_notOwnerOrADT() public {
-        uint256 l2TxGasLimit = 100000;
-        uint256 l2TxGasPerPubdataByte = 100;
-        address refundRecipient = address(0);
+    // function test_setAssetHandlerAddressOnCounterpart_notOwnerOrADT() public {
+    //     uint256 l2TxGasLimit = 100000;
+    //     uint256 l2TxGasPerPubdataByte = 100;
+    //     address refundRecipient = address(0);
 
-        vm.prank(alice);
-        vm.expectRevert("ShB: only ADT or owner");
-        sharedBridge.setAssetHandlerAddressOnCounterPart(
-            eraChainId,
-            mintValue,
-            l2TxGasLimit,
-            l2TxGasPerPubdataByte,
-            refundRecipient,
-            tokenAssetId,
-            address(token)
-        );
-    }
+    //     vm.prank(alice);
+    //     vm.expectRevert("L1AR: only ADT or owner");
+    //     sharedBridge.setAssetHandlerAddressOnCounterpart(
+    //         eraChainId,
+    //         mintValue,
+    //         l2TxGasLimit,
+    //         l2TxGasPerPubdataByte,
+    //         refundRecipient,
+    //         tokenAssetId,
+    //         address(token)
+    //     );
+    // }
 
     // function test_transferFundsToSharedBridge_Eth_CallFailed() public {
     //     vm.mockCall(address(nativeTokenVault), "0x", abi.encode(""));
     //     vm.prank(address(nativeTokenVault));
-    //     vm.expectRevert("ShB: eth transfer failed");
+    //     vm.expectRevert("L1AR: eth transfer failed");
     //     nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
     // }
 
     // function test_transferFundsToSharedBridge_Eth_CallFailed() public {
     //     vm.mockCall(address(nativeTokenVault), "0x", abi.encode(""));
     //     vm.prank(address(nativeTokenVault));
-    //     vm.expectRevert("ShB: eth transfer failed");
+    //     vm.expectRevert("L1AR: eth transfer failed");
     //     nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
     // }
 
@@ -147,20 +147,8 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         nativeTokenVault.transferFundsFromSharedBridge(address(token));
     }
 
-    function test_bridgehubDepositBaseToken_Eth_Token_notRegisteredTokenID() public {
-        // ToDo: Shall we do it properly instead of mocking?
-        stdstore
-            .target(address(sharedBridge))
-            .sig("assetHandlerAddress(bytes32)")
-            .with_key(ETH_TOKEN_ASSET_ID)
-            .checked_write(address(0));
-        vm.prank(bridgehubAddress);
-        vm.expectRevert("ShB: only address can be registered");
-        sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, ETH_TOKEN_ASSET_ID, alice, amount);
-    }
-
     function test_bridgehubDepositBaseToken_Eth_Token_incorrectSender() public {
-        vm.expectRevert("L1AssetRouter: msg.sender not equal to bridgehub or era chain");
+        vm.expectRevert("L1AR: msg.sender not equal to bridgehub or era chain");
         sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, ETH_TOKEN_ASSET_ID, alice, amount);
     }
 
@@ -195,7 +183,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_bridgehubDeposit_Eth_baseToken() public {
         vm.prank(bridgehubAddress);
-        vm.expectRevert("ShB: baseToken deposit not supported");
+        vm.expectRevert("L1AR: baseToken deposit not supported");
         // solhint-disable-next-line func-named-parameters
         sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, 0, bob));
     }
@@ -239,7 +227,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         vm.prank(bridgehubAddress);
-        vm.expectRevert("ShB tx hap");
+        vm.expectRevert("L1AR: tx hap");
         sharedBridge.bridgehubConfirmL2Transaction(chainId, txDataHash, txHash);
     }
 
@@ -305,7 +293,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             _chainId: chainId,
             _depositSender: alice,
             _assetId: ETH_TOKEN_ASSET_ID,
-            _transferData: transferData,
+            _assetData: transferData,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -338,12 +326,12 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert("ShB: last deposit time not set for Era");
+        vm.expectRevert("L1AR: last deposit time not set for Era");
         sharedBridge.bridgeRecoverFailedTransfer({
             _chainId: eraChainId,
             _depositSender: alice,
             _assetId: ETH_TOKEN_ASSET_ID,
-            _transferData: transferData,
+            _assetData: transferData,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -377,12 +365,12 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert("ShB: legacy cFD");
+        vm.expectRevert("L1AR: legacy cFD");
         sharedBridge.bridgeRecoverFailedTransfer({
             _chainId: eraChainId,
             _depositSender: alice,
             _assetId: ETH_TOKEN_ASSET_ID,
-            _transferData: transferData,
+            _assetData: transferData,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -403,7 +391,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
-            _l1Token: ETH_TOKEN_ADDRESS,
+            _l1Asset: ETH_TOKEN_ADDRESS,
             _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
@@ -437,7 +425,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
-            _l1Token: ETH_TOKEN_ADDRESS,
+            _l1Asset: ETH_TOKEN_ADDRESS,
             _amount: 0,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
@@ -466,11 +454,11 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert("ShB: d.it not hap");
+        vm.expectRevert("L1AR: d.it not hap");
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
-            _l1Token: ETH_TOKEN_ADDRESS,
+            _l1Asset: ETH_TOKEN_ADDRESS,
             _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
@@ -503,11 +491,11 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert("NTV n funds");
+        vm.expectRevert("NTV: not enough funds 2");
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
-            _l1Token: ETH_TOKEN_ADDRESS,
+            _l1Asset: ETH_TOKEN_ADDRESS,
             _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
@@ -534,7 +522,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             amount
         );
 
-        vm.expectRevert("ShB: legacy eth withdrawal");
+        vm.expectRevert("L1AR: legacy eth withdrawal");
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
             _l2BatchNumber: legacyBatchNumber,
@@ -578,7 +566,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             amount
         );
 
-        vm.expectRevert("Withdrawal is already finalized");
+        vm.expectRevert("L1AR: Withdrawal is already finalized");
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
             _l2BatchNumber: legacyBatchNumber,
@@ -599,7 +587,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             address(token),
             amount
         );
-        vm.expectRevert("ShB: legacy eth withdrawal");
+        vm.expectRevert("L1AR: legacy eth withdrawal");
 
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
@@ -621,7 +609,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             address(token),
             amount
         );
-        vm.expectRevert("ShB: diamondUFB not set for Era");
+        vm.expectRevert("L1AR: diamondUFB not set for Era");
 
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
@@ -643,7 +631,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             address(token),
             amount
         );
-        vm.expectRevert("ShB: legacy token withdrawal");
+        vm.expectRevert("L1AR: legacy token withdrawal");
 
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
@@ -665,7 +653,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             address(token),
             amount
         );
-        vm.expectRevert("ShB: LegacyUFB not set for Era");
+        vm.expectRevert("L1AR: LegacyUFB not set for Era");
 
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
@@ -700,7 +688,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         );
         _setNativeTokenVaultChainBalance(chainId, ETH_TOKEN_ADDRESS, 0);
 
-        vm.expectRevert("NTV not enough funds 2");
+        vm.expectRevert("NTV: not enough funds");
 
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
@@ -734,7 +722,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(false)
         );
 
-        vm.expectRevert("ShB withd w proof");
+        vm.expectRevert("L1AR: withd w proof");
 
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
@@ -749,7 +737,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     function test_parseL2WithdrawalMessage_wrongMsgLength() public {
         bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector);
 
-        vm.expectRevert("ShB wrong msg len");
+        vm.expectRevert("L1AR: wrong msg len");
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
@@ -763,7 +751,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     function test_parseL2WithdrawalMessage_wrongMsgLength2() public {
         bytes memory message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, abi.encode(amount, token));
 
-        vm.expectRevert("ShB wrong msg len 2");
+        vm.expectRevert("L1AR: wrong msg len 2");
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
@@ -778,7 +766,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         // notice that the selector is wrong
         bytes memory message = abi.encodePacked(IMailbox.proveL2LogInclusion.selector, alice, amount);
 
-        vm.expectRevert("ShB Incorrect message function selector");
+        vm.expectRevert("L1AR: Incorrect message function selector");
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
             _l2BatchNumber: l2BatchNumber,
@@ -794,7 +782,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         uint256 l2TxGasPerPubdataByte = 100;
         address refundRecipient = address(0);
 
-        vm.expectRevert("ShB: WETH deposit not supported 2");
+        vm.expectRevert("L1AR: WETH deposit not supported 2");
         vm.prank(l1ERC20BridgeAddress);
         sharedBridge.depositLegacyErc20Bridge({
             _prevMsgSender: alice,

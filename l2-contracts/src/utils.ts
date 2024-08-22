@@ -14,6 +14,7 @@ import type { Provider } from "zksync-ethers";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, sleep } from "zksync-ethers/build/utils";
 
 import { IERC20Factory } from "../typechain/IERC20Factory";
+import { IL1NativeTokenVaultFactory } from "../../l1-contracts/typechain/IL1NativeTokenVaultFactory";
 
 export const provider = web3Provider();
 
@@ -133,6 +134,7 @@ export async function requestL2TransactionDirect(
   const deployedAddresses = deployedAddressesFromEnv();
   const bridgehubAddress = deployedAddresses.Bridgehub.BridgehubProxy;
   const bridgehub = IBridgehubFactory.connect(bridgehubAddress, wallet);
+  const ntv = IL1NativeTokenVaultFactory.connect(deployedAddresses.Bridges.NativeTokenVaultProxy, wallet);
   gasPrice ??= await bridgehub.provider.getGasPrice();
 
   const expectedCost = await bridgehub.l2TransactionBaseCost(
@@ -142,7 +144,8 @@ export async function requestL2TransactionDirect(
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
   );
 
-  const baseTokenAddress = await bridgehub.baseToken(chainId);
+  const baseTokenAssetId = await bridgehub.baseTokenAssetId(chainId);
+  const baseTokenAddress = await ntv.tokenAddress(baseTokenAssetId);
   const baseTokenBridge = deployedAddresses.Bridges.SharedBridgeProxy;
   const baseToken = IERC20Factory.connect(baseTokenAddress, wallet);
   const ethIsBaseToken = ADDRESS_ONE == baseTokenAddress;

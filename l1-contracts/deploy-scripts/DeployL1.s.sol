@@ -351,7 +351,10 @@ contract DeployL1Script is Script {
     }
 
     function deployChainAdmin() internal {
-        bytes memory bytecode = abi.encodePacked(type(ChainAdmin).creationCode, abi.encode(config.ownerAddress));
+        bytes memory bytecode = abi.encodePacked(
+            type(ChainAdmin).creationCode,
+            abi.encode(config.ownerAddress, address(0))
+        );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("ChainAdmin deployed at:", contractAddress);
         addresses.chainAdmin = contractAddress;
@@ -369,7 +372,7 @@ contract DeployL1Script is Script {
     function deployBridgehubContract() internal {
         bytes memory bridgeHubBytecode = abi.encodePacked(
             type(Bridgehub).creationCode,
-            abi.encode(config.l1ChainId, config.ownerAddress)
+            abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains))
         );
         address bridgehubImplementation = deployViaCreate2(bridgeHubBytecode);
         console.log("Bridgehub Implementation deployed at:", bridgehubImplementation);
@@ -452,12 +455,14 @@ contract DeployL1Script is Script {
         console.log("ExecutorFacet deployed at:", executorFacet);
         addresses.stateTransition.executorFacet = executorFacet;
 
-        address adminFacet = deployViaCreate2(type(AdminFacet).creationCode);
+        address adminFacet = deployViaCreate2(
+            abi.encodePacked(type(AdminFacet).creationCode, abi.encode(config.l1ChainId))
+        );
         console.log("AdminFacet deployed at:", adminFacet);
         addresses.stateTransition.adminFacet = adminFacet;
 
         address mailboxFacet = deployViaCreate2(
-            abi.encodePacked(type(MailboxFacet).creationCode, abi.encode(config.eraChainId))
+            abi.encodePacked(type(MailboxFacet).creationCode, abi.encode(config.eraChainId, config.l1ChainId))
         );
         console.log("MailboxFacet deployed at:", mailboxFacet);
         addresses.stateTransition.mailboxFacet = mailboxFacet;
@@ -474,8 +479,7 @@ contract DeployL1Script is Script {
     function deployStateTransitionManagerImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(StateTransitionManager).creationCode,
-            abi.encode(addresses.bridgehub.bridgehubProxy),
-            abi.encode(config.contracts.maxNumberOfChains)
+            abi.encode(addresses.bridgehub.bridgehubProxy)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("StateTransitionManagerImplementation deployed at:", contractAddress);
@@ -552,7 +556,7 @@ contract DeployL1Script is Script {
         });
 
         StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
-            owner: config.ownerAddress,
+            owner: msg.sender,
             validatorTimelock: addresses.validatorTimelock,
             chainCreationParams: chainCreationParams,
             protocolVersion: config.contracts.latestProtocolVersion
@@ -577,13 +581,19 @@ contract DeployL1Script is Script {
         vm.startBroadcast(msg.sender);
         bridgehub.addStateTransitionManager(addresses.stateTransition.stateTransitionProxy);
         console.log("StateTransitionManager registered");
-
         STMDeploymentTracker stmDT = STMDeploymentTracker(addresses.bridgehub.stmDeploymentTrackerProxy);
         // vm.startBroadcast(msg.sender);
+        L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
+        sharedBridge.setAssetDeploymentTracker(
+            bytes32(uint256(uint160(addresses.stateTransition.stateTransitionProxy))),
+            address(stmDT)
+        );
+        console.log("STM DT whitelisted");
+
         stmDT.registerSTMAssetOnL1(addresses.stateTransition.stateTransitionProxy);
         vm.stopBroadcast();
         console.log("STM registered in STMDeploymentTracker");
-        L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
+
         bytes32 assetId = bridgehub.stmAssetId(addresses.stateTransition.stateTransitionProxy);
         // console.log(address(bridgehub.stmDeployer()), addresses.bridgehub.stmDeploymentTrackerProxy);
         // console.log(address(bridgehub.stmDeployer().BRIDGE_HUB()), addresses.bridgehub.bridgehubProxy);
@@ -660,7 +670,7 @@ contract DeployL1Script is Script {
     function registerSharedBridge() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         vm.startBroadcast(msg.sender);
-        bridgehub.addToken(ADDRESS_ONE);
+        bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         // bridgehub.setSharedBridge(addresses.bridges.sharedBridgeProxy);
         bridgehub.setAddresses(
             addresses.bridges.sharedBridgeProxy,
@@ -674,7 +684,7 @@ contract DeployL1Script is Script {
     function deployErc20BridgeImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(L1ERC20Bridge).creationCode,
-            abi.encode(addresses.bridges.sharedBridgeProxy, addresses.vaults.l1NativeTokenVaultProxy)
+            abi.encode(addresses.bridges.sharedBridgeProxy, addresses.vaults.l1NativeTokenVaultProxy, config.eraChainId)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("Erc20BridgeImplementation deployed at:", contractAddress);
@@ -747,8 +757,10 @@ contract DeployL1Script is Script {
         L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses.governance);
 
-        vm.stopBroadcast();
+        StateTransitionManager stm = StateTransitionManager(addresses.stateTransition.stateTransitionProxy);
+        stm.transferOwnership(addresses.governance);
 
+        vm.stopBroadcast();
         console.log("Owners updated");
     }
 

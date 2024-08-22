@@ -21,6 +21,7 @@ import {L2Message} from "contracts/common/Messaging.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -489,7 +490,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         uint256 beforeBalance = currentToken.balanceOf(sharedBridgeProxyAddress);
 
         if (beforeChainBalance < amountToWithdraw) {
-            vm.expectRevert("ShB not enough funds 2");
+            vm.expectRevert("L1AR: not enough funds 2");
         } else {
             tokenSumWithdrawal[currentTokenAddress] += amountToWithdraw;
         }
@@ -551,7 +552,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         uint256 beforeBalance = sharedBridgeProxyAddress.balance;
 
         if (beforeChainBalance < amountToWithdraw) {
-            vm.expectRevert("ShB not enough funds 2");
+            vm.expectRevert("L1AR: not enough funds 2");
         } else {
             tokenSumWithdrawal[currentTokenAddress] += amountToWithdraw;
         }

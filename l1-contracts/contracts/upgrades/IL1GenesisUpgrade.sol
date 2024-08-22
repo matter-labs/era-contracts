@@ -2,11 +2,10 @@
 
 pragma solidity 0.8.24;
 
-import {ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
 interface IL1GenesisUpgrade {
-    /// @dev emitted when an chain registers and a GenesisUpgrade happens
+    /// @dev emitted when a chain registers and a GenesisUpgrade happens
     event GenesisUpgrade(
         address indexed _hyperchain,
         L2CanonicalTransaction _l2Transaction,
@@ -18,9 +17,8 @@ interface IL1GenesisUpgrade {
         address _l1GenesisUpgrade,
         uint256 _chainId,
         uint256 _protocolVersion,
+        address _stmDeployerAddress,
         bytes calldata _forceDeployments,
         bytes[] calldata _factoryDeps
     ) external returns (bytes32);
-
-    function upgradeInner(ProposedUpgrade calldata _proposedUpgrade) external returns (bytes32);
 }

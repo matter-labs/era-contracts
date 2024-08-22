@@ -29,7 +29,7 @@ describe("WETH token & WETH bridge", function () {
       testChainId,
       1,
       richAccount.address,
-      richAccount.address,
+      ethers.constants.AddressZero,
     ]);
     const randomAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
 

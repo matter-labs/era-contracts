@@ -30,12 +30,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @notice Address of the bridgehub
     address public immutable BRIDGE_HUB;
 
-    /// @notice The total number of hyperchains can be created/connected to this STM.
-    /// This is the temporary security measure.
-    uint256 public immutable MAX_NUMBER_OF_HYPERCHAINS;
-
     /// @notice The map from chainId => hyperchain contract
-    EnumerableMap.UintToAddressMap internal hyperchainMap;
+    EnumerableMap.UintToAddressMap internal __DEPRECATED_hyperchainMap;
 
     /// @dev The batch zero hash, calculated at initialization
     bytes32 public storedBatchZero;
@@ -69,9 +65,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(address _bridgehub, uint256 _maxNumberOfHyperchains) reentrancyGuardInitializer {
+    constructor(address _bridgehub) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
-        MAX_NUMBER_OF_HYPERCHAINS = _maxNumberOfHyperchains;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
@@ -96,30 +91,23 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         return SemVer.unpackSemVer(SafeCast.toUint96(protocolVersion));
     }
 
-    /// @notice Returns all the registered hyperchain addresses
-    function getAllHyperchains() public view override returns (address[] memory chainAddresses) {
-        uint256[] memory keys = hyperchainMap.keys();
-        chainAddresses = new address[](keys.length);
-        uint256 keysLength = keys.length;
-        for (uint256 i = 0; i < keysLength; ++i) {
-            chainAddresses[i] = hyperchainMap.get(i);
-        }
+    /// @notice return the chain contract address for a chainId
+    function getHyperchain(uint256 _chainId) public view returns (address) {
+        return IBridgehub(BRIDGE_HUB).getHyperchain(_chainId);
     }
 
-    /// @notice Returns all the registered hyperchain chainIDs
-    function getAllHyperchainChainIDs() public view override returns (uint256[] memory) {
-        return hyperchainMap.keys();
-    }
-
-    /// @notice Returns the address of the hyperchain with the corresponding chainID
-    function getHyperchain(uint256 _chainId) public view override returns (address chainAddress) {
+    /// @notice return the chain contract address for a chainId
+    /// @notice Do not use! use getHyperchain instead. This will be removed.
+    function getHyperchainLegacy(uint256 _chainId) public view returns (address chainAddress) {
         // slither-disable-next-line unused-return
-        (, chainAddress) = hyperchainMap.tryGet(_chainId);
+        (, chainAddress) = __DEPRECATED_hyperchainMap.tryGet(_chainId);
     }
 
-    /// @notice Returns the address of the hyperchain admin with the corresponding chainID
+    /// @notice Returns the address of the hyperchain admin with the corresponding chainID.
+    /// @notice Not related to the STM, but it is here for legacy reasons.
+    /// @param _chainId the chainId of the chain
     function getChainAdmin(uint256 _chainId) external view override returns (address) {
-        return IZkSyncHyperchain(hyperchainMap.get(_chainId)).getAdmin();
+        return IZkSyncHyperchain(getHyperchain(_chainId)).getAdmin();
     }
 
     /// @dev initialize
@@ -209,6 +197,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev set validatorTimelock. Cannot do it during initialization, as validatorTimelock is deployed after STM
+    /// @param _validatorTimelock the new validatorTimelock address
     function setValidatorTimelock(address _validatorTimelock) external onlyOwnerOrAdmin {
         address oldValidatorTimelock = validatorTimelock;
         validatorTimelock = _validatorTimelock;
@@ -216,6 +205,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev set New Version with upgrade from old version
+    /// @param _cutData the new diamond cut data
+    /// @param _oldProtocolVersion the old protocol version
+    /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
+    /// @param _newProtocolVersion the new protocol version
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
@@ -234,16 +227,21 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev check that the protocolVersion is active
+    /// @param _protocolVersion the protocol version to check
     function protocolVersionIsActive(uint256 _protocolVersion) external view override returns (bool) {
         return block.timestamp <= protocolVersionDeadline[_protocolVersion];
     }
 
     /// @dev set the protocol version timestamp
+    /// @param _protocolVersion the protocol version
+    /// @param _timestamp the timestamp is the deadline
     function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
         protocolVersionDeadline[_protocolVersion] = _timestamp;
     }
 
     /// @dev set upgrade for some protocolVersion
+    /// @param _cutData the new diamond cut data
+    /// @param _oldProtocolVersion the old protocol version
     function setUpgradeDiamondCut(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion
@@ -254,79 +252,86 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev freezes the specified chain
+    /// @param _chainId the chainId of the chain
     function freezeChain(uint256 _chainId) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).freezeDiamond();
+        IZkSyncHyperchain(getHyperchain(_chainId)).freezeDiamond();
     }
 
     /// @dev freezes the specified chain
+    /// @param _chainId the chainId of the chain
     function unfreezeChain(uint256 _chainId) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).unfreezeDiamond();
+        IZkSyncHyperchain(getHyperchain(_chainId)).unfreezeDiamond();
     }
 
     /// @dev reverts batches on the specified chain
+    /// @param _chainId the chainId of the chain
+    /// @param _newLastBatch the new last batch
     function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).revertBatches(_newLastBatch);
+        IZkSyncHyperchain(getHyperchain(_chainId)).revertBatches(_newLastBatch);
     }
 
     /// @dev execute predefined upgrade
+    /// @param _chainId the chainId of the chain
+    /// @param _oldProtocolVersion the old protocol version
+    /// @param _diamondCut the diamond cut data
     function upgradeChainFromVersion(
         uint256 _chainId,
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
     ) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).upgradeChainFromVersion(_oldProtocolVersion, _diamondCut);
+        IZkSyncHyperchain(getHyperchain(_chainId)).upgradeChainFromVersion(_oldProtocolVersion, _diamondCut);
     }
 
     /// @dev executes upgrade on chain
+    /// @param _chainId the chainId of the chain
+    /// @param _diamondCut the diamond cut data
     function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).executeUpgrade(_diamondCut);
+        IZkSyncHyperchain(getHyperchain(_chainId)).executeUpgrade(_diamondCut);
     }
 
     /// @dev setPriorityTxMaxGasLimit for the specified chain
-    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external {
-        // onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
+    /// @param _chainId the chainId of the chain
+    /// @param _maxGasLimit the new max gas limit
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
+        IZkSyncHyperchain(getHyperchain(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// @dev setTokenMultiplier for the specified chain
-    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external {
-        // onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setTokenMultiplier(_nominator, _denominator);
+    /// @param _chainId the chainId of the chain
+    /// @param _nominator the new nominator of the token multiplier
+    /// @param _denominator the new denominator of the token multiplier
+    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
+        IZkSyncHyperchain(getHyperchain(_chainId)).setTokenMultiplier(_nominator, _denominator);
     }
 
     /// @dev changeFeeParams for the specified chain
-    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external {
-        // onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).changeFeeParams(_newFeeParams);
+    /// @param _chainId the chainId of the chain
+    /// @param _newFeeParams the new fee params
+    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external onlyOwner {
+        IZkSyncHyperchain(getHyperchain(_chainId)).changeFeeParams(_newFeeParams);
     }
 
     /// @dev setValidator for the specified chain
-    function setValidator(uint256 _chainId, address _validator, bool _active) external {
-        // onlyOwnerOrAdmin {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setValidator(_validator, _active);
+    /// @param _chainId the chainId of the chain
+    /// @param _validator the new validator
+    /// @param _active whether the validator is active
+    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwnerOrAdmin {
+        IZkSyncHyperchain(getHyperchain(_chainId)).setValidator(_validator, _active);
     }
 
     /// @dev setPorterAvailability for the specified chain
+    /// @param _chainId the chainId of the chain
+    /// @param _zkPorterIsAvailable whether the zkPorter mode is available
     function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
-        // onlyOwner {
-        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPorterAvailability(_zkPorterIsAvailable);
+        IZkSyncHyperchain(getHyperchain(_chainId)).setPorterAvailability(_zkPorterIsAvailable);
     }
 
     /// registration
 
-    /// @dev used to register already deployed hyperchain contracts
-    /// @param _chainId the chain's id
-    /// @param _hyperchain the chain's contract address
-    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external onlyOwner {
-        require(_hyperchain != address(0), "STM: hyperchain zero");
-
-        _registerNewHyperchain(_chainId, _hyperchain);
-    }
-
-    /// deploys a full set of chains contracts
+    /// @dev deploys a full set of chains contracts
     function _deployNewChain(
         uint256 _chainId,
-        address _baseToken,
+        bytes32 _baseTokenAssetId,
         address _sharedBridge,
         address _admin,
         bytes memory _diamondCut
@@ -349,20 +354,20 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             // solhint-disable-next-line func-named-parameters
             mandatoryInitData = bytes.concat(
                 bytes32(_chainId),
-                bytes32(uint256(uint160(address(BRIDGE_HUB)))),
+                bytes32(uint256(uint160(BRIDGE_HUB))),
                 bytes32(uint256(uint160(address(this)))),
-                bytes32(uint256(protocolVersion)),
+                bytes32(protocolVersion),
                 bytes32(uint256(uint160(_admin))),
                 bytes32(uint256(uint160(validatorTimelock))),
-                bytes32(uint256(uint160(_baseToken))),
+                _baseTokenAssetId,
                 bytes32(uint256(uint160(_sharedBridge))),
-                bytes32(storedBatchZero)
+                storedBatchZero
             );
         }
 
         // construct init data
         bytes memory initData;
-        /// all together 4+9*32=292 bytes
+        /// all together 4+9*32=292 bytes for the selector + mandatory data
         // solhint-disable-next-line func-named-parameters
         initData = bytes.concat(IDiamondInit.initialize.selector, mandatoryInitData, diamondCut.initCalldata);
 
@@ -372,29 +377,29 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         DiamondProxy hyperchainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
         // save data
         hyperchainAddress = address(hyperchainContract);
-
-        _registerNewHyperchain(_chainId, hyperchainAddress);
+        emit NewHyperchain(_chainId, hyperchainAddress);
     }
 
     /// @notice called by Bridgehub when a chain registers
     /// @param _chainId the chain's id
-    /// @param _baseToken the base token address used to pay for gas fees
+    /// @param _baseTokenAssetId the base token asset id used to pay for gas fees
     /// @param _sharedBridge the shared bridge address, used as base token bridge
     /// @param _admin the chain's admin address
     /// @param _initData the diamond cut data, force deployments and factoryDeps encoded
+    /// @param _factoryDeps the factory dependencies used for the genesis upgrade
     /// that initializes the chains Diamond Proxy
     function createNewChain(
         uint256 _chainId,
-        address _baseToken,
+        bytes32 _baseTokenAssetId,
         address _sharedBridge,
         address _admin,
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
-    ) external onlyBridgehub {
+    ) external onlyBridgehub returns (address hyperchainAddress) {
         (bytes memory _diamondCut, bytes memory _forceDeploymentData) = abi.decode(_initData, (bytes, bytes));
-        // TODO: only allow on L1.
+
         // solhint-disable-next-line func-named-parameters
-        address hyperchainAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut);
+        hyperchainAddress = _deployNewChain(_chainId, _baseTokenAssetId, _sharedBridge, _admin, _diamondCut);
 
         {
             // check input
@@ -402,25 +407,28 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             require(forceDeploymentHash == initialForceDeploymentHash, "STM: initial force deployment mismatch");
         }
         // genesis upgrade, deploys some contracts, sets chainId
-        IAdmin(hyperchainAddress).genesisUpgrade(l1GenesisUpgrade, _forceDeploymentData, _factoryDeps);
+        IAdmin(hyperchainAddress).genesisUpgrade(
+            l1GenesisUpgrade,
+            address(IBridgehub(BRIDGE_HUB).stmDeployer()),
+            _forceDeploymentData,
+            _factoryDeps
+        );
     }
 
+    /// @param _chainId the chainId of the chain
     function getProtocolVersion(uint256 _chainId) public view returns (uint256) {
-        return IZkSyncHyperchain(hyperchainMap.get(_chainId)).getProtocolVersion();
+        return IZkSyncHyperchain(getHyperchain(_chainId)).getProtocolVersion();
     }
 
-    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external onlyOwner {
-        require(_newSyncLayerChainId != 0, "Bad chain id");
+    /// @param _newSettlementLayerChainId the chainId of the chain
+    /// @param _isWhitelisted whether the chain is whitelisted
+    function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external onlyOwner {
+        require(_newSettlementLayerChainId != 0, "Bad chain id");
 
         // Currently, we require that the sync layer is deployed by the same STM.
-        address syncLayerAddress = hyperchainMap.get(_newSyncLayerChainId);
+        require(getHyperchain(_newSettlementLayerChainId) != address(0), "STM: sync layer not registered");
 
-        // TODO: Maybe `get` already ensured its existence.
-        require(syncLayerAddress != address(0), "STM: sync layer not registered");
-
-        IBridgehub(BRIDGE_HUB).registerSyncLayer(_newSyncLayerChainId, _isWhitelisted);
-
-        // TODO: emit event
+        IBridgehub(BRIDGE_HUB).registerSettlementLayer(_newSettlementLayerChainId, _isWhitelisted);
     }
 
     /// @notice Called by the bridgehub during the migration of a chain to another settlement layer.
@@ -430,10 +438,23 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 _chainId,
         bytes calldata _data
     ) external view override onlyBridgehub returns (bytes memory stmForwardedBridgeMintData) {
-        (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
-        require(_newSyncLayerAdmin != address(0), "STM: admin zero");
-        // todo check protocol version
-        return abi.encode(IBridgehub(BRIDGE_HUB).baseToken(_chainId), _newSyncLayerAdmin, protocolVersion, _diamondCut);
+        // Note that the `_diamondCut` here is not for the current chain, for the chain where the migration
+        // happens. The correctness of it will be checked on the STM on the new settlement layer.
+        (address _newGatewayAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
+        require(_newGatewayAdmin != address(0), "STM: admin zero");
+
+        // We ensure that the chain has the latest protocol version to avoid edge cases
+        // related to different protocol version support.
+        address hyperchain = getHyperchain(_chainId);
+        require(IZkSyncHyperchain(hyperchain).getProtocolVersion() == protocolVersion, "STM: outdated pv");
+
+        return
+            abi.encode(
+                IBridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId),
+                _newGatewayAdmin,
+                protocolVersion,
+                _diamondCut
+            );
     }
 
     /// @notice Called by the bridgehub during the migration of a chain to the current settlement layer.
@@ -443,21 +464,28 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 _chainId,
         bytes calldata _stmData
     ) external override onlyBridgehub returns (address chainAddress) {
-        (address _baseToken, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
+        (bytes32 _baseTokenAssetId, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
             _stmData,
-            (address, address, uint256, bytes)
+            (bytes32, address, uint256, bytes)
         );
+
+        // We ensure that the chain has the latest protocol version to avoid edge cases
+        // related to different protocol version support.
         require(_protocolVersion == protocolVersion, "STM, outdated pv");
-        // todo porotocl version check
         chainAddress = _deployNewChain({
             _chainId: _chainId,
-            _baseToken: _baseToken,
+            _baseTokenAssetId: _baseTokenAssetId,
             _sharedBridge: address(IBridgehub(BRIDGE_HUB).sharedBridge()),
             _admin: _admin,
             _diamondCut: _diamondCut
         });
     }
 
+    /// @notice Called by the bridgehub during the failed migration of a chain.
+    /// @param _chainId the chainId of the chain
+    /// @param _assetInfo the assetInfo of the chain
+    /// @param _prevMsgSender the previous message sender
+    /// @param _data the data of the migration
     function bridgeClaimFailedBurn(
         uint256 _chainId,
         bytes32 _assetInfo,
@@ -465,13 +493,5 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         bytes calldata _data
     ) external {
         // todo
-    }
-
-    /// @dev This internal function is used to register a new hyperchain in the system.
-    function _registerNewHyperchain(uint256 _chainId, address _hyperchain) internal {
-        // slither-disable-next-line unused-return
-        hyperchainMap.set(_chainId, _hyperchain);
-        require(hyperchainMap.length() <= MAX_NUMBER_OF_HYPERCHAINS, "STM: Hyperchain limit reached");
-        emit NewHyperchain(_chainId, _hyperchain);
     }
 }

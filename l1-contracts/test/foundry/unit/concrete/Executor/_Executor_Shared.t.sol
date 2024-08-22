@@ -28,6 +28,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
 import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
@@ -94,7 +95,7 @@ contract ExecutorTest is Test {
         selectors[6] = getters.getTotalPriorityTxs.selector;
         selectors[7] = getters.getFirstUnprocessedPriorityTx.selector;
         selectors[8] = getters.getPriorityQueueSize.selector;
-        selectors[9] = getters.priorityQueueFrontOperation.selector;
+        selectors[9] = getters.getTotalBatchesExecuted.selector;
         selectors[10] = getters.isValidator.selector;
         selectors[11] = getters.l2LogsRootHash.selector;
         selectors[12] = getters.storedBatchHash.selector;
@@ -112,7 +113,6 @@ contract ExecutorTest is Test {
         selectors[24] = getters.isFacetFreezable.selector;
         selectors[25] = getters.getTotalBatchesCommitted.selector;
         selectors[26] = getters.getTotalBatchesVerified.selector;
-        selectors[27] = getters.getTotalBatchesExecuted.selector;
         return selectors;
     }
 
@@ -158,10 +158,10 @@ contract ExecutorTest is Test {
 
         rollupL1DAValidator = new RollupL1DAValidator();
 
-        admin = new AdminFacet();
+        admin = new AdminFacet(block.chainid);
         getters = new GettersFacet();
         executor = new TestExecutor();
-        mailbox = new MailboxFacet(eraChainId);
+        mailbox = new MailboxFacet(eraChainId, block.chainid);
 
         DummyStateTransitionManager stateTransitionManager = new DummyStateTransitionManager();
         vm.mockCall(
@@ -194,7 +194,7 @@ contract ExecutorTest is Test {
             protocolVersion: 0,
             admin: owner,
             validatorTimelock: validator,
-            baseToken: ETH_TOKEN_ADDRESS,
+            baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
             baseTokenBridge: address(sharedBridge),
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
             verifier: IVerifier(testnetVerifier), // verifier

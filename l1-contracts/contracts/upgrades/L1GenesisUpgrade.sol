@@ -26,6 +26,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         address _l1GenesisUpgrade,
         uint256 _chainId,
         uint256 _protocolVersion,
+        address _stmDeployerAddress,
         bytes calldata _forceDeploymentsData,
         bytes[] calldata _factoryDeps
     ) public override returns (bytes32) {
@@ -36,7 +37,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
             {
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,
-                    (_chainId, _forceDeploymentsData)
+                    (_chainId, _stmDeployerAddress, _forceDeploymentsData)
                 );
                 complexUpgraderCalldata = abi.encodeCall(
                     IComplexUpgrader.upgrade,
@@ -87,7 +88,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
             facetCuts: emptyArray,
             initAddress: _l1GenesisUpgrade,
-            initCalldata: abi.encodeCall(this.upgradeInner, (proposedUpgrade))
+            initCalldata: abi.encodeCall(this.upgrade, (proposedUpgrade))
         });
         Diamond.diamondCut(cutData);
 
@@ -95,7 +96,8 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
-    function upgradeInner(ProposedUpgrade calldata _proposedUpgrade) external override returns (bytes32) {
+    /// @notice the upgrade function.
+    function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         super.upgrade(_proposedUpgrade);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }

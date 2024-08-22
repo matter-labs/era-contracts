@@ -17,6 +17,7 @@ import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZk
 // import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 // import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 
@@ -119,8 +120,8 @@ contract GatewayScript is Script {
         IStateTransitionManager stm = IStateTransitionManager(config.stateTransitionProxy);
         Ownable ownable = Ownable(config.stateTransitionProxy);
         vm.prank(ownable.owner());
-        stm.registerSyncLayer(config.gatewayChainId, true);
-        // bytes memory data = abi.encodeCall(stm.registerSyncLayer, (config.chainChainId, true));
+        stm.registerSettlementLayer(config.gatewayChainId, true);
+        // bytes memory data = abi.encodeCall(stm.registerSettlementLayer, (config.chainChainId, true));
         // Utils.executeUpgrade({
         //     _governor: ownable.owner(),
         //     _salt: bytes32(config.bridgehubCreateNewChainSalt),
@@ -189,8 +190,22 @@ contract GatewayScript is Script {
             l2GasLimit,
             REQUIRED_L2_GAS_PRICE_PER_PUBDATA
         ) * 2;
+        bytes32 assetId = bridgehub.stmAssetIdFromChainId(config.chainChainId);
+        bytes memory routerData = bytes.concat(bytes1(0x02), abi.encode(assetId, L2_BRIDGEHUB_ADDR));
+        L2TransactionRequestTwoBridgesOuter
+            memory assetRouterRegistrationRequest = L2TransactionRequestTwoBridgesOuter({
+                chainId: config.chainChainId,
+                mintValue: expectedCost,
+                l2Value: 0,
+                l2GasLimit: l2GasLimit,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                refundRecipient: ownable.owner(),
+                secondBridgeAddress: config.sharedBridgeProxy,
+                secondBridgeValue: 0,
+                secondBridgeCalldata: routerData
+            });
 
-        L2TransactionRequestTwoBridgesOuter memory request = L2TransactionRequestTwoBridgesOuter({
+        L2TransactionRequestTwoBridgesOuter memory bridehubRegistrationRequest = L2TransactionRequestTwoBridgesOuter({
             chainId: config.chainChainId,
             mintValue: expectedCost,
             l2Value: 0,
@@ -202,7 +217,8 @@ contract GatewayScript is Script {
             secondBridgeCalldata: abi.encode(config.stateTransitionProxy, config.stateTransitionProxy)
         });
         vm.startBroadcast(ownable.owner());
-        bridgehub.requestL2TransactionTwoBridges{value: expectedCost}(request);
+        bridgehub.requestL2TransactionTwoBridges{value: expectedCost}(assetRouterRegistrationRequest);
+        bridgehub.requestL2TransactionTwoBridges{value: expectedCost}(bridehubRegistrationRequest);
         vm.stopBroadcast();
     }
 }

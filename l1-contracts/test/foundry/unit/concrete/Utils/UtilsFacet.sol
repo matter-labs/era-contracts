@@ -24,12 +24,12 @@ contract UtilsFacet is ZkSyncHyperchainBase {
         return s.bridgehub;
     }
 
-    function util_setBaseToken(address _baseToken) external {
-        s.baseToken = _baseToken;
+    function util_setBaseToken(bytes32 _baseTokenAssetId) external {
+        s.baseTokenAssetId = _baseTokenAssetId;
     }
 
-    function util_getBaseToken() external view returns (address) {
-        return s.baseToken;
+    function util_getBaseTokenAssetId() external view returns (bytes32) {
+        return s.baseTokenAssetId;
     }
 
     function util_setBaseTokenBridge(address _baseTokenBridge) external {
@@ -160,6 +160,18 @@ contract UtilsFacet is ZkSyncHyperchainBase {
     function util_getIsFrozen() external view returns (bool) {
         Diamond.DiamondStorage storage s = Diamond.getDiamondStorage();
         return s.isFrozen;
+    }
+
+    function util_setTotalBatchesExecuted(uint256 _numberOfBatches) external {
+        s.totalBatchesExecuted = _numberOfBatches;
+    }
+
+    function util_setL2LogsRootHash(uint256 _batchNumber, bytes32 _newHash) external {
+        s.l2LogsRootHashes[_batchNumber] = _newHash;
+    }
+
+    function util_setBaseTokenGasPriceMultiplierNominator(uint128 _nominator) external {
+        s.baseTokenGasPriceMultiplierNominator = _nominator;
     }
 
     // add this to be excluded from coverage report

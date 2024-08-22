@@ -5,8 +5,10 @@ import {Test} from "forge-std/Test.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
+import {GenerateForceDeploymentsData} from "deploy-scripts/GenerateForceDeploymentsData.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract L1ContractDeployer is Test {
     using stdStorage for StdStorage;
@@ -19,6 +21,7 @@ contract L1ContractDeployer is Test {
     L1AssetRouter public sharedBridge;
 
     DeployL1Script l1Script;
+    GenerateForceDeploymentsData forceDeploymentsScript;
 
     function _deployL1Contracts() internal {
         vm.setEnv("L1_CONFIG", "/test/foundry/integration/deploy-scripts/script-config/config-deploy-l1.toml");
@@ -27,8 +30,13 @@ contract L1ContractDeployer is Test {
             "HYPERCHAIN_CONFIG",
             "/test/foundry/integration/deploy-scripts/script-out/output-deploy-hyperchain-era.toml"
         );
-
+        vm.setEnv(
+            "FORCE_DEPLOYMENTS_CONFIG",
+            "/test/foundry/integration/deploy-scripts/script-config/generate-force-deployments-data.toml"
+        );
+        forceDeploymentsScript = new GenerateForceDeploymentsData();
         l1Script = new DeployL1Script();
+        forceDeploymentsScript.run();
         l1Script.run();
 
         bridgehubProxyAddress = l1Script.getBridgehubProxyAddress();
@@ -58,9 +66,10 @@ contract L1ContractDeployer is Test {
     }
 
     function _registerNewToken(address _tokenAddress) internal {
-        if (!bridgeHub.tokenIsRegistered(_tokenAddress)) {
+        bytes32 tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _tokenAddress);
+        if (!bridgeHub.assetIdIsRegistered(tokenAssetId)) {
             vm.prank(bridgehubOwnerAddress);
-            bridgeHub.addToken(_tokenAddress);
+            bridgeHub.addTokenAssetId(tokenAssetId);
         }
     }
 

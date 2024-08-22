@@ -162,6 +162,7 @@ describe("Legacy Era tests", function () {
       l1ERC20Bridge.connect(randomSigner),
       bridgehub,
       chainId,
+      deployer.l1ChainId,
       depositorAddress,
       erc20TestToken.address,
       ethers.utils.parseUnits("800", 18),
@@ -170,10 +171,13 @@ describe("Legacy Era tests", function () {
   });
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
+    const mailboxFunctionSignature = "0x6c0960f9";
     const revertReason = await getCallRevertReason(
-      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(1, 0, 0, "0x", [ethers.constants.HashZero])
+      l1ERC20Bridge
+        .connect(randomSigner)
+        .finalizeWithdrawal(1, 0, 0, mailboxFunctionSignature, [ethers.constants.HashZero])
     );
-    expect(revertReason).equal("ShB wrong msg len");
+    expect(revertReason).equal("L1AR: wrong msg len");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function signature", async () => {
@@ -182,7 +186,7 @@ describe("Legacy Era tests", function () {
         .connect(randomSigner)
         .finalizeWithdrawal(1, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
     );
-    expect(revertReason).equal("ShB Incorrect message function selector");
+    expect(revertReason).equal("L1AR: Incorrect message function selector");
   });
 
   it("Should revert on finalizing a withdrawal with wrong batch number", async () => {
@@ -196,7 +200,7 @@ describe("Legacy Era tests", function () {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(1, 0, 0, l2ToL1message, dummyProof)
     );
-    expect(revertReason).equal("ShB withd w proof");
+    expect(revertReason).equal("L1AR: withd w proof");
   });
 
   /////////// Mailbox. Note we have these two together because we need to fix ERA Diamond proxy Address
@@ -266,7 +270,7 @@ describe("Legacy Era tests", function () {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
       );
-      expect(revertReason).equal("ShB withd w proof");
+      expect(revertReason).equal("L1AR: withd w proof");
     });
 
     it("Successful deposit", async () => {
@@ -297,7 +301,7 @@ describe("Legacy Era tests", function () {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
       );
-      expect(revertReason).equal("Withdrawal is already finalized");
+      expect(revertReason).equal("L1AR: Withdrawal is already finalized");
     });
   });
 });

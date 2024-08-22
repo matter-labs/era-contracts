@@ -2816,7 +2816,7 @@ object "Bootloader" {
 
                 // Third slot -- length of pubdata
                 let len := mload(add(ptr, 96))
-                // 4 bytes for selector, 32 bytes for ABI-encoded l2 DA validator address,
+                // 4 bytes for selector, 32 bytes for ABI-encoded L2 DA validator address,
                 // 32 bytes for array offset and 32 bytes for array length
                 let fullLen := add(len, 100)
 

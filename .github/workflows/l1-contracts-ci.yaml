@@ -3,6 +3,11 @@ name: L1 contracts CI
 on:
   pull_request:
 
+# We need this permissions for this CI to work with external contributions
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,11 +25,19 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Build artifacts
-        run: yarn l1 build
+      - name: Install l2 deps
+        working-directory: ./l2-contracts
+        run: yarn
 
-      - name: Build L2 artifacts
+      - name: Install l1 deps
+        working-directory: ./l1-contracts
+        run: yarn
+
+      - name: Build l2 artifacts
         run: yarn l2 build
+
+      - name: Build l1 artifacts
+        run: yarn l1 build
 
       - name: Create cache
         uses: actions/cache/save@v3
@@ -32,11 +45,13 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             l1-contracts/artifacts
+            l1-contracts/artifacts-zk
             l1-contracts/cache
             l1-contracts/typechain
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
+            l1-contracts/lib
 
   lint:
     runs-on: ubuntu-latest
@@ -86,11 +101,17 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             l1-contracts/artifacts
+            l1-contracts/artifacts-zk
             l1-contracts/cache
             l1-contracts/typechain
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
+            l2-contracts/typechain
+            l1-contracts/lib
 
       - name: Run tests
-        run: yarn l1 test:foundry
+        working-directory: ./l1-contracts
+        run: FOUNDRY_PROFILE=default yarn test:foundry
 
   test-hardhat:
     needs: [build, lint]
@@ -109,6 +130,10 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      - name: Install l1 deps
+        working-directory: ./l1-contracts
+        run: yarn
+
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
         with:
@@ -116,11 +141,13 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             l1-contracts/artifacts
+            l1-contracts/artifacts-zk
             l1-contracts/cache
             l1-contracts/typechain
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
+            l1-contracts/lib
 
       - name: Run tests
         run: yarn l1 test --no-compile
@@ -178,8 +205,13 @@ jobs:
           key: artifacts-l1-${{ github.sha }}
           path: |
             l1-contracts/artifacts
+            l1-contracts/artifacts-zk
             l1-contracts/cache
             l1-contracts/typechain
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
+            l2-contracts/typechain
+            l1-contracts/lib
 
       - name: Run coverage
         run: FOUNDRY_PROFILE=default yarn test:foundry && FOUNDRY_PROFILE=default yarn coverage:foundry --report summary --report lcov
@@ -217,7 +249,7 @@ jobs:
           minimum-coverage: 85 # Set coverage threshold.
 
   gas-report:
-    needs: [build, lint, test-foundry]
+    needs: [build, lint]
     runs-on: ubuntu-latest
 
     steps:
@@ -258,7 +290,7 @@ jobs:
           summaryQuantile: 0.0 # only display the 10% most significant gas diffs in the summary (defaults to 20%)
           sortCriteria: avg,max # sort diff rows by criteria
           sortOrders: desc,asc # and directions
-          ignore: test-foundry/**/* # filter out gas reports from specific paths (test/ is included by default)
+          ignore: test-foundry/**/*,l1-contracts/contracts/dev-contracts/**/*,l1-contracts/lib/**/*,l1-contracts/contracts/common/Dependencies.sol
         id: gas_diff
 
       - name: Add gas diff to sticky comment

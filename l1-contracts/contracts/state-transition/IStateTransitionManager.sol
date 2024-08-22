@@ -84,11 +84,9 @@ interface IStateTransitionManager {
 
     function acceptAdmin() external;
 
-    function getAllHyperchains() external view returns (address[] memory);
-
-    function getAllHyperchainChainIDs() external view returns (uint256[] memory);
-
     function getHyperchain(uint256 _chainId) external view returns (address);
+
+    function getHyperchainLegacy(uint256 _chainId) external view returns (address);
 
     function storedBatchZero() external view returns (bytes32);
 
@@ -104,6 +102,8 @@ interface IStateTransitionManager {
 
     function protocolVersionIsActive(uint256 _protocolVersion) external view returns (bool);
 
+    function getProtocolVersion(uint256 _chainId) external view returns (uint256);
+
     function initialize(StateTransitionManagerInitializeData calldata _initializeData) external;
 
     function setValidatorTimelock(address _validatorTimelock) external;
@@ -114,14 +114,12 @@ interface IStateTransitionManager {
 
     function createNewChain(
         uint256 _chainId,
-        address _baseToken,
+        bytes32 _baseTokenAssetId,
         address _sharedBridge,
         address _admin,
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
-    ) external;
-
-    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external;
+    ) external returns (address);
 
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
@@ -156,7 +154,7 @@ interface IStateTransitionManager {
 
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32);
 
-    function registerSyncLayer(uint256 _newSyncLayerChainId, bool _isWhitelisted) external;
+    function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external;
 
     event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
 

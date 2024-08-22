@@ -8,8 +8,12 @@ import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 
+/// @title DummyBridgehub
+/// @notice A test smart contract that allows to set State Transition Manager for a given chain
 contract DummyBridgehub {
     IMessageRoot public messageRoot;
+
+    address public hyperchain;
 
     // add this to be excluded from coverage report
     function test() internal virtual {}
@@ -28,5 +32,13 @@ contract DummyBridgehub {
 
     function setMessageRoot(address _messageRoot) public {
         messageRoot = IMessageRoot(_messageRoot);
+    }
+
+    function setHyperchain(uint256, address _hyperchain) external {
+        hyperchain = _hyperchain;
+    }
+
+    function getHyperchain(uint256) external view returns (address) {
+        return address(0);
     }
 }

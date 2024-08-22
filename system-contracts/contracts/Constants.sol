@@ -8,6 +8,7 @@ import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
 import {IKnownCodesStorage} from "./interfaces/IKnownCodesStorage.sol";
 import {IImmutableSimulator} from "./interfaces/IImmutableSimulator.sol";
 import {IBaseToken} from "./interfaces/IBaseToken.sol";
+import {IBridgehub} from "./interfaces/IBridgehub.sol";
 import {IL1Messenger} from "./interfaces/IL1Messenger.sol";
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {ICompressor} from "./interfaces/ICompressor.sol";
@@ -16,7 +17,7 @@ import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {IMessageRoot} from "./interfaces/IMessageRoot.sol";
 
-/// @dev All the system contracts introduced by zkSync have their addresses
+/// @dev All the system contracts introduced by ZKsync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
 uint160 constant SYSTEM_CONTRACTS_OFFSET = {{SYSTEM_CONTRACTS_OFFSET}}; // 2^15
 
@@ -72,6 +73,8 @@ address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0
 IBaseToken constant BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
 IBaseToken constant REAL_BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x0a));
 
+address constant L2_ASSET_ROUTER = address(USER_CONTRACTS_OFFSET + 0x03);
+IBridgehub constant L2_BRIDDGE_HUB = IBridgehub(address(USER_CONTRACTS_OFFSET + 0x02));
 IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(address(USER_CONTRACTS_OFFSET + 0x05));
 
 // Hardcoded because even for tests we should keep the address. (Instead `SYSTEM_CONTRACTS_OFFSET + 0x10`)
