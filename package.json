@@ -11,7 +11,8 @@
       "gas-bound-caller"
     ],
     "nohoist": [
-      "**/@openzeppelin/**"
+      "**/@openzeppelin/**",
+      "**/@matterlabs/**"
     ]
   },
   "devDependencies": {

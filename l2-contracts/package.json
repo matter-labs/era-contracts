@@ -33,7 +33,7 @@
   },
   "scripts": {
     "build": "hardhat compile",
-    "test:foundry": "forge test",
+    "test:foundry": "forge test --zksync",
     "clean": "hardhat clean",
     "test": "hardhat test",
     "verify": "hardhat run src/verify.ts",
