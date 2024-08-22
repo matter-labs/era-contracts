@@ -948,6 +948,7 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
     l2ProtocolUpgradeTx: buildL2CanonicalTransaction({ nonce: newProtocolVersion }),
     bootloaderHash: ethers.constants.HashZero,
     defaultAccountHash: ethers.constants.HashZero,
+    evmSimulatorHash: ethers.constants.HashZero,
     verifier: ethers.constants.AddressZero,
     verifierParams: buildVerifierParams({}),
     l1ContractsUpgradeCalldata: "0x",

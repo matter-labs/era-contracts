@@ -136,6 +136,7 @@ export interface ProposedUpgrade {
   factoryDeps: BytesLike[];
   bootloaderHash: BytesLike;
   defaultAccountHash: BytesLike;
+  evmSimulatorHash: BytesLike;
   verifier: string;
   verifierParams: VerifierParams;
   l1ContractsUpgradeCalldata: BytesLike;
