@@ -11,11 +11,16 @@ import {Test} from "forge-std/Test.sol";
 import { L2WrappedBaseToken } from "contracts/bridge/L2WrappedBaseToken.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+import {Unauthorized, UnimplementedMessage, BRIDGE_MINT_NOT_IMPLEMENTED} from "contracts/errors/L2ContractErrors.sol";
+
 contract WethTest is Test {
     L2WrappedBaseToken internal weth;
 
     // The owner of the proxy
     address ownerWallet = address(2);
+
+    address l2BridgeAddress = address(3);
+    address l1Address = address(4);
 
     function setUp() public {
         ownerWallet = makeAddr("owner");
@@ -24,6 +29,8 @@ contract WethTest is Test {
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(address(impl), ownerWallet, "");
 
         weth = L2WrappedBaseToken(payable(proxy));
+
+        weth.initializeV2("Wrapped Ether", "WETH", l2BridgeAddress, l1Address);
     }
 
     function test_shouldDepositWethByCallingDeposit() public {
@@ -98,12 +105,20 @@ contract WethTest is Test {
         weth.withdraw(1);
     }
 
-    // function test_revertWhenCallingBridgeMint() public {
-    //     weth.bridge
-    // }
+    function test_revertWhenCallingBridgeMint() public {
+        vm.expectRevert(abi.encodeWithSelector(UnimplementedMessage.selector, BRIDGE_MINT_NOT_IMPLEMENTED));
+        vm.prank(l2BridgeAddress);
+        weth.bridgeMint(address(1), 1);
+    }
 
-    // function test_revertWhenCallingBridgeBurn() public {
+    function test_revertWhenCallingBridgeMintDirectly() public {
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+        weth.bridgeMint(address(1), 1);
+    }
 
-    // }
+    function test_revertWhenCallingBridgeBurnDirectly() public {
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+        weth.bridgeBurn(address(1), 1);
+    }
 }
 
