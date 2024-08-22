@@ -372,7 +372,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                              Getters
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice baseToken function, which takes chainId, reads assetHandler from AR, and tokenAddress from AH
+    /// @notice baseToken function, which takes chainId as input, reads assetHandler from AR, and tokenAddress from AH
     function baseToken(uint256 _chainId) public view returns (address) {
         bytes32 baseTokenAssetId = baseTokenAssetId[_chainId];
         IL1BaseTokenAssetHandler assetHandlerAddress = IL1BaseTokenAssetHandler(

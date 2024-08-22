@@ -21,7 +21,6 @@ import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 // import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 
-import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 
 contract GatewayScript is Script {
