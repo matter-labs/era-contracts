@@ -35,17 +35,17 @@ contract EvmGasManager {
 
     modifier onlySystemEvm() {
         // cache use is safe since we do not support SELFDESTRUCT
-        uint256 slot = IS_ACCOUNT_EVM_PREFIX | uint256(uint160(msg.sender));
+        uint256 transient_slot = IS_ACCOUNT_EVM_PREFIX | uint256(uint160(msg.sender));
         bool isEVM;
         assembly {
-            isEVM := tload(slot)
+            isEVM := tload(transient_slot)
         }
 
         if (!isEVM) {
             isEVM = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender);
             if (isEVM) {
                 assembly {
-                    tstore(slot, isEVM)
+                    tstore(transient_slot, isEVM)
                 }
             }
         }
@@ -60,29 +60,29 @@ contract EvmGasManager {
     function warmAccount(address account) external payable onlySystemEvm returns (bool wasWarm) {
         if (uint160(account) < PRECOMPILES_END) return true;
 
-        uint256 slot = IS_ACCOUNT_WARM_PREFIX | uint256(uint160(account));
+        uint256 transient_slot = IS_ACCOUNT_WARM_PREFIX | uint256(uint160(account));
 
         assembly {
-            wasWarm := tload(slot)
+            wasWarm := tload(transient_slot)
         }
 
         if (!wasWarm) {
             assembly {
-                tstore(slot, 1)
+                tstore(transient_slot, 1)
             }
         }
     }
 
     function isSlotWarm(uint256 _slot) external view returns (bool isWarm) {
-        uint256 slot = IS_SLOT_WARM_PREFIX | uint256(uint160(msg.sender));
+        uint256 prefix = IS_SLOT_WARM_PREFIX | uint256(uint160(msg.sender));
         assembly {
-            mstore(0, slot)
+            mstore(0, prefix)
             mstore(0x20, _slot)
-            slot := keccak256(0, 64)
+            transient_slot := keccak256(0, 64)
         }
 
         assembly {
-            isWarm := tload(slot)
+            isWarm := tload(transient_slot)
         }
     }
 
@@ -90,27 +90,28 @@ contract EvmGasManager {
         uint256 _slot,
         uint256 _currentValue
     ) external payable onlySystemEvm returns (bool isWarm, uint256 originalValue) {
-        uint256 slot = IS_SLOT_WARM_PREFIX | uint256(uint160(msg.sender));
+        uint256 prefix = IS_SLOT_WARM_PREFIX | uint256(uint160(msg.sender));
+        uint256 transient_slot;
         assembly {
-            mstore(0, slot)
+            mstore(0, prefix)
             mstore(0x20, _slot)
-            slot := keccak256(0, 64)
+            transient_slot := keccak256(0, 64)
         }
 
         assembly {
-            isWarm := tload(slot)
+            isWarm := tload(transient_slot)
         }
 
         if (isWarm) {
             assembly {
-                originalValue := tload(add(slot, 1))
+                originalValue := tload(add(transient_slot, 1))
             }
         } else {
             originalValue = _currentValue;
 
             assembly {
-                tstore(slot, 1)
-                tstore(add(slot, 1), originalValue)
+                tstore(transient_slot, 1)
+                tstore(add(transient_slot, 1), originalValue)
             }
         }
     }
