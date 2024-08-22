@@ -11,16 +11,11 @@ uint160 constant PRECOMPILES_END = 0xffff;
 // Denotes that passGas has been consumed
 uint256 constant INF_PASS_GAS = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
-contract EvmGasManager {
-    // We need strust to use `storage` pointers
-    struct WarmAccountInfo {
-        bool isWarm;
-    }
+uint256 constant IS_ACCOUNT_EVM_PREFIX = 1 << 255;
+uint256 constant IS_ACCOUNT_WARM_PREFIX = 1 << 254;
+uint256 constant IS_SLOT_WARM_PREFIX = 1 << 253;
 
-    struct AccountInfo {
-        bool isEVM;
-    }
-    
+contract EvmGasManager {
     struct SlotInfo {
         bool warm;
         uint256 originalValue;
@@ -34,24 +29,25 @@ contract EvmGasManager {
 
     // The following storage variables are not used anywhere explicitly and are just used to obtain the storage pointers
     // to use the transient storage with.
-    mapping(address => WarmAccountInfo) private warmAccounts;
+    mapping(address => bool) private warmAccounts;
     mapping(address => mapping(uint256 => SlotInfo)) private warmSlots;
     EVMStackFrameInfo[] private evmStackFrames;
-    mapping(address => AccountInfo) private isAccountEVM;
 
     modifier onlySystemEvm() {
         // cache use is safe since we do not support SELFDESTRUCT
-        AccountInfo storage ptr = isAccountEVM[msg.sender];
+        uint256 slot = IS_ACCOUNT_EVM_PREFIX;
+        address _sender = msg.sender;
         bool isEVM;
         assembly {
-            isEVM := tload(ptr.slot)
+            slot := add(slot, _sender)
+            isEVM := tload(slot)
         }
 
         if (!isEVM) {
             isEVM = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender);
             if (isEVM) {
                 assembly {
-                    tstore(ptr.slot, isEVM)
+                    tstore(slot, isEVM)
                 }
             }
         }
@@ -66,44 +62,54 @@ contract EvmGasManager {
     function warmAccount(address account) external payable onlySystemEvm returns (bool wasWarm) {
         if (uint160(account) < PRECOMPILES_END) return true;
 
-        WarmAccountInfo storage ptr = warmAccounts[account];
+        uint256 slot = IS_ACCOUNT_WARM_PREFIX | uint256(uint160(account));
 
         assembly {
-            wasWarm := tload(ptr.slot)
+            wasWarm := tload(slot)
         }
 
         if (!wasWarm) {
             assembly {
-                tstore(ptr.slot, 1)
+                tstore(slot, 1)
             }
         }
     }
 
     function isSlotWarm(uint256 _slot) external view returns (bool isWarm) {
-        SlotInfo storage ptr = warmSlots[msg.sender][_slot];
+        uint256 slot = IS_SLOT_WARM_PREFIX | uint256(uint160(msg.sender));
+        assembly {
+            mstore(0, slot)
+            mstore(0x20, _slot)
+            slot := keccak256(0, 64)
+        }
 
         assembly {
-            isWarm := tload(ptr.slot)
+            isWarm := tload(slot)
         }
     }
 
     function warmSlot(uint256 _slot, uint256 _currentValue) external payable onlySystemEvm returns (bool isWarm, uint256 originalValue) {
-        SlotInfo storage ptr = warmSlots[msg.sender][_slot];
+        uint256 slot = IS_SLOT_WARM_PREFIX | uint256(uint160(msg.sender));
+        assembly {
+            mstore(0, slot)
+            mstore(0x20, _slot)
+            slot := keccak256(0, 64)
+        }
 
         assembly {
-            isWarm := tload(ptr.slot)
+            isWarm := tload(slot)
         }
 
         if (isWarm) {
             assembly {
-                originalValue := tload(add(ptr.slot, 1))
+                originalValue := tload(add(slot, 1))
             }
         } else {
             originalValue = _currentValue;
 
             assembly {
-                tstore(ptr.slot, 1)
-                tstore(add(ptr.slot, 1), originalValue)
+                tstore(slot, 1)
+                tstore(add(slot, 1), originalValue)
             }
         }
     }
