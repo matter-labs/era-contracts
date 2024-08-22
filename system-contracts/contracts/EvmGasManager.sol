@@ -86,7 +86,10 @@ contract EvmGasManager {
         }
     }
 
-    function warmSlot(uint256 _slot, uint256 _currentValue) external payable onlySystemEvm returns (bool isWarm, uint256 originalValue) {
+    function warmSlot(
+        uint256 _slot,
+        uint256 _currentValue
+    ) external payable onlySystemEvm returns (bool isWarm, uint256 originalValue) {
         uint256 slot = IS_SLOT_WARM_PREFIX | uint256(uint160(msg.sender));
         assembly {
             mstore(0, slot)
