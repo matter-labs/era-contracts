@@ -239,10 +239,6 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
         return (s.l1DAValidator, s.l2DAValidator);
     }
 
-    function getDAValidatorPair() external view returns (address, address) {
-        return (s.l1DAValidator, s.l2DAValidator);
-    }
-
     /*//////////////////////////////////////////////////////////////
                             DIAMOND LOUPE
      //////////////////////////////////////////////////////////////*/

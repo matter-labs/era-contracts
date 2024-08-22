@@ -164,19 +164,6 @@ contract RegisterHyperchainScript is Script {
         }
     }
 
-    function registerTokenOnNTV() internal {
-        IL1NativeTokenVault ntv = IL1NativeTokenVault(config.nativeTokenVault);
-        // Ownable ownable = Ownable(config.nativeTokenVault);
-        bytes32 assetId = ntv.getAssetId(config.baseToken);
-        if (ntv.tokenAddress(assetId) != address(0)) {
-            console.log("Token already registered on NTV");
-        } else {
-            // bytes memory data = abi.encodeCall(ntv.registerToken, (config.baseToken));
-            ntv.registerToken(config.baseToken);
-            console.log("Token registered on NTV");
-        }
-    }
-
     function deployGovernance() internal {
         vm.broadcast();
         Governance governance = new Governance(

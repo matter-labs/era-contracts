@@ -20,19 +20,8 @@ import {
 import { deployTokens, getTokens } from "./deploy-token";
 
 import { SYSTEM_CONFIG } from "../scripts/utils";
-import {
-  getNumberFromEnv,
-  getHashFromEnv,
-  PubdataPricingMode,
-  isCurrentNetworkLocal,
-  encodeNTVAssetId,
-} from "./utils";
-import {
-  testConfigPath,
-  ADDRESS_ONE,
-  EMPTY_STRING_KECCAK,
-  ETH_ADDRESS_IN_CONTRACTS,
-} from "../src.ts/constants";
+import { getNumberFromEnv, getHashFromEnv, PubdataPricingMode, isCurrentNetworkLocal, encodeNTVAssetId } from "./utils";
+import { testConfigPath, ADDRESS_ONE, EMPTY_STRING_KECCAK, ETH_ADDRESS_IN_CONTRACTS } from "../src.ts/constants";
 
 import { diamondCut, getCurrentFacetCutsForAdd, facetCut, Action } from "./diamondCut";
 import { CONTRACTS_GENESIS_PROTOCOL_VERSION } from "../test/unit_tests/utils";

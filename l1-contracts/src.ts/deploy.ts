@@ -43,7 +43,6 @@ import {
   applyL1ToL2Alias,
   // priorityTxMaxGasLimit,
   encodeNTVAssetId,
-  ETH_ADDRESS_IN_CONTRACTS,
 } from "./utils";
 import {
   DIAMOND_CUT_DATA_ABI_STRING,
@@ -54,6 +53,7 @@ import {
   ADDRESS_ONE,
   L2_BRIDGEHUB_ADDRESS,
   // L2_MESSAGE_ROOT_ADDRESS,
+  ETH_ADDRESS_IN_CONTRACTS,
 } from "../src.ts/constants";
 
 import type { ChainAdminCall } from "./utils";

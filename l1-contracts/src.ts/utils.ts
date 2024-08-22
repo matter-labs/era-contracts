@@ -10,8 +10,7 @@ import type { DiamondCut, FacetCut } from "./diamondCut";
 import { diamondCut } from "./diamondCut";
 import { SYSTEM_CONFIG, web3Url } from "../scripts/utils";
 import { Wallet as ZkWallet, Provider } from "zksync-ethers";
-
-import { L1_TO_L2_ALIAS_OFFSET } from "./constants";
+import { L2_NATIVE_TOKEN_VAULT_ADDRESS, L1_TO_L2_ALIAS_OFFSET } from "./constants";
 
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
 
