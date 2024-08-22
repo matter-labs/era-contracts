@@ -14,6 +14,8 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {DiamondAlreadyFrozen, Unauthorized, DiamondFreezeIncorrectState, DiamondNotFrozen} from "contracts/common/L1ContractErrors.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
@@ -46,10 +48,11 @@ contract UpgradeLogicTest is DiamondCutTest {
         admin = makeAddr("admin");
         stateTransitionManager = address(new DummyStateTransitionManager());
         randomSigner = makeAddr("randomSigner");
+        DummyBridgehub dummyBridgehub = new DummyBridgehub();
 
         diamondCutTestContract = new DiamondCutTestContract();
         diamondInit = new DiamondInit();
-        adminFacet = new AdminFacet();
+        adminFacet = new AdminFacet(block.chainid);
         gettersFacet = new GettersFacet();
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
@@ -75,12 +78,12 @@ contract UpgradeLogicTest is DiamondCutTest {
         InitializeData memory params = InitializeData({
             // TODO REVIEW
             chainId: 1,
-            bridgehub: makeAddr("bridgehub"),
+            bridgehub: address(dummyBridgehub),
             stateTransitionManager: stateTransitionManager,
             protocolVersion: 0,
             admin: admin,
             validatorTimelock: makeAddr("validatorTimelock"),
-            baseToken: makeAddr("baseToken"),
+            baseTokenAssetId: DataEncoding.encodeNTVAssetId(1, (makeAddr("baseToken"))),
             baseTokenBridge: makeAddr("baseTokenBridge"),
             storedBatchZero: bytes32(0),
             // genesisBatchHash: 0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,

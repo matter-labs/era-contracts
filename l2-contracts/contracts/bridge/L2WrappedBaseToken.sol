@@ -29,10 +29,22 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2S
     /// @dev Address of the L1 base token. It can be deposited to mint this L2 token.
     address public override l1Address;
 
+    modifier onlyBridge() {
+        if (msg.sender != l2Bridge) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     constructor() {
         // Disable initialization to prevent Parity hack.
         _disableInitializers();
+    }
+
+    /// @dev Fallback function to allow receiving Ether.
+    receive() external payable {
+        depositTo(msg.sender);
     }
 
     /// @notice Initializes a contract token for later use. Expected to be used in the proxy.
@@ -66,13 +78,6 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2S
         __ERC20Permit_init(name_);
 
         emit Initialize(name_, symbol_, 18);
-    }
-
-    modifier onlyBridge() {
-        if (msg.sender != l2Bridge) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
     }
 
     /// @notice Function for minting tokens on L2, implemented only to be compatible with IL2StandardToken interface.
@@ -121,10 +126,5 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2S
         if (!success) {
             revert WithdrawFailed();
         }
-    }
-
-    /// @dev Fallback function to allow receiving Ether.
-    receive() external payable {
-        depositTo(msg.sender);
     }
 }

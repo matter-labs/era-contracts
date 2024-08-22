@@ -2,7 +2,6 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
 import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
@@ -30,8 +29,14 @@ interface IGetters is IZkSyncHyperchainBase {
     /// @return The address of the state transition
     function getStateTransitionManager() external view returns (address);
 
+    /// @return The chain ID
+    function getChainId() external view returns (uint256);
+
     /// @return The address of the base token
     function getBaseToken() external view returns (address);
+
+    /// @return The address of the base token
+    function getBaseTokenAssetId() external view returns (bytes32);
 
     /// @return The address of the base token bridge
     function getBaseTokenBridge() external view returns (address);
@@ -48,6 +53,9 @@ interface IGetters is IZkSyncHyperchainBase {
     /// @return The total number of priority operations that were added to the priority queue, including all processed ones
     function getTotalPriorityTxs() external view returns (uint256);
 
+    /// @return The root hash of the priority tree
+    function getPriorityTreeRoot() external view returns (bytes32);
+
     /// @notice The function that returns the first unprocessed priority transaction.
     /// @dev Returns zero if and only if no operations were processed from the queue.
     /// @dev If all the transactions were processed, it will return the last processed index, so
@@ -57,9 +65,6 @@ interface IGetters is IZkSyncHyperchainBase {
 
     /// @return The number of priority operations currently in the queue
     function getPriorityQueueSize() external view returns (uint256);
-
-    /// @return The first unprocessed priority operation from the queue
-    function priorityQueueFrontOperation() external view returns (PriorityOperation memory);
 
     /// @return Whether the address has a validator access
     function isValidator(address _address) external view returns (bool);
@@ -147,4 +152,7 @@ interface IGetters is IZkSyncHyperchainBase {
 
     /// @return isFreezable Whether the facet can be frozen by the admin or always accessible
     function isFacetFreezable(address _facet) external view returns (bool isFreezable);
+
+    /// TODO
+    function getSettlementLayer() external view returns (address);
 }

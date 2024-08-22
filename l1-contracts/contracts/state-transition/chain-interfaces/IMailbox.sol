@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
 import {L2CanonicalTransaction, L2Log, L2Message, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 
-/// @title The interface of the zkSync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
+/// @title The interface of the ZKsync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IMailbox is IZkSyncHyperchainBase {
@@ -95,8 +95,31 @@ interface IMailbox is IZkSyncHyperchainBase {
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash);
 
+    /// @notice when requesting transactions through the bridgehub
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
+    ) external returns (bytes32 canonicalTxHash);
+
+    /// @dev On the Gateway the chain's mailbox receives the tx from the bridgehub.
+    function bridgehubRequestL2TransactionOnGateway(
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external;
+
+    /// @dev On L1 we have to forward to the Gateway's mailbox which sends to the Bridgehub on the Gw
+    /// @param _chainId the chainId of the chain
+    /// @param _transaction the transaction to be relayed
+    /// @param _factoryDeps the factory dependencies
+    /// @param _canonicalTxHash the canonical transaction hash
+    /// @param _expirationTimestamp the expiration timestamp
+    function requestL2TransactionToGatewayMailbox(
+        uint256 _chainId,
+        L2CanonicalTransaction calldata _transaction,
+        bytes[] calldata _factoryDeps,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
     ) external returns (bytes32 canonicalTxHash);
 
     /// @notice Estimates the cost in Ether of requesting execution of an L2 transaction from L1
@@ -110,8 +133,33 @@ interface IMailbox is IZkSyncHyperchainBase {
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
 
+    /// Proves that a certain leaf was included as part of the log merkle tree.
+    function proveL2LeafInclusion(
+        uint256 _batchNumber,
+        uint256 _batchRootMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) external view returns (bool);
+
     /// @notice transfer Eth to shared bridge as part of migration process
-    function transferEthToSharedBridge() external;
+    // function transferEthToSharedBridge() external;
+
+    // function relayTxSL(
+    //     address _to,
+    //     L2CanonicalTransaction memory _transaction,
+    //     bytes[] memory _factoryDeps,
+    //     bytes32 _canonicalTxHash,
+    //     uint64 _expirationTimestamp
+    // ) external;
+
+    // function freeAcceptTx(
+    //     L2CanonicalTransaction memory _transaction,
+    //     bytes[] memory _factoryDeps,
+    //     bytes32 _canonicalTxHash,
+    //     uint64 _expirationTimestamp
+    // ) external;
+
+    // function acceptFreeRequestFromBridgehub(BridgehubL2TransactionRequest calldata _request) external;
 
     /// @notice New priority request event. Emitted when a request is placed into the priority queue
     /// @param txId Serial number of the priority operation

@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 // note we use the IL1ERC20Bridge only to send L1<>L2 messages,
 // and we use this interface so that when the switch happened the old messages could be processed
 interface IL1ERC20Bridge {

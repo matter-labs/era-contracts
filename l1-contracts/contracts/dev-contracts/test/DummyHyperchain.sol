@@ -5,7 +5,11 @@ import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol
 import {FeeParams, PubdataPricingMode} from "../../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 
 contract DummyHyperchain is MailboxFacet {
-    constructor(address bridgeHubAddress, uint256 _eraChainId) MailboxFacet(_eraChainId) {
+    constructor(
+        address bridgeHubAddress,
+        uint256 _eraChainId,
+        uint256 _l1ChainId
+    ) MailboxFacet(_eraChainId, _l1ChainId) {
         s.bridgehub = bridgeHubAddress;
     }
 
@@ -43,4 +47,13 @@ contract DummyHyperchain is MailboxFacet {
                 minimalL2GasPrice: 250_000_000
             });
     }
+
+    function genesisUpgrade(
+        address _l1GenesisUpgrade,
+        bytes calldata _forceDeploymentData,
+        bytes[] calldata _factoryDeps
+    ) external {}
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }

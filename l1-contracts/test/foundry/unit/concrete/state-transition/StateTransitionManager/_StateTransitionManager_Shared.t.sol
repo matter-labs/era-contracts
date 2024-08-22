@@ -6,6 +6,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -13,11 +14,13 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {GenesisUpgrade} from "contracts/upgrades/GenesisUpgrade.sol";
+import {L1GenesisUpgrade as GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
 import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract StateTransitionManagerTest is Test {
@@ -38,11 +41,12 @@ contract StateTransitionManagerTest is Test {
     Diamond.FacetCut[] internal facetCuts;
 
     function setUp() public {
-        bridgehub = makeAddr("bridgehub");
+        DummyBridgehub dummyBridgehub = new DummyBridgehub();
+        bridgehub = address(dummyBridgehub);
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(bridgehub);
-        stateTransitionManager = new StateTransitionManager(bridgehub, type(uint256).max);
+        stateTransitionManager = new StateTransitionManager(address(IBridgehub(address(bridgehub))));
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new GenesisUpgrade();
 
@@ -56,7 +60,7 @@ contract StateTransitionManagerTest is Test {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new AdminFacet()),
+                facet: address(new AdminFacet(block.chainid)),
                 action: Diamond.Action.Add,
                 isFreezable: true,
                 selectors: Utils.getAdminSelectors()
@@ -84,7 +88,8 @@ contract StateTransitionManagerTest is Test {
             genesisBatchHash: bytes32(uint256(0x01)),
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x01)),
-            diamondCut: getDiamondCutData(address(diamondInit))
+            diamondCut: getDiamondCutData(address(diamondInit)),
+            forceDeploymentsData: bytes("")
         });
 
         StateTransitionManagerInitializeData memory stmInitializeDataNoGovernor = StateTransitionManagerInitializeData({
@@ -127,17 +132,19 @@ contract StateTransitionManagerTest is Test {
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }
 
-    function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal {
+    function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
         vm.stopPrank();
         vm.startPrank(bridgehub);
 
-        chainContractAddress.createNewChain({
-            _chainId: chainId,
-            _baseToken: baseToken,
-            _sharedBridge: sharedBridge,
-            _admin: newChainAdmin,
-            _diamondCut: abi.encode(_diamondCut)
-        });
+        return
+            chainContractAddress.createNewChain({
+                _chainId: chainId,
+                _baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, baseToken),
+                _sharedBridge: sharedBridge,
+                _admin: newChainAdmin,
+                _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
+                _factoryDeps: new bytes[](0)
+            });
     }
 
     // add this to be excluded from coverage report

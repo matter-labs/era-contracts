@@ -15,6 +15,8 @@ import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Utils} from "./Utils.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract RegisterHyperchainScript is Script {
     using stdToml for string;
@@ -32,12 +34,15 @@ contract RegisterHyperchainScript is Script {
         address validatorSenderOperatorCommitEth;
         address validatorSenderOperatorBlobsEth;
         address baseToken;
+        bytes32 baseTokenAssetId;
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
         address bridgehub;
+        address nativeTokenVault;
         address stateTransitionProxy;
         address validatorTimelock;
         bytes diamondCutData;
+        bytes forceDeployments;
         address governanceSecurityCouncilAddress;
         uint256 governanceMinDelay;
         address newDiamondProxy;
@@ -55,7 +60,8 @@ contract RegisterHyperchainScript is Script {
         deployGovernance();
         deployChainAdmin();
         checkTokenAddress();
-        registerTokenOnBridgehub();
+        registerAssetIdOnBridgehub();
+        registerTokenOnNTV();
         registerHyperchain();
         addValidators();
         configureZkSyncStateTransition();
@@ -67,7 +73,7 @@ contract RegisterHyperchainScript is Script {
     function initializeConfig() internal {
         // Grab config from output of l1 deployment
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/register-hyperchain.toml");
+        string memory path = string.concat(root, vm.envString("L1_OUTPUT")); //"/script-config/register-hyperchain.toml");
         string memory toml = vm.readFile(path);
 
         config.deployerAddress = msg.sender;
@@ -75,15 +81,20 @@ contract RegisterHyperchainScript is Script {
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
-        config.ownerAddress = toml.readAddress("$.owner_address");
 
         config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
         config.stateTransitionProxy = toml.readAddress(
             "$.deployed_addresses.state_transition.state_transition_proxy_addr"
         );
         config.validatorTimelock = toml.readAddress("$.deployed_addresses.validator_timelock_addr");
-
+        // config.bridgehubGovernance = toml.readAddress("$.deployed_addresses.governance_addr");
+        config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
+        config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
+        path = string.concat(root, vm.envString("HYPERCHAIN_CONFIG"));
+        toml = vm.readFile(path);
+
+        config.ownerAddress = toml.readAddress("$.owner_address");
 
         config.chainChainId = toml.readUint("$.chain.chain_chain_id");
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
@@ -118,14 +129,15 @@ contract RegisterHyperchainScript is Script {
         console.log("Using base token address:", config.baseToken);
     }
 
-    function registerTokenOnBridgehub() internal {
+    function registerAssetIdOnBridgehub() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         Ownable ownable = Ownable(config.bridgehub);
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
 
-        if (bridgehub.tokenIsRegistered(config.baseToken)) {
-            console.log("Token already registered on Bridgehub");
+        if (bridgehub.assetIdIsRegistered(baseTokenAssetId)) {
+            console.log("Base token asset id already registered on Bridgehub");
         } else {
-            bytes memory data = abi.encodeCall(bridgehub.addToken, (config.baseToken));
+            bytes memory data = abi.encodeCall(bridgehub.addTokenAssetId, (baseTokenAssetId));
             Utils.executeUpgrade({
                 _governor: ownable.owner(),
                 _salt: bytes32(config.bridgehubCreateNewChainSalt),
@@ -134,7 +146,21 @@ contract RegisterHyperchainScript is Script {
                 _value: 0,
                 _delay: 0
             });
-            console.log("Token registered on Bridgehub");
+            console.log("Base token asset id registered on Bridgehub");
+        }
+    }
+
+    function registerTokenOnNTV() internal {
+        IL1NativeTokenVault ntv = IL1NativeTokenVault(config.nativeTokenVault);
+        // Ownable ownable = Ownable(config.nativeTokenVault);
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
+        config.baseTokenAssetId = baseTokenAssetId;
+        if (ntv.tokenAddress(baseTokenAssetId) != address(0)) {
+            console.log("Token already registered on NTV");
+        } else {
+            // bytes memory data = abi.encodeCall(ntv.registerToken, (config.baseToken));
+            ntv.registerToken(config.baseToken);
+            console.log("Token registered on NTV");
         }
     }
 
@@ -166,13 +192,13 @@ contract RegisterHyperchainScript is Script {
             (
                 config.chainChainId,
                 config.stateTransitionProxy,
-                config.baseToken,
+                config.baseTokenAssetId,
                 config.bridgehubCreateNewChainSalt,
                 msg.sender,
-                config.diamondCutData
+                abi.encode(config.diamondCutData, config.forceDeployments),
+                new bytes[](0)
             )
         );
-
         Utils.executeUpgrade({
             _governor: ownable.owner(),
             _salt: bytes32(config.bridgehubCreateNewChainSalt),
@@ -203,7 +229,7 @@ contract RegisterHyperchainScript is Script {
     function addValidators() internal {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(config.validatorTimelock);
 
-        vm.startBroadcast();
+        vm.startBroadcast(msg.sender);
         validatorTimelock.addValidator(config.chainChainId, config.validatorSenderOperatorCommitEth);
         validatorTimelock.addValidator(config.chainChainId, config.validatorSenderOperatorBlobsEth);
         vm.stopBroadcast();
@@ -214,7 +240,7 @@ contract RegisterHyperchainScript is Script {
     function configureZkSyncStateTransition() internal {
         IZkSyncHyperchain hyperchain = IZkSyncHyperchain(config.newDiamondProxy);
 
-        vm.startBroadcast();
+        vm.startBroadcast(msg.sender);
         hyperchain.setTokenMultiplier(
             config.baseTokenGasPriceMultiplierNominator,
             config.baseTokenGasPriceMultiplierDenominator
@@ -231,8 +257,9 @@ contract RegisterHyperchainScript is Script {
     function setPendingAdmin() internal {
         IZkSyncHyperchain hyperchain = IZkSyncHyperchain(config.newDiamondProxy);
 
-        vm.broadcast();
+        vm.startBroadcast(msg.sender);
         hyperchain.setPendingAdmin(config.chainAdmin);
+        vm.stopBroadcast();
         console.log("Owner for ", config.newDiamondProxy, "set to", config.chainAdmin);
     }
 
@@ -243,5 +270,6 @@ contract RegisterHyperchainScript is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-register-hyperchain.toml");
         vm.writeToml(toml, path);
+        console.log("Output saved at:", path);
     }
 }

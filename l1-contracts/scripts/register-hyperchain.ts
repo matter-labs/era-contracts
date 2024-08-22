@@ -8,7 +8,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { Deployer } from "../src.ts/deploy";
 import { GAS_MULTIPLIER, web3Provider } from "./utils";
-import { ADDRESS_ONE } from "../src.ts/utils";
+import { ADDRESS_ONE, encodeNTVAssetId } from "../src.ts/utils";
 import { getTokens } from "../src.ts/deploy-token";
 
 const ETH_TOKEN_ADDRESS = ADDRESS_ONE;
@@ -66,7 +66,7 @@ async function main() {
     .option("--validium-mode")
     .option("--base-token-name <base-token-name>")
     .option("--base-token-address <base-token-address>")
-    .option("--use-governance <use-governance>")
+    .option("--use-governance")
     .option("--token-multiplier-setter-address <token-multiplier-setter-address>")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
@@ -92,21 +92,30 @@ async function main() {
         deployWallet,
         ownerAddress,
         verbose: true,
+        l1ChainId: process.env.CONTRACTS_ETH_CHAIN_ID || "31337",
       });
 
       const baseTokenAddress = await chooseBaseTokenAddress(cmd.baseTokenName, cmd.baseTokenAddress);
       await checkTokenAddress(baseTokenAddress);
       console.log(`Using base token address: ${baseTokenAddress}`);
-
-      const useGovernance = !!cmd.useGovernance && cmd.useGovernance === "true";
-
-      if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
-        await deployer.registerToken(baseTokenAddress, useGovernance);
+      console.log(deployer.addresses.Bridgehub.BridgehubProxy);
+      const baseTokenAssetId = encodeNTVAssetId(deployer.l1ChainId, baseTokenAddress);
+      if (!(await deployer.bridgehubContract(deployWallet).assetIdIsRegistered(baseTokenAssetId))) {
+        await deployer.registerTokenBridgehub(baseTokenAddress, cmd.useGovernance);
       }
+      await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
+      await deployer.registerHyperchain(
+        baseTokenAssetId,
+        cmd.validiumMode,
+        null,
+        gasPrice,
+        true,
+        null,
+        null,
+        cmd.useGovernance
+      );
 
       const tokenMultiplierSetterAddress = cmd.tokenMultiplierSetterAddress || "";
-
-      await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice, useGovernance);
       if (tokenMultiplierSetterAddress != "") {
         console.log(`Using token multiplier setter address: ${tokenMultiplierSetterAddress}`);
         await deployer.setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress);

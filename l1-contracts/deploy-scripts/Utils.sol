@@ -9,6 +9,7 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
@@ -109,6 +110,17 @@ library Utils {
      */
     function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
         return vm.readFileBinary("../system-contracts/bootloader/build/artifacts/proved_batch.yul.zbin");
+    }
+
+    /**
+     * @dev Read hardhat bytecodes
+     */
+    function readHardhatBytecode(string memory artifactPath) internal view returns (bytes memory) {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, artifactPath);
+        string memory json = vm.readFile(path);
+        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode");
+        return bytecode;
     }
 
     /**
@@ -304,6 +316,7 @@ library Utils {
         uint256 _delay
     ) internal {
         IGovernance governance = IGovernance(_governor);
+        Ownable ownable = Ownable(_governor);
 
         IGovernance.Call[] memory calls = new IGovernance.Call[](1);
         calls[0] = IGovernance.Call({target: _target, value: _value, data: _data});
@@ -314,11 +327,14 @@ library Utils {
             salt: _salt
         });
 
-        vm.startBroadcast();
+        vm.startBroadcast(ownable.owner());
         governance.scheduleTransparent(operation, _delay);
         if (_delay == 0) {
             governance.execute{value: _value}(operation);
         }
         vm.stopBroadcast();
     }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }

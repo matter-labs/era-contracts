@@ -4,12 +4,16 @@ pragma solidity ^0.8.21;
 
 import {BytecodeError, MalformedBytecode, LengthIsNotDivisibleBy32} from "../L1ContractErrors.sol";
 
+import {UncheckedMath} from "./UncheckedMath.sol";
+
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
  * @notice Helper library for working with L2 contracts on L1.
  */
 library L2ContractHelper {
+    using UncheckedMath for uint256;
+
     /// @dev The prefix used to create CREATE2 addresses.
     bytes32 private constant CREATE2_PREFIX = keccak256("zksyncCreate2");
 
@@ -86,5 +90,19 @@ library L2ContractHelper {
         );
 
         return address(uint160(uint256(data)));
+    }
+
+    /// @notice Hashes the L2 bytecodes and returns them in the format in which they are processed by the bootloader
+    function hashFactoryDeps(bytes[] memory _factoryDeps) internal pure returns (uint256[] memory hashedFactoryDeps) {
+        uint256 factoryDepsLen = _factoryDeps.length;
+        hashedFactoryDeps = new uint256[](factoryDepsLen);
+        for (uint256 i = 0; i < factoryDepsLen; i = i.uncheckedInc()) {
+            bytes32 hashedBytecode = hashL2Bytecode(_factoryDeps[i]);
+
+            // Store the resulting hash sequentially in bytes.
+            assembly {
+                mstore(add(hashedFactoryDeps, mul(add(i, 1), 32)), hashedBytecode)
+            }
+        }
     }
 }

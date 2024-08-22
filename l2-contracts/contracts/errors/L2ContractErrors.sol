@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 
 // 0x1f73225f
 error AddressMismatch(address expected, address supplied);
+error AssetIdMismatch(bytes32 expected, bytes32 supplied);
 // 0x5e85ae73
 error AmountMustBeGreaterThanZero();
 // 0xb4f54111
@@ -32,6 +33,15 @@ error UnimplementedMessage(string message);
 error UnsupportedPaymasterFlow();
 // 0x750b219c
 error WithdrawFailed();
+error MalformedBytecode(BytecodeError);
+
+enum BytecodeError {
+    Version,
+    NumberOfWords,
+    Length,
+    WordsMustBeOdd,
+    DictionaryLength
+}
 // 0xd92e233d
 error ZeroAddress();
 

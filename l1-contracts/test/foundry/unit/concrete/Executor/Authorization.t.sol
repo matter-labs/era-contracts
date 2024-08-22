@@ -34,7 +34,7 @@ contract AuthorizationTest is ExecutorTest {
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
             systemLogs: bytes(""),
-            pubdataCommitments: bytes("")
+            operatorDAInput: bytes("")
         });
     }
 
@@ -65,6 +65,6 @@ contract AuthorizationTest is ExecutorTest {
         vm.prank(randomSigner);
 
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomSigner));
-        executor.executeBatches(storedBatchInfoArray);
+        executor.executeBatches(storedBatchInfoArray, Utils.generatePriorityOps(storedBatchInfoArray.length));
     }
 }

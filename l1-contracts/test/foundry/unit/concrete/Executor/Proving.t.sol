@@ -4,18 +4,24 @@ pragma solidity 0.8.24;
 import {Vm} from "forge-std/Test.sol";
 import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 
-import {ExecutorTest} from "./_Executor_Shared.t.sol";
+import {ExecutorTest, POINT_EVALUATION_PRECOMPILE_RESULT, EMPTY_PREPUBLISHED_COMMITMENT} from "./_Executor_Shared.t.sol";
 
-import {COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {VerifiedBatchesExceedsCommittedBatches, BatchHashMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract ProvingTest is ExecutorTest {
+    bytes32 l2DAValidatorOutputHash;
+    bytes32[] blobVersionedHashes;
+    bytes operatorDAInput;
+
     function setUp() public {
+        setUpCommitBatch();
+
         vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
         currentTimestamp = block.timestamp;
 
-        bytes[] memory correctL2Logs = Utils.createSystemLogs();
+        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
         correctL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
@@ -27,11 +33,13 @@ contract ProvingTest is ExecutorTest {
 
         newCommitBatchInfo.timestamp = uint64(currentTimestamp);
         newCommitBatchInfo.systemLogs = l2Logs;
+        newCommitBatchInfo.operatorDAInput = operatorDAInput;
 
         IExecutor.CommitBatchInfo[] memory commitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         commitBatchInfoArray[0] = newCommitBatchInfo;
 
         vm.prank(validator);
+        vm.blobhashes(blobVersionedHashes);
         vm.recordLogs();
         executor.commitBatches(genesisStoredBatchInfo, commitBatchInfoArray);
         Vm.Log[] memory entries = vm.getRecordedLogs();
@@ -46,6 +54,40 @@ contract ProvingTest is ExecutorTest {
             timestamp: currentTimestamp,
             commitment: entries[0].topics[3]
         });
+    }
+
+    function setUpCommitBatch() public {
+        bytes1 source = bytes1(0x01);
+        bytes memory defaultBlobCommitment = Utils.getDefaultBlobCommitment();
+
+        bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
+        bytes32 totalL2PubdataHash = Utils.randomBytes32("totalL2PubdataHash");
+        uint8 numberOfBlobs = 1;
+        bytes32[] memory blobsLinearHashes = new bytes32[](1);
+        blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes");
+
+        operatorDAInput = abi.encodePacked(
+            uncompressedStateDiffHash,
+            totalL2PubdataHash,
+            numberOfBlobs,
+            blobsLinearHashes,
+            source,
+            defaultBlobCommitment,
+            EMPTY_PREPUBLISHED_COMMITMENT
+        );
+
+        l2DAValidatorOutputHash = Utils.constructRollupL2DAValidatorOutputHash(
+            uncompressedStateDiffHash,
+            totalL2PubdataHash,
+            uint8(numberOfBlobs),
+            blobsLinearHashes
+        );
+
+        blobVersionedHashes = new bytes32[](1);
+        blobVersionedHashes[0] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5;
+
+        bytes memory precompileInput = Utils.defaultPointEvaluationPrecompileInput(blobVersionedHashes[0]);
+        vm.mockCall(POINT_EVALUATION_PRECOMPILE_ADDR, precompileInput, POINT_EVALUATION_PRECOMPILE_RESULT);
     }
 
     function test_RevertWhen_ProvingWithWrongPreviousBlockData() public {

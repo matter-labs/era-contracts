@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
-import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
+import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {WithdrawalAlreadyFinalized} from "contracts/common/L1ContractErrors.sol";
 
@@ -47,7 +47,7 @@ contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
         vm.mockCall(
             sharedBridgeAddress,
             abi.encodeWithSelector(
-                IL1SharedBridge.finalizeWithdrawalLegacyErc20Bridge.selector,
+                IL1AssetRouter.finalizeWithdrawalLegacyErc20Bridge.selector,
                 l2BatchNumber,
                 l2MessageIndex,
                 txNumberInBatch,

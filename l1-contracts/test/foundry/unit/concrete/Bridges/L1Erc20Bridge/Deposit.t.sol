@@ -2,9 +2,10 @@
 
 pragma solidity 0.8.24;
 
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
+import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 import {EmptyDeposit, ValueMismatch, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
-import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 
 contract DepositTest is L1Erc20BridgeTest {
     event DepositInitiated(
@@ -84,6 +85,11 @@ contract DepositTest is L1Erc20BridgeTest {
 
     function test_RevertWhen_depositTransferAmountIsDifferent() public {
         uint256 amount = 2;
+        vm.mockCall(
+            address(feeOnTransferToken),
+            abi.encodeWithSelector(IERC20.balanceOf.selector),
+            abi.encode(amount + 1)
+        );
         vm.prank(alice);
         feeOnTransferToken.approve(address(bridge), amount);
         vm.expectRevert(TokensWithFeesNotSupported.selector);
@@ -99,6 +105,11 @@ contract DepositTest is L1Erc20BridgeTest {
 
     function test_RevertWhen_legacyDepositTransferAmountIsDifferent() public {
         uint256 amount = 4;
+        vm.mockCall(
+            address(feeOnTransferToken),
+            abi.encodeWithSelector(IERC20.balanceOf.selector),
+            abi.encode(amount + 1)
+        );
         vm.prank(alice);
         feeOnTransferToken.approve(address(bridge), amount);
         vm.expectRevert(TokensWithFeesNotSupported.selector);
@@ -119,7 +130,7 @@ contract DepositTest is L1Erc20BridgeTest {
         vm.mockCall(
             sharedBridgeAddress,
             abi.encodeWithSelector(
-                IL1SharedBridge.depositLegacyErc20Bridge.selector,
+                IL1AssetRouter.depositLegacyErc20Bridge.selector,
                 alice,
                 randomSigner,
                 address(token),
@@ -162,7 +173,7 @@ contract DepositTest is L1Erc20BridgeTest {
         vm.mockCall(
             sharedBridgeAddress,
             abi.encodeWithSelector(
-                IL1SharedBridge.depositLegacyErc20Bridge.selector,
+                IL1AssetRouter.depositLegacyErc20Bridge.selector,
                 alice,
                 randomSigner,
                 address(token),

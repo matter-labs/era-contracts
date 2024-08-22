@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IExecutor} from "../../state-transition/chain-interfaces/IExecutor.sol";
+import {PriorityOpsBatchInfo} from "../../state-transition/libraries/PriorityTree.sol";
 
 /// @title DummyExecutor
 /// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
@@ -125,7 +126,19 @@ contract DummyExecutor is IExecutor {
         );
     }
 
+    function executeBatches(StoredBatchInfo[] calldata _batchesData, PriorityOpsBatchInfo[] calldata) external {
+        executeBatches(_batchesData);
+    }
+
     function executeBatchesSharedBridge(uint256, StoredBatchInfo[] calldata _batchesData) external {
+        executeBatches(_batchesData);
+    }
+
+    function executeBatchesSharedBridge(
+        uint256,
+        StoredBatchInfo[] calldata _batchesData,
+        PriorityOpsBatchInfo[] calldata
+    ) external {
         executeBatches(_batchesData);
     }
 

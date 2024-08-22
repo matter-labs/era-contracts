@@ -24,12 +24,12 @@ contract UtilsFacet is ZkSyncHyperchainBase {
         return s.bridgehub;
     }
 
-    function util_setBaseToken(address _baseToken) external {
-        s.baseToken = _baseToken;
+    function util_setBaseToken(bytes32 _baseTokenAssetId) external {
+        s.baseTokenAssetId = _baseTokenAssetId;
     }
 
-    function util_getBaseToken() external view returns (address) {
-        return s.baseToken;
+    function util_getBaseTokenAssetId() external view returns (bytes32) {
+        return s.baseTokenAssetId;
     }
 
     function util_setBaseTokenBridge(address _baseTokenBridge) external {

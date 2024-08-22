@@ -12,8 +12,8 @@ import { ethers } from "ethers";
 import type { Provider } from "zksync-ethers";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, sleep } from "zksync-ethers/build/utils";
 
-import { ERC20Factory } from "../../l1-contracts/typechain";
 import { IERC20Factory } from "../typechain/IERC20Factory";
+import { IL1NativeTokenVaultFactory } from "../../l1-contracts/typechain/IL1NativeTokenVaultFactory";
 
 export const provider = web3Provider();
 
@@ -103,13 +103,39 @@ export async function create2DeployFromL1(
   gasPrice?: ethers.BigNumberish,
   extraFactoryDeps?: ethers.BytesLike[]
 ) {
-  const bridgehubAddress = deployedAddressesFromEnv().Bridgehub.BridgehubProxy;
-  const bridgehub = IBridgehubFactory.connect(bridgehubAddress, wallet);
-
-  const deployerSystemContracts = new Interface(artifacts.readArtifactSync("IContractDeployer").abi);
+  const deployerSystemContracts = new Interface(
+    artifacts.readArtifactSync("contracts/L2ContractHelper.sol:IContractDeployer").abi
+  );
   const bytecodeHash = hashL2Bytecode(bytecode);
   const calldata = deployerSystemContracts.encodeFunctionData("create2", [create2Salt, bytecodeHash, constructor]);
+
+  const factoryDeps = extraFactoryDeps ? [bytecode, ...extraFactoryDeps] : [bytecode];
+  return await requestL2TransactionDirect(
+    chainId,
+    wallet,
+    DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+    calldata,
+    l2GasLimit,
+    gasPrice,
+    factoryDeps
+  );
+}
+
+export async function requestL2TransactionDirect(
+  chainId: ethers.BigNumberish,
+  wallet: ethers.Wallet,
+  l2Contract: string,
+  calldata: string,
+  l2GasLimit: ethers.BigNumberish,
+  gasPrice?: ethers.BigNumberish,
+  factoryDeps?: ethers.BytesLike[]
+) {
+  const deployedAddresses = deployedAddressesFromEnv();
+  const bridgehubAddress = deployedAddresses.Bridgehub.BridgehubProxy;
+  const bridgehub = IBridgehubFactory.connect(bridgehubAddress, wallet);
+  const ntv = IL1NativeTokenVaultFactory.connect(deployedAddresses.Bridges.NativeTokenVaultProxy, wallet);
   gasPrice ??= await bridgehub.provider.getGasPrice();
+
   const expectedCost = await bridgehub.l2TransactionBaseCost(
     chainId,
     gasPrice,
@@ -117,8 +143,9 @@ export async function create2DeployFromL1(
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
   );
 
-  const baseTokenAddress = await bridgehub.baseToken(chainId);
-  const baseTokenBridge = deployedAddressesFromEnv().Bridges.SharedBridgeProxy;
+  const baseTokenAssetId = await bridgehub.baseTokenAssetId(chainId);
+  const baseTokenAddress = await ntv.tokenAddress(baseTokenAssetId);
+  const baseTokenBridge = deployedAddresses.Bridges.SharedBridgeProxy;
   const baseToken = IERC20Factory.connect(baseTokenAddress, wallet);
   const ethIsBaseToken = ADDRESS_ONE == baseTokenAddress;
 
@@ -126,17 +153,16 @@ export async function create2DeployFromL1(
     const tx = await baseToken.approve(baseTokenBridge, expectedCost);
     await tx.wait();
   }
-  const factoryDeps = extraFactoryDeps ? [bytecode, ...extraFactoryDeps] : [bytecode];
   return await bridgehub.requestL2TransactionDirect(
     {
       chainId,
-      l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+      l2Contract: l2Contract,
       mintValue: expectedCost,
       l2Value: 0,
       l2Calldata: calldata,
       l2GasLimit,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-      factoryDeps: factoryDeps,
+      factoryDeps: factoryDeps ?? [],
       refundRecipient: wallet.address,
     },
     { value: ethIsBaseToken ? expectedCost : 0, gasPrice }
@@ -149,44 +175,15 @@ export async function publishBytecodeFromL1(
   factoryDeps: ethers.BytesLike[],
   gasPrice?: ethers.BigNumberish
 ) {
-  const deployedAddresses = deployedAddressesFromEnv();
-  const bridgehubAddress = deployedAddresses.Bridgehub.BridgehubProxy;
-  const bridgehub = IBridgehubFactory.connect(bridgehubAddress, wallet);
-
-  const requiredValueToPublishBytecodes = await bridgehub.l2TransactionBaseCost(
+  return await requestL2TransactionDirect(
     chainId,
-    gasPrice,
+    wallet,
+    ethers.constants.AddressZero,
+    "0x",
     priorityTxMaxGasLimit,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+    gasPrice,
+    factoryDeps
   );
-
-  const baseToken = deployedAddresses.BaseToken;
-  const ethIsBaseToken = ADDRESS_ONE == baseToken;
-  if (!ethIsBaseToken) {
-    const erc20 = ERC20Factory.connect(baseToken, wallet);
-
-    const approveTx = await erc20.approve(
-      deployedAddresses.Bridges.SharedBridgeProxy,
-      requiredValueToPublishBytecodes.add(requiredValueToPublishBytecodes)
-    );
-    await approveTx.wait(1);
-  }
-  const nonce = await wallet.getTransactionCount();
-  const tx1 = await bridgehub.requestL2TransactionDirect(
-    {
-      chainId,
-      l2Contract: ethers.constants.AddressZero,
-      mintValue: requiredValueToPublishBytecodes,
-      l2Value: 0,
-      l2Calldata: "0x",
-      l2GasLimit: priorityTxMaxGasLimit,
-      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-      factoryDeps: factoryDeps,
-      refundRecipient: wallet.address,
-    },
-    { gasPrice, nonce, value: ethIsBaseToken ? requiredValueToPublishBytecodes : 0 }
-  );
-  await tx1.wait();
 }
 
 export async function awaitPriorityOps(
@@ -249,4 +246,10 @@ export async function getL1TxInfo(
     data: l1Calldata,
     value: neededValue.toString(),
   };
+}
+
+const LOCAL_NETWORKS = ["localhost", "hardhat", "localhostL2"];
+
+export function isCurrentNetworkLocal(): boolean {
+  return LOCAL_NETWORKS.includes(process.env.CHAIN_ETH_NETWORK);
 }

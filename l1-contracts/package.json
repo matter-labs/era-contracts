@@ -53,13 +53,14 @@
     "zksync-ethers": "^5.9.0"
   },
   "scripts": {
-    "build": "hardhat compile",
+    "build": "hardhat compile & CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat compile ",
+    "build-l1": "hardhat compile",
     "clean": "hardhat clean",
     "clean:foundry": "forge clean",
-    "test": "hardhat test test/unit_tests/*.spec.ts --network hardhat",
-    "test:foundry": "forge test",
+    "test": "yarn workspace da-contracts build && hardhat test test/unit_tests/*.spec.ts --network hardhat",
+    "test:foundry": "forge test --ffi",
     "test:fork": "TEST_CONTRACTS_FORK=1 yarn run hardhat test test/unit_tests/*.fork.ts --network hardhat",
-    "coverage:foundry": "forge coverage",
+    "coverage:foundry": "forge coverage --ffi",
     "deploy-no-build": "ts-node scripts/deploy.ts",
     "register-hyperchain": "ts-node scripts/register-hyperchain.ts",
     "deploy-weth-bridges": "ts-node scripts/deploy-weth-bridges.ts",
@@ -77,7 +78,10 @@
     "upgrade-system": "ts-node upgrade-system/index.ts",
     "token-migration": "ts-node scripts/token-migration.ts",
     "setup-legacy-bridge-era": "ts-node scripts/setup-legacy-bridge-era.ts",
-    "upgrade-consistency-checker": "ts-node scripts/upgrade-consistency-checker.ts"
+    "upgrade-consistency-checker": "ts-node scripts/upgrade-consistency-checker.ts",
+    "governance-accept-ownership": "ts-node scripts/governance-accept-ownership.ts",
+    "sync-layer": "ts-node scripts/sync-layer.ts",
+    "size": "hardhat size-contracts"
   },
   "dependencies": {
     "dotenv": "^16.0.3",

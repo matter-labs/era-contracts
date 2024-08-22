@@ -130,7 +130,14 @@ enum PubdataField {
     MsgHash,
     Bytecode,
     StateDiffCompressionVersion,
-    ExtraData
+    ExtraData,
+    InputDAFunctionSig,
+    InputLogsHash,
+    InputLogsRootHash,
+    InputMsgsHash,
+    InputBytecodeHash,
+    Offset,
+    Length
 }
 
 enum BytecodeError {

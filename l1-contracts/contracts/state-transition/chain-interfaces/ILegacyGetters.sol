@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
 
 /// @author Matter Labs
-/// @dev This interface contains getters for the zkSync contract that should not be used,
+/// @dev This interface contains getters for the ZKsync contract that should not be used,
 /// but still are kept for backward compatibility.
 /// @custom:security-contact security@matterlabs.dev
 interface ILegacyGetters is IZkSyncHyperchainBase {

@@ -2,12 +2,13 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IL1SharedBridge} from "./IL1SharedBridge.sol";
+import {IL1AssetRouter} from "./IL1AssetRouter.sol";
+import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
 
 /// @title L1 Bridge contract legacy interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Legacy Bridge interface before hyperchain migration, used for backward compatibility with zkSync Era
+/// @notice Legacy Bridge interface before ZK chain migration, used for backward compatibility with ZKsync Era
 interface IL1ERC20Bridge {
     event DepositInitiated(
         bytes32 indexed l2DepositTxHash,
@@ -60,7 +61,9 @@ interface IL1ERC20Bridge {
 
     function l2TokenAddress(address _l1Token) external view returns (address);
 
-    function SHARED_BRIDGE() external view returns (IL1SharedBridge);
+    function SHARED_BRIDGE() external view returns (IL1AssetRouter);
+
+    function NATIVE_TOKEN_VAULT() external view returns (IL1NativeTokenVault);
 
     function l2TokenBeacon() external view returns (address);
 
@@ -70,7 +73,5 @@ interface IL1ERC20Bridge {
         address _account,
         address _l1Token,
         bytes32 _depositL2TxHash
-    ) external returns (uint256 amount);
-
-    function transferTokenToSharedBridge(address _token) external;
+    ) external view returns (uint256 amount);
 }

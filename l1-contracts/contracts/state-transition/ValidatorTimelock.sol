@@ -6,6 +6,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager} from "./IStateTransitionManager.sol";
+import {PriorityOpsBatchInfo} from "./libraries/PriorityTree.sol";
 import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
@@ -14,7 +15,7 @@ import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErr
 /// @dev The primary purpose of this contract is to provide a trustless means of delaying batch execution without
 /// modifying the main hyperchain diamond contract. As such, even if this contract is compromised, it will not impact the main
 /// contract.
-/// @dev zkSync actively monitors the chain activity and reacts to any suspicious activity by freezing the chain.
+/// @dev ZKsync actively monitors the chain activity and reacts to any suspicious activity by freezing the chain.
 /// This allows time for investigation and mitigation before resuming normal operations.
 /// @dev The contract overloads all of the 4 methods, that are used in state transition. When the batch is committed,
 /// the timestamp is stored for it. Later, when the owner calls the batch execution, the contract checks that batch
@@ -187,15 +188,19 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the hyperchain diamond contract with the same calldata.
-    function executeBatches(StoredBatchInfo[] calldata _newBatchesData) external onlyValidator(ERA_CHAIN_ID) {
-        _executeBatchesInner(ERA_CHAIN_ID, _newBatchesData);
+    function executeBatches(
+        StoredBatchInfo[] calldata _batchesData,
+        PriorityOpsBatchInfo[] calldata
+    ) external onlyValidator(ERA_CHAIN_ID) {
+        _executeBatchesInner(ERA_CHAIN_ID, _batchesData);
     }
 
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the hyperchain diamond contract with the same calldata.
     function executeBatchesSharedBridge(
         uint256 _chainId,
-        StoredBatchInfo[] calldata _newBatchesData
+        StoredBatchInfo[] calldata _newBatchesData,
+        PriorityOpsBatchInfo[] calldata
     ) external onlyValidator(_chainId) {
         _executeBatchesInner(_chainId, _newBatchesData);
     }
@@ -210,7 +215,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
                 // Note: if the `commitBatchTimestamp` is zero, that means either:
                 // * The batch was committed, but not through this contract.
-                // * The batch wasn't committed at all, so execution will fail in the zkSync contract.
+                // * The batch wasn't committed at all, so execution will fail in the ZKsync contract.
                 // We allow executing such batches.
 
                 if (block.timestamp < commitBatchTimestamp + delay) {

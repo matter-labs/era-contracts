@@ -16,7 +16,7 @@ contract MailboxBaseTests is MailboxTest {
     }
 
     function test_mailboxConstructor() public {
-        DummyHyperchain h = new DummyHyperchain(address(0), eraChainId);
+        DummyHyperchain h = new DummyHyperchain(address(0), eraChainId, block.chainid);
         assertEq(h.getEraChainId(), eraChainId);
     }
 

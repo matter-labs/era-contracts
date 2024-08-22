@@ -14,6 +14,7 @@ import {
   TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS,
   TEST_COMPRESSOR_CONTRACT_ADDRESS,
   TEST_PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+  REAL_BRIDGEHUB_ADDRESS,
 } from "./constants";
 import { deployContractOnAddress, getWallets, loadArtifact } from "./utils";
 
@@ -37,6 +38,11 @@ const TEST_SYSTEM_CONTRACTS_MOCKS = {
   MsgValueSimulator: TEST_MSG_VALUE_SYSTEM_CONTRACT_ADDRESS,
   Bootloader: TEST_BOOTLOADER_FORMAL_ADDRESS,
   PubdataChunkPublisher: TEST_PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+  // We use `IBridgehub` name, since this is the name of the file in the system-contracts folder.
+  // The contract itself is present in a different one.
+  // For bridgehub we mock the real address for simplicity.
+  // In case of need, it can be ported to use the test address.
+  IBridgehub: REAL_BRIDGEHUB_ADDRESS,
 };
 
 // Deploys mocks, and cleans previous call results during deployments.

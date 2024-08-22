@@ -4,9 +4,9 @@ import { ethers } from "ethers";
 import * as hre from "hardhat";
 import { Provider, Wallet } from "zksync-ethers";
 import { hashBytecode } from "zksync-ethers/build/utils";
-import { unapplyL1ToL2Alias } from "./test-utils";
-import { L2SharedBridgeFactory, L2StandardERC20Factory } from "../typechain";
-import type { L2SharedBridge, L2StandardERC20 } from "../typechain";
+import { unapplyL1ToL2Alias, setCode } from "./test-utils";
+import type { L2AssetRouter, L2NativeTokenVault, L2StandardERC20 } from "../typechain";
+import { L2AssetRouterFactory, L2NativeTokenVaultFactory, L2StandardERC20Factory } from "../typechain";
 
 const richAccount = [
   {
@@ -21,12 +21,17 @@ const richAccount = [
     address: "0x0D43eB5B8a47bA8900d84AA36656c92024e9772e",
     privateKey: "0xd293c684d884d56f8d6abd64fc76757d3664904e309a0645baf8522ab6366d9e",
   },
+  {
+    address: "0xA13c10C0D5bd6f79041B9835c63f91de35A15883",
+    privateKey: "0x850683b40d4a740aa6e745f889a6fdc8327be76e122f5aba645a5b02d0248db8",
+  },
 ];
 
 describe("ERC20Bridge", function () {
   const provider = new Provider(hre.config.networks.localhost.url);
   const deployerWallet = new Wallet(richAccount[0].privateKey, provider);
   const governorWallet = new Wallet(richAccount[1].privateKey, provider);
+  const proxyAdminWallet = new Wallet(richAccount[3].privateKey, provider);
 
   // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
   // It is a bit easier to use EOA and it is sufficient for the tests.
@@ -34,10 +39,13 @@ describe("ERC20Bridge", function () {
 
   // We won't actually deploy an L1 token in these tests, but we need some address for it.
   const L1_TOKEN_ADDRESS = "0x1111000000000000000000000000000000001111";
+  const L2_ASSET_ROUTER_ADDRESS = "0x0000000000000000000000000000000000010003";
+  const L2_NATIVE_TOKEN_VAULT_ADDRESS = "0x0000000000000000000000000000000000010004";
 
   const testChainId = 9;
 
-  let erc20Bridge: L2SharedBridge;
+  let erc20Bridge: L2AssetRouter;
+  let erc20NativeTokenVault: L2NativeTokenVault;
   let erc20Token: L2StandardERC20;
 
   before("Deploy token and bridge", async function () {
@@ -53,37 +61,54 @@ describe("ERC20Bridge", function () {
       await deployer.loadArtifact("@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol:BeaconProxy"),
       [l2Erc20TokenBeacon.address, "0x"]
     );
-
     const beaconProxyBytecodeHash = hashBytecode(
       (await deployer.loadArtifact("@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol:BeaconProxy")).bytecode
     );
-
-    const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [testChainId]);
-    const bridgeInitializeData = erc20BridgeImpl.interface.encodeFunctionData("initialize", [
-      unapplyL1ToL2Alias(l1BridgeWallet.address),
-      ethers.constants.AddressZero,
-      beaconProxyBytecodeHash,
-      governorWallet.address,
-    ]);
-
-    const erc20BridgeProxy = await deployer.deploy(
-      await deployer.loadArtifact(
-        "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy"
-      ),
-      [erc20BridgeImpl.address, governorWallet.address, bridgeInitializeData]
+    let constructorArgs = ethers.utils.defaultAbiCoder.encode(
+      ["uint256", "uint256", "address", "address"],
+      /// note in real deployment we have to transfer ownership of standard deployer here
+      [testChainId, 1, unapplyL1ToL2Alias(l1BridgeWallet.address), ethers.constants.AddressZero]
+    );
+    await setCode(
+      deployerWallet,
+      L2_ASSET_ROUTER_ADDRESS,
+      (await deployer.loadArtifact("L2AssetRouter")).bytecode,
+      true,
+      constructorArgs
     );
 
-    erc20Bridge = L2SharedBridgeFactory.connect(erc20BridgeProxy.address, deployerWallet);
+    erc20Bridge = L2AssetRouterFactory.connect(L2_ASSET_ROUTER_ADDRESS, deployerWallet);
+    const l2NativeTokenVaultArtifact = await deployer.loadArtifact("L2NativeTokenVault");
+    constructorArgs = ethers.utils.defaultAbiCoder.encode(
+      ["uint256", "address", "bytes32", "address", "address", "bool"],
+      /// note in real deployment we have to transfer ownership of standard deployer here
+      [
+        9,
+        governorWallet.address,
+        beaconProxyBytecodeHash,
+        ethers.constants.AddressZero,
+        ethers.constants.AddressZero,
+        false,
+      ]
+    );
+    await setCode(
+      deployerWallet,
+      L2_NATIVE_TOKEN_VAULT_ADDRESS,
+      l2NativeTokenVaultArtifact.bytecode,
+      true,
+      constructorArgs
+    );
+
+    erc20NativeTokenVault = L2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, l1BridgeWallet);
   });
 
   it("Should finalize deposit ERC20 deposit", async function () {
-    const erc20BridgeWithL1Bridge = L2SharedBridgeFactory.connect(erc20Bridge.address, l1BridgeWallet);
-
+    const erc20BridgeWithL1BridgeWallet = L2AssetRouterFactory.connect(erc20Bridge.address, proxyAdminWallet);
     const l1Depositor = ethers.Wallet.createRandom();
     const l2Receiver = ethers.Wallet.createRandom();
-
+    const l1Bridge = await hre.ethers.getImpersonatedSigner(l1BridgeWallet.address);
     const tx = await (
-      await erc20BridgeWithL1Bridge.finalizeDeposit(
+      await erc20BridgeWithL1BridgeWallet.connect(l1Bridge)["finalizeDeposit(address,address,address,uint256,bytes)"](
         // Depositor and l2Receiver can be any here
         l1Depositor.address,
         l2Receiver.address,
@@ -92,9 +117,8 @@ describe("ERC20Bridge", function () {
         encodedTokenData("TestToken", "TT", 18)
       )
     ).wait();
-
-    const l2TokenAddress = tx.events.find((event) => event.event === "FinalizeDeposit").args.l2Token;
-
+    const l2TokenInfo = tx.events.find((event) => event.event === "FinalizeDepositSharedBridge").args.assetId;
+    const l2TokenAddress = await erc20NativeTokenVault.tokenAddress(l2TokenInfo);
     // Checking the correctness of the balance:
     erc20Token = L2StandardERC20Factory.connect(l2TokenAddress, deployerWallet);
     expect(await erc20Token.balanceOf(l2Receiver.address)).to.equal(100);

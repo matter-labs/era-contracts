@@ -2,7 +2,6 @@ import * as hardhat from "hardhat";
 import type { BigNumberish, BytesLike } from "ethers";
 import { BigNumber, ethers } from "ethers";
 import type { Address } from "zksync-ethers/build/types";
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-ethers/build/utils";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
@@ -13,6 +12,7 @@ import type { ExecutorFacet } from "../../typechain";
 import type { FeeParams, L2CanonicalTransaction } from "../../src.ts/utils";
 import { ADDRESS_ONE, PubdataPricingMode, EMPTY_STRING_KECCAK } from "../../src.ts/utils";
 import { packSemver } from "../../scripts/utils";
+import { keccak256 } from "ethers/lib/utils";
 
 export const CONTRACTS_GENESIS_PROTOCOL_VERSION = packSemver(0, 21, 0).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -20,6 +20,8 @@ export const IERC20_INTERFACE = require("@openzeppelin/contracts-v4/build/contra
 export const DEFAULT_REVERT_REASON = "VM did not revert";
 
 export const DEFAULT_L2_LOGS_TREE_ROOT_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000";
+export const DUMMY_MERKLE_PROOF_START = "0x0101000000000000000000000000000000000000000000000000000000000000";
+export const DUMMY_MERKLE_PROOF_2_START = "0x0109000000000000000000000000000000000000000000000000000000000000";
 export const L2_SYSTEM_CONTEXT_ADDRESS = "0x000000000000000000000000000000000000800b";
 export const L2_BOOTLOADER_ADDRESS = "0x0000000000000000000000000000000000008001";
 export const L2_KNOWN_CODE_STORAGE_ADDRESS = "0x0000000000000000000000000000000000008004";
@@ -44,12 +46,8 @@ export enum SYSTEM_LOG_KEYS {
   PREV_BATCH_HASH_KEY,
   CHAINED_PRIORITY_TXN_HASH_KEY,
   NUMBER_OF_LAYER_1_TXS_KEY,
-  BLOB_ONE_HASH_KEY,
-  BLOB_TWO_HASH_KEY,
-  BLOB_THREE_HASH_KEY,
-  BLOB_FOUR_HASH_KEY,
-  BLOB_FIVE_HASH_KEY,
-  BLOB_SIX_HASH_KEY,
+  L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+  USED_L2_DA_VALIDATOR_ADDRESS_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
 }
 
@@ -210,7 +208,8 @@ export function constructL2Log(isService: boolean, sender: string, key: number |
 export function createSystemLogs(
   chainedPriorityTxHashKey?: BytesLike,
   numberOfLayer1Txs?: BigNumberish,
-  previousBatchHash?: BytesLike
+  previousBatchHash?: BytesLike,
+  l2DaValidatorOutputHash?: BytesLike
 ) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
@@ -240,27 +239,19 @@ export function createSystemLogs(
       SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
       numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
     ),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
+
     constructL2Log(
       true,
-      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
-      SYSTEM_LOG_KEYS.BLOB_THREE_HASH_KEY,
-      ethers.constants.HashZero
+      L2_TO_L1_MESSENGER,
+      SYSTEM_LOG_KEYS.L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+      l2DaValidatorOutputHash ? ethers.utils.hexlify(l2DaValidatorOutputHash) : ethers.constants.HashZero
     ),
     constructL2Log(
       true,
-      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
-      SYSTEM_LOG_KEYS.BLOB_FOUR_HASH_KEY,
-      ethers.constants.HashZero
+      L2_TO_L1_MESSENGER,
+      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+      process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR
     ),
-    constructL2Log(
-      true,
-      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
-      SYSTEM_LOG_KEYS.BLOB_FIVE_HASH_KEY,
-      ethers.constants.HashZero
-    ),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_SIX_HASH_KEY, ethers.constants.HashZero),
   ];
 }
 
@@ -268,7 +259,8 @@ export function createSystemLogsWithUpgrade(
   chainedPriorityTxHashKey?: BytesLike,
   numberOfLayer1Txs?: BigNumberish,
   upgradeTxHash?: string,
-  previousBatchHash?: string
+  previousBatchHash?: string,
+  l2DaValidatorOutputHash?: BytesLike
 ) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
@@ -298,27 +290,18 @@ export function createSystemLogsWithUpgrade(
       SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
       numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
     ),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
-      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
-      SYSTEM_LOG_KEYS.BLOB_THREE_HASH_KEY,
-      ethers.constants.HashZero
+      L2_TO_L1_MESSENGER,
+      SYSTEM_LOG_KEYS.L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
+      ethers.utils.hexlify(l2DaValidatorOutputHash) || ethers.constants.HashZero
     ),
     constructL2Log(
       true,
-      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
-      SYSTEM_LOG_KEYS.BLOB_FOUR_HASH_KEY,
-      ethers.constants.HashZero
+      L2_TO_L1_MESSENGER,
+      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+      process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR || ethers.constants.AddressZero
     ),
-    constructL2Log(
-      true,
-      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
-      SYSTEM_LOG_KEYS.BLOB_FIVE_HASH_KEY,
-      ethers.constants.HashZero
-    ),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_SIX_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
       L2_BOOTLOADER_ADDRESS,
@@ -383,13 +366,14 @@ export interface CommitBatchInfo {
   bootloaderHeapInitialContentsHash: BytesLike;
   eventsQueueStateHash: BytesLike;
   systemLogs: BytesLike;
-  pubdataCommitments: BytesLike;
+  operatorDAInput: BytesLike;
 }
 
 export async function depositERC20(
   bridge: IL1ERC20Bridge,
   bridgehubContract: IBridgehub,
   chainId: string,
+  l1ChainId: number,
   l2Receiver: string,
   l1Token: string,
   amount: ethers.BigNumber,
@@ -397,7 +381,7 @@ export async function depositERC20(
   l2RefundRecipient = ethers.constants.AddressZero
 ) {
   const gasPrice = await bridge.provider.getGasPrice();
-  const gasPerPubdata = REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT;
+  const gasPerPubdata = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
   const neededValue = await bridgehubContract.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
   const ethIsBaseToken = (await bridgehubContract.baseToken(chainId)) == ADDRESS_ONE;
 
@@ -406,7 +390,7 @@ export async function depositERC20(
     l1Token,
     amount,
     l2GasLimit,
-    REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     l2RefundRecipient,
     {
       value: ethIsBaseToken ? neededValue : 0,
@@ -421,7 +405,7 @@ export function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>)
     from: ethers.constants.AddressZero,
     to: ethers.constants.AddressZero,
     gasLimit: 5000000,
-    gasPerPubdataByteLimit: REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
+    gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     maxFeePerGas: 0,
     maxPriorityFeePerGas: 0,
     paymaster: 0,
@@ -441,17 +425,60 @@ export type CommitBatchInfoWithTimestamp = Partial<CommitBatchInfo> & {
   batchNumber: BigNumberish;
 };
 
+function padStringWithZeroes(str: string, lenBytes: number): string {
+  const strLen = lenBytes * 2;
+  if (str.length > strLen) {
+    throw new Error("String is too long");
+  }
+  const paddingLength = strLen - str.length;
+  return str + "0".repeat(paddingLength);
+}
+
+// Returns a pair of strings:
+// - the expected pubdata commitemnt
+// - the required rollup l2 da hash output
+export function buildL2DARollupPubdataCommitment(stateDiffHash: string, fullPubdata: string): [string, string] {
+  const BLOB_SIZE_BYTES = 126_976;
+  const fullPubdataHash = ethers.utils.keccak256(fullPubdata);
+  if (ethers.utils.arrayify(fullPubdata).length > BLOB_SIZE_BYTES) {
+    throw new Error("Too much pubdata");
+  }
+  const blobsProvided = 1;
+
+  const blobLinearHash = keccak256(padStringWithZeroes(fullPubdata, BLOB_SIZE_BYTES));
+
+  const l1DAOutput = ethers.utils.hexConcat([
+    stateDiffHash,
+    fullPubdataHash,
+    ethers.utils.hexlify(blobsProvided),
+    blobLinearHash,
+  ]);
+  const l1DAOutputHash = ethers.utils.keccak256(l1DAOutput);
+
+  // After the header the 00 byte is for "calldata" mode.
+  // Then, there is the full pubdata.
+  // Then, there are 32 bytes for blob commitment. They must have at least one non-zero byte,
+  // so it will be the last one.
+  const fullPubdataCommitment = `${l1DAOutput}00${fullPubdata.slice(2)}${"0".repeat(62)}01`;
+
+  return [fullPubdataCommitment, l1DAOutputHash];
+}
+
 export async function buildCommitBatchInfoWithUpgrade(
   prevInfo: StoredBatchInfo,
   info: CommitBatchInfoWithTimestamp,
   upgradeTxHash: string
 ): Promise<CommitBatchInfo> {
   const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
+
+  const [fullPubdataCommitment, l1DAOutputHash] = buildL2DARollupPubdataCommitment(ethers.constants.HashZero, "0x");
+
   const systemLogs = createSystemLogsWithUpgrade(
     info.priorityOperationsHash,
     info.numberOfLayer1Txs,
     upgradeTxHash,
-    ethers.utils.hexlify(prevInfo.batchHash)
+    ethers.utils.hexlify(prevInfo.batchHash),
+    l1DAOutputHash
   );
   systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
     true,
@@ -467,7 +494,7 @@ export async function buildCommitBatchInfoWithUpgrade(
     numberOfLayer1Txs: 0,
     priorityOperationsHash: EMPTY_STRING_KECCAK,
     systemLogs: ethers.utils.hexConcat(systemLogs),
-    pubdataCommitments: `0x${"0".repeat(130)}`,
+    operatorDAInput: fullPubdataCommitment,
     bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
     eventsQueueStateHash: ethers.utils.randomBytes(32),
     ...info,
@@ -489,7 +516,8 @@ export async function makeExecutedEqualCommitted(
     })
   ).wait();
 
-  await (await proxyExecutor.executeBatches(batchesToExecute)).wait();
+  const dummyMerkleProofs = batchesToExecute.map(() => ({ leftPath: [], rightPath: [], itemHashes: [] }));
+  await (await proxyExecutor.executeBatches(batchesToExecute, dummyMerkleProofs)).wait();
 }
 
 export function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: string): StoredBatchInfo {

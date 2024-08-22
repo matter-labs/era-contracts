@@ -64,6 +64,21 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @dev Both the admin and the STM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
 
+    function genesisUpgrade(
+        address _l1GenesisUpgrade,
+        address _stmDeployer,
+        bytes calldata _forceDeploymentData,
+        bytes[] calldata _factoryDeps
+    ) external;
+
+    /// @notice Set the L1 DA validator address as well as the L2 DA validator address.
+    /// @dev While in principle it is possible that updating only one of the addresses is needed,
+    /// usually these should work in pair and L1 validator typically expects a specific input from the L2 Validator.
+    /// That's why we change those together to prevent admins of chains from shooting themselves in the foot.
+    /// @param _l1DAValidator The address of the L1 DA validator
+    /// @param _l2DAValidator The address of the L2 DA validator
+    function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external;
+
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
 
@@ -100,9 +115,38 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
 
+    /// TODO: maybe include some params
+    event MigrationComplete();
+
     /// @notice Emitted when the contract is frozen.
     event Freeze();
 
     /// @notice Emitted when the contract is unfrozen.
     event Unfreeze();
+
+    /// @notice New pair of DA validators set
+    event NewL2DAValidator(address indexed oldL2DAValidator, address indexed newL2DAValidator);
+    event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
+
+    event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
+
+    event BridgeMint(address indexed _account, uint256 _amount);
+
+    /// @dev Similar to IL1AssetHandler interface, used to send chains.
+    function forwardedBridgeBurn(
+        address _settlementLayer,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external payable returns (bytes memory _bridgeMintData);
+
+    /// @dev Similar to IL1AssetHandler interface, used to claim failed chain transfers.
+    function forwardedBridgeClaimFailedBurn(
+        uint256 _chainId,
+        bytes32 _assetInfo,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) external payable;
+
+    /// @dev Similar to IL1AssetHandler interface, used to receive chains.
+    function forwardedBridgeMint(bytes calldata _data) external payable;
 }
