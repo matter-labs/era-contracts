@@ -292,12 +292,8 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         uint256 /* _chainId */,
         bytes32 /* _assetInfo */,
         address _prevMsgSender,
-        bytes calldata _data
+        bytes calldata _chainData
     ) external payable override onlyBridgehub {
-        (, , , , /* depositAmount */ /* l2Receiver */ /* chainId */ /* stmData */ bytes memory _chainData) = abi.decode(
-            _data,
-            (uint256, address, uint256, bytes, bytes)
-        );
         HyperchainCommitment memory chainCommitment = abi.decode(_chainData, (HyperchainCommitment));
 
         require(s.settlementLayer != address(0), "Af: not migrated");

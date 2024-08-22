@@ -474,12 +474,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @param _chainId the chainId of the chain
     /// @param _assetInfo the assetInfo of the chain
     /// @param _depositSender the address of that sent the deposit
-    /// @param _data the data of the migration
-    function bridgeClaimFailedBurn(
+    /// @param _stmData the data of the migration
+    function forwardedBridgeClaimFailedBurn(
         uint256 _chainId,
         bytes32 _assetInfo,
         address _depositSender,
-        bytes calldata _data
+        bytes calldata _stmData
     ) external {
         // Function is empty due to the fact that when calling `forwardedBridgeBurn` there are no
         // state updates that occur.

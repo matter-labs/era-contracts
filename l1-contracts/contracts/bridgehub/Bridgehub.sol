@@ -664,20 +664,25 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address _depositSender,
         bytes calldata _data
     ) external payable override onlyAssetRouter onlyL1 {
+        (, , , bytes memory stmData, bytes memory chainData) = abi.decode(
+            _data,
+            (uint256, address, uint256, bytes, bytes)
+        );
+
         delete settlementLayer[_chainId];
 
-        IStateTransitionManager(stateTransitionManager[_chainId]).bridgeClaimFailedBurn({
+        IStateTransitionManager(stateTransitionManager[_chainId]).forwardedBridgeClaimFailedBurn({
             _chainId: _chainId,
             _assetInfo: _assetId,
             _depositSender: _depositSender,
-            _data: _data
+            _stmData: stmData
         });
 
         IZkSyncHyperchain(getHyperchain(_chainId)).forwardedBridgeClaimFailedBurn({
             _chainId: _chainId,
             _assetInfo: _assetId,
             _prevMsgSender: _depositSender,
-            _data: _data
+            _chainData: chainData
         });
     }
 

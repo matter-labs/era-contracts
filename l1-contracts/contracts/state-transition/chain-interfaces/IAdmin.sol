@@ -143,7 +143,7 @@ interface IAdmin is IZkSyncHyperchainBase {
         uint256 _chainId,
         bytes32 _assetInfo,
         address _prevMsgSender,
-        bytes calldata _data
+        bytes calldata _chainData
     ) external payable;
 
     /// @dev Similar to IL1AssetHandler interface, used to receive chains.
