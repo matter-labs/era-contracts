@@ -242,8 +242,13 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
     }
 
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
-    function getERC20Getters(address _token) public view returns (bytes memory) {
+    function getERC20Getters(address _token) public view override returns (bytes memory) {
         return BridgeHelper.getERC20Getters(_token, ETH_TOKEN_ADDRESS);
+    }
+
+    /// @dev Shows the assetId for a given chain and token address
+    function getAssetId(uint256 _chainId, address _l1Token) external pure override returns (bytes32) {
+        return DataEncoding.encodeNTVAssetId(_chainId, _l1Token);
     }
 
     /// @dev Transfers tokens from the depositor address to the smart contract address.

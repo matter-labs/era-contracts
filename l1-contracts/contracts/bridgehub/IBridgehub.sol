@@ -75,7 +75,7 @@ interface IBridgehub is IL1AssetHandler {
 
     function assetIdIsRegistered(bytes32 _baseTokenAssetId) external view returns (bool);
 
-    function baseToken(bytes32 _baseTokenAssetId) external view returns (address);
+    function baseToken(uint256 _chainId) external view returns (address);
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 

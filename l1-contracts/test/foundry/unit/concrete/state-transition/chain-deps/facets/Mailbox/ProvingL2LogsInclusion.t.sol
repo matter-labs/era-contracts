@@ -48,19 +48,18 @@ contract MailboxL2LogsProve is MailboxTest {
         index = elements.length - 1;
     }
 
-    // FIXME: restore the test
-    // function test_RevertWhen_batchNumberGreaterThanBatchesExecuted() public {
-    //     L2Message memory message = L2Message({txNumberInBatch: 0, sender: sender, data: data});
-    //     bytes32[] memory proof = new bytes32[](0);
+    function test_RevertWhen_batchNumberGreaterThanBatchesExecuted() public {
+        L2Message memory message = L2Message({txNumberInBatch: 0, sender: sender, data: data});
+        bytes32[] memory proof = _appendProofMetadata(new bytes32[](1));
 
-    //     vm.expectRevert(abi.encodeWithSelector(BatchNotExecuted.selector, batchNumber + 1));
-    //     mailboxFacet.proveL2MessageInclusion({
-    //         _batchNumber: batchNumber + 1,
-    //         _index: 0,
-    //         _message: message,
-    //         _proof: proof
-    //     });
-    // }
+        vm.expectRevert(abi.encodeWithSelector(BatchNotExecuted.selector, batchNumber + 1));
+        mailboxFacet.proveL2MessageInclusion({
+            _batchNumber: batchNumber + 1,
+            _index: 0,
+            _message: message,
+            _proof: proof
+        });
+    }
 
     function test_success_proveL2MessageInclusion() public {
         uint256 firstLogIndex = _addHashedLogToMerkleTree({

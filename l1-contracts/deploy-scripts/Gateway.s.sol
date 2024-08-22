@@ -117,10 +117,10 @@ contract GatewayScript is Script {
     }
 
     function registerGateway() public {
-        IStateTransitionManager stm = IStateTransitionManager(config.stateTransitionProxy);
-        Ownable ownable = Ownable(config.stateTransitionProxy);
+        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        Ownable ownable = Ownable(config.bridgehub);
         vm.prank(ownable.owner());
-        stm.registerSettlementLayer(config.gatewayChainId, true);
+        bridgehub.registerSettlementLayer(config.gatewayChainId, true);
         // bytes memory data = abi.encodeCall(stm.registerSettlementLayer, (config.chainChainId, true));
         // Utils.executeUpgrade({
         //     _governor: ownable.owner(),

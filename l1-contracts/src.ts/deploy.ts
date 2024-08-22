@@ -50,6 +50,7 @@ import {
   applyL1ToL2Alias,
   // priorityTxMaxGasLimit,
   encodeNTVAssetId,
+  ETH_ADDRESS_IN_CONTRACTS,
 } from "./utils";
 import type { ChainAdminCall } from "./utils";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
@@ -88,7 +89,7 @@ export interface DeployerConfig {
   defaultAccountBytecodeHash?: string;
   deployedLogPrefix?: string;
   l1Deployer?: Deployer;
-  l1ChainId: string;
+  l1ChainId?: string;
 }
 
 export interface Operation {
@@ -124,7 +125,7 @@ export class Deployer {
       : hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
     this.chainId = parseInt(process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID!);
-    this.l1ChainId = parseInt(config.l1ChainId);
+    this.l1ChainId = parseInt(config.l1ChainId || getNumberFromEnv("ETH_CLIENT_CHAIN_ID"));
     this.deployedLogPrefix = config.deployedLogPrefix ?? "CONTRACTS";
   }
 
@@ -976,7 +977,7 @@ export class Deployer {
     }
 
     /// registering ETH as a valid token, with address 1.
-    const baseTokenAssetId = encodeNTVAssetId(this.l1ChainId, ethers.utils.hexZeroPad(ADDRESS_ONE, 32));
+    const baseTokenAssetId = encodeNTVAssetId(this.l1ChainId, ETH_ADDRESS_IN_CONTRACTS);
     const upgradeData2 = bridgehub.interface.encodeFunctionData("addTokenAssetId", [baseTokenAssetId]);
     await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
     if (this.verbose) {
@@ -986,7 +987,7 @@ export class Deployer {
 
   public async registerTokenBridgehub(tokenAddress: string, useGovernance: boolean = false) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
-    const baseTokenAssetId = encodeNTVAssetId(this.l1ChainId, ethers.utils.hexZeroPad(tokenAddress, 32));
+    const baseTokenAssetId = encodeNTVAssetId(this.l1ChainId, tokenAddress);
     const receipt = await this.executeDirectOrGovernance(
       useGovernance,
       bridgehub,
@@ -1006,7 +1007,7 @@ export class Deployer {
     const data = nativeTokenVault.interface.encodeFunctionData("registerToken", [token]);
     await this.executeUpgrade(this.addresses.Bridges.NativeTokenVaultProxy, 0, data);
     if (this.verbose) {
-      console.log("Native token vault registered with ETH");
+      console.log("Native token vault registered with token", token);
     }
   }
 
@@ -1133,9 +1134,9 @@ export class Deployer {
   }
 
   public async registerSettlementLayer() {
-    const stm = this.stateTransitionManagerContract(this.deployWallet);
-    const calldata = stm.interface.encodeFunctionData("registerSettlementLayer", [this.chainId, true]);
-    await this.executeUpgrade(this.addresses.StateTransition.StateTransitionProxy, 0, calldata);
+    const bridgehub = this.bridgehubContract(this.deployWallet);
+    const calldata = bridgehub.interface.encodeFunctionData("registerSettlementLayer", [this.chainId, true]);
+    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, calldata);
     if (this.verbose) {
       console.log("Gateway registered");
     }
@@ -1235,7 +1236,7 @@ export class Deployer {
   }
 
   public async registerHyperchain(
-    baseTokenAddress: string,
+    baseTokenAssetId: string,
     validiumMode: boolean,
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,
@@ -1250,6 +1251,8 @@ export class Deployer {
 
     const bridgehub = this.bridgehubContract(this.deployWallet);
     const stateTransitionManager = this.stateTransitionManagerContract(this.deployWallet);
+    const ntv = this.nativeTokenVault(this.deployWallet);
+    const baseTokenAddress = await ntv.tokenAddress(baseTokenAssetId);
 
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const alreadyRegisteredInSTM =
@@ -1276,7 +1279,7 @@ export class Deployer {
       [
         inputChainId,
         this.addresses.StateTransition.StateTransitionProxy,
-        baseTokenAddress,
+        baseTokenAssetId,
         Date.now(),
         admin,
         initData,
@@ -1298,6 +1301,7 @@ export class Deployer {
     }
 
     this.addresses.BaseToken = baseTokenAddress;
+    this.addresses.BaseTokenAssetId = baseTokenAssetId;
 
     if (this.verbose) {
       console.log(`Hyperchain registered, gas used: ${receipt.gasUsed.toString()} and ${receipt.gasUsed.toString()}`);
