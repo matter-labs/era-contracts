@@ -128,13 +128,13 @@ contract EvmGasManager {
         4. callee calls popEVMFrame to return the gas to the caller & remove the frame
     */
 
-    function pushEVMFrame(uint256 _passGas, bool _isStatic) external {
+    function pushEVMFrame(uint256 _passGas, bool _isStatic) onlySystemEvm external {
         EVMStackFrameInfo memory frame = EVMStackFrameInfo({passGas: _passGas, isStatic: _isStatic});
 
         evmStackFrames.push(frame);
     }
 
-    function consumeEvmFrame() external returns (uint256 passGas, bool isStatic) {
+    function consumeEvmFrame() onlySystemEvm external returns (uint256 passGas, bool isStatic) {
         if (evmStackFrames.length == 0) return (INF_PASS_GAS, false);
 
         EVMStackFrameInfo memory frameInfo = evmStackFrames[evmStackFrames.length - 1];
@@ -146,7 +146,7 @@ contract EvmGasManager {
         evmStackFrames[evmStackFrames.length - 1].passGas = INF_PASS_GAS;
     }
 
-    function popEVMFrame() external {
+    function popEVMFrame() onlySystemEvm external {
         evmStackFrames.pop();
     }
 }
