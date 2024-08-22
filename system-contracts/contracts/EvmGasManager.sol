@@ -75,6 +75,7 @@ contract EvmGasManager {
 
     function isSlotWarm(uint256 _slot) external view returns (bool isWarm) {
         uint256 prefix = IS_SLOT_WARM_PREFIX | uint256(uint160(msg.sender));
+        uint256 transient_slot;
         assembly {
             mstore(0, prefix)
             mstore(0x20, _slot)
