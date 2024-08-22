@@ -14,25 +14,9 @@ uint256 constant INF_PASS_GAS = 0xffffffffffffffffffffffffffffffffffffffffffffff
 uint256 constant IS_ACCOUNT_EVM_PREFIX = 1 << 255;
 uint256 constant IS_ACCOUNT_WARM_PREFIX = 1 << 254;
 uint256 constant IS_SLOT_WARM_PREFIX = 1 << 253;
+uint256 constant EVM_STACK_SLOT = 2;
 
 contract EvmGasManager {
-    struct SlotInfo {
-        bool warm;
-        uint256 originalValue;
-    }
-
-    // We dont care about the size, since none of it will be stored/pub;ushed anywya
-    struct EVMStackFrameInfo {
-        bool isStatic;
-        uint256 passGas;
-    }
-
-    // The following storage variables are not used anywhere explicitly and are just used to obtain the storage pointers
-    // to use the transient storage with.
-    mapping(address => bool) private warmAccounts;
-    mapping(address => mapping(uint256 => SlotInfo)) private warmSlots;
-    EVMStackFrameInfo[] private evmStackFrames;
-
     modifier onlySystemEvm() {
         // cache use is safe since we do not support SELFDESTRUCT
         uint256 slot = IS_ACCOUNT_EVM_PREFIX | uint256(uint160(msg.sender));
@@ -125,24 +109,43 @@ contract EvmGasManager {
     */
 
     function pushEVMFrame(uint256 _passGas, bool _isStatic) external {
-        EVMStackFrameInfo memory frame = EVMStackFrameInfo({passGas: _passGas, isStatic: _isStatic});
+        uint256 stackDepth;
+        assembly {
+            stackDepth := add(tload(EVM_STACK_SLOT), 1)
+            tstore(EVM_STACK_SLOT, stackDepth)
+        }
 
-        evmStackFrames.push(frame);
+        assembly {
+            let stackPointer := add(EVM_STACK_SLOT, mul(2, stackDepth))
+            tstore(stackPointer, _passGas)
+            tstore(add(stackPointer, 1), _isStatic)
+        }
     }
 
     function consumeEvmFrame() external returns (uint256 passGas, bool isStatic) {
-        if (evmStackFrames.length == 0) return (INF_PASS_GAS, false);
-
-        EVMStackFrameInfo storage frameInfo = evmStackFrames[evmStackFrames.length - 1];
-
-        passGas = frameInfo.passGas;
-        isStatic = frameInfo.isStatic;
-
-        // Mark as used
-        frameInfo.passGas = INF_PASS_GAS;
+        uint256 stackDepth;
+        assembly {
+            stackDepth := tload(EVM_STACK_SLOT)
+        }
+        if (stackDepth == 0) return (INF_PASS_GAS, false);
+        
+        assembly {
+            let stackPointer := add(EVM_STACK_SLOT, mul(2, stackDepth))
+            passGas := tload(stackPointer)
+            isStatic := tload(add(stackPointer, 1))
+            tstore(stackPointer, INF_PASS_GAS) // Mark as used
+        }
     }
 
+    // unchecked sub
     function popEVMFrame() external {
-        evmStackFrames.pop();
+        uint256 stackDepth;
+        assembly {
+            stackDepth := tload(EVM_STACK_SLOT)
+        }
+        require(stackDepth != 0);
+        assembly {
+            tstore(EVM_STACK_SLOT, sub(stackDepth, 1))
+        }       
     }
 }
