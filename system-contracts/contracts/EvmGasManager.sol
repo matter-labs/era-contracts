@@ -28,11 +28,16 @@ contract EvmGasManager {
         uint256 passGas;
     }
 
+    struct AccountInfo {
+        bool isEVM;
+    }
+
     // The following storage variables are not used anywhere explicitly and are just used to obtain the storage pointers
     // to use the transient storage with.
     mapping(address => WarmAccountInfo) private warmAccounts;
     mapping(address => mapping(uint256 => SlotInfo)) private warmSlots;
     EVMStackFrameInfo[] private evmStackFrames;
+    mapping(address => AccountInfo) private isAccountEVM;
 
     function tstoreWarmAccount(address account, bool isWarm) internal {
         WarmAccountInfo storage ptr = warmAccounts[account];
@@ -78,7 +83,22 @@ contract EvmGasManager {
     }
 
     modifier onlySystemEvm() {
-        require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender), "only system evm");
+        AccountInfo storage ptr = isAccountEVM[msg.sender];
+        bool isEVM;
+        assembly {
+            isEVM := tload(ptr.slot)
+        }
+
+        if (!isEVM) {
+            isEVM = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender);
+            if (isEVM) {
+                assembly {
+                    tstore(ptr.slot, isEVM)
+                }
+            }
+        }
+
+        require(isEVM, "only system evm");
         _;
     }
 
