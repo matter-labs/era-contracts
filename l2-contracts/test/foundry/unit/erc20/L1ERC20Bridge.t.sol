@@ -21,112 +21,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-library Utils {
-    address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
-    Vm internal constant vm = Vm(VM_ADDRESS);
-
-    address constant L2_FORCE_DEPLOYER_ADDR = address(0x8007);
-
-    string internal constant L2_ASSET_ROUTER_PATH = "./zkout/L2AssetRouter.sol/L2AssetRouter.json"; 
-    string internal constant L2_NATIVE_TOKEN_VAULT_PATH = "./zkout/L2NativeTokenVault.sol/L2NativeTokenVault.json"; 
-
-
-    function readEraBytecode(string memory _path) internal returns (bytes memory bytecode) {
-        string memory artifact = vm.readFile(_path);
-        bytecode = vm.parseJsonBytes(artifact, ".bytecode.object");
-    }
-
-    /**
-     * @dev Returns the bytecode of a given system contract.
-     */
-    function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory file = vm.readFile(
-            // solhint-disable-next-line func-named-parameters
-            string.concat(
-                "../system-contracts/artifacts-zk/contracts-preprocessed/",
-                filename,
-                ".sol/",
-                filename,
-                ".json"
-            )
-        );
-        bytes memory bytecode = vm.parseJson(file, "$.bytecode");
-        return bytecode;
-    }
-
-    function initSystemContext() internal {
-        bytes memory contractDeployerBytecode = readSystemContractsBytecode("ContractDeployer");
-        vm.etch(DEPLOYER_SYSTEM_CONTRACT, contractDeployerBytecode);
-    }
-
-    function forceDeployAssetRouter(
-        uint256 _l1ChainId, uint256 _eraChainId, address _l1AssetRouter, address _legacySharedBridge
-    ) internal {
-        // to ensure that the bytecode is known
-        {
-            new L2AssetRouter(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge);
-        }
-
-        bytes memory bytecode = readEraBytecode(L2_ASSET_ROUTER_PATH);
-
-        bytes32 bytecodehash = L2ContractHelper.hashL2BytecodeMemory(bytecode);
-
-        IContractDeployer.ForceDeployment[] memory deployments = new IContractDeployer.ForceDeployment[](1);
-        deployments[0] = IContractDeployer.ForceDeployment({
-            bytecodeHash: bytecodehash,
-            newAddress: address(L2_ASSET_ROUTER),
-            callConstructor: true,
-            value: 0,
-            input: abi.encode(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge)
-        });
-
-        vm.prank(L2_FORCE_DEPLOYER_ADDR);
-        IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses(
-            deployments
-        );
-    }
-
-    function forceDeployNativeTokenVault(
-        uint256 _l1ChainId,
-        address _aliasedOwner,
-        bytes32 _l2TokenProxyBytecodeHash,
-        address _legacySharedBridge,
-        address _l2TokenBeacon,
-        bool _contractsDeployedAlready
-    ) internal {
-        // to ensure that the bytecode is known
-        {
-            new L2NativeTokenVault(_l1ChainId, _aliasedOwner, _l2TokenProxyBytecodeHash, _legacySharedBridge, _l2TokenBeacon, _contractsDeployedAlready);
-        }
-
-        bytes memory bytecode = readEraBytecode(L2_NATIVE_TOKEN_VAULT_PATH);
-
-        bytes32 bytecodehash = L2ContractHelper.hashL2BytecodeMemory(bytecode);
-
-        IContractDeployer.ForceDeployment[] memory deployments = new IContractDeployer.ForceDeployment[](1);
-        deployments[0] = IContractDeployer.ForceDeployment({
-            bytecodeHash: bytecodehash,
-            newAddress: address(L2_NATIVE_TOKEN_VAULT),
-            callConstructor: true,
-            value: 0,
-            input: abi.encode(_l1ChainId, _aliasedOwner, _l2TokenProxyBytecodeHash, _legacySharedBridge, _l2TokenBeacon, _contractsDeployedAlready)
-        });
-
-        vm.prank(L2_FORCE_DEPLOYER_ADDR);
-        IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses(
-            deployments
-        );
-    }
-
-    function encodeTokenData(string memory name, string memory symbol, uint8 decimals) internal pure returns (bytes memory) {
-        bytes memory encodedName = abi.encode(name);
-        bytes memory encodedSymbol = abi.encode(symbol);
-        bytes memory encodedDecimals = abi.encode(decimals);
-
-        return abi.encode(encodedName, encodedSymbol, encodedDecimals);
-    }
-
-}
+import {Utils } from "../utils/Utils.sol";
 
 contract L1Erc20BridgeTest is Test {
     // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
@@ -141,9 +36,8 @@ contract L1Erc20BridgeTest is Test {
 
     UpgradeableBeacon beacon;
 
-
-    uint256 l1ChainId = 9;
-    uint256 eraChainId = 270;
+    uint256 constant L1_CHAIN_ID = 9;
+    uint256 ERA_CHAIN_ID = 270;
 
     // We won't actually deploy an L1 token in these tests, but we need some address for it.
     address L1_TOKEN_ADDRESS = 0x1111100000000000000000000000000000011111;
@@ -169,15 +63,15 @@ contract L1Erc20BridgeTest is Test {
             beaconProxyBytecodeHash := extcodehash(proxy)
         }
     
-        Utils.initSystemContext();
+        Utils.initSystemContracts();
         Utils.forceDeployAssetRouter(
-            l1ChainId, 
-            eraChainId, 
+            L1_CHAIN_ID, 
+            ERA_CHAIN_ID, 
             l1BridgeWallet, 
             address(0)
         );
         Utils.forceDeployNativeTokenVault(
-            l1ChainId,
+            L1_CHAIN_ID,
             ownerWallet,
             beaconProxyBytecodeHash,
             address(0),
