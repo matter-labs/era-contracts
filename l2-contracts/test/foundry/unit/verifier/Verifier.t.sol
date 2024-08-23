@@ -3,8 +3,24 @@ pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
+import {Script, console2 as console} from "forge-std/Script.sol";
+
 import {Verifier} from "contracts/verifier/Verifier.sol";
 import {VerifierTest} from "contracts/dev-contracts/VerifierTest.sol";
+
+contract VerifierCaller {
+    Verifier public verifier;
+
+    constructor(Verifier _verifier) {
+        verifier = _verifier;
+    }
+
+    function verify(uint256[] memory publicInputs, uint256[] memory serializedProof, uint256[] memory recursiveAggregationInput) public view returns (bool result, uint256 gasUsed) {
+        uint256 gasBefore = gasleft();
+        result = verifier.verify(publicInputs, serializedProof, recursiveAggregationInput);
+        gasUsed = gasBefore - gasleft();
+    }
+}
 
 contract VerifierTestTest is Test {
     uint256 Q_MOD = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
@@ -70,6 +86,19 @@ contract VerifierTestTest is Test {
     function testShouldVerify() public view {
         bool success = verifier.verify(publicInputs, serializedProof, recursiveAggregationInput);
         assert(success);
+    }
+    
+    function testShouldVerifyWithGas() public {
+        // `gas snapshot` does not work well with zksync setup, so in order to obtain the amount of 
+        // zkevm gas consumed we do the following:
+        // - Deploy a VerifierCaller contract, which would execute in zkevm context
+        // - Call the verify function from the VerifierCaller contract and return the gas used
+
+        VerifierCaller caller = new VerifierCaller(verifier);
+        (bool success, uint256 gasUsed) = caller.verify(publicInputs, serializedProof, recursiveAggregationInput);
+        assert(success);
+
+        console.log("Gas used: %d", gasUsed);
     }
 
     function testShouldVerifyWithDirtyBits() public view {
