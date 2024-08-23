@@ -126,7 +126,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     ) public view returns (bool) {}
 
     function _parseProofMetadata(
-        bytes32[] calldata _proof,
+        bytes32[] calldata _proof
     ) internal pure returns (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) {
         bytes32 proofMetadata = _proof[0];
 
@@ -150,8 +150,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             bytes1 metadataVersion = bytes1(proofMetadata);
             require(uint256(uint8(metadataVersion)) == SUPPORTED_PROOF_METADATA_VERSION, "Mailbox: unsupported proof metadata version");
 
-            logLeafProofLen = uint256(uint8(_proof[1]));
-            batchLeafProofLen = uint256(uint8(_proof[2]));
+            proofStartIndex = 1;
+            logLeafProofLen = uint256(uint8(proofMetadata[1]));
+            batchLeafProofLen = uint256(uint8(proofMetadata[2]));
         } else {
             // It is the old version
 
