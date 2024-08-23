@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "./EvmConstants.sol";
+import "./libraries/Utils.sol";
 
 import {ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./Constants.sol";
 
@@ -42,10 +43,13 @@ contract EvmGasManager {
         }
 
         if (!isEVM) {
-            isEVM = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender);
+            bytes32 bytecodeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(msg.sender);
+            isEVM = Utils.isCodeHashEVM(bytecodeHash);
             if (isEVM) {
-                assembly {
-                    tstore(transient_slot, isEVM)
+                if (!Utils.isContractConstructing(bytecodeHash)) {
+                    assembly {
+                        tstore(transient_slot, isEVM)
+                    }
                 }
             }
         }
