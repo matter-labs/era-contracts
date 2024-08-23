@@ -223,13 +223,7 @@ contract MailboxL2LogsProve is MailboxTest {
         }
 
         // Prove log inclusion reverts
-        _proveL2LogInclusion(
-            batchNumber,
-            secondLogIndex,
-            log,
-            secondLogProof,
-            bytes("tw")
-        );
+        _proveL2LogInclusion(batchNumber, secondLogIndex, log, secondLogProof, bytes("tw"));
     }
 
     function test_success_proveL1ToL2TransactionStatus() public {

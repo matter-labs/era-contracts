@@ -144,11 +144,14 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
         // We shift left by 3 bytes = 24 bits to remove the top 24 bits of the metadata.
         uint256 metadataAsUint256 = (uint256(proofMetadata) << 24);
-        
+
         if (metadataAsUint256 == 0) {
             // It is the new version
             bytes1 metadataVersion = bytes1(proofMetadata);
-            require(uint256(uint8(metadataVersion)) == SUPPORTED_PROOF_METADATA_VERSION, "Mailbox: unsupported proof metadata version");
+            require(
+                uint256(uint8(metadataVersion)) == SUPPORTED_PROOF_METADATA_VERSION,
+                "Mailbox: unsupported proof metadata version"
+            );
 
             proofStartIndex = 1;
             logLeafProofLen = uint256(uint8(proofMetadata[1]));
