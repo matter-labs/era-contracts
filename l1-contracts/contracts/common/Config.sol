@@ -117,6 +117,7 @@ uint256 constant MAX_NUMBER_OF_HYPERCHAINS = 100;
 /// @dev Used as the `msg.sender` for transactions that relayed via a settlement layer.
 address constant SETTLEMENT_LAYER_RELAY_SENDER = address(uint160(0x1111111111111111111111111111111111111111));
 
+/// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.
 uint256 constant SUPPORTED_PROOF_METADATA_VERSION = 1;
 
 struct PriorityTreeCommitment {
