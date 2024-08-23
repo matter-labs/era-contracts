@@ -680,11 +680,63 @@ function incrementNonce(addr) {
     mstore8(3, 0xc6)
     mstore(4, addr)
 
-    let result := call(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 0, 36, 0, 0)
+    let farCallAbi := getFarCallABI(
+        0,
+        0,
+        0,
+        36,
+        gas(),
+        // Only rollup is supported for now
+        0,
+        0,
+        0,
+        1
+    )
+    let to := NONCE_HOLDER_SYSTEM_CONTRACT()
+    printString("PRE VERBATIM")
+    let result := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+    printString("POST VERBATIM")
+
 
     if iszero(result) {
+        printString("FAILED")
         revert(0, 0)
     }
+} 
+
+function getFarCallABI(
+    dataOffset,
+    memoryPage,
+    dataStart,
+    dataLength,
+    gasPassed,
+    shardId,
+    forwardingMode,
+    isConstructorCall,
+    isSystemCall
+) -> ret {
+    let farCallAbi := 0
+    farCallAbi :=  or(farCallAbi, dataOffset)
+    farCallAbi :=  or(farCallAbi, shl(64, dataStart))
+    farCallAbi :=  or(farCallAbi, shl(96, dataLength))
+    farCallAbi :=  or(farCallAbi, shl(192, gasPassed))
+    farCallAbi :=  or(farCallAbi, shl(224, shardId))
+    farCallAbi :=  or(farCallAbi, shl(232, forwardingMode))
+    farCallAbi :=  or(farCallAbi, shl(248, 1))
+    ret := farCallAbi
+        //     farCallAbi |= dataOffset;
+        // farCallAbi |= (uint256(memoryPage) << 32);
+        // farCallAbi |= (uint256(dataStart) << 64);
+        // farCallAbi |= (uint256(dataLength) << 96);
+        // farCallAbi |= (uint256(gasPassed) << 192);
+        // farCallAbi |= (uint256(shardId) << 224);
+        // farCallAbi |= (uint256(forwardingMode) << 232);
+        // if (isConstructorCall) {
+        //     farCallAbi |= (1 << 240);
+        // }
+        // if (isSystemCall) {
+        //     farCallAbi |= (1 << 248);
+        // }
 }
 
 function ensureAcceptableMemLocation(location) {
