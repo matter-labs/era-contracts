@@ -127,6 +127,10 @@ contract ExecutorProofTest is Test {
 
         bytes32 prevCommitment = 0x8199d18dbc01ea80a635f515d6a12312daa1aa32b5404944477dcd41fd7b2bdf;
         uint256 result = executor.getBatchProofPublicInput(prevCommitment, nextCommitment);
-        assertEq(result, 4788207466353486800513567418370563062194355012625279630180492433957, "getBatchProofPublicInput");
+        assertEq(
+            result,
+            4788207466353486800513567418370563062194355012625279630180492433957,
+            "getBatchProofPublicInput"
+        );
     }
 }
