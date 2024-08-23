@@ -21,10 +21,7 @@ object "EVMInterpreter" {
             // This error should never be triggered
             // require(offset > 100, "Offset too small");
 
-            mstore8(sub(offset, 100), 0xd9)
-            mstore8(sub(offset, 99), 0xeb)
-            mstore8(sub(offset, 98), 0x76)
-            mstore8(sub(offset, 97), 0xb2)
+            mstore(sub(offset, 100), 0xD9EB76B200000000000000000000000000000000000000000000000000000000)
             mstore(sub(offset, 96), gasLeft)
             mstore(sub(offset, 64), 0x40)
             mstore(sub(offset, 32), len)
@@ -60,8 +57,6 @@ object "EVMInterpreter" {
 
         function validateCorrectBytecode(offset, len, gasToReturn) -> returnGas {
             if len {
-                // let firstByte := shr(mload(offset), 248)
-                // FIXME: Check this.
                 let firstByte := shr(248, mload(offset))
                 if eq(firstByte, 0xEF) {
                     revert(0, 0)
