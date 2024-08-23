@@ -19,7 +19,7 @@ export default {
     },
   },
   solidity: {
-    version: "0.8.20",
+    version: "0.8.24",
   },
   defaultNetwork: "localhost",
   networks: {
