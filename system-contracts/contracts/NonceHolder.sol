@@ -2,7 +2,7 @@
 
 // solhint-disable reason-string, gas-custom-errors
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {INonceHolder} from "./interfaces/INonceHolder.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
