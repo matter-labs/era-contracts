@@ -137,8 +137,6 @@ contract NonceHolder is INonceHolder, ISystemContract {
         //     msg.sender == address(DEPLOYER_SYSTEM_CONTRACT),
         //     "Only the contract deployer can increment the deployment nonce"
         // );
-        bytes32 toPrint = "PASS THE MODIFIER";
-        printIt(toPrint);
 
         uint256 addressAsKey = uint256(uint160(_address));
         uint256 oldRawNonce = rawNonces[addressAsKey];

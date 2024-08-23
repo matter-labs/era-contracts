@@ -86,7 +86,7 @@ contract EvmGasManager is ISystemContract {
     /*
         returns true if the account was already warm
     */
-    function warmAccount(address account) external payable returns (bool wasWarm) {
+    function warmAccount(address account) external payable onlySystemEvm returns (bool wasWarm) {
         if (uint160(account) < PRECOMPILES_END) return true;
 
         wasWarm = tloadWarmAccount(account);
@@ -97,7 +97,7 @@ contract EvmGasManager is ISystemContract {
         return tloadWarmSlot(msg.sender, _slot).warm;
     }
 
-    function warmSlot(uint256 _slot, uint256 _currentValue) external payable returns (bool, uint256) {
+    function warmSlot(uint256 _slot, uint256 _currentValue) external payable onlySystemEvm returns (bool, uint256) {
         SlotInfo memory info = tloadWarmSlot(msg.sender, _slot);
 
         if (info.warm) {
