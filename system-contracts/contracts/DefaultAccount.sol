@@ -140,7 +140,7 @@ contract DefaultAccount is IAccount {
         uint32 gas = Utils.safeCastToU32(gasleft());
 
         // TODO: if possible, maybe implement some way to avoid memory copying here.
-        if (_transaction.reserved[1] != 0) {
+        if ((_transaction.reserved[1] != 0) && (to == address(0))) {
             DEPLOYER_SYSTEM_CONTRACT.createEVM{value: value}(data);
             return;
         }
