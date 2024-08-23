@@ -96,7 +96,7 @@ object "CodeOracle" {
                 // decommit operation into the `active` pointer. 
                 verbatim_0i_0o("decommit_ptr_to_active")
 
-                // This operation is never expected to overflow since the `lenInWords` is a most 2 bytes long.
+                // This operation is never expected to overflow since the `lenInWords` is at most 2 bytes long.
                 let lenInBytes := mul(lenInWords, 32) 
 
                 // To avoid the complexity of calculating the length of the preimage in circuits, the length of the pointer is always fixed to 2^21 bytes.
