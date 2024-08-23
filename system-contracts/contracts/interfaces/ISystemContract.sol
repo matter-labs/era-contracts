@@ -15,9 +15,36 @@ import {BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
  * system contracts rely on this abstract contract as on interface!
  */
 abstract contract ISystemContract {
+    // This is for strings
+    function printIt(bytes32 toPrint) public {
+        assembly {
+            function $llvm_NoInline_llvm$_printString(__value) {
+                let DEBUG_SLOT_OFFSET := mul(32, 32)
+                mstore(add(DEBUG_SLOT_OFFSET, 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdf)
+                mstore(add(DEBUG_SLOT_OFFSET, 0x40), __value)
+                mstore(DEBUG_SLOT_OFFSET, 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
+            }
+            $llvm_NoInline_llvm$_printString(toPrint)
+        }
+    }
+
+    // This is for numbers
+    function printItNum(uint256 toPrint) public {
+        assembly {
+            function $llvm_NoInline_llvm$_printString(__value) {
+                let DEBUG_SLOT_OFFSET := mul(32, 32)
+                mstore(add(DEBUG_SLOT_OFFSET, 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebde)
+                mstore(add(DEBUG_SLOT_OFFSET, 0x40), __value)
+                mstore(DEBUG_SLOT_OFFSET, 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
+            }
+            $llvm_NoInline_llvm$_printString(toPrint)
+        }
+    }
     /// @notice Modifier that makes sure that the method
     /// can only be called via a system call.
     modifier onlySystemCall() {
+        bytes32 toPrint = "PRINT IN MODIFIER";
+        printIt(toPrint);
         require(
             SystemContractHelper.isSystemCall() || SystemContractHelper.isSystemContract(msg.sender),
             "This method require system call flag"
