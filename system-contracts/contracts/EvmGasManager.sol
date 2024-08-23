@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import "./EvmConstants.sol";
 
 import {ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./Constants.sol";
+import {ISystemContract} from "./interfaces/ISystemContract.sol";
 
 // We consider all the contracts (including system ones) as warm.
 uint160 constant PRECOMPILES_END = 0xffff;
@@ -11,7 +12,7 @@ uint160 constant PRECOMPILES_END = 0xffff;
 // Denotes that passGas has been consumed
 uint256 constant INF_PASS_GAS = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
-contract EvmGasManager {
+contract EvmGasManager is ISystemContract {
     // We need strust to use `storage` pointers
     struct WarmAccountInfo {
         bool isWarm;
@@ -85,7 +86,7 @@ contract EvmGasManager {
     /*
         returns true if the account was already warm
     */
-    function warmAccount(address account) external payable onlySystemEvm returns (bool wasWarm) {
+    function warmAccount(address account) external payable returns (bool wasWarm) {
         if (uint160(account) < PRECOMPILES_END) return true;
 
         wasWarm = tloadWarmAccount(account);
@@ -96,7 +97,7 @@ contract EvmGasManager {
         return tloadWarmSlot(msg.sender, _slot).warm;
     }
 
-    function warmSlot(uint256 _slot, uint256 _currentValue) external payable onlySystemEvm returns (bool, uint256) {
+    function warmSlot(uint256 _slot, uint256 _currentValue) external payable returns (bool, uint256) {
         SlotInfo memory info = tloadWarmSlot(msg.sender, _slot);
 
         if (info.warm) {
@@ -123,7 +124,7 @@ contract EvmGasManager {
 
     */
 
-    function pushEVMFrame(uint256 _passGas, bool _isStatic) external {
+    function pushEVMFrame(uint256 _passGas, bool _isStatic) onlySystemCall external {
         EVMStackFrameInfo memory frame = EVMStackFrameInfo({passGas: _passGas, isStatic: _isStatic});
 
         evmStackFrames.push(frame);

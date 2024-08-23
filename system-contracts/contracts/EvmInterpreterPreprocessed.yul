@@ -879,8 +879,27 @@ object "EVMInterpreter" {
             mstore(4, _passGas)
             mstore(36, _isStatic)
         
-            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 0)
+            let farCallAbi := getFarCallABI(
+                0,
+                0,
+                0,
+                68,
+                gas(),
+                // Only rollup is supported for now
+                0,
+                0,
+                0,
+                1
+            )
+        
+            let to := EVM_GAS_MANAGER_CONTRACT()
+            printString("PRE VERBATIM EVM FRAME")
+            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+            printString("POST VERBATIM EVM FRAME")
+        
+            // let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 0)
             if iszero(success) {
+                printString("FAILED PUSH EVM FRAME")
                 // This error should never happen
                 revert(0, 0)
             }
@@ -3897,8 +3916,27 @@ object "EVMInterpreter" {
                 mstore(4, _passGas)
                 mstore(36, _isStatic)
             
-                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 0)
+                let farCallAbi := getFarCallABI(
+                    0,
+                    0,
+                    0,
+                    68,
+                    gas(),
+                    // Only rollup is supported for now
+                    0,
+                    0,
+                    0,
+                    1
+                )
+            
+                let to := EVM_GAS_MANAGER_CONTRACT()
+                printString("PRE VERBATIM EVM FRAME")
+                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+                printString("POST VERBATIM EVM FRAME")
+            
+                // let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 0)
                 if iszero(success) {
+                    printString("FAILED PUSH EVM FRAME")
                     // This error should never happen
                     revert(0, 0)
                 }
