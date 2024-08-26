@@ -8,7 +8,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehub, BridgehubSTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 // import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 // import {Governance} from "contracts/governance/Governance.sol";
@@ -157,7 +157,12 @@ contract GatewayScript is Script {
         bytes memory diamondCutData = config.diamondCutData; // todo replace with config.zkDiamondCutData;
         bytes memory stmData = abi.encode(newAdmin, diamondCutData);
         bytes memory chainData = abi.encode(AdminFacet(address(chain)).prepareChainCommitment());
-        bytes memory bridgehubData = abi.encode(config.chainChainId, stmData, chainData);
+        BridgehubSTMAssetData memory stmAssetData = BridgehubSTMAssetData({
+            chainId: config.chainChainId,
+            stmData: stmData,
+            chainData: chainData
+        });
+        bytes memory bridgehubData = abi.encode(stmAssetData);
         bytes memory routerData = bytes.concat(bytes1(0x01), abi.encode(stmAssetId, bridgehubData));
 
         vm.startBroadcast(chain.getAdmin());

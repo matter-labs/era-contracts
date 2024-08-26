@@ -9,7 +9,7 @@ import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, BridgehubSTMAssetData} from "./IBridgehub.sol";
 import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -601,88 +601,77 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) external payable override onlyAssetRouter onlyL1 returns (bytes memory bridgehubMintData) {
         require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
 
-        (uint256 _chainId, bytes memory _stmData, bytes memory _chainData) = abi.decode(_data, (uint256, bytes, bytes));
-        require(_assetId == stmAssetIdFromChainId(_chainId), "BH: assetInfo 1");
-        require(settlementLayer[_chainId] == block.chainid, "BH: not current SL");
-        settlementLayer[_chainId] = _settlementChainId;
+        BridgehubSTMAssetData memory bridgeData = abi.decode(_data, (BridgehubSTMAssetData));
+        require(_assetId == stmAssetIdFromChainId(bridgeData.chainId), "BH: assetInfo 1");
+        require(settlementLayer[bridgeData.chainId] == block.chainid, "BH: not current SL");
+        settlementLayer[bridgeData.chainId] = _settlementChainId;
 
-        address hyperchain = hyperchainMap.get(_chainId);
+        address hyperchain = hyperchainMap.get(bridgeData.chainId);
         require(hyperchain != address(0), "BH: hyperchain not registered");
         require(_prevMsgSender == IZkSyncHyperchain(hyperchain).getAdmin(), "BH: incorrect sender");
 
-        bytes memory stmMintData = IStateTransitionManager(stateTransitionManager[_chainId]).forwardedBridgeBurn(
-            _chainId,
-            _stmData
-        );
+        bytes memory stmMintData = IStateTransitionManager(stateTransitionManager[bridgeData.chainId])
+            .forwardedBridgeBurn(bridgeData.chainId, bridgeData.stmData);
         bytes memory chainMintData = IZkSyncHyperchain(hyperchain).forwardedBridgeBurn(
             hyperchainMap.get(_settlementChainId),
             _prevMsgSender,
-            _chainData
+            bridgeData.chainData
         );
-        bridgehubMintData = abi.encode(_chainId, stmMintData, chainMintData);
+        bridgehubMintData = abi.encode(bridgeData.chainId, stmMintData, chainMintData);
     }
 
-    /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
-    /// @param _assetId the assetId of the chain's STM
-    /// @param _bridgehubMintData the data for the mint
     function bridgeMint(
         uint256, // originChainId
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
     ) external payable override onlyAssetRouter returns (address l1Receiver) {
-        (uint256 _chainId, bytes memory _stmData, bytes memory _chainMintData) = abi.decode(
-            _bridgehubMintData,
-            (uint256, bytes, bytes)
-        );
+        BridgehubSTMAssetData memory bridgeData = abi.decode(_bridgehubMintData, (BridgehubSTMAssetData));
+
         address stm = stmAssetIdToAddress[_assetId];
         require(stm != address(0), "BH: assetInfo 2");
-        require(settlementLayer[_chainId] != block.chainid, "BH: already current SL");
+        require(settlementLayer[bridgeData.chainId] != block.chainid, "BH: already current SL");
 
-        settlementLayer[_chainId] = block.chainid;
-        stateTransitionManager[_chainId] = stm;
+        settlementLayer[bridgeData.chainId] = block.chainid;
+        stateTransitionManager[bridgeData.chainId] = stm;
         address hyperchain;
-        if (hyperchainMap.contains(_chainId)) {
-            hyperchain = hyperchainMap.get(_chainId);
+        if (hyperchainMap.contains(bridgeData.chainId)) {
+            hyperchain = hyperchainMap.get(bridgeData.chainId);
         } else {
-            hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(_chainId, _stmData);
+            hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(bridgeData.chainId, bridgeData.stmData);
         }
 
-        messageRoot.addNewChainIfNeeded(_chainId);
-        _registerNewHyperchain(_chainId, hyperchain);
-        IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData);
+        messageRoot.addNewChainIfNeeded(bridgeData.chainId);
+        _registerNewHyperchain(bridgeData.chainId, hyperchain);
+        IZkSyncHyperchain(hyperchain).forwardedBridgeMint(bridgeData.chainData);
         return address(0);
     }
 
     /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
     /// @param _chainId the chainId of the chain
     /// @param _assetId the assetId of the chain's STM
-    /// @param _data the data for the recovery. The structure for this data is:
-    ///              depositAmount || l2Receiver || chainId || stmData || chainData
+    /// @param _data the data for the recovery.
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetId,
         address _depositSender,
         bytes calldata _data
     ) external payable override onlyAssetRouter onlyL1 {
-        (, , , bytes memory stmData, bytes memory chainData) = abi.decode(
-            _data,
-            (uint256, address, uint256, bytes, bytes)
-        );
+        BridgehubSTMAssetData memory stmAssetData = abi.decode(_data, (BridgehubSTMAssetData));
 
         delete settlementLayer[_chainId];
 
-        IStateTransitionManager(stateTransitionManager[_chainId]).forwardedBridgeClaimFailedBurn({
+        IStateTransitionManager(stateTransitionManager[_chainId]).forwardedBridgeRecoverFailedTransfer({
             _chainId: _chainId,
             _assetInfo: _assetId,
             _depositSender: _depositSender,
-            _stmData: stmData
+            _stmData: stmAssetData.stmData
         });
 
-        IZkSyncHyperchain(getHyperchain(_chainId)).forwardedBridgeClaimFailedBurn({
+        IZkSyncHyperchain(getHyperchain(_chainId)).forwardedBridgeRecoverFailedTransfer({
             _chainId: _chainId,
             _assetInfo: _assetId,
             _prevMsgSender: _depositSender,
-            _chainData: chainData
+            _chainData: stmAssetData.chainData
         });
     }
 

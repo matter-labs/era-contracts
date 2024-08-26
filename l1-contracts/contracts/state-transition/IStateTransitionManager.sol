@@ -165,7 +165,7 @@ interface IStateTransitionManager {
 
     function forwardedBridgeMint(uint256 _chainId, bytes calldata _data) external returns (address);
 
-    function forwardedBridgeClaimFailedBurn(
+    function forwardedBridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetInfo,
         address _depositSender,

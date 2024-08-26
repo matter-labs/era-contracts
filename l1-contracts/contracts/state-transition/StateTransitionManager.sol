@@ -475,7 +475,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @param _assetInfo the assetInfo of the chain
     /// @param _depositSender the address of that sent the deposit
     /// @param _stmData the data of the migration
-    function forwardedBridgeClaimFailedBurn(
+    function forwardedBridgeRecoverFailedTransfer(
         uint256 _chainId,
         bytes32 _assetInfo,
         address _depositSender,

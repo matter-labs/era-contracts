@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, BridgehubSTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -181,7 +181,12 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
             bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
             bytes memory chainData = abi.encode(AdminFacet(address(chain)).prepareChainCommitment());
             bytes memory stmData = abi.encode(address(1), msg.sender, stm.protocolVersion(), initialDiamondCut);
-            transferData = abi.encode(uint256(1), address(0), migratingChainId, stmData, chainData);
+            BridgehubSTMAssetData memory data = BridgehubSTMAssetData({
+                chainId: migratingChainId,
+                stmData: stmData,
+                chainData: chainData
+            });
+            transferData = abi.encode(data);
         }
 
         address chainAdmin = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId)).getAdmin();
@@ -242,7 +247,12 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
         bytes memory chainData = abi.encode(AdminFacet(address(chain)).prepareChainCommitment());
         bytes memory stmData = abi.encode(address(1), msg.sender, stm.protocolVersion(), initialDiamondCut);
-        bytes memory bridgehubMintData = abi.encode(mintChainId, stmData, chainData);
+        BridgehubSTMAssetData memory data = BridgehubSTMAssetData({
+            chainId: mintChainId,
+            stmData: stmData,
+            chainData: chainData
+        });
+        bytes memory bridgehubMintData = abi.encode(data);
         vm.startBroadcast(address(bridgehub.sharedBridge()));
         bridgehub.bridgeMint(gatewayChainId, assetId, bridgehubMintData);
         vm.stopBroadcast();

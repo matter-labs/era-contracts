@@ -288,7 +288,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function forwardedBridgeClaimFailedBurn(
+    function forwardedBridgeRecoverFailedTransfer(
         uint256 /* _chainId */,
         bytes32 /* _assetInfo */,
         address _prevMsgSender,
