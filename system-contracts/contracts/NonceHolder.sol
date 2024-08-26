@@ -133,10 +133,11 @@ contract NonceHolder is INonceHolder, ISystemContract {
     /// @param _address The address of the account which to return the deploy nonce for.
     /// @return prevDeploymentNonce The deployment nonce at the time this function is called.
     function incrementDeploymentNonce(address _address) external onlySystemCall returns (uint256 prevDeploymentNonce) {
-        // require(
-        //     msg.sender == address(DEPLOYER_SYSTEM_CONTRACT),
-        //     "Only the contract deployer can increment the deployment nonce"
-        // );
+        require(
+            msg.sender == address(DEPLOYER_SYSTEM_CONTRACT) ||
+                ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender),
+            "Only the contract deployer can increment the deployment nonce"
+        );
 
         uint256 addressAsKey = uint256(uint160(_address));
         uint256 oldRawNonce = rawNonces[addressAsKey];

@@ -908,9 +908,24 @@ object "EVMInterpreter" {
         function _popEVMFrame() {
             // function popEVMFrame() external
         
+             let farCallAbi := getFarCallABI(
+                0,
+                0,
+                0,
+                4,
+                gas(),
+                // Only rollup is supported for now
+                0,
+                0,
+                0,
+                1
+            )
+        
+            let to := EVM_GAS_MANAGER_CONTRACT()
+        
             mstore(0, 0xE467D2F000000000000000000000000000000000000000000000000000000000)
         
-            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 0)
+            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
@@ -3945,9 +3960,24 @@ object "EVMInterpreter" {
             function _popEVMFrame() {
                 // function popEVMFrame() external
             
+                 let farCallAbi := getFarCallABI(
+                    0,
+                    0,
+                    0,
+                    4,
+                    gas(),
+                    // Only rollup is supported for now
+                    0,
+                    0,
+                    0,
+                    1
+                )
+            
+                let to := EVM_GAS_MANAGER_CONTRACT()
+            
                 mstore(0, 0xE467D2F000000000000000000000000000000000000000000000000000000000)
             
-                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 0)
+                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
                 if iszero(success) {
                     // This error should never happen
                     revert(0, 0)

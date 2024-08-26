@@ -124,7 +124,7 @@ contract EvmGasManager is ISystemContract {
 
     */
 
-    function pushEVMFrame(uint256 _passGas, bool _isStatic) onlySystemCall external {
+    function pushEVMFrame(uint256 _passGas, bool _isStatic) onlySystemCall onlySystemEvm external {
         EVMStackFrameInfo memory frame = EVMStackFrameInfo({passGas: _passGas, isStatic: _isStatic});
 
         evmStackFrames.push(frame);
@@ -142,7 +142,7 @@ contract EvmGasManager is ISystemContract {
         evmStackFrames[evmStackFrames.length - 1].passGas = INF_PASS_GAS;
     }
 
-    function popEVMFrame() external {
+    function popEVMFrame() onlySystemCall onlySystemEvm external {
         evmStackFrames.pop();
     }
 }
