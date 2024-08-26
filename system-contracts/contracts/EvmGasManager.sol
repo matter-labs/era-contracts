@@ -10,7 +10,7 @@ uint160 constant PRECOMPILES_END = 0xffff;
 
 // Denotes that passGas has been consumed
 uint256 constant INF_PASS_GAS = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-
+uint256 constant EVM_STACK_SLOT = 2;
 contract EvmGasManager {
     // We need strust to use `storage` pointers
     struct WarmAccountInfo {
@@ -123,25 +123,39 @@ contract EvmGasManager {
 
     */
 
-    function pushEVMFrame(uint256 _passGas, bool _isStatic) external {
-        EVMStackFrameInfo memory frame = EVMStackFrameInfo({passGas: _passGas, isStatic: _isStatic});
-
-        evmStackFrames.push(frame);
+    function pushEVMFrame(uint256 passGas, bool isStatic) external {
+        assembly {
+            let stackDepth := add(tload(EVM_STACK_SLOT), 1)
+            tstore(EVM_STACK_SLOT, stackDepth)
+            let stackPointer := add(EVM_STACK_SLOT, mul(2, stackDepth))
+            tstore(stackPointer, passGas)
+            tstore(add(stackPointer, 1), isStatic)
+        }
     }
 
     function consumeEvmFrame() external returns (uint256 passGas, bool isStatic) {
-        if (evmStackFrames.length == 0) return (INF_PASS_GAS, false);
-
-        EVMStackFrameInfo memory frameInfo = evmStackFrames[evmStackFrames.length - 1];
-
-        passGas = frameInfo.passGas;
-        isStatic = frameInfo.isStatic;
-
-        // Mark as used
-        evmStackFrames[evmStackFrames.length - 1].passGas = INF_PASS_GAS;
+        uint256 stackDepth;
+        assembly {
+            stackDepth := tload(EVM_STACK_SLOT)
+        }
+        if (stackDepth == 0) return (INF_PASS_GAS, false);
+        
+        assembly {
+            let stackPointer := add(EVM_STACK_SLOT, mul(2, stackDepth))
+            passGas := tload(stackPointer)
+            isStatic := tload(add(stackPointer, 1))
+            tstore(stackPointer, INF_PASS_GAS) // Mark as used
+        }
     }
 
     function popEVMFrame() external {
-        evmStackFrames.pop();
+        uint256 stackDepth;
+        assembly {
+            stackDepth := tload(EVM_STACK_SLOT)
+        }
+        require(stackDepth != 0);
+        assembly {
+            tstore(EVM_STACK_SLOT, sub(stackDepth, 1))
+        }       
     }
 }
