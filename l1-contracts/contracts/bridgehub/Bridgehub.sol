@@ -610,12 +610,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(hyperchain != address(0), "BH: hyperchain not registered");
         require(_prevMsgSender == IZkSyncHyperchain(hyperchain).getAdmin(), "BH: incorrect sender");
 
+        HyperchainCommitment memory chainCommitment = abi.decode(bridgeData.chainData, (HyperchainCommitment));
+
         bytes memory stmMintData = IStateTransitionManager(stateTransitionManager[bridgeData.chainId])
             .forwardedBridgeBurn(bridgeData.chainId, bridgeData.stmData);
         bytes memory chainMintData = IZkSyncHyperchain(hyperchain).forwardedBridgeBurn(
             hyperchainMap.get(_settlementChainId),
             _prevMsgSender,
-            bridgeData.chainData
+            abi.encode(chainCommitment.protocolVersion)
         );
         bridgehubMintData = abi.encode(bridgeData.chainId, stmMintData, chainMintData);
     }

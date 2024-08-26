@@ -232,12 +232,12 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
         require(s.settlementLayer == address(0), "Af: already migrated");
         require(_prevMsgSender == s.admin, "Af: not chainAdmin");
-
-        HyperchainCommitment memory chainCommitment = abi.decode(_data, (HyperchainCommitment));
+        // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
+        uint256 protocolVersion = abi.decode(_data, (uint256));
 
         uint256 currentProtocolVersion = s.protocolVersion;
 
-        require(currentProtocolVersion == chainCommitment.protocolVersion, "STM: protocolVersion not up to date");
+        require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
 
         s.settlementLayer = _settlementLayer;
         chainBridgeMintData = abi.encode(prepareChainCommitment());
