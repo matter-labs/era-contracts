@@ -134,7 +134,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     function _setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) internal {
         emit NewL1DAValidator(s.l1DAValidator, _l1DAValidator);
         emit NewL2DAValidator(s.l2DAValidator, _l2DAValidator);
-        
+
         s.l1DAValidator = _l1DAValidator;
         s.l2DAValidator = _l2DAValidator;
     }
