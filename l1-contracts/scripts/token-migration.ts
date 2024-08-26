@@ -233,11 +233,15 @@ export async function transferTokensOnForkedNetwork(deployer: Deployer) {
     const erc20contract = IERC20Factory.connect(tokenAddress, provider);
     console.log(`Migrating token ${tokenAddress}`);
     console.log(
-      `Balance before: ${await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
+      `Balance before: ${await erc20contract.balanceOf(
+        deployer.addresses.Bridges.ERC20BridgeProxy
+      )}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
     );
     await transferTokens(deployer, tokenAddress);
     console.log(
-      `Balance after: ${await erc20contract.balanceOf(deployer.addresses.Bridges.ERC20BridgeProxy)}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
+      `Balance after: ${await erc20contract.balanceOf(
+        deployer.addresses.Bridges.ERC20BridgeProxy
+      )}, ${await erc20contract.balanceOf(deployer.addresses.Bridges.SharedBridgeProxy)}`
     );
   }
   for (const tokenAddress of tokenList) {
