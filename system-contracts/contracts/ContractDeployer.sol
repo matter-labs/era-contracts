@@ -37,7 +37,12 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
 
     uint256 public constructorReturnGas;
 
-    function setDeployedCode(uint256 constructorGasLeft, bytes calldata paddedNewDeployedCode) external {
+    modifier onlySystemEvm() {
+        require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender), "only system evm");
+        _;
+    }
+
+    function setDeployedCode(uint256 constructorGasLeft, bytes calldata paddedNewDeployedCode) onlySystemCall onlySystemEvm external {
         require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender));
 
         uint256 bytecodeLen = uint256(bytes32(paddedNewDeployedCode[:32]));
@@ -209,8 +214,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         return newAddress;
     }
 
-    function createEVMInternal(address _newAddress, bytes calldata _initCode) external payable {
-        require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender));
+    function createEVMInternal(address _newAddress, bytes calldata _initCode) onlySystemCall onlySystemEvm external payable {
         _evmDeployOnAddress(_newAddress, _initCode);
     }
 

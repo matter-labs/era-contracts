@@ -26,7 +26,20 @@ object "EVMInterpreter" {
             mstore(sub(offset, 64), 0x40)
             mstore(sub(offset, 32), len)
 
-            let success := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 100), add(len, 100), 0, 0)
+            let farCallAbi := getFarCallABI(
+                0,
+                0,
+                sub(offset, 100),
+                add(len, 100),
+                gas(),
+                // Only rollup is supported for now
+                0,
+                0,
+                0,
+                1
+            )
+            let to := DEPLOYER_SYSTEM_CONTRACT()
+            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
 
             if iszero(success) {
                 // This error should never happen
@@ -1407,6 +1420,9 @@ object "EVMInterpreter" {
             sp := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x40)))
             sp := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x20)))
         
+        
+            _pushEVMFrame(gasForTheCall, false)
+        
             // Selector
             mstore(sub(offset, 0x80), 0x5b16a23c)
             // Arg1: address
@@ -1417,9 +1433,25 @@ object "EVMInterpreter" {
             // Length of the init code
             mstore(sub(offset, 0x20), size)
         
-            _pushEVMFrame(gasForTheCall, false)
         
-            result := call(INF_PASS_GAS(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x64), add(size, 0x64), 0, 0)
+            let farCallAbi := getFarCallABI(
+                0,
+                0,
+                sub(offset, 0x80),
+                add(size, 0x80),
+                INF_PASS_GAS(),
+                // Only rollup is supported for now
+                0,
+                0,
+                0,
+                1
+            )
+            let to := DEPLOYER_SYSTEM_CONTRACT()
+            printString("PRE VERBATIM CREATE")
+            let result := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+        
+            printString("POST VERBATIM CREATE")
+            printHex(result)
         
             let gasLeft
             switch result
@@ -4474,6 +4506,9 @@ object "EVMInterpreter" {
                 sp := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x40)))
                 sp := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x20)))
             
+            
+                _pushEVMFrame(gasForTheCall, false)
+            
                 // Selector
                 mstore(sub(offset, 0x80), 0x5b16a23c)
                 // Arg1: address
@@ -4484,9 +4519,25 @@ object "EVMInterpreter" {
                 // Length of the init code
                 mstore(sub(offset, 0x20), size)
             
-                _pushEVMFrame(gasForTheCall, false)
             
-                result := call(INF_PASS_GAS(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x64), add(size, 0x64), 0, 0)
+                let farCallAbi := getFarCallABI(
+                    0,
+                    0,
+                    sub(offset, 0x80),
+                    add(size, 0x80),
+                    INF_PASS_GAS(),
+                    // Only rollup is supported for now
+                    0,
+                    0,
+                    0,
+                    1
+                )
+                let to := DEPLOYER_SYSTEM_CONTRACT()
+                printString("PRE VERBATIM CREATE")
+                let result := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+            
+                printString("POST VERBATIM CREATE")
+                printHex(result)
             
                 let gasLeft
                 switch result
