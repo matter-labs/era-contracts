@@ -11,6 +11,7 @@ uint160 constant PRECOMPILES_END = 0xffff;
 // Denotes that passGas has been consumed
 uint256 constant INF_PASS_GAS = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 uint256 constant EVM_STACK_SLOT = 2;
+
 contract EvmGasManager {
     // We need strust to use `storage` pointers
     struct WarmAccountInfo {
@@ -139,7 +140,7 @@ contract EvmGasManager {
             stackDepth := tload(EVM_STACK_SLOT)
         }
         if (stackDepth == 0) return (INF_PASS_GAS, false);
-        
+
         assembly {
             let stackPointer := add(EVM_STACK_SLOT, mul(2, stackDepth))
             passGas := tload(stackPointer)
@@ -156,6 +157,6 @@ contract EvmGasManager {
         require(stackDepth != 0);
         assembly {
             tstore(EVM_STACK_SLOT, sub(stackDepth, 1))
-        }       
+        }
     }
 }
