@@ -29,7 +29,7 @@ interface IL1AssetHandler {
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
-    ) external payable returns (address l1Receiver);
+    ) external payable;
 
     /// @param _chainId the chainId that the message will be sent to
     /// @param _l2Value the msg.value of the L2 transaction
