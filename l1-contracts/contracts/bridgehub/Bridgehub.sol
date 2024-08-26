@@ -266,6 +266,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address sender = L1_CHAIN_ID == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);
         // This method can be accessed by STMDeployer only
         require(sender == address(stmDeployer), "BH: not stm deployer");
+        require(stateTransitionManagerIsRegistered[_assetAddress], "STM not registered");
 
         bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
         stmAssetIdToAddress[assetInfo] = _assetAddress;
@@ -369,6 +370,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     function stmAssetIdFromChainId(uint256 _chainId) public view override returns (bytes32) {
+        address stmAddress = stateTransitionManager[_chainId];
+        require(stmAddress != address(0), "chain id not registered");
         return stmAssetId(stateTransitionManager[_chainId]);
     }
 
