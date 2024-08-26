@@ -123,7 +123,7 @@ contract DummyExecutor is IExecutor {
         executeBatches(_batchesData);
     }
 
-    function revertBatches(uint256 _newLastBatch) public {
+    function revertBatchesSharedBridge(uint256, uint256 _newLastBatch) external {
         require(
             getTotalBatchesCommitted > _newLastBatch,
             "DummyExecutor: The last committed batch is less than new last batch"
@@ -134,10 +134,6 @@ contract DummyExecutor is IExecutor {
             getTotalBatchesVerified = newTotalBatchesCommitted;
         }
         getTotalBatchesCommitted = newTotalBatchesCommitted;
-    }
-
-    function revertBatchesSharedBridge(uint256, uint256 _newLastBatch) external {
-        revertBatches(_newLastBatch);
     }
 
     /// @notice Returns larger of two values

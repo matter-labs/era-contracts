@@ -479,11 +479,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
-    function revertBatches(uint256 _newLastBatch) external nonReentrant onlyValidatorOrStateTransitionManager {
-        _revertBatches(_newLastBatch);
-    }
-
-    /// @inheritdoc IExecutor
     function revertBatchesSharedBridge(uint256, uint256 _newLastBatch) external nonReentrant onlyValidator {
         _revertBatches(_newLastBatch);
     }

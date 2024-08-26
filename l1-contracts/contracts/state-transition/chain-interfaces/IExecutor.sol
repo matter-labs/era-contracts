@@ -148,12 +148,10 @@ interface IExecutor is IZkSyncHyperchainBase {
     ) external;
 
     /// @notice Reverts unexecuted batches
+    /// @param _chainId Chain ID of the chain
     /// @param _newLastBatch batch number after which batches should be reverted
     /// NOTE: Doesn't delete the stored data about batches, but only decreases
     /// counters that are responsible for the number of batches
-    function revertBatches(uint256 _newLastBatch) external;
-
-    /// @notice same as `revertBatches` but with the chainId so ValidatorTimelock can sort the inputs.
     function revertBatchesSharedBridge(uint256 _chainId, uint256 _newLastBatch) external;
 
     /// @notice Event emitted when a batch is committed
