@@ -57,8 +57,6 @@ object "EVMInterpreter" {
 
         function validateCorrectBytecode(offset, len, gasToReturn) -> returnGas {
             if len {
-                // let firstByte := shr(mload(offset), 248)
-                // FIXME: Check this.
                 let firstByte := shr(248, mload(offset))
                 if eq(firstByte, 0xEF) {
                     revert(0, 0)
@@ -147,7 +145,6 @@ object "EVMInterpreter" {
         
         // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
         function readIP(ip,maxAcceptablePos) -> opcode {
-            // TODO: Why not do this at the beginning once instead of every time?
             if gt(ip, maxAcceptablePos) {
                 revert(0, 0)
             }
@@ -226,6 +223,12 @@ object "EVMInterpreter" {
             }
         }
         
+        function pushStackCheck(sp, evmGasLeft, numInputs) {
+            if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_OFFSET())) {
+                revertWithGas(evmGasLeft)
+            }
+        }
+        
         function getCodeAddress() -> addr {
             addr := verbatim_0i_1o("code_source")
         }
@@ -285,7 +288,6 @@ object "EVMInterpreter" {
         
         function getIsStaticFromCallFlags() -> isStatic {
             isStatic := verbatim_0i_1o("get_global::call_flags")
-            // TODO: make it a constnat
             isStatic := iszero(iszero(and(isStatic, 0x04)))
         }
         
@@ -534,6 +536,13 @@ object "EVMInterpreter" {
                 }
         }
         
+        function checkMemOverflowByOffset(offset, evmGasLeft) {
+            if gt(offset, MAX_POSSIBLE_MEM()) {
+                mstore(0, evmGasLeft)
+                revert(0, 32)
+            }
+        }
+        
         function checkMemOverflow(location, evmGasLeft) {
             if gt(location, MAX_MEMORY_FRAME()) {
                 mstore(0, evmGasLeft)
@@ -656,29 +665,34 @@ object "EVMInterpreter" {
             if iszero(nonce) {
                 nonceEncoded := 128
             }
-            // The nonce has 4 bytes
-            if gt(nonce, 0xFFFFFF) {
-                nonceEncoded := shl(32, 0x84)
+            switch gt(nonce, 0xFFFF)
+            case 1 {
+                switch gt(nonce, 0xFFFFFF)
+                case 1 {
+                    // The nonce has 4 bytes
+                    nonceEncoded := shl(32, 0x84)
+                    nonceEncodedLength := 5
+                }
+                default {
+                    // The nonce has 3 bytes
+                    nonceEncoded := shl(24, 0x83)
+                    nonceEncodedLength := 4
+                }
                 nonceEncoded := add(nonceEncoded, nonce)
-                nonceEncodedLength := 5
             }
-            // The nonce has 3 bytes
-            if and(gt(nonce, 0xFFFF), lt(nonce, 0x1000000)) {
-                nonceEncoded := shl(24, 0x83)
-                nonceEncoded := add(nonceEncoded, nonce)
-                nonceEncodedLength := 4
-            }
-            // The nonce has 2 bytes
-            if and(gt(nonce, 0xFF), lt(nonce, 0x10000)) {
-                nonceEncoded := shl(16, 0x82)
-                nonceEncoded := add(nonceEncoded, nonce)
-                nonceEncodedLength := 3
-            }
-            // The nonce has 1 byte and it's in [0x80, 0xFF]
-            if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
-                nonceEncoded := shl(8, 0x81)
-                nonceEncoded := add(nonceEncoded, nonce)
-                nonceEncodedLength := 2
+            default {
+                // The nonce has 2 bytes
+                if gt(nonce, 0xFF) {
+                    nonceEncoded := shl(16, 0x82)
+                    nonceEncoded := add(nonceEncoded, nonce)
+                    nonceEncodedLength := 3
+                }
+                // The nonce has 1 byte and it's in [0x80, 0xFF]
+                if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
+                    nonceEncoded := shl(8, 0x81)
+                    nonceEncoded := add(nonceEncoded, nonce)
+                    nonceEncodedLength := 2
+                }
             }
         
             listLength := add(21, nonceEncodedLength)
@@ -824,7 +838,6 @@ object "EVMInterpreter" {
         }
         
         // Each evm gas is 5 zkEVM one
-        // FIXME: change this variable to reflect real ergs : gas ratio
         function GAS_DIVISOR() -> gas_div { gas_div := 5 }
         function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
         function OVERHEAD() -> overhead { overhead := 2000 }
@@ -921,11 +934,11 @@ object "EVMInterpreter" {
         
             addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
         
-            checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER(), evmGasLeft)
-            checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER(), evmGasLeft)
+            checkOverflow(argsOffset,argsSize, evmGasLeft)
+            checkOverflow(retOffset, retSize, evmGasLeft)
         
-            checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()), evmGasLeft)
-            checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()), evmGasLeft)
+            checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+            checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
         
             extraCost := 0
             if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -943,18 +956,9 @@ object "EVMInterpreter" {
         
             let frameGasLeft
             let success
-            if _isEVM(addr) {
-                _pushEVMFrame(gasToPass, true)
-                // TODO Check the following comment from zkSync .sol.
-                // We can not just pass all gas here to prevert overflow of zkEVM gas counter
-                success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
-        
-                frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
-                _popEVMFrame()
-            }
-        
-            // zkEVM native
-            if iszero(_isEVM(addr)) {
+            switch _isEVM(addr)
+            case 0 {
+                // zkEVM native
                 gasToPass := _getZkEVMGas(gasToPass, addr)
                 let zkevmGasBefore := gas()
                 success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, add(MEM_OFFSET_INNER(), retOffset), retSize)
@@ -966,6 +970,13 @@ object "EVMInterpreter" {
                 if gt(gasToPass, gasUsed) {
                     frameGasLeft := sub(gasToPass, gasUsed)
                 }
+            }
+            default {
+                _pushEVMFrame(gasToPass, true)
+                success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
+        
+                frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
+                _popEVMFrame()
             }
         
             let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
@@ -1001,7 +1012,31 @@ object "EVMInterpreter" {
         function _performCall(addr,gasToPass,value,argsOffset,argsSize,retOffset,retSize,isStatic) -> success, frameGasLeft, gasToPassNew{
             gasToPassNew := gasToPass
             let is_evm := _isEVM(addr)
-            if isStatic {
+        
+            switch isStatic
+            case 0 {
+                switch is_evm
+                case 0 {
+                    // zkEVM native
+                    gasToPassNew := _getZkEVMGas(gasToPassNew, addr)
+                    let zkevmGasBefore := gas()
+                    success := call(gasToPassNew, addr, value, argsOffset, argsSize, retOffset, retSize)
+                    _saveReturndataAfterZkEVMCall()
+                    let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
+            
+                    frameGasLeft := 0
+                    if gt(gasToPassNew, gasUsed) {
+                        frameGasLeft := sub(gasToPassNew, gasUsed)
+                    }
+                }
+                default {
+                    _pushEVMFrame(gasToPassNew, isStatic)
+                    success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
+                    frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+                    _popEVMFrame()
+                }
+            }
+            default {
                 if value {
                     revertWithGas(gasToPassNew)
                 }
@@ -1014,27 +1049,6 @@ object "EVMInterpreter" {
                     retOffset,
                     retSize
                 )
-            }
-        
-            if and(is_evm, iszero(isStatic)) {
-                _pushEVMFrame(gasToPassNew, isStatic)
-                success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
-                frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-                _popEVMFrame()
-            }
-        
-            // zkEVM native
-            if and(iszero(is_evm), iszero(isStatic)) {
-                gasToPassNew := _getZkEVMGas(gasToPassNew, addr)
-                let zkevmGasBefore := gas()
-                success := call(gasToPassNew, addr, value, argsOffset, argsSize, retOffset, retSize)
-                _saveReturndataAfterZkEVMCall()
-                let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
-        
-                frameGasLeft := 0
-                if gt(gasToPassNew, gasUsed) {
-                    frameGasLeft := sub(gasToPassNew, gasUsed)
-                }
             }
         }
         
@@ -1124,11 +1138,11 @@ object "EVMInterpreter" {
         
             // addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
         
-            checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER(), evmGasLeft)
-            checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER(), evmGasLeft)
+            checkOverflow(argsOffset, argsSize, evmGasLeft)
+            checkOverflow(retOffset, retSize, evmGasLeft)
         
-            checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()), evmGasLeft)
-            checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()), evmGasLeft)
+            checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+            checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
         
             if iszero(_isEVM(addr)) {
                 revertWithGas(evmGasLeft)
@@ -1144,13 +1158,6 @@ object "EVMInterpreter" {
                 extraCost := add(extraCost,maxExpand)
             }
             gasToPass := capGas(evmGasLeft,gasToPass)
-        
-            // TODO: Do this
-            // if warmAccount(addr) {
-            //     extraCost = GAS_WARM_ACCESS;
-            // } else {
-            //     extraCost = GAS_COLD_ACCOUNT_ACCESS;
-            // }
         
             _pushEVMFrame(gasToPass, isStatic)
             let success := delegatecall(
@@ -1219,18 +1226,9 @@ object "EVMInterpreter" {
             _outputOffset,
             _outputLen
         ) ->  success, _gasLeft {
-            if _calleeIsEVM {
-                _pushEVMFrame(_calleeGas, true)
-                // TODO Check the following comment from zkSync .sol.
-                // We can not just pass all gas here to prevert overflow of zkEVM gas counter
-                success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
-        
-                _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
-                _popEVMFrame()
-            }
-        
-            // zkEVM native
-            if iszero(_calleeIsEVM) {
+            switch _calleeIsEVM
+            case 0 {
+                // zkEVM native
                 _calleeGas := _getZkEVMGas(_calleeGas, _callee)
                 let zkevmGasBefore := gas()
                 success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen)
@@ -1243,6 +1241,13 @@ object "EVMInterpreter" {
                 if gt(_calleeGas, gasUsed) {
                     _gasLeft := sub(_calleeGas, gasUsed)
                 }
+            }
+            default {
+                _pushEVMFrame(_calleeGas, true)
+                success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
+        
+                _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
+                _popEVMFrame()
             }
         }
         
@@ -1283,10 +1288,11 @@ object "EVMInterpreter" {
         
             offset := add(MEM_OFFSET_INNER(), offset)
         
-            sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeftOld, oldStackHead)
-            sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeftOld, stackHead)
-            sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeftOld, stackHead)
-            sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeftOld, stackHead)
+            pushStackCheck(sp, evmGasLeftOld, 4)
+            sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x80)), oldStackHead)
+            sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x60)), stackHead)
+            sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x40)), stackHead)
+            sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x20)), stackHead)
         
             // Selector
             mstore(sub(offset, 0x80), 0x5b16a23c)
@@ -1330,7 +1336,7 @@ object "EVMInterpreter" {
         
             let back
         
-            popStackCheck(sp, evmGasLeft, 4)
+            // skipping check since we pushed exactly 4 items earlier
             back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             mstore(sub(offset, 0x20), back)
             back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
@@ -1423,9 +1429,8 @@ object "EVMInterpreter" {
             value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
             offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
         
-            checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
-        
-            checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
+            checkOverflow(offset, size, evmGasLeft)
+            checkMemOverflowByOffset(add(offset, size), evmGasLeft)
         
             if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
                 revertWithGas(evmGasLeft)
@@ -1470,9 +1475,8 @@ object "EVMInterpreter" {
             size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             salt, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
         
-            checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
-        
-            checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
+            checkOverflow(offset, size, evmGasLeft)
+            checkMemOverflowByOffset(add(offset, size), evmGasLeft)
         
             if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
                 revertWithGas(evmGasLeft)
@@ -1823,8 +1827,8 @@ object "EVMInterpreter" {
                     popStackCheck(sp, evmGasLeft, 2)
                     offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
+                    checkOverflow(offset, size, evmGasLeft)
+                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
                     let keccak := keccak256(add(MEM_OFFSET_INNER(), offset), size)
             
                     // When an offset is first accessed (either read or write), memory may trigger 
@@ -1911,6 +1915,7 @@ object "EVMInterpreter" {
                     checkMultipleOverflow(offset,size,MEM_OFFSET_INNER(), evmGasLeft)
                     checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER(), evmGasLeft)
             
+                    // TODO invalid?
                     if or(gt(add(add(offset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM()), gt(add(add(destOffset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM())) {
                         $llvm_AlwaysInline_llvm$_memsetToZero(add(destOffset, MEM_OFFSET_INNER()), size)
                     }
@@ -1979,11 +1984,6 @@ object "EVMInterpreter" {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
             
-                    // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
-                    // if a contract is created it works, but if the address is a zkSync's contract
-                    // what happens?
-                    // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)
-            
                     switch _isEVM(addr) 
                         case 0  { stackHead := extcodesize(addr) }
                         default { stackHead := _fetchDeployedCodeLen(addr) }
@@ -2009,9 +2009,6 @@ object "EVMInterpreter" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    // TODO: check if these conditions are met
-                    // The addition offset + size overflows.
-                    // offset + size is larger than RETURNDATASIZE.
                     checkOverflow(offset,len, evmGasLeft)
                     if gt(add(offset, len), mload(LAST_RETURNDATA_SIZE_OFFSET())) {
                         revertWithGas(evmGasLeft)
@@ -2019,7 +2016,7 @@ object "EVMInterpreter" {
             
                     // minimum_word_size = (size + 31) / 32
                     // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
-                    checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                    checkMemOverflowByOffset(offset, evmGasLeft)
                     let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(add(dest, len)))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
@@ -2115,8 +2112,7 @@ object "EVMInterpreter" {
             
                     let offset := stackHead
             
-                    checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                    checkMemOverflowByOffset(offset, evmGasLeft)
                     let expansionGas := expandMemory(add(offset, 32))
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
@@ -2133,8 +2129,7 @@ object "EVMInterpreter" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                    checkMemOverflowByOffset(offset, evmGasLeft)
                     let expansionGas := expandMemory(add(offset, 32))
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
@@ -2150,8 +2145,7 @@ object "EVMInterpreter" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                    checkMemOverflowByOffset(offset, evmGasLeft)
                     let expansionGas := expandMemory(add(offset, 1))
                     evmGasLeft := chargeGas(evmGasLeft, expansionGas)
             
@@ -2333,8 +2327,9 @@ object "EVMInterpreter" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
-                    checkMemOverflow(add(add(destOffset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                    // TODO overflow checks
+                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                    checkMemOverflowByOffset(add(destOffset, size), evmGasLeft)
             
                     expandMemory(add(destOffset, size))
                     expandMemory(add(offset, size))
@@ -2779,8 +2774,8 @@ object "EVMInterpreter" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                    checkOverflow(offset, size, evmGasLeft)
+                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                     let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -2802,8 +2797,8 @@ object "EVMInterpreter" {
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                    checkOverflow(offset, size, evmGasLeft)
+                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                     let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -2824,8 +2819,8 @@ object "EVMInterpreter" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                    checkOverflow(offset, size, evmGasLeft)
+                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                     let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -2853,9 +2848,8 @@ object "EVMInterpreter" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-            
-                    checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                    checkOverflow(offset, size, evmGasLeft)
+                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                     let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -2884,8 +2878,8 @@ object "EVMInterpreter" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                    checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                    checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                    checkOverflow(offset, size, evmGasLeft)
+                    checkMemOverflowByOffset(add(offset, size), evmGasLeft)
             
                     // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                     let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -2966,6 +2960,7 @@ object "EVMInterpreter" {
                     offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                     size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
+                    // TODO invalid?
                     ensureAcceptableMemLocation(offset)
                     ensureAcceptableMemLocation(size)
                     evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
@@ -3095,7 +3090,6 @@ object "EVMInterpreter" {
             
             // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
             function readIP(ip,maxAcceptablePos) -> opcode {
-                // TODO: Why not do this at the beginning once instead of every time?
                 if gt(ip, maxAcceptablePos) {
                     revert(0, 0)
                 }
@@ -3174,6 +3168,12 @@ object "EVMInterpreter" {
                 }
             }
             
+            function pushStackCheck(sp, evmGasLeft, numInputs) {
+                if iszero(lt(add(sp, mul(0x20, sub(numInputs, 1))), BYTECODE_OFFSET())) {
+                    revertWithGas(evmGasLeft)
+                }
+            }
+            
             function getCodeAddress() -> addr {
                 addr := verbatim_0i_1o("code_source")
             }
@@ -3233,7 +3233,6 @@ object "EVMInterpreter" {
             
             function getIsStaticFromCallFlags() -> isStatic {
                 isStatic := verbatim_0i_1o("get_global::call_flags")
-                // TODO: make it a constnat
                 isStatic := iszero(iszero(and(isStatic, 0x04)))
             }
             
@@ -3482,6 +3481,13 @@ object "EVMInterpreter" {
                     }
             }
             
+            function checkMemOverflowByOffset(offset, evmGasLeft) {
+                if gt(offset, MAX_POSSIBLE_MEM()) {
+                    mstore(0, evmGasLeft)
+                    revert(0, 32)
+                }
+            }
+            
             function checkMemOverflow(location, evmGasLeft) {
                 if gt(location, MAX_MEMORY_FRAME()) {
                     mstore(0, evmGasLeft)
@@ -3604,29 +3610,34 @@ object "EVMInterpreter" {
                 if iszero(nonce) {
                     nonceEncoded := 128
                 }
-                // The nonce has 4 bytes
-                if gt(nonce, 0xFFFFFF) {
-                    nonceEncoded := shl(32, 0x84)
+                switch gt(nonce, 0xFFFF)
+                case 1 {
+                    switch gt(nonce, 0xFFFFFF)
+                    case 1 {
+                        // The nonce has 4 bytes
+                        nonceEncoded := shl(32, 0x84)
+                        nonceEncodedLength := 5
+                    }
+                    default {
+                        // The nonce has 3 bytes
+                        nonceEncoded := shl(24, 0x83)
+                        nonceEncodedLength := 4
+                    }
                     nonceEncoded := add(nonceEncoded, nonce)
-                    nonceEncodedLength := 5
                 }
-                // The nonce has 3 bytes
-                if and(gt(nonce, 0xFFFF), lt(nonce, 0x1000000)) {
-                    nonceEncoded := shl(24, 0x83)
-                    nonceEncoded := add(nonceEncoded, nonce)
-                    nonceEncodedLength := 4
-                }
-                // The nonce has 2 bytes
-                if and(gt(nonce, 0xFF), lt(nonce, 0x10000)) {
-                    nonceEncoded := shl(16, 0x82)
-                    nonceEncoded := add(nonceEncoded, nonce)
-                    nonceEncodedLength := 3
-                }
-                // The nonce has 1 byte and it's in [0x80, 0xFF]
-                if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
-                    nonceEncoded := shl(8, 0x81)
-                    nonceEncoded := add(nonceEncoded, nonce)
-                    nonceEncodedLength := 2
+                default {
+                    // The nonce has 2 bytes
+                    if gt(nonce, 0xFF) {
+                        nonceEncoded := shl(16, 0x82)
+                        nonceEncoded := add(nonceEncoded, nonce)
+                        nonceEncodedLength := 3
+                    }
+                    // The nonce has 1 byte and it's in [0x80, 0xFF]
+                    if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
+                        nonceEncoded := shl(8, 0x81)
+                        nonceEncoded := add(nonceEncoded, nonce)
+                        nonceEncodedLength := 2
+                    }
                 }
             
                 listLength := add(21, nonceEncodedLength)
@@ -3772,7 +3783,6 @@ object "EVMInterpreter" {
             }
             
             // Each evm gas is 5 zkEVM one
-            // FIXME: change this variable to reflect real ergs : gas ratio
             function GAS_DIVISOR() -> gas_div { gas_div := 5 }
             function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
             function OVERHEAD() -> overhead { overhead := 2000 }
@@ -3869,11 +3879,11 @@ object "EVMInterpreter" {
             
                 addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
-                checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER(), evmGasLeft)
-                checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER(), evmGasLeft)
+                checkOverflow(argsOffset,argsSize, evmGasLeft)
+                checkOverflow(retOffset, retSize, evmGasLeft)
             
-                checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()), evmGasLeft)
-                checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()), evmGasLeft)
+                checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+                checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
             
                 extraCost := 0
                 if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
@@ -3891,18 +3901,9 @@ object "EVMInterpreter" {
             
                 let frameGasLeft
                 let success
-                if _isEVM(addr) {
-                    _pushEVMFrame(gasToPass, true)
-                    // TODO Check the following comment from zkSync .sol.
-                    // We can not just pass all gas here to prevert overflow of zkEVM gas counter
-                    success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
-            
-                    frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
-                    _popEVMFrame()
-                }
-            
-                // zkEVM native
-                if iszero(_isEVM(addr)) {
+                switch _isEVM(addr)
+                case 0 {
+                    // zkEVM native
                     gasToPass := _getZkEVMGas(gasToPass, addr)
                     let zkevmGasBefore := gas()
                     success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, add(MEM_OFFSET_INNER(), retOffset), retSize)
@@ -3914,6 +3915,13 @@ object "EVMInterpreter" {
                     if gt(gasToPass, gasUsed) {
                         frameGasLeft := sub(gasToPass, gasUsed)
                     }
+                }
+                default {
+                    _pushEVMFrame(gasToPass, true)
+                    success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
+            
+                    frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
+                    _popEVMFrame()
                 }
             
                 let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
@@ -3949,7 +3957,31 @@ object "EVMInterpreter" {
             function _performCall(addr,gasToPass,value,argsOffset,argsSize,retOffset,retSize,isStatic) -> success, frameGasLeft, gasToPassNew{
                 gasToPassNew := gasToPass
                 let is_evm := _isEVM(addr)
-                if isStatic {
+            
+                switch isStatic
+                case 0 {
+                    switch is_evm
+                    case 0 {
+                        // zkEVM native
+                        gasToPassNew := _getZkEVMGas(gasToPassNew, addr)
+                        let zkevmGasBefore := gas()
+                        success := call(gasToPassNew, addr, value, argsOffset, argsSize, retOffset, retSize)
+                        _saveReturndataAfterZkEVMCall()
+                        let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
+                
+                        frameGasLeft := 0
+                        if gt(gasToPassNew, gasUsed) {
+                            frameGasLeft := sub(gasToPassNew, gasUsed)
+                        }
+                    }
+                    default {
+                        _pushEVMFrame(gasToPassNew, isStatic)
+                        success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
+                        frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+                        _popEVMFrame()
+                    }
+                }
+                default {
                     if value {
                         revertWithGas(gasToPassNew)
                     }
@@ -3962,27 +3994,6 @@ object "EVMInterpreter" {
                         retOffset,
                         retSize
                     )
-                }
-            
-                if and(is_evm, iszero(isStatic)) {
-                    _pushEVMFrame(gasToPassNew, isStatic)
-                    success := call(EVM_GAS_STIPEND(), addr, value, argsOffset, argsSize, 0, 0)
-                    frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
-                    _popEVMFrame()
-                }
-            
-                // zkEVM native
-                if and(iszero(is_evm), iszero(isStatic)) {
-                    gasToPassNew := _getZkEVMGas(gasToPassNew, addr)
-                    let zkevmGasBefore := gas()
-                    success := call(gasToPassNew, addr, value, argsOffset, argsSize, retOffset, retSize)
-                    _saveReturndataAfterZkEVMCall()
-                    let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
-            
-                    frameGasLeft := 0
-                    if gt(gasToPassNew, gasUsed) {
-                        frameGasLeft := sub(gasToPassNew, gasUsed)
-                    }
                 }
             }
             
@@ -4072,11 +4083,11 @@ object "EVMInterpreter" {
             
                 // addr := and(addr, 0xffffffffffffffffffffffffffffffffffffffff)
             
-                checkMultipleOverflow(argsOffset,argsSize,MEM_OFFSET_INNER(), evmGasLeft)
-                checkMultipleOverflow(retOffset, retSize,MEM_OFFSET_INNER(), evmGasLeft)
+                checkOverflow(argsOffset, argsSize, evmGasLeft)
+                checkOverflow(retOffset, retSize, evmGasLeft)
             
-                checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()), evmGasLeft)
-                checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()), evmGasLeft)
+                checkMemOverflowByOffset(add(argsOffset, argsSize), evmGasLeft)
+                checkMemOverflowByOffset(add(retOffset, retSize), evmGasLeft)
             
                 if iszero(_isEVM(addr)) {
                     revertWithGas(evmGasLeft)
@@ -4092,13 +4103,6 @@ object "EVMInterpreter" {
                     extraCost := add(extraCost,maxExpand)
                 }
                 gasToPass := capGas(evmGasLeft,gasToPass)
-            
-                // TODO: Do this
-                // if warmAccount(addr) {
-                //     extraCost = GAS_WARM_ACCESS;
-                // } else {
-                //     extraCost = GAS_COLD_ACCOUNT_ACCESS;
-                // }
             
                 _pushEVMFrame(gasToPass, isStatic)
                 let success := delegatecall(
@@ -4167,18 +4171,9 @@ object "EVMInterpreter" {
                 _outputOffset,
                 _outputLen
             ) ->  success, _gasLeft {
-                if _calleeIsEVM {
-                    _pushEVMFrame(_calleeGas, true)
-                    // TODO Check the following comment from zkSync .sol.
-                    // We can not just pass all gas here to prevert overflow of zkEVM gas counter
-                    success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
-            
-                    _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
-                    _popEVMFrame()
-                }
-            
-                // zkEVM native
-                if iszero(_calleeIsEVM) {
+                switch _calleeIsEVM
+                case 0 {
+                    // zkEVM native
                     _calleeGas := _getZkEVMGas(_calleeGas, _callee)
                     let zkevmGasBefore := gas()
                     success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen)
@@ -4191,6 +4186,13 @@ object "EVMInterpreter" {
                     if gt(_calleeGas, gasUsed) {
                         _gasLeft := sub(_calleeGas, gasUsed)
                     }
+                }
+                default {
+                    _pushEVMFrame(_calleeGas, true)
+                    success := staticcall(EVM_GAS_STIPEND(), _callee, _inputOffset, _inputLen, 0, 0)
+            
+                    _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
+                    _popEVMFrame()
                 }
             }
             
@@ -4231,10 +4233,11 @@ object "EVMInterpreter" {
             
                 offset := add(MEM_OFFSET_INNER(), offset)
             
-                sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeftOld, oldStackHead)
-                sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeftOld, stackHead)
-                sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeftOld, stackHead)
-                sp, stackHead := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeftOld, stackHead)
+                pushStackCheck(sp, evmGasLeftOld, 4)
+                sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x80)), oldStackHead)
+                sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x60)), stackHead)
+                sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x40)), stackHead)
+                sp, stackHead := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x20)), stackHead)
             
                 // Selector
                 mstore(sub(offset, 0x80), 0x5b16a23c)
@@ -4278,7 +4281,7 @@ object "EVMInterpreter" {
             
                 let back
             
-                popStackCheck(sp, evmGasLeft, 4)
+                // skipping check since we pushed exactly 4 items earlier
                 back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 mstore(sub(offset, 0x20), back)
                 back, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
@@ -4371,9 +4374,8 @@ object "EVMInterpreter" {
                 value, sp, stackHead := popStackItemWithoutCheck(oldSp, oldStackHead)
                 offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
             
-                checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
-            
-                checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
+                checkOverflow(offset, size, evmGasLeft)
+                checkMemOverflowByOffset(add(offset, size), evmGasLeft)
             
                 if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
                     revertWithGas(evmGasLeft)
@@ -4418,9 +4420,8 @@ object "EVMInterpreter" {
                 size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 salt, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
             
-                checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
-            
-                checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
+                checkOverflow(offset, size, evmGasLeft)
+                checkMemOverflowByOffset(add(offset, size), evmGasLeft)
             
                 if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
                     revertWithGas(evmGasLeft)
@@ -4771,8 +4772,8 @@ object "EVMInterpreter" {
                         popStackCheck(sp, evmGasLeft, 2)
                         offset, sp, size := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
+                        checkOverflow(offset, size, evmGasLeft)
+                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
                         let keccak := keccak256(add(MEM_OFFSET_INNER(), offset), size)
                 
                         // When an offset is first accessed (either read or write), memory may trigger 
@@ -4859,6 +4860,7 @@ object "EVMInterpreter" {
                         checkMultipleOverflow(offset,size,MEM_OFFSET_INNER(), evmGasLeft)
                         checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER(), evmGasLeft)
                 
+                        // TODO invalid?
                         if or(gt(add(add(offset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM()), gt(add(add(destOffset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM())) {
                             $llvm_AlwaysInline_llvm$_memsetToZero(add(destOffset, MEM_OFFSET_INNER()), size)
                         }
@@ -4927,11 +4929,6 @@ object "EVMInterpreter" {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
                         }
                 
-                        // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
-                        // if a contract is created it works, but if the address is a zkSync's contract
-                        // what happens?
-                        // sp := pushStackItem(sp, extcodesize(addr), evmGasLeft)
-                
                         switch _isEVM(addr) 
                             case 0  { stackHead := extcodesize(addr) }
                             default { stackHead := _fetchDeployedCodeLen(addr) }
@@ -4957,9 +4954,6 @@ object "EVMInterpreter" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         len, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        // TODO: check if these conditions are met
-                        // The addition offset + size overflows.
-                        // offset + size is larger than RETURNDATASIZE.
                         checkOverflow(offset,len, evmGasLeft)
                         if gt(add(offset, len), mload(LAST_RETURNDATA_SIZE_OFFSET())) {
                             revertWithGas(evmGasLeft)
@@ -4967,7 +4961,7 @@ object "EVMInterpreter" {
                 
                         // minimum_word_size = (size + 31) / 32
                         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
-                        checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                        checkMemOverflowByOffset(offset, evmGasLeft)
                         let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(add(dest, len)))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
@@ -5063,8 +5057,7 @@ object "EVMInterpreter" {
                 
                         let offset := stackHead
                 
-                        checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                        checkMemOverflowByOffset(offset, evmGasLeft)
                         let expansionGas := expandMemory(add(offset, 32))
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
@@ -5081,8 +5074,7 @@ object "EVMInterpreter" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                        checkMemOverflowByOffset(offset, evmGasLeft)
                         let expansionGas := expandMemory(add(offset, 32))
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
@@ -5098,8 +5090,7 @@ object "EVMInterpreter" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         value, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkOverflow(offset, MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(offset, MEM_OFFSET_INNER()), evmGasLeft)
+                        checkMemOverflowByOffset(offset, evmGasLeft)
                         let expansionGas := expandMemory(add(offset, 1))
                         evmGasLeft := chargeGas(evmGasLeft, expansionGas)
                 
@@ -5281,8 +5272,9 @@ object "EVMInterpreter" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
-                        checkMemOverflow(add(add(destOffset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                        // TODO overflow checks
+                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
+                        checkMemOverflowByOffset(add(destOffset, size), evmGasLeft)
                 
                         expandMemory(add(destOffset, size))
                         expandMemory(add(offset, size))
@@ -5727,8 +5719,8 @@ object "EVMInterpreter" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                        checkOverflow(offset, size, evmGasLeft)
+                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -5750,8 +5742,8 @@ object "EVMInterpreter" {
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         topic1, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                        checkOverflow(offset, size, evmGasLeft)
+                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -5772,8 +5764,8 @@ object "EVMInterpreter" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                        checkOverflow(offset, size, evmGasLeft)
+                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -5801,9 +5793,8 @@ object "EVMInterpreter" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                
-                        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                        checkOverflow(offset, size, evmGasLeft)
+                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -5832,8 +5823,8 @@ object "EVMInterpreter" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
-                        checkMultipleOverflow(offset, size,MEM_OFFSET_INNER(), evmGasLeft)
-                        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size), evmGasLeft)
+                        checkOverflow(offset, size, evmGasLeft)
+                        checkMemOverflowByOffset(add(offset, size), evmGasLeft)
                 
                         // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
                         let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
@@ -5914,6 +5905,7 @@ object "EVMInterpreter" {
                         offset, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                         size, sp, stackHead := popStackItemWithoutCheck(sp, stackHead)
                 
+                        // TODO invalid?
                         ensureAcceptableMemLocation(offset)
                         ensureAcceptableMemLocation(size)
                         evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
