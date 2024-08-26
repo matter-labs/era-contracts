@@ -108,7 +108,9 @@ describe("ValidatorTimelock tests", function () {
   });
 
   it("Should revert if non-validator revert batches", async () => {
-    const revertReason = await getCallRevertReason(validatorTimelock.connect(randomSigner).revertBatchesSharedBridge(chainId, 1));
+    const revertReason = await getCallRevertReason(
+      validatorTimelock.connect(randomSigner).revertBatchesSharedBridge(chainId, 1)
+    );
 
     expect(revertReason).equal("ValidatorTimelock: only validator");
   });
