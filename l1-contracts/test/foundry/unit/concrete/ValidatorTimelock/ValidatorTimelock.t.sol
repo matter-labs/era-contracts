@@ -125,7 +125,11 @@ contract ValidatorTimelockTest is Test {
         uint64 timestamp = 123456;
 
         vm.warp(timestamp);
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(eraChainId));
+        vm.mockCall(
+            zkSync,
+            abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector),
+            abi.encode(eraChainId)
+        );
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
         IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
@@ -200,7 +204,11 @@ contract ValidatorTimelockTest is Test {
         IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
         storedBatches[0] = storedBatch2;
 
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.proveBatchesSharedBridge.selector), abi.encode(storedBatches));
+        vm.mockCall(
+            zkSync,
+            abi.encodeWithSelector(IExecutor.proveBatchesSharedBridge.selector),
+            abi.encode(storedBatches)
+        );
 
         vm.prank(alice);
         vm.warp(timestamp + executionDelay + 1);
