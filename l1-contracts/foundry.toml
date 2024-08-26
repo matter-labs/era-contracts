@@ -12,4 +12,7 @@ remappings = [
     "forge-std/=../lib/forge-std/src/",
     "murky/=../lib/murky/src/",
     "foundry-test/=test/foundry/",
+    "@openzeppelin/contracts-v4/=../lib/openzeppelin-contracts-v4/contracts/",
+    "@openzeppelin/contracts-upgradeable-v4/=../lib/openzeppelin-contracts-upgradeable-v4/contracts/",
+    "l2-contracts/=../l2-contracts/contracts/",
 ]
