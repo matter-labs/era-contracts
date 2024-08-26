@@ -280,6 +280,14 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
         s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
 
+        // We currently assume that the base token asset id never changes for a chain.
+        bytes32 currentBaseTokenAssetId = s.baseTokenAssetId;
+        if (currentBaseTokenAssetId == bytes32(0)) {
+            s.baseTokenAssetId = _commitment.baseTokenAssetId
+        } else {
+            require(currentBaseTokenAssetId == _commitment.baseTokenAssetId, "Af: baseTokenAssetId mismatch");
+        }
+
         // Set the settlement to 0 - as this is the current settlement chain.
         s.settlementLayer = address(0);
 
@@ -308,6 +316,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         commitment.l2SystemContractsUpgradeBatchNumber = s.l2SystemContractsUpgradeBatchNumber;
         commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         commitment.priorityTree = s.priorityTree.getCommitment();
+        commitment.baseTokenAssetId = s.baseTokenAssetId;
 
         // just in case
         require(

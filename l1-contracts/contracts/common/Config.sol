@@ -134,11 +134,19 @@ struct HyperchainCommitment {
     /// @notice Total number of committed batches i.e. batches[totalBatchesCommitted] points at the latest committed
     /// batch
     uint256 totalBatchesCommitted;
-    /// @notice
+    /// @notice The hash of the L2 system contracts ugpgrade transaction. 
+    /// @dev It is non zero if the migration happens while the upgrade is not yet finalized.
     bytes32 l2SystemContractsUpgradeTxHash;
-    /// @notice
+    /// @notice The batch when the system contracts upgrade transaction was executed.
+    /// @dev It is non-zero if the migration happens while the batch where the upgrade tx was present 
+    /// has not been finalized (executed) yet.
     uint256 l2SystemContractsUpgradeBatchNumber;
+    /// @notice The hashes of the batches that are needed to keep the blockchain working. 
+    /// @dev The length of the array is equal to the `totalBatchesCommitted - totalBatchesExecuted + 1`, i.e. we need
+    /// to store all the unexecuted batches' hashes + 1 latest executed one.
     bytes32[] batchHashes;
-    /// @notice Commitment to the priority merkle tree
+    /// @notice Commitment to the priority merkle tree.
     PriorityTreeCommitment priorityTree;
+    /// @notice The base token asset id.
+    bytes32 baseTokenAssetId;
 }
