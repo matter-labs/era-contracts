@@ -283,7 +283,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         // We currently assume that the base token asset id never changes for a chain.
         bytes32 currentBaseTokenAssetId = s.baseTokenAssetId;
         if (currentBaseTokenAssetId == bytes32(0)) {
-            s.baseTokenAssetId = _commitment.baseTokenAssetId
+            s.baseTokenAssetId = _commitment.baseTokenAssetId;
         } else {
             require(currentBaseTokenAssetId == _commitment.baseTokenAssetId, "Af: baseTokenAssetId mismatch");
         }
