@@ -367,12 +367,27 @@ object "EVMInterpreter" {
             // function consumeEvmFrame() external returns (uint256 passGas, bool isStatic)
             mstore(0, 0x04C14E9E00000000000000000000000000000000000000000000000000000000)
         
-            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 64)
+            let farCallAbi := getFarCallABI(
+                0,
+                0,
+                0,
+                4,
+                gas(),
+                // Only rollup is supported for now
+                0,
+                0,
+                0,
+                1
+            )
+            let to := EVM_GAS_MANAGER_CONTRACT()
+            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
         
             if iszero(success) {
                 // Should never happen
                 revert(0, 0)
             }
+        
+            returndatacopy(0,0,64)
         
             passGas := mload(0)
             isStatic := mload(32)
@@ -3419,12 +3434,27 @@ object "EVMInterpreter" {
                 // function consumeEvmFrame() external returns (uint256 passGas, bool isStatic)
                 mstore(0, 0x04C14E9E00000000000000000000000000000000000000000000000000000000)
             
-                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 64)
+                let farCallAbi := getFarCallABI(
+                    0,
+                    0,
+                    0,
+                    4,
+                    gas(),
+                    // Only rollup is supported for now
+                    0,
+                    0,
+                    0,
+                    1
+                )
+                let to := EVM_GAS_MANAGER_CONTRACT()
+                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
             
                 if iszero(success) {
                     // Should never happen
                     revert(0, 0)
                 }
+            
+                returndatacopy(0,0,64)
             
                 passGas := mload(0)
                 isStatic := mload(32)
