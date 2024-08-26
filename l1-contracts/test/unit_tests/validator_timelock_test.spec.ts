@@ -89,7 +89,7 @@ describe("ValidatorTimelock tests", function () {
 
   it("Should revert if non-validator commits batches", async () => {
     const revertReason = await getCallRevertReason(
-      validatorTimelock.connect(randomSigner).commitBatches(getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)])
+      validatorTimelock.connect(randomSigner).commitBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)])
     );
 
     expect(revertReason).equal("ValidatorTimelock: only validator");
@@ -99,7 +99,7 @@ describe("ValidatorTimelock tests", function () {
     const revertReason = await getCallRevertReason(
       validatorTimelock
         .connect(randomSigner)
-        .proveBatches(getMockStoredBatchInfo(0), [getMockStoredBatchInfo(1)], MOCK_PROOF_INPUT)
+        .proveBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockStoredBatchInfo(1)], MOCK_PROOF_INPUT)
     );
 
     expect(revertReason).equal("ValidatorTimelock: only validator");
@@ -113,7 +113,7 @@ describe("ValidatorTimelock tests", function () {
 
   it("Should revert if non-validator executes batches", async () => {
     const revertReason = await getCallRevertReason(
-      validatorTimelock.connect(randomSigner).executeBatches([getMockStoredBatchInfo(1)], [])
+      validatorTimelock.connect(randomSigner).executeBatchesSharedBridge(chainId, [getMockStoredBatchInfo(1)], [])
     );
 
     expect(revertReason).equal("ValidatorTimelock: only validator");

@@ -496,14 +496,14 @@ export async function makeExecutedEqualCommitted(
   batchesToExecute = [...batchesToProve, ...batchesToExecute];
 
   await (
-    await proxyExecutor.proveBatches(prevBatchInfo, batchesToProve, {
+    await proxyExecutor.proveBatchesSharedBridge(0, prevBatchInfo, batchesToProve, {
       recursiveAggregationInput: [],
       serializedProof: [],
     })
   ).wait();
 
   const dummyMerkleProofs = batchesToExecute.map(() => ({ leftPath: [], rightPath: [], itemHashes: [] }));
-  await (await proxyExecutor.executeBatches(batchesToExecute, dummyMerkleProofs)).wait();
+  await (await proxyExecutor.executeBatchesSharedBridge(0, batchesToExecute, dummyMerkleProofs)).wait();
 }
 
 export function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: string): StoredBatchInfo {

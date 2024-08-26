@@ -147,6 +147,4 @@ struct HyperchainCommitment {
     bytes32[] batchHashes;
     /// @notice Commitment to the priority merkle tree.
     PriorityTreeCommitment priorityTree;
-    /// @notice The base token asset id.
-    bytes32 baseTokenAssetId;
 }
