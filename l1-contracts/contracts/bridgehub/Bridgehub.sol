@@ -640,7 +640,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         );
         bridgehubMintData = abi.encode(_chainId, stmMintData, chainMintData);
 
-        emit BridgeBurn(_chainId, _assetId, _settlementChainId);
+        emit MigrationStarted(_chainId, _assetId, _settlementChainId);
     }
 
     /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
@@ -672,7 +672,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _registerNewHyperchain(_chainId, hyperchain);
         IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData);
 
-        emit BridgeMint(_chainId, _assetId, hyperchain);
+        emit MigrationFinalized(_chainId, _assetId, hyperchain);
     }
 
     /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
