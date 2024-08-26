@@ -190,14 +190,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
-    function commitBatches(
-        StoredBatchInfo calldata _lastCommittedBatchData,
-        CommitBatchInfo[] calldata _newBatchesData
-    ) external nonReentrant onlyValidator {
-        _commitBatches(_lastCommittedBatchData, _newBatchesData);
-    }
-
-    /// @inheritdoc IExecutor
     function commitBatchesSharedBridge(
         uint256, // _chainId
         StoredBatchInfo calldata _lastCommittedBatchData,
@@ -389,14 +381,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         _executeBatches(_batchesData, _priorityOpsData);
     }
 
-    /// @inheritdoc IExecutor
-    function executeBatches(
-        StoredBatchInfo[] calldata _batchesData,
-        PriorityOpsBatchInfo[] calldata _priorityOpsData
-    ) external nonReentrant onlyValidator {
-        _executeBatches(_batchesData, _priorityOpsData);
-    }
-
     function _executeBatches(
         StoredBatchInfo[] calldata _batchesData,
         PriorityOpsBatchInfo[] calldata _priorityOpsData
@@ -425,15 +409,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             delete s.l2SystemContractsUpgradeTxHash;
             delete s.l2SystemContractsUpgradeBatchNumber;
         }
-    }
-
-    /// @inheritdoc IExecutor
-    function proveBatches(
-        StoredBatchInfo calldata _prevBatch,
-        StoredBatchInfo[] calldata _committedBatches,
-        ProofInput calldata _proof
-    ) external nonReentrant onlyValidator {
-        _proveBatches(_prevBatch, _committedBatches, _proof);
     }
 
     /// @inheritdoc IExecutor
