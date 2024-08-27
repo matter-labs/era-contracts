@@ -45,12 +45,18 @@ describe("ERC20Bridge", function () {
 
     // While we formally don't need to deploy the token and the beacon proxy, it is a neat way to have the bytecode published
     const l2TokenImplAddress = await deployer.deploy(await deployer.loadArtifact("L2StandardERC20"));
-    const l2Erc20TokenBeacon = await deployer.deploy(await deployer.loadArtifact("UpgradeableBeacon"), [
-      l2TokenImplAddress.address,
-    ]);
-    await deployer.deploy(await deployer.loadArtifact("BeaconProxy"), [l2Erc20TokenBeacon.address, "0x"]);
+    const l2Erc20TokenBeacon = await deployer.deploy(
+      await deployer.loadArtifact("@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon"),
+      [l2TokenImplAddress.address]
+    );
+    await deployer.deploy(
+      await deployer.loadArtifact("@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol:BeaconProxy"),
+      [l2Erc20TokenBeacon.address, "0x"]
+    );
 
-    const beaconProxyBytecodeHash = hashBytecode((await deployer.loadArtifact("BeaconProxy")).bytecode);
+    const beaconProxyBytecodeHash = hashBytecode(
+      (await deployer.loadArtifact("@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol:BeaconProxy")).bytecode
+    );
 
     const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [testChainId]);
     const bridgeInitializeData = erc20BridgeImpl.interface.encodeFunctionData("initialize", [
@@ -60,11 +66,12 @@ describe("ERC20Bridge", function () {
       governorWallet.address,
     ]);
 
-    const erc20BridgeProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
-      erc20BridgeImpl.address,
-      governorWallet.address,
-      bridgeInitializeData,
-    ]);
+    const erc20BridgeProxy = await deployer.deploy(
+      await deployer.loadArtifact(
+        "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy"
+      ),
+      [erc20BridgeImpl.address, governorWallet.address, bridgeInitializeData]
+    );
 
     erc20Bridge = L2SharedBridgeFactory.connect(erc20BridgeProxy.address, deployerWallet);
   });

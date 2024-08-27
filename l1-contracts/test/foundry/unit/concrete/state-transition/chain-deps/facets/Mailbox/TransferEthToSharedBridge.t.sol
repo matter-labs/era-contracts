@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
+import {OnlyEraSupported, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract MailboxTransferEthToSharedBridge is MailboxTest {
     address baseTokenBridgeAddress;
@@ -37,7 +38,7 @@ contract MailboxTransferEthToSharedBridge is MailboxTest {
     }
 
     function test_RevertWhen_wrongCaller() public {
-        vm.expectRevert("Hyperchain: Only base token bridge can call this function");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, sender));
         vm.prank(sender);
         mailboxFacet.transferEthToSharedBridge();
     }
@@ -46,7 +47,7 @@ contract MailboxTransferEthToSharedBridge is MailboxTest {
         vm.assume(eraChainId != randomChainId);
         utilsFacet.util_setChainId(randomChainId);
 
-        vm.expectRevert("Mailbox: transferEthToSharedBridge only available for Era on mailbox");
+        vm.expectRevert(OnlyEraSupported.selector);
         mailboxFacet.transferEthToSharedBridge();
     }
 }
