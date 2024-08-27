@@ -244,7 +244,7 @@ contract DeployL2Script is Script {
             config.consensusRegistryOwner
         );
 
-        bytes memory consensusRgistryProxyConstructorData = abi.encode(
+        bytes memory consensusRegistryProxyConstructorData = abi.encode(
             config.consensusRegistryImplementation, // _logic
             l2GovernorAddress, // admin_
             proxyInitializationParams // _data
@@ -252,7 +252,7 @@ contract DeployL2Script is Script {
 
         config.consensusRegistryProxy = Utils.deployThroughL1({
             bytecode: contracts.consensusRegistryProxyBytecode,
-            constructorargs: consensusRgistryProxyConstructorData,
+            constructorargs: consensusRegistryProxyConstructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             factoryDeps: new bytes[](0),
