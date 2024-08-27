@@ -22,9 +22,7 @@ const TIMESTAMP_FILE_BOOTLOADER = "last_compilation_bootloader.timestamp";
 export async function compileYul(paths: CompilerPaths, file: string) {
   const solcCompilerPath = await getSolcLocation();
 
-  console.log("COMPILING")
   const zksolcLocation = await compilerLocation(COMPILER_VERSION, IS_COMPILER_PRE_RELEASE);
-  console.log("zksolcLocation", zksolcLocation)
   await spawn(
     `${zksolcLocation} ${paths.absolutePathSources}/${file} --solc ${solcCompilerPath} --optimization 3 --system-mode --yul --bin --overwrite -o ${paths.absolutePathArtifacts}`
   );
