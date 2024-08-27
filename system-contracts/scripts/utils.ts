@@ -207,6 +207,11 @@ export async function getSolcLocation(): Promise<string> {
 
   const solcVersion = hre.config.solidity.compilers[0].version;
 
+  if (!await downloader.isCompilerDownloaded(solcVersion)) {
+    console.log(`Compiler ${solcVersion} not found, downloading...`);
+    await downloader.downloadCompiler(solcVersion, async () => false, async () => false);
+  }
+
   return (await downloader.getCompiler(solcVersion))!.compilerPath;
 }
 
