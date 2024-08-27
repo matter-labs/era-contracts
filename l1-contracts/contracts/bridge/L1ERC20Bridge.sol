@@ -10,9 +10,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
+import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -24,6 +26,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev The shared bridge that is now used for all bridging, replacing the legacy contract.
     IL1Nullifier public immutable override NULLIFIER;
+
+    /// @dev The asset router, which holds deposited tokens.
+    IL1AssetRouter public immutable L1_ASSET_ROUTER;
 
     /// @dev The native token vault, which holds deposited tokens.
     IL1NativeTokenVault public immutable override NATIVE_TOKEN_VAULT;
@@ -67,12 +72,12 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
         IL1Nullifier _nullifier,
-        IL1AssetRouter _sharedBridge,
+        IL1AssetRouter _assetRouter,
         IL1NativeTokenVault _nativeTokenVault,
         uint256 _eraChainId
     ) reentrancyGuardInitializer {
         NULLIFIER = _nullifier;
-        SHARED_BRIDGE = _sharedBridge;
+        L1_ASSET_ROUTER = _assetRouter;
         NATIVE_TOKEN_VAULT = _nativeTokenVault;
         ERA_CHAIN_ID = _eraChainId;
     }
@@ -91,7 +96,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
         return
             L2ContractHelper.computeCreate2Address(
-                l2NativeTokenVault,
+                L2_NATIVE_TOKEN_VAULT_ADDRESS,
                 salt,
                 l2TokenProxyBytecodeHash,
                 constructorInputHash
@@ -242,23 +247,23 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
     /// @return txHash The L2 transaction hash of deposit finalization
     /// NOTE: the function doesn't use `nonreentrant` modifier, because the inner method does.
-    function deposit(
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByte
-    ) external payable returns (bytes32 txHash) {
-        txHash = deposit({
-            _l2Receiver: _l2Receiver,
-            _l1Token: _l1Token,
-            _amount: _amount,
-            _l2TxGasLimit: _l2TxGasLimit,
-            _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
-            _refundRecipient: address(0)
-        });
-    }
-
+    // function deposit(
+    //     address _l2Receiver,
+    //     address _l1Token,
+    //     uint256 _amount,
+    //     uint256 _l2TxGasLimit,
+    //     uint256 _l2TxGasPerPubdataByte
+    // ) external payable returns (bytes32 txHash) {
+    //     txHash = deposit({
+    //         _l2Receiver: _l2Receiver,
+    //         _l1Token: _l1Token,
+    //         _amount: _amount,
+    //         _l2TxGasLimit: _l2TxGasLimit,
+    //         _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
+    //         _refundRecipient: address(0)
+    //     });
+    // } // kl todo 
+ 
     /// @notice Finalize the withdrawal and release funds
     /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
@@ -310,43 +315,43 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// would not be able to make proper L2 tx requests through the Mailbox to use or withdraw the funds from L2, and
     /// the funds would be lost.
     /// @return txHash The L2 transaction hash of deposit finalization
-    function deposit(
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByte,
-        address _refundRecipient
-    ) public payable nonReentrant returns (bytes32 txHash) {
-        require(_amount != 0, "0T"); // empty deposit
-        uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
-        require(amount == _amount, "3T"); // The token has non-standard transfer logic
+    // function deposit( // kl todo this or the other one?
+    //     address _l2Receiver,
+    //     address _l1Token,
+    //     uint256 _amount,
+    //     uint256 _l2TxGasLimit,
+    //     uint256 _l2TxGasPerPubdataByte,
+    //     address _refundRecipient
+    // ) public payable nonReentrant returns (bytes32 txHash) {
+    //     require(_amount != 0, "0T"); // empty deposit
+    //     uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
+    //     require(amount == _amount, "3T"); // The token has non-standard transfer logic
 
-        txHash = SHARED_BRIDGE.depositLegacyErc20Bridge{value: msg.value}({
-            _prevMsgSender: msg.sender,
-            _l2Receiver: _l2Receiver,
-            _l1Token: _l1Token,
-            _amount: _amount,
-            _l2TxGasLimit: _l2TxGasLimit,
-            _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
-            _refundRecipient: _refundRecipient
-        });
-        depositAmount[msg.sender][_l1Token][txHash] = _amount;
-        emit DepositInitiated({
-            l2DepositTxHash: txHash,
-            from: msg.sender,
-            to: _l2Receiver,
-            l1Token: _l1Token,
-            amount: _amount
-        });
-    }
+    //     txHash = L1_ASSET_ROUTER.depositLegacyErc20Bridge{value: msg.value}({
+    //         _prevMsgSender: msg.sender,
+    //         _l2Receiver: _l2Receiver,
+    //         _l1Token: _l1Token,
+    //         _amount: _amount,
+    //         _l2TxGasLimit: _l2TxGasLimit,
+    //         _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
+    //         _refundRecipient: _refundRecipient
+    //     });
+    //     depositAmount[msg.sender][_l1Token][txHash] = _amount;
+    //     emit DepositInitiated({
+    //         l2DepositTxHash: txHash,
+    //         from: msg.sender,
+    //         to: _l2Receiver,
+    //         l1Token: _l1Token,
+    //         amount: _amount
+    //     });
+    // }
 
     /// @dev Transfers tokens from the depositor address to the shared bridge address.
     /// @return The difference between the contract balance before and after the transferring of funds.
     function _depositFundsToSharedBridge(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
-        uint256 balanceBefore = _token.balanceOf(address(SHARED_BRIDGE));
-        _token.safeTransferFrom(_from, address(SHARED_BRIDGE), _amount);
-        uint256 balanceAfter = _token.balanceOf(address(SHARED_BRIDGE));
+        uint256 balanceBefore = _token.balanceOf(address(L1_ASSET_ROUTER));
+        _token.safeTransferFrom(_from, address(L1_ASSET_ROUTER), _amount);
+        uint256 balanceAfter = _token.balanceOf(address(L1_ASSET_ROUTER));
         return balanceAfter - balanceBefore;
     }
 
@@ -355,10 +360,10 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     /// @return The L2 token address that would be minted for deposit of the given L1 token on zkSync Era.
-    function l2TokenAddress(address _l1Token) external view returns (address) {
-        bytes32 constructorInputHash = keccak256(abi.encode(l2TokenBeacon, ""));
-        bytes32 salt = bytes32(uint256(uint160(_l1Token)));
+    // function l2TokenAddress(address _l1Token) external view returns (address) {
+    //     bytes32 constructorInputHash = keccak256(abi.encode(l2TokenBeacon, ""));
+    //     bytes32 salt = bytes32(uint256(uint160(_l1Token)));
 
-        return L2ContractHelper.computeCreate2Address(l2Bridge, salt, l2TokenProxyBytecodeHash, constructorInputHash);
-    }
+    //     return L2ContractHelper.computeCreate2Address(l2Bridge, salt, l2TokenProxyBytecodeHash, constructorInputHash);
+    // } // kl todo 
 }

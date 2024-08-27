@@ -18,10 +18,14 @@ import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
 import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {BridgedStandardERC20} from "../common/BridgedStandardERC20.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
+import {BridgeHelper} from "./BridgeHelper.sol";
+
+import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
 
 import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../common/L1ContractErrors.sol";
 
@@ -38,6 +42,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
     /// @dev The address of the WETH token.
     address public immutable override WETH_TOKEN;
+
+    IL2SharedBridgeLegacy public immutable L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
     IAssetRouterBase public immutable override ASSET_ROUTER;
@@ -104,7 +110,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     function registerToken(address _nativeToken) external {
         require(_nativeToken != WETH_TOKEN, "NTV: WETH deposit not supported");
         require(_nativeToken == BASE_TOKEN_ADDRESS || _nativeToken.code.length > 0, "NTV: empty token");
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
         ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
         tokenAddress[assetId] = _nativeToken;
     }
@@ -148,7 +154,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             );
             address expectedToken = bridgedTokenAddress(originToken);
             if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
-                l1LegacyToken = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(expectedToken);
+                // l1LegacyToken = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(expectedToken); // kl todo
             }
             if (token == address(0)) {
                 bytes32 expectedAssetId = keccak256(
@@ -210,17 +216,17 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
             _bridgeMintData = DataEncoding.encodeBridgeMintData({
                 _prevMsgSender: _prevMsgSender,
-                _l2Receiver: _l2Receiver,
-                _l1Token: l1Token,
+                _l2Receiver: _receiver,
+                _l1Token: nativeToken,
                 _amount: amount,
-                _erc20Metadata: getERC20Getters(l1Token)
+                _erc20Metadata: getERC20Getters(nativeToken)
             });
 
             emit BridgeBurn({
                 chainId: _chainId,
                 assetId: _assetId,
-                l1Sender: _prevMsgSender,
-                l2receiver: _l2Receiver,
+                sender: _prevMsgSender,
+                receiver: _receiver,
                 amount: amount
             });
         } else {
@@ -236,11 +242,11 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             emit BridgeBurn({
                 chainId: _chainId,
                 assetId: _assetId,
-                l1Sender: _prevMsgSender,
-                l2receiver: _l2Receiver,
-                amount: amount
+                sender: _prevMsgSender,
+                receiver: _receiver,
+                amount: _amount
             });            
-            bridgeMintData = _data;
+            _bridgeMintData = _data;
         }
     }
 
@@ -300,7 +306,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             address l2TokenAddr = L2_LEGACY_SHARED_BRIDGE.deployBeaconProxy(salt);
             l2Token = BeaconProxy(payable(l2TokenAddr));
         }
-        L2StandardERC20(address(l2Token)).bridgeInitialize(_nativeToken, _erc20Data);
+        BridgedStandardERC20(address(l2Token)).bridgeInitialize(_nativeToken, _erc20Data);
 
         return address(l2Token);
     }

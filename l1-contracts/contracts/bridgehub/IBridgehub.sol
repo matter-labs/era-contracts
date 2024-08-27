@@ -6,6 +6,7 @@ import {L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Mess
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {IAssetRouterBase} from "../bridge/interfaces/IAssetRouterBase.sol";
+import {IAssetHandler} from "../bridge/interfaces/IAssetHandler.sol";
 import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 
 struct L2TransactionRequestDirect {
@@ -42,7 +43,7 @@ struct L2TransactionRequestTwoBridgesInner {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IBridgehub is IL1AssetHandler {
+interface IBridgehub is IAssetHandler, IL1AssetHandler {
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);

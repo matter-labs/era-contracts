@@ -32,7 +32,7 @@ interface INativeTokenVault {
     function registerToken(address _l1Token) external;
 
     /// @notice Used to get the assetId of a token
-    function getAssetId(address tokenAddress) external view returns (bytes32);
+    function getAssetId(uint256 _chainId, address _tokenAddress) external view returns (bytes32);
 
     /// @notice Used to get the the ERC20 data for a token
     function getERC20Getters(address _token) external view returns (bytes memory);

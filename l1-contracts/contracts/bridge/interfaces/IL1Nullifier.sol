@@ -102,9 +102,18 @@ interface IL1Nullifier {
         bytes32[] calldata _merkleProof
     ) external;
 
+    // function finalizeWithdrawal(
+    //     FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
+    // ) external returns (address l1Receiver, bytes32 assetId, uint256 amount);
+
     function finalizeWithdrawal(
-        FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
-    ) external returns (address l1Receiver, bytes32 assetId, uint256 amount);
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external;
 
     function L1_WETH_TOKEN() external view returns (address);
 
@@ -128,5 +137,5 @@ interface IL1Nullifier {
 
     function transferTokenToNTV(address _token) external;
 
-    function clearChainBalance(uint256 _chainId, address _token) external;
+    function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external;
 }

@@ -548,15 +548,15 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         require(s.chainId == ERA_CHAIN_ID, "Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
         IL1Nullifier(s.baseTokenBridge).finalizeWithdrawal(
             // solhint-disable-next-line func-named-parameters
-            FinalizeWithdrawalParams(
+            // FinalizeWithdrawalParams(
                 ERA_CHAIN_ID,
                 _l2BatchNumber,
                 _l2MessageIndex,
-                L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+                // L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
                 _l2TxNumberInBatch,
                 _message,
                 _merkleProof
-            )
+            // )
         );
     }
 

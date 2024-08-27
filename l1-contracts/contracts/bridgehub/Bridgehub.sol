@@ -11,6 +11,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {IAssetRouterBase} from "../bridge/interfaces/IAssetRouterBase.sol";
+import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 import {IL1BaseTokenAssetHandler} from "../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
@@ -616,7 +617,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _data the data for the migration
     function bridgeBurn(
         uint256 _settlementChainId,
-        uint256, // mintValue
+        uint256, // msgValue
         bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data

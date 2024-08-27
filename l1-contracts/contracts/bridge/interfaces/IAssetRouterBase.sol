@@ -50,10 +50,13 @@ interface IAssetRouterBase {
         uint256 _amount
     ) external payable;
 
-    /// data is abi encoded :
+    /// @dev Data has the following abi encoding for legacy deposits:
     /// address _l1Token,
     /// uint256 _amount,
     /// address _l2Receiver
+    /// for new deposits:
+    /// bytes32 _assetId,
+    /// bytes _transferData
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
@@ -61,13 +64,15 @@ interface IAssetRouterBase {
         bytes calldata _data
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
 
+    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
+
     function finalizeDeposit(
         uint256 _chainId,
         bytes32 _assetId,
         bytes memory _transferData
     ) external returns (address l1Receiver, uint256 amount);
 
-    function setAssetHandlerAddress(bytes32 _additionalData, address _assetHandlerAddress) external;
+    function setAssetHandlerAddressThisChain(bytes32 _additionalData, address _assetHandlerAddress) external;
 
     function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 

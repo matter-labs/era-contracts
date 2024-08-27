@@ -32,7 +32,7 @@ import {NativeTokenVault} from "./NativeTokenVault.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the ZK chains.
 /// @dev Designed for use with a proxy for upgradability.
-contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeTokenVault, Ownable2StepUpgradeable, PausableUpgradeable {
+contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeTokenVault {
     using SafeERC20 for IERC20;
 
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
@@ -65,17 +65,17 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     }
 
     /// @dev Accepts ether only from the Shared Bridge.
-    receive() external payable {
-        require(address(L1_SHARED_BRIDGE) == msg.sender, "NTV: ETH only accepted from Shared Bridge");
-    }
+    // receive() external payable override {
+    //     require(address(NULLIFIER) == msg.sender, "NTV: ETH only accepted from Shared Bridge");
+    // }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy
     /// @param _owner Address which can change pause / unpause the NTV
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    function initialize(address _owner) external initializer {
-        require(_owner != address(0), "NTV owner 0");
-        _transferOwnership(_owner);
-    }
+    // function initialize(address _owner) external override initializer {
+    //     require(_owner != address(0), "NTV owner 0");
+    //     _transferOwnership(_owner);
+    // }
 
     /// @notice Transfers tokens from shared bridge as part of the migration process.
     /// @dev Both ETH and ERC20 tokens can be transferred. Exhausts balance of shared bridge after the first call.
@@ -157,13 +157,13 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
                             PAUSE
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
-    function pause() external onlyOwner {
-        _pause();
-    }
+//     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
+//     function pause() external onlyOwner {
+//         _pause();
+//     }
 
-    /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
-    function unpause() external onlyOwner {
-        _unpause();
-    }
+//     /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
+//     function unpause() external onlyOwner {
+//         _unpause();
+//     }
 }

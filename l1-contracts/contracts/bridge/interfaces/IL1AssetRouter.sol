@@ -53,83 +53,61 @@ interface IL1AssetRouter is IAssetRouterBase {
         address sender
     );
 
-    function isWithdrawalFinalized(
-        uint256 _chainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2ToL1MessageNumber
-    ) external view returns (bool);
+    // function isWithdrawalFinalized(
+    //     uint256 _chainId,
+    //     uint256 _l2BatchNumber,
+    //     uint256 _l2ToL1MessageNumber
+    // ) external view returns (bool);
 
-    function depositLegacyErc20Bridge(
-        address _prevMsgSender,
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByte,
-        address _refundRecipient
-    ) external payable returns (bytes32 txHash);
+    // function depositLegacyErc20Bridge(
+    //     address _prevMsgSender,
+    //     address _l2Receiver,
+    //     address _l1Token,
+    //     uint256 _amount,
+    //     uint256 _l2TxGasLimit,
+    //     uint256 _l2TxGasPerPubdataByte,
+    //     address _refundRecipient
+    // ) external payable returns (bytes32 txHash);
 
-    function claimFailedDeposit(
-        uint256 _chainId,
-        address _depositSender,
-        address _l1Token,
-        uint256 _amount,
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
-    ) external;
+    // function claimFailedDeposit(
+    //     uint256 _chainId,
+    //     address _depositSender,
+    //     address _l1Token,
+    //     uint256 _amount,
+    //     bytes32 _l2TxHash,
+    //     uint256 _l2BatchNumber,
+    //     uint256 _l2MessageIndex,
+    //     uint16 _l2TxNumberInBatch,
+    //     bytes32[] calldata _merkleProof
+    // ) external;
 
-    function finalizeWithdrawalLegacyErc20Bridge(
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external returns (address l1Receiver, address l1Asset, uint256 amount);
+    // function finalizeWithdrawalLegacyErc20Bridge(
+    //     uint256 _l2BatchNumber,
+    //     uint256 _l2MessageIndex,
+    //     uint16 _l2TxNumberInBatch,
+    //     bytes calldata _message,
+    //     bytes32[] calldata _merkleProof
+    // ) external returns (address l1Receiver, address l1Asset, uint256 amount);
 
-    function finalizeWithdrawal(
-        uint256 _chainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external;
+    // function finalizeWithdrawal(
+    //     uint256 _chainId,
+    //     uint256 _l2BatchNumber,
+    //     uint256 _l2MessageIndex,
+    //     uint16 _l2TxNumberInBatch,
+    //     bytes calldata _message,
+    //     bytes32[] calldata _merkleProof
+    // ) external;
 
-    function L1_WETH_TOKEN() external view returns (address);
+    // function L1_WETH_TOKEN() external view returns (address);
 
-    function BRIDGE_HUB() external view returns (IBridgehub);
+    // function BRIDGE_HUB() external view returns (IBridgehub);
 
-    function legacyBridge() external view returns (IL1ERC20Bridge);
+    // function legacyBridge() external view returns (IL1ERC20Bridge);
 
-    function depositHappened(uint256 _chainId, bytes32 _l2DepositTxHash) external view returns (bytes32);
+    // function depositHappened(uint256 _chainId, bytes32 _l2DepositTxHash) external view returns (bytes32);
 
-    /// @dev Data has the following abi encoding for legacy deposits:
-    /// address _l1Token,
-    /// uint256 _amount,
-    /// address _l2Receiver
-    /// for new deposits:
-    /// bytes32 _assetId,
-    /// bytes _transferData
-    function bridgehubDeposit(
-        uint256 _chainId,
-        address _prevMsgSender,
-        uint256 _l2Value,
-        bytes calldata _data
-    ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
 
-    function bridgehubDepositBaseToken(
-        uint256 _chainId,
-        bytes32 _assetId,
-        address _prevMsgSender,
-        uint256 _amount
-    ) external payable;
-
-    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
-
-    function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
+    // function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
 
     function setAssetDeploymentTracker(bytes32 _assetRegistrationData, address _assetDeploymentTracker) external;
 
@@ -137,20 +115,18 @@ interface IL1AssetRouter is IAssetRouterBase {
 
     function setL1Nullifier(IL1Nullifier _l1Nullifier) external;
 
-    function bridgehubWithdraw(
-        uint256 _chainId,
-        address _prevMsgSender,
-        bytes32 _assetId,
-        bytes calldata _transferData
-    ) external returns (L2TransactionRequestTwoBridgesInner memory request);
+    // function bridgehubWithdraw(
+    //     uint256 _chainId,
+    //     address _prevMsgSender,
+    //     bytes32 _assetId,
+    //     bytes calldata _transferData
+    // ) external returns (L2TransactionRequestTwoBridgesInner memory request);
 
     function finalizeWithdrawal(
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _transferData
     ) external returns (address l1Receiver, uint256 amount);
-
-    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
@@ -170,9 +146,7 @@ interface IL1AssetRouter is IAssetRouterBase {
     //     bytes32[] calldata _merkleProof
     // ) external;
 
-    function chainBalance(uint256 _chainId, address _l1Token) external view returns (uint256);
+    // function chainBalance(uint256 _chainId, address _l1Token) external view returns (uint256);
 
-    function transferTokenToNTV(address _token) external;
-
-    function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external;
+    // function transferTokenToNTV(address _token) external;
 }

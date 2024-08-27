@@ -8,7 +8,7 @@ import {IAssetHandler} from "./IAssetHandler.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Used for any asset handler and called by the L1AssetRouter
-interface IL1AssetHandler is IAssetHandler {
+interface IL1AssetHandler {
     /// @param _chainId the chainId that the message will be sent to
     /// @param _assetId the assetId of the asset being bridged
     /// @param _depositSender the address of the entity that initiated the deposit.

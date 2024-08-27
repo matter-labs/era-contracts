@@ -32,7 +32,7 @@
     "zksync-ethers": "^5.9.0"
   },
   "scripts": {
-    "build": "hardhat compile",
+    "build": "copy-contracts && hardhat compile",
     "clean": "hardhat clean",
     "test": "hardhat test",
     "verify": "hardhat run src/verify.ts",
@@ -44,7 +44,8 @@
     "deploy-l2-weth": "ts-node src/deploy-l2-weth.ts",
     "upgrade-bridge-contracts": "ts-node src/upgrade-bridge-impl.ts",
     "update-l2-erc20-metadata": "ts-node src/update-l2-erc20-metadata.ts",
-    "upgrade-consistency-checker": "ts-node src/upgrade-consistency-checker.ts"
+    "upgrade-consistency-checker": "ts-node src/upgrade-consistency-checker.ts",
+    "copy-contracts": "cp -r ../l1-contracts/contracts/bridge/ ./l1-contracts-imported"
   },
   "dependencies": {
     "dotenv": "^16.0.3"
