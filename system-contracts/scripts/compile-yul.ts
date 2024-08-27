@@ -12,7 +12,7 @@ import * as fs from "fs";
 import { Command } from "commander";
 import * as _path from "path";
 
-const COMPILER_VERSION = "1.3.18";
+const COMPILER_VERSION = "1.5.0";
 const IS_COMPILER_PRE_RELEASE = true;
 const CONTRACTS_DIR = "contracts-preprocessed";
 const BOOTLOADER_DIR = "bootloader";
@@ -22,7 +22,9 @@ const TIMESTAMP_FILE_BOOTLOADER = "last_compilation_bootloader.timestamp";
 export async function compileYul(paths: CompilerPaths, file: string) {
   const solcCompilerPath = await getSolcLocation();
 
+  console.log("COMPILING")
   const zksolcLocation = await compilerLocation(COMPILER_VERSION, IS_COMPILER_PRE_RELEASE);
+  console.log("zksolcLocation", zksolcLocation)
   await spawn(
     `${zksolcLocation} ${paths.absolutePathSources}/${file} --solc ${solcCompilerPath} --optimization 3 --system-mode --yul --bin --overwrite -o ${paths.absolutePathArtifacts}`
   );
