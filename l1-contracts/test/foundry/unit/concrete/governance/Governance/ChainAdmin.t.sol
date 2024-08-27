@@ -47,9 +47,10 @@ contract ChainAdminTest is Test {
     function test_addRestriction() public {
         address[] memory restrictions = chainAdmin.getRestrictions();
 
-        vm.prank(address(chainAdmin));
         vm.expectEmit();
         emit IChainAdmin.RestrictionAdded(owner);
+
+        vm.prank(address(chainAdmin));
         chainAdmin.addRestriction(owner);
     }
 
@@ -59,37 +60,43 @@ contract ChainAdminTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(RestrictionWasAlreadyPresent.selector, owner));
         chainAdmin.addRestriction(owner);
+        vm.stopPrank();
     }
 
     function test_removeRestriction() public {
         address[] memory restrictions = chainAdmin.getRestrictions();
-        vm.prank(address(chainAdmin));
+
+        vm.startPrank(address(chainAdmin));
         chainAdmin.addRestriction(owner);
 
-        vm.prank(address(chainAdmin));
         vm.expectEmit();
         emit IChainAdmin.RestrictionRemoved(owner);
+
         chainAdmin.removeRestriction(owner);
+        vm.stopPrank();
     }
 
     function test_removeRestrictionRevert() public {
         address[] memory restrictions = chainAdmin.getRestrictions();
+
         vm.startPrank(address(chainAdmin));
         chainAdmin.addRestriction(owner);
         chainAdmin.removeRestriction(owner);
-
+        
         vm.expectRevert(abi.encodeWithSelector(RestrictionWasNotPresent.selector, owner));
         chainAdmin.removeRestriction(owner);
+        vm.stopPrank();
     }
 
-    function test_setUpgradeTimestamp() public {
+    function test_setUpgradeTimestamp(uint256 semverMinorVersionMultiplier, uint256 timestamp) public {
         (major, minor, patch) = gettersFacet.getSemverProtocolVersion();
-        uint256 protocolVersion = packSemver(major, minor, patch + 1);
+        uint256 protocolVersion = packSemver(major, minor, patch + 1, semverMinorVersionMultiplier);
 
         vm.expectEmit();
-        emit IChainAdmin.UpdateUpgradeTimestamp(protocolVersion, 10);
+        emit IChainAdmin.UpdateUpgradeTimestamp(protocolVersion, timestamp);
+
         vm.prank(address(chainAdmin));
-        chainAdmin.setUpgradeTimestamp(protocolVersion, 10);
+        chainAdmin.setUpgradeTimestamp(protocolVersion, timestamp);
     }
 
     function test_multicallRevertNoCalls() public {
@@ -104,7 +111,7 @@ contract ChainAdminTest is Test {
         calls[0] = Call({target: address(chainAdmin), value: 0, data: abi.encodeCall(gettersFacet.getAdmin, ())});
 
         vm.expectRevert();
-        vm.startPrank(owner);
+        vm.prank(owner);
         chainAdmin.multicall(calls, true);
     }
 
@@ -113,16 +120,15 @@ contract ChainAdminTest is Test {
         calls[0] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getAdmin, ())});
         calls[1] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getVerifier, ())});
 
-        vm.startPrank(owner);
+        vm.prank(owner);
         chainAdmin.multicall(calls, true);
     }
 
-    function packSemver(uint32 major, uint32 minor, uint32 patch) public returns (uint256) {
-        uint256 SEMVER_MINOR_VERSION_MULTIPLIER = 4294967296;
+    function packSemver(uint32 major, uint32 minor, uint32 patch, uint256 semverMinorVersionMultiplier) public returns (uint256) {
         if (major != 0) {
             revert("Major version must be 0");
         }
 
-        return minor * SEMVER_MINOR_VERSION_MULTIPLIER + patch;
+        return minor * semverMinorVersionMultiplier + patch;
     }
 }
