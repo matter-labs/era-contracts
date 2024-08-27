@@ -691,13 +691,9 @@ function incrementNonce(addr) {
         1
     )
     let to := NONCE_HOLDER_SYSTEM_CONTRACT()
-    printString("PRE VERBATIM")
     let result := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-    printString("POST VERBATIM")
-
 
     if iszero(result) {
-        printString("FAILED")
         revert(0, 0)
     }
 } 
@@ -839,13 +835,10 @@ function _pushEVMFrame(_passGas, _isStatic) {
     )
 
     let to := EVM_GAS_MANAGER_CONTRACT()
-    printString("PRE VERBATIM EVM FRAME")
     let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
-    printString("POST VERBATIM EVM FRAME")
 
     // let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 0)
     if iszero(success) {
-        printString("FAILED PUSH EVM FRAME")
         // This error should never happen
         revert(0, 0)
     }
@@ -1338,7 +1331,6 @@ function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGa
     sp := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x40)))
     sp := pushStackItemWithoutCheck(sp, mload(sub(offset, 0x20)))
 
-
     _pushEVMFrame(gasForTheCall, false)
 
     // Selector
@@ -1351,12 +1343,11 @@ function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGa
     // Length of the init code
     mstore(sub(offset, 0x20), size)
 
-
     let farCallAbi := getFarCallABI(
         0,
         0,
-        sub(offset, 0x80),
-        add(size, 0x80),
+        sub(offset, 0x64),
+        add(size, 0x64),
         INF_PASS_GAS(),
         // Only rollup is supported for now
         0,
@@ -1364,12 +1355,9 @@ function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGa
         0,
         1
     )
-    let to := DEPLOYER_SYSTEM_CONTRACT()
-    printString("PRE VERBATIM CREATE")
-    let result := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
 
-    printString("POST VERBATIM CREATE")
-    printHex(result)
+    let to := DEPLOYER_SYSTEM_CONTRACT()
+    result := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
 
     let gasLeft
     switch result
@@ -1379,7 +1367,7 @@ function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGa
         default {
             gasLeft := _fetchConstructorReturnGas()
         }
-        
+
     let gasUsed := sub(gasForTheCall, gasLeft)
     evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
 
