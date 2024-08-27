@@ -922,6 +922,55 @@ object "Bootloader" {
                 }
             }
 
+            function getMerkleProofFromTxData(txDataOffset, merkleProofOffset) -> merkleProof {
+                // Read the length of the merkle proof
+                let proofLength := mload(merkleProofOffset)
+                
+                // Allocate memory for the merkle proof
+                merkleProof := mload(0x40)
+                mstore(0x40, add(merkleProof, add(proofLength, 32)))
+                
+                // Store the length of the merkle proof
+                mstore(merkleProof, proofLength)
+                
+                // Copy the merkle proof data
+                let sourcePos := add(merkleProofOffset, 32)
+                let destPos := add(merkleProof, 32)
+                for { let i := 0 } lt(i, proofLength) { i := add(i, 32) }
+                {
+                    mstore(add(destPos, i), mload(add(sourcePos, i)))
+                }
+            }
+
+            function verifyXL2Tx(txDataOffset, resultPtr, transactionIndex, gasPerPubdata) {
+                // Get the location of the merkle proof in the xl2 tx
+                let merkleProofOffset := getMerkleProofOffset(txDataOffset)
+                
+                // Get the merkle proof from the tx data
+                let merkleProof := getMerkleProofFromTxData(txDataOffset, merkleProofOffset)
+                
+                // Prepare the call to verify the XL2 transaction
+                mstore(0, {{RIGHT_PADDED_VERIFY_XL2_TX_SELECTOR}})
+                mstore(4, merkleProof)
+                
+                let success := call(
+                    gas(),
+                    L2_NULLIFER_ADDR(),
+                    0,
+                    0,
+                    add(4, mload(merkleProof)), // 4 bytes for selector + length of merkle proof
+                    0,
+                    0
+                )
+                
+                if iszero(success) {
+                    revertWithReason(
+                        VERIFY_XL2_TX_FAILED_ERR_CODE(),
+                        0
+                    )
+                }
+            }
+
             /// @dev Saves the paymaster context and checks that the paymaster has returned the correct
             /// magic value.
             /// @dev IMPORTANT: this method should be called right after
@@ -1171,7 +1220,7 @@ object "Bootloader" {
             ) { 
                 debugLog("Process XL2 tx", 2)
 
-                // todo check merkle proof here
+                verifyXL2Tx(txDataOffset, resultPtr, transactionIndex, gasPerPubdata)              
                 let canonicalTxHash, success := processXChainTx(txDataOffset, resultPtr, transactionIndex, gasPerPubdata, false, false)
                 if success {
                     markTxAsExecuted(canonicalTxHash, false)
