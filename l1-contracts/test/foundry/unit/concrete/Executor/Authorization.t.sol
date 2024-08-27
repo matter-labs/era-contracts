@@ -44,7 +44,7 @@ contract AuthorizationTest is ExecutorTest {
         vm.prank(randomSigner);
 
         vm.expectRevert(bytes.concat("Hyperchain: not validator"));
-        executor.commitBatches(storedBatchInfo, commitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), storedBatchInfo, commitBatchInfoArray);
     }
 
     function test_RevertWhen_ProvingByUnauthorisedAddress() public {
@@ -54,7 +54,7 @@ contract AuthorizationTest is ExecutorTest {
         vm.prank(owner);
 
         vm.expectRevert(bytes.concat("Hyperchain: not validator"));
-        executor.proveBatches(storedBatchInfo, storedBatchInfoArray, proofInput);
+        executor.proveBatchesSharedBridge(uint256(0), storedBatchInfo, storedBatchInfoArray, proofInput);
     }
 
     function test_RevertWhen_ExecutingByUnauthorizedAddress() public {
@@ -64,6 +64,6 @@ contract AuthorizationTest is ExecutorTest {
         vm.prank(randomSigner);
 
         vm.expectRevert(bytes.concat("Hyperchain: not validator"));
-        executor.executeBatches(storedBatchInfoArray, Utils.emptyData());
+        executor.executeBatchesSharedBridge(uint256(0), storedBatchInfoArray, Utils.emptyData());
     }
 }

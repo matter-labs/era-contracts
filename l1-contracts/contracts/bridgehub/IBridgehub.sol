@@ -60,6 +60,18 @@ interface IBridgehub is IL1AssetHandler {
 
     event SettlementLayerRegistered(uint256 indexed chainId, bool indexed isWhitelisted);
 
+    /// @notice Emitted when the bridging to the chain is started.
+    /// @param chainId Chain ID of the hyperchain
+    /// @param assetId Asset ID of the token for the hyperchain's STM
+    /// @param settlementLayerChainId The chain id of the settlement layer the chain migrates to.
+    event MigrationStarted(uint256 indexed chainId, bytes32 indexed assetId, uint256 indexed settlementLayerChainId);
+
+    /// @notice Emitted when the bridging to the chain is complete.
+    /// @param chainId Chain ID of the hyperchain
+    /// @param assetId Asset ID of the token for the hyperchain's STM
+    /// @param hyperchain The address of the hyperchain on the chain where it is migrated to.
+    event MigrationFinalized(uint256 indexed chainId, bytes32 indexed assetId, address indexed hyperchain);
+
     /// @notice Starts the transfer of admin rights. Only the current admin or owner can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin
