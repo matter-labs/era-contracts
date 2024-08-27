@@ -375,8 +375,8 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   const receipt3 = await deployer.executeUpgradeOnL2(
     chainId,
     L2_BRIDGEHUB_ADDRESS,
-    gasPrice, 
-    l1Bridgehub.interface.encodeFunctionData('addStateTransitionManager', [l2STMAddress]),
+    gasPrice,
+    l1Bridgehub.interface.encodeFunctionData("addStateTransitionManager", [l2STMAddress]),
     priorityTxMaxGasLimit
   );
   console.log(`L2 STM address ${l2STMAddress} registered on gateway, txHash: ${receipt3.transactionHash}`);
