@@ -243,7 +243,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function registerSettlementLayer(
         uint256 _newSettlementLayerChainId,
         bool _isWhitelisted
-    ) external onlyChainSTM(_newSettlementLayerChainId) onlyL1 {
+    ) external onlyOwner onlyL1 {
         whitelistedSettlementLayers[_newSettlementLayerChainId] = _isWhitelisted;
         emit SettlementLayerRegistered(_newSettlementLayerChainId, _isWhitelisted);
     }
@@ -266,6 +266,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address sender = L1_CHAIN_ID == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);
         // This method can be accessed by STMDeployer only
         require(sender == address(stmDeployer), "BH: not stm deployer");
+        require(stateTransitionManagerIsRegistered[_assetAddress], "STM not registered");
 
         bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
         stmAssetIdToAddress[assetInfo] = _assetAddress;
@@ -336,7 +337,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                              Getters
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice baseToken function, which takes assetId as input, reads assetHandler from AR, and tokenAddress from AH
+    /// @notice baseToken function, which takes chainId as input, reads assetHandler from AR, and tokenAddress from AH
     function baseToken(uint256 _chainId) public view returns (address) {
         bytes32 baseTokenAssetId = baseTokenAssetId[_chainId];
         IL1BaseTokenAssetHandler assetHandlerAddress = IL1BaseTokenAssetHandler(
@@ -369,6 +370,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     function stmAssetIdFromChainId(uint256 _chainId) public view override returns (bytes32) {
+        address stmAddress = stateTransitionManager[_chainId];
+        require(stmAddress != address(0), "chain id not registered");
         return stmAssetId(stateTransitionManager[_chainId]);
     }
 
@@ -636,6 +639,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _chainData
         );
         bridgehubMintData = abi.encode(_chainId, stmMintData, chainMintData);
+
+        emit MigrationStarted(_chainId, _assetId, _settlementChainId);
     }
 
     /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
@@ -645,7 +650,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256, // originChainId
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
-    ) external payable override onlyAssetRouter returns (address l1Receiver) {
+    ) external payable override onlyAssetRouter {
         (uint256 _chainId, bytes memory _stmData, bytes memory _chainMintData) = abi.decode(
             _bridgehubMintData,
             (uint256, bytes, bytes)
@@ -666,7 +671,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         messageRoot.addNewChainIfNeeded(_chainId);
         _registerNewHyperchain(_chainId, hyperchain);
         IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData);
-        return address(0);
+
+        emit MigrationFinalized(_chainId, _assetId, hyperchain);
     }
 
     /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.

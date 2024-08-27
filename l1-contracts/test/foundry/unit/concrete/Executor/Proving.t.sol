@@ -40,7 +40,7 @@ contract ProvingTest is ExecutorTest {
         vm.prank(validator);
         vm.blobhashes(blobVersionedHashes);
         vm.recordLogs();
-        executor.commitBatches(genesisStoredBatchInfo, commitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, commitBatchInfoArray);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         newStoredBatchInfo = IExecutor.StoredBatchInfo({
@@ -99,7 +99,7 @@ contract ProvingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes.concat("t1"));
-        executor.proveBatches(wrongPreviousStoredBatchInfo, storedBatchInfoArray, proofInput);
+        executor.proveBatchesSharedBridge(uint256(0), wrongPreviousStoredBatchInfo, storedBatchInfoArray, proofInput);
     }
 
     function test_RevertWhen_ProvingWithWrongCommittedBlock() public {
@@ -112,12 +112,12 @@ contract ProvingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes.concat("o1"));
-        executor.proveBatches(genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
+        executor.proveBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
     }
 
     function test_RevertWhen_ProvingRevertedBlockWithoutCommittingAgain() public {
         vm.prank(validator);
-        executor.revertBatches(0);
+        executor.revertBatchesSharedBridge(0, 0);
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         storedBatchInfoArray[0] = newStoredBatchInfo;
@@ -125,7 +125,7 @@ contract ProvingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes.concat("q"));
-        executor.proveBatches(genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
+        executor.proveBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
     }
 
     function test_SuccessfulProve() public {
@@ -134,7 +134,7 @@ contract ProvingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        executor.proveBatches(genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
+        executor.proveBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
 
         uint256 totalBlocksVerified = getters.getTotalBlocksVerified();
         assertEq(totalBlocksVerified, 1);
