@@ -92,7 +92,7 @@ async function main() {
         deployWallet,
         ownerAddress,
         verbose: true,
-        l1ChainId: process.env.CONTRACTS_ETH_CHAIN_ID || "31337",
+        l1ChainId: process.env.CONTRACTS_L1_CHAIN_ID|| "31337",
       });
 
       const baseTokenAddress = await chooseBaseTokenAddress(cmd.baseTokenName, cmd.baseTokenAddress);

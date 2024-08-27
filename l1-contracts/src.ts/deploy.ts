@@ -1235,6 +1235,7 @@ export class Deployer {
     predefinedChainId?: string,
     useGovernance: boolean = false
   ) {
+    console.log(baseTokenAssetId);
     const txOptions = this.isZkMode() ? {} : { gasLimit: 10_000_000 };
 
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
