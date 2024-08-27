@@ -120,10 +120,11 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) external payable override onlyBridge whenNotPaused returns (address receiver) {
+    ) external payable override onlyBridge whenNotPaused {
         // Either it was locked before, therefore is not zero, or it is sent from remote chain and standard erc20 will be deployed
         address token = tokenAddress[_assetId];
         uint256 amount;
+        address receiver;
 
         if (chainBalance[_chainId][token] > 0) {
             (amount, receiver) = abi.decode(_transferData, (uint256, address));

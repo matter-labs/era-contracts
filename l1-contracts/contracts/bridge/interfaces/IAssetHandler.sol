@@ -29,7 +29,7 @@ interface IAssetHandler {
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
-    ) external payable returns (address l1Receiver);
+    ) external payable;
 
     /// @notice Burns bridged tokens and returns the calldata for L2 -> L1 message.
     /// @dev In case of native token vault _data is the tuple of _depositAmount and _l2Receiver.
