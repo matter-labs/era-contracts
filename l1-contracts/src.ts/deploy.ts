@@ -1124,9 +1124,9 @@ export class Deployer {
   }
 
   public async registerSettlementLayer() {
-    const stm = this.stateTransitionManagerContract(this.deployWallet);
-    const calldata = stm.interface.encodeFunctionData("registerSettlementLayer", [this.chainId, true]);
-    await this.executeUpgrade(this.addresses.StateTransition.StateTransitionProxy, 0, calldata);
+    const bridgehub = this.bridgehubContract(this.deployWallet);
+    const calldata = bridgehub.interface.encodeFunctionData("registerSettlementLayer", [this.chainId, true]);
+    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, calldata);
     if (this.verbose) {
       console.log("Gateway registered");
     }
@@ -1235,6 +1235,7 @@ export class Deployer {
     predefinedChainId?: string,
     useGovernance: boolean = false
   ) {
+    console.log(baseTokenAssetId);
     const txOptions = this.isZkMode() ? {} : { gasLimit: 10_000_000 };
 
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();

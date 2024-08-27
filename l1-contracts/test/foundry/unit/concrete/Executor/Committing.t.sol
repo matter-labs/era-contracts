@@ -65,7 +65,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes.concat("i"));
-        executor.commitBatches(wrongGenesisStoredBatchInfo, newCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), wrongGenesisStoredBatchInfo, newCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithWrongOrderOfBatches() public {
@@ -78,7 +78,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes.concat("f"));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithWrongNewBatchTimestamp() public {
@@ -103,7 +103,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
 
         vm.expectRevert(bytes.concat("tb"));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithTooSmallNewBatchTimestamp() public {
@@ -128,7 +128,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
 
         vm.expectRevert(bytes.concat("h1"));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingTooBigLastL2BatchTimestamp() public {
@@ -153,7 +153,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
 
         vm.expectRevert(bytes.concat("h2"));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithWrongPreviousBatchHash() public {
@@ -177,7 +177,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
 
         vm.expectRevert(bytes.concat("l"));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithoutProcessingSystemContextLog() public {
@@ -195,7 +195,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
 
         vm.expectRevert(bytes.concat("tb"));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithProcessingSystemContextLogTwice() public {
@@ -223,7 +223,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
 
         vm.expectRevert(bytes.concat("kp"));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_UnexpectedL2ToL1Log() public {
@@ -245,7 +245,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes.concat("sc"));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithWrongCanonicalTxHash() public {
@@ -269,7 +269,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes.concat("t"));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithWrongNumberOfLayer1txs() public {
@@ -293,7 +293,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes.concat("ta"));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithUnknownSystemLogKey() public {
@@ -313,7 +313,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes.concat("ul"));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_SystemLogIsFromIncorrectAddress() public {
@@ -362,7 +362,7 @@ contract CommittingTest is ExecutorTest {
             vm.prank(validator);
 
             vm.expectRevert(errors[i]);
-            executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+            executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
         }
     }
 
@@ -381,7 +381,7 @@ contract CommittingTest is ExecutorTest {
     //            vm.prank(validator);
     //
     //            vm.expectRevert(bytes.concat("b7"));
-    //            executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+    //            executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     //        }
     //    }
 
@@ -447,7 +447,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
         vm.recordLogs();
 
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -483,7 +483,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.recordLogs();
 
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -548,7 +548,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.recordLogs();
 
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -572,7 +572,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes("e4"));
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
     }
 
     function test_RevertWhen_EmptyPubdataCommitments() public {
@@ -596,7 +596,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes("too small"));
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
     }
 
     function test_RevertWhen_PartialPubdataCommitment() public {
@@ -632,7 +632,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
 
         vm.expectRevert(bytes("bd"));
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
     }
 
     function test_RevertWhen_TooManyPubdataCommitments() public {
@@ -669,7 +669,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes("bd"));
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
     }
 
     function test_RevertWhen_NotEnoughPubdataCommitments() public {
@@ -696,7 +696,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(versionedHashes);
 
         vm.expectRevert(bytes("lh"));
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         vm.clearMockedCalls();
     }
@@ -722,7 +722,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes("vh"));
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         vm.clearMockedCalls();
     }
@@ -751,7 +751,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(blobVersionedHashes);
 
         vm.expectRevert(bytes("lh"));
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         vm.clearMockedCalls();
     }
@@ -806,7 +806,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(blobVersionedHashes);
 
         vm.expectRevert(bytes("bh"));
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         vm.clearMockedCalls();
     }

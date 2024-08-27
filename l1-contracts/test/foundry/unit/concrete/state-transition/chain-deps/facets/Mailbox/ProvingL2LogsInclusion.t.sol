@@ -47,19 +47,18 @@ contract MailboxL2LogsProve is MailboxTest {
         index = elements.length - 1;
     }
 
-    // FIXME: restore the test
-    // function test_RevertWhen_batchNumberGreaterThanBatchesExecuted() public {
-    //     L2Message memory message = L2Message({txNumberInBatch: 0, sender: sender, data: data});
-    //     bytes32[] memory proof = new bytes32[](0);
+    function test_RevertWhen_batchNumberGreaterThanBatchesExecuted() public {
+        L2Message memory message = L2Message({txNumberInBatch: 0, sender: sender, data: data});
+        bytes32[] memory proof = _appendProofMetadata(new bytes32[](1));
 
-    //     vm.expectRevert(bytes("xx"));
-    //     mailboxFacet.proveL2MessageInclusion({
-    //         _batchNumber: batchNumber + 1,
-    //         _index: 0,
-    //         _message: message,
-    //         _proof: proof
-    //     });
-    // }
+        _proveL2MessageInclusion({
+            _batchNumber: batchNumber + 1,
+            _index: 0,
+            _message: message,
+            _proof: proof,
+            _expectedError: bytes("xx")
+        });
+    }
 
     function test_success_proveL2MessageInclusion() public {
         uint256 firstLogIndex = _addHashedLogToMerkleTree({
@@ -99,16 +98,14 @@ contract MailboxL2LogsProve is MailboxTest {
             assertEq(calculatedRoot, root);
         }
 
-        bytes32[] memory fullProof = _appendProofMetadata(firstLogProof);
-
         // Prove L2 message inclusion
-        bool ret = mailboxFacet.proveL2MessageInclusion(batchNumber, firstLogIndex, message, fullProof);
+        bool ret = _proveL2MessageInclusion(batchNumber, firstLogIndex, message, firstLogProof, bytes(""));
 
         // Assert that the proof was successful
         assertEq(ret, true);
 
         // Prove L2 message inclusion for wrong leaf
-        ret = mailboxFacet.proveL2MessageInclusion(batchNumber, secondLogIndex, message, fullProof);
+        ret = _proveL2MessageInclusion(batchNumber, secondLogIndex, message, firstLogProof, bytes(""));
 
         // Assert that the proof has failed
         assertEq(ret, false);
@@ -159,25 +156,25 @@ contract MailboxL2LogsProve is MailboxTest {
             assertEq(calculatedRoot, root);
         }
 
-        bytes32[] memory fullProof = _appendProofMetadata(secondLogProof);
-
         // Prove l2 log inclusion with correct proof
-        bool ret = mailboxFacet.proveL2LogInclusion({
+        bool ret = _proveL2LogInclusion({
             _batchNumber: batchNumber,
             _index: secondLogIndex,
-            _proof: fullProof,
-            _log: log
+            _proof: secondLogProof,
+            _log: log,
+            _expectedError: bytes("")
         });
 
         // Assert that the proof was successful
         assertEq(ret, true);
 
         // Prove l2 log inclusion with wrong proof
-        ret = mailboxFacet.proveL2LogInclusion({
+        ret = _proveL2LogInclusion({
             _batchNumber: batchNumber,
             _index: firstLogIndex,
-            _proof: fullProof,
-            _log: log
+            _proof: secondLogProof,
+            _log: log,
+            _expectedError: bytes("")
         });
 
         // Assert that the proof was successful
@@ -225,16 +222,8 @@ contract MailboxL2LogsProve is MailboxTest {
             assertEq(calculatedRoot, root);
         }
 
-        bytes32[] memory fullProof = _appendProofMetadata(secondLogProof);
-
         // Prove log inclusion reverts
-        vm.expectRevert(bytes("tw"));
-        mailboxFacet.proveL2LogInclusion({
-            _batchNumber: batchNumber,
-            _index: secondLogIndex,
-            _proof: fullProof,
-            _log: log
-        });
+        _proveL2LogInclusion(batchNumber, secondLogIndex, log, secondLogProof, bytes("tw"));
     }
 
     function test_success_proveL1ToL2TransactionStatus() public {
@@ -276,20 +265,111 @@ contract MailboxL2LogsProve is MailboxTest {
             assertEq(calculatedRoot, root);
         }
 
-        bytes32[] memory fullProof = _appendProofMetadata(secondLogProof);
-
         // Prove L1 to L2 transaction status
-        bool ret = mailboxFacet.proveL1ToL2TransactionStatus({
+        bool ret = _proveL1ToL2TransactionStatus({
             _l2TxHash: secondL2TxHash,
             _l2BatchNumber: batchNumber,
             _l2MessageIndex: secondLogIndex,
             _l2TxNumberInBatch: 1,
-            _merkleProof: fullProof,
+            _merkleProof: secondLogProof,
             _status: txStatus
         });
-
         // Assert that the proof was successful
         assertEq(ret, true);
+    }
+
+    /// @notice Proves L1 to L2 transaction status and cross-checks new and old encoding
+    function _proveL1ToL2TransactionStatus(
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] memory _merkleProof,
+        TxStatus _status
+    ) internal returns (bool) {
+        bool retOldEncoding = mailboxFacet.proveL1ToL2TransactionStatus({
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _merkleProof: _merkleProof,
+            _status: _status
+        });
+        bool retNewEncoding = mailboxFacet.proveL1ToL2TransactionStatus({
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _merkleProof: _appendProofMetadata(_merkleProof),
+            _status: _status
+        });
+
+        assertEq(retOldEncoding, retNewEncoding);
+
+        return retOldEncoding;
+    }
+
+    /// @notice Proves L2 log inclusion and cross-checks new and old encoding
+    function _proveL2LogInclusion(
+        uint256 _batchNumber,
+        uint256 _index,
+        L2Log memory _log,
+        bytes32[] memory _proof,
+        bytes memory _expectedError
+    ) internal returns (bool) {
+        if (_expectedError.length > 0) {
+            vm.expectRevert(_expectedError);
+        }
+        bool retOldEncoding = mailboxFacet.proveL2LogInclusion({
+            _batchNumber: _batchNumber,
+            _index: _index,
+            _proof: _proof,
+            _log: _log
+        });
+
+        if (_expectedError.length > 0) {
+            vm.expectRevert(_expectedError);
+        }
+        bool retNewEncoding = mailboxFacet.proveL2LogInclusion({
+            _batchNumber: _batchNumber,
+            _index: _index,
+            _proof: _appendProofMetadata(_proof),
+            _log: _log
+        });
+
+        assertEq(retOldEncoding, retNewEncoding);
+        return retOldEncoding;
+    }
+
+    function _proveL2MessageInclusion(
+        uint256 _batchNumber,
+        uint256 _index,
+        L2Message memory _message,
+        bytes32[] memory _proof,
+        bytes memory _expectedError
+    ) internal returns (bool) {
+        if (_expectedError.length > 0) {
+            vm.expectRevert(_expectedError);
+        }
+        bool retOldEncoding = mailboxFacet.proveL2MessageInclusion({
+            _batchNumber: _batchNumber,
+            _index: _index,
+            _message: _message,
+            _proof: _proof
+        });
+
+        if (_expectedError.length > 0) {
+            vm.expectRevert(_expectedError);
+        }
+        bool retNewEncoding = mailboxFacet.proveL2MessageInclusion({
+            _batchNumber: _batchNumber,
+            _index: _index,
+            _message: _message,
+            _proof: _appendProofMetadata(_proof)
+        });
+
+        assertEq(retOldEncoding, retNewEncoding);
+        return retOldEncoding;
     }
 
     /// @notice Appends the proof metadata to the log proof as if the proof is for a batch that settled on L1.

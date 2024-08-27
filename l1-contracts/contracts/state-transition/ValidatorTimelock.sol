@@ -111,15 +111,6 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @dev Records the timestamp for all provided committed batches and make
     /// a call to the hyperchain diamond contract with the same calldata.
-    function commitBatches(
-        StoredBatchInfo calldata,
-        CommitBatchInfo[] calldata _newBatchesData
-    ) external onlyValidator(ERA_CHAIN_ID) {
-        _commitBatchesInner(ERA_CHAIN_ID, _newBatchesData);
-    }
-
-    /// @dev Records the timestamp for all provided committed batches and make
-    /// a call to the hyperchain diamond contract with the same calldata.
     function commitBatchesSharedBridge(
         uint256 _chainId,
         StoredBatchInfo calldata,
@@ -145,26 +136,8 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
-    function revertBatches(uint256) external onlyValidator(ERA_CHAIN_ID) {
-        _propagateToZkSyncHyperchain(ERA_CHAIN_ID);
-    }
-
-    /// @dev Make a call to the hyperchain diamond contract with the same calldata.
-    /// Note: If the batch is reverted, it needs to be committed first before the execution.
-    /// So it's safe to not override the committed batches.
     function revertBatchesSharedBridge(uint256 _chainId, uint256) external onlyValidator(_chainId) {
         _propagateToZkSyncHyperchain(_chainId);
-    }
-
-    /// @dev Make a call to the hyperchain diamond contract with the same calldata.
-    /// Note: We don't track the time when batches are proven, since all information about
-    /// the batch is known on the commit stage and the proved is not finalized (may be reverted).
-    function proveBatches(
-        StoredBatchInfo calldata,
-        StoredBatchInfo[] calldata,
-        ProofInput calldata
-    ) external onlyValidator(ERA_CHAIN_ID) {
-        _propagateToZkSyncHyperchain(ERA_CHAIN_ID);
     }
 
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
@@ -177,15 +150,6 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         ProofInput calldata
     ) external onlyValidator(_chainId) {
         _propagateToZkSyncHyperchain(_chainId);
-    }
-
-    /// @dev Check that batches were committed at least X time ago and
-    /// make a call to the hyperchain diamond contract with the same calldata.
-    function executeBatches(
-        StoredBatchInfo[] calldata _batchesData,
-        PriorityOpsBatchInfo[] calldata
-    ) external onlyValidator(ERA_CHAIN_ID) {
-        _executeBatchesInner(ERA_CHAIN_ID, _batchesData);
     }
 
     /// @dev Check that batches were committed at least X time ago and

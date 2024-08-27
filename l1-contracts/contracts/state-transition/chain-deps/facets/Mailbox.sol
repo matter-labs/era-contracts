@@ -23,13 +23,13 @@ import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_PROOF_METADATA_VERSION} from "../../../common/Config.sol";
 
 import {IL1AssetRouter} from "../../../bridge/interfaces/IL1AssetRouter.sol";
 import {IL1Nullifier, FinalizeWithdrawalParams} from "../../../bridge/interfaces/IL1Nullifier.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER} from "../../../common/Config.sol";
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
@@ -129,13 +129,44 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     ) public view returns (bool) {}
 
     function _parseProofMetadata(
-        bytes32 _proofMetadata
-    ) internal pure returns (uint256 logLeafProofLen, uint256 batchLeafProofLen) {
-        bytes1 metadataVersion = bytes1(_proofMetadata[0]);
-        require(metadataVersion == 0x01, "Mailbox: unsupported proof metadata version");
+        bytes32[] calldata _proof
+    ) internal pure returns (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) {
+        bytes32 proofMetadata = _proof[0];
 
-        logLeafProofLen = uint256(uint8(_proofMetadata[1]));
-        batchLeafProofLen = uint256(uint8(_proofMetadata[2]));
+        // We support two formats of the proofs:
+        // 1. The old format, where `_proof` is just a plain Merkle proof.
+        // 2. The new format, where the first element of the `_proof` is encoded metadata, which consists of the following:
+        // - first byte: metadata version (0x01).
+        // - second byte: length of the log leaf proof (the proof that the log belongs to a batch).
+        // - third byte: length of the batch leaf proof (the proof that the batch belongs to another settlement layer, if any).
+        // - the rest of the bytes are zeroes.
+        //
+        // In the future the old version will be disabled, and only the new version will be supported.
+        // For now, we need to support both for backwards compatibility. We distinguish between those based on whether the last 29 bytes are zeroes.
+        // It is safe, since the elements of the proof are hashes and are unlikely to have 29 zero bytes in them.
+
+        // We shift left by 3 bytes = 24 bits to remove the top 24 bits of the metadata.
+        uint256 metadataAsUint256 = (uint256(proofMetadata) << 24);
+
+        if (metadataAsUint256 == 0) {
+            // It is the new version
+            bytes1 metadataVersion = bytes1(proofMetadata);
+            require(
+                uint256(uint8(metadataVersion)) == SUPPORTED_PROOF_METADATA_VERSION,
+                "Mailbox: unsupported proof metadata version"
+            );
+
+            proofStartIndex = 1;
+            logLeafProofLen = uint256(uint8(proofMetadata[1]));
+            batchLeafProofLen = uint256(uint8(proofMetadata[2]));
+        } else {
+            // It is the old version
+
+            // The entire proof is a merkle path
+            proofStartIndex = 0;
+            logLeafProofLen = _proof.length;
+            batchLeafProofLen = 0;
+        }
     }
 
     function extractSlice(
@@ -147,6 +178,15 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         for (uint256 i = _left; i < _right; i = i.uncheckedInc()) {
             slice[i - _left] = _proof[i];
         }
+    }
+
+    /// @notice Extracts slice until the end of the array.
+    /// @dev It is used in one place in order to circumvent the stack too deep error.
+    function extractSliceUntilEnd(
+        bytes32[] calldata _proof,
+        uint256 _start
+    ) internal pure returns (bytes32[] memory slice) {
+        slice = extractSlice(_proof, _start, _proof.length);
     }
 
     /// @inheritdoc IMailbox
@@ -165,13 +205,11 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        // FIXME: maybe support legacy interface
-
         uint256 ptr = 0;
         bytes32 chainIdLeaf;
         {
-            (uint256 logLeafProofLen, uint256 batchLeafProofLen) = _parseProofMetadata(_proof[ptr]);
-            ++ptr;
+            (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) = _parseProofMetadata(_proof);
+            ptr = proofStartIndex;
 
             bytes32 batchSettlementRoot = Merkle.calculateRootMemory(
                 extractSlice(_proof, ptr, ptr + logLeafProofLen),
@@ -180,9 +218,12 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             );
             ptr += logLeafProofLen;
 
-            // Note that this logic works only for chains that do not migrate away from the synclayer back to L1.
-            // Support for chains that migrate back to L1 will be added in the future.
-            if (s.settlementLayer == address(0)) {
+            // If the `batchLeafProofLen` is 0, then we assume that this is L1 contract of the top-level
+            // in the aggregation, i.e. the batch root is stored here on L1.
+            if (batchLeafProofLen == 0) {
+                // Double checking that the batch has been executed.
+                require(_batchNumber <= s.totalBatchesExecuted, "xx");
+
                 bytes32 correctBatchRoot = s.l2LogsRootHashes[_batchNumber];
                 require(correctBatchRoot != bytes32(0), "local root is 0");
                 return correctBatchRoot == batchSettlementRoot;
@@ -208,6 +249,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
         uint256 settlementLayerBatchNumber;
         uint256 settlementLayerBatchRootMask;
+        address settlementLayerAddress;
 
         // Preventing stack too deep error
         {
@@ -216,14 +258,25 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             ++ptr;
             settlementLayerBatchNumber = uint256(settlementLayerPackedBatchInfo >> 128);
             settlementLayerBatchRootMask = uint256(settlementLayerPackedBatchInfo & ((1 << 128) - 1));
+
+            uint256 settlementLayerChainId = uint256(_proof[ptr]);
+            ++ptr;
+
+            // Assuming that `settlementLayerChainId` is an honest chain, the `chainIdLeaf` should belong
+            // to a chain's message root only if the chain has indeed executed its batch on top of it.
+            //
+            // We trust all chains whitelisted by the Bridgehub governance.
+            require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(settlementLayerChainId), "Mailbox: wrong STM");
+
+            settlementLayerAddress = IBridgehub(s.bridgehub).getHyperchain(settlementLayerChainId);
         }
 
         return
-            IMailbox(s.settlementLayer).proveL2LeafInclusion(
+            IMailbox(settlementLayerAddress).proveL2LeafInclusion(
                 settlementLayerBatchNumber,
                 settlementLayerBatchRootMask,
                 chainIdLeaf,
-                extractSlice(_proof, ptr, _proof.length)
+                extractSliceUntilEnd(_proof, ptr)
             );
     }
 
@@ -234,8 +287,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         L2Log memory _log,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        // require(_batchNumber <= s.totalBatchesExecuted, "xx");
-
         bytes32 hashedLog = keccak256(
             // solhint-disable-next-line func-named-parameters
             abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)

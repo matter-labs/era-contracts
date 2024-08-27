@@ -534,19 +534,18 @@ ReentrancyGuard {
     //     require(!_isEraLegacyEthWithdrawal(_chainId, _l2BatchNumber), "L1AR: legacy eth withdrawal");
     //     require(!_isEraLegacyTokenWithdrawal(_chainId, _l2BatchNumber), "L1AR: legacy token withdrawal");
 
-    //     bytes memory transferData;
-    //     {
-    //         MessageParams memory messageParams = MessageParams({
-    //             l2BatchNumber: _l2BatchNumber,
-    //             l2MessageIndex: _l2MessageIndex,
-    //             l2TxNumberInBatch: _l2TxNumberInBatch
-    //         });
-    //         (assetId, transferData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
-    //     }
-    //     address l1AssetHandler = assetHandlerAddress[assetId];
-    //     // slither-disable-next-line unused-return
-    //     IL1AssetHandler(l1AssetHandler).bridgeMint(_chainId, assetId, transferData);
-    //     (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
+        // bytes memory transferData;
+        // {
+        //     MessageParams memory messageParams = MessageParams({
+        //         l2BatchNumber: _l2BatchNumber,
+        //         l2MessageIndex: _l2MessageIndex,
+        //         l2TxNumberInBatch: _l2TxNumberInBatch
+        //     });
+        //     (assetId, transferData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
+        // }
+        // address l1AssetHandler = assetHandlerAddress[assetId];
+        // IL1AssetHandler(l1AssetHandler).bridgeMint(_chainId, assetId, transferData);
+        // (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
 
     //     emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetId, amount);
     // }

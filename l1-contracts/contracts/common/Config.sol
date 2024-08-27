@@ -117,6 +117,9 @@ uint256 constant MAX_NUMBER_OF_HYPERCHAINS = 100;
 /// @dev Used as the `msg.sender` for transactions that relayed via a settlement layer.
 address constant SETTLEMENT_LAYER_RELAY_SENDER = address(uint160(0x1111111111111111111111111111111111111111));
 
+/// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.
+uint256 constant SUPPORTED_PROOF_METADATA_VERSION = 1;
+
 struct PriorityTreeCommitment {
     uint256 nextLeafIndex;
     uint256 startIndex;
@@ -134,11 +137,17 @@ struct HyperchainCommitment {
     /// @notice Total number of committed batches i.e. batches[totalBatchesCommitted] points at the latest committed
     /// batch
     uint256 totalBatchesCommitted;
-    /// @notice
+    /// @notice The hash of the L2 system contracts ugpgrade transaction.
+    /// @dev It is non zero if the migration happens while the upgrade is not yet finalized.
     bytes32 l2SystemContractsUpgradeTxHash;
-    /// @notice
+    /// @notice The batch when the system contracts upgrade transaction was executed.
+    /// @dev It is non-zero if the migration happens while the batch where the upgrade tx was present
+    /// has not been finalized (executed) yet.
     uint256 l2SystemContractsUpgradeBatchNumber;
+    /// @notice The hashes of the batches that are needed to keep the blockchain working.
+    /// @dev The length of the array is equal to the `totalBatchesCommitted - totalBatchesExecuted + 1`, i.e. we need
+    /// to store all the unexecuted batches' hashes + 1 latest executed one.
     bytes32[] batchHashes;
-    /// @notice Commitment to the priority merkle tree
+    /// @notice Commitment to the priority merkle tree.
     PriorityTreeCommitment priorityTree;
 }

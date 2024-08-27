@@ -73,7 +73,7 @@ contract ExecutingTest is ExecutorTest {
         vm.prank(validator);
         vm.blobhashes(blobVersionedHashes);
         vm.recordLogs();
-        executor.commitBatches(genesisStoredBatchInfo, commitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, commitBatchInfoArray);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         newStoredBatchInfo = IExecutor.StoredBatchInfo({
@@ -91,7 +91,7 @@ contract ExecutingTest is ExecutorTest {
         storedBatchInfoArray[0] = newStoredBatchInfo;
 
         vm.prank(validator);
-        executor.proveBatches(genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
+        executor.proveBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
     }
 
     function test_RevertWhen_ExecutingBlockWithWrongBatchNumber() public {
@@ -103,7 +103,11 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("k"));
-        executor.executeBatches(storedBatchInfoArray, Utils.generatePriorityOps(storedBatchInfoArray.length));
+        executor.executeBatchesSharedBridge(
+            uint256(0),
+            storedBatchInfoArray,
+            Utils.generatePriorityOps(storedBatchInfoArray.length)
+        );
     }
 
     function test_RevertWhen_ExecutingBlockWithWrongData() public {
@@ -115,24 +119,32 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("exe10"));
-        executor.executeBatches(storedBatchInfoArray, Utils.generatePriorityOps(storedBatchInfoArray.length));
+        executor.executeBatchesSharedBridge(
+            uint256(0),
+            storedBatchInfoArray,
+            Utils.generatePriorityOps(storedBatchInfoArray.length)
+        );
     }
 
     function test_RevertWhen_ExecutingRevertedBlockWithoutCommittingAndProvingAgain() public {
         vm.prank(validator);
-        executor.revertBatches(0);
+        executor.revertBatchesSharedBridge(0, 0);
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         storedBatchInfoArray[0] = newStoredBatchInfo;
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("n"));
-        executor.executeBatches(storedBatchInfoArray, Utils.generatePriorityOps(storedBatchInfoArray.length));
+        executor.executeBatchesSharedBridge(
+            uint256(0),
+            storedBatchInfoArray,
+            Utils.generatePriorityOps(storedBatchInfoArray.length)
+        );
     }
 
     function test_RevertWhen_ExecutingUnavailablePriorityOperationHash() public {
         vm.prank(validator);
-        executor.revertBatches(0);
+        executor.revertBatchesSharedBridge(0, 0);
 
         bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32("arbitraryCanonicalTxHash");
         bytes32 chainedPriorityTxHash = keccak256(bytes.concat(keccak256(""), arbitraryCanonicalTxHash));
@@ -168,7 +180,7 @@ contract ExecutingTest is ExecutorTest {
         vm.prank(validator);
         vm.blobhashes(blobVersionedHashes);
         vm.recordLogs();
-        executor.commitBatches(genesisStoredBatchInfo, correctNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctNewCommitBatchInfoArray);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         IExecutor.StoredBatchInfo memory correctNewStoredBatchInfo = newStoredBatchInfo;
@@ -181,11 +193,17 @@ contract ExecutingTest is ExecutorTest {
         correctNewStoredBatchInfoArray[0] = correctNewStoredBatchInfo;
 
         vm.prank(validator);
-        executor.proveBatches(genesisStoredBatchInfo, correctNewStoredBatchInfoArray, proofInput);
+        executor.proveBatchesSharedBridge(
+            uint256(0),
+            genesisStoredBatchInfo,
+            correctNewStoredBatchInfoArray,
+            proofInput
+        );
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("s"));
-        executor.executeBatches(
+        executor.executeBatchesSharedBridge(
+            uint256(0),
             correctNewStoredBatchInfoArray,
             Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length)
         );
@@ -193,7 +211,7 @@ contract ExecutingTest is ExecutorTest {
 
     function test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash() public {
         vm.prank(validator);
-        executor.revertBatches(0);
+        executor.revertBatchesSharedBridge(0, 0);
 
         bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32("arbitraryCanonicalTxHash");
         bytes32 chainedPriorityTxHash = keccak256(bytes.concat(keccak256(""), arbitraryCanonicalTxHash));
@@ -228,7 +246,7 @@ contract ExecutingTest is ExecutorTest {
         vm.prank(validator);
         vm.blobhashes(blobVersionedHashes);
         vm.recordLogs();
-        executor.commitBatches(genesisStoredBatchInfo, correctNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctNewCommitBatchInfoArray);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         IExecutor.StoredBatchInfo memory correctNewStoredBatchInfo = newStoredBatchInfo;
@@ -241,7 +259,12 @@ contract ExecutingTest is ExecutorTest {
         correctNewStoredBatchInfoArray[0] = correctNewStoredBatchInfo;
 
         vm.prank(validator);
-        executor.proveBatches(genesisStoredBatchInfo, correctNewStoredBatchInfoArray, proofInput);
+        executor.proveBatchesSharedBridge(
+            uint256(0),
+            genesisStoredBatchInfo,
+            correctNewStoredBatchInfoArray,
+            proofInput
+        );
 
         bytes32 randomFactoryDeps0 = Utils.randomBytes32("randomFactoryDeps0");
 
@@ -266,7 +289,8 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("x"));
-        executor.executeBatches(
+        executor.executeBatchesSharedBridge(
+            uint256(0),
             correctNewStoredBatchInfoArray,
             Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length)
         );
@@ -295,7 +319,7 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("i"));
-        executor.commitBatches(genesisBlock, correctNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisBlock, correctNewCommitBatchInfoArray);
     }
 
     function test_ShouldExecuteBatchesuccessfully() public {
@@ -303,7 +327,11 @@ contract ExecutingTest is ExecutorTest {
         storedBatchInfoArray[0] = newStoredBatchInfo;
 
         vm.prank(validator);
-        executor.executeBatches(storedBatchInfoArray, Utils.generatePriorityOps(storedBatchInfoArray.length));
+        executor.executeBatchesSharedBridge(
+            uint256(0),
+            storedBatchInfoArray,
+            Utils.generatePriorityOps(storedBatchInfoArray.length)
+        );
 
         uint256 totalBlocksExecuted = getters.getTotalBlocksExecuted();
         assertEq(totalBlocksExecuted, 1);

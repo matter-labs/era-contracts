@@ -21,7 +21,6 @@ import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 // import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 
-import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 
 contract GatewayScript is Script {
@@ -117,10 +116,10 @@ contract GatewayScript is Script {
     }
 
     function registerGateway() public {
-        IStateTransitionManager stm = IStateTransitionManager(config.stateTransitionProxy);
-        Ownable ownable = Ownable(config.stateTransitionProxy);
+        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        Ownable ownable = Ownable(config.bridgehub);
         vm.prank(ownable.owner());
-        stm.registerSettlementLayer(config.gatewayChainId, true);
+        bridgehub.registerSettlementLayer(config.gatewayChainId, true);
         // bytes memory data = abi.encodeCall(stm.registerSettlementLayer, (config.chainChainId, true));
         // Utils.executeUpgrade({
         //     _governor: ownable.owner(),

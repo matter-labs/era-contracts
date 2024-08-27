@@ -200,10 +200,10 @@ library Utils {
 
     function getExecutorSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
-        selectors[0] = ExecutorFacet.commitBatches.selector;
-        selectors[1] = ExecutorFacet.proveBatches.selector;
-        selectors[2] = ExecutorFacet.executeBatches.selector;
-        selectors[3] = ExecutorFacet.revertBatches.selector;
+        selectors[0] = ExecutorFacet.commitBatchesSharedBridge.selector;
+        selectors[1] = ExecutorFacet.proveBatchesSharedBridge.selector;
+        selectors[2] = ExecutorFacet.executeBatchesSharedBridge.selector;
+        selectors[3] = ExecutorFacet.revertBatchesSharedBridge.selector;
         return selectors;
     }
 
