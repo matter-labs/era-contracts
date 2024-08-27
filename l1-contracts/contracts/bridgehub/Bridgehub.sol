@@ -177,8 +177,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _stmDeployer the stm deployment tracker address
     /// @param _messageRoot the message root address
     function setAddresses(
-        IAssetRouterBase _sharedBridge,
         address _nullifier,
+        IAssetRouterBase _sharedBridge,
         ISTMDeploymentTracker _stmDeployer,
         IMessageRoot _messageRoot
     ) external onlyOwner {

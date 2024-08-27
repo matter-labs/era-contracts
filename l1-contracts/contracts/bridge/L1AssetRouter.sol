@@ -65,6 +65,8 @@ contract L1AssetRouter is
     /// @dev Address of nullifier.
     IL1Nullifier public nullifierStorage;
 
+
+
     /// @notice Checks that the message sender is the nullifier.
     modifier onlyNullifier() {
         require(msg.sender == address(nullifierStorage), "L1AR: not nullifier");

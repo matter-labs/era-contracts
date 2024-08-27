@@ -122,6 +122,8 @@ export interface DeployedAddresses {
     DiamondProxy: string;
   };
   Bridges: {
+    L1NullifierImplementation: string;
+    L1NullifierProxy: string;
     ERC20BridgeImplementation: string;
     ERC20BridgeProxy: string;
     SharedBridgeImplementation: string;
@@ -181,6 +183,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       DiamondProxy: getAddressFromEnv("CONTRACTS_DIAMOND_PROXY_ADDR"),
     },
     Bridges: {
+      L1NullifierImplementation: getAddressFromEnv("CONTRACTS_L1_NULLIFIER_IMPL_ADDR"),
+      L1NullifierProxy: getAddressFromEnv("CONTRACTS_L1_NULLIFIER_PROXY_ADDR"),
       ERC20BridgeImplementation: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR"),
       ERC20BridgeProxy: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR"),
       SharedBridgeImplementation: getAddressFromEnv("CONTRACTS_L1_SHARED_BRIDGE_IMPL_ADDR"),
