@@ -663,12 +663,27 @@ object "EVMInterpreter" {
             mstore(4, key)
             mstore(36,currentValue)
         
-            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 64)
+            let farCallAbi := getFarCallABI(
+                0,
+                0,
+                0,
+                68,
+                gas(),
+                // Only rollup is supported for now
+                0,
+                0,
+                0,
+                1
+            )
+            let to := EVM_GAS_MANAGER_CONTRACT()
+            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
         
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
             }
+        
+            returndatacopy(0, 0, 64)
         
             isWarm := mload(0)
             originalValue := mload(32)
@@ -827,13 +842,27 @@ object "EVMInterpreter" {
             mstore(0, 0x8DB2BA7800000000000000000000000000000000000000000000000000000000)
             mstore(4, addr)
         
-            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
+            let farCallAbi := getFarCallABI(
+                0,
+                0,
+                0,
+                36,
+                gas(),
+                // Only rollup is supported for now
+                0,
+                0,
+                0,
+                1
+            )
+            let to := EVM_GAS_MANAGER_CONTRACT()
+            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
         
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
             }
         
+            returndatacopy(0, 0, 32)
             isWarm := mload(0)
         }
         
@@ -3724,12 +3753,27 @@ object "EVMInterpreter" {
                 mstore(4, key)
                 mstore(36,currentValue)
             
-                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 64)
+                let farCallAbi := getFarCallABI(
+                    0,
+                    0,
+                    0,
+                    68,
+                    gas(),
+                    // Only rollup is supported for now
+                    0,
+                    0,
+                    0,
+                    1
+                )
+                let to := EVM_GAS_MANAGER_CONTRACT()
+                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
             
                 if iszero(success) {
                     // This error should never happen
                     revert(0, 0)
                 }
+            
+                returndatacopy(0, 0, 64)
             
                 isWarm := mload(0)
                 originalValue := mload(32)
@@ -3888,13 +3932,27 @@ object "EVMInterpreter" {
                 mstore(0, 0x8DB2BA7800000000000000000000000000000000000000000000000000000000)
                 mstore(4, addr)
             
-                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
+                let farCallAbi := getFarCallABI(
+                    0,
+                    0,
+                    0,
+                    36,
+                    gas(),
+                    // Only rollup is supported for now
+                    0,
+                    0,
+                    0,
+                    1
+                )
+                let to := EVM_GAS_MANAGER_CONTRACT()
+                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
             
                 if iszero(success) {
                     // This error should never happen
                     revert(0, 0)
                 }
             
+                returndatacopy(0, 0, 32)
                 isWarm := mload(0)
             }
             
