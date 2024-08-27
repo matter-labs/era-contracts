@@ -5,17 +5,23 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
-import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {IL1NativeTokenVault} from "../../bridge/L1NativeTokenVault.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../../common/L2ContractAddresses.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IL2Bridge} from "../../bridge/interfaces/IL2Bridge.sol";
+import {IL2BridgeLegacy} from "../../bridge/interfaces/IL2BridgeLegacy.sol";
 
-contract DummySharedBridge {
+contract DummySharedBridge is PausableUpgradeable {
+    using SafeERC20 for IERC20;
+
     IL1NativeTokenVault public nativeTokenVault;
 
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,
         address indexed from,
-        address l1Token,
+        bytes32 assetId,
         uint256 amount
     );
 
@@ -23,7 +29,7 @@ contract DummySharedBridge {
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across hyperchains.
     /// This serves as a security measure until hyperbridging is implemented.
-    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) internal chainBalance;
+    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 
     /// @dev Indicates whether the hyperbridging is enabled for a given chain.
     mapping(uint256 chainId => bool enabled) internal hyperbridgingEnabled;
@@ -46,6 +52,8 @@ contract DummySharedBridge {
         l1TokenReturnInFinalizeWithdrawal = _l1Token;
         amountReturnInFinalizeWithdrawal = _amount;
     }
+
+    function receiveEth(uint256 _chainId) external payable {}
 
     function depositLegacyErc20Bridge(
         address, //_msgSender,
@@ -70,6 +78,18 @@ contract DummySharedBridge {
         bytes32[] calldata // _merkleProof
     ) external {}
 
+    function claimFailedDeposit(
+        uint256, // _chainId,
+        address, // _depositSender,
+        address, // _l1Asset,
+        uint256, // _amount,
+        bytes32, // _l2TxHash,
+        uint256, // _l2BatchNumber,
+        uint256, // _l2MessageIndex,
+        uint16, // _l2TxNumberInBatch,
+        bytes32[] calldata //_merkleProof
+    ) external {}
+
     function finalizeWithdrawalLegacyErc20Bridge(
         uint256, //_l2BatchNumber,
         uint256, //_l2MessageIndex,
@@ -84,28 +104,60 @@ contract DummySharedBridge {
 
     event Debugger(uint256);
 
+    function pause() external {
+        _pause();
+    }
+
+    function unpause() external {
+        _unpause();
+    }
+
+    // This function expects abi encoded data
+    function _parseL2WithdrawalMessage(
+        bytes memory _l2ToL1message
+    ) internal view returns (address l1Receiver, address l1Token, uint256 amount) {
+        (l1Receiver, l1Token, amount) = abi.decode(_l2ToL1message, (address, address, uint256));
+    }
+
+    // simple function to just transfer the funds
+    function finalizeWithdrawal(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external {
+        (address l1Receiver, address l1Token, uint256 amount) = _parseL2WithdrawalMessage(_message);
+
+        if (l1Token == address(1)) {
+            bool callSuccess;
+            // Low-level assembly call, to avoid any memory copying (save gas)
+            assembly {
+                callSuccess := call(gas(), l1Receiver, amount, 0, 0, 0, 0)
+            }
+            require(callSuccess, "ShB: withdraw failed");
+        } else {
+            // Withdraw funds
+            IERC20(l1Token).safeTransfer(l1Receiver, amount);
+        }
+    }
+
     function bridgehubDepositBaseToken(
         uint256 _chainId,
+        bytes32 _assetId,
         address _prevMsgSender,
-        address _l1Token,
         uint256 _amount
-    ) external payable {
-        if (_l1Token == address(1)) {
-            require(msg.value == _amount, "L1AssetRouter: msg.value not equal to amount");
-        } else {
-            // The Bridgehub also checks this, but we want to be sure
-            require(msg.value == 0, "ShB m.v > 0 b d.it");
-            uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
-            require(amount == _amount, "5T"); // The token has non-standard transfer logic
-        }
+    ) external payable whenNotPaused {
+        // Dummy bridge supports only working with ETH for simplicity.
+        require(msg.value == _amount, "L1AR: msg.value not equal to amount");
 
         if (!hyperbridgingEnabled[_chainId]) {
-            chainBalance[_chainId][_l1Token] += _amount;
+            chainBalance[_chainId][address(1)] += _amount;
         }
 
-        emit Debugger(5);
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
-        emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _l1Token, _amount);
+        emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _assetId, _amount);
     }
 
     function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
@@ -117,14 +169,33 @@ contract DummySharedBridge {
     }
 
     function bridgehubDeposit(
-        uint256, //_chainId,
-        address, //_prevMsgSender,
-        uint256, // l2Value, needed for Weth deposits in the future
-        bytes calldata //_data
+        uint256,
+        address _prevMsgSender,
+        uint256,
+        bytes calldata _data
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request) {
-        // Request the finalization of the deposit on the L2 side
-        bytes memory l2TxCalldata = bytes("0xabcd123");
-        bytes32 txDataHash = bytes32("0x1212121212abf");
+        (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
+            _data,
+            (address, uint256, address)
+        );
+        uint256 amount;
+
+        if (_l1Token == ETH_TOKEN_ADDRESS) {
+            amount = msg.value;
+            require(_depositAmount == 0, "ShB wrong withdraw amount");
+        } else {
+            require(msg.value == 0, "ShB m.v > 0 for BH d.it 2");
+            amount = _depositAmount;
+
+            uint256 withdrawAmount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _depositAmount);
+            require(withdrawAmount == _depositAmount, "5T"); // The token has non-standard transfer logic
+        }
+
+        bytes memory l2TxCalldata = abi.encodeCall(
+            IL2BridgeLegacy.finalizeDeposit,
+            (_prevMsgSender, _l2Receiver, _l1Token, amount, new bytes(0))
+        );
+        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
@@ -139,17 +210,20 @@ contract DummySharedBridge {
 
     /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
     function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external {
-        require(address(nativeTokenVault) == address(0), "ShB: legacy bridge already set");
-        require(address(_nativeTokenVault) != address(0), "ShB: legacy bridge 0");
+        require(address(nativeTokenVault) == address(0), "L1AR: legacy bridge already set");
+        require(address(_nativeTokenVault) != address(0), "L1AR: legacy bridge 0");
         nativeTokenVault = _nativeTokenVault;
     }
 
     /// @dev Used to set the assedAddress for a given assetId.
-    function setAssetHandlerAddressInitial(bytes32 _additionalData, address _assetHandlerAddress) external {
+    function setAssetHandlerAddressThisChain(bytes32 _additionalData, address _assetHandlerAddress) external {
         address sender = msg.sender == address(nativeTokenVault) ? L2_NATIVE_TOKEN_VAULT_ADDRESS : msg.sender;
         bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _additionalData));
         assetHandlerAddress[assetId] = _assetHandlerAddress;
         // assetDeploymentTracker[assetId] = sender;
         // emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _additionalData, sender);
     }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }

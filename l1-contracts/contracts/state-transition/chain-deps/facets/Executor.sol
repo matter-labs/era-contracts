@@ -5,7 +5,8 @@ pragma solidity 0.8.24;
 // solhint-disable gas-custom-errors, reason-string
 
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-// import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
@@ -19,7 +20,7 @@ import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAV
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
-/// @title zkSync hyperchain Executor contract capable of processing events emitted in the zkSync hyperchain protocol.
+/// @title ZKsync hyperchain Executor contract capable of processing events emitted in the ZKsync hyperchain protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
@@ -30,6 +31,12 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "ExecutorFacet";
 
+    /// @dev Checks that the chain is connected to the current bridehub and not migrated away.
+    modifier chainOnCurrentBridgehub() {
+        require(s.settlementLayer == address(0), "Chain was migrated");
+        _;
+    }
+
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
     /// @dev returns new batch StoredBatchInfo
     /// @notice Does not change storage
@@ -38,18 +45,19 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
     ) internal returns (StoredBatchInfo memory) {
-        require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batchs
+        require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batch
 
-        // Check that batch contain all meta information for L2 logs.
+        // Check that batch contains all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
-        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA(
-            s.chainId,
-            logOutput.l2DAValidatorOutputHash,
-            _newBatch.operatorDAInput,
-            TOTAL_BLOBS_IN_COMMITMENT
-        );
+        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
+            _chainId: s.chainId,
+            _batchNumber: uint256(_newBatch.batchNumber),
+            _l2DAValidatorOutputHash: logOutput.l2DAValidatorOutputHash,
+            _operatorDAInput: _newBatch.operatorDAInput,
+            _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
+        });
 
         require(_previousBatch.batchHash == logOutput.previousBatchHash, "l");
         // Check that the priority operation hash in the L2 logs is as expected
@@ -168,13 +176,13 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             }
         }
 
-        // FIXME: temporarily old logs were kept for backwards compaitibility. This check can not work now.
+        // FIXME: temporarily old logs were kept for backwards compatibility. This check cannot work now.
         //
-        // We only require 13 logs to be checked, the 14th is if we are expecting a protocol upgrade
-        // Without the protocol upgrade we expect 13 logs: 2^13 - 1 = 8191
-        // With the protocol upgrade we expect 14 logs: 2^14 - 1 = 16383
+        // We only require 8 logs to be checked, the 9th is if we are expecting a protocol upgrade
+        // Without the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
+        // With the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
-            // require(processedLogs == 127, "b7");
+            // require(processedLogs == 255, "b7");
         } else {
             // FIXME: do restore this code to the one that was before
             require(_checkBit(processedLogs, uint8(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)), "b8");
@@ -201,7 +209,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     function _commitBatches(
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
-    ) internal {
+    ) internal chainOnCurrentBridgehub {
         // check that we have the right protocol version
         // three comments:
         // 1. A chain has to keep their protocol version up to date, as processing a block requires the latest or previous protocol version
@@ -335,14 +343,15 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         bytes32 priorityOperationsHash = _collectOperationsFromPriorityQueue(_storedBatch.numberOfLayer1Txs);
         _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash);
 
-        uint256 firstUnprocessed = s.priorityQueue.getFirstUnprocessedPriorityTx();
-        uint256 treeStartIndex = s.priorityTree.startIndex;
-        if (firstUnprocessed > treeStartIndex) {
-            s.priorityTree.unprocessedIndex = firstUnprocessed - treeStartIndex;
-        }
+        uint256 currentBatchNumber = _storedBatch.batchNumber;
 
         // Save root hash of L2 -> L1 logs tree
-        s.l2LogsRootHashes[_storedBatch.batchNumber] = _storedBatch.l2LogsTreeRoot;
+        s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
+
+        // Once the batch is executed, we include its message to the message root.
+        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+        messageRootContract.addChainBatchRoot(s.chainId, currentBatchNumber, _storedBatch.l2LogsTreeRoot);
+
         // IBridgehub bridgehub = IBridgehub(s.bridgehub);
         // bridgehub.messageRoot().addChainBatchRoot(
         //     s.chainId,
@@ -361,10 +370,17 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash);
         s.priorityTree.processBatch(_priorityOpsData);
 
+        uint256 currentBatchNumber = _storedBatch.batchNumber;
+
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[_storedBatch.batchNumber] = _storedBatch.l2LogsTreeRoot;
+
+        // Once the batch is executed, we include its message to the message root.
+        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+        messageRootContract.addChainBatchRoot(s.chainId, currentBatchNumber, _storedBatch.l2LogsTreeRoot);
     }
 
+    /// @inheritdoc IExecutor
     function executeBatchesSharedBridge(
         uint256,
         StoredBatchInfo[] calldata _batchesData,
@@ -373,6 +389,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         _executeBatches(_batchesData, _priorityOpsData);
     }
 
+    /// @inheritdoc IExecutor
     function executeBatches(
         StoredBatchInfo[] calldata _batchesData,
         PriorityOpsBatchInfo[] calldata _priorityOpsData
@@ -383,15 +400,17 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     function _executeBatches(
         StoredBatchInfo[] calldata _batchesData,
         PriorityOpsBatchInfo[] calldata _priorityOpsData
-    ) internal {
+    ) internal chainOnCurrentBridgehub {
         uint256 nBatches = _batchesData.length;
-        uint256 dataIndex = 0;
+        require(_batchesData.length == _priorityOpsData.length, "bp");
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
             if (s.priorityTree.startIndex <= s.priorityQueue.getFirstUnprocessedPriorityTx()) {
-                // solhint-disable-next-line gas-increment-by-one
-                _executeOneBatch(_batchesData[i], _priorityOpsData[dataIndex++], i);
+                _executeOneBatch(_batchesData[i], _priorityOpsData[i], i);
             } else {
+                require(_priorityOpsData[i].leftPath.length == 0, "le");
+                require(_priorityOpsData[i].rightPath.length == 0, "re");
+                require(_priorityOpsData[i].itemHashes.length == 0, "ih");
                 _executeOneBatch(_batchesData[i], i);
             }
             emit BlockExecution(_batchesData[i].batchNumber, _batchesData[i].batchHash, _batchesData[i].commitment);
@@ -431,7 +450,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         StoredBatchInfo calldata _prevBatch,
         StoredBatchInfo[] calldata _committedBatches,
         ProofInput calldata _proof
-    ) internal {
+    ) internal chainOnCurrentBridgehub {
         // Save the variables into the stack to save gas on reading them later
         uint256 currentTotalBatchesVerified = s.totalBatchesVerified;
         uint256 committedBatchesLength = _committedBatches.length;
@@ -494,7 +513,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         _revertBatches(_newLastBatch);
     }
 
-    function _revertBatches(uint256 _newLastBatch) internal {
+    function _revertBatches(uint256 _newLastBatch) internal chainOnCurrentBridgehub {
         require(s.totalBatchesCommitted > _newLastBatch, "v1"); // The last committed batch is less than new last batch
         require(_newLastBatch >= s.totalBatchesExecuted, "v2"); // Already executed batches cannot be reverted
 

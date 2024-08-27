@@ -21,10 +21,10 @@ bytes32 constant L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = 0x72abee45b59e344af8a6e5202
 // TODO: change constant to the real root hash of empty Merkle tree (SMA-184)
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = bytes32(0);
 
-/// @dev Denotes the type of the zkSync transaction that came from L1.
+/// @dev Denotes the type of the ZKsync transaction that came from L1.
 uint256 constant PRIORITY_OPERATION_L2_TX_TYPE = 255;
 
-/// @dev Denotes the type of the zkSync transaction that is used for system upgrades.
+/// @dev Denotes the type of the ZKsync transaction that is used for system upgrades.
 uint256 constant SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 
 /// @dev The maximal allowed difference between protocol minor versions in an upgrade. The 100 gap is needed
@@ -102,21 +102,20 @@ uint256 constant MEMORY_OVERHEAD_GAS = 10;
 /// @dev The maximum gas limit for a priority transaction in L2.
 uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 
+/// @dev the address used to identify eth as the base token for chains.
 address constant ETH_TOKEN_ADDRESS = address(1);
 
+/// @dev the value returned in bridgehubDeposit in the TwoBridges function.
 bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
 
 /// @dev https://eips.ethereum.org/EIPS/eip-1352
 address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint16).max));
 
+/// @dev the maximum number of supported chains, this is an arbitrary limit.
 uint256 constant MAX_NUMBER_OF_HYPERCHAINS = 100;
 
-/// FIXME: move to a different file
-
-struct StoredBatchHashInfo {
-    uint256 number;
-    bytes32 hash;
-}
+/// @dev Used as the `msg.sender` for transactions that relayed via a settlement layer.
+address constant SETTLEMENT_LAYER_RELAY_SENDER = address(uint160(0x1111111111111111111111111111111111111111));
 
 struct PriorityTreeCommitment {
     uint256 nextLeafIndex;

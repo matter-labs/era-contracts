@@ -11,15 +11,15 @@ interface IAssetHandler {
     event BridgeInitialize(address indexed token, string name, string symbol, uint8 decimals);
 
     /// @dev Emitted when a token is minted
-    event BridgeMint(uint256 indexed _chainId, bytes32 indexed _assetId, address _receiver, uint256 _amount);
+    event BridgeMint(uint256 indexed chainId, bytes32 indexed assetId, address receiver, uint256 amount);
 
     /// @dev Emitted when a token is burned
     event BridgeBurn(
-        uint256 indexed _chainId,
-        bytes32 indexed _assetId,
+        uint256 indexed chainId,
+        bytes32 indexed assetId,
         address indexed sender,
-        address _receiver,
-        uint256 _amount
+        address receiver,
+        uint256 amount
     );
 
     /// @param _chainId the chainId that the message is from
@@ -32,13 +32,13 @@ interface IAssetHandler {
     ) external payable returns (address l1Receiver);
 
     /// @param _chainId the chainId that the message will be sent to
-    /// param mintValue the amount of base tokens to be minted on L2, will be used by Weth AssetHandler
+    /// @param _msgValue the msg.value of the L2 transaction
     /// @param _assetId the assetId of the asset being bridged
     /// @param _prevMsgSender the original caller of the Bridgehub,
     /// @param _data the actual data specified for the function
     function bridgeBurn(
         uint256 _chainId,
-        uint256 _mintValue,
+        uint256 _msgValue,
         bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data

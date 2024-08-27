@@ -9,8 +9,9 @@ import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
+import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
@@ -66,7 +67,12 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getBaseToken() external view returns (address) {
-        return s.baseToken;
+        return IBridgehub(s.bridgehub).baseToken(s.chainId);
+    }
+
+    /// @inheritdoc IGetters
+    function getBaseTokenAssetId() external view returns (bytes32) {
+        return s.baseTokenAssetId;
     }
 
     /// @inheritdoc IGetters
@@ -130,9 +136,6 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
             return s.priorityQueue.getSize();
         }
     }
-
-    /// @inheritdoc IGetters
-    function priorityQueueFrontOperation() external view returns (PriorityOperation memory op) {}
 
     /// @inheritdoc IGetters
     function isValidator(address _address) external view returns (bool) {
@@ -227,9 +230,13 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getSyncLayer() external view returns (address) {
+    function getSettlementLayer() external view returns (address) {
         // TODO: consider making private so that no one relies on it
-        return s.syncLayer;
+        return s.settlementLayer;
+    }
+
+    function getDAValidatorPair() external view returns (address, address) {
+        return (s.l1DAValidator, s.l2DAValidator);
     }
 
     /*//////////////////////////////////////////////////////////////

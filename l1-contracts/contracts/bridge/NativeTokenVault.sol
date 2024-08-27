@@ -104,8 +104,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     function registerToken(address _nativeToken) external {
         require(_nativeToken != WETH_TOKEN, "NTV: WETH deposit not supported");
         require(_nativeToken == BASE_TOKEN_ADDRESS || _nativeToken.code.length > 0, "NTV: empty token");
-        bytes32 assetId = getAssetId(_nativeToken);
-        ASSET_ROUTER.setAssetHandlerAddress(bytes32(uint256(uint160(_nativeToken))), address(this));
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
+        ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
         tokenAddress[assetId] = _nativeToken;
     }
 
@@ -176,8 +176,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         uint256,
         bytes32 _assetId,
         address _prevMsgSender,
-        bytes calldata _transferData
-    ) external payable override onlyBridge whenNotPaused returns (bytes memory bridgeMintData) {
+        bytes calldata _data
+    ) external payable override onlyBridge whenNotPaused returns (bytes memory _bridgeMintData) {
         if (isTokenBridged[_assetId]) {
             (uint256 _depositAmount, address _receiver) = abi.decode(_transferData, (uint256, address));
 
@@ -205,10 +205,21 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
             chainBalance[_chainId][nativeToken] += amount;
 
-            // solhint-disable-next-line func-named-parameters
-            bridgeMintData = abi.encode(amount, _prevMsgSender, _receiver, getERC20Getters(nativeToken), nativeToken);
-            // solhint-disable-next-line func-named-parameters
-            emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _receiver, amount);
+            _bridgeMintData = DataEncoding.encodeBridgeMintData({
+                _prevMsgSender: _prevMsgSender,
+                _l2Receiver: _l2Receiver,
+                _l1Token: l1Token,
+                _amount: amount,
+                _erc20Metadata: getERC20Getters(l1Token)
+            });
+
+            emit BridgeBurn({
+                chainId: _chainId,
+                assetId: _assetId,
+                l1Sender: _prevMsgSender,
+                l2receiver: _l2Receiver,
+                amount: amount
+            });
         } else {
             (uint256 _amount, address _receiver) = abi.decode(_transferData, (uint256, address));
             if (_amount == 0) {
@@ -219,8 +230,13 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             address bridgedToken = tokenAddress[_assetId];
             IBridgedStandardToken(bridgedToken).bridgeBurn(_prevMsgSender, _amount);
 
-            // solhint-disable-next-line func-named-parameters
-            emit BridgeBurn(_chainId, _assetId, _prevMsgSender, _receiver, _amount);
+            emit BridgeBurn({
+                chainId: _chainId,
+                assetId: _assetId,
+                l1Sender: _prevMsgSender,
+                l2receiver: _l2Receiver,
+                amount: amount
+            });            
             bridgeMintData = _transferData;
         }
     }
@@ -247,28 +263,17 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         return balanceAfter - balanceBefore;
     }
 
-    /// @notice Receives and parses (name, symbol, decimals) from the token contract.
     /// @param _token The address of token of interest.
-    /// @return Returns encoded name, symbol, and decimals for specific token.
-    function getERC20Getters(address _token) public view returns (bytes memory) {
-        if (_token == ETH_TOKEN_ADDRESS) {
-            bytes memory name = bytes("Ether");
-            bytes memory symbol = bytes("ETH");
-            bytes memory decimals = abi.encode(uint8(18));
-            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
-        }
-
-        (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
-        (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
-        (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
-        return abi.encode(data1, data2, data3);
+    /// @dev Receives and parses (name, symbol, decimals) from the token contract
+    function getERC20Getters(address _token) public view override returns (bytes memory) {
+        return BridgeHelper.getERC20Getters(_token, BASE_TOKEN_ADDRESS);
     }
 
     /// @notice Returns the parsed assetId.
     /// @param _nativeToken The address of the token to be parsed.
-    /// @return The asset ID.
-    function getAssetId(address _nativeToken) public view override returns (bytes32) {
-        return keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, _nativeToken));
+    /// @dev Shows the assetId for a given chain and token address
+    function getAssetId(uint256 _chainId, address _l1Token) external pure override returns (bytes32) {
+        return DataEncoding.encodeNTVAssetId(_chainId, _l1Token);
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
@@ -283,8 +288,16 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     function _deployBridgedToken(address _nativeToken, bytes memory _erc20Data) internal returns (address) {
         bytes32 salt = _getCreate2Salt(_nativeToken);
 
-        BeaconProxy l2Token = _deployBeaconProxy(salt);
-        BridgedStandardERC20(address(l2Token)).bridgeInitialize(_nativeToken, _erc20Data);
+        BeaconProxy l2Token;
+        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
+            // Deploy the beacon proxy for the L2 token
+            l2Token = _deployBeaconProxy(salt);
+        } else {
+            // Deploy the beacon proxy for the L2 token
+            address l2TokenAddr = L2_LEGACY_SHARED_BRIDGE.deployBeaconProxy(salt);
+            l2Token = BeaconProxy(payable(l2TokenAddr));
+        }
+        L2StandardERC20(address(l2Token)).bridgeInitialize(_nativeToken, _erc20Data);
 
         return address(l2Token);
     }

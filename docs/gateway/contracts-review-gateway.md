@@ -14,7 +14,8 @@ List of changes and new features:
 
 Other smaller changes:
 
-- The L2SharedBridge and L2NativeTokenVault contracts are now deployed at genesis at fixed addresses in user space. This is done in the genesis upgrade, previously called setChainId upgrade.
+- The setChainId upgrade is updated to become the Genesis upgrade with an L2 contract (deployed at genesis in user-space).
+- The Bridgehub, MessageRoot, L2SharedBridge and L2NativeTokenVault contracts are now deployed at genesis on the L2 at fixed addresses in user space.
 - The SharedBridges are renamed to AssetRouters.
 - Merkle.sol was moved from state-transition/libraries to common/libraries.
 
@@ -24,6 +25,9 @@ Known issues, and features that still need to be implemented:
 - Chains cannot yet leave the Gateway. Failed migration to the Gateway cannot yet be reclaimed.
 - Upgrade process, how do we upgrade to CAB bridge, to the new system contracts.
 - We had the syncLayer internal name previously for the Gateway. This has not been replaced everywhere yet.
+- permissions for some functions are not properly restricted yet, mostly they are missing a modifier.
+- Bridgehub setAssetHandlerAddress `address sender` might be an issue.
+- MessageRoot should be renamed to MessageRootAggregator
 
 ![Untitled](./Hyperchain-scheme.png)
 
@@ -46,3 +50,19 @@ Known issues, and features that still need to be implemented:
 - l2-contracts/contracts/
   - data-availability/\*
   - L2ContractHelper.sol
+
+## Later scope
+
+The majority of the rest of the changes. This makes the scope quite big, so please focus on the initial scope in more detail, and if you have time include the later scope.
+
+- MessageRoot.sol
+- STMDeploymentTracker.sol
+- Bridgehub.sol
+- Config.sol
+- L2ContractAddresses.sol
+- StateTransitionManager.sol
+- ValidatorTimelock.sol
+- DiamondInit.sol
+- ZkSyncHyperchainStorage.sol
+- Admin.sol
+- L1GenesisUpgrade.sol

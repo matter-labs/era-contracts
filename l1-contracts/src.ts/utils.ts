@@ -104,6 +104,15 @@ export function computeL2Create2Address(
   return ethers.utils.hexDataSlice(data, 12);
 }
 
+export function encodeNTVAssetId(chainId: number, tokenAddress: BytesLike) {
+  return ethers.utils.keccak256(
+    ethers.utils.defaultAbiCoder.encode(
+      ["uint256", "address", "bytes32"],
+      [chainId, L2_NATIVE_TOKEN_VAULT_ADDRESS, ethers.utils.hexZeroPad(tokenAddress, 32)]
+    )
+  );
+}
+
 export function getAddressFromEnv(envName: string): string {
   const address = process.env[envName];
   if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
@@ -298,7 +307,7 @@ export function compileInitialCutHash(
       protocolVersion: "0x0000000000000000000000000000000000002234",
       admin: "0x0000000000000000000000000000000000003234",
       validatorTimelock: "0x0000000000000000000000000000000000004234",
-      baseToken: "0x0000000000000000000000000000000000004234",
+      baseTokenAssetId: "0x0000000000000000000000000000000000000000000000000000000000004234",
       baseTokenBridge: "0x0000000000000000000000000000000000004234",
       storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
       verifier,
@@ -317,4 +326,10 @@ export function compileInitialCutHash(
 export enum PubdataSource {
   Rollup,
   Validium,
+}
+
+export interface ChainAdminCall {
+  target: string;
+  value: BigNumberish;
+  data: BytesLike;
 }

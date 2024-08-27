@@ -11,10 +11,14 @@ import {StateTransitionManager} from "../../state-transition/StateTransitionMana
 contract DummyStateTransitionManagerWBH is StateTransitionManager {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
+    address hyperchain;
     /// @notice Constructor
-    constructor(address bridgeHub) StateTransitionManager(bridgeHub, type(uint256).max) {}
+    constructor(address bridgeHub) StateTransitionManager(bridgeHub) {}
 
     function setHyperchain(uint256 _chainId, address _hyperchain) external {
-        hyperchainMap.set(_chainId, _hyperchain);
+        hyperchain = _hyperchain;
     }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }

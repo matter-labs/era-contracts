@@ -19,6 +19,6 @@ contract MerkleTest {
         uint256 _startIndex,
         bytes32[] calldata _itemHashes
     ) external pure returns (bytes32) {
-        return Merkle.calculateRoot(_startPath, _endPath, _startIndex, _itemHashes);
+        return Merkle.calculateRootPaths(_startPath, _endPath, _startIndex, _itemHashes);
     }
 }

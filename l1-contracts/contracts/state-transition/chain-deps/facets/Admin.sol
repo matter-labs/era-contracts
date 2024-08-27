@@ -27,6 +27,19 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "AdminFacet";
 
+    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
+    /// L1 that is at the most base layer.
+    uint256 internal immutable L1_CHAIN_ID;
+
+    constructor(uint256 _l1ChainId) {
+        L1_CHAIN_ID = _l1ChainId;
+    }
+
+    modifier onlyL1() {
+        require(block.chainid == L1_CHAIN_ID, "AdminFacet: not L1");
+        _;
+    }
+
     /// @inheritdoc IAdmin
     function setPendingAdmin(address _newPendingAdmin) external onlyAdmin {
         // Save previous value into the stack to put it into the event later
@@ -72,7 +85,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function changeFeeParams(FeeParams calldata _newFeeParams) external onlyAdminOrStateTransitionManager {
+    function changeFeeParams(FeeParams calldata _newFeeParams) external onlyAdminOrStateTransitionManager onlyL1 {
         // Double checking that the new fee params are valid, i.e.
         // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
         require(_newFeeParams.maxPubdataPerBatch >= _newFeeParams.priorityTxMaxPubdata, "n6");
@@ -87,7 +100,10 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrStateTransitionManager {
+    function setTokenMultiplier(
+        uint128 _nominator,
+        uint128 _denominator
+    ) external onlyAdminOrStateTransitionManager onlyL1 {
         require(_denominator != 0, "AF: denominator 0");
         uint128 oldNominator = s.baseTokenGasPriceMultiplierNominator;
         uint128 oldDenominator = s.baseTokenGasPriceMultiplierDenominator;
@@ -99,13 +115,14 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin {
+    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin onlyL1 {
         require(s.totalBatchesCommitted == 0, "AdminFacet: set validium only after genesis"); // Validium mode can be set only before the first batch is processed
         s.feeParams.pubdataPricingMode = _pricingMode;
         emit ValidiumModeStatusUpdate(_pricingMode);
     }
 
-    function setTransactionFilterer(address _transactionFilterer) external onlyAdmin {
+    /// @inheritdoc IAdmin
+    function setTransactionFilterer(address _transactionFilterer) external onlyAdmin onlyL1 {
         address oldTransactionFilterer = s.transactionFilterer;
         s.transactionFilterer = _transactionFilterer;
         emit NewTransactionFilterer(oldTransactionFilterer, _transactionFilterer);
@@ -163,19 +180,17 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
     function genesisUpgrade(
         address _l1GenesisUpgrade,
+        address _stmDeployer,
         bytes calldata _forceDeploymentData,
         bytes[] calldata _factoryDeps
     ) external onlyStateTransitionManager {
-        uint256 cachedProtocolVersion = s.protocolVersion;
-        uint256 chainId = s.chainId;
-
         Diamond.FacetCut[] memory emptyArray;
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
             facetCuts: emptyArray,
             initAddress: _l1GenesisUpgrade,
             initCalldata: abi.encodeCall(
                 IL1GenesisUpgrade.genesisUpgrade,
-                (_l1GenesisUpgrade, chainId, cachedProtocolVersion, _forceDeploymentData, _factoryDeps)
+                (_l1GenesisUpgrade, s.chainId, s.protocolVersion, _stmDeployer, _forceDeploymentData, _factoryDeps)
             )
         });
 
@@ -210,28 +225,27 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
                             CHAIN MIGRATION
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev we can move assets using these
+    /// @inheritdoc IAdmin
     function forwardedBridgeBurn(
-        address _syncLayer,
+        address _settlementLayer,
         address _prevMsgSender,
         bytes calldata
     ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
-        // (address _newSyncLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
-        require(s.syncLayer == address(0), "Af: already migrated");
+        require(s.settlementLayer == address(0), "Af: already migrated");
         require(_prevMsgSender == s.admin, "Af: not chainAdmin");
         IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
 
-        // address chainBaseToken = hyperchain.getBaseToken();
         uint256 currentProtocolVersion = s.protocolVersion;
         uint256 protocolVersion = stm.protocolVersion();
 
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
 
-        s.syncLayer = _syncLayer;
-        chainBridgeMintData = abi.encode(_prepareChainCommitment());
+        s.settlementLayer = _settlementLayer;
+        chainBridgeMintData = abi.encode(prepareChainCommitment());
     }
 
-    function forwardedBridgeMint(bytes calldata _data) external payable override {
+    /// @inheritdoc IAdmin
+    function forwardedBridgeMint(bytes calldata _data) external payable override onlyBridgehub {
         HyperchainCommitment memory _commitment = abi.decode(_data, (HyperchainCommitment));
 
         uint256 batchesExecuted = _commitment.totalBatchesExecuted;
@@ -266,20 +280,26 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
         s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
 
+        // Set the settlement to 0 - as this is the current settlement chain.
+        s.settlementLayer = address(0);
+
         _setDAValidatorPair(address(0), address(0));
 
         emit MigrationComplete();
     }
 
+    /// @inheritdoc IAdmin
     function forwardedBridgeClaimFailedBurn(
         uint256 _chainId,
         bytes32 _assetInfo,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override {}
+    ) external payable override onlyBridgehub {}
 
-    // todo make internal. For now useful for testing
-    function _prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {
+    /// @notice Returns the commitment for a chain.
+    /// @dev Note, that this is a getter method helpful for debugging and should not be relied upon by clients.
+    /// @return commitment The commitment for the chain.
+    function prepareChainCommitment() public view returns (HyperchainCommitment memory commitment) {
         require(s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex, "PQ not ready");
 
         commitment.totalBatchesCommitted = s.totalBatchesCommitted;
@@ -312,25 +332,21 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         commitment.batchHashes = batchHashes;
     }
 
-    function readChainCommitment() external view returns (bytes memory commitment) {
-        return abi.encode(_prepareChainCommitment());
-    }
-
-    // function recoverFromFailedMigrationToSyncLayer(
-    //     uint256 _syncLayerChainId,
+    // function recoverFromFailedMigrationToGateway(
+    //     uint256 _settlementLayerChainId,
     //     uint256 _l2BatchNumber,
     //     uint256 _l2MessageIndex,
     //     uint16 _l2TxNumberInBatch,
     //     bytes32[] calldata _merkleProof
     // ) external onlyAdmin {
-    //     require(s.syncLayerState == SyncLayerState.MigratedFromL1, "not migrated L1");
+    //     require(s.settlementLayerState == SettlementLayerState.MigratedFromL1, "not migrated L1");
 
-    //     bytes32 migrationHash = s.syncLayerMigrationHash;
+    //     bytes32 migrationHash = s.settlementLayerMigrationHash;
     //     require(migrationHash != bytes32(0), "can not recover when there is no migration");
 
     //     require(
     //         IBridgehub(s.bridgehub).proveL1ToL2TransactionStatus(
-    //             _syncLayerChainId,
+    //             _settlementLayerChainId,
     //             migrationHash,
     //             _l2BatchNumber,
     //             _l2MessageIndex,
@@ -341,9 +357,9 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     //         "Migration not failed"
     //     );
 
-    //     s.syncLayerState = SyncLayerState.ActiveOnL1;
-    //     s.syncLayerChainId = 0;
-    //     s.syncLayerMigrationHash = bytes32(0);
+    //     s.settlementLayerState = SettlementLayerState.ActiveOnL1;
+    //     s.settlementLayerChainId = 0;
+    //     s.settlementLayerMigrationHash = bytes32(0);
 
     //     // We do not need to perform any additional actions, since no changes related to the chain commitment can be performed
     //     // while the chain is in the "migrated" state.

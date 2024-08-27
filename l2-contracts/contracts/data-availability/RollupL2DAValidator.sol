@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors, reason-string
-
 import {IL2DAValidator} from "../interfaces/IL2DAValidator.sol";
 import {StateDiffL2DAValidator} from "./StateDiffL2DAValidator.sol";
 import {PUBDATA_CHUNK_PUBLISHER} from "../L2ContractHelper.sol";
@@ -17,30 +15,25 @@ import {ReconstructionMismatch, PubdataField} from "./DAErrors.sol";
 contract RollupL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
     function validatePubdata(
         // The rolling hash of the user L2->L1 logs.
-        bytes32 _chainedLogsHash,
+        bytes32,
         // The root hash of the user L2->L1 logs.
         bytes32,
         // The chained hash of the L2->L1 messages
         bytes32 _chainedMessagesHash,
         // The chained hash of uncompressed bytecodes sent to L1
-        bytes32 _chainedBytescodesHash,
+        bytes32 _chainedBytecodesHash,
         // Operator data, that is related to the DA itself
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
     ) external returns (bytes32 outputHash) {
         (bytes32 stateDiffHash, bytes calldata _totalPubdata, bytes calldata leftover) = _produceStateDiffPubdata(
-            _chainedLogsHash,
             _chainedMessagesHash,
-            _chainedBytescodesHash,
+            _chainedBytecodesHash,
             _totalL2ToL1PubdataAndStateDiffs
         );
 
         /// Check for calldata strict format
         if (leftover.length != 0) {
-            revert ReconstructionMismatch(
-                PubdataField.ExtraData,
-                bytes32(leftover.length + _totalL2ToL1PubdataAndStateDiffs.length),
-                bytes32(_totalL2ToL1PubdataAndStateDiffs.length)
-            );
+            revert ReconstructionMismatch(PubdataField.ExtraData, bytes32(0), bytes32(leftover.length));
         }
 
         // The preimage under the hash `outputHash` is expected to be in the following format:

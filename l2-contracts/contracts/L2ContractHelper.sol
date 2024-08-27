@@ -99,18 +99,21 @@ interface IPubdataChunkPublisher {
 
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
 
-uint160 constant KERNEL_SPACE_OFFSET = 0x10000; // 2^16
+/// @dev The offset from which the built-in, but user space contracts are located.
+uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
 
 address constant BOOTLOADER_ADDRESS = address(SYSTEM_CONTRACTS_OFFSET + 0x01);
 address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
 address constant DEPLOYER_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x06);
 
-address constant L2_BRIDGEHUB_ADDRESS = address(KERNEL_SPACE_OFFSET + 0x02);
+address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
 
-IL2AssetRouter constant L2_ASSET_ROUTER = IL2AssetRouter(address(KERNEL_SPACE_OFFSET + 0x03));
+IL2AssetRouter constant L2_ASSET_ROUTER = IL2AssetRouter(address(USER_CONTRACTS_OFFSET + 0x03));
 
 /// @dev The contract responsible for handling tokens native to a single chain.
-IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(address(KERNEL_SPACE_OFFSET + 0x04));
+IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(address(USER_CONTRACTS_OFFSET + 0x04));
+
+uint256 constant L1_CHAIN_ID = 1;
 
 IL2Messenger constant L2_MESSENGER = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
 
@@ -196,7 +199,7 @@ library L2ContractHelper {
     }
 }
 
-/// @notice Structure used to represent a zkSync transaction.
+/// @notice Structure used to represent a ZKsync transaction.
 struct Transaction {
     // The type of the transaction.
     uint256 txType;

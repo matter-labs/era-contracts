@@ -29,10 +29,22 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
     /// @dev Address of the L1 base token. It can be deposited to mint this L2 token.
     address public override l1Address;
 
+    modifier onlyBridge() {
+        if (msg.sender != l2Bridge) {
+            revert Unauthorized();
+        }
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     constructor() {
         // Disable initialization to prevent Parity hack.
         _disableInitializers();
+    }
+
+    /// @dev Fallback function to allow receiving Ether.
+    receive() external payable {
+        depositTo(msg.sender);
     }
 
     /// @notice Initializes a contract token for later use. Expected to be used in the proxy.
@@ -68,14 +80,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
         emit Initialize(name_, symbol_, 18);
     }
 
-    modifier onlyBridge() {
-        if (msg.sender != l2Bridge) {
-            revert Unauthorized();
-        }
-        _;
-    }
-
-    /// @notice Function for minting tokens on L2, implemented only to be compatible with IBridgedStandardToken interface.
+    /// @notice Function for minting tokens on L2, implemented only to be compatible with IL2StandardToken interface.
     /// Always reverts instead of minting anything!
     /// Note: Use `deposit`/`depositTo` methods instead.
     // solhint-disable-next-line no-unused-vars
@@ -121,10 +126,5 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
         if (!success) {
             revert WithdrawFailed();
         }
-    }
-
-    /// @dev Fallback function to allow receiving Ether.
-    receive() external payable {
-        depositTo(msg.sender);
     }
 }

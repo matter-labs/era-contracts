@@ -3,7 +3,6 @@
 pragma solidity 0.8.24;
 
 import {IZkSyncHyperchainBase} from "../chain-interfaces/IZkSyncHyperchainBase.sol";
-import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
@@ -67,6 +66,7 @@ interface IAdmin is IZkSyncHyperchainBase {
 
     function genesisUpgrade(
         address _l1GenesisUpgrade,
+        address _stmDeployer,
         bytes calldata _forceDeploymentData,
         bytes[] calldata _factoryDeps
     ) external;
@@ -74,7 +74,7 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice Set the L1 DA validator address as well as the L2 DA validator address.
     /// @dev While in principle it is possible that updating only one of the addresses is needed,
     /// usually these should work in pair and L1 validator typically expects a specific input from the L2 Validator.
-    /// That's why we change those together to prevent shooting admins of chains from shooting themselves in the foot.
+    /// That's why we change those together to prevent admins of chains from shooting themselves in the foot.
     /// @param _l1DAValidator The address of the L1 DA validator
     /// @param _l2DAValidator The address of the L2 DA validator
     function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external;
@@ -127,23 +127,19 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice New pair of DA validators set
     event NewL2DAValidator(address indexed oldL2DAValidator, address indexed newL2DAValidator);
     event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
-    /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
-    event SetChainIdUpgrade(
-        address indexed _hyperchain,
-        L2CanonicalTransaction _l2Transaction,
-        uint256 indexed _protocolVersion
-    );
 
     event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
 
     event BridgeMint(address indexed _account, uint256 _amount);
 
+    /// @dev Similar to IL1AssetHandler interface, used to send chains.
     function forwardedBridgeBurn(
-        address _syncLayer,
+        address _settlementLayer,
         address _prevMsgSender,
         bytes calldata _data
     ) external payable returns (bytes memory _bridgeMintData);
 
+    /// @dev Similar to IL1AssetHandler interface, used to claim failed chain transfers.
     function forwardedBridgeClaimFailedBurn(
         uint256 _chainId,
         bytes32 _assetInfo,
@@ -151,5 +147,6 @@ interface IAdmin is IZkSyncHyperchainBase {
         bytes calldata _data
     ) external payable;
 
+    /// @dev Similar to IL1AssetHandler interface, used to receive chains.
     function forwardedBridgeMint(bytes calldata _data) external payable;
 }

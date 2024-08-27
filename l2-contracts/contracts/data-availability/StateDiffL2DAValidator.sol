@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors, reason-string
-
 import {ReconstructionMismatch, PubdataField} from "./DAErrors.sol";
 import {COMPRESSOR_CONTRACT, L2ContractHelper} from "../L2ContractHelper.sol";
 
@@ -20,16 +18,15 @@ uint256 constant STATE_DIFF_ENTRY_SIZE = 272;
 /// A library that could be used by any L2 DA validator to produce standard state-diff-based
 /// DA output.
 abstract contract StateDiffL2DAValidator {
-    /// @notice Validates, that the operator provided the correct preimages for los, messages, and bytecodes.
+    /// @notice Validates, that the operator provided the correct preimages for logs, messages, and bytecodes.
     /// @return uncompressedStateDiffHash the hash of the uncompressed state diffs
     /// @return totalL2Pubdata total pubdata that should be sent to L1.
     /// @return leftoverSuffix the suffix left after pubdata and uncompressed state diffs.
     /// On Era or other "vanilla" rollups it is empty, but it can be used for providing additional data by the operator,
     /// e.g. DA committee signatures, etc.
     function _produceStateDiffPubdata(
-        bytes32 _chainedLogsHash,
         bytes32 _chainedMessagesHash,
-        bytes32 _chainedBytescodesHash,
+        bytes32 _chainedBytecodesHash,
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
     )
         internal
@@ -40,19 +37,7 @@ abstract contract StateDiffL2DAValidator {
 
         /// Check logs
         uint32 numberOfL2ToL1Logs = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-        calldataPtr += 4;
-
-        bytes32 reconstructedChainedLogsHash;
-        for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
-            bytes32 hashedLog = EfficientCall.keccak(
-                _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + L2_TO_L1_LOG_SERIALIZE_SIZE]
-            );
-            calldataPtr += L2_TO_L1_LOG_SERIALIZE_SIZE;
-            reconstructedChainedLogsHash = keccak256(abi.encode(reconstructedChainedLogsHash, hashedLog));
-        }
-        if (reconstructedChainedLogsHash != _chainedLogsHash) {
-            revert ReconstructionMismatch(PubdataField.LogsHash, _chainedLogsHash, reconstructedChainedLogsHash);
-        }
+        calldataPtr += 4 + numberOfL2ToL1Logs * L2_TO_L1_LOG_SERIALIZE_SIZE;
 
         /// Check messages
         uint32 numberOfMessages = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
@@ -90,10 +75,10 @@ abstract contract StateDiffL2DAValidator {
             );
             calldataPtr += currentBytecodeLength;
         }
-        if (reconstructedChainedL1BytecodesRevealDataHash != _chainedBytescodesHash) {
+        if (reconstructedChainedL1BytecodesRevealDataHash != _chainedBytecodesHash) {
             revert ReconstructionMismatch(
                 PubdataField.Bytecode,
-                _chainedBytescodesHash,
+                _chainedBytecodesHash,
                 reconstructedChainedL1BytecodesRevealDataHash
             );
         }

@@ -31,13 +31,18 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @dev Base token address.
     address public immutable override BASE_TOKEN_ADDRESS;
 
+    /// @dev Address of native token vault.
+    INativeTokenVault public nativeTokenVault;
+
     /// @dev Maps asset ID to address of corresponding asset handler.
     /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset.
     /// @dev P.S. this liquidity was locked directly in SharedBridge before.
     mapping(bytes32 assetId => address assetHandlerAddress) public assetHandlerAddress;
 
-    /// @dev Address of native token vault.
-    INativeTokenVault public nativeTokenVault;
+        /// @dev Maps asset ID to the asset deployment tracker address.
+    /// @dev Tracks the address of Deployment Tracker contract on L1, which sets Asset Handlers on L2s (ZK chain).
+    /// @dev For the asset and stores respective addresses.
+    mapping(bytes32 assetId => address assetDeploymentTracker) public assetDeploymentTracker;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -65,7 +70,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @dev No access control on the caller, as msg.sender is encoded in the assetId.
     /// @param _assetData In most cases this parameter is bytes32 encoded token address. However, it can include extra information used by custom asset handlers.
     /// @param _assetHandlerAddress The address of the asset handler, which will hold the token of interest.
-    function setAssetHandlerAddress(bytes32 _assetData, address _assetHandlerAddress) external virtual {
+    function setAssetHandlerAddressThisChain(bytes32 _assetData, address _assetHandlerAddress) external virtual {
         address sender = msg.sender == address(nativeTokenVault) ? L2_NATIVE_TOKEN_VAULT_ADDRESS : msg.sender;
         bytes32 assetId = keccak256(abi.encode(uint256(block.chainid), sender, _assetData));
         assetHandlerAddress[assetId] = _assetHandlerAddress;
@@ -85,11 +90,13 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         uint256 _amount
     ) public payable virtual override onlyBridgehub whenNotPaused {
         address assetHandler = assetHandlerAddress[_assetId];
+        require(l1AssetHandler != address(0), "AR: asset handler not set");
+
         _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
         // slither-disable-next-line unused-return
         IAssetHandler(assetHandler).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
-            _mintValue: _amount,
+            _msgValue: 0,
             _assetId: _assetId,
             _prevMsgSender: _prevMsgSender,
             _data: abi.encode(_amount, address(0))
@@ -192,6 +199,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes32 _txDataHash
     ) internal view virtual returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes memory l2TxCalldata = getDepositL2Calldata(_chainId, _prevMsgSender, _assetId, _bridgeMintCalldata);
+        // bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _assetId, _bridgeMintCalldata);
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
@@ -218,11 +226,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         // Second branch handles tokens registered with NTV and uses legacy calldata encoding
         if (nativeTokenVault.tokenAddress(_assetId) == address(0)) {
             return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (_chainId, _assetId, _transferData));
+            // return abi.encodeCall(IL2Bridge.finalizeDeposit, (_assetId, _assetData));
         } else {
-            (uint256 _amount, , address _l2Receiver, bytes memory _gettersData, address _parsedL1Token) = abi.decode(
-                _transferData,
-                (uint256, address, address, bytes, address)
-            );
+            // slither-disable-next-line unused-return
+            (, address _l2Receiver, address _parsedL1Token, uint256 _amount, bytes memory _gettersData) = DataEncoding
+                .decodeBridgeMintData(_assetData);
             return
                 abi.encodeCall(
                     IL2BridgeLegacy.finalizeDeposit,
@@ -231,22 +239,27 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         }
     }
 
+    /// @dev send the burn message to the asset
     /// @notice Forwards the burn request for specific asset to respective asset handler.
     /// @param _chainId The chain ID of the ZK chain to which to deposit.
     /// @param _value The L2 `msg.value` from the L1 -> L2 deposit transaction.
     /// @param _assetId The deposited asset ID.
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
     /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
+    /// @param _passValue Boolean indicating whether to pass msg.value in the call.
     /// @return bridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
     function _burn(
         uint256 _chainId,
         uint256 _value,
         bytes32 _assetId,
         address _prevMsgSender,
-        bytes memory _transferData
+        bytes memory _transferData,
+        bool _passValue
     ) internal returns (bytes memory bridgeMintCalldata) {
         address l1AssetHandler = assetHandlerAddress[_assetId];
-        bridgeMintCalldata = IAssetHandler(l1AssetHandler).bridgeBurn{value: msg.value}({
+        uint256 msgValue = _passValue ? msg.value : 0;
+        
+        bridgeMintCalldata = IAssetHandler(l1AssetHandler).bridgeBurn{value: msgValue}({
             _chainId: _chainId,
             _mintValue: _value,
             _assetId: _assetId,

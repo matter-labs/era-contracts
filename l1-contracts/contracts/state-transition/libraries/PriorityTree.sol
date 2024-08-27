@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity ^0.8.24;
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
 // solhint-disable gas-custom-errors
 
@@ -40,7 +40,7 @@ library PriorityTree {
 
     /// @return The total number of unprocessed priority operations in a priority queue
     function getSize(Tree storage _tree) internal view returns (uint256) {
-        return uint256(_tree.tree._nextLeafIndex - _tree.unprocessedIndex);
+        return _tree.tree._nextLeafIndex - _tree.unprocessedIndex;
     }
 
     /// @notice Add the priority operation to the end of the priority queue
@@ -49,18 +49,21 @@ library PriorityTree {
         _tree.historicalRoots[newRoot] = true;
     }
 
+    /// @notice Set up the tree
     function setup(Tree storage _tree, uint256 _startIndex) internal {
         _tree.tree.setup(ZERO_LEAF_HASH);
         _tree.startIndex = _startIndex;
     }
 
+    /// @return Returns the tree root.
     function getRoot(Tree storage _tree) internal view returns (bytes32) {
         return _tree.tree.root();
     }
 
+    /// @notice Process the priority operations of a batch.
     function processBatch(Tree storage _tree, PriorityOpsBatchInfo calldata _priorityOpsData) internal {
         if (_priorityOpsData.itemHashes.length > 0) {
-            bytes32 expectedRoot = Merkle.calculateRoot(
+            bytes32 expectedRoot = Merkle.calculateRootPaths(
                 _priorityOpsData.leftPath,
                 _priorityOpsData.rightPath,
                 _tree.unprocessedIndex,
@@ -71,6 +74,7 @@ library PriorityTree {
         }
     }
 
+    /// @notice Initialize a chain from a commitment.
     function initFromCommitment(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal {
         uint256 height = _commitment.sides.length; // Height, including the root node.
         require(height > 0, "PT: invalid commitment");
@@ -87,6 +91,7 @@ library PriorityTree {
         _tree.historicalRoots[_tree.tree.root()] = true;
     }
 
+    /// @notice Returns the commitment to the priority tree.
     function getCommitment(Tree storage _tree) internal view returns (PriorityTreeCommitment memory commitment) {
         commitment.nextLeafIndex = _tree.tree._nextLeafIndex;
         commitment.startIndex = _tree.startIndex;

@@ -16,12 +16,12 @@ import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.so
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
+import {MessageHashing} from "../../../common/libraries/MessageHashing.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../../common/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/interfaces/IL1AssetRouter.sol";
@@ -29,11 +29,11 @@ import {IL1Nullifier, FinalizeWithdrawalParams} from "../../../bridge/interfaces
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
-
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER} from "../../../common/Config.sol";
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
-/// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
+/// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
@@ -47,11 +47,21 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     /// @dev Era's chainID
     uint256 internal immutable ERA_CHAIN_ID;
 
-    constructor(uint256 _eraChainId) {
-        ERA_CHAIN_ID = _eraChainId;
+    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
+    /// L1 that is at the most base layer.
+    uint256 internal immutable L1_CHAIN_ID;
+
+    modifier onlyL1() {
+        require(block.chainid == L1_CHAIN_ID, "MailboxFacet: not L1");
+        _;
     }
 
-    /// @notice when requesting transactions through the bridgehub
+    constructor(uint256 _eraChainId, uint256 _l1ChainId) {
+        ERA_CHAIN_ID = _eraChainId;
+        L1_CHAIN_ID = _l1ChainId;
+    }
+
+    /// @inheritdoc IMailbox
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
     ) external onlyBridgehub returns (bytes32 canonicalTxHash) {
@@ -109,7 +119,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     }
 
     // /// @inheritdoc IMailbox
-    function proveL1ToL2TransactionStatusViaSyncLayer(
+    function proveL1ToL2TransactionStatusViaGateway(
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
@@ -118,6 +128,105 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         TxStatus _status
     ) public view returns (bool) {}
 
+    function _parseProofMetadata(
+        bytes32 _proofMetadata
+    ) internal pure returns (uint256 logLeafProofLen, uint256 batchLeafProofLen) {
+        bytes1 metadataVersion = bytes1(_proofMetadata[0]);
+        require(metadataVersion == 0x01, "Mailbox: unsupported proof metadata version");
+
+        logLeafProofLen = uint256(uint8(_proofMetadata[1]));
+        batchLeafProofLen = uint256(uint8(_proofMetadata[2]));
+    }
+
+    function extractSlice(
+        bytes32[] calldata _proof,
+        uint256 _left,
+        uint256 _right
+    ) internal pure returns (bytes32[] memory slice) {
+        slice = new bytes32[](_right - _left);
+        for (uint256 i = _left; i < _right; i = i.uncheckedInc()) {
+            slice[i - _left] = _proof[i];
+        }
+    }
+
+    /// @inheritdoc IMailbox
+    function proveL2LeafInclusion(
+        uint256 _batchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) external view override returns (bool) {
+        return _proveL2LeafInclusion(_batchNumber, _leafProofMask, _leaf, _proof);
+    }
+
+    function _proveL2LeafInclusion(
+        uint256 _batchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) internal view returns (bool) {
+        // FIXME: maybe support legacy interface
+
+        uint256 ptr = 0;
+        bytes32 chainIdLeaf;
+        {
+            (uint256 logLeafProofLen, uint256 batchLeafProofLen) = _parseProofMetadata(_proof[ptr]);
+            ++ptr;
+
+            bytes32 batchSettlementRoot = Merkle.calculateRootMemory(
+                extractSlice(_proof, ptr, ptr + logLeafProofLen),
+                _leafProofMask,
+                _leaf
+            );
+            ptr += logLeafProofLen;
+
+            // Note that this logic works only for chains that do not migrate away from the synclayer back to L1.
+            // Support for chains that migrate back to L1 will be added in the future.
+            if (s.settlementLayer == address(0)) {
+                bytes32 correctBatchRoot = s.l2LogsRootHashes[_batchNumber];
+                require(correctBatchRoot != bytes32(0), "local root is 0");
+                return correctBatchRoot == batchSettlementRoot;
+            }
+
+            require(s.l2LogsRootHashes[_batchNumber] == bytes32(0), "local root must be 0");
+
+            // Now, we'll have to check that the Gateway included the message.
+            bytes32 batchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, _batchNumber);
+
+            uint256 batchLeafProofMask = uint256(bytes32(_proof[ptr]));
+            ++ptr;
+
+            bytes32 chainIdRoot = Merkle.calculateRootMemory(
+                extractSlice(_proof, ptr, ptr + batchLeafProofLen),
+                batchLeafProofMask,
+                batchLeafHash
+            );
+            ptr += batchLeafProofLen;
+
+            chainIdLeaf = MessageHashing.chainIdLeafHash(chainIdRoot, s.chainId);
+        }
+
+        uint256 settlementLayerBatchNumber;
+        uint256 settlementLayerBatchRootMask;
+
+        // Preventing stack too deep error
+        {
+            // Now, we just need to double check whether this chainId leaf was present in the tree.
+            uint256 settlementLayerPackedBatchInfo = uint256(_proof[ptr]);
+            ++ptr;
+            settlementLayerBatchNumber = uint256(settlementLayerPackedBatchInfo >> 128);
+            settlementLayerBatchRootMask = uint256(settlementLayerPackedBatchInfo & ((1 << 128) - 1));
+        }
+
+        return
+            IMailbox(s.settlementLayer).proveL2LeafInclusion(
+                settlementLayerBatchNumber,
+                settlementLayerBatchRootMask,
+                chainIdLeaf,
+                extractSlice(_proof, ptr, _proof.length)
+            );
+    }
+
     /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
     function _proveL2LogInclusion(
         uint256 _batchNumber,
@@ -125,7 +234,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         L2Log memory _log,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        require(_batchNumber <= s.totalBatchesExecuted, "xx");
+        // require(_batchNumber <= s.totalBatchesExecuted, "xx");
 
         bytes32 hashedLog = keccak256(
             // solhint-disable-next-line func-named-parameters
@@ -139,10 +248,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         // of leaf preimage (which is `L2_TO_L1_LOG_SERIALIZE_SIZE`) is not
         // equal to the length of other nodes preimages (which are `2 * 32`)
 
-        bytes32 calculatedRootHash = Merkle.calculateRoot(_proof, _index, hashedLog);
-        bytes32 actualRootHash = s.l2LogsRootHashes[_batchNumber];
+        // We can use `index` as a mask, since the `localMessageRoot` is on the left part of the tree.
 
-        return actualRootHash == calculatedRootHash;
+        return _proveL2LeafInclusion(_batchNumber, _index, hashedLog, _proof);
     }
 
     /// @dev Convert arbitrary-length message to the raw l2 log
@@ -195,14 +303,14 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         return Math.max(l2GasPrice, minL2GasPriceBaseToken);
     }
 
-    /// @dev On L1 we have to forward to SyncLayer mailbox
-    function requestL2TransactionToSyncLayerMailbox(
+    /// @inheritdoc IMailbox
+    function requestL2TransactionToGatewayMailbox(
         uint256 _chainId,
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external returns (bytes32 canonicalTxHash) {
+    ) external override onlyL1 returns (bytes32 canonicalTxHash) {
         require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId), "Mailbox SL: not SL");
         require(
             IStateTransitionManager(s.stateTransitionManager).getHyperchain(_chainId) == msg.sender,
@@ -216,16 +324,16 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             _canonicalTxHash: _canonicalTxHash,
             _expirationTimestamp: _expirationTimestamp
         });
-        canonicalTxHash = _requestL2TransactionToSyncLayerFree(wrappedRequest);
+        canonicalTxHash = _requestL2TransactionToGatewayFree(wrappedRequest);
     }
 
-    /// @dev On SL the chain's mailbox
-    function bridgehubRequestL2TransactionOnSyncLayer(
+    /// @inheritdoc IMailbox
+    function bridgehubRequestL2TransactionOnGateway(
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external {
+    ) external override onlyBridgehub {
         _writePriorityOp(_transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp);
     }
 
@@ -234,20 +342,17 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
-        uint256 _expirationTimestamp
+        uint64 _expirationTimestamp
     ) internal view returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
-        bytes memory data = abi.encodeWithSelector(
-            IBridgehub(s.bridgehub).forwardTransactionOnSyncLayer.selector,
-            _chainId,
-            _transaction,
-            _factoryDeps,
-            _canonicalTxHash,
-            _expirationTimestamp
+        bytes memory data = abi.encodeCall(
+            IBridgehub(s.bridgehub).forwardTransactionOnGateway,
+            (_chainId, _transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp)
         );
         return
             BridgehubL2TransactionRequest({
-                sender: s.bridgehub,
+                /// There is no sender for the wrapping, we use a virtual address.
+                sender: SETTLEMENT_LAYER_RELAY_SENDER,
                 contractL2: L2_BRIDGEHUB_ADDR,
                 mintValue: 0,
                 l2Value: 0,
@@ -305,7 +410,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
         request.refundRecipient = AddressAliasHelper.actualRefundRecipient(request.refundRecipient, request.sender);
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
-        // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
+        // Please note, currently ZKsync address derivation is different from Ethereum one, but it may be changed in the future.
         // slither-disable-next-line tx-origin
         if (request.sender != tx.origin) {
             request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
@@ -318,15 +423,15 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         (transaction, canonicalTxHash) = _validateTx(_params);
 
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
-        if (s.syncLayer != address(0)) {
-            canonicalTxHash = IMailbox(s.syncLayer).requestL2TransactionToSyncLayerMailbox({
+        if (s.settlementLayer != address(0)) {
+            // slither-disable-next-line unused-return
+            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
                 _chainId: s.chainId,
                 _transaction: transaction,
                 _factoryDeps: _params.request.factoryDeps,
                 _canonicalTxHash: canonicalTxHash,
                 _expirationTimestamp: _params.expirationTimestamp
             });
-            return canonicalTxHash;
         }
     }
 
@@ -338,7 +443,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         }
     }
 
-    function _requestL2TransactionToSyncLayerFree(
+    function _requestL2TransactionToGatewayFree(
         BridgehubL2TransactionRequest memory _request
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         WritePriorityOpParams memory params = WritePriorityOpParams({
@@ -380,7 +485,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
     function _validateTx(
         WritePriorityOpParams memory _priorityOpParams
-    ) internal returns (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) {
+    ) internal view returns (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) {
         transaction = _serializeL2Transaction(_priorityOpParams);
         bytes memory transactionEncoding = abi.encode(transaction);
         TransactionValidator.validateL1ToL2Transaction(
@@ -439,7 +544,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external nonReentrant {
+    ) external nonReentrant onlyL1 {
         require(s.chainId == ERA_CHAIN_ID, "Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
         IL1Nullifier(s.baseTokenBridge).finalizeWithdrawal(
             // solhint-disable-next-line func-named-parameters
@@ -464,7 +569,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
         address _refundRecipient
-    ) external payable returns (bytes32 canonicalTxHash) {
+    ) external payable onlyL1 returns (bytes32 canonicalTxHash) {
         require(s.chainId == ERA_CHAIN_ID, "Mailbox: legacy interface only available for Era");
         canonicalTxHash = _requestL2TransactionSender(
             BridgehubL2TransactionRequest({

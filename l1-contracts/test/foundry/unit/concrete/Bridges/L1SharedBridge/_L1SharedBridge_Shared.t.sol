@@ -13,8 +13,11 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
+import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
+import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract L1AssetRouterTest is Test {
     using stdStorage for StdStorage;
@@ -98,10 +101,7 @@ contract L1AssetRouterTest is Test {
     uint256 legacyBatchNumber = 0;
 
     uint256 isWithdrawalFinalizedStorageLocation = uint256(8 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1 + 50);
-    bytes32 ETH_TOKEN_ASSET_ID =
-        keccak256(
-            abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
-        );
+    bytes32 ETH_TOKEN_ASSET_ID = keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, ETH_TOKEN_ADDRESS));
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -142,8 +142,7 @@ contract L1AssetRouterTest is Test {
         sharedBridge = L1AssetRouter(payable(sharedBridgeProxy));
         nativeTokenVaultImpl = new L1NativeTokenVault({
             _l1WethAddress: l1WethAddress,
-            _l1SharedBridge: IL1AssetRouter(address(sharedBridge)),
-            _eraChainId: eraChainId
+            _l1SharedBridge: IL1AssetRouter(address(sharedBridge))
         });
         TransparentUpgradeableProxy nativeTokenVaultProxy = new TransparentUpgradeableProxy(
             address(nativeTokenVaultImpl),
@@ -153,7 +152,7 @@ contract L1AssetRouterTest is Test {
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
         vm.prank(owner);
         sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
-        tokenAssetId = nativeTokenVault.getAssetId(address(token));
+        tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
         vm.prank(owner);
         sharedBridge.setNativeTokenVault(IL1NativeTokenVault(address(nativeTokenVault)));
         vm.prank(address(nativeTokenVault));
@@ -219,12 +218,12 @@ contract L1AssetRouterTest is Test {
 
         vm.mockCall(
             address(nativeTokenVault),
-            abi.encodeWithSelector(IL1NativeTokenVault.tokenAddress.selector, tokenAssetId),
+            abi.encodeWithSelector(IL1BaseTokenAssetHandler.tokenAddress.selector, tokenAssetId),
             abi.encode(address(token))
         );
         vm.mockCall(
             address(nativeTokenVault),
-            abi.encodeWithSelector(IL1NativeTokenVault.tokenAddress.selector, ETH_TOKEN_ASSET_ID),
+            abi.encodeWithSelector(IL1BaseTokenAssetHandler.tokenAddress.selector, ETH_TOKEN_ASSET_ID),
             abi.encode(address(ETH_TOKEN_ADDRESS))
         );
     }

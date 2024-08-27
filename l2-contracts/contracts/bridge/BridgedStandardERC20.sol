@@ -8,6 +8,7 @@ import {ERC1967Upgrade} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Upgra
 
 import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
 import {EmptyAddress, Unauthorized, NonSequentialVersion, Unimplemented} from "../L2ContractErrors.sol";
+import {L2_NATIVE_TOKEN_VAULT} from "../L2ContractHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -31,11 +32,28 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
     /// @notice OpenZeppelin token represents `name` and `symbol` as storage variables and `decimals` as constant.
     uint8 private decimals_;
 
+    /// @notice The l2Bridge now is deprecated, use the L2AssetRouter and L2NativeTokenVault instead.
     /// @dev Address of the L2 bridge that is used as trustee who can mint/burn tokens
     address public override l2Bridge;
 
     /// @dev Address of the L1 token that can be deposited to mint this L2 token
     address public override l1Address;
+
+    modifier onlyNTV() {
+        if (msg.sender != address(L2_NATIVE_TOKEN_VAULT)) {
+            revert Unauthorized();
+        }
+        _;
+    }
+
+    modifier onlyNextVersion(uint8 _version) {
+        // The version should be incremented by 1. Otherwise, the governor risks disabling
+        // future reinitialization of the token by providing too large a version.
+        if (_version != _getInitializedVersion() + 1) {
+            revert NonSequentialVersion();
+        }
+        _;
+    }
 
     /// @dev Contract is expected to be used as proxy implementation.
     constructor() {
@@ -131,27 +149,11 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         emit BridgeInitialize(l1Address, _newName, _newSymbol, decimals_);
     }
 
-    modifier onlyBridge() {
-        if (msg.sender != l2Bridge) {
-            revert Unauthorized();
-        }
-        _;
-    }
-
-    modifier onlyNextVersion(uint8 _version) {
-        // The version should be incremented by 1. Otherwise, the governor risks disabling
-        // future reinitialization of the token by providing too large a version.
-        if (_version != _getInitializedVersion() + 1) {
-            revert NonSequentialVersion();
-        }
-        _;
-    }
-
     /// @dev Mint tokens to a given account.
     /// @param _to The account that will receive the created tokens.
     /// @param _amount The amount that will be created.
     /// @notice Should be called by bridge after depositing tokens from L1.
-    function bridgeMint(address _to, uint256 _amount) external override onlyBridge {
+    function bridgeMint(address _to, uint256 _amount) external override onlyNTV {
         _mint(_to, _amount);
         emit BridgeMint(_to, _amount);
     }
@@ -160,9 +162,19 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
     /// @param _from The account from which tokens will be burned.
     /// @param _amount The amount that will be burned.
     /// @notice Should be called by bridge before withdrawing tokens to L1.
-    function bridgeBurn(address _from, uint256 _amount) external override onlyBridge {
+    function bridgeBurn(address _from, uint256 _amount) external override onlyNTV {
         _burn(_from, _amount);
         emit BridgeBurn(_from, _amount);
+    }
+
+    /// @dev External function to decode a string from bytes.
+    function decodeString(bytes calldata _input) external pure returns (string memory result) {
+        (result) = abi.decode(_input, (string));
+    }
+
+    /// @dev External function to decode a uint8 from bytes.
+    function decodeUint8(bytes calldata _input) external pure returns (uint8 result) {
+        (result) = abi.decode(_input, (uint8));
     }
 
     function name() public view override returns (string memory) {
@@ -181,15 +193,5 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         // If method is not available, behave like a token that does not implement this method - revert on call.
         if (availableGetters.ignoreDecimals) revert Unimplemented();
         return decimals_;
-    }
-
-    /// @dev External function to decode a string from bytes.
-    function decodeString(bytes calldata _input) external pure returns (string memory result) {
-        (result) = abi.decode(_input, (string));
-    }
-
-    /// @dev External function to decode a uint8 from bytes.
-    function decodeUint8(bytes calldata _input) external pure returns (uint8 result) {
-        (result) = abi.decode(_input, (uint8));
     }
 }

@@ -32,8 +32,8 @@ contract GettersFacetWrapper is GettersFacet {
         s.stateTransitionManager = _stateTransitionManager;
     }
 
-    function util_setBaseToken(address _baseToken) external {
-        s.baseToken = _baseToken;
+    function util_setBaseToken(bytes32 _baseTokenAssetId) external {
+        s.baseTokenAssetId = _baseTokenAssetId;
     }
 
     function util_setBaseTokenBridge(address _baseTokenBridge) external {

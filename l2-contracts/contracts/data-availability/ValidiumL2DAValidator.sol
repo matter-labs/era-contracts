@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors, reason-string
-
 import {IL2DAValidator} from "../interfaces/IL2DAValidator.sol";
 
 /// Rollup DA validator. It will publish data that would allow to use either calldata or blobs.
