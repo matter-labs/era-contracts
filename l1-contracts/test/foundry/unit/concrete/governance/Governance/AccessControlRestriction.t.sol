@@ -46,9 +46,8 @@ contract AccessRestrictionTest is Test {
         new AccessControlRestriction(0, address(0));
     }
 
-    function test_setRequiredRoleForCallByNotDefaultAdmin() public {
+    function test_setRequiredRoleForCallByNotDefaultAdmin(bytes32 role) public {
         bytes4[] memory chainAdminSelectors = getChainAdminSelectors();
-        bytes32 role = Utils.randomBytes32("1");
         string memory revertMsg = string(
             abi.encodePacked(
                 "AccessControl: account ",
@@ -59,22 +58,39 @@ contract AccessRestrictionTest is Test {
         );
 
         vm.expectRevert(bytes(revertMsg));
-        vm.startPrank(randomCaller);
+        vm.prank(randomCaller);
         restriction.setRequiredRoleForCall(address(chainAdmin), chainAdminSelectors[0], role);
     }
 
-    function test_setRequiredRoleForCall() public {
+    function test_setRequiredRoleForCallAccessToFunctionDenied(bytes32 role) public {
         bytes4[] memory chainAdminSelectors = getChainAdminSelectors();
-        bytes32 role = Utils.randomBytes32("1");
+
+        vm.startPrank(owner);
+        restriction.setRequiredRoleForCall(address(chainAdmin), chainAdminSelectors[0], role);
+        vm.stopPrank();
+
+        Call memory call = Call({target: address(chainAdmin), value: 0, data: abi.encodeCall(IChainAdmin.getRestrictions, ())});
+
+        vm.expectRevert(abi.encodeWithSelector(AccessToFunctionDenied.selector, address(chainAdmin), chainAdminSelectors[0], randomCaller));
+        restriction.validateCall(call, randomCaller);
+    }
+
+    function test_setRequiredRoleForCall(bytes32 role) public {
+        bytes4[] memory chainAdminSelectors = getChainAdminSelectors();
 
         vm.expectEmit();
         emit IAccessControlRestriction.RoleSet(address(chainAdmin), chainAdminSelectors[0], role);
-        vm.prank(owner);
+
+        vm.startPrank(owner);
         restriction.setRequiredRoleForCall(address(chainAdmin), chainAdminSelectors[0], role);
+        restriction.grantRole(role, randomCaller);
+        vm.stopPrank();
+
+        Call memory call = Call({target: address(chainAdmin), value: 0, data: abi.encodeCall(IChainAdmin.getRestrictions, ())});
+        restriction.validateCall(call, randomCaller);
     }
 
-    function test_setRequiredRoleForFallbackByNotDefaultAdmin() public {
-        bytes32 role = Utils.randomBytes32("1");
+    function test_setRequiredRoleForFallbackByNotDefaultAdmin(bytes32 role) public {
         string memory revertMsg = string(
             abi.encodePacked(
                 "AccessControl: account ",
@@ -85,22 +101,36 @@ contract AccessRestrictionTest is Test {
         );
 
         vm.expectRevert(bytes(revertMsg));
-        vm.startPrank(randomCaller);
+        vm.prank(randomCaller);
         restriction.setRequiredRoleForFallback(address(chainAdmin), role);
     }
 
-    function test_setRequiredRoleForFallback() public {
-        bytes32 role = Utils.randomBytes32("1");
+    function test_setRequiredRoleForFallbackAccessToFallbackDenied(bytes32 role) public {
+        vm.startPrank(owner);
+        restriction.setRequiredRoleForFallback(address(chainAdmin), role);
+        vm.stopPrank();
 
+        Call memory call = Call({target: address(chainAdmin), value: 0, data: "" });
+
+        vm.expectRevert(abi.encodeWithSelector(AccessToFallbackDenied.selector, address(chainAdmin), randomCaller));
+        restriction.validateCall(call, randomCaller);
+    }
+
+    function test_setRequiredRoleForFallback(bytes32 role) public {
         vm.expectEmit();
         emit IAccessControlRestriction.FallbackRoleSet(address(chainAdmin), role);
-        vm.prank(owner);
+
+        vm.startPrank(owner);
         restriction.setRequiredRoleForFallback(address(chainAdmin), role);
+        restriction.grantRole(role, randomCaller);
+        vm.stopPrank();
+        
+        Call memory call = Call({target: address(chainAdmin), value: 0, data: "" });
+        restriction.validateCall(call, randomCaller);
     }
 
-    function test_validateCallFunction() public {
+    function test_validateCallFunction(bytes32 role) public {
         bytes4[] memory chainAdminSelectors = getChainAdminSelectors();
-        bytes32 role = Utils.randomBytes32("1");
         vm.startPrank(owner);
         restriction.setRequiredRoleForCall(address(chainAdmin), chainAdminSelectors[0], role);
         restriction.grantRole(role, randomCaller);
@@ -114,9 +144,8 @@ contract AccessRestrictionTest is Test {
         restriction.validateCall(call, randomCaller);
     }
 
-    function test_validateCallAccessToFunctionDenied() public {
+    function test_validateCallAccessToFunctionDenied(bytes32 role) public {
         bytes4[] memory chainAdminSelectors = getChainAdminSelectors();
-        bytes32 role = Utils.randomBytes32("1");
         vm.startPrank(owner);
         restriction.setRequiredRoleForCall(address(chainAdmin), chainAdminSelectors[0], role);
         vm.stopPrank();
@@ -138,8 +167,7 @@ contract AccessRestrictionTest is Test {
         restriction.validateCall(call, randomCaller);
     }
 
-    function test_validateCallFallback() public {
-        bytes32 role = Utils.randomBytes32("1");
+    function test_validateCallFallback(bytes32 role) public {
         vm.startPrank(owner);
         restriction.setRequiredRoleForFallback(address(chainAdmin), role);
         restriction.grantRole(role, randomCaller);
@@ -149,8 +177,7 @@ contract AccessRestrictionTest is Test {
         restriction.validateCall(call, randomCaller);
     }
 
-    function test_validateCAllAccessToFallbackDenied() public {
-        bytes32 role = Utils.randomBytes32("1");
+    function test_validateCAllAccessToFallbackDenied(bytes32 role) public {
         vm.startPrank(owner);
         restriction.setRequiredRoleForFallback(address(chainAdmin), role);
         vm.stopPrank();
