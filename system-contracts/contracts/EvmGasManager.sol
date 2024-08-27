@@ -78,16 +78,36 @@ contract EvmGasManager {
     }
 
     function isSlotWarm(uint256 _slot) external view returns (bool isWarm) {
-        uint256 prefix = IS_SLOT_WARM_PREFIX | uint256(uint160(msg.sender));
+        address prefix = msg.sender;
         uint256 transient_slot;
+
+        /*if (_slot > 2**96 - 1) {
+            assembly {
+                mstore(0, prefix)
+                mstore(0x20, _slot)
+                transient_slot := keccak256(0, 64)
+            }
+        } else {
+            assembly {
+                transient_slot := or(shl(160, _slot), prefix)
+            }
+        }*/
+
+        uint256 transient_slot_1;
+        uint256 mask = (1 << 32 - 1) << 224;
+
+        uint256 counter;
         assembly {
-            mstore(0, prefix)
-            mstore(0x20, _slot)
-            transient_slot := keccak256(0, 64)
+            transient_slot_1 := or(prefix, shr(32, and(mask, _slot)))
+            counter := tload(transient_slot_1)
         }
 
-        assembly {
-            isWarm := tload(transient_slot)
+        if (counter != 0) {
+            assembly {
+                transient_slot := and(not(mask), _slot)
+                transient_slot := or(transient_slot, shl(224, counter))
+                isWarm := tload(transient_slot)
+            }
         }
     }
 
@@ -95,28 +115,67 @@ contract EvmGasManager {
         uint256 _slot,
         uint256 _currentValue
     ) external payable onlySystemEvm returns (bool isWarm, uint256 originalValue) {
-        uint256 prefix = IS_SLOT_WARM_PREFIX | uint256(uint160(msg.sender));
+        address prefix = msg.sender;
         uint256 transient_slot;
-        assembly {
-            mstore(0, prefix)
-            mstore(0x20, _slot)
-            transient_slot := keccak256(0, 64)
-        }
-
-        assembly {
-            isWarm := tload(transient_slot)
-        }
-
-        if (isWarm) {
+        /*if (_slot > 2**96 - 1) {
             assembly {
-                originalValue := tload(add(transient_slot, 1))
+                mstore(0, prefix)
+                mstore(0x20, _slot)
+                transient_slot := keccak256(0, 64)
             }
         } else {
+            assembly {
+                transient_slot := or(shl(160, _slot), prefix)
+            }
+        }*/
+
+        uint256 transient_slot_1;
+        uint256 mask = (1 << 32 - 1) << 224;
+
+        uint256 counter;
+        assembly {
+            transient_slot_1 := or(prefix, shr(32, and(mask, _slot)))
+            counter := tload(transient_slot_1)
+        }
+
+        if (counter == 0) {
+            // isWarm = false
+            assembly {
+                counter := add(tload(IS_SLOT_WARM_PREFIX), 1)
+                tstore(IS_SLOT_WARM_PREFIX, counter)
+                tstore(transient_slot_1, counter)
+            }
+
+            assembly {
+                transient_slot := and(not(mask), _slot)
+                transient_slot := or(transient_slot, shl(224, counter))
+            }
+
             originalValue = _currentValue;
 
             assembly {
                 tstore(transient_slot, 1)
                 tstore(add(transient_slot, 1), originalValue)
+            }
+
+        } else {
+            assembly {
+                transient_slot := and(not(mask), _slot)
+                transient_slot := or(transient_slot, shl(224, counter))
+                isWarm := tload(transient_slot)
+            }
+
+            if (isWarm) {
+                assembly {
+                    originalValue := tload(add(transient_slot, 1))
+                }
+            } else {
+                originalValue = _currentValue;
+    
+                assembly {
+                    tstore(transient_slot, 1)
+                    tstore(add(transient_slot, 1), originalValue)
+                }
             }
         }
     }
