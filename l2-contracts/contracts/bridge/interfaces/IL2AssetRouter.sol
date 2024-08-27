@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {IAssetRouterBase} from "l1-contracts-imported/contracts/bridge/interfaces/IAssetRouterBase.sol";
+import {IAssetRouterBase} from "../../l1-contracts-imported/contracts/bridge/interfaces/IAssetRouterBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

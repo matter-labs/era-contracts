@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {INativeTokenVault} from "l1-contracts-imported/contracts/bridge/interfaces/INativeTokenVault.sol";
+import {INativeTokenVault} from "../l1-contracts-imported/contracts/bridge/interfaces/INativeTokenVault.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

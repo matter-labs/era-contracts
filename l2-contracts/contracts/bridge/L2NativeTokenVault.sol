@@ -7,13 +7,13 @@ pragma solidity 0.8.24;
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
-import {INativeTokenVault} from "l1-contracts-imported/contracts/bridge/interfaces/INativeTokenVault.sol";
+import {INativeTokenVault} from "../l1-contracts-imported/contracts/bridge/interfaces/INativeTokenVault.sol";
 import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 // import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
 
 // import {BridgedStandardERC20} from "./BridgedStandardERC20.sol";
 // import {IAssetRouterBase} from "l1-contracts-imported/contracts/bridge/interfaces/IAssetRouterBase.sol";
-import {NativeTokenVault} from "l1-contracts-imported/contracts/bridge/NativeTokenVault.sol";
+import {NativeTokenVault} from "../l1-contracts-imported/contracts/bridge/NativeTokenVault.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT, L2_ASSET_ROUTER, IContractDeployer} from "../L2ContractHelper.sol";
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
 

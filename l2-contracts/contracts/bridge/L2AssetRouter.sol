@@ -11,8 +11,8 @@ import {IL2AssetHandler} from "./interfaces/IL2AssetHandler.sol";
 import {ILegacyL2SharedBridge} from "./interfaces/ILegacyL2SharedBridge.sol";
 import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
 
-import {IBridgehub} from "l1-contracts-imported/contracts/bridgehub/IBridgehub.sol";
-import {AssetRouterBase} from "l1-contracts-imported/contracts/bridge/AssetRouterBase.sol";
+import {IBridgehub} from "../l1-contracts-imported/contracts/bridgehub/IBridgehub.sol";
+import {AssetRouterBase} from "../l1-contracts-imported/contracts/bridge/AssetRouterBase.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, L2_NATIVE_TOKEN_VAULT} from "../L2ContractHelper.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
