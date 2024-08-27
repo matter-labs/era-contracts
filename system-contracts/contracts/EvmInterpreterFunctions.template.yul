@@ -718,19 +718,6 @@ function getFarCallABI(
     farCallAbi :=  or(farCallAbi, shl(232, forwardingMode))
     farCallAbi :=  or(farCallAbi, shl(248, 1))
     ret := farCallAbi
-        //     farCallAbi |= dataOffset;
-        // farCallAbi |= (uint256(memoryPage) << 32);
-        // farCallAbi |= (uint256(dataStart) << 64);
-        // farCallAbi |= (uint256(dataLength) << 96);
-        // farCallAbi |= (uint256(gasPassed) << 192);
-        // farCallAbi |= (uint256(shardId) << 224);
-        // farCallAbi |= (uint256(forwardingMode) << 232);
-        // if (isConstructorCall) {
-        //     farCallAbi |= (1 << 240);
-        // }
-        // if (isSystemCall) {
-        //     farCallAbi |= (1 << 248);
-        // }
 }
 
 function ensureAcceptableMemLocation(location) {
