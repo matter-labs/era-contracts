@@ -31,11 +31,14 @@ interface IAssetHandler {
         bytes calldata _data
     ) external payable returns (address l1Receiver);
 
+    /// @notice Burns bridged tokens and returns the calldata for L2 -> L1 message.
+    /// @dev In case of native token vault _data is the tuple of _depositAmount and _l2Receiver.
     /// @param _chainId the chainId that the message will be sent to
     /// @param _msgValue the msg.value of the L2 transaction
     /// @param _assetId the assetId of the asset being bridged
     /// @param _prevMsgSender the original caller of the Bridgehub,
     /// @param _data the actual data specified for the function
+    /// @return _bridgeMintData The calldata used by counterpart asset handler to unlock tokens for recipient.
     function bridgeBurn(
         uint256 _chainId,
         uint256 _msgValue,

@@ -147,6 +147,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
                 (address, uint256, address, bytes, address)
             );
             address expectedToken = bridgedTokenAddress(originToken);
+            if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
+                l1LegacyToken = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(expectedToken);
+            }
             if (token == address(0)) {
                 bytes32 expectedAssetId = keccak256(
                     abi.encode(_chainId, L2_NATIVE_TOKEN_VAULT_ADDRESS, bytes32(uint256(uint160(originToken))))
@@ -179,7 +182,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes calldata _data
     ) external payable override onlyBridge whenNotPaused returns (bytes memory _bridgeMintData) {
         if (isTokenBridged[_assetId]) {
-            (uint256 _depositAmount, address _receiver) = abi.decode(_transferData, (uint256, address));
+            (uint256 _depositAmount, address _receiver) = abi.decode(_data, (uint256, address));
 
             uint256 amount;
             address nativeToken = tokenAddress[_assetId];
@@ -221,7 +224,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
                 amount: amount
             });
         } else {
-            (uint256 _amount, address _receiver) = abi.decode(_transferData, (uint256, address));
+            (uint256 _amount, address _receiver) = abi.decode(_data, (uint256, address));
             if (_amount == 0) {
                 // "Amount cannot be zero");
                 revert AmountMustBeGreaterThanZero();
@@ -237,7 +240,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
                 l2receiver: _l2Receiver,
                 amount: amount
             });            
-            bridgeMintData = _transferData;
+            bridgeMintData = _data;
         }
     }
 
@@ -272,8 +275,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @notice Returns the parsed assetId.
     /// @param _nativeToken The address of the token to be parsed.
     /// @dev Shows the assetId for a given chain and token address
-    function getAssetId(uint256 _chainId, address _l1Token) external pure override returns (bytes32) {
-        return DataEncoding.encodeNTVAssetId(_chainId, _l1Token);
+    function getAssetId(uint256 _chainId, address _nativeToken) external pure override returns (bytes32) {
+        return DataEncoding.encodeNTVAssetId(_chainId, _nativeToken);
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.

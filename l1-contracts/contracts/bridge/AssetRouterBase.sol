@@ -12,6 +12,7 @@ import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
 import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
 import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
@@ -90,7 +91,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         uint256 _amount
     ) public payable virtual override onlyBridgehub whenNotPaused {
         address assetHandler = assetHandlerAddress[_assetId];
-        require(l1AssetHandler != address(0), "AR: asset handler not set");
+        // require(l1AssetHandler != address(0), "AR: asset handler not set");
 
         _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
         // slither-disable-next-line unused-return
@@ -214,18 +215,18 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @param _chainId The chain ID of the ZK chain to which deposit.
     /// @param _l1Sender The address of the deposit initiator.
     /// @param _assetId The deposited asset ID.
-    /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
+    /// @param _assetData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
     /// @return Returns calldata used on ZK chain.
     function getDepositL2Calldata(
         uint256 _chainId,
         address _l1Sender,
         bytes32 _assetId,
-        bytes memory _transferData
+        bytes memory _assetData
     ) public view override returns (bytes memory) {
         // First branch covers the case when asset is not registered with NTV (custom asset handler)
         // Second branch handles tokens registered with NTV and uses legacy calldata encoding
         if (nativeTokenVault.tokenAddress(_assetId) == address(0)) {
-            return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (_chainId, _assetId, _transferData));
+            return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (_chainId, _assetId, _assetData));
             // return abi.encodeCall(IL2Bridge.finalizeDeposit, (_assetId, _assetData));
         } else {
             // slither-disable-next-line unused-return

@@ -2,9 +2,10 @@
 
 pragma solidity 0.8.24;
 
-import {L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
+import {L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect, IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {IL1Nullifier} from "./IL1Nullifier.sol";
+import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";    
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
@@ -161,13 +162,13 @@ interface IL1AssetRouter is IAssetRouterBase {
     function depositLegacyErc20Bridge(
         L2TransactionRequestDirect calldata _request
     ) external payable returns (bytes32 l2TxHash);
-        bytes calldata _assetData,
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
-    ) external;
+    //     bytes calldata _assetData,
+    //     bytes32 _l2TxHash,
+    //     uint256 _l2BatchNumber,
+    //     uint256 _l2MessageIndex,
+    //     uint16 _l2TxNumberInBatch,
+    //     bytes32[] calldata _merkleProof
+    // ) external;
 
     function chainBalance(uint256 _chainId, address _l1Token) external view returns (uint256);
 

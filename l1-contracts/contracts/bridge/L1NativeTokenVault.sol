@@ -107,8 +107,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
     }
 
-    }
-
     ///  @inheritdoc IL1AssetHandler
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
