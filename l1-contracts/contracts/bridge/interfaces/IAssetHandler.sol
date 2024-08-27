@@ -25,11 +25,7 @@ interface IAssetHandler {
     /// @param _chainId the chainId that the message is from
     /// @param _assetId the assetId of the asset being bridged
     /// @param _data the actual data specified for the function
-    function bridgeMint(
-        uint256 _chainId,
-        bytes32 _assetId,
-        bytes calldata _data
-    ) external payable;
+    function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable;
 
     /// @notice Burns bridged tokens and returns the calldata for L2 -> L1 message.
     /// @dev In case of native token vault _data is the tuple of _depositAmount and _l2Receiver.

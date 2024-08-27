@@ -4,8 +4,8 @@ pragma solidity 0.8.24;
 
 // solhint-disable reason-string, gas-custom-errors
 
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+// import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+// import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 
@@ -15,16 +15,16 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
-import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
-import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
+// import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
+// import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 
-import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
+// import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+// import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
-import {BridgeHelper} from "./BridgeHelper.sol";
+// import {BridgeHelper} from "./BridgeHelper.sol";
 
 import {NativeTokenVault} from "./NativeTokenVault.sol";
 
@@ -152,18 +152,17 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return BeaconProxy(payable(proxyAddress));
     }
 
-
     /*//////////////////////////////////////////////////////////////
                             PAUSE
     //////////////////////////////////////////////////////////////*/
 
-//     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
-//     function pause() external onlyOwner {
-//         _pause();
-//     }
+    //     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
+    //     function pause() external onlyOwner {
+    //         _pause();
+    //     }
 
-//     /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
-//     function unpause() external onlyOwner {
-//         _unpause();
-//     }
+    //     /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
+    //     function unpause() external onlyOwner {
+    //         _unpause();
+    //     }
 }

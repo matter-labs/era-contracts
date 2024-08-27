@@ -262,8 +262,8 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     //         _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
     //         _refundRecipient: address(0)
     //     });
-    // } // kl todo 
- 
+    // } // kl todo
+
     /// @notice Finalize the withdrawal and release funds
     /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
@@ -365,5 +365,5 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     //     bytes32 salt = bytes32(uint256(uint160(_l1Token)));
 
     //     return L2ContractHelper.computeCreate2Address(l2Bridge, salt, l2TokenProxyBytecodeHash, constructorInputHash);
-    // } // kl todo 
+    // } // kl todo
 }

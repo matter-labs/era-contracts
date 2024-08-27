@@ -22,7 +22,7 @@ import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
+// import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
@@ -47,7 +47,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev The address of ZKSync Era diamond proxy contract.
     address internal immutable ERA_DIAMOND_PROXY;
 
-  /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after Diamond proxy upgrade.
+    /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after Diamond proxy upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade Eth withdrawals. Withdrawals from batches older
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
     uint256 internal _eraPostDiamondUpgradeFirstBatch;
@@ -537,7 +537,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        bytes32 assetId = nativeTokenVault.getAssetId(block.chainid, _l1Token);// kl todo this chain?
+        bytes32 assetId = nativeTokenVault.getAssetId(block.chainid, _l1Token); // kl todo this chain?
         // For legacy deposits, the l2 receiver is not required to check tx data hash
         bytes memory transferData = abi.encode(_amount, _depositSender);
         // bytes memory transferData = abi.encode(_amount, address(0));
@@ -639,13 +639,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             IERC20(_l1Token).forceApprove(address(nativeTokenVault), _amount);
 
             // solhint-disable-next-line func-named-parameters
-            bridgeMintCalldata = abi.encode( // kl todo check correct
-                _amount,
-                _prevMsgSender,
-                _l2Receiver,
-                getERC20Getters(_l1Token),
-                _l1Token
-            );
+            bridgeMintCalldata = abi.encode(_amount, _prevMsgSender, _l2Receiver, getERC20Getters(_l1Token), _l1Token); // kl todo check correct
             // bridgeMintCalldata = _burn({
             //     _chainId: ERA_CHAIN_ID,
             //     _l2Value: 0,
@@ -718,13 +712,13 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         this.finalizeWithdrawal(
             // solhint-disable-next-line func-named-parameters
             // FinalizeWithdrawalParams(
-                ERA_CHAIN_ID,
-                _l2BatchNumber,
-                _l2MessageIndex,
-                // L2_ASSET_ROUTER_ADDR,
-                _l2TxNumberInBatch,
-                _message,
-                _merkleProof
+            ERA_CHAIN_ID,
+            _l2BatchNumber,
+            _l2MessageIndex,
+            // L2_ASSET_ROUTER_ADDR,
+            _l2TxNumberInBatch,
+            _message,
+            _merkleProof
             // )
         );
         l1Asset = nativeTokenVault.tokenAddress(assetId);

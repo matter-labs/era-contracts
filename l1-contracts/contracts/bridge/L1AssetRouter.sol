@@ -4,8 +4,8 @@ pragma solidity 0.8.24;
 
 // solhint-disable reason-string, gas-custom-errors
 
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+// import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+// import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -13,17 +13,17 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
-import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
+// import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
 import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
 import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
 import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
-import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
-import {IL1SharedBridgeLegacy} from "./interfaces/IL1SharedBridgeLegacy.sol";
+// import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
+// import {IL1SharedBridgeLegacy} from "./interfaces/IL1SharedBridgeLegacy.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
+// import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 
@@ -32,7 +32,7 @@ import {L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
 
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
-import {BridgeHelper} from "./BridgeHelper.sol";
+// import {BridgeHelper} from "./BridgeHelper.sol";
 
 import {IL1AssetDeploymentTracker} from "../bridge/interfaces/IL1AssetDeploymentTracker.sol";
 
@@ -40,8 +40,11 @@ import {IL1AssetDeploymentTracker} from "../bridge/interfaces/IL1AssetDeployment
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Bridges assets between L1 and ZK chain, supporting both ETH and ERC20 tokens.
 /// @dev Designed for use with a proxy for upgradability.
-contract L1AssetRouter is  AssetRouterBase, IL1AssetRouter, // IL1SharedBridgeLegacy,
-ReentrancyGuard {
+contract L1AssetRouter is
+    AssetRouterBase,
+    IL1AssetRouter, // IL1SharedBridgeLegacy,
+    ReentrancyGuard
+{
     using SafeERC20 for IERC20;
 
     /// @dev Era's chainID
@@ -81,7 +84,7 @@ ReentrancyGuard {
     // modifier onlyLegacyBridge() {
     //     require(msg.sender == address(legacyBridge), "L1AR: not legacy bridge");
     //     _;
-    // } // kl todo 
+    // } // kl todo
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -110,7 +113,7 @@ ReentrancyGuard {
     // function l2BridgeAddress(uint256 _chainId) external view returns (address) {
     //     // slither-disable-next-line uninitialized-state-variables
     //     return __DEPRECATED_l2BridgeAddress[_chainId];
-    // } // kl todo 
+    // } // kl todo
 
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
@@ -126,7 +129,7 @@ ReentrancyGuard {
     //     require(address(_legacyBridge) == address(0), "L1AR: legacy bridge already set");
     //     require(_legacyBridge != address(0), "L1AR: legacy bridge 0");
     //     legacyBridge = IL1ERC20Bridge(_legacyBridge);
-    // } // kl todo 
+    // } // kl todo
 
     /// @notice Used to set the assed deployment tracker address for given asset data.
     /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
@@ -148,7 +151,10 @@ ReentrancyGuard {
     /// @dev `setAssetHandlerAddressOnCounterpart` should be called on L1 to set asset handlers on L2 chains for a specific asset ID.
     /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
     /// @param _assetHandlerAddress The address of the asset handler to be set for the provided asset.
-    function setAssetHandlerAddressThisChain(bytes32 _assetRegistrationData, address _assetHandlerAddress) external override(IL1AssetRouter, AssetRouterBase) {
+    function setAssetHandlerAddressThisChain(
+        bytes32 _assetRegistrationData,
+        address _assetHandlerAddress
+    ) external override(IL1AssetRouter, AssetRouterBase) {
         bool senderIsNTV = msg.sender == address(nativeTokenVault);
         address sender = senderIsNTV ? L2_NATIVE_TOKEN_VAULT_ADDRESS : msg.sender;
         bytes32 assetId = DataEncoding.encodeAssetId(block.chainid, _assetRegistrationData, sender);
@@ -316,7 +322,6 @@ ReentrancyGuard {
     // }
 
     /// @notice Routes the confirmation to nullifier for backward compatibility.
- 
 
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
     /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
@@ -347,9 +352,6 @@ ReentrancyGuard {
     /// @param _depositSender The address of the deposit initiator.
     /// @param _assetId The address of the deposited L1 ERC20 token.
     /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
- 
-
-
 
     /// @dev Calls the internal `_encodeTxDataHash`. Used as a wrapped for try / catch case.
     /// @param _encodingVersion The version of the encoding.
@@ -383,7 +385,12 @@ ReentrancyGuard {
         bytes32 _assetId,
         bytes memory _assetData
     ) external onlyNullifier nonReentrant whenNotPaused {
-        IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(_chainId, _assetId, _depositSender, _assetData);
+        IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(
+            _chainId,
+            _assetId,
+            _depositSender,
+            _assetData
+        );
 
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetId, _assetData);
     }
@@ -404,7 +411,7 @@ ReentrancyGuard {
                      Legacy Functions & Helpers
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Routes the request through l1 asset router, to miminize the number of addresses from with l2 asset router expects deposit.
+    /// @notice Routes the request through l1 asset router, to minimize the number of addresses from with l2 asset router expects deposit.
     function depositLegacyErc20Bridge(
         L2TransactionRequestDirect calldata _request
     ) external payable override onlyNullifier nonReentrant whenNotPaused returns (bytes32 l2TxHash) {
@@ -451,7 +458,7 @@ ReentrancyGuard {
     // function bridgeRecoverFailedTransfer(
     //     uint256 _chainId,
     //     address _depositSender,
-    //     bytes32 _assetId,        
+    //     bytes32 _assetId,
     //     bytes32 _l2TxHash,
     //     uint256 _l2BatchNumber,
     //     uint256 _l2MessageIndex,
@@ -534,22 +541,21 @@ ReentrancyGuard {
     //     require(!_isEraLegacyEthWithdrawal(_chainId, _l2BatchNumber), "L1AR: legacy eth withdrawal");
     //     require(!_isEraLegacyTokenWithdrawal(_chainId, _l2BatchNumber), "L1AR: legacy token withdrawal");
 
-        // bytes memory transferData;
-        // {
-        //     MessageParams memory messageParams = MessageParams({
-        //         l2BatchNumber: _l2BatchNumber,
-        //         l2MessageIndex: _l2MessageIndex,
-        //         l2TxNumberInBatch: _l2TxNumberInBatch
-        //     });
-        //     (assetId, transferData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
-        // }
-        // address l1AssetHandler = assetHandlerAddress[assetId];
-        // IL1AssetHandler(l1AssetHandler).bridgeMint(_chainId, assetId, transferData);
-        // (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
+    // bytes memory transferData;
+    // {
+    //     MessageParams memory messageParams = MessageParams({
+    //         l2BatchNumber: _l2BatchNumber,
+    //         l2MessageIndex: _l2MessageIndex,
+    //         l2TxNumberInBatch: _l2TxNumberInBatch
+    //     });
+    //     (assetId, transferData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
+    // }
+    // address l1AssetHandler = assetHandlerAddress[assetId];
+    // IL1AssetHandler(l1AssetHandler).bridgeMint(_chainId, assetId, transferData);
+    // (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
 
     //     emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetId, amount);
     // }
-
 
     // /// @dev Determines if the provided data for a failed deposit corresponds to a legacy failed deposit.
     // /// @param _prevMsgSender The address of the entity that initiated the deposit.
@@ -593,8 +599,6 @@ ReentrancyGuard {
             txDataHash = keccak256(bytes.concat(_encodingVersion, abi.encode(_prevMsgSender, _assetId, _transferData)));
         }
     } // kl todo this function
-
-
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE

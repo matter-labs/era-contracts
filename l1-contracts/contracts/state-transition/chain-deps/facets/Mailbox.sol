@@ -600,13 +600,13 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         IL1Nullifier(s.baseTokenBridge).finalizeWithdrawal(
             // solhint-disable-next-line func-named-parameters
             // FinalizeWithdrawalParams(
-                ERA_CHAIN_ID,
-                _l2BatchNumber,
-                _l2MessageIndex,
-                // L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-                _l2TxNumberInBatch,
-                _message,
-                _merkleProof
+            ERA_CHAIN_ID,
+            _l2BatchNumber,
+            _l2MessageIndex,
+            // L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            _l2TxNumberInBatch,
+            _message,
+            _merkleProof
             // )
         );
     }

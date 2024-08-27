@@ -17,7 +17,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
 
-import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../bridgehub/IBridgehub.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -40,7 +40,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @dev P.S. this liquidity was locked directly in SharedBridge before.
     mapping(bytes32 assetId => address assetHandlerAddress) public assetHandlerAddress;
 
-        /// @dev Maps asset ID to the asset deployment tracker address.
+    /// @dev Maps asset ID to the asset deployment tracker address.
     /// @dev Tracks the address of Deployment Tracker contract on L1, which sets Asset Handlers on L2s (ZK chain).
     /// @dev For the asset and stores respective addresses.
     mapping(bytes32 assetId => address assetDeploymentTracker) public assetDeploymentTracker;
@@ -62,7 +62,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @dev Should be called only once by the owner.
     /// @param _nativeTokenVault The address of the native token vault.
     function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external onlyOwner {
-        require(address(nativeTokenVault) == address(0), "AR: native token vault already set");
+        require(address(nativeTokenVault) == address(0), "AR: native token v already set");
         require(address(_nativeTokenVault) != address(0), "AR: native token vault 0");
         nativeTokenVault = _nativeTokenVault;
     }
@@ -129,7 +129,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     {
         (bytes32 assetId, bytes memory transferData) = abi.decode(_data[1:], (bytes32, bytes));
 
-        require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, "AR: baseToken deposit not supported");
+        require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, "AR: baseToken deposit not");
 
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
@@ -260,7 +260,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     ) internal returns (bytes memory bridgeMintCalldata) {
         address l1AssetHandler = assetHandlerAddress[_assetId];
         uint256 msgValue = _passValue ? msg.value : 0;
-        
+
         bridgeMintCalldata = IAssetHandler(l1AssetHandler).bridgeBurn{value: msgValue}({
             _chainId: _chainId,
             _msgValue: 0, // kl todo or value?

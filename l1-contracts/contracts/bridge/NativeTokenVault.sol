@@ -9,7 +9,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+// import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -17,11 +17,11 @@ import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
 import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
 import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
-import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
+// import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {BridgedStandardERC20} from "../common/BridgedStandardERC20.sol";
-import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+// import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 import {BridgeHelper} from "./BridgeHelper.sol";
 
@@ -246,7 +246,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
                 sender: _prevMsgSender,
                 receiver: _receiver,
                 amount: _amount
-            });            
+            });
             _bridgeMintData = _data;
         }
     }

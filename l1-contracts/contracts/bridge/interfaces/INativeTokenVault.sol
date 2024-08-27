@@ -9,7 +9,7 @@ import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The NTV is an Asset Handler for the L1AssetRouter to handle native tokens
 interface INativeTokenVault {
-    event bridgedTokenBeaconUpdated(address bridgedTokenBeacon, bytes32 bridgedTokenProxyBytecodeHash);
+    event BridgedTokenBeaconUpdated(address bridgedTokenBeacon, bytes32 bridgedTokenProxyBytecodeHash);
 
     function setBridgedTokenBeacon() external;
 

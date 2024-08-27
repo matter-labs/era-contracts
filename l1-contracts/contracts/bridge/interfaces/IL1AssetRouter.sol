@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.24;
 
-import {L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect, IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {IL1Nullifier} from "./IL1Nullifier.sol";
-import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";    
+// import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
@@ -39,7 +39,7 @@ interface IL1AssetRouter is IAssetRouterBase {
         bytes32 indexed assetId,
         uint256 amount
     );
-    
+
     event AssetDeploymentTrackerSet(
         bytes32 indexed assetId,
         address indexed assetDeploymentTracker,
@@ -105,7 +105,6 @@ interface IL1AssetRouter is IAssetRouterBase {
     // function legacyBridge() external view returns (IL1ERC20Bridge);
 
     // function depositHappened(uint256 _chainId, bytes32 _l2DepositTxHash) external view returns (bytes32);
-
 
     // function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
 
