@@ -189,7 +189,7 @@ export class Deployer {
       assetRouterZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2AssetRouter");
       nativeTokenVaultZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2NativeTokenVault");
       const l2TokenProxyBytecode = readBytecode(
-        "../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon",
+        "../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon",
         "BeaconProxy"
       );
       l2TokenProxyBytecodeHash = ethers.utils.hexlify(hashL2Bytecode(l2TokenProxyBytecode));
