@@ -15,6 +15,8 @@ import {Utils} from "../Utils/Utils.sol";
 import {InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {DiamondAlreadyFrozen, Unauthorized, DiamondFreezeIncorrectState, DiamondNotFrozen} from "contracts/common/L1ContractErrors.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
     DiamondProxy private diamondProxy;
@@ -81,7 +83,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             protocolVersion: 0,
             admin: admin,
             validatorTimelock: makeAddr("validatorTimelock"),
-            baseToken: makeAddr("baseToken"),
+            baseTokenAssetId: DataEncoding.encodeNTVAssetId(1, (makeAddr("baseToken"))),
             baseTokenBridge: makeAddr("baseTokenBridge"),
             storedBatchZero: bytes32(0),
             // genesisBatchHash: 0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
@@ -120,8 +122,7 @@ contract UpgradeLogicTest is DiamondCutTest {
 
     function test_RevertWhen_EmergencyFreezeWhenUnauthorizedGovernor() public {
         vm.startPrank(randomSigner);
-
-        vm.expectRevert(abi.encodePacked("Hyperchain: not state transition manager"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomSigner));
         proxyAsAdmin.freezeDiamond();
     }
 
@@ -130,14 +131,14 @@ contract UpgradeLogicTest is DiamondCutTest {
 
         proxyAsAdmin.freezeDiamond();
 
-        vm.expectRevert(abi.encodePacked("a9"));
+        vm.expectRevert(DiamondAlreadyFrozen.selector);
         proxyAsAdmin.freezeDiamond();
     }
 
     function test_RevertWhen_UnfreezingWhenNotFrozen() public {
         vm.startPrank(stateTransitionManager);
 
-        vm.expectRevert(abi.encodePacked("a7"));
+        vm.expectRevert(DiamondNotFrozen.selector);
         proxyAsAdmin.unfreezeDiamond();
     }
 

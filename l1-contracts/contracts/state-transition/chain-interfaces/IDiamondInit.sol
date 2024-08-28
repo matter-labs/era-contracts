@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.24;
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
 import {IVerifier, VerifierParams} from "./IVerifier.sol";
 import {FeeParams} from "../chain-deps/ZkSyncHyperchainStorage.sol";
@@ -11,7 +11,7 @@ import {FeeParams} from "../chain-deps/ZkSyncHyperchainStorage.sol";
 /// @param protocolVersion initial protocol version
 /// @param validatorTimelock address of the validator timelock that delays execution
 /// @param admin address who can manage the contract
-/// @param baseToken address of the base token of the chain
+/// @param baseTokenAssetId asset id of the base token of the chain
 /// @param baseTokenBridge address of the L1 shared bridge contract
 /// @param storedBatchZero hash of the initial genesis batch
 /// @param verifier address of Verifier contract
@@ -29,7 +29,7 @@ struct InitializeData {
     uint256 protocolVersion;
     address admin;
     address validatorTimelock;
-    address baseToken;
+    bytes32 baseTokenAssetId;
     address baseTokenBridge;
     bytes32 storedBatchZero;
     IVerifier verifier;

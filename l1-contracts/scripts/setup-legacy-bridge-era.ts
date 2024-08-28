@@ -16,7 +16,7 @@ import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import { ethTestConfig, getAddressFromEnv } from "../src.ts/utils";
 import { hashL2Bytecode } from "../../l2-contracts/src/utils";
 import { Provider } from "zksync-ethers";
-import beaconProxy = require("../../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json");
+import beaconProxy = require("../../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol/BeaconProxy.json");
 
 const provider = web3Provider();
 
@@ -64,7 +64,9 @@ async function main() {
 
       await deployer.deploySharedBridgeImplementation(create2Salt, { nonce });
 
-      const proxyAdminInterface = new Interface(hardhat.artifacts.readArtifactSync("ProxyAdmin").abi);
+      const proxyAdminInterface = new Interface(
+        hardhat.artifacts.readArtifactSync("@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin").abi
+      );
       let calldata = proxyAdminInterface.encodeFunctionData("upgrade(address,address)", [
         deployer.addresses.Bridges.SharedBridgeProxy,
         deployer.addresses.Bridges.SharedBridgeImplementation,
@@ -116,7 +118,8 @@ async function main() {
       console.log("l2TokenBytecodeHash:", ethers.utils.hexlify(l2TokenBytecodeHash));
 
       // set storage values
-      const tx = await dummyBridge.setValues(l2SharedBridgeAddress, l2TokenBeacon, l2TokenBytecodeHash);
+      // FIXME(EVM-716): we provide the `L2NativeTokenVaultAddress` as the "shared bridge value" as it is only used for calculating of L2 token addresses.
+      const tx = await dummyBridge.setValues(L2NativeTokenVaultAddress, l2TokenBeacon, l2TokenBytecodeHash);
       await tx.wait();
 
       console.log("Set storage values for TestERC20Bridge");

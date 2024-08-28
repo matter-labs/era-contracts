@@ -4,8 +4,8 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
-import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
@@ -15,9 +15,10 @@ import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager, StateTransitionManagerInitializeData, ChainCreationParams} from "./IStateTransitionManager.sol";
 import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
+import {Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
@@ -75,13 +76,17 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
-        require(msg.sender == BRIDGE_HUB, "STM: only bridgehub");
+        if (msg.sender != BRIDGE_HUB) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     /// @notice the admin can call, for non-critical updates
     modifier onlyOwnerOrAdmin() {
-        require(msg.sender == admin || msg.sender == owner(), "STM: not owner or admin");
+        if (msg.sender != admin && msg.sender != owner()) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
@@ -114,7 +119,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function initialize(
         StateTransitionManagerInitializeData calldata _initializeData
     ) external reentrancyGuardInitializer {
-        require(_initializeData.owner != address(0), "STM: owner zero");
+        if (_initializeData.owner == address(0)) {
+            revert ZeroAddress();
+        }
         _transferOwnership(_initializeData.owner);
 
         protocolVersion = _initializeData.protocolVersion;
@@ -127,13 +134,18 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters
     function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal {
-        require(_chainCreationParams.genesisUpgrade != address(0), "STM: genesisUpgrade zero");
-        require(_chainCreationParams.genesisBatchHash != bytes32(0), "STM: genesisBatchHash zero");
-        require(
-            _chainCreationParams.genesisIndexRepeatedStorageChanges != uint64(0),
-            "STM: genesisIndexRepeatedStorageChanges zero"
-        );
-        require(_chainCreationParams.genesisBatchCommitment != bytes32(0), "STM: genesisBatchCommitment zero");
+        if (_chainCreationParams.genesisUpgrade == address(0)) {
+            revert GenesisUpgradeZero();
+        }
+        if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
+            revert GenesisBatchHashZero();
+        }
+        if (_chainCreationParams.genesisIndexRepeatedStorageChanges == uint64(0)) {
+            revert GenesisIndexStorageZero();
+        }
+        if (_chainCreationParams.genesisBatchCommitment == bytes32(0)) {
+            revert GenesisBatchCommitmentZero();
+        }
 
         l1GenesisUpgrade = _chainCreationParams.genesisUpgrade;
 
@@ -186,7 +198,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
     function acceptAdmin() external {
         address currentPendingAdmin = pendingAdmin;
-        require(msg.sender == currentPendingAdmin, "n42"); // Only proposed by current admin address can claim the admin rights
+        // Only proposed by current admin address can claim the admin rights
+        if (msg.sender != currentPendingAdmin) {
+            revert Unauthorized(msg.sender);
+        }
 
         address previousAdmin = admin;
         admin = currentPendingAdmin;
@@ -267,7 +282,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @param _chainId the chainId of the chain
     /// @param _newLastBatch the new last batch
     function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
-        IZkSyncHyperchain(getHyperchain(_chainId)).revertBatches(_newLastBatch);
+        IZkSyncHyperchain(getHyperchain(_chainId)).revertBatchesSharedBridge(_chainId, _newLastBatch);
     }
 
     /// @dev execute predefined upgrade
@@ -328,10 +343,15 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// registration
 
-    /// @dev deploys a full set of chains contracts
+    /// @notice deploys a full set of chains contracts
+    /// @param _chainId the chain's id
+    /// @param _baseTokenAssetId the base token asset id used to pay for gas fees
+    /// @param _sharedBridge the shared bridge address, used as base token bridge
+    /// @param _admin the chain's admin address
+    /// @param _diamondCut the diamond cut data that initializes the chains Diamond Proxy
     function _deployNewChain(
         uint256 _chainId,
-        address _baseToken,
+        bytes32 _baseTokenAssetId,
         address _sharedBridge,
         address _admin,
         bytes memory _diamondCut
@@ -347,29 +367,28 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         {
             // check input
             bytes32 cutHashInput = keccak256(_diamondCut);
-            require(cutHashInput == initialCutHash, "STM: initial cutHash mismatch");
-        }
-        bytes memory mandatoryInitData;
-        {
-            // solhint-disable-next-line func-named-parameters
-            mandatoryInitData = bytes.concat(
-                bytes32(_chainId),
-                bytes32(uint256(uint160(BRIDGE_HUB))),
-                bytes32(uint256(uint160(address(this)))),
-                bytes32(protocolVersion),
-                bytes32(uint256(uint160(_admin))),
-                bytes32(uint256(uint160(validatorTimelock))),
-                bytes32(uint256(uint160(_baseToken))),
-                bytes32(uint256(uint160(_sharedBridge))),
-                storedBatchZero
-            );
+            if (cutHashInput != initialCutHash) {
+                revert HashMismatch(initialCutHash, cutHashInput);
+            }
         }
 
         // construct init data
         bytes memory initData;
         /// all together 4+9*32=292 bytes for the selector + mandatory data
         // solhint-disable-next-line func-named-parameters
-        initData = bytes.concat(IDiamondInit.initialize.selector, mandatoryInitData, diamondCut.initCalldata);
+        initData = bytes.concat(
+            IDiamondInit.initialize.selector,
+            bytes32(_chainId),
+            bytes32(uint256(uint160(BRIDGE_HUB))),
+            bytes32(uint256(uint160(address(this)))),
+            bytes32(protocolVersion),
+            bytes32(uint256(uint160(_admin))),
+            bytes32(uint256(uint160(validatorTimelock))),
+            _baseTokenAssetId,
+            bytes32(uint256(uint160(_sharedBridge))),
+            storedBatchZero,
+            diamondCut.initCalldata
+        );
 
         diamondCut.initCalldata = initData;
         // deploy hyperchainContract
@@ -382,7 +401,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @notice called by Bridgehub when a chain registers
     /// @param _chainId the chain's id
-    /// @param _baseToken the base token address used to pay for gas fees
+    /// @param _baseTokenAssetId the base token asset id used to pay for gas fees
     /// @param _sharedBridge the shared bridge address, used as base token bridge
     /// @param _admin the chain's admin address
     /// @param _initData the diamond cut data, force deployments and factoryDeps encoded
@@ -390,7 +409,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// that initializes the chains Diamond Proxy
     function createNewChain(
         uint256 _chainId,
-        address _baseToken,
+        bytes32 _baseTokenAssetId,
         address _sharedBridge,
         address _admin,
         bytes calldata _initData,
@@ -399,7 +418,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         (bytes memory _diamondCut, bytes memory _forceDeploymentData) = abi.decode(_initData, (bytes, bytes));
 
         // solhint-disable-next-line func-named-parameters
-        hyperchainAddress = _deployNewChain(_chainId, _baseToken, _sharedBridge, _admin, _diamondCut);
+        hyperchainAddress = _deployNewChain(_chainId, _baseTokenAssetId, _sharedBridge, _admin, _diamondCut);
 
         {
             // check input
@@ -407,7 +426,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             require(forceDeploymentHash == initialForceDeploymentHash, "STM: initial force deployment mismatch");
         }
         // genesis upgrade, deploys some contracts, sets chainId
-        IAdmin(hyperchainAddress).genesisUpgrade(l1GenesisUpgrade, _forceDeploymentData, _factoryDeps);
+        IAdmin(hyperchainAddress).genesisUpgrade(
+            l1GenesisUpgrade,
+            address(IBridgehub(BRIDGE_HUB).stmDeployer()),
+            _forceDeploymentData,
+            _factoryDeps
+        );
     }
 
     /// @param _chainId the chainId of the chain
@@ -443,7 +467,13 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address hyperchain = getHyperchain(_chainId);
         require(IZkSyncHyperchain(hyperchain).getProtocolVersion() == protocolVersion, "STM: outdated pv");
 
-        return abi.encode(IBridgehub(BRIDGE_HUB).baseToken(_chainId), _newGatewayAdmin, protocolVersion, _diamondCut);
+        return
+            abi.encode(
+                IBridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId),
+                _newGatewayAdmin,
+                protocolVersion,
+                _diamondCut
+            );
     }
 
     /// @notice Called by the bridgehub during the migration of a chain to the current settlement layer.
@@ -453,9 +483,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 _chainId,
         bytes calldata _stmData
     ) external override onlyBridgehub returns (address chainAddress) {
-        (address _baseToken, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
+        (bytes32 _baseTokenAssetId, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
             _stmData,
-            (address, address, uint256, bytes)
+            (bytes32, address, uint256, bytes)
         );
 
         // We ensure that the chain has the latest protocol version to avoid edge cases
@@ -463,7 +493,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         require(_protocolVersion == protocolVersion, "STM, outdated pv");
         chainAddress = _deployNewChain({
             _chainId: _chainId,
-            _baseToken: _baseToken,
+            _baseTokenAssetId: _baseTokenAssetId,
             _sharedBridge: address(IBridgehub(BRIDGE_HUB).sharedBridge()),
             _admin: _admin,
             _diamondCut: _diamondCut

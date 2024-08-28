@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.24;
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
 import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
@@ -72,6 +72,18 @@ interface IBridgehub is IL1AssetHandler {
 
     event SettlementLayerRegistered(uint256 indexed chainId, bool indexed isWhitelisted);
 
+    /// @notice Emitted when the bridging to the chain is started.
+    /// @param chainId Chain ID of the hyperchain
+    /// @param assetId Asset ID of the token for the hyperchain's STM
+    /// @param settlementLayerChainId The chain id of the settlement layer the chain migrates to.
+    event MigrationStarted(uint256 indexed chainId, bytes32 indexed assetId, uint256 indexed settlementLayerChainId);
+
+    /// @notice Emitted when the bridging to the chain is complete.
+    /// @param chainId Chain ID of the hyperchain
+    /// @param assetId Asset ID of the token for the hyperchain's STM
+    /// @param hyperchain The address of the hyperchain on the chain where it is migrated to.
+    event MigrationFinalized(uint256 indexed chainId, bytes32 indexed assetId, address indexed hyperchain);
+
     /// @notice Starts the transfer of admin rights. Only the current admin or owner can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin
@@ -85,7 +97,7 @@ interface IBridgehub is IL1AssetHandler {
 
     function stateTransitionManager(uint256 _chainId) external view returns (address);
 
-    function tokenIsRegistered(address _baseToken) external view returns (bool);
+    function assetIdIsRegistered(bytes32 _baseTokenAssetId) external view returns (bool);
 
     function baseToken(uint256 _chainId) external view returns (address);
 
@@ -149,7 +161,7 @@ interface IBridgehub is IL1AssetHandler {
     function createNewChain(
         uint256 _chainId,
         address _stateTransitionManager,
-        address _baseToken,
+        bytes32 _baseTokenAssetId,
         uint256 _salt,
         address _admin,
         bytes calldata _initData,
@@ -160,7 +172,7 @@ interface IBridgehub is IL1AssetHandler {
 
     function removeStateTransitionManager(address _stateTransitionManager) external;
 
-    function addToken(address _token) external;
+    function addTokenAssetId(bytes32 _baseTokenAssetId) external;
 
     function setAddresses(
         address _sharedBridge,
@@ -174,9 +186,7 @@ interface IBridgehub is IL1AssetHandler {
 
     event StateTransitionManagerRemoved(address indexed stateTransitionManager);
 
-    event TokenRegistered(address indexed token);
-
-    event SharedBridgeUpdated(address indexed sharedBridge);
+    event BaseTokenAssetIdRegistered(bytes32 indexed assetId);
 
     function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
 

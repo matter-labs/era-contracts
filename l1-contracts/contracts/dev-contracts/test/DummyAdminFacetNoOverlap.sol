@@ -18,7 +18,6 @@ contract DummyAdminFacetNoOverlap is ZkSyncHyperchainBase {
 
     function executeUpgradeNoOverlap(Diamond.DiamondCutData calldata _diamondCut) external {
         Diamond.diamondCut(_diamondCut);
-        s.baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, s.baseToken);
     }
 
     function receiveEther() external payable {}

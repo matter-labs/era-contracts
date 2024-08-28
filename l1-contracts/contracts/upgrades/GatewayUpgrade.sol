@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable-v4/proxy/utils/Initializable.sol";
 
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 
@@ -38,7 +38,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
             (bytes, bytes)
         );
 
-        s.baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, s.baseToken);
+        s.baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, s.__DEPRECATED_baseToken);
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
         IBridgehub(s.bridgehub).setLegacyBaseTokenAssetId(s.chainId);
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;

@@ -10,6 +10,8 @@ import {CalldataDA} from "./CalldataDA.sol";
 
 import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE, POINT_EVALUATION_PRECOMPILE_ADDR} from "./DAUtils.sol";
 
+import {PubdataCommitmentsEmpty, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed} from "./DAContractsErrors.sol";
+
 uint256 constant BLOBS_SUPPORTED = 6;
 
 contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
@@ -22,8 +24,12 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
     /// `_pubdataCommitments` is a packed list of commitments of the following format:
     /// opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)
     function publishBlobs(bytes calldata _pubdataCommitments) external {
-        require(_pubdataCommitments.length > 0, "zln");
-        require(_pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE == 0, "bd");
+        if (_pubdataCommitments.length == 0) {
+            revert PubdataCommitmentsEmpty();
+        }
+        if (_pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE != 0) {
+            revert InvalidPubdataCommitmentsSize();
+        }
 
         uint256 versionedHashIndex = 0;
         // solhint-disable-next-line gas-length-in-loops
@@ -68,11 +74,12 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         // or there are values for both.
         // This is mostly a sanity check and it is not strictly required.
         for (uint256 i = 0; i < _maxBlobsSupported; ++i) {
-            require(
-                (blobsLinearHashes[i] == bytes32(0) && blobCommitments[i] == bytes32(0)) ||
-                    (blobsLinearHashes[i] != bytes32(0) && blobCommitments[i] != bytes32(0)),
-                "bh"
-            );
+            if (
+                (blobsLinearHashes[i] == bytes32(0) && blobCommitments[i] != bytes32(0)) ||
+                (blobsLinearHashes[i] != bytes32(0) && blobCommitments[i] == bytes32(0))
+            ) {
+                revert BlobHashCommitmentError(i, blobsLinearHashes[i] == bytes32(0), blobCommitments[i] == bytes32(0));
+            }
         }
 
         output.stateDiffHash = stateDiffHash;
@@ -87,7 +94,9 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
     function _getPublishedBlobCommitment(uint256 _index, bytes calldata _commitment) internal view returns (bytes32) {
         bytes32 blobVersionedHash = _getBlobVersionedHash(_index);
 
-        require(blobVersionedHash != bytes32(0), "vh");
+        if (blobVersionedHash == bytes32(0)) {
+            revert EmptyBlobVersionHash(_index);
+        }
 
         // First 16 bytes is the opening point. While we get the point as 16 bytes, the point evaluation precompile
         // requires it to be 32 bytes. The blob commitment must use the opening point as 16 bytes though.
@@ -120,7 +129,9 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         // 144 bytes for commitment data
         // 32 bytes for the prepublished commitment. If it is non-zero, it means that it is expected that
         // such commitment was published before. Otherwise, it is expected that it is published in this transaction
-        require(_operatorDAInput.length == _blobsProvided * BLOB_DA_INPUT_SIZE, "bd");
+        if (_operatorDAInput.length != _blobsProvided * BLOB_DA_INPUT_SIZE) {
+            revert InvalidPubdataCommitmentsSize();
+        }
 
         uint256 versionedHashIndex = 0;
 
@@ -149,7 +160,9 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
         // This check is required because we want to ensure that there aren't any extra blobs trying to be published.
         // Calling the BLOBHASH opcode with an index > # blobs - 1 yields bytes32(0)
         bytes32 versionedHash = _getBlobVersionedHash(versionedHashIndex);
-        require(versionedHash == bytes32(0), "lh");
+        if (versionedHash != bytes32(0)) {
+            revert NonEmptyBlobVersionHash(versionedHashIndex);
+        }
     }
 
     /// @notice Calls the point evaluation precompile and verifies the output
@@ -167,9 +180,13 @@ contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
 
         // We verify that the point evaluation precompile call was successful by testing the latter 32 bytes of the
         // response is equal to BLS_MODULUS as defined in https://eips.ethereum.org/EIPS/eip-4844#point-evaluation-precompile
-        require(success, "failed to call point evaluation precompile");
+        if (!success) {
+            revert PointEvalCallFailed(precompileInput);
+        }
         (, uint256 result) = abi.decode(data, (uint256, uint256));
-        require(result == BLS_MODULUS, "precompile unexpected output");
+        if (result != BLS_MODULUS) {
+            revert PointEvalFailed(abi.encode(result));
+        }
     }
 
     function _getBlobVersionedHash(uint256 _index) internal view virtual returns (bytes32 versionedHash) {

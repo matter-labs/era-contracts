@@ -8,8 +8,8 @@ import {Vm} from "forge-std/Vm.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
@@ -110,6 +110,17 @@ library Utils {
      */
     function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
         return vm.readFileBinary("../system-contracts/bootloader/build/artifacts/proved_batch.yul.zbin");
+    }
+
+    /**
+     * @dev Read hardhat bytecodes
+     */
+    function readHardhatBytecode(string memory artifactPath) internal view returns (bytes memory) {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, artifactPath);
+        string memory json = vm.readFile(path);
+        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode");
+        return bytecode;
     }
 
     /**
@@ -288,11 +299,11 @@ library Utils {
     /**
      * @dev Read hardhat bytecodes
      */
-    function readHardhatBytecode(string memory artifactPath) internal view returns (bytes memory) {
+    function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, artifactPath);
         string memory json = vm.readFile(path);
-        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode");
+        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode.object");
         return bytecode;
     }
 

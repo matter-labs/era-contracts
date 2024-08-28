@@ -28,6 +28,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
 import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
@@ -75,10 +76,10 @@ contract ExecutorTest is Test {
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](5);
-        selectors[0] = executor.commitBatches.selector;
-        selectors[1] = executor.proveBatches.selector;
-        selectors[2] = executor.executeBatches.selector;
-        selectors[3] = executor.revertBatches.selector;
+        selectors[0] = executor.commitBatchesSharedBridge.selector;
+        selectors[1] = executor.proveBatchesSharedBridge.selector;
+        selectors[2] = executor.executeBatchesSharedBridge.selector;
+        selectors[3] = executor.revertBatchesSharedBridge.selector;
         selectors[4] = executor.setPriorityTreeStartIndex.selector;
         return selectors;
     }
@@ -112,6 +113,7 @@ contract ExecutorTest is Test {
         selectors[24] = getters.isFacetFreezable.selector;
         selectors[25] = getters.getTotalBatchesCommitted.selector;
         selectors[26] = getters.getTotalBatchesVerified.selector;
+        selectors[27] = getters.storedBlockHash.selector;
         return selectors;
     }
 
@@ -193,7 +195,7 @@ contract ExecutorTest is Test {
             protocolVersion: 0,
             admin: owner,
             validatorTimelock: validator,
-            baseToken: ETH_TOKEN_ADDRESS,
+            baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
             baseTokenBridge: address(sharedBridge),
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
             verifier: IVerifier(testnetVerifier), // verifier

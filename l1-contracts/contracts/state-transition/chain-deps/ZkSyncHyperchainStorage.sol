@@ -144,7 +144,7 @@ struct ZkSyncHyperchainStorage {
     /// @dev The address of the StateTransitionManager
     address stateTransitionManager;
     /// @dev The address of the baseToken contract. Eth is address(1)
-    address baseToken;
+    address __DEPRECATED_baseToken;
     /// @dev The address of the baseTokenbridge. Eth also uses the shared bridge
     address baseTokenBridge;
     /// @notice gasPriceMultiplier for each baseToken, so that each L1->L2 transaction pays for its transaction on the destination

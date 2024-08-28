@@ -5,10 +5,8 @@ pragma solidity 0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-// import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {Verifier} from "contracts/state-transition/Verifier.sol";
@@ -351,7 +349,10 @@ contract DeployL1Script is Script {
     }
 
     function deployChainAdmin() internal {
-        bytes memory bytecode = abi.encodePacked(type(ChainAdmin).creationCode, abi.encode(config.ownerAddress));
+        bytes memory bytecode = abi.encodePacked(
+            type(ChainAdmin).creationCode,
+            abi.encode(config.ownerAddress, address(0))
+        );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("ChainAdmin deployed at:", contractAddress);
         addresses.chainAdmin = contractAddress;
@@ -553,7 +554,7 @@ contract DeployL1Script is Script {
         });
 
         StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
-            owner: config.ownerAddress,
+            owner: msg.sender,
             validatorTimelock: addresses.validatorTimelock,
             chainCreationParams: chainCreationParams,
             protocolVersion: config.contracts.latestProtocolVersion
@@ -667,7 +668,7 @@ contract DeployL1Script is Script {
     function registerSharedBridge() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         vm.startBroadcast(msg.sender);
-        bridgehub.addToken(ADDRESS_ONE);
+        bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         // bridgehub.setSharedBridge(addresses.bridges.sharedBridgeProxy);
         bridgehub.setAddresses(
             addresses.bridges.sharedBridgeProxy,
@@ -754,8 +755,10 @@ contract DeployL1Script is Script {
         L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses.governance);
 
-        vm.stopBroadcast();
+        StateTransitionManager stm = StateTransitionManager(addresses.stateTransition.stateTransitionProxy);
+        stm.transferOwnership(addresses.governance);
 
+        vm.stopBroadcast();
         console.log("Owners updated");
     }
 
