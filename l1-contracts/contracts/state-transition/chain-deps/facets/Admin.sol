@@ -125,7 +125,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin {
+    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin onlyL1 {
         // Validium mode can be set only before the first batch is processed
         if (s.totalBatchesCommitted != 0) {
             revert ChainAlreadyLive();

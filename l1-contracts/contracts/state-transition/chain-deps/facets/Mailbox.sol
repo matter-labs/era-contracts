@@ -60,7 +60,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         L1_CHAIN_ID = _l1ChainId;
     }
 
-    /// @notice when requesting transactions through the bridgehub
+    /// @inheritdoc IMailbox
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
     ) external onlyBridgehub returns (bytes32 canonicalTxHash) {
@@ -482,7 +482,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         if (request.sender != tx.origin) {
             request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
         }
-        // solhint-enable avoid-tx-origin
 
         // populate missing fields
         _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
