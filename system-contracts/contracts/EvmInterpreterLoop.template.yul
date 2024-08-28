@@ -410,7 +410,10 @@ for { } true { } {
         offset, sp := popStackItemWithoutCheck(sp)
         size, sp := popStackItemWithoutCheck(sp)
 
-        if or(gt(add(add(offset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM()), gt(add(add(destOffset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM())) {
+        checkOverflow(destOffset, size, evmGasLeft)
+        checkMemOverflowByOffset(add(destOffset,size), evmGasLeft)
+
+        if gt(add(add(offset, size), MEM_OFFSET_INNER()), MAX_MEMORY_FRAME()) {
             $llvm_AlwaysInline_llvm$_memsetToZero(add(destOffset, MEM_OFFSET_INNER()), size)
         }
 
