@@ -92,21 +92,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bridgedTokenBeacon.transferOwnership(owner());
     }
 
-    /// @dev Initializes a contract for later use. Expected to be used in the proxy.
-    /// @param _owner Address which can change pause / unpause the NTV.
-    /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    function initialize(address _owner) external initializer {
-        if (_owner == address(0)) {
-            revert ZeroAddress();
-        }
-        _transferOwnership(_owner);
-    }
-
-    /// @dev Accepts ether only from the Shared Bridge.
-    receive() external payable {
-        require(address(ASSET_ROUTER) == msg.sender, "NTV: ETH only accepted from Asset Router");
-    }
-
     /// @notice Registers tokens within the NTV.
     /// @dev The goal was to allow bridging native tokens automatically, by registering them on the fly.
     /// @notice Allows the bridge to register a token address for the vault.
@@ -121,6 +106,10 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         tokenAddress[assetId] = _nativeToken;
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            FINISH TRANSACTION FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
     ///  @inheritdoc IAssetHandler
     function bridgeMint(
         uint256 _chainId,
@@ -133,60 +122,69 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         address receiver;
 
         if (chainBalance[_chainId][token] > 0) {
-            (amount, receiver) = abi.decode(_transferData, (uint256, address));
-            // Check that the chain has sufficient balance
-            if (chainBalance[_chainId][token] < amount) {
-                revert InsufficientChainBalance();
-            }
-            chainBalance[_chainId][token] -= amount;
-
-            if (token == BASE_TOKEN_ADDRESS) {
-                bool callSuccess;
-                // Low-level assembly call, to avoid any memory copying (save gas)
-                assembly {
-                    callSuccess := call(gas(), receiver, amount, 0, 0, 0, 0)
-                }
-                if (!callSuccess) {
-                    revert WithdrawFailed();
-                }
-            } else {
-                // Withdraw funds
-                IERC20(token).safeTransfer(receiver, amount);
-            }
-            // solhint-disable-next-line func-named-parameters
-            emit BridgeMint(_chainId, _assetId, receiver, amount);
+            _bridgeMintNativeToken(_chainId, _assetId, _transferData);
         } else {
-            bytes memory erc20Data;
-            address originToken;
-
-            (, amount, receiver, erc20Data, originToken) = abi.decode(
-                _transferData,
-                (address, uint256, address, bytes, address)
-            );
-            address expectedToken = bridgedTokenAddress(originToken);
-            if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
-                // l1LegacyToken = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(expectedToken); // kl todo
-            }
-            if (token == address(0)) {
-                bytes32 expectedAssetId = keccak256(
-                    abi.encode(_chainId, L2_NATIVE_TOKEN_VAULT_ADDRESS, bytes32(uint256(uint160(originToken))))
-                );
-                if (_assetId != expectedAssetId) {
-                    // Make sure that a NativeTokenVault sent the message
-                    revert AssetIdMismatch(_assetId, expectedAssetId);
-                }
-                address deployedToken = _deployBridgedToken(originToken, erc20Data);
-                if (deployedToken != expectedToken) {
-                    revert AddressMismatch(expectedToken, deployedToken);
-                }
-                isTokenBridged[_assetId] = true;
-                tokenAddress[_assetId] = expectedToken;
-            }
-
-            IBridgedStandardToken(expectedToken).bridgeMint(receiver, amount);
+            _bridgeMintBridgedToken(_chainId, _assetId, _transferData);
         }
         emit BridgeMint(_chainId, _assetId, receiver, amount);
     }
+
+    function _bridgeMintBridgedToken(
+        uint256 _originChainId,
+        bytes32 _assetId,
+        bytes calldata _transferData
+    ) internal virtual {
+        // Either it was locked before, therefore is not zero, or it is sent from remote chain and standard erc20 will be deployed
+        address token = tokenAddress[_assetId];
+        uint256 amount;
+        address receiver;
+        bytes memory erc20Data;
+        address originToken;
+
+        (, amount, receiver, erc20Data, originToken) = abi.decode(
+            _transferData,
+            (address, uint256, address, bytes, address)
+        );
+
+        if (token == address(0)) {
+            token = _ensureTokenDeployed(_originChainId, _assetId, originToken, erc20Data);
+        }
+
+        IBridgedStandardToken(token).bridgeMint(receiver, amount);
+    }
+
+    function _bridgeMintNativeToken(uint256 _originChainId, bytes32 _assetId, bytes calldata _transferData) internal {
+        // Either it was locked before, therefore is not zero, or it is sent from remote chain and standard erc20 will be deployed
+        address token = tokenAddress[_assetId];
+        uint256 amount;
+        address receiver;
+        (amount, receiver) = abi.decode(_transferData, (uint256, address));
+        // Check that the chain has sufficient balance
+        if (chainBalance[_originChainId][token] < amount) {
+            revert InsufficientChainBalance();
+        }
+        chainBalance[_originChainId][token] -= amount;
+
+        if (token == BASE_TOKEN_ADDRESS) {
+            bool callSuccess;
+            // Low-level assembly call, to avoid any memory copying (save gas)
+            assembly {
+                callSuccess := call(gas(), receiver, amount, 0, 0, 0, 0)
+            }
+            if (!callSuccess) {
+                revert WithdrawFailed();
+            }
+        } else {
+            // Withdraw funds
+            IERC20(token).safeTransfer(receiver, amount);
+        }
+        // solhint-disable-next-line func-named-parameters
+        emit BridgeMint(_originChainId, _assetId, receiver, amount);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Start transaction Functions
+    //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetHandler
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
@@ -199,78 +197,100 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes calldata _data
     ) external payable override onlyBridge whenNotPaused returns (bytes memory _bridgeMintData) {
         if (isTokenBridged[_assetId]) {
-            (uint256 _depositAmount, address _receiver) = abi.decode(_data, (uint256, address));
-
-            uint256 amount;
-            address nativeToken = tokenAddress[_assetId];
-            if (nativeToken == BASE_TOKEN_ADDRESS) {
-                amount = msg.value;
-
-                // In the old SDK/contracts the user had to always provide `0` as the deposit amount for ETH token, while
-                // ultimately the provided `msg.value` was used as the deposit amount. This check is needed for backwards compatibility.
-                if (_depositAmount == 0) {
-                    _depositAmount = amount;
-                }
-
-                if (_depositAmount != amount) {
-                    revert ValueMismatch(amount, msg.value);
-                }
-            } else {
-                // The Bridgehub also checks this, but we want to be sure
-                if (msg.value != 0) {
-                    revert NonEmptyMsgValue();
-                }
-
-                amount = _depositAmount;
-
-                uint256 expectedDepositAmount = _depositFunds(_prevMsgSender, IERC20(nativeToken), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
-                // The token has non-standard transfer logic
-                if (amount != expectedDepositAmount) {
-                    revert TokensWithFeesNotSupported();
-                }
-            }
-            if (amount == 0) {
-                // empty deposit amount
-                revert EmptyDeposit();
-            }
-
-            chainBalance[_chainId][nativeToken] += amount;
-
-            _bridgeMintData = DataEncoding.encodeBridgeMintData({
-                _prevMsgSender: _prevMsgSender,
-                _l2Receiver: _receiver,
-                _l1Token: nativeToken,
-                _amount: amount,
-                _erc20Metadata: getERC20Getters(nativeToken)
-            });
-
-            emit BridgeBurn({
-                chainId: _chainId,
-                assetId: _assetId,
-                sender: _prevMsgSender,
-                receiver: _receiver,
-                amount: amount
-            });
+            _bridgeMintData = _bridgeBurnBridgedToken(_chainId, _assetId, _prevMsgSender, _data);
         } else {
-            (uint256 _amount, address _receiver) = abi.decode(_data, (uint256, address));
-            if (_amount == 0) {
-                // "Amount cannot be zero");
-                revert AmountMustBeGreaterThanZero();
-            }
-
-            address bridgedToken = tokenAddress[_assetId];
-            IBridgedStandardToken(bridgedToken).bridgeBurn(_prevMsgSender, _amount);
-
-            emit BridgeBurn({
-                chainId: _chainId,
-                assetId: _assetId,
-                sender: _prevMsgSender,
-                receiver: _receiver,
-                amount: _amount
-            });
-            _bridgeMintData = _data;
+            _bridgeMintData = _bridgeBurnNativeToken(_chainId, _assetId, _prevMsgSender, _data);
         }
     }
+
+    function _bridgeBurnNativeToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) internal returns (bytes memory _bridgeMintData) {
+        (uint256 _amount, address _receiver) = abi.decode(_data, (uint256, address));
+        if (_amount == 0) {
+            // "Amount cannot be zero");
+            revert AmountMustBeGreaterThanZero();
+        }
+
+        address bridgedToken = tokenAddress[_assetId];
+        IBridgedStandardToken(bridgedToken).bridgeBurn(_prevMsgSender, _amount);
+
+        emit BridgeBurn({
+            chainId: _chainId,
+            assetId: _assetId,
+            sender: _prevMsgSender,
+            receiver: _receiver,
+            amount: _amount
+        });
+        _bridgeMintData = _data;
+    }
+
+    function _bridgeBurnBridgedToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) internal returns (bytes memory _bridgeMintData) {
+        (uint256 _depositAmount, address _receiver) = abi.decode(_data, (uint256, address));
+
+        uint256 amount;
+        address nativeToken = tokenAddress[_assetId];
+        if (nativeToken == BASE_TOKEN_ADDRESS) {
+            amount = msg.value;
+
+            // In the old SDK/contracts the user had to always provide `0` as the deposit amount for ETH token, while
+            // ultimately the provided `msg.value` was used as the deposit amount. This check is needed for backwards compatibility.
+            if (_depositAmount == 0) {
+                _depositAmount = amount;
+            }
+
+            if (_depositAmount != amount) {
+                revert ValueMismatch(amount, msg.value);
+            }
+        } else {
+            // The Bridgehub also checks this, but we want to be sure
+            if (msg.value != 0) {
+                revert NonEmptyMsgValue();
+            }
+
+            amount = _depositAmount;
+
+            uint256 expectedDepositAmount = _depositFunds(_prevMsgSender, IERC20(nativeToken), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
+            // The token has non-standard transfer logic
+            if (amount != expectedDepositAmount) {
+                revert TokensWithFeesNotSupported();
+            }
+        }
+        if (amount == 0) {
+            // empty deposit amount
+            revert EmptyDeposit();
+        }
+
+        chainBalance[_chainId][nativeToken] += amount;
+
+        _bridgeMintData = DataEncoding.encodeBridgeMintData({
+            _prevMsgSender: _prevMsgSender,
+            _l2Receiver: _receiver,
+            _l1Token: nativeToken,
+            _amount: amount,
+            _erc20Metadata: getERC20Getters(nativeToken)
+        });
+
+        emit BridgeBurn({
+            chainId: _chainId,
+            assetId: _assetId,
+            sender: _prevMsgSender,
+            receiver: _receiver,
+            amount: amount
+        });
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            INTERNAL & HELPER FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice Transfers tokens from the depositor address to the smart contract address.
     /// @param _from The address of the depositor.
@@ -307,27 +327,61 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         return DataEncoding.encodeNTVAssetId(_chainId, _nativeToken);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            TOKEN DEPLOYER FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function _ensureTokenDeployed(
+        uint256 _originChainId,
+        bytes32 _assetId,
+        address _originToken,
+        bytes memory _erc20Data
+    ) internal virtual returns (address _token) {
+        _token = _ensureTokenDeployedInner(_originChainId, _assetId, _originToken, _erc20Data);
+    }
+
+    function _ensureTokenDeployedInner(
+        uint256 _originChainId,
+        bytes32 _assetId,
+        address _originToken,
+        bytes memory _erc20Data
+    ) internal returns (address) {
+        address expectedToken = calculateCreate2TokenAddress(_originChainId, _originToken);
+        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_originChainId, _originToken);
+
+        if (_assetId != expectedAssetId) {
+            // Make sure that a NativeTokenVault sent the message
+            revert AssetIdMismatch(_assetId, expectedAssetId);
+        }
+        address deployedToken = _deployBridgedToken(_originChainId, _originToken, _erc20Data);
+        if (deployedToken != expectedToken) {
+            revert AddressMismatch(expectedToken, deployedToken);
+        }
+        isTokenBridged[_assetId] = true;
+        tokenAddress[_assetId] = expectedToken;
+        return expectedToken;
+    }
+
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
-    /// @param _nativeToken The address of native token.
+    /// @param _bridgeToken The address of native token.
     /// @return The address of bridged token.
-    function bridgedTokenAddress(address _nativeToken) public view virtual override returns (address);
+    function calculateCreate2TokenAddress(
+        uint256 _originChainId,
+        address _bridgeToken
+    ) public view virtual override returns (address);
 
     /// @notice Deploys and initializes the bridged token for the native counterpart.
     /// @param _nativeToken The address of native token.
     /// @param _erc20Data The ERC20 metadata of the token deployed.
     /// @return The address of the beacon proxy (bridged token).
-    function _deployBridgedToken(address _nativeToken, bytes memory _erc20Data) internal returns (address) {
-        bytes32 salt = _getCreate2Salt(_nativeToken);
+    function _deployBridgedToken(
+        uint256 _originChainId,
+        address _nativeToken,
+        bytes memory _erc20Data
+    ) internal returns (address) {
+        bytes32 salt = _getCreate2Salt(_originChainId, _nativeToken);
 
-        BeaconProxy l2Token;
-        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
-            // Deploy the beacon proxy for the L2 token
-            l2Token = _deployBeaconProxy(salt);
-        } else {
-            // Deploy the beacon proxy for the L2 token
-            address l2TokenAddr = L2_LEGACY_SHARED_BRIDGE.deployBeaconProxy(salt);
-            l2Token = BeaconProxy(payable(l2TokenAddr));
-        }
+        BeaconProxy l2Token = _deployBeaconProxy(salt);
         BridgedStandardERC20(address(l2Token)).bridgeInitialize(_nativeToken, _erc20Data);
 
         return address(l2Token);
@@ -336,8 +390,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @notice Converts the L1 token address to the create2 salt of deployed L2 token.
     /// @param _l1Token The address of token on L1.
     /// @return salt The salt used to compute address of bridged token on L2 and for beacon proxy deployment.
-    function _getCreate2Salt(address _l1Token) internal pure returns (bytes32 salt) {
-        salt = bytes32(uint256(uint160(_l1Token)));
+    function _getCreate2Salt(uint256 _originChainId, address _l1Token) internal view virtual returns (bytes32 salt) {
+        salt = keccak256(abi.encode(_originChainId, _l1Token));
     }
 
     /// @notice Deploys the beacon proxy for the bridged token.

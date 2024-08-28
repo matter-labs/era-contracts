@@ -7,7 +7,7 @@ import {INativeTokenVault} from "./INativeTokenVault.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL2NativeTokenVault is INativeTokenVault {
+interface IL2NativeTokenVault {
     event FinalizeDeposit(
         address indexed l1Sender,
         address indexed l2Receiver,
@@ -28,5 +28,5 @@ interface IL2NativeTokenVault is INativeTokenVault {
 
     function l2TokenAddress(address _l1Token) external view returns (address);
 
-    function calculateCreate2TokenAddress(address _l1Token) external view returns (address);
+    // function calculateCreate2TokenAddress(address _l1Token) external view returns (address);
 }

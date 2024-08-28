@@ -227,7 +227,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
 
         // For backwards compatibility, the bridge smust return the address of the token even if it
         // has not been deployed yet.
-        return l2NativeTokenVault.calculateCreate2TokenAddress(_l1Token);
+        return INativeTokenVault(address(l2NativeTokenVault)).calculateCreate2TokenAddress(L1_CHAIN_ID, _l1Token);
     }
 
     /// @notice Returns the address of the L1 asset router.

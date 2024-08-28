@@ -67,20 +67,22 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         wrappedTokenProxyBytecode = _wrappedTokenProxyBytecode;
     }
 
-    /// @dev Accepts ether only from the Shared Bridge.
-    // receive() external payable override {
-    //     require(address(NULLIFIER) == msg.sender, "NTV: ETH only accepted from Shared Bridge");
-    // }
+    /// @dev Accepts ether only from the contract that was the shared Bridge.
+    receive() external payable {
+        if (address(NULLIFIER) != msg.sender) {
+            revert Unauthorized(msg.sender);
+        }
+    }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy
     /// @param _owner Address which can change pause / unpause the NTV
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    // function initialize(address _owner) external initializer {
-    //     if (_owner == address(0)) {
-    //         revert ZeroAddress();
-    //     }
-    //     _transferOwnership(_owner);
-    // }
+    function initialize(address _owner) external initializer {
+        if (_owner == address(0)) {
+            revert ZeroAddress();
+        }
+        _transferOwnership(_owner);
+    }
 
     /// @notice Transfers tokens from shared bridge as part of the migration process.
     /// @dev Both ETH and ERC20 tokens can be transferred. Exhausts balance of shared bridge after the first call.
@@ -113,6 +115,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + sharedBridgeChainBalance;
         NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            L1 SPECIFIC FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     ///  @inheritdoc IL1AssetHandler
     function bridgeRecoverFailedTransfer(
@@ -147,16 +153,23 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         }
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            INTERNAL & HELPER FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
     // get the computed address before the contract DeployWithCreate2 deployed using Bytecode of contract DeployWithCreate2 and salt specified by the sender
-    function bridgedTokenAddress(
-        address _salt
-    ) public view override(INativeTokenVault, NativeTokenVault) returns (address) {
+    function calculateCreate2TokenAddress(
+        uint256 _originChainId,
+        address _l1Token
+    ) public view override returns (address) {
+        bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
         bytes32 hash = keccak256(
-            abi.encodePacked(bytes1(0xff), address(this), uint256(uint160(_salt)), keccak256(wrappedTokenProxyBytecode))
+            abi.encodePacked(bytes1(0xff), address(this), salt, keccak256(wrappedTokenProxyBytecode))
         );
         return address(uint160(uint256(hash)));
     }
 
+    // kl todo move to beacon proxy here as well
     function _deployBeaconProxy(bytes32 _salt) internal override returns (BeaconProxy proxy) {
         // Use CREATE2 to deploy the BeaconProxy
         address proxyAddress = Create2.deploy(0, _salt, wrappedTokenProxyBytecode);

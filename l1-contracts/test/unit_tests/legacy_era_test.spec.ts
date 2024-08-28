@@ -102,7 +102,7 @@ describe("Legacy Era tests", function () {
     const sharedBridgeFactory = await hardhat.ethers.getContractFactory("L1AssetRouter");
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const sharedBridge = await sharedBridgeFactory.deploy(
-      l1WethToken,
+      // l1WethToken,
       deployer.addresses.Bridgehub.BridgehubProxy,
       deployer.chainId,
       deployer.addresses.StateTransition.DiamondProxy

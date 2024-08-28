@@ -41,5 +41,5 @@ interface INativeTokenVault {
     function tokenAddress(bytes32 assetId) external view returns (address);
 
     /// @notice Used to get the expected bridged token address corresponding to its native counterpart
-    function bridgedTokenAddress(address _nativeToken) external view returns (address);
+    function calculateCreate2TokenAddress(uint256 _originChainId, address _originToken) external view returns (address);
 }

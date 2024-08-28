@@ -12,9 +12,8 @@ import {INativeTokenVault} from "./INativeTokenVault.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The NTV is an Asset Handler for the L1AssetRouter to handle native tokens
-interface IL1NativeTokenVault is
-    INativeTokenVault // is IL1AssetHandler, IL1BaseTokenAssetHandler {
-{
+// is IL1AssetHandler, IL1BaseTokenAssetHandler {
+interface IL1NativeTokenVault {
     /// @notice The L1Nullifier contract
     function NULLIFIER() external view returns (IL1Nullifier);
 

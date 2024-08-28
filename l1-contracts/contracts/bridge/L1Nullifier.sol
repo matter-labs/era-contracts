@@ -17,6 +17,8 @@ import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "./asset-router/IAssetRouterBase.sol";
+import {INativeTokenVault} from "./ntv/INativeTokenVault.sol";
+
 import {IL1Nullifier, FinalizeWithdrawalParams} from "./interfaces/IL1Nullifier.sol";
 
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
@@ -592,7 +594,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        bytes32 assetId = nativeTokenVault.getAssetId(block.chainid, _l1Token);
+        bytes32 assetId = INativeTokenVault(address(nativeTokenVault)).getAssetId(block.chainid, _l1Token);
         // For legacy deposits, the l2 receiver is not required to check tx data hash
         // bytes memory transferData = abi.encode(_amount, _depositSender);
         bytes memory assetData = abi.encode(_amount, address(0));
@@ -622,9 +624,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _l1Token The L1 token address which should be registered with native token vault.
     /// @return assetId The asset ID of the token provided.
     function _ensureTokenRegisteredWithNTV(address _l1Token) internal returns (bytes32 assetId) {
-        assetId = nativeTokenVault.getAssetId(block.chainid, _l1Token);
-        if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
-            nativeTokenVault.registerToken(_l1Token);
+        assetId = INativeTokenVault(address(nativeTokenVault)).getAssetId(block.chainid, _l1Token);
+        if (INativeTokenVault(address(nativeTokenVault)).tokenAddress(assetId) == address(0)) {
+            INativeTokenVault(address(nativeTokenVault)).registerToken(_l1Token);
         }
     }
 
@@ -778,7 +780,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _merkleProof
             // )
         );
-        l1Asset = nativeTokenVault.tokenAddress(assetId);
+        l1Asset = INativeTokenVault(address(nativeTokenVault)).tokenAddress(assetId);
     }
 
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on ZKSync Era chain.
@@ -804,7 +806,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge {
         bytes memory assetData = abi.encode(_amount, _depositSender);
-        bytes32 assetId = nativeTokenVault.getAssetId(block.chainid, _l1Asset); // kl todo this chain?
+        bytes32 assetId = INativeTokenVault(address(nativeTokenVault)).getAssetId(block.chainid, _l1Asset); // kl todo this chain?
 
         bridgeVerifyFailedTransfer({
             _depositSender: _depositSender,

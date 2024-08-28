@@ -68,8 +68,8 @@ import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
 import { BridgehubFactory, ChainAdminFactory, ERC20Factory, StateTransitionManagerFactory } from "../typechain";
 
-import { IL1AssetRouterFactory } from "../typechain/IL1AssetRouterFactory";
-import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
+import { IL1AssetRouterCombinedFactory } from "../typechain/IL1AssetRouterCombinedFactory";
+import { IL1NativeTokenVaultCombinedFactory } from "../typechain/IL1NativeTokenVaultCombinedFactory";
 import { ISTMDeploymentTrackerFactory } from "../typechain/ISTMDeploymentTrackerFactory";
 
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
@@ -1622,11 +1622,11 @@ export class Deployer {
   }
 
   public defaultSharedBridge(signerOrProvider: Signer | providers.Provider) {
-    return IL1AssetRouterFactory.connect(this.addresses.Bridges.SharedBridgeProxy, signerOrProvider);
+    return IL1AssetRouterCombinedFactory.connect(this.addresses.Bridges.SharedBridgeProxy, signerOrProvider);
   }
 
   public nativeTokenVault(signerOrProvider: Signer | providers.Provider) {
-    return IL1NativeTokenVaultFactory.connect(this.addresses.Bridges.NativeTokenVaultProxy, signerOrProvider);
+    return IL1NativeTokenVaultCombinedFactory.connect(this.addresses.Bridges.NativeTokenVaultProxy, signerOrProvider);
   }
 
   public stmDeploymentTracker(signerOrProvider: Signer | providers.Provider) {
