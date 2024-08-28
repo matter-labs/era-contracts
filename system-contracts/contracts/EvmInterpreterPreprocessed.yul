@@ -1431,31 +1431,15 @@ object "EVMInterpreter" {
         
             _pushEVMFrame(gasForTheCall, false)
         
-            // Selector
-            mstore(sub(offset, 0x80), 0x5b16a23c)
-            // Arg1: address
-            mstore(sub(offset, 0x60), addr)
-            // Arg2: init code
-            // Where the arg starts (third word)
-            mstore(sub(offset, 0x40), 0x40)
+            // CreateEVM selector
+            mstore(sub(offset, 0x60), 0xff311601)
+            // Where the arg starts (second word)
+            mstore(sub(offset, 0x40), 0x20)
             // Length of the init code
             mstore(sub(offset, 0x20), size)
         
-            let farCallAbi := getFarCallABI(
-                0,
-                0,
-                sub(offset, 0x64),
-                add(size, 0x64),
-                INF_PASS_GAS(),
-                // Only rollup is supported for now
-                0,
-                0,
-                0,
-                1
-            )
         
-            let to := DEPLOYER_SYSTEM_CONTRACT()
-            result := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+            result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x44), add(size, 0x44), 0, 32)
         
             let gasLeft
             switch result
@@ -1470,18 +1454,6 @@ object "EVMInterpreter" {
             evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
         
             _popEVMFrame()
-        
-            switch result
-            case 1 {
-                incrementNonce(address())
-            }
-            default {
-                switch isEOA(address())
-                case 1 {
-                    incrementNonce(address())
-                }
-                default {}
-            }
         
             let back
         
@@ -4521,31 +4493,15 @@ object "EVMInterpreter" {
             
                 _pushEVMFrame(gasForTheCall, false)
             
-                // Selector
-                mstore(sub(offset, 0x80), 0x5b16a23c)
-                // Arg1: address
-                mstore(sub(offset, 0x60), addr)
-                // Arg2: init code
-                // Where the arg starts (third word)
-                mstore(sub(offset, 0x40), 0x40)
+                // CreateEVM selector
+                mstore(sub(offset, 0x60), 0xff311601)
+                // Where the arg starts (second word)
+                mstore(sub(offset, 0x40), 0x20)
                 // Length of the init code
                 mstore(sub(offset, 0x20), size)
             
-                let farCallAbi := getFarCallABI(
-                    0,
-                    0,
-                    sub(offset, 0x64),
-                    add(size, 0x64),
-                    INF_PASS_GAS(),
-                    // Only rollup is supported for now
-                    0,
-                    0,
-                    0,
-                    1
-                )
             
-                let to := DEPLOYER_SYSTEM_CONTRACT()
-                result := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+                result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x44), add(size, 0x44), 0, 32)
             
                 let gasLeft
                 switch result
@@ -4560,18 +4516,6 @@ object "EVMInterpreter" {
                 evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
             
                 _popEVMFrame()
-            
-                switch result
-                case 1 {
-                    incrementNonce(address())
-                }
-                default {
-                    switch isEOA(address())
-                    case 1 {
-                        incrementNonce(address())
-                    }
-                    default {}
-                }
             
                 let back
             

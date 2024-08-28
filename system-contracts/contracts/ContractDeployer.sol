@@ -194,9 +194,15 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     function createEVM(bytes calldata _initCode) external payable override returns (address) {
         // If the account is an EOA, use the min nonce. If it's a contract, use deployment nonce
         // Subtract 1 for EOA since the nonce has already been incremented for this transaction
+
+        uint256 deploymentNonce = NONCE_HOLDER_SYSTEM_CONTRACT.getDeploymentNonce(msg.sender);
+        if (deploymentNonce == 0) {
+            NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
+        }
+
         uint256 senderNonce = msg.sender == tx.origin
             ? NONCE_HOLDER_SYSTEM_CONTRACT.getMinNonce(msg.sender) - 1
-            : NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender) + 1;
+            : NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
         address newAddress = Utils.getNewAddressCreateEVM(msg.sender, senderNonce);
         _evmDeployOnAddress(newAddress, _initCode);
         return newAddress;
