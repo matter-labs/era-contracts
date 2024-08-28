@@ -1410,7 +1410,7 @@ object "EVMInterpreter" {
             gasLeft := mload(0)
         }
         
-        function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, evmGasLeft {
+        function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftOld,isCreate2, salt) -> result, evmGasLeft, addr {
             pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
         
             _eraseReturndataPointer()
@@ -1431,15 +1431,34 @@ object "EVMInterpreter" {
         
             _pushEVMFrame(gasForTheCall, false)
         
-            // CreateEVM selector
-            mstore(sub(offset, 0x60), 0xff311601)
-            // Where the arg starts (second word)
-            mstore(sub(offset, 0x40), 0x20)
-            // Length of the init code
-            mstore(sub(offset, 0x20), size)
+            if isCreate2 {
+                // Create2EVM selector
+                mstore(sub(offset, 0x80), 0x4e96f4c0)
+                // salt
+                mstore(sub(offset, 0x60), salt)
+                // Where the arg starts (third word)
+                mstore(sub(offset, 0x40), 0x40)
+                // Length of the init code
+                mstore(sub(offset, 0x20), size)
         
         
-            result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x44), add(size, 0x44), 0, 32)
+                result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x64), add(size, 0x64), 0, 32)
+            }
+        
+        
+            if iszero(isCreate2) {
+                // CreateEVM selector
+                mstore(sub(offset, 0x60), 0xff311601)
+                // Where the arg starts (second word)
+                mstore(sub(offset, 0x40), 0x20)
+                // Length of the init code
+                mstore(sub(offset, 0x20), size)
+        
+        
+                result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x44), add(size, 0x44), 0, 32)
+            }
+        
+            addr := mload(0)
         
             let gasLeft
             switch result
@@ -1575,7 +1594,7 @@ object "EVMInterpreter" {
             let addr := getNewAddress(address())
         
             let result
-            result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
+            result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,false,0)
         
             switch result
                 case 0 { sp := pushStackItem(sp, 0, evmGasLeft) }
@@ -1631,7 +1650,7 @@ object "EVMInterpreter" {
                 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
             )
         
-            result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
+            result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,true,salt)
         }
         
 
@@ -4472,7 +4491,7 @@ object "EVMInterpreter" {
                 gasLeft := mload(0)
             }
             
-            function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, evmGasLeft {
+            function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftOld,isCreate2, salt) -> result, evmGasLeft, addr {
                 pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
             
                 _eraseReturndataPointer()
@@ -4493,15 +4512,34 @@ object "EVMInterpreter" {
             
                 _pushEVMFrame(gasForTheCall, false)
             
-                // CreateEVM selector
-                mstore(sub(offset, 0x60), 0xff311601)
-                // Where the arg starts (second word)
-                mstore(sub(offset, 0x40), 0x20)
-                // Length of the init code
-                mstore(sub(offset, 0x20), size)
+                if isCreate2 {
+                    // Create2EVM selector
+                    mstore(sub(offset, 0x80), 0x4e96f4c0)
+                    // salt
+                    mstore(sub(offset, 0x60), salt)
+                    // Where the arg starts (third word)
+                    mstore(sub(offset, 0x40), 0x40)
+                    // Length of the init code
+                    mstore(sub(offset, 0x20), size)
             
             
-                result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x44), add(size, 0x44), 0, 32)
+                    result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x64), add(size, 0x64), 0, 32)
+                }
+            
+            
+                if iszero(isCreate2) {
+                    // CreateEVM selector
+                    mstore(sub(offset, 0x60), 0xff311601)
+                    // Where the arg starts (second word)
+                    mstore(sub(offset, 0x40), 0x20)
+                    // Length of the init code
+                    mstore(sub(offset, 0x20), size)
+            
+            
+                    result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x44), add(size, 0x44), 0, 32)
+                }
+            
+                addr := mload(0)
             
                 let gasLeft
                 switch result
@@ -4637,7 +4675,7 @@ object "EVMInterpreter" {
                 let addr := getNewAddress(address())
             
                 let result
-                result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
+                result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,false,0)
             
                 switch result
                     case 0 { sp := pushStackItem(sp, 0, evmGasLeft) }
@@ -4693,7 +4731,7 @@ object "EVMInterpreter" {
                     0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
                 )
             
-                result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
+                result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,true,salt)
             }
             
 
