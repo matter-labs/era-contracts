@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: MIT
-
-// solhint-disable gas-custom-errors
-
-// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
 import {EfficientCall} from "./EfficientCall.sol";
@@ -12,7 +9,7 @@ import {MalformedBytecode, BytecodeError, Overflow} from "../SystemContractError
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @dev Common utilities used in zkSync system contracts
+ * @dev Common utilities used in ZKsync system contracts
  */
 library Utils {
     /// @dev Bit mask of bytecode hash "isConstructor" marker

@@ -181,7 +181,7 @@ contract BootloaderUtilities is IBootloaderUtilities {
             // Otherwise the length is not encoded at all.
         }
 
-        // On zkSync, access lists are always zero length (at least for now).
+        // On ZKsync, access lists are always zero length (at least for now).
         bytes memory encodedAccessListLength = RLPEncoder.encodeListLen(0);
 
         bytes memory rEncoded;
@@ -282,7 +282,7 @@ contract BootloaderUtilities is IBootloaderUtilities {
             // Otherwise the length is not encoded at all.
         }
 
-        // On zkSync, access lists are always zero length (at least for now).
+        // On ZKsync, access lists are always zero length (at least for now).
         bytes memory encodedAccessListLength = RLPEncoder.encodeListLen(0);
 
         bytes memory rEncoded;

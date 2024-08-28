@@ -16,7 +16,7 @@ import {BatchNumberMismatch, TimeNotReached, TooManyBlobs, ValueMismatch, Invali
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
-/// @title zkSync hyperchain Executor contract capable of processing events emitted in the zkSync hyperchain protocol.
+/// @title ZKsync hyperchain Executor contract capable of processing events emitted in the ZKsync hyperchain protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {

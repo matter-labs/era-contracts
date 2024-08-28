@@ -104,7 +104,7 @@ class ZkSyncDeployer {
     this.nonce += 1;
   }
 
-  // Returns the current default account bytecode on zkSync
+  // Returns the current default account bytecode on ZKsync
   async currentDefaultAccountBytecode(): Promise<string> {
     const zkSync = await this.deployer.zkWallet.getMainContract();
     return await zkSync.getL2DefaultAccountBytecodeHash();
@@ -115,7 +115,7 @@ class ZkSyncDeployer {
     const bytecodeHash = ethers.utils.hexlify(hashBytecode(defaultAccountBytecode));
     const currentDefaultAccountBytecode = ethers.utils.hexlify(await this.currentDefaultAccountBytecode());
 
-    // If the bytecode is not the same as the one deployed on zkSync, we need to add it to the deployment
+    // If the bytecode is not the same as the one deployed on ZKsync, we need to add it to the deployment
     if (bytecodeHash.toLowerCase() !== currentDefaultAccountBytecode) {
       this.defaultAccountToUpgrade = {
         name: DEFAULT_ACCOUNT_CONTRACT_NAME,
@@ -211,7 +211,7 @@ class ZkSyncDeployer {
     const bytecodeHash = ethers.utils.hexlify(hashBytecode(bootloaderCode));
     const currentBootloaderBytecode = ethers.utils.hexlify(await this.currentBootloaderBytecode());
 
-    // If the bytecode is not the same as the one deployed on zkSync, we need to add it to the deployment
+    // If the bytecode is not the same as the one deployed on ZKsync, we need to add it to the deployment
     if (bytecodeHash.toLowerCase() !== currentBootloaderBytecode) {
       this.bootloaderToUpgrade = {
         name: BOOTLOADER_CONTRACT_NAME,
