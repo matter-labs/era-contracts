@@ -739,12 +739,6 @@ object "EVMInterpreter" {
             }
         }
         
-        function ensureAcceptableMemLocation(location) {
-            if gt(location,MAX_POSSIBLE_MEM()) {
-                revert(0,0) // Check if this is whats needed
-            }
-        }
-        
         function addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft) -> newOffset,newSize {
             newOffset := offset
             newSize := size
@@ -3696,12 +3690,6 @@ object "EVMInterpreter" {
             
                 if iszero(result) {
                     revert(0, 0)
-                }
-            }
-            
-            function ensureAcceptableMemLocation(location) {
-                if gt(location,MAX_POSSIBLE_MEM()) {
-                    revert(0,0) // Check if this is whats needed
                 }
             }
             
