@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
 import {Utils} from "./libraries/Utils.sol";
@@ -14,7 +14,7 @@ import {Unauthorized, InvalidCodeHash, CodeHashReason} from "./SystemContractErr
  * @dev Code hash is not strictly a hash, it's a structure where the first byte denotes the version of the hash,
  * the second byte denotes whether the contract is constructed, and the next two bytes denote the length in 32-byte words.
  * And then the next 28 bytes are the truncated hash.
- * @dev In this version of zkSync, the first byte of the hash MUST be 1.
+ * @dev In this version of ZKsync, the first byte of the hash MUST be 1.
  * @dev The length of each bytecode MUST be odd.  It's internal code format requirements, due to padding of SHA256 function.
  * @dev It is also assumed that all the bytecode hashes are *known*, i.e. the full bytecodes
  * were published on L1 as calldata. This contract trusts the ContractDeployer and the KnownCodesStorage
