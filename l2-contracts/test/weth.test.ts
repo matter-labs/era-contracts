@@ -33,16 +33,18 @@ describe("WETH token & WETH bridge", function () {
     ]);
     const randomAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
 
-    const wethTokenProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
-      wethTokenImpl.address,
-      randomAddress,
-      "0x",
-    ]);
-    const wethBridgeProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [
-      wethBridgeImpl.address,
-      randomAddress,
-      "0x",
-    ]);
+    const wethTokenProxy = await deployer.deploy(
+      await deployer.loadArtifact(
+        "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy"
+      ),
+      [wethTokenImpl.address, randomAddress, "0x"]
+    );
+    const wethBridgeProxy = await deployer.deploy(
+      await deployer.loadArtifact(
+        "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy"
+      ),
+      [wethBridgeImpl.address, randomAddress, "0x"]
+    );
 
     wethToken = L2WrappedBaseTokenFactory.connect(wethTokenProxy.address, wallet);
     wethBridge = L2AssetRouterFactory.connect(wethBridgeProxy.address, wallet);

@@ -37,7 +37,7 @@ describe("Admin facet tests", function () {
     const revertReason = await getCallRevertReason(
       adminFacetTest.connect(randomSigner).setValidator(validatorAddress, true)
     );
-    expect(revertReason).equal("Hyperchain: not state transition manager");
+    expect(revertReason).contains("Unauthorized");
   });
 
   it("StateTransitionManager successfully set porter availability", async () => {
@@ -49,7 +49,7 @@ describe("Admin facet tests", function () {
 
   it("random account fails to set porter availability", async () => {
     const revertReason = await getCallRevertReason(adminFacetTest.connect(randomSigner).setPorterAvailability(false));
-    expect(revertReason).equal("Hyperchain: not state transition manager");
+    expect(revertReason).contains("Unauthorized");
   });
 
   it("StateTransitionManager successfully set priority transaction max gas limit", async () => {
@@ -65,7 +65,7 @@ describe("Admin facet tests", function () {
     const revertReason = await getCallRevertReason(
       adminFacetTest.connect(randomSigner).setPriorityTxMaxGasLimit(gasLimit)
     );
-    expect(revertReason).equal("Hyperchain: not state transition manager");
+    expect(revertReason).contains("Unauthorized");
   });
 
   describe("change admin", function () {
@@ -93,7 +93,7 @@ describe("Admin facet tests", function () {
 
     it("failed to accept admin from not proposed account", async () => {
       const revertReason = await getCallRevertReason(adminFacetTest.connect(randomSigner).acceptAdmin());
-      expect(revertReason).equal("n4");
+      expect(revertReason).contains("Unauthorized");
     });
 
     it("accept admin from proposed account", async () => {

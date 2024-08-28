@@ -8,7 +8,7 @@ import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
@@ -16,6 +16,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTE
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
+import {BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -45,7 +46,10 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
     ) internal returns (StoredBatchInfo memory) {
-        require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batch
+        // only commit next batch
+        if (_newBatch.batchNumber != _previousBatch.batchNumber + 1) {
+            revert BatchNumberMismatch(_previousBatch.batchNumber + 1, _newBatch.batchNumber);
+        }
 
         // Check that batch contains all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
@@ -59,11 +63,17 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
         });
 
-        require(_previousBatch.batchHash == logOutput.previousBatchHash, "l");
+        if (_previousBatch.batchHash != logOutput.previousBatchHash) {
+            revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
+        }
         // Check that the priority operation hash in the L2 logs is as expected
-        require(logOutput.chainedPriorityTxsHash == _newBatch.priorityOperationsHash, "t");
+        if (logOutput.chainedPriorityTxsHash != _newBatch.priorityOperationsHash) {
+            revert HashMismatch(logOutput.chainedPriorityTxsHash, _newBatch.priorityOperationsHash);
+        }
         // Check that the number of processed priority operations is as expected
-        require(logOutput.numberOfLayer1Txs == _newBatch.numberOfLayer1Txs, "ta");
+        if (logOutput.numberOfLayer1Txs != _newBatch.numberOfLayer1Txs) {
+            revert ValueMismatch(logOutput.numberOfLayer1Txs, _newBatch.numberOfLayer1Txs);
+        }
 
         // Check the timestamp of the new batch
         _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
@@ -100,11 +110,15 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     ) internal view {
         // Check that the timestamp that came from the system context is expected
         uint256 batchTimestamp = _packedBatchAndL2BlockTimestamp >> 128;
-        require(batchTimestamp == _expectedBatchTimestamp, "tb");
+        if (batchTimestamp != _expectedBatchTimestamp) {
+            revert TimestampError();
+        }
 
         // While the fact that _previousBatchTimestamp < batchTimestamp is already checked on L2,
         // we double check it here for clarity
-        require(_previousBatchTimestamp < batchTimestamp, "h3");
+        if (_previousBatchTimestamp >= batchTimestamp) {
+            revert NonIncreasingTimestamp();
+        }
 
         uint256 lastL2BlockTimestamp = _packedBatchAndL2BlockTimestamp & PACKED_L2_BLOCK_TIMESTAMP_MASK;
 
@@ -112,8 +126,14 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // So here we need to only double check that:
         // - The timestamp of the batch is not too small.
         // - The timestamp of the last L2 block is not too big.
-        require(block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER <= batchTimestamp, "h1"); // New batch timestamp is too small
-        require(lastL2BlockTimestamp <= block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA, "h2"); // The last L2 block timestamp is too big
+        // New batch timestamp is too small
+        if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > batchTimestamp) {
+            revert TimeNotReached(batchTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
+        }
+        // The last L2 block timestamp is too big
+        if (lastL2BlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
+            revert L2TimestampTooBig();
+        }
     }
 
     /// @dev Check that L2 logs are proper and batch contain all meta information for them
@@ -129,7 +149,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         // Used as bitmap to set/check log processing happens exactly once.
         // See SystemLogKey enum in Constants.sol for ordering.
-        uint256 processedLogs;
+        uint256 processedLogs = 0;
 
         // linear traversal of the logs
         uint256 logsLength = emittedL2Logs.length;
@@ -143,36 +163,56 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             (bytes32 logValue, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + L2_LOG_VALUE_OFFSET);
 
             // Ensure that the log hasn't been processed already
-            require(!_checkBit(processedLogs, uint8(logKey)), "kp");
+            if (_checkBit(processedLogs, uint8(logKey))) {
+                revert LogAlreadyProcessed(uint8(logKey));
+            }
             processedLogs = _setBit(processedLogs, uint8(logKey));
 
             // Need to check that each log was sent by the correct address.
             if (logKey == uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)) {
-                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lm");
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
                 logOutput.l2LogsTreeRoot = logValue;
             } else if (logKey == uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)) {
-                require(logSender == L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, "sc");
+                if (logSender != L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
                 logOutput.packedBatchAndL2BlockTimestamp = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.PREV_BATCH_HASH_KEY)) {
-                require(logSender == L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, "sv");
+                if (logSender != L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
                 logOutput.previousBatchHash = logValue;
             } else if (logKey == uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY)) {
-                require(logSender == L2_BOOTLOADER_ADDRESS, "bl");
+                if (logSender != L2_BOOTLOADER_ADDRESS) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
                 logOutput.chainedPriorityTxsHash = logValue;
             } else if (logKey == uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)) {
-                require(logSender == L2_BOOTLOADER_ADDRESS, "bk");
+                if (logSender != L2_BOOTLOADER_ADDRESS) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
                 logOutput.numberOfLayer1Txs = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)) {
-                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "vk");
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
                 require(s.l2DAValidator == address(uint160(uint256(logValue))), "lo");
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
-                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lp2");
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
                 logOutput.l2DAValidatorOutputHash = logValue;
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
-                require(logSender == L2_BOOTLOADER_ADDRESS, "bu");
-                require(_expectedSystemContractUpgradeTxHash == logValue, "ut");
+                if (logSender != L2_BOOTLOADER_ADDRESS) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
+                if (_expectedSystemContractUpgradeTxHash != logValue) {
+                    revert TxHashMismatch();
+                }
             } else if (logKey > uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
-                revert("ul");
+                revert UnexpectedSystemLog(logKey);
             }
         }
 
@@ -209,14 +249,21 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // 2. A chain might become out of sync if it launches while we are in the middle of a protocol upgrade. This would mean they cannot process their genesis upgrade
         // as their protocolversion would be outdated, and they also cannot process the protocol upgrade tx as they have a pending upgrade.
         // 3. The protocol upgrade is increased in the BaseZkSyncUpgrade, in the executor only the systemContractsUpgradeTxHash is checked
-        require(
-            IStateTransitionManager(s.stateTransitionManager).protocolVersionIsActive(s.protocolVersion),
-            "Executor facet: wrong protocol version"
-        );
+        if (!IStateTransitionManager(s.stateTransitionManager).protocolVersionIsActive(s.protocolVersion)) {
+            revert InvalidProtocolVersion();
+        }
         // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
-        require(_newBatchesData.length == 1, "e4");
+        if (_newBatchesData.length != 1) {
+            revert CanOnlyProcessOneBatch();
+        }
         // Check that we commit batches after last committed batch
-        require(s.storedBatchHashes[s.totalBatchesCommitted] == _hashStoredBatchInfo(_lastCommittedBatchData), "i"); // incorrect previous batch data
+        if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(_lastCommittedBatchData)) {
+            // incorrect previous batch data
+            revert BatchHashMismatch(
+                s.storedBatchHashes[s.totalBatchesCommitted],
+                _hashStoredBatchInfo(_lastCommittedBatchData)
+            );
+        }
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         // Upgrades are rarely done so we optimize a case with no active system contracts upgrade.
@@ -240,6 +287,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) internal {
+        // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
             _lastCommittedBatchData = _commitOneBatch(_lastCommittedBatchData, _newBatchesData[i], bytes32(0));
@@ -267,12 +315,15 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // carried out within the first batch committed after the upgrade.
 
         // While the logic of the contract ensures that the s.l2SystemContractsUpgradeBatchNumber is 0 when this function is called,
-        // this check is added just in case. Since it is a hot read, it does not encure noticeable gas cost.
-        require(s.l2SystemContractsUpgradeBatchNumber == 0, "ik");
+        // this check is added just in case. Since it is a hot read, it does not incur noticeable gas cost.
+        if (s.l2SystemContractsUpgradeBatchNumber != 0) {
+            revert UpgradeBatchNumberIsNotZero();
+        }
 
         // Save the batch number where the upgrade transaction was executed.
         s.l2SystemContractsUpgradeBatchNumber = _newBatchesData[0].batchNumber;
 
+        // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
             // The upgrade transaction must only be included in the first batch.
@@ -319,12 +370,15 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         bytes32 _priorityOperationsHash
     ) internal view {
         uint256 currentBatchNumber = _storedBatch.batchNumber;
-        require(currentBatchNumber == s.totalBatchesExecuted + _executedBatchIdx + 1, "k"); // Execute batches in order
-        require(
-            _hashStoredBatchInfo(_storedBatch) == s.storedBatchHashes[currentBatchNumber],
-            "exe10" // executing batch should be committed
-        );
-        require(_priorityOperationsHash == _storedBatch.priorityOperationsHash, "x"); // priority operations hash does not match with expected
+        if (currentBatchNumber != s.totalBatchesExecuted + _executedBatchIdx + 1) {
+            revert NonSequentialBatch();
+        }
+        if (_hashStoredBatchInfo(_storedBatch) != s.storedBatchHashes[currentBatchNumber]) {
+            revert BatchHashMismatch(s.storedBatchHashes[currentBatchNumber], _hashStoredBatchInfo(_storedBatch));
+        }
+        if (_priorityOperationsHash != _storedBatch.priorityOperationsHash) {
+            revert PriorityOperationsRollingHashMismatch();
+        }
     }
 
     /// @dev Executes one batch
@@ -352,6 +406,10 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // );
     }
 
+    /// @notice Executes one batch
+    /// @dev 1. Processes all pending operations (Complete priority requests)
+    /// @dev 2. Finalizes batch
+    /// @dev _executedBatchIdx is an index in the array of the batches that we want to execute together
     function _executeOneBatch(
         StoredBatchInfo memory _storedBatch,
         PriorityOpsBatchInfo calldata _priorityOpsData,
@@ -402,7 +460,9 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         uint256 newTotalBatchesExecuted = s.totalBatchesExecuted + nBatches;
         s.totalBatchesExecuted = newTotalBatchesExecuted;
-        require(newTotalBatchesExecuted <= s.totalBatchesVerified, "n"); // Can't execute batches more than committed and proven currently.
+        if (newTotalBatchesExecuted > s.totalBatchesVerified) {
+            revert CantExecuteUnprovenBatches();
+        }
 
         uint256 batchWhenUpgradeHappened = s.l2SystemContractsUpgradeBatchNumber;
         if (batchWhenUpgradeHappened != 0 && batchWhenUpgradeHappened <= newTotalBatchesExecuted) {
@@ -434,22 +494,31 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         uint256[] memory proofPublicInput = new uint256[](committedBatchesLength);
 
         // Check that the batch passed by the validator is indeed the first unverified batch
-        require(_hashStoredBatchInfo(_prevBatch) == s.storedBatchHashes[currentTotalBatchesVerified], "t1");
+        if (_hashStoredBatchInfo(_prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]) {
+            revert BatchHashMismatch(
+                s.storedBatchHashes[currentTotalBatchesVerified],
+                _hashStoredBatchInfo(_prevBatch)
+            );
+        }
 
         bytes32 prevBatchCommitment = _prevBatch.commitment;
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
-            require(
-                _hashStoredBatchInfo(_committedBatches[i]) == s.storedBatchHashes[currentTotalBatchesVerified],
-                "o1"
-            );
+            if (_hashStoredBatchInfo(_committedBatches[i]) != s.storedBatchHashes[currentTotalBatchesVerified]) {
+                revert BatchHashMismatch(
+                    s.storedBatchHashes[currentTotalBatchesVerified],
+                    _hashStoredBatchInfo(_committedBatches[i])
+                );
+            }
 
             bytes32 currentBatchCommitment = _committedBatches[i].commitment;
             proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
 
             prevBatchCommitment = currentBatchCommitment;
         }
-        require(currentTotalBatchesVerified <= s.totalBatchesCommitted, "q");
+        if (currentTotalBatchesVerified > s.totalBatchesCommitted) {
+            revert VerifiedBatchesExceedsCommittedBatches();
+        }
 
         _verifyProof(proofPublicInput, _proof);
 
@@ -459,14 +528,18 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
     function _verifyProof(uint256[] memory proofPublicInput, ProofInput calldata _proof) internal view {
         // We can only process 1 batch proof at a time.
-        require(proofPublicInput.length == 1, "t4");
+        if (proofPublicInput.length != 1) {
+            revert CanOnlyProcessOneBatch();
+        }
 
         bool successVerifyProof = s.verifier.verify(
             proofPublicInput,
             _proof.serializedProof,
             _proof.recursiveAggregationInput
         );
-        require(successVerifyProof, "p"); // Proof verification fail
+        if (!successVerifyProof) {
+            revert InvalidProof();
+        }
     }
 
     /// @dev Gets zk proof public input
@@ -484,8 +557,12 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     }
 
     function _revertBatches(uint256 _newLastBatch) internal chainOnCurrentBridgehub {
-        require(s.totalBatchesCommitted > _newLastBatch, "v1"); // The last committed batch is less than new last batch
-        require(_newLastBatch >= s.totalBatchesExecuted, "v2"); // Already executed batches cannot be reverted
+        if (s.totalBatchesCommitted <= _newLastBatch) {
+            revert RevertedBatchNotAfterNewLastBatch();
+        }
+        if (_newLastBatch < s.totalBatchesExecuted) {
+            revert CantRevertExecutedBatch();
+        }
 
         if (_newLastBatch < s.totalBatchesVerified) {
             s.totalBatchesVerified = _newLastBatch;
@@ -546,7 +623,9 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
     ) internal pure returns (bytes memory) {
-        require(_batch.systemLogs.length <= MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, "pu");
+        if (_batch.systemLogs.length > MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES) {
+            revert SystemLogsSizeTooBig();
+        }
 
         bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
 
@@ -571,8 +650,9 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     ) internal pure returns (bytes32[] memory blobAuxOutputWords) {
         // These invariants should be checked by the caller of this function, but we double check
         // just in case.
-        require(_blobCommitments.length == TOTAL_BLOBS_IN_COMMITMENT, "b10");
-        require(_blobHashes.length == TOTAL_BLOBS_IN_COMMITMENT, "b11");
+        if (_blobCommitments.length != TOTAL_BLOBS_IN_COMMITMENT || _blobHashes.length != TOTAL_BLOBS_IN_COMMITMENT) {
+            revert InvalidNumberOfBlobs(TOTAL_BLOBS_IN_COMMITMENT, _blobCommitments.length, _blobHashes.length);
+        }
 
         // for each blob we have:
         // linear hash (hash of preimage from system logs) and
@@ -584,7 +664,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
         blobAuxOutputWords = new bytes32[](2 * TOTAL_BLOBS_IN_COMMITMENT);
 
-        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; ++i) {
+        for (uint256 i = 0; i < TOTAL_BLOBS_IN_COMMITMENT; ++i) {
             blobAuxOutputWords[i * 2] = _blobHashes[i];
             blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
         }

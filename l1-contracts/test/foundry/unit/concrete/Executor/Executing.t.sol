@@ -10,6 +10,7 @@ import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {PriorityOperationsRollingHashMismatch, BatchHashMismatch, NonSequentialBatch, CantExecuteUnprovenBatches, QueueIsEmpty, TxHashMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract ExecutingTest is ExecutorTest {
     bytes32 l2DAValidatorOutputHash;
@@ -102,7 +103,7 @@ contract ExecutingTest is ExecutorTest {
         storedBatchInfoArray[0] = wrongNewStoredBatchInfo;
 
         vm.prank(validator);
-        vm.expectRevert(bytes.concat("k"));
+        vm.expectRevert(NonSequentialBatch.selector);
         executor.executeBatchesSharedBridge(
             uint256(0),
             storedBatchInfoArray,
@@ -118,7 +119,13 @@ contract ExecutingTest is ExecutorTest {
         storedBatchInfoArray[0] = wrongNewStoredBatchInfo;
 
         vm.prank(validator);
-        vm.expectRevert(bytes.concat("exe10"));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BatchHashMismatch.selector,
+                keccak256(abi.encode(newStoredBatchInfo)),
+                keccak256(abi.encode(wrongNewStoredBatchInfo))
+            )
+        );
         executor.executeBatchesSharedBridge(
             uint256(0),
             storedBatchInfoArray,
@@ -134,7 +141,7 @@ contract ExecutingTest is ExecutorTest {
         storedBatchInfoArray[0] = newStoredBatchInfo;
 
         vm.prank(validator);
-        vm.expectRevert(bytes.concat("n"));
+        vm.expectRevert(CantExecuteUnprovenBatches.selector);
         executor.executeBatchesSharedBridge(
             uint256(0),
             storedBatchInfoArray,
@@ -201,7 +208,7 @@ contract ExecutingTest is ExecutorTest {
         );
 
         vm.prank(validator);
-        vm.expectRevert(bytes.concat("s"));
+        vm.expectRevert(QueueIsEmpty.selector);
         executor.executeBatchesSharedBridge(
             uint256(0),
             correctNewStoredBatchInfoArray,
@@ -288,7 +295,7 @@ contract ExecutingTest is ExecutorTest {
         });
 
         vm.prank(validator);
-        vm.expectRevert(bytes.concat("x"));
+        vm.expectRevert(PriorityOperationsRollingHashMismatch.selector);
         executor.executeBatchesSharedBridge(
             uint256(0),
             correctNewStoredBatchInfoArray,
@@ -317,8 +324,12 @@ contract ExecutingTest is ExecutorTest {
         IExecutor.StoredBatchInfo memory genesisBlock = genesisStoredBatchInfo;
         genesisBlock.batchHash = wrongPreviousBatchHash;
 
+        bytes32 storedBatchHash = getters.storedBlockHash(1);
+
         vm.prank(validator);
-        vm.expectRevert(bytes.concat("i"));
+        vm.expectRevert(
+            abi.encodeWithSelector(BatchHashMismatch.selector, storedBatchHash, keccak256(abi.encode(genesisBlock)))
+        );
         executor.commitBatchesSharedBridge(uint256(0), genesisBlock, correctNewCommitBatchInfoArray);
     }
 

@@ -2,14 +2,13 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors
-
 import {Diamond} from "../libraries/Diamond.sol";
 import {ZkSyncHyperchainBase} from "./facets/ZkSyncHyperchainBase.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
 import {InitializeData, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
+import {ZeroAddress, TooMuchGas} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
@@ -25,15 +24,33 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
     /// initializer
     function initialize(InitializeData calldata _initializeData) external reentrancyGuardInitializer returns (bytes32) {
-        require(address(_initializeData.verifier) != address(0), "vt");
-        require(_initializeData.admin != address(0), "vy");
-        require(_initializeData.validatorTimelock != address(0), "hc");
-        require(_initializeData.priorityTxMaxGasLimit <= MAX_GAS_PER_TRANSACTION, "vu");
-        require(_initializeData.bridgehub != address(0), "DiamondInit: b0");
-        require(_initializeData.stateTransitionManager != address(0), "DiamondInit: stm0");
-        require(_initializeData.baseTokenAssetId != bytes32(0), "DiamondInit: bt0");
-        require(_initializeData.baseTokenBridge != address(0), "DiamondInit: btb0");
-        require(_initializeData.blobVersionedHashRetriever != address(0), "DiamondInit: bvhr0");
+        if (address(_initializeData.verifier) == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_initializeData.admin == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_initializeData.validatorTimelock == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_initializeData.priorityTxMaxGasLimit > MAX_GAS_PER_TRANSACTION) {
+            revert TooMuchGas();
+        }
+        if (_initializeData.bridgehub == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_initializeData.stateTransitionManager == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_initializeData.baseTokenAssetId == bytes32(0)) {
+            revert ZeroAddress();
+        }
+        if (_initializeData.baseTokenBridge == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_initializeData.blobVersionedHashRetriever == address(0)) {
+            revert ZeroAddress();
+        }
 
         s.chainId = _initializeData.chainId;
         s.bridgehub = _initializeData.bridgehub;
