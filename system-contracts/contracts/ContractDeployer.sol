@@ -196,7 +196,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         // Subtract 1 for EOA since the nonce has already been incremented for this transaction
 
         uint256 deploymentNonce = NONCE_HOLDER_SYSTEM_CONTRACT.getDeploymentNonce(msg.sender);
-        if (deploymentNonce == 0) {
+        if ((msg.sender != tx.origin) && deploymentNonce == 0) {
             NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
         }
 
