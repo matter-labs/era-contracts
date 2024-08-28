@@ -14,7 +14,7 @@ uint160 constant PRECOMPILES_END = 0xffff;
 // Denotes that passGas has been consumed
 uint256 constant INF_PASS_GAS = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
-contract EvmGasManager is ISystemContract {
+contract EvmGasManager {
     // We need strust to use `storage` pointers
     struct WarmAccountInfo {
         bool isWarm;
