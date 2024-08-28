@@ -39,8 +39,6 @@ export const DIAMOND_CUT_DATA_ABI_STRING =
   "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)";
 export const FORCE_DEPLOYMENT_ABI_STRING =
   "tuple(bytes32 bytecodeHash, address newAddress, bool callConstructor, uint256 value, bytes input)[]";
-export const HYPERCHAIN_COMMITMENT_ABI_STRING =
-  "tuple(uint256 totalBatchesExecuted, uint256 totalBatchesVerified, uint256 totalBatchesCommitted, bytes32 l2SystemContractsUpgradeTxHash, uint256 l2SystemContractsUpgradeBatchNumber, bytes32[] batchHashes, tuple(uint256 nextLeafIndex, uint256 startIndex, uint256 unprocessedIndex, bytes32[] sides) priorityTree, uint256 protocolVersion)";
 export const BRIDGEHUB_STM_ASSET_DATA_ABI_STRING = "tuple(uint256 chainId, bytes stmData, bytes chainData)";
 
 export function applyL1ToL2Alias(address: string): string {

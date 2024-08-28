@@ -471,15 +471,15 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @notice Called by the bridgehub during the failed migration of a chain.
-    /// @param _chainId the chainId of the chain
-    /// @param _assetInfo the assetInfo of the chain
-    /// @param _depositSender the address of that sent the deposit
-    /// @param _stmData the data of the migration
+    /// param _chainId the chainId of the chain
+    /// param _assetInfo the assetInfo of the chain
+    /// param _depositSender the address of that sent the deposit
+    /// param _stmData the data of the migration
     function forwardedBridgeRecoverFailedTransfer(
-        uint256 _chainId,
-        bytes32 _assetInfo,
-        address _depositSender,
-        bytes calldata _stmData
+        uint256 /* _chainId */,
+        bytes32 /* _assetInfo */,
+        address /* _depositSender */,
+        bytes calldata /* _stmData */
     ) external {
         // Function is empty due to the fact that when calling `forwardedBridgeBurn` there are no
         // state updates that occur.

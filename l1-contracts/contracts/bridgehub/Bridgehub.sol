@@ -9,14 +9,14 @@ import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, BridgehubSTMAssetData} from "./IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, BridgehubMintSTMAssetData, BridgehubBurnSTMAssetData} from "./IBridgehub.sol";
 import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, HyperchainCommitment} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
@@ -601,7 +601,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) external payable override onlyAssetRouter onlyL1 returns (bytes memory bridgehubMintData) {
         require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
 
-        BridgehubSTMAssetData memory bridgeData = abi.decode(_data, (BridgehubSTMAssetData));
+        BridgehubBurnSTMAssetData memory bridgeData = abi.decode(_data, (BridgehubBurnSTMAssetData));
         require(_assetId == stmAssetIdFromChainId(bridgeData.chainId), "BH: assetInfo 1");
         require(settlementLayer[bridgeData.chainId] == block.chainid, "BH: not current SL");
         settlementLayer[bridgeData.chainId] = _settlementChainId;
@@ -610,14 +610,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(hyperchain != address(0), "BH: hyperchain not registered");
         require(_prevMsgSender == IZkSyncHyperchain(hyperchain).getAdmin(), "BH: incorrect sender");
 
-        HyperchainCommitment memory chainCommitment = abi.decode(bridgeData.chainData, (HyperchainCommitment));
-
         bytes memory stmMintData = IStateTransitionManager(stateTransitionManager[bridgeData.chainId])
             .forwardedBridgeBurn(bridgeData.chainId, bridgeData.stmData);
         bytes memory chainMintData = IZkSyncHyperchain(hyperchain).forwardedBridgeBurn(
             hyperchainMap.get(_settlementChainId),
             _prevMsgSender,
-            abi.encode(chainCommitment.protocolVersion)
+            bridgeData.chainData
         );
         bridgehubMintData = abi.encode(bridgeData.chainId, stmMintData, chainMintData);
     }
@@ -627,7 +625,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
     ) external payable override onlyAssetRouter returns (address l1Receiver) {
-        BridgehubSTMAssetData memory bridgeData = abi.decode(_bridgehubMintData, (BridgehubSTMAssetData));
+        BridgehubMintSTMAssetData memory bridgeData = abi.decode(_bridgehubMintData, (BridgehubMintSTMAssetData));
 
         address stm = stmAssetIdToAddress[_assetId];
         require(stm != address(0), "BH: assetInfo 2");
@@ -658,8 +656,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address _depositSender,
         bytes calldata _data
     ) external payable override onlyAssetRouter onlyL1 {
-        BridgehubSTMAssetData memory stmAssetData = abi.decode(_data, (BridgehubSTMAssetData));
-        HyperchainCommitment memory chainCommitment = abi.decode(stmAssetData.chainData, (HyperchainCommitment));
+        BridgehubBurnSTMAssetData memory stmAssetData = abi.decode(_data, (BridgehubBurnSTMAssetData));
 
         delete settlementLayer[_chainId];
 
@@ -674,7 +671,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _chainId: _chainId,
             _assetInfo: _assetId,
             _prevMsgSender: _depositSender,
-            _chainData: abi.encode(chainCommitment.protocolVersion)
+            _chainData: stmAssetData.chainData
         });
     }
 

@@ -40,7 +40,13 @@ struct L2TransactionRequestTwoBridgesInner {
     bytes32 txDataHash;
 }
 
-struct BridgehubSTMAssetData {
+struct BridgehubMintSTMAssetData {
+    uint256 chainId;
+    bytes stmData;
+    bytes chainData;
+}
+
+struct BridgehubBurnSTMAssetData {
     uint256 chainId;
     bytes stmData;
     bytes chainData;

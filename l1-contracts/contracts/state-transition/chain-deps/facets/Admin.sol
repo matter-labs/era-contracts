@@ -288,17 +288,19 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
+    /// @dev Note that this function does not check that the caller is the chain admin.
     function forwardedBridgeRecoverFailedTransfer(
         uint256 /* _chainId */,
         bytes32 /* _assetInfo */,
-        address _prevMsgSender,
+        address _depositSender,
         bytes calldata _chainData
     ) external payable override onlyBridgehub {
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
         uint256 protocolVersion = abi.decode(_chainData, (uint256));
 
         require(s.settlementLayer != address(0), "Af: not migrated");
-        require(_prevMsgSender == s.admin, "Af: not chainAdmin");
+        // Sanity check that the _depositSender is the chain admin.
+        require(_depositSender == s.admin, "Af: not chainAdmin");
 
         uint256 currentProtocolVersion = s.protocolVersion;
 
