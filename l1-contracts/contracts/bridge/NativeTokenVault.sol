@@ -20,7 +20,7 @@ import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 // import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
-import {BridgedStandardERC20} from "../common/BridgedStandardERC20.sol";
+import {BridgedStandardERC20} from "./BridgedStandardERC20.sol";
 // import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 import {BridgeHelper} from "./BridgeHelper.sol";

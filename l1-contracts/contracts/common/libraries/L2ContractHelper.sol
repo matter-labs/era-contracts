@@ -5,6 +5,38 @@ pragma solidity 0.8.24;
 // solhint-disable gas-custom-errors
 
 import {UncheckedMath} from "./UncheckedMath.sol";
+import {L2_MESSENGER} from "../L2ContractAddresses.sol";
+
+/**
+ * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
+ * @notice Interface for the contract that is used to deploy contracts on L2.
+ */
+ interface IContractDeployer {
+    /// @notice A struct that describes a forced deployment on an address.
+    /// @param bytecodeHash The bytecode hash to put on an address.
+    /// @param newAddress The address on which to deploy the bytecodehash to.
+    /// @param callConstructor Whether to run the constructor on the force deployment.
+    /// @param value The `msg.value` with which to initialize a contract.
+    /// @param input The constructor calldata.
+    struct ForceDeployment {
+        bytes32 bytecodeHash;
+        address newAddress;
+        bool callConstructor;
+        uint256 value;
+        bytes input;
+    }
+
+    /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
+    /// @param _deployParams A set of parameters describing force deployment.
+    function forceDeployOnAddresses(ForceDeployment[] calldata _deployParams) external payable;
+
+    /// @notice Creates a new contract at a determined address using the `CREATE2` salt on L2
+    /// @param _salt a unique value to create the deterministic address of the new contract
+    /// @param _bytecodeHash the bytecodehash of the new contract to be deployed
+    /// @param _input the calldata to be sent to the constructor of the new contract
+    function create2(bytes32 _salt, bytes32 _bytecodeHash, bytes calldata _input) external returns (address);
+}
 
 /**
  * @author Matter Labs
@@ -16,6 +48,13 @@ library L2ContractHelper {
 
     /// @dev The prefix used to create CREATE2 addresses.
     bytes32 private constant CREATE2_PREFIX = keccak256("zksyncCreate2");
+
+    /// @notice Sends L2 -> L1 arbitrary-long message through the system contract messenger.
+    /// @param _message Data to be sent to L1.
+    /// @return keccak256 hash of the sent message.
+    function sendMessageToL1(bytes memory _message) internal returns (bytes32) {
+        return L2_MESSENGER.sendToL1(_message);
+    }
 
     /// @notice Validate the bytecode format and calculate its hash.
     /// @param _bytecode The bytecode to hash.

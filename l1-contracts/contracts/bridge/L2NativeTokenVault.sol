@@ -3,25 +3,26 @@
 pragma solidity 0.8.24;
 
 // import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-// import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
-import {INativeTokenVault} from "../l1-contracts-imported/contracts/bridge/interfaces/INativeTokenVault.sol";
+import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
 import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 // import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
 
 // import {BridgedStandardERC20} from "./BridgedStandardERC20.sol";
-// import {IAssetRouterBase} from "l1-contracts-imported/contracts/bridge/interfaces/IAssetRouterBase.sol";
-import {NativeTokenVault} from "../l1-contracts-imported/contracts/bridge/NativeTokenVault.sol";
-import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT, L2_ASSET_ROUTER, IContractDeployer} from "../L2ContractHelper.sol";
+// import {IAssetRouterBase} from "l1-contracts-imported/bridge/interfaces/IAssetRouterBase.sol";
+import {NativeTokenVault} from "./NativeTokenVault.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
+import {L2ContractHelper, IContractDeployer} from "../common/libraries/L2ContractHelper.sol";
 
-// import {L2StandardERC20} from "./L2StandardERC20.sol";
-import {SystemContractsCaller} from "../SystemContractsCaller.sol";
+import {BridgedStandardERC20} from "./BridgedStandardERC20.sol";
+import {SystemContractsCaller} from "../common/libraries/SystemContractsCaller.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
-import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../L2ContractErrors.sol";
+import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -32,7 +33,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     uint256 public immutable L1_CHAIN_ID;
 
     /// @dev The address of the L2 legacy shared bridge.
-    IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE;
+    // IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
@@ -41,13 +42,13 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
 
-    modifier onlyBridge() {
-        if (msg.sender != address(L2_ASSET_ROUTER)) {
-            revert InvalidCaller(msg.sender);
-            // Only L2 bridge can call this method
-        }
-        _;
-    }
+    // modifier onlyBridge() override {
+    //     if (msg.sender != L2_ASSET_ROUTER_ADDR) {
+    //         revert InvalidCaller(msg.sender);
+    //         // Only L2 bridge can call this method
+    //     }
+    //     _;
+    // }
 
     /// @notice Initializes the bridge contract for later use.
     /// @param _l1ChainId The L1 chain id differs between mainnet and testnets.
@@ -67,7 +68,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bool _contractsDeployedAlready,
         address _wethToken,
         address _baseTokenAddress
-    ) NativeTokenVault(_wethToken, address(L2_ASSET_ROUTER), _baseTokenAddress) {
+    ) NativeTokenVault(_wethToken, L2_ASSET_ROUTER_ADDR, _baseTokenAddress) {
         L1_CHAIN_ID = _l1ChainId;
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
@@ -88,7 +89,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             }
             l2TokenBeacon = UpgradeableBeacon(_l2TokenBeacon);
         } else {
-            address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
+            address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
             l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
             l2TokenBeacon.transferOwnership(owner());
             emit L2TokenBeaconUpdated(_l2TokenBeacon, _l2TokenProxyBytecodeHash);

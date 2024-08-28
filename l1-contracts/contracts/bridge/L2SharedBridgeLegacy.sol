@@ -5,14 +5,18 @@ pragma solidity 0.8.24;
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import {L2StandardERC20} from "./L2StandardERC20.sol";
+import {BridgedStandardERC20} from "./BridgedStandardERC20.sol";
 
-import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER, L2_NATIVE_TOKEN_VAULT, IContractDeployer} from "../L2ContractHelper.sol";
-import {SystemContractsCaller} from "../SystemContractsCaller.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
+import {SystemContractsCaller} from "../common/libraries/SystemContractsCaller.sol";
+import {L2ContractHelper, IContractDeployer} from "../common/libraries/L2ContractHelper.sol";
+
+import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
+import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
 
-import {EmptyAddress, EmptyBytes32, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../L2ContractErrors.sol";
+import {EmptyAddress, EmptyBytes32, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -41,7 +45,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
     address public override l1Bridge;
 
     modifier onlyNTV() {
-        if (msg.sender != address(L2_NATIVE_TOKEN_VAULT)) {
+        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDRESS) {
             revert InvalidCaller(msg.sender);
         }
         _;
@@ -78,7 +82,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         l1SharedBridge = _l1SharedBridge;
 
         if (block.chainid != ERA_CHAIN_ID) {
-            address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
+            address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
             l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
             l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
             l2TokenBeacon.transferOwnership(_aliasedOwner);
@@ -100,12 +104,12 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         if (_amount == 0) {
             revert AmountMustBeGreaterThanZero();
         }
-        L2_ASSET_ROUTER.withdrawLegacyBridge(_l1Receiver, _l2Token, _amount, msg.sender);
+        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).withdrawLegacyBridge(_l1Receiver, _l2Token, _amount, msg.sender);
     }
 
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view override returns (address) {
-        address token = L2_NATIVE_TOKEN_VAULT.l2TokenAddress(_l1Token);
+        address token = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDRESS).l2TokenAddress(_l1Token);
         if (token != address(0)) {
             return token;
         }

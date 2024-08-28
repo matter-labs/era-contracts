@@ -14,14 +14,14 @@ import { ethersWalletToZkWallet, readBytecode, readInterface } from "./utils";
 export const BUILT_IN_ZKSYNC_CREATE2_FACTORY = "0x0000000000000000000000000000000000010000";
 
 const contractsHome = process.env.ZKSYNC_HOME ? path.join(process.env.ZKSYNC_HOME as string, "contracts/") : "../";
-const contractArtifactsPath = path.join(contractsHome, "l2-contracts/artifacts-zk/");
+const contractArtifactsPath = path.join(contractsHome, "l1-contracts/artifacts-zk/");
 const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@openzeppelin/contracts/proxy/beacon");
 const L2_SHARED_BRIDGE_PATH = contractArtifactsPath + "contracts/bridge";
 export const L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE = readBytecode(
   openzeppelinBeaconProxyArtifactsPath,
   "UpgradeableBeacon"
 );
-export const L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE = readBytecode(L2_SHARED_BRIDGE_PATH, "L2StandardERC20");
+export const L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE = readBytecode(L2_SHARED_BRIDGE_PATH, "BridgedStandardERC20");
 export const L2_STANDARD_TOKEN_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
 
 export async function deployViaCreate2(

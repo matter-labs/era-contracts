@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {IAssetRouterBase} from "../../l1-contracts-imported/contracts/bridge/interfaces/IAssetRouterBase.sol";
+import {IAssetRouterBase} from ".././/interfaces/IAssetRouterBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -29,7 +29,7 @@ interface IL2AssetRouter is IAssetRouterBase {
 
     function withdraw(bytes32 _assetId, bytes calldata _transferData) external;
 
-    function assetHandlerAddress(bytes32 _assetId) external view returns (address);
+    // function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 
     function l1AssetRouter() external view returns (address);
 
