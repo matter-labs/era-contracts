@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
 /**
  * @author Matter Labs
- * @notice System smart contract that is responsible for deploying other smart contracts on a zkSync hyperchain.
+ * @notice System smart contract that is responsible for deploying other smart contracts on a ZKsync hyperchain.
  */
 interface IL2ContractDeployer {
     /// @notice A struct that describes a forced deployment on an address.

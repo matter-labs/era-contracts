@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
 import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
@@ -75,7 +75,7 @@ uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 /// than the maximal number of blobs supported by the contract (`MAX_NUMBER_OF_BLOBS`).
 uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
 
-/// @title The interface of the zkSync Executor contract capable of processing events emitted in the zkSync protocol.
+/// @title The interface of the ZKsync Executor contract capable of processing events emitted in the ZKsync protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IExecutor is IZkSyncHyperchainBase {
@@ -87,7 +87,7 @@ interface IExecutor is IZkSyncHyperchainBase {
     /// @param priorityOperationsHash Hash of all priority operations from this batch
     /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch
     /// @param timestamp Rollup batch timestamp, have the same format as Ethereum batch constant
-    /// @param commitment Verified input for the zkSync circuit
+    /// @param commitment Verified input for the ZKsync circuit
     // solhint-disable-next-line gas-struct-packing
     struct StoredBatchInfo {
         uint64 batchNumber;
@@ -195,7 +195,7 @@ interface IExecutor is IZkSyncHyperchainBase {
     /// @notice Event emitted when a batch is committed
     /// @param batchNumber Number of the batch committed
     /// @param batchHash Hash of the L2 batch
-    /// @param commitment Calculated input for the zkSync circuit
+    /// @param commitment Calculated input for the ZKsync circuit
     /// @dev It has the name "BlockCommit" and not "BatchCommit" due to backward compatibility considerations
     event BlockCommit(uint256 indexed batchNumber, bytes32 indexed batchHash, bytes32 indexed commitment);
 
@@ -208,7 +208,7 @@ interface IExecutor is IZkSyncHyperchainBase {
     /// @notice Event emitted when a batch is executed
     /// @param batchNumber Number of the batch executed
     /// @param batchHash Hash of the L2 batch
-    /// @param commitment Verified input for the zkSync circuit
+    /// @param commitment Verified input for the ZKsync circuit
     /// @dev It has the name "BlockExecution" and not "BatchExecution" due to backward compatibility considerations
     event BlockExecution(uint256 indexed batchNumber, bytes32 indexed batchHash, bytes32 indexed commitment);
 
