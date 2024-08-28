@@ -189,7 +189,7 @@ export class Deployer {
       assetRouterZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2AssetRouter");
       nativeTokenVaultZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2NativeTokenVault");
       const l2TokenProxyBytecode = readBytecode(
-        "../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon",
+        "../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon",
         "BeaconProxy"
       );
       l2TokenProxyBytecodeHash = ethers.utils.hexlify(hashL2Bytecode(l2TokenProxyBytecode));
@@ -394,16 +394,25 @@ export class Deployer {
     if (this.isZkMode()) {
       // @ts-ignore
       // TODO try to make it work with zksync ethers
-      const artifact = hardhat.artifacts.readArtifactSync("ProxyAdmin");
       const zkWal = this.deployWallet as ZkWallet;
-      const contractFactory = new ZkContractFactory(artifact.abi, artifact.bytecode, zkWal);
+      // FIXME: this is a hack
+      const tmpContractFactory = await hardhat.ethers.getContractFactory(
+        "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin",
+        {
+          signer: this.deployWallet,
+        }
+      );
+      const contractFactory = new ZkContractFactory(tmpContractFactory.interface, tmpContractFactory.bytecode, zkWal);
       proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
       rec = await proxyAdmin.deployTransaction.wait();
     } else {
       ethTxOptions.gasLimit ??= 10_000_000;
-      const contractFactory = await hardhat.ethers.getContractFactory("ProxyAdmin", {
-        signer: this.deployWallet,
-      });
+      const contractFactory = await hardhat.ethers.getContractFactory(
+        "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin",
+        {
+          signer: this.deployWallet,
+        }
+      );
       proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
       rec = await proxyAdmin.deployTransaction.wait();
     }
@@ -450,7 +459,7 @@ export class Deployer {
     const initCalldata = bridgehub.encodeFunctionData("initialize", [this.addresses.Governance]);
 
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [this.addresses.Bridgehub.BridgehubImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
@@ -550,7 +559,7 @@ export class Deployer {
     ]);
 
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [
         this.addresses.StateTransition.StateTransitionImplementation,
         this.addresses.TransparentProxyAdmin,
@@ -793,7 +802,7 @@ export class Deployer {
       "initialize"
     );
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [this.addresses.Bridges.ERC20BridgeImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
@@ -834,7 +843,7 @@ export class Deployer {
       [this.addresses.Governance, 1, 1, 1, 0]
     );
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [this.addresses.Bridges.SharedBridgeImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions

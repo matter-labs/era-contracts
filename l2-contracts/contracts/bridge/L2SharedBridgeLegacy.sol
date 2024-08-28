@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
 
@@ -11,8 +11,7 @@ import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER, L2_NATIVE_T
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
-
-import {EmptyAddress, EmptyBytes32, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../L2ContractErrors.sol";
+import {ZeroAddress, EmptyBytes32, Unauthorized, AmountMustBeGreaterThanZero, DeployFailed} from "../errors/L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -42,7 +41,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
 
     modifier onlyNTV() {
         if (msg.sender != address(L2_NATIVE_TOKEN_VAULT)) {
-            revert InvalidCaller(msg.sender);
+            revert Unauthorized(msg.sender);
         }
         _;
     }
@@ -64,7 +63,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         address _aliasedOwner
     ) external reinitializer(2) {
         if (_l1SharedBridge == address(0)) {
-            revert EmptyAddress();
+            revert ZeroAddress();
         }
 
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
@@ -72,7 +71,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         }
 
         if (_aliasedOwner == address(0)) {
-            revert EmptyAddress();
+            revert ZeroAddress();
         }
 
         l1SharedBridge = _l1SharedBridge;
@@ -84,7 +83,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
             l2TokenBeacon.transferOwnership(_aliasedOwner);
         } else {
             if (_l1Bridge == address(0)) {
-                revert EmptyAddress();
+                revert ZeroAddress();
             }
             l1Bridge = _l1Bridge;
             // l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy

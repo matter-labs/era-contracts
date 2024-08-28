@@ -8,6 +8,7 @@ import "forge-std/Test.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L1_GAS_PER_PUBDATA_BYTE, L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/common/Config.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
+import {BatchNotExecuted, HashedLogIsDefault} from "contracts/common/L1ContractErrors.sol";
 import {MurkyBase} from "murky/common/MurkyBase.sol";
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 import {TxStatus} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -56,7 +57,7 @@ contract MailboxL2LogsProve is MailboxTest {
             _index: 0,
             _message: message,
             _proof: proof,
-            _expectedError: bytes("xx")
+            _expectedError: abi.encodeWithSelector(BatchNotExecuted.selector, batchNumber + 1)
         });
     }
 
@@ -223,7 +224,13 @@ contract MailboxL2LogsProve is MailboxTest {
         }
 
         // Prove log inclusion reverts
-        _proveL2LogInclusion(batchNumber, secondLogIndex, log, secondLogProof, bytes("tw"));
+        _proveL2LogInclusion(
+            batchNumber,
+            secondLogIndex,
+            log,
+            secondLogProof,
+            bytes.concat(HashedLogIsDefault.selector)
+        );
     }
 
     function test_success_proveL1ToL2TransactionStatus() public {

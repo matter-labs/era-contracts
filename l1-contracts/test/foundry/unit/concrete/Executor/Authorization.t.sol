@@ -6,6 +6,7 @@ import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract AuthorizationTest is ExecutorTest {
     IExecutor.StoredBatchInfo private storedBatchInfo;
@@ -43,7 +44,7 @@ contract AuthorizationTest is ExecutorTest {
 
         vm.prank(randomSigner);
 
-        vm.expectRevert(bytes.concat("Hyperchain: not validator"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomSigner));
         executor.commitBatchesSharedBridge(uint256(0), storedBatchInfo, commitBatchInfoArray);
     }
 
@@ -53,7 +54,7 @@ contract AuthorizationTest is ExecutorTest {
 
         vm.prank(owner);
 
-        vm.expectRevert(bytes.concat("Hyperchain: not validator"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, owner));
         executor.proveBatchesSharedBridge(uint256(0), storedBatchInfo, storedBatchInfoArray, proofInput);
     }
 
@@ -63,7 +64,7 @@ contract AuthorizationTest is ExecutorTest {
 
         vm.prank(randomSigner);
 
-        vm.expectRevert(bytes.concat("Hyperchain: not validator"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomSigner));
         executor.executeBatchesSharedBridge(uint256(0), storedBatchInfoArray, Utils.emptyData());
     }
 }
