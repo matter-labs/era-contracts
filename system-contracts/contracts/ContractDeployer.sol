@@ -40,7 +40,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     modifier onlySystemEvm() {
         require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender), "only system evm");
         require(
-            SystemContractHelper.isSystemCall() || SystemContractHelper.isSystemContract(msg.sender),
+            SystemContractHelper.isSystemCall(),
             "This method require system call flag"
         );
         _;
@@ -222,10 +222,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         _evmDeployOnAddress(newAddress, _initCode);
 
         return newAddress;
-    }
-
-    function createEVMInternal(address _newAddress, bytes calldata _initCode) onlySystemEvm external payable {
-        _evmDeployOnAddress(_newAddress, _initCode);
     }
 
     /// @notice Deploys a contract account with similar address derivation rules to the EVM's `CREATE2` opcode.

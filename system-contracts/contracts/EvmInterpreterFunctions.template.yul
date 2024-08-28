@@ -620,75 +620,6 @@ function isEOA(addr) -> ret {
     }
 }
 
-function getNewAddress(addr) -> newAddr {
-    let digest, nonce, addressEncoded, nonceEncoded, nonceEncodedLength, listLength, listLengthEconded
-
-    nonce := getNonce(addr)
-
-    addressEncoded := and(
-        add(addr, shl(160, 0x94)),
-        0xffffffffffffffffffffffffffffffffffffffffff
-    )
-
-    nonceEncoded := nonce
-    nonceEncodedLength := 1
-    if iszero(nonce) {
-        nonceEncoded := 128
-    }
-    switch gt(nonce, 0xFFFF)
-    case 1 {
-        switch gt(nonce, 0xFFFFFF)
-        case 1 {
-            // The nonce has 4 bytes
-            nonceEncoded := shl(32, 0x84)
-            nonceEncodedLength := 5
-        }
-        default {
-            // The nonce has 3 bytes
-            nonceEncoded := shl(24, 0x83)
-            nonceEncodedLength := 4
-        }
-        nonceEncoded := add(nonceEncoded, nonce)
-    }
-    default {
-        // The nonce has 2 bytes
-        if gt(nonce, 0xFF) {
-            nonceEncoded := shl(16, 0x82)
-            nonceEncoded := add(nonceEncoded, nonce)
-            nonceEncodedLength := 3
-        }
-        // The nonce has 1 byte and it's in [0x80, 0xFF]
-        if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
-            nonceEncoded := shl(8, 0x81)
-            nonceEncoded := add(nonceEncoded, nonce)
-            nonceEncodedLength := 2
-        }
-    }
-
-    listLength := add(21, nonceEncodedLength)
-    listLengthEconded := add(listLength, 0xC0)
-
-    let arrayLength := add(168, mul(8, nonceEncodedLength))
-
-    digest := add(
-        shl(arrayLength, listLengthEconded),
-        add(
-            shl(
-                mul(8, nonceEncodedLength),
-                addressEncoded
-            ),
-            nonceEncoded
-        )
-    )
-
-    mstore(0, shl(sub(248, arrayLength), digest))
-
-    newAddr := and(
-        keccak256(0, add(div(arrayLength, 8), 1)),
-        0xffffffffffffffffffffffffffffffffffffffff
-    )
-}
-
 function incrementNonce(addr) {
     mstore(0, 0x306395C600000000000000000000000000000000000000000000000000000000)
     mstore(4, addr)
@@ -782,19 +713,6 @@ function $llvm_AlwaysInline_llvm$_warmAddress(addr) -> isWarm {
 
     returndatacopy(0, 0, 32)
     isWarm := mload(0)
-}
-
-function getNonce(addr) -> nonce {
-    mstore(0, 0xFB1A9A5700000000000000000000000000000000000000000000000000000000)
-    mstore(4, addr)
-
-    let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
-
-    if iszero(result) {
-        revert(0, 0)
-    }
-
-    nonce := mload(0)
 }
 
 function getRawNonce(addr) -> nonce {
@@ -1509,9 +1427,7 @@ function performCreate(evmGas,oldSp,isStatic) -> evmGasLeft, sp {
     )
     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-    let addr := getNewAddress(address())
-
-    let result
+    let result, addr
     result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,false,0)
 
     switch result
@@ -1554,19 +1470,6 @@ function performCreate2(evmGas, oldSp, isStatic) -> evmGasLeft, sp, result, addr
         expandMemory(add(offset, size)),
         shr(2, add(size, 31))
     ))
-
-    {
-        let hashedBytecode := keccak256(add(MEM_OFFSET_INNER(), offset), size)
-        mstore(0, 0xFF00000000000000000000000000000000000000000000000000000000000000)
-        mstore(0x01, shl(0x60, address()))
-        mstore(0x15, salt)
-        mstore(0x35, hashedBytecode)
-    }
-
-    addr := and(
-        keccak256(0, 0x55),
-        0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-    )
 
     result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,true,salt)
 }

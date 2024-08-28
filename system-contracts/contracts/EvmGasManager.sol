@@ -83,7 +83,7 @@ contract EvmGasManager is ISystemContract {
     modifier onlySystemEvm() {
         require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender), "only system evm");
         require(
-            SystemContractHelper.isSystemCall() || SystemContractHelper.isSystemContract(msg.sender),
+            SystemContractHelper.isSystemCall(),
             "This method require system call flag"
         );
         _;
