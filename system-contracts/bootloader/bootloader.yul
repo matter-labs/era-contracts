@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 object "Bootloader" {
     code {
     }
