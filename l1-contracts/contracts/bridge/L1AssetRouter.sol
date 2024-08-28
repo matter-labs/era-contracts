@@ -58,7 +58,7 @@ contract L1AssetRouter is
     /// @dev Era's chainID
     uint256 internal immutable ERA_CHAIN_ID;
 
-    /// @dev The address of zkSync Era diamond proxy contract.
+    /// @dev The address of ZKsync Era diamond proxy contract.
     address internal immutable ERA_DIAMOND_PROXY;
 
     /// @dev The encoding version used for new txs.
@@ -70,17 +70,17 @@ contract L1AssetRouter is
     /// @dev The encoding version used for txs that set the asset handler on the counterpart contract.
     bytes1 internal constant SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION = 0x02;
 
-    /// @dev Stores the first batch number on the zkSync Era Diamond Proxy that was settled after Diamond proxy upgrade.
+    /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after Diamond proxy upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade Eth withdrawals. Withdrawals from batches older
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
     uint256 internal eraPostDiamondUpgradeFirstBatch;
 
-    /// @dev Stores the first batch number on the zkSync Era Diamond Proxy that was settled after L1ERC20 Bridge upgrade.
+    /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after L1ERC20 Bridge upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade ERC20 withdrawals. Withdrawals from batches older
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
     uint256 internal eraPostLegacyBridgeUpgradeFirstBatch;
 
-    /// @dev Stores the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge
+    /// @dev Stores the ZKsync Era batch number that processes the last deposit tx initiated by the legacy bridge
     /// This variable (together with eraLegacyBridgeLastDepositTxNumber) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older batches
     /// than this value are considered to have been processed prior to the upgrade and handled separately.
     /// We use this both for Eth and erc20 token deposits, so we need to update the diamond and bridge simultaneously.
@@ -142,7 +142,7 @@ contract L1AssetRouter is
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub or zkSync Era Diamond Proxy.
+    /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
             revert Unauthorized(msg.sender);
@@ -177,9 +177,9 @@ contract L1AssetRouter is
     /// @dev Used for testing purposes only, as the contract has been initialized on mainnet.
     /// @param _owner The address which can change L2 token implementation and upgrade the bridge implementation.
     /// The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    /// @param _eraPostDiamondUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after diamond proxy upgrade.
-    /// @param _eraPostLegacyBridgeUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after legacy bridge upgrade.
-    /// @param _eraLegacyBridgeLastDepositBatch The the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge.
+    /// @param _eraPostDiamondUpgradeFirstBatch The first batch number on the ZKsync Era Diamond Proxy that was settled after diamond proxy upgrade.
+    /// @param _eraPostLegacyBridgeUpgradeFirstBatch The first batch number on the ZKsync Era Diamond Proxy that was settled after legacy bridge upgrade.
+    /// @param _eraLegacyBridgeLastDepositBatch The the ZKsync Era batch number that processes the last deposit tx initiated by the legacy bridge.
     /// @param _eraLegacyBridgeLastDepositTxNumber The tx number in the _eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge.
     function initialize(
         address _owner,
@@ -712,7 +712,7 @@ contract L1AssetRouter is
         }
     }
 
-    /// @dev Determines if an eth withdrawal was initiated on zkSync Era before the upgrade to the Shared Bridge.
+    /// @dev Determines if an eth withdrawal was initiated on ZKsync Era before the upgrade to the Shared Bridge.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
     /// @return Whether withdrawal was initiated on ZKsync Era before diamond proxy upgrade.
@@ -777,7 +777,7 @@ contract L1AssetRouter is
         }
     }
 
-    /// @dev Determines if a deposit was initiated on zkSync Era before the upgrade to the Shared Bridge.
+    /// @dev Determines if a deposit was initiated on ZKsync Era before the upgrade to the Shared Bridge.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _l2BatchNumber The L2 batch number for the deposit where it was processed.
     /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the deposit was processed.
