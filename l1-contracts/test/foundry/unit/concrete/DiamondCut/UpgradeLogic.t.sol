@@ -101,7 +101,8 @@ contract UpgradeLogicTest is DiamondCutTest {
                 priorityTxMaxPubdata: 99_000,
                 minimalL2GasPrice: 250_000_000
             }),
-            blobVersionedHashRetriever: makeAddr("blobVersionedHashRetriver")
+            blobVersionedHashRetriever: makeAddr("blobVersionedHashRetriver"),
+            batchCommitDeadline: 3 days
         });
 
         bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);

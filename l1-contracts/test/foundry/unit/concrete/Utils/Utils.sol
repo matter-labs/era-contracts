@@ -341,7 +341,8 @@ library Utils {
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 priorityTxMaxGasLimit: 500000,
                 feeParams: makeFeeParams(),
-                blobVersionedHashRetriever: address(0x23746765237749923040872834)
+                blobVersionedHashRetriever: address(0x23746765237749923040872834),
+                batchCommitDeadline: 3 days
             });
     }
 
@@ -356,7 +357,8 @@ library Utils {
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 priorityTxMaxGasLimit: 80000000,
                 feeParams: makeFeeParams(),
-                blobVersionedHashRetriever: address(0x23746765237749923040872834)
+                blobVersionedHashRetriever: address(0x23746765237749923040872834),
+                batchCommitDeadline: 3 days
             });
     }
 

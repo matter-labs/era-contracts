@@ -437,7 +437,8 @@ contract DeployL1Script is Script {
             l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
             priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
             feeParams: feeParams,
-            blobVersionedHashRetriever: addresses.blobVersionedHashRetriever
+            blobVersionedHashRetriever: addresses.blobVersionedHashRetriever,
+            batchCommitDeadline: 3 days
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({

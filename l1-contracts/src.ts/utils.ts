@@ -282,6 +282,7 @@ export function compileInitialCutHash(
       priorityTxMaxGasLimit,
       feeParams,
       blobVersionedHashRetriever,
+      batchCommitDeadline: 0,
     },
   ]);
 

@@ -21,6 +21,7 @@ import {FeeParams} from "../chain-deps/ZkSyncHyperchainStorage.sol";
 /// @param priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
 /// @param feeParams Fee parameters to be used for L1->L2 transactions
 /// @param blobVersionedHashRetriever Address of contract used to pull the blob versioned hash for a transaction.
+/// @param batchCommitDeadline The deadline to commit a batch
 // solhint-disable-next-line gas-struct-packing
 struct InitializeData {
     uint256 chainId;
@@ -39,6 +40,7 @@ struct InitializeData {
     uint256 priorityTxMaxGasLimit;
     FeeParams feeParams;
     address blobVersionedHashRetriever;
+    uint256 batchCommitDeadline;
 }
 
 /// @param verifier address of Verifier contract
@@ -56,6 +58,7 @@ struct InitializeDataNewChain {
     uint256 priorityTxMaxGasLimit;
     FeeParams feeParams;
     address blobVersionedHashRetriever;
+    uint256 batchCommitDeadline;
 }
 
 interface IDiamondInit {

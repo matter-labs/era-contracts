@@ -105,4 +105,7 @@ interface IAdmin is IZkSyncHyperchainBase {
 
     /// @notice Emitted when the contract is unfrozen.
     event Unfreeze();
+
+    /// @notice Batch commit deadline changed
+    event NewBatchCommitDeadline(uint256 oldBatchCommitDeadline, uint256 newBatchCommitDeadline);
 }
