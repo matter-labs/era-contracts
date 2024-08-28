@@ -692,63 +692,6 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
-            /// @dev The function that is temporarily needed to upgrade the SystemContext system contract. This function is to be removed 
-            /// once the upgrade is complete.
-            /// @dev Checks whether the code hash of the SystemContext contract is correct and updates it if needed.
-            /// @dev The bootloader calls `setPubdataInfo` before each transaction, including the upgrade one.
-            /// However, the old SystemContext does not have this method. So the bootloader should invoke this function 
-            /// before starting any transaction.
-            function upgradeSystemContextIfNeeded() {
-                let expectedCodeHash := {{SYSTEM_CONTEXT_EXPECTED_CODE_HASH}}
-                
-                let actualCodeHash := getRawCodeHash(SYSTEM_CONTEXT_ADDR(), true)
-                if iszero(eq(expectedCodeHash, actualCodeHash)) {
-                    // Now, we need to encode the call to the `ContractDeployer.forceDeployOnAddresses()` function.
-
-                    // The `mimicCallOnlyResult` requires that the first word of the data
-                    // contains its length. Here it is 292 bytes.
-                    mstore(0, 292)
-                    mstore(32, {{PADDED_FORCE_DEPLOY_ON_ADDRESSES_SELECTOR}})
-
-                    // The 0x20 offset, for the array of forced deployments
-                    mstore(36, 0x0000000000000000000000000000000000000000000000000000000000000020)
-                    // Only one force deployment
-                    mstore(68, 0x0000000000000000000000000000000000000000000000000000000000000001)
-
-                    // Now, starts the description of the forced deployment itself. 
-                    // Firstly, the offset.
-                    mstore(100, 0x0000000000000000000000000000000000000000000000000000000000000020)
-                    // The new hash of the SystemContext contract.
-                    mstore(132, expectedCodeHash)
-                    // The address of the system context
-                    mstore(164, SYSTEM_CONTEXT_ADDR())
-                    // The constructor must be called to reset the `blockGasLimit` variable
-                    mstore(196, 0x0000000000000000000000000000000000000000000000000000000000000001)
-                    // The value should be 0.
-                    mstore(228, 0x0000000000000000000000000000000000000000000000000000000000000000)
-                    // The offset of the input array.
-                    mstore(260, 0x00000000000000000000000000000000000000000000000000000000000000a0)
-                    // No input is provided, the array is empty.
-                    mstore(292, 0x0000000000000000000000000000000000000000000000000000000000000000)
-                    
-                    // We'll use a mimicCall to simulate the correct sender.
-                    let success := mimicCallOnlyResult(
-                        CONTRACT_DEPLOYER_ADDR(),
-                        FORCE_DEPLOYER(), 
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
-                    )
-
-                    if iszero(success) {
-                        assertionError("system context upgrade fail")
-                    }
-                }
-            }
-
             /// @dev Calculates the canonical hash of the L1->L2 transaction that will be
             /// sent to L1 as a message to the L1 contract that a certain operation has been processed.
             function getCanonicalL1TxHash(txDataOffset) -> ret {
@@ -4019,8 +3962,6 @@ object "Bootloader" {
                     assertionError("baseFee inconsistent")
                 }
 
-                upgradeSystemContextIfNeeded()
-
                 setNewBatch(PREV_BATCH_HASH, NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
 
                 <!-- @endif -->
@@ -4028,8 +3969,6 @@ object "Bootloader" {
                 <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
 
                 let SHOULD_SET_NEW_BATCH := mload(224)
-
-                upgradeSystemContextIfNeeded()
 
                 switch SHOULD_SET_NEW_BATCH
                 case 0 {
