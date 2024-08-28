@@ -18,7 +18,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {BridgeHelper} from "./BridgeHelper.sol";
 
-import {Unauthorized, ZeroAddress, SharedBridgeValueAlreadySet, SharedBridgeKey, NoFundsTransferred, ZeroBalance, ValueMismatch, TokensWithFeesNotSupported, NonEmptyMsgValue, L2BridgeNotSet, TokenNotSupported, DepositIncorrectAmount, EmptyDeposit, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, InsufficientChainBalance, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, WithdrawFailed, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeBalanceMismatch, SharedBridgeValueNotSet} from "../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress, NoFundsTransferred, ValueMismatch, TokensWithFeesNotSupported, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, InsufficientChainBalance, WithdrawFailed} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -43,7 +43,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
 
     /// @notice Checks that the message sender is the bridge.
     modifier onlyBridge() {
-        require(msg.sender == address(L1_SHARED_BRIDGE), "NTV not ShB");
+        if (msg.sender != address(L1_SHARED_BRIDGE)) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
@@ -64,7 +66,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
     /// @param _owner Address which can change pause / unpause the NTV
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
     function initialize(address _owner) external initializer {
-        require(_owner != address(0), "NTV owner 0");
+        if (_owner == address(0)) {
+            revert ZeroAddress();
+        }
         _transferOwnership(_owner);
     }
 
@@ -77,7 +81,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
             uint256 balanceBefore = address(this).balance;
             L1_SHARED_BRIDGE.transferTokenToNTV(_token);
             uint256 balanceAfter = address(this).balance;
-            require(balanceAfter > balanceBefore, "NTV: 0 eth transferred");
+            if (balanceAfter == balanceBefore) {
+                revert NoFundsTransferred();
+            }
         } else {
             uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
             uint256 sharedBridgeChainBalance = IERC20(_token).balanceOf(address(L1_SHARED_BRIDGE));

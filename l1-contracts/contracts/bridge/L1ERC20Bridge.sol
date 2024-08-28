@@ -12,7 +12,7 @@ import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
-import {Unauthorized, EmptyDeposit, TokensWithFeesNotSupported, WithdrawalAlreadyFinalized} from "../common/L1ContractErrors.sol";
+import {EmptyDeposit, TokensWithFeesNotSupported, WithdrawalAlreadyFinalized} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

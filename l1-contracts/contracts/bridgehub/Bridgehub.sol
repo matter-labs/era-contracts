@@ -23,7 +23,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {Unauthorized, STMAlreadyRegistered, STMNotRegistered, TokenAlreadyRegistered, TokenNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {HyperchainLimitReached, Unauthorized, STMAlreadyRegistered, STMNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -366,7 +366,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function _registerNewHyperchain(uint256 _chainId, address _hyperchain) internal {
         // slither-disable-next-line unused-return
         hyperchainMap.set(_chainId, _hyperchain);
-        require(hyperchainMap.length() <= MAX_NUMBER_OF_HYPERCHAINS, "STM: Hyperchain limit reached");
+        if (hyperchainMap.length() > MAX_NUMBER_OF_HYPERCHAINS) {
+            revert HyperchainLimitReached();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
