@@ -17,6 +17,17 @@ fs_permissions = [
 test = "test/foundry"
 solc_version = "0.8.24"
 evm_version = "cancun"
+allow_paths = ["../l2-contracts/contracts"]
+fs_permissions = [
+    { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
+    { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed" },
+    { access = "read", path = "../l2-contracts/artifacts-zk/" },
+    { access = "read", path = "../l2-contracts/zkout/" },
+    { access = "read", path = "../system-contracts/zkout/" },
+    { access = "read", path = "./script-config" },
+    { access = "read-write", path = "./script-out" },
+    { access = "read", path = "./out" }
+]
 ignored_error_codes = ["missing-receive-ether", "code-size"]
 ignored_warnings_from = ["test", "contracts/dev-contracts"]
 remappings = [
@@ -25,4 +36,6 @@ remappings = [
     "foundry-test/=test/foundry/",
     "l2-contracts/=../l2-contracts/contracts/",
     "da-contracts/=../da-contracts/contracts/"
+    "@openzeppelin/contracts-v4/=./lib/openzeppelin-contracts-v4/contracts/",
+    "@openzeppelin/contracts-upgradeable-v4/=./lib/openzeppelin-contracts-upgradeable-v4/contracts/",
 ]
