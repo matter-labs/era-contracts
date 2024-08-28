@@ -183,7 +183,7 @@ contract PermanentRestrictionTest is Test {
         emit IPermanentRestriction.AdminImplementationAllowed(implementationHash, true);
 
         vm.prank(owner);
-        permRestriction.allowAdminImplementation(implementationHash , true);
+        permRestriction.allowAdminImplementation(implementationHash, true);
     }
 
     function test_setAllowedData(bytes memory data) public {
@@ -191,7 +191,7 @@ contract PermanentRestrictionTest is Test {
         emit IPermanentRestriction.AllowedDataChanged(data, true);
 
         vm.prank(owner);
-        permRestriction.setAllowedData(data , true);
+        permRestriction.setAllowedData(data, true);
     }
 
     function test_setSelectorIsValidated(bytes4 selector) public {
@@ -199,7 +199,7 @@ contract PermanentRestrictionTest is Test {
         emit IPermanentRestriction.SelectorValidationChanged(selector, true);
 
         vm.prank(owner);
-        permRestriction.setSelectorIsValidated(selector , true);
+        permRestriction.setSelectorIsValidated(selector, true);
     }
 
     function test_tryCompareAdminOfAChainIsAddressZero() public {
@@ -222,11 +222,7 @@ contract PermanentRestrictionTest is Test {
     }
 
     function test_validateCallTooShortData() public {
-        Call memory call = Call({
-            target: hyperchain,
-            value: 0,
-            data: ""
-        });
+        Call memory call = Call({target: hyperchain, value: 0, data: ""});
 
         vm.startPrank(newChainAdmin);
         permRestriction.validateCall(call, owner);
@@ -249,7 +245,7 @@ contract PermanentRestrictionTest is Test {
 
     function test_validateCallSetPendingAdminRemovingPermanentRestriction() public {
         vm.prank(owner);
-        permRestriction.allowAdminImplementation(address(chainAdmin).codehash , true);
+        permRestriction.allowAdminImplementation(address(chainAdmin).codehash, true);
 
         Call memory call = Call({
             target: hyperchain,
@@ -258,7 +254,7 @@ contract PermanentRestrictionTest is Test {
         });
 
         vm.expectRevert(RemovingPermanentRestriction.selector);
-        
+
         vm.startPrank(newChainAdmin);
         permRestriction.validateCall(call, owner);
         vm.stopPrank();
@@ -276,7 +272,7 @@ contract PermanentRestrictionTest is Test {
             value: 0,
             data: abi.encodeWithSelector(IAdmin.setPendingAdmin.selector, address(chainAdmin))
         });
-        
+
         vm.startPrank(newChainAdmin);
         permRestriction.validateCall(call, owner);
         vm.stopPrank();
@@ -288,7 +284,7 @@ contract PermanentRestrictionTest is Test {
             value: 0,
             data: abi.encodeWithSelector(IAdmin.acceptAdmin.selector)
         });
-        
+
         vm.startPrank(newChainAdmin);
         permRestriction.validateCall(call, owner);
         vm.stopPrank();
@@ -302,7 +298,7 @@ contract PermanentRestrictionTest is Test {
             value: 0,
             data: abi.encodeWithSelector(IAdmin.acceptAdmin.selector)
         });
-        
+
         vm.expectRevert(abi.encodeWithSelector(CallNotAllowed.selector, call.data));
 
         vm.startPrank(newChainAdmin);
@@ -318,7 +314,7 @@ contract PermanentRestrictionTest is Test {
             value: 0,
             data: abi.encodeWithSelector(IAdmin.acceptAdmin.selector)
         });
-        
+
         vm.prank(owner);
         permRestriction.setAllowedData(call.data, true);
 
