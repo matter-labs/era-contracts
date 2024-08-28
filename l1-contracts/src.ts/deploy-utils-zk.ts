@@ -15,7 +15,10 @@ export const BUILT_IN_ZKSYNC_CREATE2_FACTORY = "0x000000000000000000000000000000
 
 const contractsHome = process.env.ZKSYNC_HOME ? path.join(process.env.ZKSYNC_HOME as string, "contracts/") : "../";
 const contractArtifactsPath = path.join(contractsHome, "l2-contracts/artifacts-zk/");
-const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@openzeppelin/contracts-v4/proxy/beacon");
+const openzeppelinBeaconProxyArtifactsPath = path.join(
+  contractArtifactsPath,
+  "@openzeppelin/contracts-v4/proxy/beacon"
+);
 const L2_SHARED_BRIDGE_PATH = contractArtifactsPath + "contracts/bridge";
 export const L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE = readBytecode(
   openzeppelinBeaconProxyArtifactsPath,
