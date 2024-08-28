@@ -81,7 +81,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
             uint256 balanceBefore = address(this).balance;
             L1_SHARED_BRIDGE.transferTokenToNTV(_token);
             uint256 balanceAfter = address(this).balance;
-            if (balanceAfter == balanceBefore) {
+            if (balanceAfter <= balanceBefore) {
                 revert NoFundsTransferred();
             }
         } else {
