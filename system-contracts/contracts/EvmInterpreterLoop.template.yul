@@ -410,10 +410,6 @@ for { } true { } {
         offset, sp := popStackItemWithoutCheck(sp)
         size, sp := popStackItemWithoutCheck(sp)
 
-        checkMultipleOverflow(offset,size,MEM_OFFSET_INNER(), evmGasLeft)
-        checkMultipleOverflow(destOffset,size,MEM_OFFSET_INNER(), evmGasLeft)
-
-        // TODO invalid?
         if or(gt(add(add(offset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM()), gt(add(add(destOffset, size), MEM_OFFSET_INNER()), MAX_POSSIBLE_MEM())) {
             $llvm_AlwaysInline_llvm$_memsetToZero(add(destOffset, MEM_OFFSET_INNER()), size)
         }
@@ -812,7 +808,6 @@ for { } true { } {
         offset, sp := popStackItemWithoutCheck(sp)
         size, sp := popStackItemWithoutCheck(sp)
 
-        // TODO overflow checks
         checkMemOverflowByOffset(add(offset, size), evmGasLeft)
         checkMemOverflowByOffset(add(destOffset, size), evmGasLeft)
 
@@ -1444,11 +1439,10 @@ for { } true { } {
         offset, sp := popStackItemWithoutCheck(sp)
         size, sp := popStackItemWithoutCheck(sp)
 
-        // TODO invalid?
-        ensureAcceptableMemLocation(offset)
-        ensureAcceptableMemLocation(size)
+        checkOverflow(offset,size, evmGasLeft)
         evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
 
+        checkOverflow(offset,MEM_OFFSET_INNER(), evmGasLeft)
         offset := add(offset, MEM_OFFSET_INNER())
         offset,size := addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft)
 
