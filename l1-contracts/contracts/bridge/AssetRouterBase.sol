@@ -92,8 +92,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     ) public payable virtual override onlyBridgehub whenNotPaused {
         address assetHandler = assetHandlerAddress[_assetId];
         // require(l1AssetHandler != address(0), "AR: asset handler not set");
-
-        _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
         // slither-disable-next-line unused-return
         IAssetHandler(assetHandler).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
@@ -268,30 +266,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             _prevMsgSender: _prevMsgSender,
             _data: _transferData
         });
-    }
-
-    /// @notice Deposits allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
-    /// @dev assetId is not the padded address, but the correct encoded ID (NTV stores respective format for IDs).
-    /// @param _assetId The encoding of asset ID.
-    /// @param _amount The asset amount to be transferred to native token vault.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    function _transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) internal {
-        address tokenAddress = nativeTokenVault.tokenAddress(_assetId);
-        if (tokenAddress == address(0) || tokenAddress == BASE_TOKEN_ADDRESS) {
-            return;
-        }
-        IERC20 token = IERC20(tokenAddress);
-
-        // Do the transfer if allowance to Shared bridge is bigger than amount
-        // And if there is not enough allowance for the NTV
-        if (
-            token.allowance(_prevMsgSender, address(this)) >= _amount &&
-            token.allowance(_prevMsgSender, address(nativeTokenVault)) < _amount
-        ) {
-            // slither-disable-next-line arbitrary-send-erc20
-            token.safeTransferFrom(_prevMsgSender, address(this), _amount);
-            token.safeIncreaseAllowance(address(nativeTokenVault), _amount);
-        }
     }
 
     /*//////////////////////////////////////////////////////////////

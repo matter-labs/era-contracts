@@ -4,13 +4,13 @@ pragma solidity 0.8.24;
 
 // solhint-disable reason-string, gas-custom-errors
 
-// import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-// import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
-import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
+// import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+// import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
+import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
@@ -27,6 +27,8 @@ import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 // import {BridgeHelper} from "./BridgeHelper.sol";
 
 import {NativeTokenVault} from "./NativeTokenVault.sol";
+
+import {Unauthorized, ZeroAddress, NoFundsTransferred, ValueMismatch, TokensWithFeesNotSupported, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, InsufficientChainBalance, WithdrawFailed} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -72,8 +74,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Initializes a contract for later use. Expected to be used in the proxy
     /// @param _owner Address which can change pause / unpause the NTV
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    // function initialize(address _owner) external override initializer {
-    //     require(_owner != address(0), "NTV owner 0");
+    // function initialize(address _owner) external initializer {
+    //     if (_owner == address(0)) {
+    //         revert ZeroAddress();
+    //     }
     //     _transferOwnership(_owner);
     // }
 
@@ -86,7 +90,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             uint256 balanceBefore = address(this).balance;
             NULLIFIER.transferTokenToNTV(_token);
             uint256 balanceAfter = address(this).balance;
-            require(balanceAfter > balanceBefore, "NTV: 0 eth transferred");
+            if (balanceAfter <= balanceBefore) {
+                revert NoFundsTransferred();
+            }
         } else {
             uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
             uint256 sharedBridgeChainBalance = IERC20(_token).balanceOf(address(ASSET_ROUTER));
@@ -116,10 +122,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     ) external payable override onlyBridge whenNotPaused {
         (uint256 _amount, ) = abi.decode(_data, (uint256, address));
         address l1Token = tokenAddress[_assetId];
-        require(_amount > 0, "y1");
+        if (_amount == 0) {
+            revert NoFundsTransferred();
+        }
 
         // check that the chain has sufficient balance
-        require(chainBalance[_chainId][l1Token] >= _amount, "NTV: not enough funds 2");
+        if (chainBalance[_chainId][l1Token] < _amount) {
+            revert InsufficientChainBalance();
+        }
         chainBalance[_chainId][l1Token] -= _amount;
 
         if (l1Token == ETH_TOKEN_ADDRESS) {

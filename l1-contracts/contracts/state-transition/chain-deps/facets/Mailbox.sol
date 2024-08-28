@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
+// solhint-disable gas-custom-errors, reason-string
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
@@ -30,6 +30,8 @@ import {IL1Nullifier, FinalizeWithdrawalParams} from "../../../bridge/interfaces
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
+import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow} from "../../../common/L1ContractErrors.sol";
+
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
@@ -205,6 +207,10 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
+        if (_proof.length == 0) {
+            revert MerklePathEmpty();
+        }
+
         uint256 ptr = 0;
         bytes32 chainIdLeaf;
         {
@@ -222,7 +228,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             // in the aggregation, i.e. the batch root is stored here on L1.
             if (batchLeafProofLen == 0) {
                 // Double checking that the batch has been executed.
-                require(_batchNumber <= s.totalBatchesExecuted, "xx");
+                if (_batchNumber > s.totalBatchesExecuted) {
+                    revert BatchNotExecuted(_batchNumber);
+                }
 
                 bytes32 correctBatchRoot = s.l2LogsRootHashes[_batchNumber];
                 require(correctBatchRoot != bytes32(0), "local root is 0");
@@ -293,7 +301,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         );
         // Check that hashed log is not the default one,
         // otherwise it means that the value is out of range of sent L2 -> L1 logs
-        require(hashedLog != L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, "tw");
+        if (hashedLog == L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH) {
+            revert HashedLogIsDefault();
+        }
 
         // It is ok to not check length of `_proof` array, as length
         // of leaf preimage (which is `L2_TO_L1_LOG_SERIALIZE_SIZE`) is not
@@ -333,7 +343,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     /// @return The price of L2 gas in the base token
     function _deriveL2GasPrice(uint256 _l1GasPrice, uint256 _gasPerPubdata) internal view returns (uint256) {
         FeeParams memory feeParams = s.feeParams;
-        require(s.baseTokenGasPriceMultiplierDenominator > 0, "Mailbox: baseTokenGasPriceDenominator not set");
+        if (s.baseTokenGasPriceMultiplierDenominator == 0) {
+            revert BaseTokenGasPriceDenominatorNotSet();
+        }
         uint256 l1GasPriceConverted = (_l1GasPrice * s.baseTokenGasPriceMultiplierNominator) /
             s.baseTokenGasPriceMultiplierDenominator;
         uint256 pubdataPriceBaseToken;
@@ -422,17 +434,18 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         // Check that the transaction is allowed by the filterer (if the filterer is set).
         if (s.transactionFilterer != address(0)) {
-            require(
-                ITransactionFilterer(s.transactionFilterer).isTransactionAllowed({
+            if (
+                !ITransactionFilterer(s.transactionFilterer).isTransactionAllowed({
                     sender: _request.sender,
                     contractL2: _request.contractL2,
                     mintValue: _request.mintValue,
                     l2Value: _request.l2Value,
                     l2Calldata: _request.l2Calldata,
                     refundRecipient: _request.refundRecipient
-                }),
-                "tf"
-            );
+                })
+            ) {
+                revert TransactionNotAllowed();
+            }
         }
 
         // Enforcing that `_request.l2GasPerPubdataByteLimit` equals to a certain constant number. This is needed
@@ -440,7 +453,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         // VERY IMPORTANT: nobody should rely on this constant to be fixed and every contract should give their users the ability to provide the
         // ability to provide `_request.l2GasPerPubdataByteLimit` for each independent transaction.
         // CHANGING THIS CONSTANT SHOULD BE A CLIENT-SIDE CHANGE.
-        require(_request.l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");
+        if (_request.l2GasPerPubdataByteLimit != REQUIRED_L2_GAS_PRICE_PER_PUBDATA) {
+            revert GasPerPubdataMismatch();
+        }
 
         WritePriorityOpParams memory params;
         params.request = _request;
@@ -451,13 +466,17 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
         BridgehubL2TransactionRequest memory request = _params.request;
 
-        require(request.factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
+        if (request.factoryDeps.length > MAX_NEW_FACTORY_DEPS) {
+            revert TooManyFactoryDeps();
+        }
         _params.txId = _nextPriorityTxId();
 
         // Checking that the user provided enough ether to pay for the transaction.
         _params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, request.l2GasPerPubdataByteLimit);
         uint256 baseCost = _params.l2GasPrice * request.l2GasLimit;
-        require(request.mintValue >= baseCost + request.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
+        if (request.mintValue < baseCost + request.l2Value) {
+            revert MsgValueTooLow(baseCost + request.l2Value, request.mintValue);
+        }
 
         request.refundRecipient = AddressAliasHelper.actualRefundRecipient(request.refundRecipient, request.sender);
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
@@ -596,19 +615,17 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant onlyL1 {
-        require(s.chainId == ERA_CHAIN_ID, "Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
-        IL1Nullifier(s.baseTokenBridge).finalizeWithdrawal(
-            // solhint-disable-next-line func-named-parameters
-            // FinalizeWithdrawalParams(
-            ERA_CHAIN_ID,
-            _l2BatchNumber,
-            _l2MessageIndex,
-            // L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            _l2TxNumberInBatch,
-            _message,
-            _merkleProof
-            // )
-        );
+        if (s.chainId != ERA_CHAIN_ID) {
+            revert OnlyEraSupported();
+        }
+        IL1Nullifier(s.baseTokenBridge).finalizeWithdrawal({
+            _chainId: ERA_CHAIN_ID,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
+        });
     }
 
     ///  @inheritdoc IMailbox
@@ -621,7 +638,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) external payable onlyL1 returns (bytes32 canonicalTxHash) {
-        require(s.chainId == ERA_CHAIN_ID, "Mailbox: legacy interface only available for Era");
+        if (s.chainId != ERA_CHAIN_ID) {
+            revert OnlyEraSupported();
+        }
         canonicalTxHash = _requestL2TransactionSender(
             BridgehubL2TransactionRequest({
                 sender: msg.sender,

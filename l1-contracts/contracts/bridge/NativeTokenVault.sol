@@ -64,7 +64,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridge() {
-        require(msg.sender == address(ASSET_ROUTER), "NTV not AR");
+        if(msg.sender == address(ASSET_ROUTER)){
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
@@ -94,7 +96,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @param _owner Address which can change pause / unpause the NTV.
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
     function initialize(address _owner) external initializer {
-        require(_owner != address(0), "NTV owner 0");
+        if (_owner == address(0)) {
+            revert ZeroAddress();
+        }
         _transferOwnership(_owner);
     }
 
@@ -108,7 +112,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @notice Allows the bridge to register a token address for the vault.
     /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
     function registerToken(address _nativeToken) external {
-        require(_nativeToken != WETH_TOKEN, "NTV: WETH deposit not supported");
+        if (_nativeToken == WETH_TOKEN) {
+            revert TokenNotSupported(L1_WETH_TOKEN);
+        }
         require(_nativeToken == BASE_TOKEN_ADDRESS || _nativeToken.code.length > 0, "NTV: empty token");
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
         ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
@@ -129,7 +135,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         if (chainBalance[_chainId][token] > 0) {
             (amount, receiver) = abi.decode(_transferData, (uint256, address));
             // Check that the chain has sufficient balance
-            require(chainBalance[_chainId][token] >= amount, "NTV not enough funds 2"); // not enough funds
+            if (chainBalance[_chainId][l1Token] < amount) {
+                revert InsufficientChainBalance();
+            }
             chainBalance[_chainId][token] -= amount;
 
             if (token == BASE_TOKEN_ADDRESS) {
@@ -138,7 +146,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
                 assembly {
                     callSuccess := call(gas(), receiver, amount, 0, 0, 0, 0)
                 }
-                require(callSuccess, "NTV: withdrawal failed, no funds or cannot transfer to receiver");
+                if (!callSuccess) {
+                    revert WithdrawFailed();
+                }
             } else {
                 // Withdraw funds
                 IERC20(token).safeTransfer(receiver, amount);
@@ -202,17 +212,28 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
                     _depositAmount = amount;
                 }
 
-                require(_depositAmount == amount, "L1NTV: msg.value not equal to amount");
+                if (_depositAmount != amount) {
+                    revert ValueMismatch(amount, msg.value);
+                }
             } else {
                 // The Bridgehub also checks this, but we want to be sure
-                require(msg.value == 0, "NTV m.v > 0 b d.it");
+                if (msg.value != 0) {
+                    revert NonEmptyMsgValue();
+                }
+
                 amount = _depositAmount;
 
                 uint256 expectedDepositAmount = _depositFunds(_prevMsgSender, IERC20(nativeToken), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
-                require(expectedDepositAmount == _depositAmount, "5T"); // The token has non-standard transfer logic
+                // The token has non-standard transfer logic
+                if (amount != expectedDepositAmount) {
+                    revert TokensWithFeesNotSupported();
+                }        
             }
-            require(amount != 0, "6T"); // empty deposit amount
-
+            if (amount == 0) {
+                // empty deposit amount
+                revert EmptyDeposit();
+            }
+            
             chainBalance[_chainId][nativeToken] += amount;
 
             _bridgeMintData = DataEncoding.encodeBridgeMintData({

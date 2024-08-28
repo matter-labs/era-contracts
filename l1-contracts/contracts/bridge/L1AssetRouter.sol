@@ -4,11 +4,11 @@ pragma solidity 0.8.24;
 
 // solhint-disable reason-string, gas-custom-errors
 
-// import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-// import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+// import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+// import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
@@ -35,6 +35,8 @@ import {AssetRouterBase} from "./AssetRouterBase.sol";
 // import {BridgeHelper} from "./BridgeHelper.sol";
 
 import {IL1AssetDeploymentTracker} from "../bridge/interfaces/IL1AssetDeploymentTracker.sol";
+
+import {AssetIdNotSupported, Unauthorized, ZeroAddress, SharedBridgeKey, TokenNotSupported, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -65,26 +67,27 @@ contract L1AssetRouter is
     /// @dev Address of nullifier.
     IL1Nullifier public nullifierStorage;
 
-
-
     /// @notice Checks that the message sender is the nullifier.
     modifier onlyNullifier() {
-        require(msg.sender == address(nullifierStorage), "L1AR: not nullifier");
+        if (msg.sender != address(nullifierStorage)) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub or zkSync Era Diamond Proxy.
+    /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
-        require(
-            msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY),
-            "L1AR: msg.sender not equal to bridgehub or era chain"
-        );
+        if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     /// @notice Checks that the message sender is the legacy bridge.
     // modifier onlyLegacyBridge() {
-    //     require(msg.sender == address(legacyBridge), "L1AR: not legacy bridge");
+    //     if (msg.sender != address(legacyBridge)) {
+    //         revert Unauthorized(msg.sender);
+    //     }
     //     _;
     // } // kl todo
 
@@ -104,8 +107,12 @@ contract L1AssetRouter is
     /// @dev Used for testing purposes only, as the contract has been initialized on mainnet.
     /// @param _owner The address which can change L2 token implementation and upgrade the bridge implementation.
     /// The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    function initialize(address _owner) external reentrancyGuardInitializer initializer {
-        require(_owner != address(0), "ShB owner 0");
+    function initialize(
+        address _owner
+    ) external reentrancyGuardInitializer initializer {
+        if (_owner == address(0)) {
+            revert ZeroAddress();
+        }
         _transferOwnership(_owner);
     }
 
@@ -117,13 +124,26 @@ contract L1AssetRouter is
     //     return __DEPRECATED_l2BridgeAddress[_chainId];
     // } // kl todo
 
-    /// @notice Sets the L1ERC20Bridge contract address.
+    /// @notice Sets the L1Nullifier contract address.
     /// @dev Should be called only once by the owner.
     /// @param _nullifier The address of the nullifier.
     function setL1Nullifier(IL1Nullifier _nullifier) external onlyOwner {
         require(address(_nullifier) == address(0), "ShB: nullifier already set");
         require(address(_nullifier) != address(0), "ShB: nullifier 0");
         nullifierStorage = _nullifier;
+    }
+
+    /// @notice Sets the L1ERC20Bridge contract address.
+    /// @dev Should be called only once by the owner.
+    /// @param _legacyBridge The address of the legacy bridge.
+    function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
+        if (address(legacyBridge) != address(0)) {
+            revert AddressAlreadyUsed(address(legacyBridge));
+        }
+        if (_legacyBridge == address(0)) {
+            revert ZeroAddress();
+        }
+        legacyBridge = IL1ERC20Bridge(_legacyBridge);
     }
 
     /// @param _legacyBridge The address of the legacy bridge.
@@ -212,6 +232,7 @@ contract L1AssetRouter is
         address _prevMsgSender,
         uint256 _amount
     ) public payable virtual override(IAssetRouterBase, AssetRouterBase) onlyBridgehubOrEra(_chainId) whenNotPaused {
+        _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
         super.bridgehubDepositBaseToken(_chainId, _assetId, _prevMsgSender, _amount);
     }
 
@@ -259,7 +280,9 @@ contract L1AssetRouter is
             (assetId, transferData) = _handleLegacyData(_data, _prevMsgSender);
         }
 
-        require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, "L1AR: baseToken deposit not supported");
+        if (BRIDGE_HUB.baseTokenAssetId(_chainId) == assetId) {
+            revert AssetIdNotSupported(assetId);
+        }
 
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
@@ -533,10 +556,9 @@ contract L1AssetRouter is
     //     bytes calldata _message,
     //     bytes32[] calldata _merkleProof
     // ) internal nonReentrant whenNotPaused returns (address l1Receiver, bytes32 assetId, uint256 amount) {
-    //     require(
-    //         !isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex],
-    //         "L1AR: Withdrawal is already finalized"
-    //     );
+    //     if (isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex]) {
+    //         revert WithdrawalAlreadyFinalized();
+    //     }
     //     isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
     //     // Handling special case for withdrawal from ZKsync Era initiated before Shared Bridge.
@@ -559,26 +581,44 @@ contract L1AssetRouter is
     //     emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetId, amount);
     // }
 
-    // /// @dev Determines if the provided data for a failed deposit corresponds to a legacy failed deposit.
-    // /// @param _prevMsgSender The address of the entity that initiated the deposit.
-    // /// @param _assetId The unique identifier of the deposited L1 token.
-    // /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
-    // /// @param _expectedTxDataHash The nullifier data hash stored for the failed deposit.
-    // /// @return isLegacyTxDataHash True if the transaction is legacy, false otherwise.
-    // function _isLegacyTxDataHash(
-    //     address _prevMsgSender,
-    //     bytes32 _assetId,
-    //     bytes memory _transferData,
-    //     bytes32 _expectedTxDataHash
-    // ) internal view returns (bool isLegacyTxDataHash) {
-    //     try this.encodeTxDataHash(LEGACY_ENCODING_VERSION, _prevMsgSender, _assetId, _transferData) returns (
-    //         bytes32 txDataHash
-    //     ) {
-    //         return txDataHash == _expectedTxDataHash;
-    //     } catch {
-    //         return false;
-    //     }
-    // }
+    /// @notice Decodes the transfer input for legacy data and transfers allowance to NTV.
+    /// @dev Is not applicable for custom asset handlers.
+    /// @param _data The encoded transfer data (address _l1Token, uint256 _depositAmount, address _l2Receiver).
+    /// @param _prevMsgSender The address of the deposit initiator.
+    /// @return Tuple of asset ID and encoded transfer data to conform with new encoding standard.
+    function _handleLegacyData(bytes calldata _data, address _prevMsgSender) internal returns (bytes32, bytes memory) {
+        (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
+            _data,
+            (address, uint256, address)
+        );
+        bytes32 assetId = _ensureTokenRegisteredWithNTV(_l1Token);
+        _transferAllowanceToNTV(assetId, _depositAmount, _prevMsgSender);
+        return (assetId, abi.encode(_depositAmount, _l2Receiver));
+    }
+
+    /// @notice Transfers allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
+    /// @dev assetId is not the padded address, but the correct encoded id (NTV stores respective format for IDs)
+    /// @param _amount The asset amount to be transferred to native token vault.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    function _transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) internal {
+        address l1TokenAddress = nativeTokenVault.tokenAddress(_assetId);
+        if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
+            return;
+        }
+        IERC20 l1Token = IERC20(l1TokenAddress);
+
+        // Do the transfer if allowance to Shared bridge is bigger than amount
+        // And if there is not enough allowance for the NTV
+        if (
+            l1Token.allowance(_prevMsgSender, address(this)) >= _amount &&
+            l1Token.allowance(_prevMsgSender, address(nativeTokenVault)) < _amount
+        ) {
+            // slither-disable-next-line arbitrary-send-erc20
+            l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
+            l1Token.forceApprove(address(nativeTokenVault), _amount);
+        }
+    }
+
 
     /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
     /// @param _encodingVersion EncodingVersion.

@@ -16,6 +16,7 @@ import {InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.
 import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {DiamondAlreadyFrozen, Unauthorized, DiamondFreezeIncorrectState, DiamondNotFrozen} from "contracts/common/L1ContractErrors.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
     DiamondProxy private diamondProxy;
@@ -121,8 +122,7 @@ contract UpgradeLogicTest is DiamondCutTest {
 
     function test_RevertWhen_EmergencyFreezeWhenUnauthorizedGovernor() public {
         vm.startPrank(randomSigner);
-
-        vm.expectRevert(abi.encodePacked("Hyperchain: not state transition manager"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomSigner));
         proxyAsAdmin.freezeDiamond();
     }
 
@@ -131,14 +131,14 @@ contract UpgradeLogicTest is DiamondCutTest {
 
         proxyAsAdmin.freezeDiamond();
 
-        vm.expectRevert(abi.encodePacked("a9"));
+        vm.expectRevert(DiamondAlreadyFrozen.selector);
         proxyAsAdmin.freezeDiamond();
     }
 
     function test_RevertWhen_UnfreezingWhenNotFrozen() public {
         vm.startPrank(stateTransitionManager);
 
-        vm.expectRevert(abi.encodePacked("a7"));
+        vm.expectRevert(DiamondNotFrozen.selector);
         proxyAsAdmin.unfreezeDiamond();
     }
 

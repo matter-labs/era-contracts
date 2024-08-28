@@ -15,8 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-pragma solidity 0.8.24;
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
 
 library AddressAliasHelper {
     uint160 internal constant offset = uint160(0x1111000000000000000000000000000000001111);

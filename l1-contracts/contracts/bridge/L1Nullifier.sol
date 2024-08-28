@@ -27,6 +27,7 @@ import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {AssetIdNotSupported, Unauthorized, ZeroAddress, SharedBridgeKey, TokenNotSupported, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -231,7 +232,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32 _txDataHash,
         bytes32 _txHash
     ) external override onlyAssetRouter whenNotPaused {
-        require(depositHappened[_chainId][_txHash] == 0x00, "L1N tx hap");
+        if (depositHappened[_chainId][_txHash] != 0x00) {
+            revert DepositExists();
+        }
         depositHappened[_chainId][_txHash] = _txDataHash;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
@@ -247,7 +250,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
     function bridgeVerifyFailedTransfer(
-        bool _checkedInLegacyBridge,
         uint256 _chainId,
         bytes32 _assetId,
         bytes memory _transferData,
@@ -267,33 +269,68 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _merkleProof: _merkleProof,
                 _status: TxStatus.Failure
             });
-            require(proofValid, "yn");
+            if (!proofValid) {
+                revert InvalidProof();
+            }
         }
 
+        require(!_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch), "L1AR: legacy cFD");
         {
-            bool notCheckedInLegacyBridgeOrWeCanCheckDeposit;
-            {
-                // Deposits that happened before the upgrade cannot be checked here, they have to be claimed and checked in the legacyBridge
-                bool weCanCheckDepositHere = !_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch);
-                // Double claims are not possible, as depositHappened is checked here for all except legacy deposits (which have to happen through the legacy bridge)
-                // Funds claimed before the update will still be recorded in the legacy bridge
-                // Note we double check NEW deposits if they are called from the legacy bridge
-                notCheckedInLegacyBridgeOrWeCanCheckDeposit = (!_checkedInLegacyBridge) || weCanCheckDepositHere;
-            }
-            if (notCheckedInLegacyBridgeOrWeCanCheckDeposit) {
-                bytes32 txDataHash;
-                {
-                    (uint256 amount, address prevMsgSender) = abi.decode(_transferData, (uint256, address));
-                    address l1Token = nativeTokenVault.tokenAddress(_assetId);
-                    txDataHash = keccak256(abi.encode(prevMsgSender, l1Token, amount));
+            bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
+            // Determine if the given dataHash matches the calculated legacy transaction hash.
+            bool isLegacyTxDataHash = _isLegacyTxDataHash(_depositSender, _assetId, _assetData, dataHash);
+            // If the dataHash matches the legacy transaction hash, skip the next step.
+            // Otherwise, perform the check using the new transaction data hash encoding.
+            if (!isLegacyTxDataHash) {
+                bytes32 txDataHash = _encodeTxDataHash(NEW_ENCODING_VERSION, _depositSender, _assetId, _assetData);
+                if (dataHash != txDataHash) {
+                    revert DepositDoesNotExist();
                 }
-                {
-                    bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
-                    require(dataHash == txDataHash, "L1N: d.it not hap");
-                }
-                delete depositHappened[_chainId][_l2TxHash];
             }
         }
+        delete depositHappened[_chainId][_l2TxHash];    
+    }
+
+        // /// @dev Determines if the provided data for a failed deposit corresponds to a legacy failed deposit.
+    // /// @param _prevMsgSender The address of the entity that initiated the deposit.
+    // /// @param _assetId The unique identifier of the deposited L1 token.
+    // /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
+    // /// @param _expectedTxDataHash The nullifier data hash stored for the failed deposit.
+    // /// @return isLegacyTxDataHash True if the transaction is legacy, false otherwise.
+    // function _isLegacyTxDataHash(
+    //     address _prevMsgSender,
+    //     bytes32 _assetId,
+    //     bytes memory _transferData,
+    //     bytes32 _expectedTxDataHash
+    // ) internal view returns (bool isLegacyTxDataHash) {
+    //     try this.encodeTxDataHash(LEGACY_ENCODING_VERSION, _prevMsgSender, _assetId, _transferData) returns (
+    //         bytes32 txDataHash
+    //     ) {
+    //         return txDataHash == _expectedTxDataHash;
+    //     } catch {
+    //         return false;
+    //     }
+    // }
+
+        /// @dev Determines if the provided data for a failed deposit corresponds to a legacy failed deposit.
+    /// @param _prevMsgSender The address of the entity that initiated the deposit.
+    /// @param _assetId The unique identifier of the deposited L1 token.
+    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
+    /// @param _expectedTxDataHash The nullifier data hash stored for the failed deposit.
+    /// @return isLegacyTxDataHash True if the transaction is legacy, false otherwise.
+    function _isLegacyTxDataHash(
+        address _prevMsgSender,
+        bytes32 _assetId,
+        bytes memory _transferData,
+        bytes32 _expectedTxDataHash
+    ) internal view returns (bool isLegacyTxDataHash) {
+        // try this.encodeTxDataHash(LEGACY_ENCODING_VERSION, _prevMsgSender, _assetId, _transferData) returns (
+        //     bytes32 txDataHash
+        // ) {
+        //     return txDataHash == _expectedTxDataHash;
+        // } catch {
+        //     return false;
+        // }
     }
 
     /// @notice Finalize the withdrawal and release funds
@@ -351,7 +388,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
     /// @return Whether withdrawal was initiated on ZKsync Era before diamond proxy upgrade.
     function _isEraLegacyEthWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
-        require((_chainId != ERA_CHAIN_ID) || _eraPostDiamondUpgradeFirstBatch != 0, "L1N: diamondUFB not set for Era");
+        if ((_chainId == ERA_CHAIN_ID) && _eraPostDiamondUpgradeFirstBatch == 0) {
+            revert SharedBridgeValueNotSet(SharedBridgeKey.PostUpgradeFirstBatch);
+        }
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < _eraPostDiamondUpgradeFirstBatch);
     }
 
@@ -360,10 +399,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
     /// @return Whether withdrawal was initiated on ZKsync Era before Legacy Bridge upgrade.
     function _isEraLegacyTokenWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
-        require(
-            (_chainId != ERA_CHAIN_ID) || _eraPostLegacyBridgeUpgradeFirstBatch != 0,
-            "L1N: LegacyUFB not set for Era"
-        );
+        if ((_chainId == ERA_CHAIN_ID) && _eraPostLegacyBridgeUpgradeFirstBatch == 0) {
+            revert SharedBridgeValueNotSet(SharedBridgeKey.LegacyBridgeFirstBatch);
+        }
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < _eraPostLegacyBridgeUpgradeFirstBatch);
     }
 
@@ -377,10 +415,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint256 _l2BatchNumber,
         uint256 _l2TxNumberInBatch
     ) internal view returns (bool) {
-        require(
-            (_chainId != ERA_CHAIN_ID) || (_eraLegacyBridgeLastDepositBatch != 0),
-            ": last deposit time not set for Era"
-        );
+        if ((_chainId == ERA_CHAIN_ID) && (_eraLegacyBridgeLastDepositBatch == 0)) {
+            revert SharedBridgeValueNotSet(SharedBridgeKey.LegacyBridgeLastDepositBatch);
+        }
         return
             (_chainId == ERA_CHAIN_ID) &&
             (_l2BatchNumber < _eraLegacyBridgeLastDepositBatch ||
@@ -453,7 +490,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _message: l2ToL1Message,
             _proof: _finalizeWithdrawalParams.merkleProof
         });
-        require(success, "L1N withd w proof"); // withdrawal wrong proof
+        // withdrawal wrong proof
+        if (!success) {
+            revert InvalidProof();
+        }
     }
 
     /// @notice Parses the withdrawal message and returns withdrawal details.
@@ -474,8 +514,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         // 2. The message that is encoded by `getL1WithdrawMessage(bytes32 _assetId, bytes memory _bridgeMintData)`
         // No length is assume. The assetId is decoded and the mintData is passed to respective assetHandler
 
-        // So the data is expected to be at least 56 bytes long.
-        require(_l2ToL1message.length >= 56, "L1N wrong msg len"); // wrong message length
+        // The data is expected to be at least 56 bytes long.
+        if (_l2ToL1message.length < 56) {
+            revert L2WithdrawalMessageWrongLength(_l2ToL1message.length);
+        }
         uint256 amount;
         address l1Receiver;
 
@@ -495,7 +537,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             // Check that the message length is correct.
             // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
             // 76 (bytes).
-            require(_l2ToL1message.length == 76, "L1N wrong msg len 2");
+            if (_l2ToL1message.length != 76) {
+                revert L2WithdrawalMessageWrongLength(_l2ToL1message.length);
+            }
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             // slither-disable-next-line unused-return
@@ -509,7 +553,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
             transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         } else {
-            revert("L1N Incorrect message function selector");
+            revert InvalidSelector(bytes4(functionSignature));
         }
     }
 
@@ -537,10 +581,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        bytes32 assetId = nativeTokenVault.getAssetId(block.chainid, _l1Token); // kl todo this chain?
+        bytes32 assetId = nativeTokenVault.getAssetId(block.chainid, _l1Token);
         // For legacy deposits, the l2 receiver is not required to check tx data hash
-        bytes memory transferData = abi.encode(_amount, _depositSender);
-        // bytes memory transferData = abi.encode(_amount, address(0));
+        // bytes memory transferData = abi.encode(_amount, _depositSender);
+        bytes memory transferData = abi.encode(_amount, address(0));
 
         bridgeVerifyFailedTransfer({
             _checkedInLegacyBridge: false,
@@ -567,7 +611,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _l1Token The L1 token address which should be registered with native token vault.
     /// @return assetId The asset ID of the token provided.
     function _ensureTokenRegisteredWithNTV(address _l1Token) internal returns (bytes32 assetId) {
-        assetId = nativeTokenVault.getAssetId(block.chainid, _l1Token); // kl todo this chain?
+        assetId = nativeTokenVault.getAssetId(block.chainid, _l1Token);
         if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
             nativeTokenVault.registerToken(_l1Token);
         }
@@ -628,7 +672,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 txHash) {
-        require(_l1Token != L1_WETH_TOKEN, "L1N: WETH deposit not supported 2");
+        if (_l1Token == L1_WETH_TOKEN) {
+            revert TokenNotSupported(L1_WETH_TOKEN);
+        }
 
         bytes32 _assetId;
         bytes memory bridgeMintCalldata;

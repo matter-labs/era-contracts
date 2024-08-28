@@ -8,6 +8,7 @@ import {ExecutorTest, POINT_EVALUATION_PRECOMPILE_RESULT, EMPTY_PREPUBLISHED_COM
 
 import {COMMIT_TIMESTAMP_NOT_OLDER, POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {RevertedBatchNotAfterNewLastBatch} from "contracts/common/L1ContractErrors.sol";
 
 contract RevertingTest is ExecutorTest {
     bytes32 l2DAValidatorOutputHash;
@@ -97,7 +98,7 @@ contract RevertingTest is ExecutorTest {
 
     function test_RevertWhen_RevertingMoreBatchesThanAlreadyCommitted() public {
         vm.prank(validator);
-        vm.expectRevert(bytes.concat("v1"));
+        vm.expectRevert(RevertedBatchNotAfterNewLastBatch.selector);
         executor.revertBatchesSharedBridge(0, 10);
     }
 

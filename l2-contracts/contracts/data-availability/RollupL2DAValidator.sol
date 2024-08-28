@@ -6,7 +6,7 @@ import {IL2DAValidator} from "../interfaces/IL2DAValidator.sol";
 import {StateDiffL2DAValidator} from "./StateDiffL2DAValidator.sol";
 import {PUBDATA_CHUNK_PUBLISHER} from "../L2ContractHelper.sol";
 
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
 
 import {ReconstructionMismatch, PubdataField} from "./DAErrors.sol";

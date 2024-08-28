@@ -3,6 +3,8 @@ pragma solidity 0.8.24;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+
 contract setValidatorTimelockTest is StateTransitionManagerTest {
     function test_SettingValidatorTimelock() public {
         assertEq(
@@ -33,7 +35,7 @@ contract setValidatorTimelockTest is StateTransitionManagerTest {
         );
 
         vm.prank(notOwner);
-        vm.expectRevert("STM: not owner or admin");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notOwner));
         address newValidatorTimelock = address(0x0000000000000000000000000000000000004235);
         chainContractAddress.setValidatorTimelock(newValidatorTimelock);
 

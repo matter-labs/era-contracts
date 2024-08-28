@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
 
 import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
 import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";

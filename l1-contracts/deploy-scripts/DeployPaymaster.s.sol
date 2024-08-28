@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.21;
 
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
@@ -43,8 +43,8 @@ contract DeployPaymaster is Script {
     }
 
     function deploy() internal {
-        bytes memory testnetPaymasterBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/TestnetPaymaster.sol/TestnetPaymaster.json"
+        bytes memory testnetPaymasterBytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/TestnetPaymaster.sol/TestnetPaymaster.json"
         );
 
         config.paymaster = Utils.deployThroughL1({

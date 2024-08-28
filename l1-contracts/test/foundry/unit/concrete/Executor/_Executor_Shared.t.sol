@@ -113,6 +113,7 @@ contract ExecutorTest is Test {
         selectors[24] = getters.isFacetFreezable.selector;
         selectors[25] = getters.getTotalBatchesCommitted.selector;
         selectors[26] = getters.getTotalBatchesVerified.selector;
+        selectors[27] = getters.storedBlockHash.selector;
         return selectors;
     }
 

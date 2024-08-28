@@ -2,10 +2,8 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable gas-custom-errors
-
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
@@ -15,6 +13,8 @@ import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
+
+import {EmptyDeposit, TokensWithFeesNotSupported, WithdrawalAlreadyFinalized} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -215,7 +215,10 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
         uint256 amount = depositAmount[_depositSender][_l1Token][_l2TxHash];
-        require(amount != 0, "2T"); // empty deposit
+        // empty deposit
+        if (amount == 0) {
+            revert EmptyDeposit();
+        }
         delete depositAmount[_depositSender][_l1Token][_l2TxHash];
 
         NULLIFIER.claimFailedDepositLegacyErc20Bridge({
@@ -245,7 +248,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @param _amount The total amount of tokens to be bridged
     /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
-    /// @return txHash The L2 transaction hash of deposit finalization
+    /// @return l2TxHash The L2 transaction hash of deposit finalization
     /// NOTE: the function doesn't use `nonreentrant` modifier, because the inner method does.
     // function deposit(
     //     address _l2Receiver,
@@ -253,8 +256,8 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     //     uint256 _amount,
     //     uint256 _l2TxGasLimit,
     //     uint256 _l2TxGasPerPubdataByte
-    // ) external payable returns (bytes32 txHash) {
-    //     txHash = deposit({
+    // ) external payable returns (bytes32 l2TxHash) {
+    //     l2TxHash = deposit({
     //         _l2Receiver: _l2Receiver,
     //         _l1Token: _l1Token,
     //         _amount: _amount,
@@ -262,7 +265,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     //         _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
     //         _refundRecipient: address(0)
     //     });
-    // } // kl todo
+    // } // kl todo 
 
     /// @notice Finalize the withdrawal and release funds
     /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
@@ -277,7 +280,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
-        require(!isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], "pw");
+        if (isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex]) {
+            revert WithdrawalAlreadyFinalized();
+        }
         // We don't need to set finalizeWithdrawal here, as we set it in the shared bridge
 
         (address l1Receiver, address l1Token, uint256 amount) = NULLIFIER.finalizeWithdrawalLegacyErc20Bridge({
@@ -314,20 +319,26 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// L2 tx if the L1 msg.sender is a contract. Without address aliasing for L1 contracts as refund recipients they
     /// would not be able to make proper L2 tx requests through the Mailbox to use or withdraw the funds from L2, and
     /// the funds would be lost.
-    /// @return txHash The L2 transaction hash of deposit finalization
-    // function deposit( // kl todo this or the other one?
+    /// @return l2TxHash The L2 transaction hash of deposit finalization
+    // function deposit(
     //     address _l2Receiver,
     //     address _l1Token,
     //     uint256 _amount,
     //     uint256 _l2TxGasLimit,
     //     uint256 _l2TxGasPerPubdataByte,
     //     address _refundRecipient
-    // ) public payable nonReentrant returns (bytes32 txHash) {
-    //     require(_amount != 0, "0T"); // empty deposit
+    // ) public payable nonReentrant returns (bytes32 l2TxHash) {
+    //     // empty deposit
+    //     if (_amount == 0) {
+    //         revert EmptyDeposit();
+    //     }
     //     uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
-    //     require(amount == _amount, "3T"); // The token has non-standard transfer logic
+    //     // The token has non-standard transfer logic
+    //     if (amount != _amount) {
+    //         revert TokensWithFeesNotSupported();
+    //     }
 
-    //     txHash = L1_ASSET_ROUTER.depositLegacyErc20Bridge{value: msg.value}({
+    //     l2TxHash = L1_ASSET_ROUTER.depositLegacyErc20Bridge{value: msg.value}({
     //         _prevMsgSender: msg.sender,
     //         _l2Receiver: _l2Receiver,
     //         _l1Token: _l1Token,
@@ -336,15 +347,15 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     //         _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
     //         _refundRecipient: _refundRecipient
     //     });
-    //     depositAmount[msg.sender][_l1Token][txHash] = _amount;
+    //     depositAmount[msg.sender][_l1Token][l2TxHash] = _amount;
     //     emit DepositInitiated({
-    //         l2DepositTxHash: txHash,
+    //         l2DepositTxHash: l2TxHash,
     //         from: msg.sender,
     //         to: _l2Receiver,
     //         l1Token: _l1Token,
     //         amount: _amount
     //     });
-    // }
+    // } // kl todo 
 
     /// @dev Transfers tokens from the depositor address to the shared bridge address.
     /// @return The difference between the contract balance before and after the transferring of funds.

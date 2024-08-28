@@ -2,12 +2,12 @@
 
 pragma solidity 0.8.24;
 
-import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
+import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
 
 import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
 import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
 
-import {EmptyAddress, Unauthorized, UnimplementedMessage, BRIDGE_MINT_NOT_IMPLEMENTED, WithdrawFailed} from "../common/L1ContractErrors.sol";
+import {ZeroAddress, Unauthorized, UnimplementedMessage, BRIDGE_MINT_NOT_IMPLEMENTED, WithdrawFailed} from "../errors/L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -31,7 +31,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
 
     modifier onlyBridge() {
         if (msg.sender != l2Bridge) {
-            revert Unauthorized();
+            revert Unauthorized(msg.sender);
         }
         _;
     }
@@ -62,11 +62,11 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
         address _l1Address
     ) external reinitializer(2) {
         if (_l2Bridge == address(0)) {
-            revert EmptyAddress();
+            revert ZeroAddress();
         }
 
         if (_l1Address == address(0)) {
-            revert EmptyAddress();
+            revert ZeroAddress();
         }
         l2Bridge = _l2Bridge;
         l1Address = _l1Address;

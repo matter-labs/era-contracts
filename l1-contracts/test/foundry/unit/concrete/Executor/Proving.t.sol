@@ -8,6 +8,7 @@ import {ExecutorTest, POINT_EVALUATION_PRECOMPILE_RESULT, EMPTY_PREPUBLISHED_COM
 
 import {COMMIT_TIMESTAMP_NOT_OLDER, POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {VerifiedBatchesExceedsCommittedBatches, BatchHashMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract ProvingTest is ExecutorTest {
     bytes32 l2DAValidatorOutputHash;
@@ -98,7 +99,13 @@ contract ProvingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes.concat("t1"));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BatchHashMismatch.selector,
+                keccak256(abi.encode(genesisStoredBatchInfo)),
+                keccak256(abi.encode(wrongPreviousStoredBatchInfo))
+            )
+        );
         executor.proveBatchesSharedBridge(uint256(0), wrongPreviousStoredBatchInfo, storedBatchInfoArray, proofInput);
     }
 
@@ -111,7 +118,13 @@ contract ProvingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes.concat("o1"));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BatchHashMismatch.selector,
+                keccak256(abi.encode(newStoredBatchInfo)),
+                keccak256(abi.encode(wrongNewStoredBatchInfo))
+            )
+        );
         executor.proveBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
     }
 
@@ -124,7 +137,7 @@ contract ProvingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes.concat("q"));
+        vm.expectRevert(VerifiedBatchesExceedsCommittedBatches.selector);
         executor.proveBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
     }
 
