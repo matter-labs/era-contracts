@@ -153,9 +153,9 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
         config.baseToken = toml.readAddress("$.chain.base_token_addr");
 
-        bytecodes.l2SharedBridgeBytecode = Utils.readFoundryBytecode("/script-config/artifacts/L2SharedBridge.json");
-        bytecodes.beaconProxy = Utils.readFoundryBytecode("/script-config/artifacts/BeaconProxy.json");
-        bytecodes.l2SharedBridgeProxyBytecode = Utils.readFoundryBytecode(
+        bytecodes.l2SharedBridgeBytecode = Utils.readHardhatBytecode("/script-config/artifacts/L2SharedBridge.json");
+        bytecodes.beaconProxy = Utils.readHardhatBytecode("/script-config/artifacts/BeaconProxy.json");
+        bytecodes.l2SharedBridgeProxyBytecode = Utils.readHardhatBytecode(
             "/script-config/artifacts/TransparentUpgradeableProxy.json"
         );
     }
