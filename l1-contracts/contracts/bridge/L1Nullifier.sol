@@ -4,15 +4,15 @@ pragma solidity 0.8.24;
 
 // solhint-disable reason-string, gas-custom-errors
 
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
-import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
+import {IL1AssetRouter, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./interfaces/IL1AssetRouter.sol";
 import {IL1Nullifier, FinalizeWithdrawalParams} from "./interfaces/IL1Nullifier.sol";
 import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 
@@ -240,9 +240,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
-    /// @param _checkedInLegacyBridge The boolean notifying in deposit was checked in legacy bridge.
+    // / @param _checkedInLegacyBridge The boolean notifying in deposit was checked in legacy bridge.
+    /// @param _depositSender The address of the entity that initiated the deposit.
     /// @param _assetId The address of the deposited L1 ERC20 token.
-    /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
+    /// @param _assetData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
     /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization.
     /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed.
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
@@ -251,8 +252,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
     function bridgeVerifyFailedTransfer(
         uint256 _chainId,
+        address _depositSender,
         bytes32 _assetId,
-        bytes memory _transferData,
+        bytes memory _assetData,
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
@@ -282,7 +284,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             // If the dataHash matches the legacy transaction hash, skip the next step.
             // Otherwise, perform the check using the new transaction data hash encoding.
             if (!isLegacyTxDataHash) {
-                bytes32 txDataHash = _encodeTxDataHash(NEW_ENCODING_VERSION, _depositSender, _assetId, _assetData);
+                bytes32 txDataHash = DataEncoding.encodeTxDataHash(NEW_ENCODING_VERSION, _depositSender, _assetId, address(0), _assetData);
                 if (dataHash != txDataHash) {
                     revert DepositDoesNotExist();
                 }
@@ -584,13 +586,13 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32 assetId = nativeTokenVault.getAssetId(block.chainid, _l1Token);
         // For legacy deposits, the l2 receiver is not required to check tx data hash
         // bytes memory transferData = abi.encode(_amount, _depositSender);
-        bytes memory transferData = abi.encode(_amount, address(0));
+        bytes memory assetData = abi.encode(_amount, address(0));
 
         bridgeVerifyFailedTransfer({
-            _checkedInLegacyBridge: false,
+            _depositSender: _depositSender,
             _chainId: _chainId,
             _assetId: assetId,
-            _transferData: transferData,
+            _assetData: assetData,
             _l2TxHash: _l2TxHash,
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
@@ -602,7 +604,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _chainId: _chainId,
             _depositSender: _depositSender,
             _assetId: assetId,
-            _transferData: transferData
+            _transferData: assetData
         });
     }
 
@@ -792,14 +794,14 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge {
-        bytes memory transferData = abi.encode(_amount, _depositSender);
+        bytes memory assetData = abi.encode(_amount, _depositSender);
         bytes32 assetId = nativeTokenVault.getAssetId(block.chainid, _l1Asset); // kl todo this chain?
 
         bridgeVerifyFailedTransfer({
-            _checkedInLegacyBridge: false,
+            _depositSender: _depositSender,
             _chainId: ERA_CHAIN_ID,
             _assetId: assetId,
-            _transferData: transferData,
+            _assetData: assetData,
             _l2TxHash: _l2TxHash,
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
@@ -811,7 +813,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _chainId: ERA_CHAIN_ID,
             _depositSender: _depositSender,
             _assetId: assetId,
-            _transferData: transferData
+            _transferData: assetData
         });
     }
 

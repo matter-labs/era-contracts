@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-// error InvalidCaller(address);
-// error InvalidInput();
-// error InsufficientAllowance(uint256 providedAllowance, uint256 requiredAmount);
-// error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
-// error UnsupportedPaymasterFlow();
-// error EmptyAddress();
-// error EmptyBytes32();
-// error AddressMismatch(address expected, address supplied);
-// error AssetIdMismatch(bytes32 expected, bytes32 supplied);
-// error AmountMustBeGreaterThanZero();
-// error DeployFailed();
-// error NonSequentialVersion();
-// error UnimplementedMessage(string);
+error InvalidCaller(address);
+error InvalidInput();
+error InsufficientAllowance(uint256 providedAllowance, uint256 requiredAmount);
+error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
+error UnsupportedPaymasterFlow();
+error EmptyAddress();
+error EmptyBytes32();
+error AddressMismatch(address expected, address supplied);
+error AssetIdMismatch(bytes32 expected, bytes32 supplied);
+error AmountMustBeGreaterThanZero();
+error DeployFailed();
+error NonSequentialVersion();
+error UnimplementedMessage(string);
 
 // 0x1ff9d522
 error AddressAlreadyUsed(address addr);

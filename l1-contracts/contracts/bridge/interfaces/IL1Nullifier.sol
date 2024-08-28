@@ -91,8 +91,8 @@ interface IL1Nullifier {
     ) external returns (address l1Receiver, address l1Token, uint256 amount);
 
     function bridgeVerifyFailedTransfer(
-        bool _checkedInLegacyBridge,
         uint256 _chainId,
+        address _depositSender,
         bytes32 _assetId,
         bytes memory _transferData,
         bytes32 _l2TxHash,

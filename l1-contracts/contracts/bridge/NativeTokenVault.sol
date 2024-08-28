@@ -4,14 +4,14 @@ pragma solidity 0.8.24;
 
 // solhint-disable reason-string, gas-custom-errors
 
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
+import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
-// import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+// import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
 import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
@@ -27,7 +27,7 @@ import {BridgeHelper} from "./BridgeHelper.sol";
 
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
 
-import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../common/L1ContractErrors.sol";
+import {EmptyAddress, EmptyDeposit,Unauthorized,TokensWithFeesNotSupported, TokenNotSupported,NonEmptyMsgValue,ZeroAddress, EmptyBytes32,ValueMismatch,WithdrawFailed,InsufficientChainBalance, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -113,7 +113,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
     function registerToken(address _nativeToken) external {
         if (_nativeToken == WETH_TOKEN) {
-            revert TokenNotSupported(L1_WETH_TOKEN);
+            revert TokenNotSupported(WETH_TOKEN);
         }
         require(_nativeToken == BASE_TOKEN_ADDRESS || _nativeToken.code.length > 0, "NTV: empty token");
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
@@ -135,7 +135,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         if (chainBalance[_chainId][token] > 0) {
             (amount, receiver) = abi.decode(_transferData, (uint256, address));
             // Check that the chain has sufficient balance
-            if (chainBalance[_chainId][l1Token] < amount) {
+            if (chainBalance[_chainId][token] < amount) {
                 revert InsufficientChainBalance();
             }
             chainBalance[_chainId][token] -= amount;
@@ -233,7 +233,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
                 // empty deposit amount
                 revert EmptyDeposit();
             }
-            
+
             chainBalance[_chainId][nativeToken] += amount;
 
             _bridgeMintData = DataEncoding.encodeBridgeMintData({

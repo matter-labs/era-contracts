@@ -7,6 +7,16 @@ import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {IL1Nullifier} from "./IL1Nullifier.sol";
 // import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 
+
+    /// @dev The encoding version used for new txs.
+    bytes1 constant LEGACY_ENCODING_VERSION = 0x00;
+
+    /// @dev The encoding version used for legacy txs.
+    bytes1 constant NEW_ENCODING_VERSION = 0x01;
+
+    /// @dev The encoding version used for txs that set the asset handler on the counterpart contract.
+    bytes1 constant SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION = 0x02;
+
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

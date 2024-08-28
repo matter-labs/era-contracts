@@ -10,7 +10,7 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
+import {IL1AssetRouter, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./interfaces/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
 // import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
@@ -54,15 +54,6 @@ contract L1AssetRouter is
 
     /// @dev The address of ZKsync Era diamond proxy contract.
     address internal immutable ERA_DIAMOND_PROXY;
-
-    /// @dev The encoding version used for new txs.
-    bytes1 internal constant LEGACY_ENCODING_VERSION = 0x00;
-
-    /// @dev The encoding version used for legacy txs.
-    bytes1 internal constant NEW_ENCODING_VERSION = 0x01;
-
-    /// @dev The encoding version used for txs that set the asset handler on the counterpart contract.
-    bytes1 internal constant SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION = 0x02;
 
     /// @dev Address of nullifier.
     IL1Nullifier public nullifierStorage;
@@ -136,15 +127,15 @@ contract L1AssetRouter is
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
-    function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
-        if (address(legacyBridge) != address(0)) {
-            revert AddressAlreadyUsed(address(legacyBridge));
-        }
-        if (_legacyBridge == address(0)) {
-            revert ZeroAddress();
-        }
-        legacyBridge = IL1ERC20Bridge(_legacyBridge);
-    }
+    // function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
+    //     if (address(legacyBridge) != address(0)) {
+    //         revert AddressAlreadyUsed(address(legacyBridge));
+    //     }
+    //     if (_legacyBridge == address(0)) {
+    //         revert ZeroAddress();
+    //     }
+    //     legacyBridge = IL1ERC20Bridge(_legacyBridge);
+    // }
 
     /// @param _legacyBridge The address of the legacy bridge.
     // function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
@@ -390,7 +381,7 @@ contract L1AssetRouter is
         bytes32 _assetId,
         bytes calldata _transferData
     ) external view returns (bytes32 txDataHash) {
-        return _encodeTxDataHash(_encodingVersion, _prevMsgSender, _assetId, _transferData);
+        return DataEncoding.encodeTxDataHash(_encodingVersion, _prevMsgSender, _assetId, address(nativeTokenVault), _transferData);
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
@@ -441,21 +432,6 @@ contract L1AssetRouter is
         L2TransactionRequestDirect calldata _request
     ) external payable override onlyNullifier nonReentrant whenNotPaused returns (bytes32 l2TxHash) {
         return BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(_request);
-    }
-
-    /// @notice Decodes the transfer input for legacy data and transfers allowance to NTV.
-    /// @dev Is not applicable for custom asset handlers.
-    /// @param _data The encoded transfer data (address _l1Token, uint256 _depositAmount, address _l2Receiver).
-    /// @param _prevMsgSender The address of the deposit initiator.
-    /// @return Tuple of asset ID and encoded transfer data to conform with new encoding standard.
-    function _handleLegacyData(bytes calldata _data, address _prevMsgSender) internal returns (bytes32, bytes memory) {
-        (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
-            _data,
-            (address, uint256, address)
-        );
-        bytes32 assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-        _transferAllowanceToNTV(assetId, _depositAmount, _prevMsgSender);
-        return (assetId, abi.encode(_depositAmount, _l2Receiver));
     }
 
     /// @notice Finalize the withdrawal and release funds.
@@ -620,27 +596,7 @@ contract L1AssetRouter is
     }
 
 
-    /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
-    /// @param _encodingVersion EncodingVersion.
-    /// @param _prevMsgSender The address of the entity that initiated the deposit.
-    /// @param _assetId The unique identifier of the deposited L1 token.
-    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
-    /// @return txDataHash The resulting encoded transaction data hash.
-    function _encodeTxDataHash(
-        bytes1 _encodingVersion,
-        address _prevMsgSender,
-        bytes32 _assetId,
-        bytes memory _transferData
-    ) internal view returns (bytes32 txDataHash) {
-        if (_encodingVersion == LEGACY_ENCODING_VERSION) {
-            (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
-            txDataHash = keccak256(abi.encode(_prevMsgSender, nativeTokenVault.tokenAddress(_assetId), depositAmount));
-        } else {
-            // Similarly to calldata, the txDataHash is collision-resistant.
-            // In the legacy data hash, the first encoded variable was the address, which is padded with zeros during `abi.encode`.
-            txDataHash = keccak256(bytes.concat(_encodingVersion, abi.encode(_prevMsgSender, _assetId, _transferData)));
-        }
-    } // kl todo this function
+
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE
