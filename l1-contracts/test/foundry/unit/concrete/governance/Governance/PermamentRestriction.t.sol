@@ -160,16 +160,12 @@ contract PermanentRestrictionTest is Test {
         vm.stopPrank();
 
         owner = makeAddr("owner");
-
         hyperchain = chainContractAddress.getHyperchain(chainId);
-        console.log(hyperchain);
         uint256 id = IZkSyncHyperchain(hyperchain).getChainId();
         permRestriction = new PermanentRestriction(owner, iBridgehub);
-
         restriction = new AccessControlRestriction(0, owner);
         address[] memory restrictions = new address[](1);
         restrictions[0] = address(restriction);
-
         chainAdmin = new ChainAdmin(restrictions);
     }
 
