@@ -346,13 +346,7 @@ contract PermanentRestrictionTest is Test {
             _initData: abi.encode(_diamondCut)
         });
     }
-    // uint256 _chainId,
-    // address _stateTransitionManager,
-    // address _baseToken,
-    // // solhint-disable-next-line no-unused-vars
-    // uint256 _salt,
-    // address _admin,
-    // bytes calldata _initData
+
     function gettersSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](29);
         selectors[0] = GettersFacet.getVerifier.selector;
