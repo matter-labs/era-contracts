@@ -117,10 +117,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _data
-    ) external payable override onlyBridge whenNotPaused returns (address l1Receiver) {
+    ) external payable override onlyBridge whenNotPaused {
         // here we are minting the tokens after the bridgeBurn has happened on an L2, so we can assume the l1Token is not zero
         address l1Token = tokenAddress[_assetId];
         uint256 amount;
+        address l1Receiver;
         (amount, l1Receiver) = abi.decode(_data, (uint256, address));
         // Check that the chain has sufficient balance
         if (chainBalance[_chainId][l1Token] < amount) {

@@ -280,7 +280,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @param _chainId the chainId of the chain
     /// @param _newLastBatch the new last batch
     function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
-        IZkSyncHyperchain(getHyperchain(_chainId)).revertBatches(_newLastBatch);
+        IZkSyncHyperchain(getHyperchain(_chainId)).revertBatchesSharedBridge(_chainId, _newLastBatch);
     }
 
     /// @dev execute predefined upgrade

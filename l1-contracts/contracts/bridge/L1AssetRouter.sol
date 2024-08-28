@@ -623,7 +623,6 @@ contract L1AssetRouter is
             (assetId, transferData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
         }
         address l1AssetHandler = assetHandlerAddress[assetId];
-        // slither-disable-next-line unused-return
         IL1AssetHandler(l1AssetHandler).bridgeMint(_chainId, assetId, transferData);
         (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
 

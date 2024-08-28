@@ -25,11 +25,7 @@ interface IL1AssetHandler {
     /// @param _chainId the chainId that the message is from
     /// @param _assetId the assetId of the asset being bridged
     /// @param _data the actual data specified for the function
-    function bridgeMint(
-        uint256 _chainId,
-        bytes32 _assetId,
-        bytes calldata _data
-    ) external payable returns (address l1Receiver);
+    function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable;
 
     /// @param _chainId the chainId that the message will be sent to
     /// @param _l2Value the msg.value of the L2 transaction

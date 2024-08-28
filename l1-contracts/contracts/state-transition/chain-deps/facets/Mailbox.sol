@@ -20,7 +20,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER} from "../../../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_PROOF_METADATA_VERSION} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../../common/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/interfaces/IL1AssetRouter.sol";
@@ -126,13 +126,44 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     ) public view returns (bool) {}
 
     function _parseProofMetadata(
-        bytes32 _proofMetadata
-    ) internal pure returns (uint256 logLeafProofLen, uint256 batchLeafProofLen) {
-        bytes1 metadataVersion = bytes1(_proofMetadata[0]);
-        require(metadataVersion == 0x01, "Mailbox: unsupported proof metadata version");
+        bytes32[] calldata _proof
+    ) internal pure returns (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) {
+        bytes32 proofMetadata = _proof[0];
 
-        logLeafProofLen = uint256(uint8(_proofMetadata[1]));
-        batchLeafProofLen = uint256(uint8(_proofMetadata[2]));
+        // We support two formats of the proofs:
+        // 1. The old format, where `_proof` is just a plain Merkle proof.
+        // 2. The new format, where the first element of the `_proof` is encoded metadata, which consists of the following:
+        // - first byte: metadata version (0x01).
+        // - second byte: length of the log leaf proof (the proof that the log belongs to a batch).
+        // - third byte: length of the batch leaf proof (the proof that the batch belongs to another settlement layer, if any).
+        // - the rest of the bytes are zeroes.
+        //
+        // In the future the old version will be disabled, and only the new version will be supported.
+        // For now, we need to support both for backwards compatibility. We distinguish between those based on whether the last 29 bytes are zeroes.
+        // It is safe, since the elements of the proof are hashes and are unlikely to have 29 zero bytes in them.
+
+        // We shift left by 3 bytes = 24 bits to remove the top 24 bits of the metadata.
+        uint256 metadataAsUint256 = (uint256(proofMetadata) << 24);
+
+        if (metadataAsUint256 == 0) {
+            // It is the new version
+            bytes1 metadataVersion = bytes1(proofMetadata);
+            require(
+                uint256(uint8(metadataVersion)) == SUPPORTED_PROOF_METADATA_VERSION,
+                "Mailbox: unsupported proof metadata version"
+            );
+
+            proofStartIndex = 1;
+            logLeafProofLen = uint256(uint8(proofMetadata[1]));
+            batchLeafProofLen = uint256(uint8(proofMetadata[2]));
+        } else {
+            // It is the old version
+
+            // The entire proof is a merkle path
+            proofStartIndex = 0;
+            logLeafProofLen = _proof.length;
+            batchLeafProofLen = 0;
+        }
     }
 
     function extractSlice(
@@ -178,8 +209,8 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         uint256 ptr = 0;
         bytes32 chainIdLeaf;
         {
-            (uint256 logLeafProofLen, uint256 batchLeafProofLen) = _parseProofMetadata(_proof[ptr]);
-            ++ptr;
+            (uint256 proofStartIndex, uint256 logLeafProofLen, uint256 batchLeafProofLen) = _parseProofMetadata(_proof);
+            ptr = proofStartIndex;
 
             bytes32 batchSettlementRoot = Merkle.calculateRootMemory(
                 extractSlice(_proof, ptr, ptr + logLeafProofLen),
