@@ -10,8 +10,8 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 
-import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
-import {IAssetRouterBase} from "../bridge/interfaces/IAssetRouterBase.sol";
+import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";

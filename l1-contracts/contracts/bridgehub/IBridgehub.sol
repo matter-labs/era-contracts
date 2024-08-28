@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {IAssetRouterBase} from "../bridge/interfaces/IAssetRouterBase.sol";
+import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IAssetHandler} from "../bridge/interfaces/IAssetHandler.sol";
 import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 

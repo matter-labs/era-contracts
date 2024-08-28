@@ -3,8 +3,8 @@
 pragma solidity 0.8.24;
 
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../L2ContractAddresses.sol";
-import {LEGACY_ENCODING_VERSION} from "../../bridge/interfaces/IL1AssetRouter.sol";
-import {INativeTokenVault} from "../../bridge/interfaces/INativeTokenVault.sol";
+import {LEGACY_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
+import {INativeTokenVault} from "../../bridge/ntv/INativeTokenVault.sol";
 
 /**
  * @author Matter Labs

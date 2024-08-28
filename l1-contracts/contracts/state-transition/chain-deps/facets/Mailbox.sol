@@ -25,7 +25,7 @@ import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../../common/L2ContractAddresses.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_PROOF_METADATA_VERSION} from "../../../common/Config.sol";
 
-import {IL1AssetRouter} from "../../../bridge/interfaces/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "../../../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1Nullifier, FinalizeWithdrawalParams} from "../../../bridge/interfaces/IL1Nullifier.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
@@ -654,7 +654,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
                 refundRecipient: _refundRecipient
             })
         );
-        IL1AssetRouter(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
+        IAssetRouterBase(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
             s.baseTokenAssetId,
             msg.sender,

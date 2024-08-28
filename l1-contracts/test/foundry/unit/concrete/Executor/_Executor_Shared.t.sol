@@ -27,7 +27,7 @@ import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {RollupL1DAValidator} from "da-contracts/RollupL1DAValidator.sol";
-import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;

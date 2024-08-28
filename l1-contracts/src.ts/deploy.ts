@@ -653,7 +653,12 @@ export class Deployer {
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const contractAddress = await this.deployViaCreate2(
       dummy ? "DummyL1ERC20Bridge" : "L1ERC20Bridge",
-      [this.addresses.Bridges.L1NullifierProxy, this.addresses.Bridges.SharedBridgeProxy, this.addresses.Bridges.NativeTokenVaultProxy, eraChainId],
+      [
+        this.addresses.Bridges.L1NullifierProxy,
+        this.addresses.Bridges.SharedBridgeProxy,
+        this.addresses.Bridges.NativeTokenVaultProxy,
+        eraChainId,
+      ],
       create2Salt,
       ethTxOptions
     );
@@ -666,14 +671,14 @@ export class Deployer {
   }
 
   public async setParametersSharedBridge() {
-  //   const sharedBridge = L1AssetRouterFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
-  //   const data1 = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
-  //     this.addresses.Bridges.ERC20BridgeProxy,
-  //   ]);
-  //   await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data1);
-  //   if (this.verbose) {
-  //     console.log("Shared bridge updated with ERC20Bridge address");
-  //   }
+    //   const sharedBridge = L1AssetRouterFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
+    //   const data1 = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
+    //     this.addresses.Bridges.ERC20BridgeProxy,
+    //   ]);
+    //   await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data1);
+    //   if (this.verbose) {
+    //     console.log("Shared bridge updated with ERC20Bridge address");
+    //   }
   } // kl todo
 
   public async executeDirectOrGovernance(
@@ -814,10 +819,7 @@ export class Deployer {
     this.addresses.Bridges.ERC20BridgeProxy = contractAddress;
   }
 
-  public async deployL1NullifierImplementation(
-    create2Salt: string,
-    ethTxOptions: ethers.providers.TransactionRequest
-  ) {
+  public async deployL1NullifierImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const tokens = getTokens();
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
@@ -839,10 +841,7 @@ export class Deployer {
   public async deployL1NullifierProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const initCalldata = new Interface(hardhat.artifacts.readArtifactSync("L1Nullifier").abi).encodeFunctionData(
       "initialize",
-      [
-        this.addresses.Governance,
-        1, 1, 1, 0
-      ]
+      [this.addresses.Governance, 1, 1, 1, 0]
     );
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
@@ -908,7 +907,14 @@ export class Deployer {
     const wrappedTokenProxyBytecode = ethers.constants.HashZero; // kl todo // getAddressFromEnv("CONTRACTS_L1_WRAPPED_TOKEN_PROXY_BYTECODE");
     const contractAddress = await this.deployViaCreate2(
       "L1NativeTokenVault",
-      [l1WethToken, this.addresses.Bridges.SharedBridgeProxy, eraChainId, this.addresses.Bridges.L1NullifierProxy, wrappedTokenProxyBytecode, ETH_ADDRESS_IN_CONTRACTS],
+      [
+        l1WethToken,
+        this.addresses.Bridges.SharedBridgeProxy,
+        eraChainId,
+        this.addresses.Bridges.L1NullifierProxy,
+        wrappedTokenProxyBytecode,
+        ETH_ADDRESS_IN_CONTRACTS,
+      ],
       create2Salt,
       ethTxOptions
     );

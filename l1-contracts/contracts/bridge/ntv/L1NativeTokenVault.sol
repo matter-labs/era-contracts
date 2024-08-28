@@ -12,23 +12,24 @@ import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
-import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
-import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
+import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
+import {INativeTokenVault} from "./INativeTokenVault.sol";
+import {NativeTokenVault} from "./NativeTokenVault.sol";
+
+import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
+
+import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 // import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
 // import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
-import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
-import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
+import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 
 // import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
-import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 // import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 // import {BridgeHelper} from "./BridgeHelper.sol";
 
-import {NativeTokenVault} from "./NativeTokenVault.sol";
-
-import {Unauthorized, ZeroAddress, NoFundsTransferred, ValueMismatch, TokensWithFeesNotSupported, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, InsufficientChainBalance, WithdrawFailed} from "../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress, NoFundsTransferred, ValueMismatch, TokensWithFeesNotSupported, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

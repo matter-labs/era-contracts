@@ -11,10 +11,13 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
+import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./asset-router/IAssetRouterBase.sol";
+import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
+
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
-import {IL1AssetRouter, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./interfaces/IL1AssetRouter.sol";
+import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "./asset-router/IAssetRouterBase.sol";
 import {IL1Nullifier, FinalizeWithdrawalParams} from "./interfaces/IL1Nullifier.sol";
-import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
 
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {L2Message, TxStatus} from "../common/Messaging.sol";
@@ -284,16 +287,22 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             // If the dataHash matches the legacy transaction hash, skip the next step.
             // Otherwise, perform the check using the new transaction data hash encoding.
             if (!isLegacyTxDataHash) {
-                bytes32 txDataHash = DataEncoding.encodeTxDataHash(NEW_ENCODING_VERSION, _depositSender, _assetId, address(0), _assetData);
+                bytes32 txDataHash = DataEncoding.encodeTxDataHash(
+                    NEW_ENCODING_VERSION,
+                    _depositSender,
+                    _assetId,
+                    address(0),
+                    _assetData
+                );
                 if (dataHash != txDataHash) {
                     revert DepositDoesNotExist();
                 }
             }
         }
-        delete depositHappened[_chainId][_l2TxHash];    
+        delete depositHappened[_chainId][_l2TxHash];
     }
 
-        // /// @dev Determines if the provided data for a failed deposit corresponds to a legacy failed deposit.
+    // /// @dev Determines if the provided data for a failed deposit corresponds to a legacy failed deposit.
     // /// @param _prevMsgSender The address of the entity that initiated the deposit.
     // /// @param _assetId The unique identifier of the deposited L1 token.
     // /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
@@ -314,7 +323,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     //     }
     // }
 
-        /// @dev Determines if the provided data for a failed deposit corresponds to a legacy failed deposit.
+    /// @dev Determines if the provided data for a failed deposit corresponds to a legacy failed deposit.
     /// @param _prevMsgSender The address of the entity that initiated the deposit.
     /// @param _assetId The unique identifier of the deposited L1 token.
     /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
@@ -699,7 +708,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         }
 
         {
-            bytes memory l2TxCalldata = l1AssetRouter.getDepositL2Calldata(
+            bytes memory l2TxCalldata = IAssetRouterBase(address(l1AssetRouter)).getDepositL2Calldata(
                 ERA_CHAIN_ID,
                 _prevMsgSender,
                 _assetId,

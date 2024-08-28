@@ -7,8 +7,8 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
-import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
-import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
+import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
+import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -265,7 +265,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     //         _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
     //         _refundRecipient: address(0)
     //     });
-    // } // kl todo 
+    // } // kl todo
 
     /// @notice Finalize the withdrawal and release funds
     /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
@@ -355,7 +355,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     //         l1Token: _l1Token,
     //         amount: _amount
     //     });
-    // } // kl todo 
+    // } // kl todo
 
     /// @dev Transfers tokens from the depositor address to the shared bridge address.
     /// @return The difference between the contract balance before and after the transferring of funds.

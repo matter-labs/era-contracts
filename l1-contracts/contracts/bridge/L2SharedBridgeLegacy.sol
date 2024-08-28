@@ -11,8 +11,8 @@ import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_AD
 import {SystemContractsCaller} from "../common/libraries/SystemContractsCaller.sol";
 import {L2ContractHelper, IContractDeployer} from "../common/libraries/L2ContractHelper.sol";
 
-import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
-import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
+import {IL2AssetRouter} from "./asset-router/IL2AssetRouter.sol";
+import {IL2NativeTokenVault} from "./ntv/IL2NativeTokenVault.sol";
 
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
 import {ZeroAddress, EmptyBytes32, Unauthorized, AmountMustBeGreaterThanZero, DeployFailed} from "../common/L1ContractErrors.sol";

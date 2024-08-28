@@ -12,7 +12,7 @@ import {L2_MESSENGER} from "../L2ContractAddresses.sol";
  * @custom:security-contact security@matterlabs.dev
  * @notice Interface for the contract that is used to deploy contracts on L2.
  */
- interface IContractDeployer {
+interface IContractDeployer {
     /// @notice A struct that describes a forced deployment on an address.
     /// @param bytecodeHash The bytecode hash to put on an address.
     /// @param newAddress The address on which to deploy the bytecodehash to.

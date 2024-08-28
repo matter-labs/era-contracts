@@ -13,21 +13,21 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
-import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
-import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
-import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
+import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
+import {INativeTokenVault} from "./INativeTokenVault.sol";
+import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
+import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 // import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {BridgedStandardERC20} from "./BridgedStandardERC20.sol";
+import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 // import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
-import {BridgeHelper} from "./BridgeHelper.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../../common/L2ContractAddresses.sol";
+import {BridgeHelper} from "../BridgeHelper.sol";
 
-import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
+import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 
-import {EmptyAddress, EmptyDeposit,Unauthorized,TokensWithFeesNotSupported, TokenNotSupported,NonEmptyMsgValue,ZeroAddress, EmptyBytes32,ValueMismatch,WithdrawFailed,InsufficientChainBalance, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../common/L1ContractErrors.sol";
+import {EmptyAddress, EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ZeroAddress, EmptyBytes32, ValueMismatch, WithdrawFailed, InsufficientChainBalance, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -64,7 +64,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridge() {
-        if(msg.sender == address(ASSET_ROUTER)){
+        if (msg.sender == address(ASSET_ROUTER)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -227,7 +227,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
                 // The token has non-standard transfer logic
                 if (amount != expectedDepositAmount) {
                     revert TokensWithFeesNotSupported();
-                }        
+                }
             }
             if (amount == 0) {
                 // empty deposit amount

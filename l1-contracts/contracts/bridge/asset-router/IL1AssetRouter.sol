@@ -4,23 +4,13 @@ pragma solidity ^0.8.21;
 
 import {L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
-import {IL1Nullifier} from "./IL1Nullifier.sol";
+import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 // import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
-
-
-    /// @dev The encoding version used for new txs.
-    bytes1 constant LEGACY_ENCODING_VERSION = 0x00;
-
-    /// @dev The encoding version used for legacy txs.
-    bytes1 constant NEW_ENCODING_VERSION = 0x01;
-
-    /// @dev The encoding version used for txs that set the asset handler on the counterpart contract.
-    bytes1 constant SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION = 0x02;
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL1AssetRouter is IAssetRouterBase {
+interface IL1AssetRouter {
     event BridgehubMintData(bytes bridgeMintData);
 
     event BridgehubDepositFinalized(
@@ -54,13 +44,6 @@ interface IL1AssetRouter is IAssetRouterBase {
         bytes32 indexed assetId,
         address indexed assetDeploymentTracker,
         bytes32 indexed additionalData
-    );
-
-    event AssetHandlerRegisteredInitial(
-        bytes32 indexed assetId,
-        address indexed assetHandlerAddress,
-        bytes32 indexed additionalData,
-        address sender
     );
 
     // function isWithdrawalFinalized(
@@ -120,7 +103,11 @@ interface IL1AssetRouter is IAssetRouterBase {
 
     function setAssetDeploymentTracker(bytes32 _assetRegistrationData, address _assetDeploymentTracker) external;
 
-    function setAssetHandlerAddressThisChain(bytes32 _additionalData, address _assetHandlerAddress) external;
+    // function setAssetHandlerAddressThisChain(bytes32 _additionalData, address _assetHandlerAddress) external;
+
+    /// @dev Used to set the assedAddress for a given assetId.
+    /// @dev Will be used by ZK Gateway
+    function setAssetHandlerAddress(address _sender, bytes32 _assetId, address _assetAddress) external;
 
     function setL1Nullifier(IL1Nullifier _l1Nullifier) external;
 

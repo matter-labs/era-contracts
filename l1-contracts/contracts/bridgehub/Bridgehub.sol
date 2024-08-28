@@ -10,8 +10,8 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
-import {IAssetRouterBase} from "../bridge/interfaces/IAssetRouterBase.sol";
-// import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+// import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 import {IL1BaseTokenAssetHandler} from "../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";

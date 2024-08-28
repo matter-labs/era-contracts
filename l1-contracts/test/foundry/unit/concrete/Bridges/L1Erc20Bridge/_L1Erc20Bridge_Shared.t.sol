@@ -7,13 +7,13 @@ import {Test} from "forge-std/Test.sol";
 
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
-import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {FeeOnTransferToken} from "contracts/dev-contracts/FeeOnTransferToken.sol";
 import {ReenterL1ERC20Bridge} from "contracts/dev-contracts/test/ReenterL1ERC20Bridge.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {Utils} from "../../Utils/Utils.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 
 contract L1Erc20BridgeTest is Test {
     L1ERC20Bridge internal bridge;

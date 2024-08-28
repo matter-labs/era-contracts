@@ -4,8 +4,8 @@ pragma solidity 0.8.24;
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
-import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
-import {IL1AssetRouter} from "./IL1AssetRouter.sol";
+import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
+import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 
 /// @param chainId The chain ID of the transaction to check.
 /// @param l2BatchNumber The L2 batch number where the withdrawal was processed.

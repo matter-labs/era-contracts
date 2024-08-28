@@ -3,8 +3,8 @@
 pragma solidity 0.8.24;
 
 import {L1ERC20Bridge} from "../bridge/L1ERC20Bridge.sol";
-import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
-import {IL1NativeTokenVault} from "../bridge/interfaces/IL1NativeTokenVault.sol";
+import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
+import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 
 contract DummyL1ERC20Bridge is L1ERC20Bridge {

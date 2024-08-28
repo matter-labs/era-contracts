@@ -10,33 +10,32 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {IL1AssetRouter, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./interfaces/IL1AssetRouter.sol";
-import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
-import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
+import {IL1AssetRouter} from "./IL1AssetRouter.sol";
+import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
+import {AssetRouterBase} from "./AssetRouterBase.sol";
+
+import {IL2Bridge} from "../interfaces/IL2Bridge.sol";
 // import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
-import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
-import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
-import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
-import {IL1NativeTokenVault} from "./interfaces/IL1NativeTokenVault.sol";
+import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
+import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
+import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
+import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 // import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
 // import {IL1SharedBridgeLegacy} from "./interfaces/IL1SharedBridgeLegacy.sol";
 
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 // import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
+import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../../common/L2ContractAddresses.sol";
+import {AssetIdNotSupported, Unauthorized, ZeroAddress, SharedBridgeKey, TokenNotSupported, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet} from "../../common/L1ContractErrors.sol";
+import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 
-import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
-import {L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
-
-import {AssetRouterBase} from "./AssetRouterBase.sol";
+import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
 
 // import {BridgeHelper} from "./BridgeHelper.sol";
 
-import {IL1AssetDeploymentTracker} from "../bridge/interfaces/IL1AssetDeploymentTracker.sol";
-
-import {AssetIdNotSupported, Unauthorized, ZeroAddress, SharedBridgeKey, TokenNotSupported, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet} from "../common/L1ContractErrors.sol";
+import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -49,9 +48,6 @@ contract L1AssetRouter is
 {
     using SafeERC20 for IERC20;
 
-    /// @dev Era's chainID
-    uint256 internal immutable ERA_CHAIN_ID;
-
     /// @dev The address of ZKsync Era diamond proxy contract.
     address internal immutable ERA_DIAMOND_PROXY;
 
@@ -61,6 +57,13 @@ contract L1AssetRouter is
     /// @notice Checks that the message sender is the nullifier.
     modifier onlyNullifier() {
         if (msg.sender != address(nullifierStorage)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    modifier onlyNullifierWithSender(address _expectedSender, address _prevMsgSender) {
+        if (msg.sender != address(nullifierStorage) || _expectedSender != _prevMsgSender) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -88,9 +91,8 @@ contract L1AssetRouter is
         address _bridgehub,
         uint256 _eraChainId,
         address _eraDiamondProxy
-    ) reentrancyGuardInitializer AssetRouterBase(IBridgehub(_bridgehub), ETH_TOKEN_ADDRESS) {
+    ) reentrancyGuardInitializer AssetRouterBase(_eraChainId, IBridgehub(_bridgehub), ETH_TOKEN_ADDRESS) {
         _disableInitializers();
-        ERA_CHAIN_ID = _eraChainId;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;
     }
 
@@ -98,9 +100,7 @@ contract L1AssetRouter is
     /// @dev Used for testing purposes only, as the contract has been initialized on mainnet.
     /// @param _owner The address which can change L2 token implementation and upgrade the bridge implementation.
     /// The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    function initialize(
-        address _owner
-    ) external reentrancyGuardInitializer initializer {
+    function initialize(address _owner) external reentrancyGuardInitializer initializer {
         if (_owner == address(0)) {
             revert ZeroAddress();
         }
@@ -158,25 +158,13 @@ contract L1AssetRouter is
         emit AssetDeploymentTrackerSet(assetId, _assetDeploymentTracker, _assetRegistrationData);
     }
 
-    /// @notice Sets the asset handler address for a specified asset ID on the chain of the asset deployment tracker.
-    /// @dev The caller of this function is encoded within the `assetId`, therefore, it should be invoked by the asset deployment tracker contract.
-    /// @dev Typically, for most tokens, ADT is the native token vault. However, custom tokens may have their own specific asset deployment trackers.
-    /// @dev `setAssetHandlerAddressOnCounterpart` should be called on L1 to set asset handlers on L2 chains for a specific asset ID.
-    /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
-    /// @param _assetHandlerAddress The address of the asset handler to be set for the provided asset.
-    function setAssetHandlerAddressThisChain(
-        bytes32 _assetRegistrationData,
-        address _assetHandlerAddress
-    ) external override(IL1AssetRouter, AssetRouterBase) {
-        bool senderIsNTV = msg.sender == address(nativeTokenVault);
-        address sender = senderIsNTV ? L2_NATIVE_TOKEN_VAULT_ADDRESS : msg.sender;
-        bytes32 assetId = DataEncoding.encodeAssetId(block.chainid, _assetRegistrationData, sender);
-        require(senderIsNTV || msg.sender == assetDeploymentTracker[assetId], "ShB: not NTV or ADT");
-        assetHandlerAddress[assetId] = _assetHandlerAddress;
-        if (senderIsNTV) {
-            assetDeploymentTracker[assetId] = msg.sender;
-        }
-        emit AssetHandlerRegisteredInitial(assetId, _assetHandlerAddress, _assetRegistrationData, sender);
+    ///  @inheritdoc IL1AssetRouter
+    function setAssetHandlerAddress(
+        address _prevMsgSender,
+        bytes32 _assetId,
+        address _assetAddress
+    ) external onlyNullifierWithSender(L2_ASSET_ROUTER_ADDR, _prevMsgSender) {
+        _setAssetHandlerAddress(_assetId, _assetAddress);
     }
 
     /// @notice Used to set the asset handler address for a given asset ID on a remote ZK chain
@@ -190,7 +178,7 @@ contract L1AssetRouter is
         address _prevMsgSender,
         bytes32 _assetId,
         address _assetHandlerAddressOnCounterpart
-    ) internal returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal view override returns (L2TransactionRequestTwoBridgesInner memory request) {
         IL1AssetDeploymentTracker(assetDeploymentTracker[_assetId]).bridgeCheckCounterpartAddress(
             _chainId,
             _assetId,
@@ -211,95 +199,19 @@ contract L1AssetRouter is
         });
     }
 
-    /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
-    /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
-    /// @param _chainId The chain ID of the ZK chain to which deposit.
-    /// @param _assetId The deposited asset ID.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    /// @param _amount The total amount of tokens to be bridged.
+    /*//////////////////////////////////////////////////////////////
+                            Start transaction Functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IAssetRouterBase
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,
         address _prevMsgSender,
         uint256 _amount
-    ) public payable virtual override(IAssetRouterBase, AssetRouterBase) onlyBridgehubOrEra(_chainId) whenNotPaused {
+    ) public payable virtual override onlyBridgehubOrEra(_chainId) whenNotPaused {
         _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
         super.bridgehubDepositBaseToken(_chainId, _assetId, _prevMsgSender, _amount);
-    }
-
-    /// @notice Initiates a deposit transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
-    /// @param _chainId The chain ID of the ZK chain to which deposit.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    /// @param _l2Value The L2 `msg.value` from the L1 -> L2 deposit transaction.
-    /// @param _data The calldata for the second bridge deposit.
-    /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
-    function bridgehubDeposit(
-        uint256 _chainId,
-        address _prevMsgSender,
-        uint256 _l2Value,
-        bytes calldata _data
-    )
-        external
-        payable
-        override(IAssetRouterBase, AssetRouterBase)
-        onlyBridgehub
-        whenNotPaused
-        returns (L2TransactionRequestTwoBridgesInner memory request)
-    {
-        bytes32 assetId;
-        bytes memory transferData;
-        bytes1 encodingVersion = _data[0];
-
-        // The new encoding ensures that the calldata is collision-resistant with respect to the legacy format.
-        // In the legacy calldata, the first input was the address, meaning the most significant byte was always `0x00`.
-        if (encodingVersion == SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION) {
-            (bytes32 _assetId, address _assetHandlerAddressOnCounterpart) = abi.decode(_data[1:], (bytes32, address));
-            return
-                _setAssetHandlerAddressOnCounterpart(
-                    _chainId,
-                    _prevMsgSender,
-                    _assetId,
-                    _assetHandlerAddressOnCounterpart
-                );
-        } else if (encodingVersion == NEW_ENCODING_VERSION) {
-            (assetId, transferData) = abi.decode(_data[1:], (bytes32, bytes));
-            require(
-                assetHandlerAddress[assetId] != address(nativeTokenVault),
-                "ShB: new encoding format not yet supported for NTV"
-            );
-        } else {
-            (assetId, transferData) = _handleLegacyData(_data, _prevMsgSender);
-        }
-
-        if (BRIDGE_HUB.baseTokenAssetId(_chainId) == assetId) {
-            revert AssetIdNotSupported(assetId);
-        }
-
-        bytes memory bridgeMintCalldata = _burn({
-            _chainId: _chainId,
-            _value: _l2Value,
-            _assetId: assetId,
-            _prevMsgSender: _prevMsgSender,
-            _transferData: transferData,
-            _passValue: true
-        });
-        bytes32 txDataHash = this.encodeTxDataHash(encodingVersion, _prevMsgSender, assetId, transferData);
-
-        request = _requestToBridge({
-            _chainId: block.chainid, // kl todo this chain?
-            _prevMsgSender: _prevMsgSender,
-            _assetId: assetId,
-            _bridgeMintCalldata: bridgeMintCalldata,
-            _txDataHash: txDataHash
-        });
-
-        emit BridgehubDepositInitiated({
-            chainId: _chainId,
-            txDataHash: txDataHash,
-            from: _prevMsgSender,
-            assetId: assetId,
-            bridgeMintCalldata: bridgeMintCalldata
-        });
     }
 
     // /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -348,41 +260,15 @@ contract L1AssetRouter is
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash
-    ) external override onlyBridgehub whenNotPaused {
+    ) external override(AssetRouterBase) onlyBridgehub whenNotPaused {
         nullifierStorage.bridgehubConfirmL2Transaction(_chainId, _txDataHash, _txHash);
     }
-
-    /// @notice Ensures that token is registered with native token vault.
-    /// @dev Only used when deposit is made with legacy data encoding format.
-    /// @param _l1Token The L1 token address which should be registered with native token vault.
-    /// @return assetId The asset ID of the token provided.
-    function _ensureTokenRegisteredWithNTV(address _l1Token) internal returns (bytes32 assetId) {
-        assetId = nativeTokenVault.getAssetId(block.chainid, _l1Token); // kl todo this chain?
-        if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
-            nativeTokenVault.registerToken(_l1Token);
-        }
-    } // kl todo fix function
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// @param _chainId The chain ID to which transfer failed.
     /// @param _depositSender The address of the deposit initiator.
     /// @param _assetId The address of the deposited L1 ERC20 token.
     /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
-
-    /// @dev Calls the internal `_encodeTxDataHash`. Used as a wrapped for try / catch case.
-    /// @param _encodingVersion The version of the encoding.
-    /// @param _prevMsgSender The address of the entity that initiated the deposit.
-    /// @param _assetId The unique identifier of the deposited L1 token.
-    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
-    /// @return txDataHash The resulting encoded transaction data hash.
-    function encodeTxDataHash(
-        bytes1 _encodingVersion,
-        address _prevMsgSender,
-        bytes32 _assetId,
-        bytes calldata _transferData
-    ) external view returns (bytes32 txDataHash) {
-        return DataEncoding.encodeTxDataHash(_encodingVersion, _prevMsgSender, _assetId, address(nativeTokenVault), _transferData);
-    }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// @param _chainId The ZK chain id to which deposit was initiated.
@@ -411,6 +297,39 @@ contract L1AssetRouter is
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetId, _assetData);
     }
 
+    /// @notice Decodes the transfer input for legacy data and transfers allowance to NTV.
+    /// @dev Is not applicable for custom asset handlers.
+    /// @param _data The encoded transfer data (address _l1Token, uint256 _depositAmount, address _l2Receiver).
+    /// @param _prevMsgSender The address of the deposit initiator.
+    /// @return Tuple of asset ID and encoded transfer data to conform with new encoding standard.
+    function _handleLegacyData(
+        bytes calldata _data,
+        address _prevMsgSender
+    ) internal override returns (bytes32, bytes memory) {
+        (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
+            _data,
+            (address, uint256, address)
+        );
+        bytes32 assetId = _ensureTokenRegisteredWithNTV(_l1Token);
+        _transferAllowanceToNTV(assetId, _depositAmount, _prevMsgSender);
+        return (assetId, abi.encode(_depositAmount, _l2Receiver));
+    }
+
+    /// @notice Ensures that token is registered with native token vault.
+    /// @dev Only used when deposit is made with legacy data encoding format.
+    /// @param _token The L1 token address which should be registered with native token vault.
+    /// @return assetId The asset ID of the token provided.
+    function _ensureTokenRegisteredWithNTV(address _token) internal returns (bytes32 assetId) {
+        assetId = nativeTokenVault.getAssetId(block.chainid, _token);
+        if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
+            nativeTokenVault.registerToken(_token);
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Receive transaction Functions
+    //////////////////////////////////////////////////////////////*/
+
     /// @notice Finalize the withdrawal and release funds.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _assetId The bridged asset ID.
@@ -419,12 +338,39 @@ contract L1AssetRouter is
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public override(AssetRouterBase, IAssetRouterBase) onlyNullifier returns (address l1Receiver, uint256 amount) {
+    ) public override onlyNullifier returns (address l1Receiver, uint256 amount) {
         (l1Receiver, amount) = super.finalizeDeposit(_chainId, _assetId, _transferData);
     }
 
     /*//////////////////////////////////////////////////////////////
-                     Legacy Functions & Helpers
+                     Internal & Helpers
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Transfers allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
+    /// @dev assetId is not the padded address, but the correct encoded id (NTV stores respective format for IDs)
+    /// @param _amount The asset amount to be transferred to native token vault.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    function _transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) internal {
+        address l1TokenAddress = nativeTokenVault.tokenAddress(_assetId);
+        if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
+            return;
+        }
+        IERC20 l1Token = IERC20(l1TokenAddress);
+
+        // Do the transfer if allowance to Shared bridge is bigger than amount
+        // And if there is not enough allowance for the NTV
+        if (
+            l1Token.allowance(_prevMsgSender, address(this)) >= _amount &&
+            l1Token.allowance(_prevMsgSender, address(nativeTokenVault)) < _amount
+        ) {
+            // slither-disable-next-line arbitrary-send-erc20
+            l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
+            l1Token.forceApprove(address(nativeTokenVault), _amount);
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                     Legacy Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Routes the request through l1 asset router, to minimize the number of addresses from with l2 asset router expects deposit.
@@ -456,6 +402,7 @@ contract L1AssetRouter is
 
         emit WithdrawalFinalizedAssetRouter(_chainId, l1Receiver, _assetId, amount);
     }
+
     // function bridgeRecoverFailedTransfer(
     //     uint256 _chainId,
     //     address _depositSender,
@@ -555,60 +502,5 @@ contract L1AssetRouter is
     // (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
 
     //     emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetId, amount);
-    // }
-
-    /// @notice Decodes the transfer input for legacy data and transfers allowance to NTV.
-    /// @dev Is not applicable for custom asset handlers.
-    /// @param _data The encoded transfer data (address _l1Token, uint256 _depositAmount, address _l2Receiver).
-    /// @param _prevMsgSender The address of the deposit initiator.
-    /// @return Tuple of asset ID and encoded transfer data to conform with new encoding standard.
-    function _handleLegacyData(bytes calldata _data, address _prevMsgSender) internal returns (bytes32, bytes memory) {
-        (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
-            _data,
-            (address, uint256, address)
-        );
-        bytes32 assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-        _transferAllowanceToNTV(assetId, _depositAmount, _prevMsgSender);
-        return (assetId, abi.encode(_depositAmount, _l2Receiver));
-    }
-
-    /// @notice Transfers allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
-    /// @dev assetId is not the padded address, but the correct encoded id (NTV stores respective format for IDs)
-    /// @param _amount The asset amount to be transferred to native token vault.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    function _transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) internal {
-        address l1TokenAddress = nativeTokenVault.tokenAddress(_assetId);
-        if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
-            return;
-        }
-        IERC20 l1Token = IERC20(l1TokenAddress);
-
-        // Do the transfer if allowance to Shared bridge is bigger than amount
-        // And if there is not enough allowance for the NTV
-        if (
-            l1Token.allowance(_prevMsgSender, address(this)) >= _amount &&
-            l1Token.allowance(_prevMsgSender, address(nativeTokenVault)) < _amount
-        ) {
-            // slither-disable-next-line arbitrary-send-erc20
-            l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
-            l1Token.forceApprove(address(nativeTokenVault), _amount);
-        }
-    }
-
-
-
-
-    /*//////////////////////////////////////////////////////////////
-                            PAUSE
-    //////////////////////////////////////////////////////////////*/
-
-    // /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
-    // function pause() external onlyOwner {
-    //     _pause();
-    // }
-
-    // /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
-    // function unpause() external onlyOwner {
-    //     _unpause();
     // }
 }

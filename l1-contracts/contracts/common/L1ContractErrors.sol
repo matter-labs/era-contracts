@@ -297,6 +297,7 @@ error UnexpectedNumberOfFactoryDeps();
 error UnexpectedSystemLog(uint256 logKey);
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
+error UnsupportedEncodingVersion();
 // 0x47b3b145
 error ValidateTxnNotEnoughGas();
 // 0x626ade30
@@ -353,4 +354,3 @@ enum UpgradeTxVerifyParam {
 }
 
 string constant BRIDGE_MINT_NOT_IMPLEMENTED = "bridgeMint is not implemented! Use deposit/depositTo methods instead.";
-

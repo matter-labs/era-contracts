@@ -6,23 +6,24 @@ pragma solidity 0.8.24;
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
-import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
-import {INativeTokenVault} from "./interfaces/INativeTokenVault.sol";
-import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
+import {INativeTokenVault} from "./INativeTokenVault.sol";
+import {IL2NativeTokenVault} from "./IL2NativeTokenVault.sol";
+import {NativeTokenVault} from "./NativeTokenVault.sol";
+
+import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
+import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 // import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
+import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 
 // import {BridgedStandardERC20} from "./BridgedStandardERC20.sol";
-// import {IAssetRouterBase} from "l1-contracts-imported/bridge/interfaces/IAssetRouterBase.sol";
-import {NativeTokenVault} from "./NativeTokenVault.sol";
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
-import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
-import {L2ContractHelper, IContractDeployer} from "../common/libraries/L2ContractHelper.sol";
+// import {IAssetRouterBase} from "l1-contracts-imported/bridge/asset-router/IAssetRouterBase.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2ContractHelper.sol";
 
-import {BridgedStandardERC20} from "./BridgedStandardERC20.sol";
-import {SystemContractsCaller} from "../common/libraries/SystemContractsCaller.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../common/L1ContractErrors.sol";
+import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

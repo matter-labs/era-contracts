@@ -4,34 +4,30 @@ pragma solidity 0.8.24;
 
 import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
 
-import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
-import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
-import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
-import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
-import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
-import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
-import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
+import {IL2AssetRouter} from "./IL2AssetRouter.sol";
+import {IL1AssetRouter} from "./IL1AssetRouter.sol";
+import {IAssetRouterBase} from "./IAssetRouterBase.sol";
+import {AssetRouterBase} from "./AssetRouterBase.sol";
 
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {AssetRouterBase} from ".//AssetRouterBase.sol";
-import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_BRIDGEHUB_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
-import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {IL2NativeTokenVault, INativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
 
-import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero} from "../common/L1ContractErrors.sol";
+import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
+import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
+import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
+
+import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
+
+import {L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_BRIDGEHUB_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
-    /// @dev Chain ID of Era for legacy reasons
-    uint256 public immutable ERA_CHAIN_ID;
-
-    /// @dev Chain ID of L1 for bridging reasons
-    uint256 public immutable L1_CHAIN_ID;
-
     /// @dev The address of the L2 legacy shared bridge.
     address public immutable L2_LEGACY_SHARED_BRIDGE;
 
@@ -42,10 +38,14 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     // mapping(bytes32 assetId => address assetHandlerAddress) public override assetHandlerAddress;
 
     /// @notice Checks that the message sender is the L1 Asset Router.
-    modifier onlyL1AssetRouter() {
-        // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-        if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1AssetRouter) {
-            revert InvalidCaller(msg.sender);
+    modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
+        if (_originChainId == L1_CHAIN_ID) {
+            // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
+            if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1AssetRouter) {
+                revert InvalidCaller(msg.sender);
+            }
+        } else {
+            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
         }
         _;
     }
@@ -60,30 +60,39 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
 
     /// @dev Disable the initialization to prevent Parity hack.
     /// @param _l1AssetRouter The address of the L1 Bridge contract.
-    constructor(uint256 _l1ChainId, uint256 _eraChainId, address _l1AssetRouter, address _legacySharedBridge) AssetRouterBase(IBridgehub(L2_BRIDGEHUB_ADDR), L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR){
-        ERA_CHAIN_ID = _eraChainId;
-        L1_CHAIN_ID = _l1ChainId;
+    constructor(
+        uint256 _l1ChainId,
+        uint256 _eraChainId,
+        address _l1AssetRouter,
+        address _legacySharedBridge
+    ) AssetRouterBase(_eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR), L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR) {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
+        L1_CHAIN_ID = _l1ChainId;
         if (_l1AssetRouter == address(0)) {
             revert EmptyAddress();
         }
-
+        nativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDRESS);
         l1AssetRouter = _l1AssetRouter;
 
         _disableInitializers();
     }
 
-    /// @dev Used to set the assedAddress for a given assetId.
-    /// @dev Will be used by ZK Gateway
-    function setAssetHandlerAddress(bytes32 _assetId, address _assetAddress) external onlyL1AssetRouter {
-        assetHandlerAddress[_assetId] = _assetAddress;
-        emit AssetHandlerRegistered(_assetId, _assetAddress);
+    ///  @inheritdoc IL2AssetRouter
+    function setAssetHandlerAddress(
+        uint256 _originChainId,
+        bytes32 _assetId,
+        address _assetAddress
+    ) external onlyAssetRouterCounterpart(_originChainId) {
+        _setAssetHandlerAddress(_assetId, _assetAddress);
     }
 
     /// @notice Finalize the deposit and mint funds
     /// @param _assetId The encoding of the asset on L2
     /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken)
-    function finalizeDeposit(bytes32 _assetId, bytes memory _transferData) public override onlyL1AssetRouter {
+    function finalizeDeposit(
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) public override onlyAssetRouterCounterpart(L1_CHAIN_ID) {
         address assetHandler = assetHandlerAddress[_assetId];
         if (assetHandler != address(0)) {
             IAssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
@@ -136,7 +145,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IL1AssetRouter.finalizeWithdrawal.selector, _assetId, _l1bridgeMintData);
     }
-    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {}
 
     /*//////////////////////////////////////////////////////////////
                             LEGACY FUNCTIONS
@@ -155,7 +163,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external onlyL1AssetRouter {
+    ) external onlyAssetRouterCounterpart(L1_CHAIN_ID) {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         // solhint-disable-next-line func-named-parameters
         bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);
@@ -221,10 +229,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         // has not been deployed yet.
         return l2NativeTokenVault.calculateCreate2TokenAddress(_l1Token);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                            Legacy functions
-    //////////////////////////////////////////////////////////////*/
 
     /// @notice Returns the address of the L1 asset router.
     /// @dev The old name is kept for backward compatibility.

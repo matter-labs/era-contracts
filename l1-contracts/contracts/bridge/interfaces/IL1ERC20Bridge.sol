@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {IL1Nullifier} from "./IL1Nullifier.sol";
-import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
+import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 
 /// @title L1 Bridge contract legacy interface
 /// @author Matter Labs

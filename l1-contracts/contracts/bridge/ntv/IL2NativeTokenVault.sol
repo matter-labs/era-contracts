@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {INativeTokenVault} from ".././/interfaces/INativeTokenVault.sol";
+import {INativeTokenVault} from "./INativeTokenVault.sol";
 // import {IAssetHandler} from "./IAssetHandler.sol";
 
 /// @author Matter Labs

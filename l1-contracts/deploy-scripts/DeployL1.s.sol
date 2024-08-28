@@ -35,8 +35,8 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
 
 import {ISTMDeploymentTracker} from "contracts/bridgehub/ISTMDeploymentTracker.sol";
