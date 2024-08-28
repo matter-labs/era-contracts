@@ -156,11 +156,11 @@ contract PermanentRestrictionTest is Test {
         executorFacet = ExecutorFacet(address(newChainAddress));
         gettersFacet = GettersFacet(address(newChainAddress));
         adminFacet = AdminFacet(address(newChainAddress));
+
         vm.stopPrank();
 
         owner = makeAddr("owner");
 
-        iBridgehub = new Bridgehub();
         hyperchain = chainContractAddress.getHyperchain(chainId);
         console.log(hyperchain);
         uint256 id = IZkSyncHyperchain(hyperchain).getChainId();
@@ -208,8 +208,8 @@ contract PermanentRestrictionTest is Test {
     }
 
     function test_tryCompareAdminOfAChainNotAHyperchain() public {
-        //vm.expectRevert(ChainZeroAddress.selector);
-        permRestriction.tryCompareAdminOfAChain(makeAddr("Caller"), owner);
+        vm.expectRevert();
+        permRestriction.tryCompareAdminOfAChain(makeAddr("random"), owner);
     }
 
     function test_tryCompareAdminOfAChainNotAnAdmin() public {
@@ -266,7 +266,8 @@ contract PermanentRestrictionTest is Test {
 
     function test_validateCallSetPendingAdmin() public {
         vm.prank(owner);
-        permRestriction.allowAdminImplementation(address(chainAdmin).codehash , true);
+        permRestriction.allowAdminImplementation(address(chainAdmin).codehash, true);
+
         vm.prank(address(chainAdmin));
         chainAdmin.addRestriction(address(permRestriction));
 
@@ -336,17 +337,26 @@ contract PermanentRestrictionTest is Test {
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal {
         vm.stopPrank();
-        vm.startPrank(bridgehub);
-
-        chainContractAddress.createNewChain({
+        vm.startPrank(0x0000000000000000000000000000000000000000);
+        iBridgehub.addStateTransitionManager(address(chainContractAddress));
+        iBridgehub.addToken(baseToken);
+        iBridgehub.setSharedBridge(sharedBridge);
+        iBridgehub.createNewChain({
             _chainId: chainId,
+            _stateTransitionManager: address(chainContractAddress),
             _baseToken: baseToken,
-            _sharedBridge: sharedBridge,
+            _salt: 0,
             _admin: newChainAdmin,
-            _diamondCut: abi.encode(_diamondCut)
+            _initData: abi.encode(_diamondCut)
         });
     }
-
+    // uint256 _chainId,
+    // address _stateTransitionManager,
+    // address _baseToken,
+    // // solhint-disable-next-line no-unused-vars
+    // uint256 _salt,
+    // address _admin,
+    // bytes calldata _initData
     function gettersSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](29);
         selectors[0] = GettersFacet.getVerifier.selector;
