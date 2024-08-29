@@ -39,14 +39,11 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
 
     modifier onlySystemEvm() {
         require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender), "only system evm");
-        require(
-            SystemContractHelper.isSystemCall(),
-            "This method require system call flag"
-        );
+        require(SystemContractHelper.isSystemCall(), "This method require system call flag");
         _;
     }
 
-    function setDeployedCode(uint256 constructorGasLeft, bytes calldata paddedNewDeployedCode) onlySystemEvm external {
+    function setDeployedCode(uint256 constructorGasLeft, bytes calldata paddedNewDeployedCode) external onlySystemEvm {
         require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender));
 
         uint256 bytecodeLen = uint256(bytes32(paddedNewDeployedCode[:32]));

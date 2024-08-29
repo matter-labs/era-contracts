@@ -7,7 +7,6 @@ import {ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./Constants.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 
-
 // We consider all the contracts (including system ones) as warm.
 uint160 constant PRECOMPILES_END = 0xffff;
 
@@ -82,10 +81,7 @@ contract EvmGasManager {
 
     modifier onlySystemEvm() {
         require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender), "only system evm");
-        require(
-            SystemContractHelper.isSystemCall(),
-            "This method require system call flag"
-        );
+        require(SystemContractHelper.isSystemCall(), "This method require system call flag");
         _;
     }
 
@@ -130,13 +126,13 @@ contract EvmGasManager {
 
     */
 
-    function pushEVMFrame(uint256 _passGas, bool _isStatic) onlySystemEvm external {
+    function pushEVMFrame(uint256 _passGas, bool _isStatic) external onlySystemEvm {
         EVMStackFrameInfo memory frame = EVMStackFrameInfo({passGas: _passGas, isStatic: _isStatic});
 
         evmStackFrames.push(frame);
     }
 
-    function consumeEvmFrame() onlySystemEvm external returns (uint256 passGas, bool isStatic) {
+    function consumeEvmFrame() external onlySystemEvm returns (uint256 passGas, bool isStatic) {
         if (evmStackFrames.length == 0) return (INF_PASS_GAS, false);
 
         EVMStackFrameInfo memory frameInfo = evmStackFrames[evmStackFrames.length - 1];
@@ -148,7 +144,7 @@ contract EvmGasManager {
         evmStackFrames[evmStackFrames.length - 1].passGas = INF_PASS_GAS;
     }
 
-    function popEVMFrame() onlySystemEvm external {
+    function popEVMFrame() external onlySystemEvm {
         evmStackFrames.pop();
     }
 }
