@@ -21,7 +21,7 @@ contract PermanentRestrictionTest is StateTransitionManagerTest {
     ChainAdmin internal chainAdmin;
     AccessControlRestriction internal restriction;
     PermanentRestriction internal permRestriction;
-    
+
     address internal owner;
     address internal hyperchain;
 

@@ -5,11 +5,10 @@ import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract createNewChainTest is StateTransitionManagerTest {
-
     function setUp() public {
         deploy();
     }
-    
+
     function test_RevertWhen_InitialDiamondCutHashMismatch() public {
         Diamond.DiamondCutData memory initialDiamondCutData = getDiamondCutData(sharedBridge);
 

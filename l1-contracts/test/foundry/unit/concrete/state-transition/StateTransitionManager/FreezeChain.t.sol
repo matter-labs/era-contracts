@@ -5,11 +5,10 @@ import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
 contract freezeChainTest is StateTransitionManagerTest {
-
     function setUp() public {
         deploy();
     }
-    
+
     function test_FreezingChain() public {
         createNewChain(getDiamondCutData(diamondInit));
 
