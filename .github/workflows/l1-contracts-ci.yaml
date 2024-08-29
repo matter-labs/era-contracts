@@ -155,7 +155,7 @@ jobs:
       - name: Run tests
         run: yarn l1 test --no-compile
 
-  check-verifier-generator:
+  check-verifier-generator (L1):
     runs-on: ubuntu-latest
 
     steps:
