@@ -689,7 +689,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _prevMsgSender,
             bridgeData.chainData
         );
-        bridgehubMintData = abi.encode(bridgeData.chainId, stmMintData, chainMintData);
+        BridgehubMintSTMAssetData memory bridgeMintStruct = BridgehubMintSTMAssetData({
+            chainId: bridgeData.chainId,
+            stmData: stmMintData,
+            chainData: chainMintData
+        });
+        bridgehubMintData = abi.encode(bridgeMintStruct);
 
         emit MigrationStarted(bridgeData.chainId, _assetId, _settlementChainId);
     }

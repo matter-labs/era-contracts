@@ -342,7 +342,6 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         commitment.l2SystemContractsUpgradeBatchNumber = s.l2SystemContractsUpgradeBatchNumber;
         commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         commitment.priorityTree = s.priorityTree.getCommitment();
-        commitment.protocolVersion = s.protocolVersion;
 
         // just in case
         require(

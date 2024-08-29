@@ -150,6 +150,4 @@ struct HyperchainCommitment {
     bytes32[] batchHashes;
     /// @notice Commitment to the priority merkle tree.
     PriorityTreeCommitment priorityTree;
-    /// @notice Current active protocol version
-    uint256 protocolVersion;
 }
