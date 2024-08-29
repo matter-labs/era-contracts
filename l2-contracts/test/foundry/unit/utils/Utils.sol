@@ -13,7 +13,7 @@ library Utils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     Vm internal constant vm = Vm(VM_ADDRESS);
 
-    address constant L2_FORCE_DEPLOYER_ADDR = address(0x8007);
+    address internal constant L2_FORCE_DEPLOYER_ADDR = address(0x8007);
 
     string internal constant L2_ASSET_ROUTER_PATH = "./zkout/L2AssetRouter.sol/L2AssetRouter.json"; 
     string internal constant L2_NATIVE_TOKEN_VAULT_PATH = "./zkout/L2NativeTokenVault.sol/L2NativeTokenVault.json"; 
@@ -109,7 +109,14 @@ library Utils {
     ) internal {
         // to ensure that the bytecode is known
         {
-            new L2NativeTokenVault(_l1ChainId, _aliasedOwner, _l2TokenProxyBytecodeHash, _legacySharedBridge, _l2TokenBeacon, _contractsDeployedAlready);
+            new L2NativeTokenVault({
+                _l1ChainId: _l1ChainId, 
+                _aliasedOwner: _aliasedOwner, 
+                _l2TokenProxyBytecodeHash: _l2TokenProxyBytecodeHash, 
+                _legacySharedBridge: _legacySharedBridge, 
+                _l2TokenBeacon: _l2TokenBeacon, 
+                _contractsDeployedAlready: _contractsDeployedAlready
+            });
         }
 
         bytes memory bytecode = readEraBytecode("L2NativeTokenVault");
@@ -122,6 +129,7 @@ library Utils {
             newAddress: address(L2_NATIVE_TOKEN_VAULT),
             callConstructor: true,
             value: 0,
+            // solhint-disable-next-line func-named-parameters
             input: abi.encode(_l1ChainId, _aliasedOwner, _l2TokenProxyBytecodeHash, _legacySharedBridge, _l2TokenBeacon, _contractsDeployedAlready)
         });
 

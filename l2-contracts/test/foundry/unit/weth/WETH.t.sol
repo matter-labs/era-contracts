@@ -2,10 +2,6 @@
 
 pragma solidity 0.8.20;
 
-import {Vm} from "forge-std/Vm.sol";
-
-import {Script, console2 as console} from "forge-std/Script.sol";
-
 import {Test} from "forge-std/Test.sol";
 
 import { L2WrappedBaseToken } from "contracts/bridge/L2WrappedBaseToken.sol";
@@ -17,10 +13,10 @@ contract WethTest is Test {
     L2WrappedBaseToken internal weth;
 
     // The owner of the proxy
-    address ownerWallet = address(2);
+    address internal ownerWallet = address(2);
 
-    address l2BridgeAddress = address(3);
-    address l1Address = address(4);
+    address internal l2BridgeAddress = address(3);
+    address internal l1Address = address(4);
 
     function setUp() public {
         ownerWallet = makeAddr("owner");
