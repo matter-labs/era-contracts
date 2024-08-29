@@ -2,11 +2,13 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable gas-custom-errors, reason-string
+
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
@@ -14,7 +16,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTE
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {BatchNumberMismatch, TimeNotReached, TooManyBlobs, ValueMismatch, InvalidPubdataMode, InvalidPubdataLength, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, MissingSystemLogs, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, PointEvalFailed, EmptyBlobVersionHash, NonEmptyBlobVersionHash, BlobHashCommitmentError, CalldataLengthTooBig, InvalidPubdataHash, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, PubdataCommitmentsEmpty, PointEvalCallFailed, PubdataCommitmentsTooBig, InvalidPubdataCommitmentsSize} from "../../../common/L1ContractErrors.sol";
+import {BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -49,7 +51,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             revert BatchNumberMismatch(_previousBatch.batchNumber + 1, _newBatch.batchNumber);
         }
 
-        // Check that batch contain all meta information for L2 logs.
+        // Check that batch contains all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
@@ -225,14 +227,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             // FIXME: do restore this code to the one that was before
             require(_checkBit(processedLogs, uint8(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)), "b8");
         }
-    }
-
-    /// @inheritdoc IExecutor
-    function commitBatches(
-        StoredBatchInfo calldata _lastCommittedBatchData,
-        CommitBatchInfo[] calldata _newBatchesData
-    ) external nonReentrant onlyValidator {
-        _commitBatches(_lastCommittedBatchData, _newBatchesData);
     }
 
     /// @inheritdoc IExecutor
@@ -445,14 +439,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         _executeBatches(_batchesData, _priorityOpsData);
     }
 
-    /// @inheritdoc IExecutor
-    function executeBatches(
-        StoredBatchInfo[] calldata _batchesData,
-        PriorityOpsBatchInfo[] calldata _priorityOpsData
-    ) external nonReentrant onlyValidator {
-        _executeBatches(_batchesData, _priorityOpsData);
-    }
-
     function _executeBatches(
         StoredBatchInfo[] calldata _batchesData,
         PriorityOpsBatchInfo[] calldata _priorityOpsData
@@ -483,15 +469,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             delete s.l2SystemContractsUpgradeTxHash;
             delete s.l2SystemContractsUpgradeBatchNumber;
         }
-    }
-
-    /// @inheritdoc IExecutor
-    function proveBatches(
-        StoredBatchInfo calldata _prevBatch,
-        StoredBatchInfo[] calldata _committedBatches,
-        ProofInput calldata _proof
-    ) external nonReentrant onlyValidator {
-        _proveBatches(_prevBatch, _committedBatches, _proof);
     }
 
     /// @inheritdoc IExecutor
@@ -572,11 +549,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     ) internal pure returns (uint256) {
         return
             uint256(keccak256(abi.encodePacked(_prevBatchCommitment, _currentBatchCommitment))) >> PUBLIC_INPUT_SHIFT;
-    }
-
-    /// @inheritdoc IExecutor
-    function revertBatches(uint256 _newLastBatch) external nonReentrant onlyValidatorOrStateTransitionManager {
-        _revertBatches(_newLastBatch);
     }
 
     /// @inheritdoc IExecutor

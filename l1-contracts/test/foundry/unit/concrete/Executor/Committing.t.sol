@@ -72,7 +72,7 @@ contract CommittingTest is ExecutorTest {
                 keccak256(abi.encode(wrongGenesisStoredBatchInfo))
             )
         );
-        executor.commitBatches(wrongGenesisStoredBatchInfo, newCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), wrongGenesisStoredBatchInfo, newCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithWrongOrderOfBatches() public {
@@ -85,7 +85,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(abi.encodeWithSelector(BatchNumberMismatch.selector, uint256(1), uint256(2)));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithWrongNewBatchTimestamp() public {
@@ -110,7 +110,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
 
         vm.expectRevert(TimestampError.selector);
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithTooSmallNewBatchTimestamp() public {
@@ -135,7 +135,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
 
         vm.expectRevert(abi.encodeWithSelector(TimeNotReached.selector, 1, 2));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingTooBigLastL2BatchTimestamp() public {
@@ -160,7 +160,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
 
         vm.expectRevert(abi.encodeWithSelector(L2TimestampTooBig.selector));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithWrongPreviousBatchHash() public {
@@ -184,7 +184,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
 
         vm.expectRevert(abi.encodeWithSelector(HashMismatch.selector, wrongPreviousBatchHash, bytes32(0)));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     // function test_RevertWhen_CommittingWithoutProcessingSystemContextLog() public {
@@ -202,7 +202,7 @@ contract CommittingTest is ExecutorTest {
     //     vm.blobhashes(defaultBlobVersionedHashes);
 
     //     vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 8191, 8183));
-    //     executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+    //     executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     // }
 
     function test_RevertWhen_CommittingWithProcessingSystemContextLogTwice() public {
@@ -230,7 +230,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
 
         vm.expectRevert(abi.encodeWithSelector(LogAlreadyProcessed.selector, 3));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_UnexpectedL2ToL1Log() public {
@@ -258,7 +258,7 @@ contract CommittingTest is ExecutorTest {
                 uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)
             )
         );
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithWrongCanonicalTxHash() public {
@@ -282,7 +282,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(abi.encodeWithSelector(HashMismatch.selector, wrongChainedPriorityHash, keccak256("")));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithWrongNumberOfLayer1txs() public {
@@ -306,7 +306,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, uint256(bytes32(bytes1(0x01))), uint256(2)));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_CommittingWithUnknownSystemLogKey() public {
@@ -326,7 +326,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(abi.encodeWithSelector(UnexpectedSystemLog.selector, uint256(119)));
-        executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 
     function test_RevertWhen_SystemLogIsFromIncorrectAddress() public {
@@ -375,7 +375,7 @@ contract CommittingTest is ExecutorTest {
             vm.prank(validator);
 
             vm.expectRevert(abi.encodeWithSelector(InvalidLogSender.selector, wrongAddress, i));
-            executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+            executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
         }
     }
 
@@ -395,7 +395,7 @@ contract CommittingTest is ExecutorTest {
 
     //         uint256 allLogsProcessed = uint256(8191);
     //         vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 8191, allLogsProcessed ^ (1 << i)));
-    //         executor.commitBatches(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+    //         executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     //     }
     // }
 
@@ -461,7 +461,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
         vm.recordLogs();
 
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -497,7 +497,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.recordLogs();
 
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -562,7 +562,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.recordLogs();
 
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -586,7 +586,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(abi.encodeWithSelector(CanOnlyProcessOneBatch.selector));
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
     }
 
     // function test_RevertWhen_EmptyPubdataCommitments() public {
@@ -610,7 +610,7 @@ contract CommittingTest is ExecutorTest {
     //     vm.prank(validator);
 
     //     vm.expectRevert(PubdataCommitmentsEmpty.selector);
-    //     executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+    //     executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
     // }
 
     // function test_RevertWhen_PartialPubdataCommitment() public {
@@ -646,7 +646,7 @@ contract CommittingTest is ExecutorTest {
     //     vm.blobhashes(defaultBlobVersionedHashes);
 
     //     vm.expectRevert(InvalidPubdataCommitmentsSize.selector);
-    //     executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+    //     executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
     // }
 
     function test_RevertWhen_TooManyPubdataCommitments() public {
@@ -683,7 +683,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(InvalidPubdataCommitmentsSize.selector);
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
     }
 
     function test_RevertWhen_NotEnoughPubdataCommitments() public {
@@ -710,7 +710,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(versionedHashes);
 
         vm.expectRevert(abi.encodeWithSelector(NonEmptyBlobVersionHash.selector, uint256(1)));
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         vm.clearMockedCalls();
     }
@@ -736,7 +736,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(abi.encodeWithSelector(EmptyBlobVersionHash.selector, 0));
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         vm.clearMockedCalls();
     }
@@ -765,7 +765,7 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(blobVersionedHashes);
 
         vm.expectRevert(abi.encodeWithSelector(NonEmptyBlobVersionHash.selector, uint256(1)));
-        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         vm.clearMockedCalls();
     }
@@ -819,7 +819,7 @@ contract CommittingTest is ExecutorTest {
     //     vm.prank(validator);
 
     //     vm.expectRevert(abi.encodeWithSelector(BlobHashCommitmentError.selector, uint256(1), true, false));
-    //     executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+    //     executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, correctCommitBatchInfoArray);
     // }
 
     // function test_RevertWhen_SecondBlobLinearHashNotZeroWithEmptyCommitment() public {

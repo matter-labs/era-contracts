@@ -2,14 +2,10 @@
 
 pragma solidity ^0.8.20;
 
-import {Vm} from "forge-std/Vm.sol";
-
-import {Script, console2 as console} from "forge-std/Script.sol";
-
 import {Test} from "forge-std/Test.sol";
 
-import { L2WrappedBaseToken } from "contracts/bridge/L2WrappedBaseToken.sol";
-import { TransparentUpgradeableProxy } from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Unauthorized, UnimplementedMessage, BRIDGE_MINT_NOT_IMPLEMENTED} from "contracts/errors/L2ContractErrors.sol";
 
@@ -17,10 +13,10 @@ contract WethTest is Test {
     L2WrappedBaseToken internal weth;
 
     // The owner of the proxy
-    address ownerWallet = address(2);
+    address internal ownerWallet = address(2);
 
-    address l2BridgeAddress = address(3);
-    address l1Address = address(4);
+    address internal l2BridgeAddress = address(3);
+    address internal l1Address = address(4);
 
     function setUp() public {
         ownerWallet = makeAddr("owner");
@@ -53,9 +49,8 @@ contract WethTest is Test {
     function test_shouldWithdrawWethToL2Eth() public {
         address sender = makeAddr("sender");
         uint256 amount = 100;
-        
-        vm.deal(sender, amount);
 
+        vm.deal(sender, amount);
 
         vm.prank(sender);
         weth.deposit{value: amount}();
@@ -121,4 +116,3 @@ contract WethTest is Test {
         weth.bridgeBurn(address(1), 1);
     }
 }
-

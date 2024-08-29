@@ -58,7 +58,7 @@ abstract contract CalldataDA {
 
         require(_operatorDAInput.length >= BLOB_DATA_OFFSET + 32 * blobsProvided, "invalid blobs hashes");
 
-        cloneCalldata(blobsLinearHashes, _operatorDAInput[BLOB_DATA_OFFSET:], blobsProvided);
+        _cloneCalldata(blobsLinearHashes, _operatorDAInput[BLOB_DATA_OFFSET:], blobsProvided);
 
         uint256 ptr = BLOB_DATA_OFFSET + 32 * blobsProvided;
 
@@ -100,7 +100,7 @@ abstract contract CalldataDA {
     /// @param _dst The destination array.
     /// @param _input The input calldata.
     /// @param _len The length of the slice in 32-byte words to clone.
-    function cloneCalldata(bytes32[] memory _dst, bytes calldata _input, uint256 _len) internal pure {
+    function _cloneCalldata(bytes32[] memory _dst, bytes calldata _input, uint256 _len) internal pure {
         assembly {
             // The pointer to the allocated memory above. We skip 32 bytes to avoid overwriting the length.
             let dstPtr := add(_dst, 0x20)

@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {L1_MESSENGER_CONTRACT, BLOB_SIZE_BYTES, MAX_NUMBER_OF_BLOBS, SystemLogKey} from "./Constants.sol";
-import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
+import {BLOB_SIZE_BYTES, MAX_NUMBER_OF_BLOBS} from "./Constants.sol";
 import {TooMuchPubdata} from "./SystemContractErrors.sol";
 
 /**

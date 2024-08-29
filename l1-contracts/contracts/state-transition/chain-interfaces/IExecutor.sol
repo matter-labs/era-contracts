@@ -113,14 +113,9 @@ interface IExecutor is IZkSyncHyperchainBase {
     /// - Verifying the correctness of their timestamps.
     /// - Processing their L2->L1 logs.
     /// - Storing batch commitments.
+    /// @param _chainId Chain ID of the chain.
     /// @param _lastCommittedBatchData Stored data of the last committed batch.
     /// @param _newBatchesData Data of the new batches to be committed.
-    function commitBatches(
-        StoredBatchInfo calldata _lastCommittedBatchData,
-        CommitBatchInfo[] calldata _newBatchesData
-    ) external;
-
-    /// @notice same as `commitBatches` but with the chainId so ValidatorTimelock can sort the inputs.
     function commitBatchesSharedBridge(
         uint256 _chainId,
         StoredBatchInfo calldata _lastCommittedBatchData,
@@ -129,16 +124,10 @@ interface IExecutor is IZkSyncHyperchainBase {
 
     /// @notice Batches commitment verification.
     /// @dev Only verifies batch commitments without any other processing.
+    /// @param _chainId Chain ID of the chain.
     /// @param _prevBatch Stored data of the last committed batch.
     /// @param _committedBatches Stored data of the committed batches.
     /// @param _proof The zero knowledge proof.
-    function proveBatches(
-        StoredBatchInfo calldata _prevBatch,
-        StoredBatchInfo[] calldata _committedBatches,
-        ProofInput calldata _proof
-    ) external;
-
-    /// @notice same as `proveBatches` but with the chainId so ValidatorTimelock can sort the inputs.
     function proveBatchesSharedBridge(
         uint256 _chainId,
         StoredBatchInfo calldata _prevBatch,
@@ -149,14 +138,9 @@ interface IExecutor is IZkSyncHyperchainBase {
     /// @notice The function called by the operator to finalize (execute) batches. It is responsible for:
     /// - Processing all pending operations (commpleting priority requests).
     /// - Finalizing this batch (i.e. allowing to withdraw funds from the system)
+    /// @param _chainId Chain ID of the chain.
     /// @param _batchesData Data of the batches to be executed.
     /// @param _priorityOpsData Merkle proofs of the priority operations for each batch.
-    function executeBatches(
-        StoredBatchInfo[] calldata _batchesData,
-        PriorityOpsBatchInfo[] calldata _priorityOpsData
-    ) external;
-
-    /// @notice same as `executeBatches` but with the chainId so ValidatorTimelock can sort the inputs.
     function executeBatchesSharedBridge(
         uint256 _chainId,
         StoredBatchInfo[] calldata _batchesData,
@@ -164,12 +148,10 @@ interface IExecutor is IZkSyncHyperchainBase {
     ) external;
 
     /// @notice Reverts unexecuted batches
+    /// @param _chainId Chain ID of the chain
     /// @param _newLastBatch batch number after which batches should be reverted
     /// NOTE: Doesn't delete the stored data about batches, but only decreases
     /// counters that are responsible for the number of batches
-    function revertBatches(uint256 _newLastBatch) external;
-
-    /// @notice same as `revertBatches` but with the chainId so ValidatorTimelock can sort the inputs.
     function revertBatchesSharedBridge(uint256 _chainId, uint256 _newLastBatch) external;
 
     /// @notice Event emitted when a batch is committed

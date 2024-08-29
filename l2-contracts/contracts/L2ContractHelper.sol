@@ -62,7 +62,7 @@ interface IContractDeployer {
         bytes32 _bytecodeHash,
         bytes32 _salt,
         bytes calldata _input
-    ) external view returns (address newAddress) ;
+    ) external view returns (address newAddress);
 }
 
 /**
@@ -223,9 +223,7 @@ library L2ContractHelper {
         if (bytecodeLenInWords % 2 == 0) {
             revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
         }
-        hashedBytecode =
-            sha256(_bytecode) &
-            0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+        hashedBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
         // Setting the version of the hash
         hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));
         // Setting the length
