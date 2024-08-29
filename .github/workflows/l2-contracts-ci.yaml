@@ -63,7 +63,7 @@ jobs:
       - name: Lint
         run: yarn lint:check
 
-  check-verifier-generator (L2):
+  check-verifier-generator-l2:
     needs: [build]
     runs-on: ubuntu-latest
 
