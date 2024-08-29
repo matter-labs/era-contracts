@@ -24,3 +24,4 @@ fs_permissions = [
 
 [profile.default.zksync] 
 enable_eravm_extensions = true
+zksolc = "1.5.0"
