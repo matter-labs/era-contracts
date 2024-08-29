@@ -1,161 +1,40 @@
 pragma solidity 0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-
 import "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
-import "forge-std/console.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
-import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
-import {InitializeData, DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {GenesisUpgrade} from "contracts/upgrades/GenesisUpgrade.sol";
-import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
-import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
-import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
-import {Utils} from "test/foundry/unit/concrete/Utils/Utils.sol";
 import {ZeroAddress, ChainZeroAddress, NotAnAdmin, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
-// import {StateTransitionManagerTest} from "test/foundry/unit/concrete/state-transition/StateTransitionManager/_StateTransitionManager_Shared.t.sol";
+import {StateTransitionManagerTest} from "test/foundry/unit/concrete/state-transition/StateTransitionManager/_StateTransitionManager_Shared.t.sol";
 
-contract PermanentRestrictionTest is Test {
-    IBridgehub internal iBridgehub;
+contract PermanentRestrictionTest is StateTransitionManagerTest {
     ChainAdmin internal chainAdmin;
     AccessControlRestriction internal restriction;
     PermanentRestriction internal permRestriction;
-    DiamondProxy internal diamondProxy;
+    
     address internal owner;
-
-    address newChainAddress;
-    DiamondInit internal initializeDiamond;
-
-    IExecutor.ProofInput internal proofInput;
-
-    AdminFacet internal adminFacet;
-    ExecutorFacet internal executorFacet;
-    GettersFacet internal gettersFacet;
-
-    StateTransitionManager internal stateTransitionManager;
-    StateTransitionManager internal chainContractAddress;
-    GenesisUpgrade internal genesisUpgradeContract;
-    address internal bridgehub;
-    address internal diamondInit;
-    address internal constant governor = address(0x1010101);
-    address internal constant admin = address(0x2020202);
-    address internal constant validator = address(0x5050505);
-    address internal constant baseToken = address(0x3030303);
-    address internal constant sharedBridge = address(0x4040404);
-    address internal newChainAdmin;
-    uint256 chainId = block.chainid;
-    address internal testnetVerifier = address(new TestnetVerifier());
     address internal hyperchain;
 
-    Diamond.FacetCut[] internal facetCuts;
-
     function setUp() public {
-        // deploy();
-
-        iBridgehub = new Bridgehub();
-        bridgehub = address(iBridgehub);
-        newChainAdmin = makeAddr("chainadmin");
-
-        vm.startPrank(bridgehub);
-        stateTransitionManager = new StateTransitionManager(bridgehub, type(uint256).max);
-        diamondInit = address(new DiamondInit());
-        genesisUpgradeContract = new GenesisUpgrade();
-
-        facetCuts.push(
-            Diamond.FacetCut({
-                facet: address(new UtilsFacet()),
-                action: Diamond.Action.Add,
-                isFreezable: true,
-                selectors: Utils.getUtilsFacetSelectors()
-            })
-        );
-        facetCuts.push(
-            Diamond.FacetCut({
-                facet: address(new AdminFacet()),
-                action: Diamond.Action.Add,
-                isFreezable: true,
-                selectors: Utils.getAdminSelectors()
-            })
-        );
-        facetCuts.push(
-            Diamond.FacetCut({
-                facet: address(new ExecutorFacet()),
-                action: Diamond.Action.Add,
-                isFreezable: true,
-                selectors: Utils.getExecutorSelectors()
-            })
-        );
-        address gettersFacetAddress = address(new GettersFacet());
-        facetCuts.push(
-            Diamond.FacetCut({
-                facet: gettersFacetAddress,
-                action: Diamond.Action.Add,
-                isFreezable: true,
-                selectors: Utils.getGettersSelectors()
-            })
-        );
-
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: 0x01,
-            genesisBatchCommitment: bytes32(uint256(0x01)),
-            diamondCut: getDiamondCutData(address(diamondInit))
-        });
-
-        StateTransitionManagerInitializeData memory stmInitializeDataNoGovernor = StateTransitionManagerInitializeData({
-            owner: address(0),
-            validatorTimelock: validator,
-            chainCreationParams: chainCreationParams,
-            protocolVersion: 0
-        });
-
-        StateTransitionManagerInitializeData memory stmInitializeData = StateTransitionManagerInitializeData({
-            owner: governor,
-            validatorTimelock: validator,
-            chainCreationParams: chainCreationParams,
-            protocolVersion: 0
-        });
-
-        TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(
-            address(stateTransitionManager),
-            admin,
-            abi.encodeCall(StateTransitionManager.initialize, stmInitializeData)
-        );
-        chainContractAddress = StateTransitionManager(address(transparentUpgradeableProxy));
-
-        vm.stopPrank();
-        vm.startPrank(governor);
+        deploy();
 
         createNewChainBridgehub(getDiamondCutData(address(diamondInit)));
-        initializeDiamond = new DiamondInit();
-        newChainAddress = chainContractAddress.getHyperchain(chainId);
 
         vm.stopPrank();
 
         owner = makeAddr("owner");
         hyperchain = chainContractAddress.getHyperchain(chainId);
-        permRestriction = new PermanentRestriction(owner, iBridgehub);
+        permRestriction = new PermanentRestriction(owner, bridgehub);
         restriction = new AccessControlRestriction(0, owner);
         address[] memory restrictions = new address[](1);
         restrictions[0] = address(restriction);
@@ -164,7 +43,7 @@ contract PermanentRestrictionTest is Test {
 
     function test_ownerAsAddressZero() public {
         vm.expectRevert(ZeroAddress.selector);
-        permRestriction = new PermanentRestriction(address(0), iBridgehub);
+        permRestriction = new PermanentRestriction(address(0), bridgehub);
     }
 
     function test_allowAdminImplementation(bytes32 implementationHash) public {
@@ -312,21 +191,13 @@ contract PermanentRestrictionTest is Test {
         vm.stopPrank();
     }
 
-    function getDiamondCutData(address _diamondInit) internal returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier);
-
-        bytes memory initCalldata = abi.encode(initializeData);
-
-        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
-    }
-
     function createNewChainBridgehub(Diamond.DiamondCutData memory _diamondCut) internal {
         vm.stopPrank();
         vm.startPrank(address(0));
-        iBridgehub.addStateTransitionManager(address(chainContractAddress));
-        iBridgehub.addToken(baseToken);
-        iBridgehub.setSharedBridge(sharedBridge);
-        iBridgehub.createNewChain({
+        bridgehub.addStateTransitionManager(address(chainContractAddress));
+        bridgehub.addToken(baseToken);
+        bridgehub.setSharedBridge(sharedBridge);
+        bridgehub.createNewChain({
             _chainId: chainId,
             _stateTransitionManager: address(chainContractAddress),
             _baseToken: baseToken,
