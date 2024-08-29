@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-// solhint-disable no-console
+// solhint-disable no-console, gas-struct-packing, gas-custom-errors
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
@@ -13,7 +13,6 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
-import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {Utils} from "./Utils.sol";
 
 /**
