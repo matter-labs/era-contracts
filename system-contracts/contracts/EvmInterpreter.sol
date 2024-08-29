@@ -980,7 +980,7 @@ contract EvmInterpreter {
         return (_createdAddress, _gasLeft);
     }
 
-    uint32 constant CREATE_EVM_INTERNAL_SELECTOR = uint32(DEPLOYER_SYSTEM_CONTRACT.createEVMInternal.selector);
+    uint32 constant CREATE_EVM_INTERNAL_SELECTOR = uint32(DEPLOYER_SYSTEM_CONTRACT.createEVM.selector);
 
     function _performCreateCall(
         address _deployedAddress,

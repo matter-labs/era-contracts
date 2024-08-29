@@ -26,7 +26,20 @@ object "EVMInterpreter" {
             mstore(sub(offset, 64), 0x40)
             mstore(sub(offset, 32), len)
 
-            let success := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 100), add(len, 100), 0, 0)
+            let farCallAbi := getFarCallABI(
+                0,
+                0,
+                sub(offset, 100),
+                add(len, 100),
+                gas(),
+                // Only rollup is supported for now
+                0,
+                0,
+                0,
+                1
+            )
+            let to := DEPLOYER_SYSTEM_CONTRACT()
+            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
 
             if iszero(success) {
                 // This error should never happen
