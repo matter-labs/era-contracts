@@ -90,7 +90,14 @@ jobs:
             l2-contracts/typechain
 
       - name: Install foundry zksync
-        run: cargo install --git https://github.com/matter-labs/foundry-zksync  --locked forge cast
+        run: | 
+          wget https://github.com/matter-labs/foundry-zksync/releases/download/nightly-f908ce43834bc1ffb4de6576ea5600eaab49dddb/foundry_nightly_linux_amd64.tar.gz -O foundry-zksync.tar.gz
+          tar -xzf foundry-zksync.tar.gz
+          sudo mv forge /usr/local/bin/forge
+          sudo mv cast /usr/local/bin/cast
+          sudo chmod +x /usr/local/bin/forge
+          sudo chmod +x /usr/local/bin/cast
+          forge --version
 
       - name: Run tests
         run: yarn l2 test:foundry
