@@ -29,7 +29,20 @@ object "EVMInterpreter" {
             mstore(sub(offset, 64), 0x40)
             mstore(sub(offset, 32), len)
 
-            let success := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 100), add(len, 100), 0, 0)
+            let farCallAbi := getFarCallABI(
+                0,
+                0,
+                sub(offset, 100),
+                add(len, 100),
+                gas(),
+                // Only rollup is supported for now
+                0,
+                0,
+                0,
+                1
+            )
+            let to := DEPLOYER_SYSTEM_CONTRACT()
+            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
 
             if iszero(success) {
                 // This error should never happen
@@ -390,12 +403,27 @@ object "EVMInterpreter" {
             mstore8(2, 0x4e)
             mstore8(3, 0x9e)
         
-            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 64)
+            let farCallAbi := getFarCallABI(
+                    0,
+                    0,
+                    0,
+                    4,
+                    gas(),
+                    // Only rollup is supported for now
+                    0,
+                    0,
+                    0,
+                    1
+                )
+                let to := EVM_GAS_MANAGER_CONTRACT()
+                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
         
             if iszero(success) {
                 // Should never happen
                 revert(0, 0)
             }
+
+            returndatacopy(0,0,64)
         
             passGas := mload(0)
             isStatic := mload(32)
@@ -567,6 +595,13 @@ object "EVMInterpreter" {
                     gasToCharge := 0
                 }
         }
+
+        function checkMemOverflowByOffset(offset, evmGasLeft) {
+            if gt(offset, MAX_POSSIBLE_MEM()) {
+                mstore(0, evmGasLeft)
+                revert(0, 32)
+            }
+        }
         
         function checkMemOverflow(location, evmGasLeft) {
             if gt(location, MAX_MEMORY_FRAME()) {
@@ -659,12 +694,27 @@ object "EVMInterpreter" {
             mstore(4, key)
             mstore(36,currentValue)
         
-            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 64)
+            let farCallAbi := getFarCallABI(
+                0,
+                0,
+                0,
+                68,
+                gas(),
+                // Only rollup is supported for now
+                0,
+                0,
+                0,
+                1
+            )
+            let to := EVM_GAS_MANAGER_CONTRACT()
+            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
         
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
             }
+
+            returndatacopy(0, 0, 64)
         
             isWarm := mload(0)
             originalValue := mload(32)
@@ -746,19 +796,54 @@ object "EVMInterpreter" {
                 0xffffffffffffffffffffffffffffffffffffffff
             )
         }
+
+        function getFarCallABI(
+                dataOffset,
+                memoryPage,
+                dataStart,
+                dataLength,
+                gasPassed,
+                shardId,
+                forwardingMode,
+                isConstructorCall,
+                isSystemCall
+            ) -> ret {
+                let farCallAbi := 0
+                farCallAbi :=  or(farCallAbi, dataOffset)
+                farCallAbi :=  or(farCallAbi, shl(64, dataStart))
+                farCallAbi :=  or(farCallAbi, shl(96, dataLength))
+                farCallAbi :=  or(farCallAbi, shl(192, gasPassed))
+                farCallAbi :=  or(farCallAbi, shl(224, shardId))
+                farCallAbi :=  or(farCallAbi, shl(232, forwardingMode))
+                farCallAbi :=  or(farCallAbi, shl(248, 1))
+                ret := farCallAbi
+            }
         
         function incrementNonce(addr) {
-            mstore8(0, 0x30)
-            mstore8(1, 0x63)
-            mstore8(2, 0x95)
-            mstore8(3, 0xc6)
-            mstore(4, addr)
-        
-            let result := call(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 0, 36, 0, 0)
-        
-            if iszero(result) {
-                revert(0, 0)
-            }
+                mstore8(0, 0x30)
+                mstore8(1, 0x63)
+                mstore8(2, 0x95)
+                mstore8(3, 0xc6)
+                mstore(4, addr)
+            
+                let farCallAbi := getFarCallABI(
+                    0,
+                    0,
+                    0,
+                    36,
+                    gas(),
+                    // Only rollup is supported for now
+                    0,
+                    0,
+                    0,
+                    1
+                )
+                let to := NONCE_HOLDER_SYSTEM_CONTRACT()
+                let result := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+            
+                if iszero(result) {
+                    revert(0, 0)
+                }
         }
         
         function ensureAcceptableMemLocation(location) {
@@ -790,16 +875,31 @@ object "EVMInterpreter" {
             mstore8(3, 0x78)
             mstore(4, addr)
         
-            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
+            let farCallAbi := getFarCallABI(
+                0,
+                0,
+                0,
+                36,
+                gas(),
+                // Only rollup is supported for now
+                0,
+                0,
+                0,
+                1
+            )
+            let to := EVM_GAS_MANAGER_CONTRACT()
+            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
         
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
             }
+
+            returndatacopy(0, 0, 32)
         
             isWarm := mload(0)
         }
-        
+
         function getNonce(addr) -> nonce {
             mstore8(0, 0xfb)
             mstore8(1, 0x1a)
@@ -815,7 +915,7 @@ object "EVMInterpreter" {
         
             nonce := mload(0)
         }
-        
+
         function getRawNonce(addr) -> nonce {
             mstore8(0, 0x5a)
             mstore8(1, 0xa9)
@@ -831,7 +931,7 @@ object "EVMInterpreter" {
         
             nonce := mload(0)
         }
-        
+
         function _isEVM(_addr) -> isEVM {
             // bytes4 selector = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM.selector; (0x8c040477)
             // function isAccountEVM(address _addr) external view returns (bool);
@@ -854,7 +954,7 @@ object "EVMInterpreter" {
         
             isEVM := mload(0)
         }
-        
+
         function _pushEVMFrame(_passGas, _isStatic) {
             // function pushEVMFrame(uint256 _passGas, bool _isStatic) external
             let selector := 0xead77156
@@ -866,15 +966,47 @@ object "EVMInterpreter" {
             mstore(4, _passGas)
             mstore(36, _isStatic)
         
-            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 0)
+            let farCallAbi := getFarCallABI(
+                0,
+                0,
+                0,
+                68,
+                gas(),
+                // Only rollup is supported for now
+                0,
+                0,
+                0,
+                1
+            )
+
+            let to := EVM_GAS_MANAGER_CONTRACT()
+            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+
+            // let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 0)
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
             }
         }
-        
+
         function _popEVMFrame() {
             // function popEVMFrame() external
+
+            let farCallAbi := getFarCallABI(
+                0,
+                0,
+                0,
+                4,
+                gas(),
+                // Only rollup is supported for now
+                0,
+                0,
+                0,
+                1
+            )
+
+            let to := EVM_GAS_MANAGER_CONTRACT()
+
             // 0xe467d2f0
             let selector := 0xe467d2f0
         
@@ -883,7 +1015,7 @@ object "EVMInterpreter" {
             mstore8(2, 0xd2)
             mstore8(3, 0xf0)
         
-            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 0)
+            let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
@@ -1326,7 +1458,7 @@ object "EVMInterpreter" {
             gasLeft := mload(0)
         }
         
-        function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, evmGasLeft {
+        function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftOld, isCreate2, salt) -> result, evmGasLeft, addr {
             pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
         
             _eraseReturndataPointer()
@@ -1344,19 +1476,36 @@ object "EVMInterpreter" {
             sp := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeftOld)
             sp := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeftOld)
         
-            // Selector
-            mstore(sub(offset, 0x80), 0x5b16a23c)
-            // Arg1: address
-            mstore(sub(offset, 0x60), addr)
-            // Arg2: init code
-            // Where the arg starts (third word)
-            mstore(sub(offset, 0x40), 0x40)
-            // Length of the init code
-            mstore(sub(offset, 0x20), size)
-        
             _pushEVMFrame(gasForTheCall, false)
         
-            result := call(INF_PASS_GAS(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x64), add(size, 0x64), 0, 0)
+            if isCreate2 {
+                // Create2EVM selector
+                mstore(sub(offset, 0x80), 0x4e96f4c0)
+                // salt
+                mstore(sub(offset, 0x60), salt)
+                // Where the arg starts (third word)
+                mstore(sub(offset, 0x40), 0x40)
+                // Length of the init code
+                mstore(sub(offset, 0x20), size)
+
+
+                result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x64), add(size, 0x64), 0, 32)
+            }
+
+
+            if iszero(isCreate2) {
+                // CreateEVM selector
+                mstore(sub(offset, 0x60), 0xff311601)
+                // Where the arg starts (second word)
+                mstore(sub(offset, 0x40), 0x20)
+                // Length of the init code
+                mstore(sub(offset, 0x20), size)
+
+
+                result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x44), add(size, 0x44), 0, 32)
+            }
+
+            addr := mload(0)
         
             let gasLeft
             switch result
@@ -1371,18 +1520,6 @@ object "EVMInterpreter" {
             evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
         
             _popEVMFrame()
-        
-            switch result
-            case 1 {
-                incrementNonce(address())
-            }
-            default {
-                switch isEOA(address())
-                case 1 {
-                    incrementNonce(address())
-                }
-                default {}
-            }
         
             let back
         
@@ -1451,7 +1588,7 @@ object "EVMInterpreter" {
             size, sp := popStackItemWithoutCheck(sp)
         
             checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
-        
+
             checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)), evmGasLeft)
         
             if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
@@ -1472,10 +1609,8 @@ object "EVMInterpreter" {
             )
             evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
         
-            let addr := getNewAddress(address())
-        
-            let result
-            result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
+            let result, addr
+            result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,false,0)
         
             switch result
                 case 0 { sp := pushStackItem(sp, 0, evmGasLeft) }
@@ -1532,7 +1667,7 @@ object "EVMInterpreter" {
                 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
             )
         
-            result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
+            result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft, true, salt)
         }
         
 
@@ -3385,13 +3520,28 @@ object "EVMInterpreter" {
                 mstore8(2, 0x4e)
                 mstore8(3, 0x9e)
             
-                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 64)
+                let farCallAbi := getFarCallABI(
+                    0,
+                    0,
+                    0,
+                    4,
+                    gas(),
+                    // Only rollup is supported for now
+                    0,
+                    0,
+                    0,
+                    1
+                )
+                let to := EVM_GAS_MANAGER_CONTRACT()
+                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
             
                 if iszero(success) {
                     // Should never happen
                     revert(0, 0)
                 }
-            
+
+                returndatacopy(0,0,64)
+
                 passGas := mload(0)
                 isStatic := mload(32)
             
@@ -3562,6 +3712,13 @@ object "EVMInterpreter" {
                         gasToCharge := 0
                     }
             }
+
+            function checkMemOverflowByOffset(offset, evmGasLeft) {
+                if gt(offset, MAX_POSSIBLE_MEM()) {
+                    mstore(0, evmGasLeft)
+                    revert(0, 32)
+                }
+            }
             
             function checkMemOverflow(location, evmGasLeft) {
                 if gt(location, MAX_MEMORY_FRAME()) {
@@ -3654,12 +3811,27 @@ object "EVMInterpreter" {
                 mstore(4, key)
                 mstore(36,currentValue)
             
-                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 64)
+                let farCallAbi := getFarCallABI(
+                    0,
+                    0,
+                    0,
+                    68,
+                    gas(),
+                    // Only rollup is supported for now
+                    0,
+                    0,
+                    0,
+                    1
+                )
+                let to := EVM_GAS_MANAGER_CONTRACT()
+                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
             
                 if iszero(success) {
                     // This error should never happen
                     revert(0, 0)
                 }
+
+                returndatacopy(0, 0, 64)
             
                 isWarm := mload(0)
                 originalValue := mload(32)
@@ -3741,6 +3913,28 @@ object "EVMInterpreter" {
                     0xffffffffffffffffffffffffffffffffffffffff
                 )
             }
+
+             function getFarCallABI(
+                dataOffset,
+                memoryPage,
+                dataStart,
+                dataLength,
+                gasPassed,
+                shardId,
+                forwardingMode,
+                isConstructorCall,
+                isSystemCall
+            ) -> ret {
+                let farCallAbi := 0
+                farCallAbi :=  or(farCallAbi, dataOffset)
+                farCallAbi :=  or(farCallAbi, shl(64, dataStart))
+                farCallAbi :=  or(farCallAbi, shl(96, dataLength))
+                farCallAbi :=  or(farCallAbi, shl(192, gasPassed))
+                farCallAbi :=  or(farCallAbi, shl(224, shardId))
+                farCallAbi :=  or(farCallAbi, shl(232, forwardingMode))
+                farCallAbi :=  or(farCallAbi, shl(248, 1))
+                ret := farCallAbi
+            }
             
             function incrementNonce(addr) {
                 mstore8(0, 0x30)
@@ -3749,7 +3943,20 @@ object "EVMInterpreter" {
                 mstore8(3, 0xc6)
                 mstore(4, addr)
             
-                let result := call(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 0, 36, 0, 0)
+                let farCallAbi := getFarCallABI(
+                    0,
+                    0,
+                    0,
+                    36,
+                    gas(),
+                    // Only rollup is supported for now
+                    0,
+                    0,
+                    0,
+                    1
+                )
+                let to := NONCE_HOLDER_SYSTEM_CONTRACT()
+                let result := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
             
                 if iszero(result) {
                     revert(0, 0)
@@ -3785,13 +3992,28 @@ object "EVMInterpreter" {
                 mstore8(3, 0x78)
                 mstore(4, addr)
             
-                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
+                let farCallAbi := getFarCallABI(
+                    0,
+                    0,
+                    0,
+                    36,
+                    gas(),
+                    // Only rollup is supported for now
+                    0,
+                    0,
+                    0,
+                    1
+                )
+                let to := EVM_GAS_MANAGER_CONTRACT()
+                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
             
                 if iszero(success) {
                     // This error should never happen
                     revert(0, 0)
                 }
-            
+
+                returndatacopy(0, 0, 32)
+        
                 isWarm := mload(0)
             }
             
@@ -3861,7 +4083,23 @@ object "EVMInterpreter" {
                 mstore(4, _passGas)
                 mstore(36, _isStatic)
             
-                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 0)
+                let farCallAbi := getFarCallABI(
+                    0,
+                    0,
+                    0,
+                    68,
+                    gas(),
+                    // Only rollup is supported for now
+                    0,
+                    0,
+                    0,
+                    1
+                )
+
+                let to := EVM_GAS_MANAGER_CONTRACT()
+                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
+
+                // let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 0)
                 if iszero(success) {
                     // This error should never happen
                     revert(0, 0)
@@ -3870,6 +4108,22 @@ object "EVMInterpreter" {
             
             function _popEVMFrame() {
                 // function popEVMFrame() external
+
+                let farCallAbi := getFarCallABI(
+                    0,
+                    0,
+                    0,
+                    4,
+                    gas(),
+                    // Only rollup is supported for now
+                    0,
+                    0,
+                    0,
+                    1
+                )
+
+                let to := EVM_GAS_MANAGER_CONTRACT()
+
                 // 0xe467d2f0
                 let selector := 0xe467d2f0
             
@@ -3878,7 +4132,7 @@ object "EVMInterpreter" {
                 mstore8(2, 0xd2)
                 mstore8(3, 0xf0)
             
-                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 0)
+                let success := verbatim_6i_1o("system_call", to, farCallAbi, 0, 0, 0, 0)
                 if iszero(success) {
                     // This error should never happen
                     revert(0, 0)
@@ -4321,76 +4575,81 @@ object "EVMInterpreter" {
                 gasLeft := mload(0)
             }
             
-            function $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, evmGasLeft {
-                pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
-            
-                _eraseReturndataPointer()
-            
-                let gasForTheCall := capGas(evmGasLeftOld,INF_PASS_GAS())
-            
-                if lt(selfbalance(),value) {
-                    revertWithGas(evmGasLeftOld)
-                }
-            
-                offset := add(MEM_OFFSET_INNER(), offset)
-            
-                sp := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeftOld)
-                sp := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeftOld)
-                sp := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeftOld)
-                sp := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeftOld)
-            
-                // Selector
-                mstore(sub(offset, 0x80), 0x5b16a23c)
-                // Arg1: address
-                mstore(sub(offset, 0x60), addr)
-                // Arg2: init code
+            function $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeftOld, isCreate2, salt) -> result, evmGasLeft, addr {
+            pop($llvm_AlwaysInline_llvm$_warmAddress(addr))
+        
+            _eraseReturndataPointer()
+        
+            let gasForTheCall := capGas(evmGasLeftOld,INF_PASS_GAS())
+        
+            if lt(selfbalance(),value) {
+                revertWithGas(evmGasLeftOld)
+            }
+        
+            offset := add(MEM_OFFSET_INNER(), offset)
+        
+            sp := pushStackItem(sp, mload(sub(offset, 0x80)), evmGasLeftOld)
+            sp := pushStackItem(sp, mload(sub(offset, 0x60)), evmGasLeftOld)
+            sp := pushStackItem(sp, mload(sub(offset, 0x40)), evmGasLeftOld)
+            sp := pushStackItem(sp, mload(sub(offset, 0x20)), evmGasLeftOld)
+        
+            _pushEVMFrame(gasForTheCall, false)
+        
+            if isCreate2 {
+                // Create2EVM selector
+                mstore(sub(offset, 0x80), 0x4e96f4c0)
+                // salt
+                mstore(sub(offset, 0x60), salt)
                 // Where the arg starts (third word)
                 mstore(sub(offset, 0x40), 0x40)
                 // Length of the init code
                 mstore(sub(offset, 0x20), size)
-            
-                _pushEVMFrame(gasForTheCall, false)
-            
-                result := call(INF_PASS_GAS(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x64), add(size, 0x64), 0, 0)
-            
-                let gasLeft
-                switch result
-                    case 0 {
-                        gasLeft := _saveReturndataAfterEVMCall(0, 0)
-                    }
-                    default {
-                        gasLeft := _fetchConstructorReturnGas()
-                    }
-                    
-                let gasUsed := sub(gasForTheCall, gasLeft)
-                evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
-            
-                _popEVMFrame()
-            
-                switch result
-                case 1 {
-                    incrementNonce(address())
+
+
+                result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x64), add(size, 0x64), 0, 32)
+            }
+
+
+            if iszero(isCreate2) {
+                // CreateEVM selector
+                mstore(sub(offset, 0x60), 0xff311601)
+                // Where the arg starts (second word)
+                mstore(sub(offset, 0x40), 0x20)
+                // Length of the init code
+                mstore(sub(offset, 0x20), size)
+
+
+                result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x44), add(size, 0x44), 0, 32)
+            }
+
+            addr := mload(0)
+        
+            let gasLeft
+            switch result
+                case 0 {
+                    gasLeft := _saveReturndataAfterEVMCall(0, 0)
                 }
                 default {
-                    switch isEOA(address())
-                    case 1 {
-                        incrementNonce(address())
-                    }
-                    default {}
+                    gasLeft := _fetchConstructorReturnGas()
                 }
-            
-                let back
-            
-                popStackCheck(sp, evmGasLeft, 4)
-                back, sp := popStackItemWithoutCheck(sp)
-                mstore(sub(offset, 0x20), back)
-                back, sp := popStackItemWithoutCheck(sp)
-                mstore(sub(offset, 0x40), back)
-                back, sp := popStackItemWithoutCheck(sp)
-                mstore(sub(offset, 0x60), back)
-                back, sp := popStackItemWithoutCheck(sp)
-                mstore(sub(offset, 0x80), back)
-            }
+                
+            let gasUsed := sub(gasForTheCall, gasLeft)
+            evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
+        
+            _popEVMFrame()
+        
+            let back
+        
+            popStackCheck(sp, evmGasLeft, 4)
+            back, sp := popStackItemWithoutCheck(sp)
+            mstore(sub(offset, 0x20), back)
+            back, sp := popStackItemWithoutCheck(sp)
+            mstore(sub(offset, 0x40), back)
+            back, sp := popStackItemWithoutCheck(sp)
+            mstore(sub(offset, 0x60), back)
+            back, sp := popStackItemWithoutCheck(sp)
+            mstore(sub(offset, 0x80), back)
+        }
             
             function performExtCodeCopy(evmGas,oldSp) -> evmGasLeft, sp {
                 evmGasLeft := chargeGas(evmGas, 100)
@@ -4467,10 +4726,8 @@ object "EVMInterpreter" {
                 )
                 evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                let addr := getNewAddress(address())
-            
-                let result
-                result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
+                let result, addr
+                result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,false,0)
             
                 switch result
                     case 0 { sp := pushStackItem(sp, 0, evmGasLeft) }
@@ -4527,7 +4784,7 @@ object "EVMInterpreter" {
                     0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
                 )
             
-                result, evmGasLeft := $llvm_NoInline_llvm$_genericCreate(addr, offset, size, sp, value, evmGasLeft)
+                result, evmGasLeft, addr := $llvm_NoInline_llvm$_genericCreate(offset, size, sp, value, evmGasLeft,true,salt)
             }
             
 
