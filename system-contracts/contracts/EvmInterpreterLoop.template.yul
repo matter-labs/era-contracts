@@ -411,7 +411,8 @@ for { } true { } {
         size, sp := popStackItemWithoutCheck(sp)
 
         checkOverflow(destOffset, size, evmGasLeft)
-        checkMultipleOverflow(offset, size, MEM_OFFSET_INNER(), evmGasLeft)
+        checkOverflow(offset, size, evmGasLeft)
+        checkOverflow(add(offset, size), MEM_OFFSET_INNER(), evmGasLeft)
         checkMemOverflowByOffset(add(destOffset,size), evmGasLeft)
 
         if gt(add(add(offset, size), MEM_OFFSET_INNER()), MAX_MEMORY_FRAME()) {
