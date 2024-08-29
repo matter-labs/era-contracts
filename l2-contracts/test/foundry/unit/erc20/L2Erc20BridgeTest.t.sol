@@ -140,7 +140,7 @@ contract L2Erc20BridgeTest is Test {
         assertEq(L2StandardERC20(l2TokenAddress).decimals(), 18);
     }
 
-    function test_governanceShoudNotBeAbleToSkipInitializerVersions() public {
+    function test_governanceShouldNotBeAbleToSkipInitializerVersions() public {
         address l2TokenAddress = initializeTokenByDeposit();
         
         L2StandardERC20.ERC20Getters memory getters =  L2StandardERC20.ERC20Getters({
