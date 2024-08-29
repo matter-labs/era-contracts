@@ -350,7 +350,11 @@ fn get_modexp_function(l2_mode: bool) -> String {
     if l2_mode {
         r#"function modexp(value, power) -> res {
                 res := 1
-                for { } gt(power, 0) { } {
+                for {
+
+                } gt(power, 0) {
+
+                } {
                     if mod(power, 2) {
                         res := mulmod(res, value, R_MOD)
                     }

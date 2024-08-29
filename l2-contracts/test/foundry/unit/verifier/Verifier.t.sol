@@ -15,7 +15,11 @@ contract VerifierCaller {
         verifier = _verifier;
     }
 
-    function verify(uint256[] memory publicInputs, uint256[] memory serializedProof, uint256[] memory recursiveAggregationInput) public view returns (bool result, uint256 gasUsed) {
+    function verify(
+        uint256[] memory publicInputs,
+        uint256[] memory serializedProof,
+        uint256[] memory recursiveAggregationInput
+    ) public view returns (bool result, uint256 gasUsed) {
         uint256 gasBefore = gasleft();
         result = verifier.verify(publicInputs, serializedProof, recursiveAggregationInput);
         gasUsed = gasBefore - gasleft();
@@ -87,9 +91,9 @@ contract VerifierTestTest is Test {
         bool success = verifier.verify(publicInputs, serializedProof, recursiveAggregationInput);
         assert(success);
     }
-    
+
     function testShouldVerifyWithGas() public {
-        // `gas snapshot` does not work well with zksync setup, so in order to obtain the amount of 
+        // `gas snapshot` does not work well with zksync setup, so in order to obtain the amount of
         // zkevm gas consumed we do the following:
         // - Deploy a VerifierCaller contract, which would execute in zkevm context
         // - Call the verify function from the VerifierCaller contract and return the gas used
