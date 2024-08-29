@@ -9,7 +9,7 @@ import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {NoCallsProvided, RestrictionWasAlreadyPresent, RestrictionWasNotPresent} from "contracts/common/L1ContractErrors.sol";
+import {NoCallsProvided, RestrictionWasAlreadyPresent, RestrictionWasNotPresent, AccessToFallbackDenied, AccessToFunctionDenied} from "contracts/common/L1ContractErrors.sol";
 import {Utils} from "test/foundry/unit/concrete/Utils/Utils.sol";
 
 contract ChainAdminTest is Test {
@@ -21,6 +21,7 @@ contract ChainAdminTest is Test {
     uint32 internal major;
     uint32 internal minor;
     uint32 internal patch;
+    bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
 
     function setUp() public {
         owner = makeAddr("random address");
@@ -111,6 +112,32 @@ contract ChainAdminTest is Test {
         calls[0] = Call({target: address(chainAdmin), value: 0, data: abi.encodeCall(gettersFacet.getAdmin, ())});
 
         vm.expectRevert();
+        vm.prank(owner);
+        chainAdmin.multicall(calls, true);
+    }
+
+    function test_validateCallAccessToFunctionDenied(bytes32 role) public {
+        Call[] memory calls = new Call[](2);
+        calls[0] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getAdmin, ())});
+        calls[1] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getVerifier, ())});
+
+        vm.prank(owner);
+        restriction.setRequiredRoleForCall(address(gettersFacet), gettersFacet.getAdmin.selector, role);
+
+        vm.expectRevert(abi.encodeWithSelector(AccessToFunctionDenied.selector, address(gettersFacet), gettersFacet.getAdmin.selector, owner));
+        vm.prank(owner);
+        chainAdmin.multicall(calls, true);
+    }
+
+    function test_validateCallAccessToFallbackDenied(bytes32 role) public {
+        Call[] memory calls = new Call[](2);
+        calls[0] = Call({target: address(gettersFacet), value: 0, data: "" });
+        calls[1] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getVerifier, ())});
+
+        vm.prank(owner);
+        restriction.setRequiredRoleForFallback(address(gettersFacet), role);
+
+        vm.expectRevert(abi.encodeWithSelector(AccessToFallbackDenied.selector, address(gettersFacet), owner));
         vm.prank(owner);
         chainAdmin.multicall(calls, true);
     }
