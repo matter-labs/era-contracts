@@ -5,6 +5,7 @@
 pragma solidity ^0.8.0;
 
 import {ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./Constants.sol";
+import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 
 // We consider all the contracts (including system ones) as warm.
 uint160 constant PRECOMPILES_END = 0xffff;
@@ -80,6 +81,7 @@ contract EvmGasManager {
 
     modifier onlySystemEvm() {
         require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender), "only system evm");
+        require(SystemContractHelper.isSystemCall(), "This method require system call flag");
         _;
     }
 

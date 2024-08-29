@@ -95,8 +95,6 @@ interface IContractDeployer {
 
     function create2EVM(bytes32 _salt, bytes calldata _initCode) external payable returns (address);
 
-    function createEVMInternal(address _newAddress, bytes calldata _initCode) external payable;
-
     function evmCodeHash(address) external view returns (bytes32);
 
     function setDeployedCode(uint256 constructorGasLeft, bytes calldata newDeployedCode) external;
