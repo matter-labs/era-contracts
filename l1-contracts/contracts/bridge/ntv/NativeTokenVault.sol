@@ -122,33 +122,30 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     ) external payable override onlyAssetRouter whenNotPaused {
         // Either it was locked before, therefore is not zero, or it is sent from remote chain and standard erc20 will be deployed
         address token = tokenAddress[_assetId];
-        uint256 amount;
-        address receiver;
-
         if (chainBalance[_chainId][token] > 0) {
             _bridgeMintNativeToken(_chainId, _assetId, _data);
         } else {
             _bridgeMintBridgedToken(_chainId, _assetId, _data);
         }
-        emit BridgeMint(_chainId, _assetId, receiver, amount);
     }
 
     function _bridgeMintBridgedToken(uint256 _originChainId, bytes32 _assetId, bytes calldata _data) internal virtual {
         // Either it was locked before, therefore is not zero, or it is sent from remote chain and standard erc20 will be deployed
         address token = tokenAddress[_assetId];
-        address sender;
+        // address sender;
         uint256 amount;
         address receiver;
         bytes memory erc20Data;
         address originToken;
 
-        (sender, receiver, originToken, amount, erc20Data) = DataEncoding.decodeBridgeMintData(_data);
+        (, receiver, originToken, amount, erc20Data) = DataEncoding.decodeBridgeMintData(_data);
 
         if (token == address(0)) {
             token = _ensureTokenDeployed(_originChainId, _assetId, originToken, erc20Data);
         }
 
         IBridgedStandardToken(token).bridgeMint(receiver, amount);
+        emit BridgeMint(_originChainId, _assetId, receiver, amount);
         /// backwards compatible event
         // emit FinalizeDeposit(sender, receiver, token, amount);
     }
@@ -156,9 +153,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     function _bridgeMintNativeToken(uint256 _originChainId, bytes32 _assetId, bytes calldata _data) internal {
         // Either it was locked before, therefore is not zero, or it is sent from remote chain and standard erc20 will be deployed
         address token = tokenAddress[_assetId];
-        uint256 amount;
-        address receiver;
-        (amount, receiver) = abi.decode(_data, (uint256, address));
+        (uint256 amount, address receiver) = abi.decode(_data, (uint256, address));
         // Check that the chain has sufficient balance
         if (chainBalance[_originChainId][token] < amount) {
             revert InsufficientChainBalance();

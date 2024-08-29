@@ -128,7 +128,8 @@ describe("Gateway", function () {
           refundRecipient: migratingDeployer.deployWallet.address,
           secondBridgeAddress: stmDeploymentTracker.address,
           secondBridgeValue: 0,
-          secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(["address", "address"], [stm.address, stm.address]),
+          secondBridgeCalldata:
+            "0x01" + ethers.utils.defaultAbiCoder.encode(["address", "address"], [stm.address, stm.address]).slice(2),
         },
       ])
     );

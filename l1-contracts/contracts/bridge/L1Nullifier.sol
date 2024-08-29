@@ -50,7 +50,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Era's chainID
     uint256 internal immutable ERA_CHAIN_ID;
 
-    /// @dev The address of ZKSync Era diamond proxy contract.
+    /// @dev The address of ZKsync Era diamond proxy contract.
     address internal immutable ERA_DIAMOND_PROXY;
 
     /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after Diamond proxy upgrade.
@@ -118,7 +118,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub or ZKSync Era Diamond Proxy.
+    /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
             revert Unauthorized(msg.sender);
@@ -153,9 +153,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Used for testing purposes only, as the contract has been initialized on mainnet.
     /// @param _owner The address which can change L2 token implementation and upgrade the bridge implementation.
     /// The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    /// @param __eraPostDiamondUpgradeFirstBatch The first batch number on the ZKSync Era Diamond Proxy that was settled after diamond proxy upgrade.
-    /// @param __eraPostLegacyBridgeUpgradeFirstBatch The first batch number on the ZKSync Era Diamond Proxy that was settled after legacy bridge upgrade.
-    /// @param __eraLegacyBridgeLastDepositBatch The the ZKSync Era batch number that processes the last deposit tx initiated by the legacy bridge.
+    /// @param __eraPostDiamondUpgradeFirstBatch The first batch number on the ZKsync Era Diamond Proxy that was settled after diamond proxy upgrade.
+    /// @param __eraPostLegacyBridgeUpgradeFirstBatch The first batch number on the ZKsync Era Diamond Proxy that was settled after legacy bridge upgrade.
+    /// @param __eraLegacyBridgeLastDepositBatch The the ZKsync Era batch number that processes the last deposit tx initiated by the legacy bridge.
     /// @param __eraLegacyBridgeLastDepositTxNumber The tx number in the __eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge.
     function initialize(
         address _owner,
@@ -309,48 +309,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         delete depositHappened[_chainId][_l2TxHash];
     }
 
-    // /// @dev Determines if the provided data for a failed deposit corresponds to a legacy failed deposit.
-    // /// @param _prevMsgSender The address of the entity that initiated the deposit.
-    // /// @param _assetId The unique identifier of the deposited L1 token.
-    // /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
-    // /// @param _expectedTxDataHash The nullifier data hash stored for the failed deposit.
-    // /// @return isLegacyTxDataHash True if the transaction is legacy, false otherwise.
-    // function _isLegacyTxDataHash(
-    //     address _prevMsgSender,
-    //     bytes32 _assetId,
-    //     bytes memory _transferData,
-    //     bytes32 _expectedTxDataHash
-    // ) internal view returns (bool isLegacyTxDataHash) {
-    //     try this.encodeTxDataHash(LEGACY_ENCODING_VERSION, _prevMsgSender, _assetId, _transferData) returns (
-    //         bytes32 txDataHash
-    //     ) {
-    //         return txDataHash == _expectedTxDataHash;
-    //     } catch {
-    //         return false;
-    //     }
-    // }
-
-    /// @dev Determines if the provided data for a failed deposit corresponds to a legacy failed deposit.
-    /// @param _prevMsgSender The address of the entity that initiated the deposit.
-    /// @param _assetId The unique identifier of the deposited L1 token.
-    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
-    /// @param _expectedTxDataHash The nullifier data hash stored for the failed deposit.
-    /// @return isLegacyTxDataHash True if the transaction is legacy, false otherwise.
-    function _isLegacyTxDataHash(
-        address _prevMsgSender,
-        bytes32 _assetId,
-        bytes memory _transferData,
-        bytes32 _expectedTxDataHash
-    ) internal view returns (bool isLegacyTxDataHash) {
-        // try this.encodeTxDataHash(LEGACY_ENCODING_VERSION, _prevMsgSender, _assetId, _transferData) returns (
-        //     bytes32 txDataHash
-        // ) {
-        //     return txDataHash == _expectedTxDataHash;
-        // } catch {
-        //     return false;
-        // }
-    }
-
     /// @notice Finalize the withdrawal and release funds
     /// @param _chainId The chain ID of the transaction to check
     /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
@@ -378,6 +336,71 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         this.finalizeWithdrawalExternal(finalizeWithdrawalParams);
     }
 
+    /// @notice Transfers allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
+    /// @dev assetId is not the padded address, but the correct encoded id (NTV stores respective format for IDs)
+    /// @param _amount The asset amount to be transferred to native token vault.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    function transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) external onlyAssetRouter {
+        address l1TokenAddress = INativeTokenVault(address(nativeTokenVault)).tokenAddress(_assetId);
+        if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
+            return;
+        }
+        IERC20 l1Token = IERC20(l1TokenAddress);
+
+        // Do the transfer if allowance to Shared bridge is bigger than amount
+        // And if there is not enough allowance for the NTV
+        if (
+            l1Token.allowance(_prevMsgSender, address(this)) >= _amount &&
+            l1Token.allowance(_prevMsgSender, address(nativeTokenVault)) < _amount
+        ) {
+            // slither-disable-next-line arbitrary-send-erc20
+            l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
+            l1Token.forceApprove(address(nativeTokenVault), _amount);
+        }
+    }
+    /// @dev Determines if an eth withdrawal was initiated on ZKsync Era before the upgrade to the Shared Bridge.
+    /// @param _chainId The chain ID of the transaction to check.
+    /// @param _l2BatchNumber The L2 batch number for the withdrawal.
+    /// @return Whether withdrawal was initiated on ZKsync Era before diamond proxy upgrade.
+    function _isEraLegacyEthWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
+        if ((_chainId == ERA_CHAIN_ID) && _eraPostDiamondUpgradeFirstBatch == 0) {
+            revert SharedBridgeValueNotSet(SharedBridgeKey.PostUpgradeFirstBatch);
+        }
+        return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < _eraPostDiamondUpgradeFirstBatch);
+    }
+
+    /// @dev Determines if a token withdrawal was initiated on ZKsync Era before the upgrade to the Shared Bridge.
+    /// @param _chainId The chain ID of the transaction to check.
+    /// @param _l2BatchNumber The L2 batch number for the withdrawal.
+    /// @return Whether withdrawal was initiated on ZKsync Era before Legacy Bridge upgrade.
+    function _isEraLegacyTokenWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
+        if ((_chainId == ERA_CHAIN_ID) && _eraPostLegacyBridgeUpgradeFirstBatch == 0) {
+            revert SharedBridgeValueNotSet(SharedBridgeKey.LegacyBridgeFirstBatch);
+        }
+        return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < _eraPostLegacyBridgeUpgradeFirstBatch);
+    }
+
+    /// @dev Determines if the provided data for a failed deposit corresponds to a legacy failed deposit.
+    /// @param _prevMsgSender The address of the entity that initiated the deposit.
+    /// @param _assetId The unique identifier of the deposited L1 token.
+    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
+    /// @param _expectedTxDataHash The nullifier data hash stored for the failed deposit.
+    /// @return isLegacyTxDataHash True if the transaction is legacy, false otherwise.
+    function _isLegacyTxDataHash(
+        address _prevMsgSender,
+        bytes32 _assetId,
+        bytes memory _transferData,
+        bytes32 _expectedTxDataHash
+    ) internal view returns (bool isLegacyTxDataHash) {
+        // try this.encodeTxDataHash(LEGACY_ENCODING_VERSION, _prevMsgSender, _assetId, _transferData) returns (
+        //     bytes32 txDataHash
+        // ) {
+        //     return txDataHash == _expectedTxDataHash;
+        // } catch {
+        //     return false;
+        // }
+    }
+
     function finalizeWithdrawalExternal(FinalizeWithdrawalParams calldata _finalizeWithdrawalParams) external {
         require(msg.sender == address(this), "L1N: not self");
         _finalizeWithdrawal(_finalizeWithdrawalParams);
@@ -401,29 +424,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         );
     }
 
-    /// @dev Determines if an eth withdrawal was initiated on ZKSync Era before the upgrade to the Shared Bridge.
-    /// @param _chainId The chain ID of the transaction to check.
-    /// @param _l2BatchNumber The L2 batch number for the withdrawal.
-    /// @return Whether withdrawal was initiated on ZKsync Era before diamond proxy upgrade.
-    function _isEraLegacyEthWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
-        if ((_chainId == ERA_CHAIN_ID) && _eraPostDiamondUpgradeFirstBatch == 0) {
-            revert SharedBridgeValueNotSet(SharedBridgeKey.PostUpgradeFirstBatch);
-        }
-        return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < _eraPostDiamondUpgradeFirstBatch);
-    }
-
-    /// @dev Determines if a token withdrawal was initiated on ZKSync Era before the upgrade to the Shared Bridge.
-    /// @param _chainId The chain ID of the transaction to check.
-    /// @param _l2BatchNumber The L2 batch number for the withdrawal.
-    /// @return Whether withdrawal was initiated on ZKsync Era before Legacy Bridge upgrade.
-    function _isEraLegacyTokenWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
-        if ((_chainId == ERA_CHAIN_ID) && _eraPostLegacyBridgeUpgradeFirstBatch == 0) {
-            revert SharedBridgeValueNotSet(SharedBridgeKey.LegacyBridgeFirstBatch);
-        }
-        return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < _eraPostLegacyBridgeUpgradeFirstBatch);
-    }
-
-    /// @dev Determines if a deposit was initiated on ZKSync Era before the upgrade to the Shared Bridge.
+    /// @dev Determines if a deposit was initiated on ZKsync Era before the upgrade to the Shared Bridge.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _l2BatchNumber The L2 batch number for the deposit where it was processed.
     /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the deposit was processed.
@@ -461,7 +462,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _finalizeWithdrawalParams.l2MessageIndex
         ] = true;
 
-        // Handling special case for withdrawal from ZKSync Era initiated before Shared Bridge.
+        // Handling special case for withdrawal from ZKsync Era initiated before Shared Bridge.
         require(
             !_isEraLegacyEthWithdrawal(_finalizeWithdrawalParams.chainId, _finalizeWithdrawalParams.l2BatchNumber),
             "L1N: legacy eth withdrawal"
@@ -894,7 +895,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         l1Asset = INativeTokenVault(address(nativeTokenVault)).tokenAddress(assetId);
     }
 
-    /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on ZKSync Era chain.
+    /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on ZKsync Era chain.
     /// This function is specifically designed for maintaining backward-compatibility with legacy `claimFailedDeposit`
     /// method in `L1ERC20Bridge`.
     ///
