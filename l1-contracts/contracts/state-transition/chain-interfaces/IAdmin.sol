@@ -148,5 +148,5 @@ interface IAdmin is IZkSyncHyperchainBase {
     ) external payable;
 
     /// @dev Similar to IL1AssetHandler interface, used to receive chains.
-    function forwardedBridgeMint(bytes calldata _data) external payable;
+    function forwardedBridgeMint(bytes calldata _data, bool _contractAlreadyDeployed) external payable;
 }
