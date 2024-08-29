@@ -127,7 +127,7 @@ interface IL1Nullifier {
 
     function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
 
-    function nativeTokenVault() external view returns (IL1NativeTokenVault);
+    function l1NativeTokenVault() external view returns (IL1NativeTokenVault);
 
     function setL1NativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external;
 
@@ -138,4 +138,6 @@ interface IL1Nullifier {
     function transferTokenToNTV(address _token) external;
 
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external;
+
+    function transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) external;
 }

@@ -97,7 +97,6 @@ describe("Shared Bridge tests", () => {
       .approve(l1NativeTokenVault.address, ethers.utils.parseUnits("10000", 18));
 
     await l1NativeTokenVault.registerToken(erc20TestToken.address);
-    // console.log(deployer.addresses)
   });
 
   it("Should not allow depositing zero erc20 amount", async () => {
@@ -181,7 +180,6 @@ describe("Shared Bridge tests", () => {
           [ethers.constants.HashZero]
         )
     );
-    console.log(revertReason);
     expect(revertReason).contains("L2WithdrawalMessageWrongLength");
   });
 

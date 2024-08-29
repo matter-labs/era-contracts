@@ -4,6 +4,8 @@ pragma solidity 0.8.24;
 
 // solhint-disable reason-string, gas-custom-errors
 
+import "hardhat/console.sol";
+
 // import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 // import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
@@ -39,7 +41,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     using SafeERC20 for IERC20;
 
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
-    IL1Nullifier public immutable override NULLIFIER;
+    IL1Nullifier public immutable override L1_NULLIFIER;
 
     /// @dev Era's chainID
     uint256 public immutable ERA_CHAIN_ID;
@@ -63,13 +65,13 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address _baseTokenAddress
     ) NativeTokenVault(_wethAddress, _l1AssetRouter, _baseTokenAddress) {
         ERA_CHAIN_ID = _eraChainId;
-        NULLIFIER = _l1Nullifier;
+        L1_NULLIFIER = _l1Nullifier;
         wrappedTokenProxyBytecode = _wrappedTokenProxyBytecode;
     }
 
     /// @dev Accepts ether only from the contract that was the shared Bridge.
     receive() external payable {
-        if ((address(NULLIFIER) != msg.sender) && (address(ASSET_ROUTER) != msg.sender)) {
+        if ((address(L1_NULLIFIER) != msg.sender) && (address(ASSET_ROUTER) != msg.sender)) {
             revert Unauthorized(msg.sender);
         }
     }
@@ -91,7 +93,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     function transferFundsFromSharedBridge(address _token) external {
         if (_token == ETH_TOKEN_ADDRESS) {
             uint256 balanceBefore = address(this).balance;
-            NULLIFIER.transferTokenToNTV(_token);
+            L1_NULLIFIER.transferTokenToNTV(_token);
             uint256 balanceAfter = address(this).balance;
             if (balanceAfter <= balanceBefore) {
                 revert NoFundsTransferred();
@@ -100,7 +102,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
             uint256 sharedBridgeChainBalance = IERC20(_token).balanceOf(address(ASSET_ROUTER));
             require(sharedBridgeChainBalance > 0, "NTV: 0 amount to transfer");
-            NULLIFIER.transferTokenToNTV(_token);
+            L1_NULLIFIER.transferTokenToNTV(_token);
             uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
             require(balanceAfter - balanceBefore >= sharedBridgeChainBalance, "NTV: wrong amount transferred");
         }
@@ -111,14 +113,25 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     /// @param _targetChainId The chain ID of the corresponding ZK chain.
     function updateChainBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
-        uint256 sharedBridgeChainBalance = NULLIFIER.chainBalance(_targetChainId, _token);
+        uint256 sharedBridgeChainBalance = L1_NULLIFIER.chainBalance(_targetChainId, _token);
         chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + sharedBridgeChainBalance;
-        NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
+        L1_NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
     }
 
     /*//////////////////////////////////////////////////////////////
                             L1 SPECIFIC FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    function _bridgeBurnNativeToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _prevMsgSender,
+        bytes calldata _data
+    ) internal override returns (bytes memory _bridgeMintData) {
+        (uint256 _depositAmount, address _receiver) = abi.decode(_data, (uint256, address));
+        L1_NULLIFIER.transferAllowanceToNTV(_assetId, _depositAmount, _prevMsgSender);
+        _bridgeMintData = super._bridgeBurnNativeToken(_chainId, _assetId, _prevMsgSender, _data);
+    }
 
     ///  @inheritdoc IL1AssetHandler
     function bridgeRecoverFailedTransfer(
@@ -167,6 +180,24 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             abi.encodePacked(bytes1(0xff), address(this), salt, keccak256(wrappedTokenProxyBytecode))
         );
         return address(uint160(uint256(hash)));
+    }
+
+    /// @notice Transfers tokens from the depositor address to the smart contract address.
+    /// @param _from The address of the depositor.
+    /// @param _token The ERC20 token to be transferred.
+    /// @param _amount The amount to be transferred.
+    /// @return The difference between the contract balance before and after the transferring of funds.
+    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal override returns (uint256) {
+        address from = _from;
+        // in the legacy scenario the SharedBridge = L1Nullifier was granting the allowance, we have to transfer from them instead of the user
+        if (
+            _token.allowance(address(L1_NULLIFIER), address(this)) >= _amount &&
+            _token.allowance(_from, address(this)) < _amount
+        ) {
+            console.log("kl todo _depositFunds");
+            from = address(L1_NULLIFIER);
+        }
+        return super._depositFunds(from, _token, _amount);
     }
 
     // kl todo move to beacon proxy here as well

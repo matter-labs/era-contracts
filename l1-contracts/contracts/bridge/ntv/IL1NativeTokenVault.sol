@@ -15,7 +15,7 @@ import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 // is IL1AssetHandler, IL1BaseTokenAssetHandler {
 interface IL1NativeTokenVault {
     /// @notice The L1Nullifier contract
-    function NULLIFIER() external view returns (IL1Nullifier);
+    function L1_NULLIFIER() external view returns (IL1Nullifier);
 
     /// @notice The weth contract
     // function WETH_TOKEN() external view returns (address);

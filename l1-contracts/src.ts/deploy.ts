@@ -1228,8 +1228,8 @@ export class Deployer {
 
     const stmData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [newAdmin, initialDiamondCut]);
     const bridgehubData = new ethers.utils.AbiCoder().encode(
-      [BRIDGEHUB_STM_ASSET_DATA_ABI_STRING],
-      [[this.chainId, stmData, chainData]]
+      ["uint256", "bytes", "bytes"],
+      [this.chainId, stmData, chainData]
     );
 
     // console.log("bridgehubData", bridgehubData)
@@ -1274,7 +1274,7 @@ export class Deployer {
   }
 
   public async finishMoveChainToL1(synclayerChainId: number) {
-    const sharedBridge = this.defaultSharedBridge(this.deployWallet);
+    const nullifier = this.l1NullifierContract(this.deployWallet);
     // const baseTokenAmount = ethers.utils.parseEther("1");
     // const chainData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [ADDRESS_ONE, "0x"]); // todo
     // const bridgehubData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [this.chainId, chainData]);
@@ -1290,7 +1290,7 @@ export class Deployer {
     const l2TxNumberInBatch = 1;
     const message = ethers.utils.defaultAbiCoder.encode(["bytes32", "bytes"], []);
     const merkleProof = ["0x00"];
-    const tx = await sharedBridge.finalizeWithdrawal(
+    const tx = await nullifier.finalizeWithdrawal(
       synclayerChainId,
       l2BatchNumber,
       l2MsgIndex,

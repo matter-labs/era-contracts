@@ -104,6 +104,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
                             INITIATTE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
+
     /// @inheritdoc IAssetRouterBase
     function bridgehubDepositBaseToken(
         uint256 _chainId,
@@ -186,7 +187,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
-            _value: _value,
+            _msgValue: _value,
             _assetId: assetId,
             _prevMsgSender: _prevMsgSender,
             _transferData: transferData,
@@ -327,7 +328,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @dev send the burn message to the asset
     /// @notice Forwards the burn request for specific asset to respective asset handler.
     /// @param _chainId The chain ID of the ZK chain to which to deposit.
-    /// @param _value The L2 `msg.value` from the L1 -> L2 deposit transaction.
+    /// @param _msgValue The L2 `msg.value` from the L1 -> L2 deposit transaction.
     /// @param _assetId The deposited asset ID.
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
     /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
@@ -335,19 +336,19 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @return bridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
     function _burn(
         uint256 _chainId,
-        // solhint-disable-next-line no-unused-vars
-        uint256 _value,
+        uint256 _msgValue,
         bytes32 _assetId,
         address _prevMsgSender,
         bytes memory _transferData,
         bool _passValue
     ) internal returns (bytes memory bridgeMintCalldata) {
         address l1AssetHandler = assetHandlerAddress[_assetId];
+        require(l1AssetHandler != address(0), "ShB: asset handler does not exist for assetId");
+        
         uint256 msgValue = _passValue ? msg.value : 0;
-
         bridgeMintCalldata = IAssetHandler(l1AssetHandler).bridgeBurn{value: msgValue}({
             _chainId: _chainId,
-            _msgValue: 0, // kl todo or value?
+            _msgValue: _msgValue,
             _assetId: _assetId,
             _prevMsgSender: _prevMsgSender,
             _data: _transferData

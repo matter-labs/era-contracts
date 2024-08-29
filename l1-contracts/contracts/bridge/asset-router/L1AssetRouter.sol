@@ -201,12 +201,10 @@ contract L1AssetRouter is
         address _prevMsgSender,
         uint256 _amount
     ) public payable virtual override onlyBridgehubOrEra(_chainId) whenNotPaused {
-        _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
         _bridgehubDepositBaseToken(_chainId, _assetId, _prevMsgSender, _amount);
     }
 
     /// @notice Routes the confirmation to nullifier for backward compatibility.
-
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
     /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
     /// @param _chainId The chain ID of the ZK chain to which confirm the deposit.
@@ -301,50 +299,27 @@ contract L1AssetRouter is
             _assetData
         );
 
-        emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetId, _assetData);
+        emit ClaimedFailedDepositAssetRouter(_chainId, _assetId, _assetData);
     }
     /*//////////////////////////////////////////////////////////////
                      Internal & Helpers
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Transfers allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
-    /// @dev assetId is not the padded address, but the correct encoded id (NTV stores respective format for IDs)
-    /// @param _amount The asset amount to be transferred to native token vault.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    function _transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) internal {
-        address l1TokenAddress = nativeTokenVault.tokenAddress(_assetId);
-        if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
-            return;
-        }
-        IERC20 l1Token = IERC20(l1TokenAddress);
-
-        // Do the transfer if allowance to Shared bridge is bigger than amount
-        // And if there is not enough allowance for the NTV
-        if (
-            l1Token.allowance(_prevMsgSender, address(this)) >= _amount &&
-            l1Token.allowance(_prevMsgSender, address(nativeTokenVault)) < _amount
-        ) {
-            // slither-disable-next-line arbitrary-send-erc20
-            l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
-            l1Token.forceApprove(address(nativeTokenVault), _amount);
-        }
-    }
-
     /// @notice Decodes the transfer input for legacy data and transfers allowance to NTV.
     /// @dev Is not applicable for custom asset handlers.
     /// @param _data The encoded transfer data (address _l1Token, uint256 _depositAmount, address _l2Receiver).
-    /// @param _prevMsgSender The address of the deposit initiator.
+    // / @param _prevMsgSender The address of the deposit initiator.
     /// @return Tuple of asset ID and encoded transfer data to conform with new encoding standard.
     function _handleLegacyData(
         bytes calldata _data,
-        address _prevMsgSender
+        address 
     ) internal override returns (bytes32, bytes memory) {
         (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
             _data,
             (address, uint256, address)
         );
         bytes32 assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-        _transferAllowanceToNTV(assetId, _depositAmount, _prevMsgSender);
+        // L1_NULLIFIER.transferAllowanceToNTV(assetId, _depositAmount, _prevMsgSender);
         return (assetId, abi.encode(_depositAmount, _l2Receiver));
     }
 

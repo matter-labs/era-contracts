@@ -105,14 +105,22 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 
     /// @dev Address of native token vault.
-    IL1NativeTokenVault public nativeTokenVault;
+    IL1NativeTokenVault public l1NativeTokenVault;
 
     /// @dev Address of L1 asset router.
     IL1AssetRouter public l1AssetRouter;
 
-    /// @notice Checks that the message sender is the bridgehub.
+    /// @notice Checks that the message sender is the asset router..
     modifier onlyAssetRouter() {
         if (msg.sender != address(l1AssetRouter)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice Checks that the message sender is the native token vault.
+    modifier onlyL1NTV() {
+        if (msg.sender != address(l1NativeTokenVault)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -133,6 +141,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         }
         _;
     }
+
+
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -178,7 +188,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev This function is part of the upgrade process used to transfer liquidity.
     /// @param _token The address of the token to be transferred to NTV.
     function transferTokenToNTV(address _token) external {
-        address ntvAddress = address(nativeTokenVault);
+        address ntvAddress = address(l1NativeTokenVault);
         require(msg.sender == ntvAddress, "L1AR: not NTV");
         if (ETH_TOKEN_ADDRESS == _token) {
             uint256 amount = address(this).balance;
@@ -198,7 +208,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _chainId The ID of the ZK chain.
     /// @param _token The address of the token which was previously deposit to shared bridge.
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external {
-        require(msg.sender == address(nativeTokenVault), "L1AR: not NTV");
+        require(msg.sender == address(l1NativeTokenVault), "L1AR: not NTV");
         chainBalance[_chainId][_token] = 0;
     }
 
@@ -214,11 +224,11 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
-    /// @param _nativeTokenVault The address of the native token vault.
-    function setL1NativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external onlyOwner {
-        require(address(nativeTokenVault) == address(0), "Nullifier: native token vault already set");
-        require(address(_nativeTokenVault) != address(0), "Nullifier: native token vault 0");
-        nativeTokenVault = _nativeTokenVault;
+    /// @param _l1NativeTokenVault The address of the native token vault.
+    function setL1NativeTokenVault(IL1NativeTokenVault _l1NativeTokenVault) external onlyOwner {
+        require(address(l1NativeTokenVault) == address(0), "Nullifier: native token vault already set");
+        require(address(_l1NativeTokenVault) != address(0), "Nullifier: native token vault 0");
+        l1NativeTokenVault = _l1NativeTokenVault;
     }
 
     /// @notice Sets the L1 asset router contract address.
@@ -340,8 +350,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev assetId is not the padded address, but the correct encoded id (NTV stores respective format for IDs)
     /// @param _amount The asset amount to be transferred to native token vault.
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    function transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) external onlyAssetRouter {
-        address l1TokenAddress = INativeTokenVault(address(nativeTokenVault)).tokenAddress(_assetId);
+    function transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) external onlyL1NTV {
+        address l1TokenAddress = INativeTokenVault(address(l1NativeTokenVault)).tokenAddress(_assetId);
         if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
             return;
         }
@@ -351,13 +361,14 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         // And if there is not enough allowance for the NTV
         if (
             l1Token.allowance(_prevMsgSender, address(this)) >= _amount &&
-            l1Token.allowance(_prevMsgSender, address(nativeTokenVault)) < _amount
+            l1Token.allowance(_prevMsgSender, address(l1NativeTokenVault)) < _amount
         ) {
             // slither-disable-next-line arbitrary-send-erc20
             l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
-            l1Token.forceApprove(address(nativeTokenVault), _amount);
+            l1Token.forceApprove(address(l1NativeTokenVault), _amount);
         }
     }
+
     /// @dev Determines if an eth withdrawal was initiated on ZKsync Era before the upgrade to the Shared Bridge.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
@@ -699,7 +710,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        bytes32 assetId = INativeTokenVault(address(nativeTokenVault)).getAssetId(block.chainid, _l1Token);
+        bytes32 assetId = INativeTokenVault(address(l1NativeTokenVault)).getAssetId(block.chainid, _l1Token);
         // For legacy deposits, the l2 receiver is not required to check tx data hash
         // bytes memory transferData = abi.encode(_amount, _depositSender);
         bytes memory assetData = abi.encode(_amount, address(0));
@@ -729,9 +740,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _l1Token The L1 token address which should be registered with native token vault.
     /// @return assetId The asset ID of the token provided.
     function _ensureTokenRegisteredWithNTV(address _l1Token) internal returns (bytes32 assetId) {
-        assetId = INativeTokenVault(address(nativeTokenVault)).getAssetId(block.chainid, _l1Token);
-        if (INativeTokenVault(address(nativeTokenVault)).tokenAddress(assetId) == address(0)) {
-            INativeTokenVault(address(nativeTokenVault)).registerToken(_l1Token);
+        assetId = INativeTokenVault(address(l1NativeTokenVault)).getAssetId(block.chainid, _l1Token);
+        if (INativeTokenVault(address(l1NativeTokenVault)).tokenAddress(assetId) == address(0)) {
+            INativeTokenVault(address(l1NativeTokenVault)).registerToken(_l1Token);
         }
     }
 
@@ -800,7 +811,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         {
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-            IERC20(_l1Token).forceApprove(address(nativeTokenVault), _amount);
+            IERC20(_l1Token).forceApprove(address(l1NativeTokenVault), _amount);
 
             // solhint-disable-next-line func-named-parameters
             // bridgeMintCalldata = abi.encode(_amount, _prevMsgSender, _l2Receiver, getERC20Getters(_l1Token), _l1Token); // kl todo check correct
@@ -892,7 +903,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _merkleProof
             // )
         );
-        l1Asset = INativeTokenVault(address(nativeTokenVault)).tokenAddress(assetId);
+        l1Asset = INativeTokenVault(address(l1NativeTokenVault)).tokenAddress(assetId);
     }
 
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on ZKsync Era chain.
@@ -918,7 +929,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge {
         bytes memory assetData = abi.encode(_amount, _depositSender);
-        bytes32 assetId = INativeTokenVault(address(nativeTokenVault)).getAssetId(block.chainid, _l1Asset); // kl todo this chain?
+        bytes32 assetId = INativeTokenVault(address(l1NativeTokenVault)).getAssetId(block.chainid, _l1Asset); // kl todo this chain?
 
         bridgeVerifyFailedTransfer({
             _depositSender: _depositSender,

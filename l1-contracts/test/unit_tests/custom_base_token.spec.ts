@@ -102,7 +102,7 @@ describe("Custom base token chain and bridge tests", () => {
   it("Should deposit base token successfully direct via bridgehub", async () => {
     await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), ethers.utils.parseUnits("800", 18));
     await (
-      await baseToken.connect(randomSigner).approve(l1SharedBridge.address, ethers.utils.parseUnits("800", 18))
+      await baseToken.connect(randomSigner).approve(l1Nullifier.address, ethers.utils.parseUnits("800", 18))
     ).wait();
     await bridgehub.connect(randomSigner).requestL2TransactionDirect({
       chainId,
@@ -123,10 +123,10 @@ describe("Custom base token chain and bridge tests", () => {
     const baseTokenAmount = ethers.utils.parseUnits("800", 18);
 
     await altToken.connect(randomSigner).mint(await randomSigner.getAddress(), altTokenAmount);
-    await (await altToken.connect(randomSigner).approve(l1SharedBridge.address, altTokenAmount)).wait();
+    await (await altToken.connect(randomSigner).approve(l1Nullifier.address, altTokenAmount)).wait();
 
     await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), baseTokenAmount);
-    await (await baseToken.connect(randomSigner).approve(l1SharedBridge.address, baseTokenAmount)).wait();
+    await (await baseToken.connect(randomSigner).approve(l1Nullifier.address, baseTokenAmount)).wait();
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges({
       chainId,
       mintValue: baseTokenAmount,

@@ -98,5 +98,11 @@ describe("Initial deployment test", function () {
     expect(assetRouterAddress1.toLowerCase()).equal(assetRouterAddress2.toLowerCase());
     expect(assetRouterAddress1.toLowerCase()).equal(assetRouterAddress3.toLowerCase());
     expect(assetRouterAddress1.toLowerCase()).equal(assetRouterAddress4.toLowerCase());
+
+    const ntvAddress1 = deployer.addresses.Bridges.NativeTokenVaultProxy;
+    const ntvAddress2 = await l1Nullifier.l1NativeTokenVault();
+    const ntvAddress3 = await l1AssetRouter.nativeTokenVault();
+    expect(ntvAddress1.toLowerCase()).equal(ntvAddress2.toLowerCase());
+    expect(ntvAddress1.toLowerCase()).equal(ntvAddress3.toLowerCase());
   });
 });

@@ -230,7 +230,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
-    ) internal returns (bytes memory _bridgeMintData) {
+    ) internal virtual returns (bytes memory _bridgeMintData) {
         (uint256 _depositAmount, address _receiver) = abi.decode(_data, (uint256, address));
 
         uint256 amount;
@@ -294,18 +294,10 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @param _token The ERC20 token to be transferred.
     /// @param _amount The amount to be transferred.
     /// @return The difference between the contract balance before and after the transferring of funds.
-    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
+    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal virtual returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));
-        address from = _from;
-        // in the legacy scenario the SharedBridge was granting the allowance, we have to transfer from them instead of the user
-        if (
-            _token.allowance(address(ASSET_ROUTER), address(this)) >= _amount &&
-            _token.allowance(_from, address(this)) < _amount
-        ) {
-            from = address(ASSET_ROUTER);
-        }
         // slither-disable-next-line arbitrary-send-erc20
-        _token.safeTransferFrom(from, address(this), _amount);
+        _token.safeTransferFrom(_from, address(this), _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
 
         return balanceAfter - balanceBefore;
