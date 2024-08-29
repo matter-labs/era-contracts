@@ -14,7 +14,7 @@ import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 
-import {EmptyDeposit, TokensWithFeesNotSupported, WithdrawalAlreadyFinalized} from "../common/L1ContractErrors.sol";
+import {EmptyDeposit, WithdrawalAlreadyFinalized} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -169,7 +169,10 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) public payable nonReentrant returns (bytes32 l2TxHash) {
-        require(_amount != 0, "0T"); // empty deposit
+        if (_amount == 0) {
+            // empty deposit amount
+            revert EmptyDeposit();
+        }
         uint256 amount = _depositFundsToNTV(msg.sender, IERC20(_l1Token), _amount);
         require(amount == _amount, "3T"); // The token has non-standard transfer logic
 

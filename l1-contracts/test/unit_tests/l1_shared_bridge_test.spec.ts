@@ -1,12 +1,13 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
-import type { L1AssetRouter, Bridgehub, L1NativeTokenVault, MockExecutorFacet } from "../../typechain";
+import type { L1AssetRouter, Bridgehub, L1NativeTokenVault, MockExecutorFacet, L1Nullifier } from "../../typechain";
 import {
   L1AssetRouterFactory,
   BridgehubFactory,
   TestnetERC20TokenFactory,
   MockExecutorFacetFactory,
+  L1NullifierFactory,
 } from "../../typechain";
 import { L1NativeTokenVaultFactory } from "../../typechain/L1NativeTokenVaultFactory";
 
@@ -25,6 +26,7 @@ describe("Shared Bridge tests", () => {
   let deployer: Deployer;
   let bridgehub: Bridgehub;
   let l1NativeTokenVault: L1NativeTokenVault;
+  let l1Nullifier: L1Nullifier;
   let proxyAsMockExecutor: MockExecutorFacet;
   let l1SharedBridge: L1AssetRouter;
   let erc20TestToken: ethers.Contract;
@@ -82,6 +84,7 @@ describe("Shared Bridge tests", () => {
       deployer.addresses.Bridges.NativeTokenVaultProxy,
       deployWallet
     );
+    l1Nullifier = L1NullifierFactory.connect(deployer.addresses.Bridges.L1NullifierProxy, deployWallet);
 
     const tokens = getTokens();
 
@@ -94,6 +97,7 @@ describe("Shared Bridge tests", () => {
       .approve(l1NativeTokenVault.address, ethers.utils.parseUnits("10000", 18));
 
     await l1NativeTokenVault.registerToken(erc20TestToken.address);
+    // console.log(deployer.addresses)
   });
 
   it("Should not allow depositing zero erc20 amount", async () => {
@@ -157,7 +161,7 @@ describe("Shared Bridge tests", () => {
 
   it("Should revert on finalizing a withdrawal with short message length", async () => {
     const revertReason = await getCallRevertReason(
-      l1SharedBridge
+      l1Nullifier
         .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [ethers.constants.HashZero])
     );
@@ -166,7 +170,7 @@ describe("Shared Bridge tests", () => {
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
     const revertReason = await getCallRevertReason(
-      l1SharedBridge
+      l1Nullifier
         .connect(randomSigner)
         .finalizeWithdrawal(
           chainId,
@@ -177,12 +181,13 @@ describe("Shared Bridge tests", () => {
           [ethers.constants.HashZero]
         )
     );
+    console.log(revertReason);
     expect(revertReason).contains("L2WithdrawalMessageWrongLength");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
+      l1Nullifier.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
     );
     expect(revertReason).contains("InvalidSelector");
   });
@@ -213,7 +218,7 @@ describe("Shared Bridge tests", () => {
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
     const revertReason = await getCallRevertReason(
-      l1SharedBridge
+      l1Nullifier
         .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [ethers.constants.HashZero])
     );
@@ -222,7 +227,7 @@ describe("Shared Bridge tests", () => {
 
   it("Should revert on finalizing a withdrawal with wrong function signature", async () => {
     const revertReason = await getCallRevertReason(
-      l1SharedBridge
+      l1Nullifier
         .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
     );
@@ -238,7 +243,7 @@ describe("Shared Bridge tests", () => {
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 10, 0, 0, l2ToL1message, dummyProof)
+      l1Nullifier.connect(randomSigner).finalizeWithdrawal(chainId, 10, 0, 0, l2ToL1message, dummyProof)
     );
     expect(revertReason).contains("BatchNotExecuted");
   });
@@ -252,7 +257,7 @@ describe("Shared Bridge tests", () => {
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, [])
+      l1Nullifier.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, [])
     );
     expect(revertReason).contains("MerklePathEmpty");
   });
@@ -266,7 +271,7 @@ describe("Shared Bridge tests", () => {
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
-      l1SharedBridge
+      l1Nullifier
         .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, [dummyProof[0], dummyProof[1]])
     );

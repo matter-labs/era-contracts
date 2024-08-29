@@ -8,19 +8,19 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {IL2SharedBridge} from "../interfaces/IL2SharedBridge.sol";
-import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
+// import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
+// import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
 import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
+// import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
-import {InvalidCaller, UnsupportedEncodingVersion, InvalidChainId, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
+import {UnsupportedEncodingVersion, InvalidChainId, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -62,19 +62,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(uint256 _eraChainId, IBridgehub _bridgehub, address _baseTokenAddress) {
+    constructor(uint256 _l1ChainId, uint256 _eraChainId, IBridgehub _bridgehub, address _baseTokenAddress) {
+        L1_CHAIN_ID = _l1ChainId;
         ERA_CHAIN_ID = _eraChainId;
         BRIDGE_HUB = _bridgehub;
         BASE_TOKEN_ADDRESS = _baseTokenAddress;
-    }
-
-    /// @notice Sets the L1ERC20Bridge contract address.
-    /// @dev Should be called only once by the owner.
-    /// @param _nativeTokenVault The address of the native token vault.
-    function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external onlyOwner {
-        require(address(nativeTokenVault) == address(0), "AR: native token v already set");
-        require(address(_nativeTokenVault) != address(0), "AR: native token vault 0");
-        nativeTokenVault = _nativeTokenVault;
     }
 
     /// @notice Sets the asset handler address for a specified asset ID on the chain of the asset deployment tracker.
@@ -109,7 +101,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     ) internal virtual returns (L2TransactionRequestTwoBridgesInner memory request) {}
 
     /*//////////////////////////////////////////////////////////////
-                            Start transaction Functions
+                            INITIATTE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetRouterBase
@@ -119,8 +111,18 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         address _prevMsgSender,
         uint256 _amount
     ) public payable virtual override onlyBridgehub whenNotPaused {
+        _bridgehubDepositBaseToken(_chainId, _assetId, _prevMsgSender, _amount);
+    }
+
+    function _bridgehubDepositBaseToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _prevMsgSender,
+        uint256 _amount
+    ) internal {
         address assetHandler = assetHandlerAddress[_assetId];
         // require(l1AssetHandler != address(0), "AR: asset handler not set");
+
         // slither-disable-next-line unused-return
         IAssetHandler(assetHandler).bridgeBurn{value: msg.value}({
             _chainId: _chainId,
@@ -212,7 +214,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external virtual {}
 
     /// @inheritdoc IAssetRouterBase
-    function getDepositL2Calldata(
+    function getDepositCalldata(
         uint256 _chainId,
         address _sender,
         bytes32 _assetId,
@@ -226,13 +228,17 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             // slither-disable-next-line unused-return
             (, address _receiver, address _parsedNativeToken, uint256 _amount, bytes memory _gettersData) = DataEncoding
                 .decodeBridgeMintData(_assetData);
-            return
-                abi.encodeCall(
-                    IL2SharedBridge.finalizeDeposit,
-                    (_sender, _receiver, _parsedNativeToken, _amount, _gettersData)
-                );
+            return _getLegacyNTVCalldata(_sender, _receiver, _parsedNativeToken, _amount, _gettersData);
         }
     }
+
+    function _getLegacyNTVCalldata(
+        address _sender,
+        address _receiver,
+        address _parsedNativeToken,
+        uint256 _amount,
+        bytes memory _gettersData
+    ) internal view virtual returns (bytes memory) {}
 
     /*//////////////////////////////////////////////////////////////
                             Receive transaction Functions
@@ -280,7 +286,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes memory _bridgeMintCalldata,
         bytes32 _txDataHash
     ) internal view virtual returns (L2TransactionRequestTwoBridgesInner memory request) {
-        bytes memory l2TxCalldata = getDepositL2Calldata(_chainId, _prevMsgSender, _assetId, _bridgeMintCalldata);
+        bytes memory l2TxCalldata = getDepositCalldata(_chainId, _prevMsgSender, _assetId, _bridgeMintCalldata);
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
@@ -329,6 +335,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @return bridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
     function _burn(
         uint256 _chainId,
+        // solhint-disable-next-line no-unused-vars
         uint256 _value,
         bytes32 _assetId,
         address _prevMsgSender,

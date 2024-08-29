@@ -3,8 +3,9 @@
 pragma solidity ^0.8.21;
 
 import {L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
-import {IAssetRouterBase} from "./IAssetRouterBase.sol";
+// import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
+import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 // import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 
 /// @title L1 Bridge contract interface
@@ -91,6 +92,8 @@ interface IL1AssetRouter {
     //     bytes32[] calldata _merkleProof
     // ) external;
 
+    function L1_NULLIFIER() external view returns (IL1Nullifier);
+
     // function L1_WETH_TOKEN() external view returns (address);
 
     // function BRIDGE_HUB() external view returns (IBridgehub);
@@ -109,7 +112,9 @@ interface IL1AssetRouter {
     /// @dev Will be used by ZK Gateway
     function setAssetHandlerAddress(address _sender, bytes32 _assetId, address _assetAddress) external;
 
-    function setL1Nullifier(IL1Nullifier _l1Nullifier) external;
+    // function setL1Nullifier(IL1Nullifier _l1Nullifier) external;
+
+    function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external;
 
     // function bridgehubWithdraw(
     //     uint256 _chainId,

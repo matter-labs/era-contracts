@@ -8,8 +8,10 @@ import type { IBridgehub } from "../../typechain/IBridgehub";
 import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
 import type { IL1AssetRouter } from "../../typechain/IL1AssetRouter";
 import { IL1AssetRouterFactory } from "../../typechain/IL1AssetRouterFactory";
-import type { IL1NativeTokenVault } from "../../typechain/IL1NativeTokenVault";
-import { IL1NativeTokenVaultFactory } from "../../typechain/IL1NativeTokenVaultFactory";
+import type { IL1NativeTokenVaultCombined } from "../../typechain/IL1NativeTokenVaultCombined";
+import { IL1NativeTokenVaultCombinedFactory } from "../../typechain/IL1NativeTokenVaultCombinedFactory";
+import type { IL1Nullifier } from "../../typechain/IL1Nullifier";
+import { IL1NullifierFactory } from "../../typechain/IL1NullifierFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
@@ -24,8 +26,9 @@ describe("Custom base token chain and bridge tests", () => {
   let deployWallet: Wallet;
   let deployer: Deployer;
   let l1SharedBridge: IL1AssetRouter;
+  let l1Nullifier: IL1Nullifier;
   let bridgehub: IBridgehub;
-  let nativeTokenVault: IL1NativeTokenVault;
+  let nativeTokenVault: IL1NativeTokenVaultCombined;
   let baseToken: TestnetERC20Token;
   let baseTokenAddress: string;
   let altTokenAddress: string;
@@ -64,8 +67,9 @@ describe("Custom base token chain and bridge tests", () => {
 
     // prepare the bridge
     l1SharedBridge = IL1AssetRouterFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
+    l1Nullifier = IL1NullifierFactory.connect(deployer.addresses.Bridges.L1NullifierProxy, deployWallet);
 
-    nativeTokenVault = IL1NativeTokenVaultFactory.connect(
+    nativeTokenVault = IL1NativeTokenVaultCombinedFactory.connect(
       deployer.addresses.Bridges.NativeTokenVaultProxy,
       deployWallet
     );
@@ -79,7 +83,7 @@ describe("Custom base token chain and bridge tests", () => {
 
   it("Should not allow direct legacy deposits", async () => {
     const revertReason = await getCallRevertReason(
-      l1SharedBridge
+      l1Nullifier
         .connect(randomSigner)
         .depositLegacyErc20Bridge(
           await randomSigner.getAddress(),
@@ -146,14 +150,14 @@ describe("Custom base token chain and bridge tests", () => {
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
     const mailboxFunctionSignature = "0x6c0960f9";
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [])
+      l1Nullifier.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [])
     );
     expect(revertReason).contains("L2WithdrawalMessageWrongLength");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
+      l1Nullifier.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
     );
     expect(revertReason).contains("InvalidSelector");
   });

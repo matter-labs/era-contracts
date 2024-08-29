@@ -26,6 +26,7 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESS
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_PROOF_METADATA_VERSION} from "../../../common/Config.sol";
 
 import {IAssetRouterBase} from "../../../bridge/asset-router/IAssetRouterBase.sol";
+import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier, FinalizeWithdrawalParams} from "../../../bridge/interfaces/IL1Nullifier.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
@@ -618,14 +619,22 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         if (s.chainId != ERA_CHAIN_ID) {
             revert OnlyEraSupported();
         }
-        IL1Nullifier(s.baseTokenBridge).finalizeWithdrawal({
-            _chainId: ERA_CHAIN_ID,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _message: _message,
-            _merkleProof: _merkleProof
-        });
+        // IL1Nullifier(s.baseTokenBridge).finalizeWithdrawal({
+        //     _chainId: ERA_CHAIN_ID,
+        //     _l2BatchNumber: _l2BatchNumber,
+        //     _l2MessageIndex: _l2MessageIndex,
+        //     _l2TxNumberInBatch: _l2TxNumberInBatch,
+        //     _message: _message,
+        //     _merkleProof: _merkleProof
+        // });
+        IL1AssetRouter(s.baseTokenBridge).L1_NULLIFIER().finalizeWithdrawal(
+            ERA_CHAIN_ID,
+            _l2BatchNumber,
+            _l2MessageIndex,
+            _l2TxNumberInBatch,
+            _message,
+            _merkleProof
+        );
     }
 
     ///  @inheritdoc IMailbox

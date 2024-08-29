@@ -2,17 +2,17 @@
 
 pragma solidity 0.8.24;
 
-import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
+// import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
 
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
-import {IAssetRouterBase} from "./IAssetRouterBase.sol";
+// import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL2NativeTokenVault, INativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
 
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
-import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
+// import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
@@ -65,9 +65,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256 _eraChainId,
         address _l1AssetRouter,
         address _legacySharedBridge
-    ) AssetRouterBase(_eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR), L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR) {
+    ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR), L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR) {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
-        L1_CHAIN_ID = _l1ChainId;
         if (_l1AssetRouter == address(0)) {
             revert EmptyAddress();
         }
@@ -86,6 +85,14 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         _setAssetHandlerAddress(_assetId, _assetAddress);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            INITIATTE DEPOSIT Functions
+    //////////////////////////////////////////////////////////////*/
+
+    /*//////////////////////////////////////////////////////////////
+                            Receive transaction Functions
+    //////////////////////////////////////////////////////////////*/
+
     /// @notice Finalize the deposit and mint funds
     /// @param _assetId The encoding of the asset on L2
     /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken)
@@ -102,48 +109,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         }
 
         emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, _transferData);
-    }
-
-    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
-    /// where tokens would be unlocked
-    /// @param _assetId The asset id of the withdrawn asset
-    /// @param _assetData The data that is passed to the asset handler contract
-    function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
-        _withdrawSender(_assetId, _assetData, msg.sender);
-    }
-
-    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
-    /// where tokens would be unlocked
-    /// @param _assetId The asset id of the withdrawn asset
-    /// @param _assetData The data that is passed to the asset handler contract
-    /// @param _sender The address of the sender of the message
-    function _withdrawSender(bytes32 _assetId, bytes memory _assetData, address _sender) internal {
-        address assetHandler = assetHandlerAddress[_assetId];
-        bytes memory _l1bridgeMintData = IAssetHandler(assetHandler).bridgeBurn({
-            _chainId: L1_CHAIN_ID,
-            _msgValue: 0,
-            _assetId: _assetId,
-            _prevMsgSender: _sender,
-            _data: _assetData
-        });
-
-        bytes memory message = _getL1WithdrawMessage(_assetId, _l1bridgeMintData);
-        L2ContractHelper.sendMessageToL1(message);
-
-        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, _sender, _assetId, _assetData);
-    }
-
-    /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
-    /// @param _assetId The encoding of the asset on L2 which is withdrawn.
-    /// @param _l1bridgeMintData The calldata used by l1 asset handler to unlock tokens for recipient.
-    function _getL1WithdrawMessage(
-        bytes32 _assetId,
-        bytes memory _l1bridgeMintData
-    ) internal pure returns (bytes memory) {
-        // note we use the IL1SharedBridge.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
-        // and we use this interface so that when the switch happened the old messages could be processed
-        // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IL1AssetRouter.finalizeWithdrawal.selector, _assetId, _l1bridgeMintData);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -183,6 +148,14 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         _withdrawLegacy(_l1Receiver, _l2Token, _amount, msg.sender);
     }
 
+    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
+    /// where tokens would be unlocked
+    /// @param _assetId The asset id of the withdrawn asset
+    /// @param _assetData The data that is passed to the asset handler contract
+    function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
+        _withdrawSender(_assetId, _assetData, msg.sender);
+    }
+
     /// @notice Legacy withdraw.
     /// @dev Finalizes the deposit and mint funds.
     /// @param _l1Receiver The address of token receiver on L1.
@@ -202,6 +175,40 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, getL1TokenAddress(_l2Token));
         bytes memory data = abi.encode(_amount, _l1Receiver);
         _withdrawSender(assetId, data, _sender);
+    }
+
+    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
+    /// where tokens would be unlocked
+    /// @param _assetId The asset id of the withdrawn asset
+    /// @param _assetData The data that is passed to the asset handler contract
+    /// @param _sender The address of the sender of the message
+    function _withdrawSender(bytes32 _assetId, bytes memory _assetData, address _sender) internal {
+        address assetHandler = assetHandlerAddress[_assetId];
+        bytes memory _l1bridgeMintData = IAssetHandler(assetHandler).bridgeBurn({
+            _chainId: L1_CHAIN_ID,
+            _msgValue: 0,
+            _assetId: _assetId,
+            _prevMsgSender: _sender,
+            _data: _assetData
+        });
+
+        bytes memory message = _getL1WithdrawMessage(_assetId, _l1bridgeMintData);
+        L2ContractHelper.sendMessageToL1(message);
+
+        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, _sender, _assetId, _assetData);
+    }
+
+    /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
+    /// @param _assetId The encoding of the asset on L2 which is withdrawn.
+    /// @param _l1bridgeMintData The calldata used by l1 asset handler to unlock tokens for recipient.
+    function _getL1WithdrawMessage(
+        bytes32 _assetId,
+        bytes memory _l1bridgeMintData
+    ) internal pure returns (bytes memory) {
+        // note we use the IL1SharedBridge.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
+        // and we use this interface so that when the switch happened the old messages could be processed
+        // solhint-disable-next-line func-named-parameters
+        return abi.encodePacked(IL1AssetRouter.finalizeWithdrawal.selector, _assetId, _l1bridgeMintData);
     }
 
     /// @notice Legacy getL1TokenAddress.

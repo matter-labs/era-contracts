@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
-import {INativeTokenVault} from "./INativeTokenVault.sol";
+// import {INativeTokenVault} from "./INativeTokenVault.sol";
 // import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 // import {IL1AssetHandler} from "./IL1AssetHandler.sol";
 // import {IL1BaseTokenAssetHandler} from "./IL1BaseTokenAssetHandler.sol";

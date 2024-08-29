@@ -539,7 +539,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         }
 
         address refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
-
+        // kl todo enable L2->L1 txs here, ( we also need to add method to L1MessageSender)
         canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(
             BridgehubL2TransactionRequest({
                 sender: _request.secondBridgeAddress,

@@ -95,65 +95,13 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         tokenAddress[assetId] = _l2TokenAddress;
     }
 
-    // / @notice Used when the chain receives a transfer from L1 Shared Bridge and correspondingly mints the asset.
-    // / @param _chainId The chainId that the message is from.
-    // / @param _assetId The assetId of the asset being bridged.
-    // / @param _data The abi.encoded transfer data.
-    // function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable override onlyBridge {
-    //     address token = tokenAddress[_assetId];
-    //     (
-    //         address _l1Sender,
-    //         address _l2Receiver,
-    //         address originToken,
-    //         uint256 _amount,
-    //         bytes memory erc20Data
-    //     ) = DataEncoding.decodeBridgeMintData(_data);
-
-    //     if (token == address(0)) {
-    //         address expectedToken = calculateCreate2TokenAddress(originToken);
-    //         bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, originToken);
-    //         if (_assetId != expectedAssetId) {
-    //             // Make sure that a NativeTokenVault sent the message
-    //             revert AssetIdMismatch(expectedAssetId, _assetId);
-    //         }
-    //         address l1LegacyToken;
-    //         if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
-    //             l1LegacyToken = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(expectedToken);
-    //         }
-    //         if (l1LegacyToken != address(0)) {
-    //             /// token is a legacy token, no need to deploy
-    //             if (l1LegacyToken != originToken) {
-    //                 revert AddressMismatch(originToken, l1LegacyToken);
-    //             }
-    //         } else {
-    //             address deployedToken = _deployL2Token(originToken, erc20Data);
-    //             if (deployedToken != expectedToken) {
-    //                 revert AddressMismatch(expectedToken, deployedToken);
-    //             }
-    //         }
-    //         tokenAddress[_assetId] = expectedToken;
-    //         token = expectedToken;
-    //     }
-
-    //     IL2StandardToken(token).bridgeMint(_l2Receiver, _amount);
-    //     /// backwards compatible event
-    //     emit FinalizeDeposit(_l1Sender, _l2Receiver, token, _amount);
-    //     emit BridgeMint({
-    //         chainId: _chainId,
-    //         assetId: _assetId,
-    //         sender: _l1Sender,
-    //         l2Receiver: _l2Receiver,
-    //         amount: _amount
-    //     });
-    // }
-
     function _ensureTokenDeployed(
         uint256 _originChainId,
         bytes32 _assetId,
         address _originToken,
         bytes memory _erc20Data
     ) internal override returns (address _token) {
-        address expectedToken = calculateCreate2TokenAddress(_originChainId, _originToken);
+        address expectedToken = _assetIdCheck(_originChainId, _assetId, _originToken);
         address l1LegacyToken;
         if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
             l1LegacyToken = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(expectedToken); // kl todo
@@ -167,7 +115,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             tokenAddress[_assetId] = expectedToken;
             _token = expectedToken;
         } else {
-            _token = super._ensureTokenDeployedInner(_originChainId, _assetId, _originToken, _erc20Data);
+            _token = super._ensureTokenDeployedInner(_originChainId, _assetId, _originToken, _erc20Data, expectedToken);
         }
     }
 

@@ -13,10 +13,10 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
-import {INativeTokenVault} from "./INativeTokenVault.sol";
+// import {INativeTokenVault} from "./INativeTokenVault.sol";
 import {NativeTokenVault} from "./NativeTokenVault.sol";
 
-import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
+// import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 // import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
@@ -29,7 +29,7 @@ import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 
 // import {BridgeHelper} from "./BridgeHelper.sol";
 
-import {Unauthorized, ZeroAddress, NoFundsTransferred, ValueMismatch, TokensWithFeesNotSupported, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress, NoFundsTransferred, TokensWithFeesNotSupported, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -69,7 +69,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @dev Accepts ether only from the contract that was the shared Bridge.
     receive() external payable {
-        if (address(NULLIFIER) != msg.sender) {
+        if ((address(NULLIFIER) != msg.sender) && (address(ASSET_ROUTER) != msg.sender)) {
             revert Unauthorized(msg.sender);
         }
     }
@@ -126,7 +126,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         bytes32 _assetId,
         address _depositSender,
         bytes calldata _data
-    ) external payable override onlyBridge whenNotPaused {
+    ) external payable override onlyAssetRouter whenNotPaused {
         (uint256 _amount, ) = abi.decode(_data, (uint256, address));
         address l1Token = tokenAddress[_assetId];
         if (_amount == 0) {

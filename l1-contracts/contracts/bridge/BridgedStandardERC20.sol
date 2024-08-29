@@ -7,7 +7,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {ERC1967Upgrade} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Upgrade.sol";
 
 import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
-import {EmptyAddress, Unauthorized, NonSequentialVersion, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {Unauthorized, NonSequentialVersion, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 
 /// @author Matter Labs

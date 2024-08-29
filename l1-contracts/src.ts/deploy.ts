@@ -71,6 +71,7 @@ import { BridgehubFactory, ChainAdminFactory, ERC20Factory, StateTransitionManag
 import { IL1AssetRouterCombinedFactory } from "../typechain/IL1AssetRouterCombinedFactory";
 import { IL1NativeTokenVaultCombinedFactory } from "../typechain/IL1NativeTokenVaultCombinedFactory";
 import { ISTMDeploymentTrackerFactory } from "../typechain/ISTMDeploymentTrackerFactory";
+import { IL1NullifierFactory } from "../typechain/IL1NullifierFactory";
 
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
 
@@ -865,7 +866,7 @@ export class Deployer {
     const eraDiamondProxy = getAddressFromEnv("CONTRACTS_ERA_DIAMOND_PROXY_ADDR");
     const contractAddress = await this.deployViaCreate2(
       "L1AssetRouter",
-      [this.addresses.Bridgehub.BridgehubProxy, eraChainId, eraDiamondProxy],
+      [this.addresses.Bridgehub.BridgehubProxy, this.addresses.Bridges.L1NullifierProxy, eraChainId, eraDiamondProxy],
       create2Salt,
       ethTxOptions
     );
@@ -945,13 +946,31 @@ export class Deployer {
 
     this.addresses.Bridges.NativeTokenVaultProxy = contractAddress;
 
-    const sharedBridge = this.defaultSharedBridge(this.deployWallet);
-    const data = await sharedBridge.interface.encodeFunctionData("setNativeTokenVault", [
+    const nullifier = this.l1NullifierContract(this.deployWallet);
+    const assetRouter = this.defaultSharedBridge(this.deployWallet);
+
+    const data = await assetRouter.interface.encodeFunctionData("setNativeTokenVault", [
       this.addresses.Bridges.NativeTokenVaultProxy,
     ]);
     await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data);
     if (this.verbose) {
       console.log("Native token vault set in shared bridge");
+    }
+
+    const data2 = await nullifier.interface.encodeFunctionData("setL1NativeTokenVault", [
+      this.addresses.Bridges.NativeTokenVaultProxy,
+    ]);
+    await this.executeUpgrade(this.addresses.Bridges.L1NullifierProxy, 0, data2);
+    if (this.verbose) {
+      console.log("Native token vault set in nullifier");
+    }
+
+    const data3 = await nullifier.interface.encodeFunctionData("setL1AssetRouter", [
+      this.addresses.Bridges.SharedBridgeProxy,
+    ]);
+    await this.executeUpgrade(this.addresses.Bridges.L1NullifierProxy, 0, data3);
+    if (this.verbose) {
+      console.log("Asset router set in nullifier");
     }
   }
 
@@ -1475,9 +1494,11 @@ export class Deployer {
 
     await this.deployL1NullifierImplementation(create2Salt, { gasPrice, nonce: nonce });
     await this.deployL1NullifierProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
+
     nonce = nonce + 2;
     await this.deploySharedBridgeImplementation(create2Salt, { gasPrice, nonce: nonce });
     await this.deploySharedBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
+
     await this.deployNativeTokenVaultImplementation(create2Salt, { gasPrice, nonce: nonce + 2 });
     await this.deployNativeTokenVaultProxy(create2Salt, { gasPrice });
     await this.deploySTMDeploymentTrackerImplementation(create2Salt, { gasPrice });
@@ -1623,6 +1644,10 @@ export class Deployer {
 
   public defaultSharedBridge(signerOrProvider: Signer | providers.Provider) {
     return IL1AssetRouterCombinedFactory.connect(this.addresses.Bridges.SharedBridgeProxy, signerOrProvider);
+  }
+
+  public l1NullifierContract(signerOrProvider: Signer | providers.Provider) {
+    return IL1NullifierFactory.connect(this.addresses.Bridges.L1NullifierProxy, signerOrProvider);
   }
 
   public nativeTokenVault(signerOrProvider: Signer | providers.Provider) {

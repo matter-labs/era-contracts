@@ -99,8 +99,6 @@ interface IAssetRouterBase {
 
     function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 
-    function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external;
-
     function nativeTokenVault() external view returns (INativeTokenVault);
 
     /// @notice Generates a calldata for calling the deposit finalization on the L2 native token contract.
@@ -109,7 +107,7 @@ interface IAssetRouterBase {
     /// @param _assetId The deposited asset ID.
     /// @param _assetData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
     /// @return Returns calldata used on ZK chain.
-    function getDepositL2Calldata(
+    function getDepositCalldata(
         uint256 _chainId,
         address _sender,
         bytes32 _assetId,

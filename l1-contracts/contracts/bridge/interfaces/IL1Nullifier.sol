@@ -129,7 +129,7 @@ interface IL1Nullifier {
 
     function nativeTokenVault() external view returns (IL1NativeTokenVault);
 
-    function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external;
+    function setL1NativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external;
 
     function setL1AssetRouter(IL1AssetRouter _l1AssetRouter) external;
 

@@ -77,7 +77,7 @@ export async function defaultEraDeployerForTests(deployWallet: Wallet, ownerAddr
   const deployer = new EraDeployer({
     deployWallet,
     ownerAddress,
-    verbose: true, // change here to view deployment
+    verbose: false, // change here to view deployment
     addresses: addressConfig,
     bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
     defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,

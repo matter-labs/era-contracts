@@ -4,17 +4,19 @@ import * as hardhat from "hardhat";
 import type { BytesLike } from "ethers/lib/utils";
 import { Interface } from "ethers/lib/utils";
 
-import type { Bridgehub, GettersFacet, MockExecutorFacet } from "../../typechain";
+import type { Bridgehub, GettersFacet, MockExecutorFacet, L1Nullifier } from "../../typechain";
 import {
   BridgehubFactory,
   TestnetERC20TokenFactory,
   MailboxFacetFactory,
   GettersFacetFactory,
   MockExecutorFacetFactory,
+  L1NullifierFactory,
 } from "../../typechain";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
 import type { IMailbox } from "../../typechain/IMailbox";
+import { IL1Nullifier } from "../../typechain/IL1Nullifier";
 
 import { ethTestConfig } from "../../src.ts/utils";
 import { Action, facetCut } from "../../src.ts/diamondCut";
@@ -104,6 +106,7 @@ describe("Legacy Era tests", function () {
     const sharedBridge = await sharedBridgeFactory.deploy(
       // l1WethToken,
       deployer.addresses.Bridgehub.BridgehubProxy,
+      deployer.addresses.Bridges.L1NullifierProxy,
       deployer.chainId,
       deployer.addresses.StateTransition.DiamondProxy
     );
@@ -120,6 +123,13 @@ describe("Legacy Era tests", function () {
     if (deployer.verbose) {
       console.log("L1AssetRouter upgrade sent for testing");
     }
+
+    const setL1Erc20BridgeCalldata = L1NullifierFactory.connect(
+      deployer.addresses.Bridges.L1NullifierProxy,
+      deployWallet
+    ).interface.encodeFunctionData("setL1Erc20Bridge", [l1ERC20Bridge.address]);
+
+    await deployer.executeUpgrade(deployer.addresses.Bridges.L1NullifierProxy, 0, setL1Erc20BridgeCalldata);
 
     mailbox = MailboxFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
     getter = GettersFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
@@ -209,7 +219,7 @@ describe("Legacy Era tests", function () {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, l2ToL1message, [])
     );
-    expect(revertReason).contains("L1AR: legacy eth withdrawal");
+    expect(revertReason).contains("L1N: legacy eth withdrawal");
   });
 
   it("Should revert on finalizing a withdrawal with wrong proof", async () => {
