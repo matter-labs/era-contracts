@@ -735,8 +735,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             messageRoot.addNewChain(_chainId);
         }
 
-        messageRoot.addNewChainIfNeeded(_chainId);
-        _registerNewHyperchain(_chainId, hyperchain);
         IZkSyncHyperchain(hyperchain).forwardedBridgeMint(_chainMintData, contractAlreadyDeployed);
 
         emit MigrationFinalized(_chainId, _assetId, hyperchain);
