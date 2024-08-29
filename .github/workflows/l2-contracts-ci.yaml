@@ -89,5 +89,8 @@ jobs:
             l2-contracts/cache-zk
             l2-contracts/typechain
 
+      - name: Install foundry zksync
+        run: cargo install --git https://github.com/matter-labs/foundry-zksync  --locked forge cast
+
       - name: Run tests
         run: yarn l2 test:foundry
