@@ -108,7 +108,7 @@ contract revertBatchesTest is StateTransitionManagerTest {
     //     vm.stopPrank();
     //     vm.startPrank(validator);
     //     vm.recordLogs();
-    //     executorFacet.commitBatches(genesisStoredBatchInfo, commitBatchInfoArray);
+    //     executorFacet.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, commitBatchInfoArray);
     //     Vm.Log[] memory entries = vm.getRecordedLogs();
 
     //     newStoredBatchInfo = IExecutor.StoredBatchInfo({

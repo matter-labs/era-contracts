@@ -135,7 +135,7 @@ describe("L2 upgrade test", function () {
     );
 
     const commitReceipt = await (
-      await proxyExecutor.commitBatches(genesisStoredBatchInfo(), [batch1InfoChainIdUpgrade])
+      await proxyExecutor.commitBatchesSharedBridge(chainId, genesisStoredBatchInfo(), [batch1InfoChainIdUpgrade])
     ).wait();
 
     const commitment = commitReceipt.events[0].args.commitment;
@@ -151,7 +151,7 @@ describe("L2 upgrade test", function () {
     });
 
     const commitReceipt = await (
-      await proxyExecutor.commitBatches(storedBatch1InfoChainIdUpgrade, [batch2Info])
+      await proxyExecutor.commitBatchesSharedBridge(chainId, storedBatch1InfoChainIdUpgrade, [batch2Info])
     ).wait();
     const commitment = commitReceipt.events[0].args.commitment;
 
@@ -632,7 +632,7 @@ describe("L2 upgrade test", function () {
   //     batchNumber: 3,
   //   });
   //   const revertReason = await getCallRevertReason(
-  //     proxyExecutor.commitBatches(storedBatch2Info, [batch3InfoNoUpgradeTx])
+  //     proxyExecutor.commitBatchesSharedBridge(storedBatch2Info, [batch3InfoNoUpgradeTx])
   //   );
   //   expect(revertReason).to.contains("MissingSystemLogs");
   // });
@@ -675,7 +675,7 @@ describe("L2 upgrade test", function () {
       systemLogs
     );
     const revertReason = await getCallRevertReason(
-      proxyExecutor.commitBatches(storedBatch2Info, [batch3InfoNoUpgradeTx])
+      proxyExecutor.commitBatchesSharedBridge(chainId, storedBatch2Info, [batch3InfoNoUpgradeTx])
     );
     expect(revertReason).to.contains("LogAlreadyProcessed");
   });
@@ -708,7 +708,7 @@ describe("L2 upgrade test", function () {
     );
 
     const revertReason = await getCallRevertReason(
-      proxyExecutor.commitBatches(storedBatch2Info, [batch3InfoTwoUpgradeTx])
+      proxyExecutor.commitBatchesSharedBridge(chainId, storedBatch2Info, [batch3InfoTwoUpgradeTx])
     );
     expect(revertReason).to.contains("TxHashMismatch");
   });
@@ -740,13 +740,13 @@ describe("L2 upgrade test", function () {
       systemLogs
     );
 
-    await (await proxyExecutor.commitBatches(storedBatch2Info, [batch3InfoTwoUpgradeTx])).wait();
+    await (await proxyExecutor.commitBatchesSharedBridge(chainId, storedBatch2Info, [batch3InfoTwoUpgradeTx])).wait();
 
     expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(3);
   });
 
   it("Should commit successfully when batch was reverted and reupgraded", async () => {
-    await (await proxyExecutor.revertBatches(2)).wait();
+    await (await proxyExecutor.revertBatchesSharedBridge(chainId, 2)).wait();
     const timestamp = (await hardhat.ethers.provider.getBlock("latest")).timestamp;
     const systemLogs = createSystemLogs();
     systemLogs.push(
@@ -773,7 +773,9 @@ describe("L2 upgrade test", function () {
       systemLogs
     );
 
-    const commitReceipt = await (await proxyExecutor.commitBatches(storedBatch2Info, [batch3InfoTwoUpgradeTx])).wait();
+    const commitReceipt = await (
+      await proxyExecutor.commitBatchesSharedBridge(chainId, storedBatch2Info, [batch3InfoTwoUpgradeTx])
+    ).wait();
 
     expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(3);
     const commitment = commitReceipt.events[0].args.commitment;
@@ -810,7 +812,9 @@ describe("L2 upgrade test", function () {
       systemLogs
     );
 
-    const commitReceipt = await (await proxyExecutor.commitBatches(storedBatch2Info, [batch4InfoTwoUpgradeTx])).wait();
+    const commitReceipt = await (
+      await proxyExecutor.commitBatchesSharedBridge(chainId, storedBatch2Info, [batch4InfoTwoUpgradeTx])
+    ).wait();
     const commitment = commitReceipt.events[0].args.commitment;
     const newBatchStoredInfo = getBatchStoredInfo(batch4InfoTwoUpgradeTx, commitment);
 
@@ -864,7 +868,9 @@ describe("L2 upgrade test", function () {
       systemLogs
     );
 
-    const commitReceipt = await (await proxyExecutor.commitBatches(storedBatch2Info, [batch5InfoTwoUpgradeTx])).wait();
+    const commitReceipt = await (
+      await proxyExecutor.commitBatchesSharedBridge(chainId, storedBatch2Info, [batch5InfoTwoUpgradeTx])
+    ).wait();
     const commitment = commitReceipt.events[0].args.commitment;
     const newBatchStoredInfo = getBatchStoredInfo(batch5InfoTwoUpgradeTx, commitment);
 

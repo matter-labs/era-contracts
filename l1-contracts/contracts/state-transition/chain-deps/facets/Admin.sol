@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+// solhint-disable gas-custom-errors, reason-string
+
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {MAX_GAS_PER_TRANSACTION, HyperchainCommitment} from "../../../common/Config.sol";
@@ -123,7 +125,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin {
+    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external onlyAdmin onlyL1 {
         // Validium mode can be set only before the first batch is processed
         if (s.totalBatchesCommitted != 0) {
             revert ChainAlreadyLive();
@@ -143,14 +145,11 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     /// @dev It does not check for these addresses to be non-zero, since when migrating to a new settlement
     /// layer, we set them to zero.
     function _setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) internal {
-        address oldL1DAValidator = s.l1DAValidator;
-        address oldL2DAValidator = s.l2DAValidator;
+        emit NewL1DAValidator(s.l1DAValidator, _l1DAValidator);
+        emit NewL2DAValidator(s.l2DAValidator, _l2DAValidator);
 
         s.l1DAValidator = _l1DAValidator;
         s.l2DAValidator = _l2DAValidator;
-
-        emit NewL1DAValidator(oldL1DAValidator, _l1DAValidator);
-        emit NewL2DAValidator(oldL2DAValidator, _l2DAValidator);
     }
 
     /// @inheritdoc IAdmin

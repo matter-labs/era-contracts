@@ -126,7 +126,11 @@ contract ValidatorTimelockTest is Test {
         uint64 timestamp = 123456;
 
         vm.warp(timestamp);
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatches.selector), abi.encode(eraChainId));
+        vm.mockCall(
+            zkSync,
+            abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector),
+            abi.encode(eraChainId)
+        );
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
         IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
@@ -135,14 +139,14 @@ contract ValidatorTimelockTest is Test {
         IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
         batchesToCommit[0] = batchToCommit;
 
-        vm.prank(dan);
-        validator.commitBatches(storedBatch, batchesToCommit);
+        vm.prank(alice);
+        validator.commitBatchesSharedBridge(chainId, storedBatch, batchesToCommit);
 
-        assert(validator.getCommittedBatchTimestamp(eraChainId, batchNumber) == timestamp);
+        assert(validator.getCommittedBatchTimestamp(chainId, batchNumber) == timestamp);
     }
 
     function test_commitBatches() public {
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatches.selector), abi.encode(chainId));
+        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(chainId));
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
         IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
@@ -150,39 +154,15 @@ contract ValidatorTimelockTest is Test {
         IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
         batchesToCommit[0] = batchToCommit;
 
-        vm.prank(dan);
-        validator.commitBatches(storedBatch, batchesToCommit);
-    }
-
-    function test_revertBatches() public {
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.revertBatches.selector), abi.encode(lastBatchNumber));
-
-        vm.prank(dan);
-        validator.revertBatches(lastBatchNumber);
+        vm.prank(alice);
+        validator.commitBatchesSharedBridge(chainId, storedBatch, batchesToCommit);
     }
 
     function test_revertBatchesSharedBridge() public {
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.revertBatches.selector), abi.encode(chainId));
+        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.revertBatchesSharedBridge.selector), abi.encode(chainId));
 
         vm.prank(alice);
         validator.revertBatchesSharedBridge(chainId, lastBatchNumber);
-    }
-
-    function test_proveBatches() public {
-        IExecutor.StoredBatchInfo memory prevBatch = Utils.createStoredBatchInfo();
-        IExecutor.StoredBatchInfo memory batchToProve = Utils.createStoredBatchInfo();
-        IExecutor.ProofInput memory proof = Utils.createProofInput();
-
-        IExecutor.StoredBatchInfo[] memory batchesToProve = new IExecutor.StoredBatchInfo[](1);
-        batchesToProve[0] = batchToProve;
-
-        vm.mockCall(
-            zkSync,
-            abi.encodeWithSelector(IExecutor.proveBatches.selector),
-            abi.encode(prevBatch, batchesToProve, proof)
-        );
-        vm.prank(dan);
-        validator.proveBatches(prevBatch, batchesToProve, proof);
     }
 
     function test_proveBatchesSharedBridge() public {
@@ -195,48 +175,18 @@ contract ValidatorTimelockTest is Test {
 
         vm.mockCall(
             zkSync,
-            abi.encodeWithSelector(IExecutor.proveBatches.selector),
+            abi.encodeWithSelector(IExecutor.proveBatchesSharedBridge.selector),
             abi.encode(chainId, prevBatch, batchesToProve, proof)
         );
         vm.prank(alice);
         validator.proveBatchesSharedBridge(chainId, prevBatch, batchesToProve, proof);
     }
 
-    function test_executeBatches() public {
-        uint64 timestamp = 123456;
-        uint64 batchNumber = 123;
-        // Commit batches first to have the valid timestamp
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatches.selector), abi.encode(chainId));
-
-        IExecutor.StoredBatchInfo memory storedBatch1 = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
-
-        batchToCommit.batchNumber = batchNumber;
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
-        batchesToCommit[0] = batchToCommit;
-
-        vm.prank(dan);
-        vm.warp(timestamp);
-        validator.commitBatches(storedBatch1, batchesToCommit);
-
-        // Execute batches
-        IExecutor.StoredBatchInfo memory storedBatch2 = Utils.createStoredBatchInfo();
-        storedBatch2.batchNumber = batchNumber;
-        IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
-        storedBatches[0] = storedBatch2;
-
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.proveBatches.selector), abi.encode(storedBatches));
-
-        vm.prank(dan);
-        vm.warp(timestamp + executionDelay + 1);
-        validator.executeBatches(storedBatches, Utils.emptyData());
-    }
-
     function test_executeBatchesSharedBridge() public {
         uint64 timestamp = 123456;
         uint64 batchNumber = 123;
         // Commit batches first to have the valid timestamp
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatches.selector), abi.encode(chainId));
+        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(chainId));
 
         IExecutor.StoredBatchInfo memory storedBatch1 = Utils.createStoredBatchInfo();
         IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
@@ -255,7 +205,11 @@ contract ValidatorTimelockTest is Test {
         IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
         storedBatches[0] = storedBatch2;
 
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.proveBatches.selector), abi.encode(storedBatches));
+        vm.mockCall(
+            zkSync,
+            abi.encodeWithSelector(IExecutor.proveBatchesSharedBridge.selector),
+            abi.encode(storedBatches)
+        );
 
         vm.prank(alice);
         vm.warp(timestamp + executionDelay + 1);
@@ -311,7 +265,7 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bob));
-        validator.commitBatches(storedBatch, batchesToCommit);
+        validator.commitBatchesSharedBridge(chainId, storedBatch, batchesToCommit);
     }
 
     function test_RevertWhen_setStateTransitionManagerNotOwner() public {
@@ -321,24 +275,12 @@ contract ValidatorTimelockTest is Test {
 
     function test_RevertWhen_revertBatchesNotValidator() public {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        validator.revertBatches(lastBatchNumber);
+        validator.revertBatchesSharedBridge(uint256(0), lastBatchNumber);
     }
 
     function test_RevertWhen_revertBatchesSharedBridgeNotValidator() public {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
         validator.revertBatchesSharedBridge(chainId, lastBatchNumber);
-    }
-
-    function test_RevertWhen_proveBatchesNotValidator() public {
-        IExecutor.StoredBatchInfo memory prevBatch = Utils.createStoredBatchInfo();
-        IExecutor.StoredBatchInfo memory batchToProve = Utils.createStoredBatchInfo();
-        IExecutor.ProofInput memory proof = Utils.createProofInput();
-
-        IExecutor.StoredBatchInfo[] memory batchesToProve = new IExecutor.StoredBatchInfo[](1);
-        batchesToProve[0] = batchToProve;
-
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        validator.proveBatches(prevBatch, batchesToProve, proof);
     }
 
     function test_RevertWhen_proveBatchesSharedBridgeNotValidator() public {
@@ -354,17 +296,6 @@ contract ValidatorTimelockTest is Test {
         validator.proveBatchesSharedBridge(chainId, prevBatch, batchesToProve, proof);
     }
 
-    function test_RevertWhen_executeBatchesNotValidator() public {
-        IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
-
-        IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
-        storedBatches[0] = storedBatch;
-
-        vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bob));
-        validator.executeBatches(storedBatches, Utils.emptyData());
-    }
-
     function test_RevertWhen_executeBatchesSharedBridgeNotValidator() public {
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
 
@@ -376,42 +307,11 @@ contract ValidatorTimelockTest is Test {
         validator.executeBatchesSharedBridge(chainId, storedBatches, Utils.emptyData());
     }
 
-    function test_RevertWhen_executeBatchesTooEarly() public {
-        uint64 timestamp = 123456;
-        uint64 batchNumber = 123;
-        // Prove batches first to have the valid timestamp
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatches.selector), abi.encode(chainId));
-
-        IExecutor.StoredBatchInfo memory storedBatch1 = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
-
-        batchToCommit.batchNumber = batchNumber;
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
-        batchesToCommit[0] = batchToCommit;
-
-        vm.prank(dan);
-        vm.warp(timestamp);
-        validator.commitBatches(storedBatch1, batchesToCommit);
-
-        // Execute batches
-        IExecutor.StoredBatchInfo memory storedBatch2 = Utils.createStoredBatchInfo();
-        storedBatch2.batchNumber = batchNumber;
-        IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
-        storedBatches[0] = storedBatch2;
-
-        vm.prank(dan);
-        vm.warp(timestamp + executionDelay - 1);
-        vm.expectRevert(
-            abi.encodeWithSelector(TimeNotReached.selector, timestamp + executionDelay, timestamp + executionDelay - 1)
-        );
-        validator.executeBatches(storedBatches, Utils.emptyData());
-    }
-
     function test_RevertWhen_executeBatchesSharedBridgeTooEarly() public {
         uint64 timestamp = 123456;
         uint64 batchNumber = 123;
         // Prove batches first to have the valid timestamp
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatches.selector), abi.encode(chainId));
+        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(chainId));
 
         IExecutor.StoredBatchInfo memory storedBatch1 = Utils.createStoredBatchInfo();
         IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();

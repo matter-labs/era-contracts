@@ -44,7 +44,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_initialize_wrongOwnerNTV() public {
-        vm.expectRevert("NTV owner 0");
+        vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
         new TransparentUpgradeableProxy(
             address(nativeTokenVaultImpl),
             admin,
@@ -69,9 +69,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_setL1Erc20Bridge_alreadySet() public {
-        address curretnBridge = address(sharedBridge.legacyBridge());
+        address currentBridge = address(sharedBridge.legacyBridge());
         vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(AddressAlreadyUsed.selector, curretnBridge));
+        vm.expectRevert(abi.encodeWithSelector(AddressAlreadyUsed.selector, currentBridge));
         sharedBridge.setL1Erc20Bridge(address(0));
     }
 
@@ -130,7 +130,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     function test_transferFundsToSharedBridge_Eth_0_AmountTransferred() public {
         vm.deal(address(sharedBridge), 0);
         vm.prank(address(nativeTokenVault));
-        vm.expectRevert("NTV: 0 eth transferred");
+        vm.expectRevert(abi.encodeWithSelector(NoFundsTransferred.selector));
         nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
     }
 

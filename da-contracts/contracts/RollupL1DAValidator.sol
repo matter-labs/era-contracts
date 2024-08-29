@@ -10,7 +10,7 @@ import {CalldataDA} from "./CalldataDA.sol";
 
 import {PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, BLOB_DA_INPUT_SIZE, POINT_EVALUATION_PRECOMPILE_ADDR} from "./DAUtils.sol";
 
-import {PubdataCommitmentsEmpty, PubdataCommitmentsTooBig, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed} from "./DAContractsErrors.sol";
+import {PubdataCommitmentsEmpty, InvalidPubdataCommitmentsSize, BlobHashCommitmentError, EmptyBlobVersionHash, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed} from "./DAContractsErrors.sol";
 
 uint256 constant BLOBS_SUPPORTED = 6;
 

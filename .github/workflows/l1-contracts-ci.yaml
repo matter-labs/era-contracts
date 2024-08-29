@@ -149,6 +149,9 @@ jobs:
             l2-contracts/typechain
             l1-contracts/lib
 
+      - name: Build L2 contracts
+        run: yarn l2 build
+
       - name: Run tests
         run: yarn l1 test --no-compile
 
