@@ -69,9 +69,20 @@ contract AccessRestrictionTest is Test {
         restriction.setRequiredRoleForCall(address(chainAdmin), chainAdminSelectors[0], role);
         vm.stopPrank();
 
-        Call memory call = Call({target: address(chainAdmin), value: 0, data: abi.encodeCall(IChainAdmin.getRestrictions, ())});
+        Call memory call = Call({
+            target: address(chainAdmin),
+            value: 0,
+            data: abi.encodeCall(IChainAdmin.getRestrictions, ())
+        });
 
-        vm.expectRevert(abi.encodeWithSelector(AccessToFunctionDenied.selector, address(chainAdmin), chainAdminSelectors[0], randomCaller));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AccessToFunctionDenied.selector,
+                address(chainAdmin),
+                chainAdminSelectors[0],
+                randomCaller
+            )
+        );
         restriction.validateCall(call, randomCaller);
     }
 
@@ -86,7 +97,11 @@ contract AccessRestrictionTest is Test {
         restriction.grantRole(role, randomCaller);
         vm.stopPrank();
 
-        Call memory call = Call({target: address(chainAdmin), value: 0, data: abi.encodeCall(IChainAdmin.getRestrictions, ())});
+        Call memory call = Call({
+            target: address(chainAdmin),
+            value: 0,
+            data: abi.encodeCall(IChainAdmin.getRestrictions, ())
+        });
         restriction.validateCall(call, randomCaller);
     }
 
@@ -110,7 +125,7 @@ contract AccessRestrictionTest is Test {
         restriction.setRequiredRoleForFallback(address(chainAdmin), role);
         vm.stopPrank();
 
-        Call memory call = Call({target: address(chainAdmin), value: 0, data: "" });
+        Call memory call = Call({target: address(chainAdmin), value: 0, data: ""});
 
         vm.expectRevert(abi.encodeWithSelector(AccessToFallbackDenied.selector, address(chainAdmin), randomCaller));
         restriction.validateCall(call, randomCaller);
@@ -124,8 +139,8 @@ contract AccessRestrictionTest is Test {
         restriction.setRequiredRoleForFallback(address(chainAdmin), role);
         restriction.grantRole(role, randomCaller);
         vm.stopPrank();
-        
-        Call memory call = Call({target: address(chainAdmin), value: 0, data: "" });
+
+        Call memory call = Call({target: address(chainAdmin), value: 0, data: ""});
         restriction.validateCall(call, randomCaller);
     }
 

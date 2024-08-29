@@ -83,7 +83,7 @@ contract ChainAdminTest is Test {
         vm.startPrank(address(chainAdmin));
         chainAdmin.addRestriction(owner);
         chainAdmin.removeRestriction(owner);
-        
+
         vm.expectRevert(abi.encodeWithSelector(RestrictionWasNotPresent.selector, owner));
         chainAdmin.removeRestriction(owner);
         vm.stopPrank();
@@ -124,14 +124,21 @@ contract ChainAdminTest is Test {
         vm.prank(owner);
         restriction.setRequiredRoleForCall(address(gettersFacet), gettersFacet.getAdmin.selector, role);
 
-        vm.expectRevert(abi.encodeWithSelector(AccessToFunctionDenied.selector, address(gettersFacet), gettersFacet.getAdmin.selector, owner));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AccessToFunctionDenied.selector,
+                address(gettersFacet),
+                gettersFacet.getAdmin.selector,
+                owner
+            )
+        );
         vm.prank(owner);
         chainAdmin.multicall(calls, true);
     }
 
     function test_validateCallAccessToFallbackDenied(bytes32 role) public {
         Call[] memory calls = new Call[](2);
-        calls[0] = Call({target: address(gettersFacet), value: 0, data: "" });
+        calls[0] = Call({target: address(gettersFacet), value: 0, data: ""});
         calls[1] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getVerifier, ())});
 
         vm.prank(owner);
@@ -151,7 +158,12 @@ contract ChainAdminTest is Test {
         chainAdmin.multicall(calls, true);
     }
 
-    function packSemver(uint32 major, uint32 minor, uint32 patch, uint256 semverMinorVersionMultiplier) public returns (uint256) {
+    function packSemver(
+        uint32 major,
+        uint32 minor,
+        uint32 patch,
+        uint256 semverMinorVersionMultiplier
+    ) public returns (uint256) {
         if (major != 0) {
             revert("Major version must be 0");
         }
