@@ -2,20 +2,21 @@
 
 pragma solidity 0.8.20;
 
+// solhint-disable gas-custom-errors
 
 import {Test} from "forge-std/Test.sol";
 
 import {L2StandardERC20} from "contracts/bridge/L2StandardERC20.sol";
-import {L2AssetRouter}  from "contracts/bridge/L2AssetRouter.sol";
+import {L2AssetRouter} from "contracts/bridge/L2AssetRouter.sol";
 
-import { UpgradeableBeacon } from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import { BeaconProxy } from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
+import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
-import { L2_ASSET_ROUTER, L2_NATIVE_TOKEN_VAULT } from "contracts/L2ContractHelper.sol";
+import {L2_ASSET_ROUTER, L2_NATIVE_TOKEN_VAULT} from "contracts/L2ContractHelper.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
-import {Utils } from "../utils/Utils.sol";
+import {Utils} from "../utils/Utils.sol";
 
 contract L2Erc20BridgeTest is Test {
     // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
@@ -28,7 +29,7 @@ contract L2Erc20BridgeTest is Test {
 
     L2StandardERC20 internal standardErc20Impl;
 
-    UpgradeableBeacon beacon;
+    UpgradeableBeacon internal beacon;
 
     uint256 internal constant L1_CHAIN_ID = 9;
     uint256 internal ERA_CHAIN_ID = 270;
@@ -55,14 +56,9 @@ contract L2Erc20BridgeTest is Test {
         assembly {
             beaconProxyBytecodeHash := extcodehash(proxy)
         }
-    
+
         Utils.initSystemContracts();
-        Utils.forceDeployAssetRouter(
-            L1_CHAIN_ID, 
-            ERA_CHAIN_ID, 
-            l1BridgeWallet, 
-            address(0)
-        );
+        Utils.forceDeployAssetRouter(L1_CHAIN_ID, ERA_CHAIN_ID, l1BridgeWallet, address(0));
         Utils.forceDeployNativeTokenVault({
             _l1ChainId: L1_CHAIN_ID,
             _aliasedOwner: ownerWallet,
@@ -73,11 +69,7 @@ contract L2Erc20BridgeTest is Test {
         });
     }
 
-    function performDeposit(
-        address depositor,
-        address receiver,
-        uint256 amount
-    ) internal {
+    function performDeposit(address depositor, address receiver, uint256 amount) internal {
         vm.prank(aliasedL1BridgeWallet);
         L2AssetRouter(address(L2_ASSET_ROUTER)).finalizeDeposit({
             _l1Sender: depositor,
@@ -89,11 +81,7 @@ contract L2Erc20BridgeTest is Test {
     }
 
     function initializeTokenByDeposit() internal returns (address l2TokenAddress) {
-        performDeposit(
-            makeAddr("someDepositor"),
-            makeAddr("someReeiver"),
-            1
-        );
+        performDeposit(makeAddr("someDepositor"), makeAddr("someReeiver"), 1);
 
         l2TokenAddress = L2_NATIVE_TOKEN_VAULT.l2TokenAddress(L1_TOKEN_ADDRESS);
         require(l2TokenAddress != address(0), "Token not initialized");
@@ -103,11 +91,7 @@ contract L2Erc20BridgeTest is Test {
         address depositor = makeAddr("depositor");
         address receiver = makeAddr("receiver");
 
-        performDeposit(
-            depositor,
-            receiver,
-            100
-        );
+        performDeposit(depositor, receiver, 100);
 
         address l2TokenAddress = L2_NATIVE_TOKEN_VAULT.l2TokenAddress(L1_TOKEN_ADDRESS);
 
@@ -121,19 +105,14 @@ contract L2Erc20BridgeTest is Test {
     function test_governanceShouldBeAbleToReinitializeToken() public {
         address l2TokenAddress = initializeTokenByDeposit();
 
-        L2StandardERC20.ERC20Getters memory getters =  L2StandardERC20.ERC20Getters({
+        L2StandardERC20.ERC20Getters memory getters = L2StandardERC20.ERC20Getters({
             ignoreName: false,
             ignoreSymbol: false,
             ignoreDecimals: false
         });
 
         vm.prank(ownerWallet);
-        L2StandardERC20(l2TokenAddress).reinitializeToken(
-            getters,
-            "TestTokenNewName",
-            "TTN",
-            2
-        );
+        L2StandardERC20(l2TokenAddress).reinitializeToken(getters, "TestTokenNewName", "TTN", 2);
         assertEq(L2StandardERC20(l2TokenAddress).name(), "TestTokenNewName");
         assertEq(L2StandardERC20(l2TokenAddress).symbol(), "TTN");
         // The decimals should stay the same
@@ -142,8 +121,8 @@ contract L2Erc20BridgeTest is Test {
 
     function test_governanceShouldNotBeAbleToSkipInitializerVersions() public {
         address l2TokenAddress = initializeTokenByDeposit();
-        
-        L2StandardERC20.ERC20Getters memory getters =  L2StandardERC20.ERC20Getters({
+
+        L2StandardERC20.ERC20Getters memory getters = L2StandardERC20.ERC20Getters({
             ignoreName: false,
             ignoreSymbol: false,
             ignoreDecimals: false
@@ -151,11 +130,6 @@ contract L2Erc20BridgeTest is Test {
 
         vm.expectRevert();
         vm.prank(ownerWallet);
-        L2StandardERC20(l2TokenAddress).reinitializeToken(
-            getters,
-            "TestTokenNewName",
-            "TTN",
-            20
-        );
+        L2StandardERC20(l2TokenAddress).reinitializeToken(getters, "TestTokenNewName", "TTN", 20);
     }
 }

@@ -4,8 +4,8 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import { L2WrappedBaseToken } from "contracts/bridge/L2WrappedBaseToken.sol";
-import { TransparentUpgradeableProxy } from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Unauthorized, UnimplementedMessage, BRIDGE_MINT_NOT_IMPLEMENTED} from "contracts/errors/L2ContractErrors.sol";
 
@@ -49,9 +49,8 @@ contract WethTest is Test {
     function test_shouldWithdrawWethToL2Eth() public {
         address sender = makeAddr("sender");
         uint256 amount = 100;
-        
-        vm.deal(sender, amount);
 
+        vm.deal(sender, amount);
 
         vm.prank(sender);
         weth.deposit{value: amount}();
@@ -117,4 +116,3 @@ contract WethTest is Test {
         weth.bridgeBurn(address(1), 1);
     }
 }
-
