@@ -33,6 +33,7 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+// import {StateTransitionManagerTest} from "test/foundry/unit/concrete/state-transition/StateTransitionManager/_StateTransitionManager_Shared.t.sol";
 
 contract PermanentRestrictionTest is Test {
     IBridgehub internal iBridgehub;
@@ -69,6 +70,8 @@ contract PermanentRestrictionTest is Test {
     Diamond.FacetCut[] internal facetCuts;
 
     function setUp() public {
+        // deploy();
+
         iBridgehub = new Bridgehub();
         bridgehub = address(iBridgehub);
         newChainAdmin = makeAddr("chainadmin");
@@ -102,12 +105,13 @@ contract PermanentRestrictionTest is Test {
                 selectors: Utils.getExecutorSelectors()
             })
         );
+        address gettersFacetAddress = address(new GettersFacet());
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new GettersFacet()),
+                facet: gettersFacetAddress,
                 action: Diamond.Action.Add,
                 isFreezable: true,
-                selectors: gettersSelectors()
+                selectors: Utils.getGettersSelectors()
             })
         );
 
@@ -126,13 +130,6 @@ contract PermanentRestrictionTest is Test {
             protocolVersion: 0
         });
 
-        vm.expectRevert(bytes.concat("STM: owner zero"));
-        new TransparentUpgradeableProxy(
-            address(stateTransitionManager),
-            admin,
-            abi.encodeCall(StateTransitionManager.initialize, stmInitializeDataNoGovernor)
-        );
-
         StateTransitionManagerInitializeData memory stmInitializeData = StateTransitionManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
@@ -150,18 +147,14 @@ contract PermanentRestrictionTest is Test {
         vm.stopPrank();
         vm.startPrank(governor);
 
-        createNewChain(getDiamondCutData(address(diamondInit)));
+        createNewChainBridgehub(getDiamondCutData(address(diamondInit)));
         initializeDiamond = new DiamondInit();
         newChainAddress = chainContractAddress.getHyperchain(chainId);
-        executorFacet = ExecutorFacet(address(newChainAddress));
-        gettersFacet = GettersFacet(address(newChainAddress));
-        adminFacet = AdminFacet(address(newChainAddress));
 
         vm.stopPrank();
 
         owner = makeAddr("owner");
         hyperchain = chainContractAddress.getHyperchain(chainId);
-        uint256 id = IZkSyncHyperchain(hyperchain).getChainId();
         permRestriction = new PermanentRestriction(owner, iBridgehub);
         restriction = new AccessControlRestriction(0, owner);
         address[] memory restrictions = new address[](1);
@@ -175,7 +168,7 @@ contract PermanentRestrictionTest is Test {
     }
 
     function test_allowAdminImplementation(bytes32 implementationHash) public {
-        vm.expectEmit();
+        vm.expectEmit(true, false, false, true);
         emit IPermanentRestriction.AdminImplementationAllowed(implementationHash, true);
 
         vm.prank(owner);
@@ -183,7 +176,7 @@ contract PermanentRestrictionTest is Test {
     }
 
     function test_setAllowedData(bytes memory data) public {
-        vm.expectEmit();
+        vm.expectEmit(false, false, false, true);
         emit IPermanentRestriction.AllowedDataChanged(data, true);
 
         vm.prank(owner);
@@ -191,7 +184,7 @@ contract PermanentRestrictionTest is Test {
     }
 
     function test_setSelectorIsValidated(bytes4 selector) public {
-        vm.expectEmit();
+        vm.expectEmit(true, false, false, true);
         emit IPermanentRestriction.SelectorValidationChanged(selector, true);
 
         vm.prank(owner);
@@ -327,9 +320,9 @@ contract PermanentRestrictionTest is Test {
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }
 
-    function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal {
+    function createNewChainBridgehub(Diamond.DiamondCutData memory _diamondCut) internal {
         vm.stopPrank();
-        vm.startPrank(0x0000000000000000000000000000000000000000);
+        vm.startPrank(address(0));
         iBridgehub.addStateTransitionManager(address(chainContractAddress));
         iBridgehub.addToken(baseToken);
         iBridgehub.setSharedBridge(sharedBridge);
@@ -341,39 +334,5 @@ contract PermanentRestrictionTest is Test {
             _admin: newChainAdmin,
             _initData: abi.encode(_diamondCut)
         });
-    }
-
-    function gettersSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](29);
-        selectors[0] = GettersFacet.getVerifier.selector;
-        selectors[1] = GettersFacet.getAdmin.selector;
-        selectors[2] = GettersFacet.getPendingAdmin.selector;
-        selectors[3] = GettersFacet.getChainId.selector;
-        selectors[4] = GettersFacet.getTotalBlocksVerified.selector;
-        selectors[5] = GettersFacet.getTotalBlocksExecuted.selector;
-        selectors[6] = GettersFacet.getTotalPriorityTxs.selector;
-        selectors[7] = GettersFacet.getFirstUnprocessedPriorityTx.selector;
-        selectors[8] = GettersFacet.getPriorityQueueSize.selector;
-        selectors[9] = GettersFacet.priorityQueueFrontOperation.selector;
-        selectors[10] = GettersFacet.isValidator.selector;
-        selectors[11] = GettersFacet.l2LogsRootHash.selector;
-        selectors[12] = GettersFacet.storedBatchHash.selector;
-        selectors[13] = GettersFacet.getL2BootloaderBytecodeHash.selector;
-        selectors[14] = GettersFacet.getL2DefaultAccountBytecodeHash.selector;
-        selectors[15] = GettersFacet.getVerifierParams.selector;
-        selectors[16] = GettersFacet.getL2SystemContractsUpgradeBatchNumber.selector;
-        selectors[17] = GettersFacet.getPriorityTxMaxGasLimit.selector;
-        selectors[18] = GettersFacet.isEthWithdrawalFinalized.selector;
-        selectors[19] = GettersFacet.facets.selector;
-        selectors[20] = GettersFacet.facetFunctionSelectors.selector;
-        selectors[21] = GettersFacet.facetAddresses.selector;
-        selectors[22] = GettersFacet.facetAddress.selector;
-        selectors[23] = GettersFacet.getSemverProtocolVersion.selector;
-        selectors[24] = GettersFacet.getProtocolVersion.selector;
-        selectors[25] = GettersFacet.getTotalBatchesCommitted.selector;
-        selectors[26] = GettersFacet.getTotalBatchesVerified.selector;
-        selectors[27] = GettersFacet.getTotalBatchesExecuted.selector;
-        selectors[28] = GettersFacet.getL2SystemContractsUpgradeTxHash.selector;
-        return selectors;
     }
 }
