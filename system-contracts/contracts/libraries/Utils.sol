@@ -2,6 +2,8 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
+// solhint-disable gas-custom-errors
+
 import {EfficientCall} from "./EfficientCall.sol";
 import {RLPEncoder} from "./RLPEncoder.sol";
 import {MalformedBytecode, BytecodeError, Overflow} from "../SystemContractErrors.sol";
@@ -130,6 +132,7 @@ library Utils {
     uint256 internal constant MAX_EVM_BYTECODE_LENGTH = (2 ** 16) - 1;
 
     function hashEVMBytecode(bytes memory _bytecode) internal view returns (bytes32 hashedEVMBytecode) {
+        // solhint-disable gas-custom-errors
         require(_bytecode.length <= MAX_EVM_BYTECODE_LENGTH, "po");
 
         hashedEVMBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;

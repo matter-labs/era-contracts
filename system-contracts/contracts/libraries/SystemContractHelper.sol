@@ -376,6 +376,7 @@ library SystemContractHelper {
         }
         uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
 
+        // solhint-disable func-named-parameters
         uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
             0,
             0,
