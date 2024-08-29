@@ -26,6 +26,9 @@ jobs:
       - name: Build L2 artifacts
         run: yarn l2 build
 
+      - name: Build system contract artifacts
+        run: yarn sc build
+
       - name: Create cache
         uses: actions/cache/save@v3
         with:
@@ -37,6 +40,9 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
+            system-contracts/artifacts-zk
+            system-contracts/cache-zk
+            system-contracts/typechain
 
   lint:
     runs-on: ubuntu-latest
@@ -88,6 +94,9 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
+            system-contracts/artifacts-zk
+            system-contracts/cache-zk
+            system-contracts/typechain
 
       - name: Install foundry zksync
         run: |
