@@ -48,6 +48,7 @@ import {
   compileInitialCutHash,
   readBytecode,
   applyL1ToL2Alias,
+  BRIDGEHUB_STM_ASSET_DATA_ABI_STRING,
   // priorityTxMaxGasLimit,
   encodeNTVAssetId,
   ETH_ADDRESS_IN_CONTRACTS,
@@ -1211,6 +1212,8 @@ export class Deployer {
 
   // Main function to move the current chain (that is hooked to l1), on top of the syncLayer chain.
   public async moveChainToGateway(gatewayChainId: string, gasPrice: BigNumberish) {
+    const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
+    const chainData = ethers.utils.defaultAbiCoder.encode(["uint256"], [protocolVersion]);
     const bridgehub = this.bridgehubContract(this.deployWallet);
     // Just some large gas limit that should always be enough
     const l2GasLimit = ethers.BigNumber.from(72_000_000);
@@ -1224,10 +1227,9 @@ export class Deployer {
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
     const stmData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [newAdmin, initialDiamondCut]);
-    const chainData = new ethers.utils.AbiCoder().encode(["uint256"], [ADDRESS_ONE]); // empty for now
     const bridgehubData = new ethers.utils.AbiCoder().encode(
-      ["uint256", "bytes", "bytes"],
-      [this.chainId, stmData, chainData]
+      [BRIDGEHUB_STM_ASSET_DATA_ABI_STRING],
+      [[this.chainId, stmData, chainData]]
     );
 
     // console.log("bridgehubData", bridgehubData)

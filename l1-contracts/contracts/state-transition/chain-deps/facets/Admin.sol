@@ -249,14 +249,14 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     function forwardedBridgeBurn(
         address _settlementLayer,
         address _prevMsgSender,
-        bytes calldata
+        bytes calldata _data
     ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
         require(s.settlementLayer == address(0), "Af: already migrated");
         require(_prevMsgSender == s.admin, "Af: not chainAdmin");
-        IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
+        // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
+        uint256 protocolVersion = abi.decode(_data, (uint256));
 
         uint256 currentProtocolVersion = s.protocolVersion;
-        uint256 protocolVersion = stm.protocolVersion();
 
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
 
@@ -309,12 +309,26 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function forwardedBridgeClaimFailedBurn(
-        uint256 _chainId,
-        bytes32 _assetInfo,
-        address _prevMsgSender,
-        bytes calldata _data
-    ) external payable override onlyBridgehub {}
+    /// @dev Note that this function does not check that the caller is the chain admin.
+    function forwardedBridgeRecoverFailedTransfer(
+        uint256 /* _chainId */,
+        bytes32 /* _assetInfo */,
+        address _depositSender,
+        bytes calldata _chainData
+    ) external payable override onlyBridgehub {
+        // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
+        uint256 protocolVersion = abi.decode(_chainData, (uint256));
+
+        require(s.settlementLayer != address(0), "Af: not migrated");
+        // Sanity check that the _depositSender is the chain admin.
+        require(_depositSender == s.admin, "Af: not chainAdmin");
+
+        uint256 currentProtocolVersion = s.protocolVersion;
+
+        require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
+
+        s.settlementLayer = address(0);
+    }
 
     /// @notice Returns the commitment for a chain.
     /// @dev Note, that this is a getter method helpful for debugging and should not be relied upon by clients.
