@@ -9,7 +9,8 @@ import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 // import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
-import {IL2NativeTokenVault, INativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
+import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
+import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 // import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
