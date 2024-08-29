@@ -48,7 +48,7 @@ contract ChainAdminTest is Test {
     function test_addRestriction() public {
         address[] memory restrictions = chainAdmin.getRestrictions();
 
-        vm.expectEmit();
+        vm.expectEmit(true, false, false, true);
         emit IChainAdmin.RestrictionAdded(owner);
 
         vm.prank(address(chainAdmin));
@@ -70,7 +70,7 @@ contract ChainAdminTest is Test {
         vm.startPrank(address(chainAdmin));
         chainAdmin.addRestriction(owner);
 
-        vm.expectEmit();
+        vm.expectEmit(true, false, false, true);
         emit IChainAdmin.RestrictionRemoved(owner);
 
         chainAdmin.removeRestriction(owner);
@@ -93,7 +93,7 @@ contract ChainAdminTest is Test {
         (major, minor, patch) = gettersFacet.getSemverProtocolVersion();
         uint256 protocolVersion = packSemver(major, minor, patch + 1, semverMinorVersionMultiplier);
 
-        vm.expectEmit();
+        vm.expectEmit(true, false, false, true);
         emit IChainAdmin.UpdateUpgradeTimestamp(protocolVersion, timestamp);
 
         vm.prank(address(chainAdmin));

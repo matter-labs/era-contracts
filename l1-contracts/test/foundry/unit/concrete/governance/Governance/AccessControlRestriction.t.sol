@@ -89,7 +89,7 @@ contract AccessRestrictionTest is Test {
     function test_setRequiredRoleForCall(bytes32 role) public {
         bytes4[] memory chainAdminSelectors = getChainAdminSelectors();
 
-        vm.expectEmit();
+        vm.expectEmit(true, true, false, true);
         emit IAccessControlRestriction.RoleSet(address(chainAdmin), chainAdminSelectors[0], role);
 
         vm.startPrank(owner);
@@ -132,7 +132,7 @@ contract AccessRestrictionTest is Test {
     }
 
     function test_setRequiredRoleForFallback(bytes32 role) public {
-        vm.expectEmit();
+        vm.expectEmit(true, false, false, true);
         emit IAccessControlRestriction.FallbackRoleSet(address(chainAdmin), role);
 
         vm.startPrank(owner);
