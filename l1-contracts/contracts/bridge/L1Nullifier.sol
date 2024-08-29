@@ -809,7 +809,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _l1Token: _l1Token,
                 _amount: _amount,
                 _erc20Metadata: getERC20Getters(_l1Token)
-            }); // kl todo don't we care about backwards compatiblity here?
+            }); // kl todo don't we care about backwards compatibility here?
             // bridgeMintCalldata = _burn({
             //     _chainId: ERA_CHAIN_ID,
             //     _l2Value: 0,
