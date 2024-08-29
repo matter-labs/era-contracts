@@ -346,24 +346,17 @@ object "EVMInterpreter" {
         function _fetchDeployedCodeLen(addr) -> codeLen {
             let codeHash := _getRawCodeHash(addr)
         
-            mstore(0, codeHash)
-        
-            let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
-        
-            switch iszero(success)
+            switch shr(248, codeHash)
             case 1 {
-                // The code oracle call can only fail in the case where the contract
-                // we are querying is the current one executing and it has not yet been
-                // deployed, i.e., if someone calls codesize (or extcodesize(address()))
-                // inside the constructor. In that case, code length is zero.
-                codeLen := 0
+                // EraVM
+                let codeLengthInWords := and(shr(224, codeHash), 0xffff)
+                codeLen := shl(5, codeLengthInWords) // codeLengthInWords * 32
             }
-            default {
-                // The first word is the true length of the bytecode
-                returndatacopy(0, 0, 32)
-                codeLen := mload(0)
+            case 2 {
+                // EVM
+                let codeLengthInBytes := and(shr(224, codeHash), 0xffff)
+                codeLen := codeLengthInBytes
             }
-        
         }
         
         function getDeployedBytecode() {
@@ -2048,9 +2041,7 @@ object "EVMInterpreter" {
                         evmGasLeft := chargeGas(evmGasLeft, 2500)
                     }
             
-                    switch _isEVM(addr) 
-                        case 0  { sp := pushStackItemWithoutCheck(sp, extcodesize(addr)) }
-                        default { sp := pushStackItemWithoutCheck(sp, _fetchDeployedCodeLen(addr)) }
+                    sp := pushStackItemWithoutCheck(sp, _fetchDeployedCodeLen(addr))
                     ip := add(ip, 1)
                 }
                 case 0x3C { // OP_EXTCODECOPY
@@ -3330,24 +3321,17 @@ object "EVMInterpreter" {
             function _fetchDeployedCodeLen(addr) -> codeLen {
                 let codeHash := _getRawCodeHash(addr)
             
-                mstore(0, codeHash)
-            
-                let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
-            
-                switch iszero(success)
+                switch shr(248, codeHash)
                 case 1 {
-                    // The code oracle call can only fail in the case where the contract
-                    // we are querying is the current one executing and it has not yet been
-                    // deployed, i.e., if someone calls codesize (or extcodesize(address()))
-                    // inside the constructor. In that case, code length is zero.
-                    codeLen := 0
+                    // EraVM
+                    let codeLengthInWords := and(shr(224, codeHash), 0xffff)
+                    codeLen := shl(5, codeLengthInWords) // codeLengthInWords * 32
                 }
-                default {
-                    // The first word is the true length of the bytecode
-                    returndatacopy(0, 0, 32)
-                    codeLen := mload(0)
+                case 2 {
+                    // EVM
+                    let codeLengthInBytes := and(shr(224, codeHash), 0xffff)
+                    codeLen := codeLengthInBytes
                 }
-            
             }
             
             function getDeployedBytecode() {
@@ -5032,9 +5016,7 @@ object "EVMInterpreter" {
                             evmGasLeft := chargeGas(evmGasLeft, 2500)
                         }
                 
-                        switch _isEVM(addr) 
-                            case 0  { sp := pushStackItemWithoutCheck(sp, extcodesize(addr)) }
-                            default { sp := pushStackItemWithoutCheck(sp, _fetchDeployedCodeLen(addr)) }
+                        sp := pushStackItemWithoutCheck(sp, _fetchDeployedCodeLen(addr))
                         ip := add(ip, 1)
                     }
                     case 0x3C { // OP_EXTCODECOPY
