@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
-pragma solidity 0.8.24;
-
-// solhint-disable gas-custom-errors
-
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import {TX_SLOT_OVERHEAD_L2_GAS, MEMORY_OVERHEAD_GAS, L1_TX_INTRINSIC_L2_GAS, L1_TX_DELTA_544_ENCODING_BYTES, L1_TX_DELTA_FACTORY_DEPS_L2_GAS, L1_TX_MIN_L2_GAS_BASE, L1_TX_INTRINSIC_PUBDATA, L1_TX_DELTA_FACTORY_DEPS_PUBDATA} from "../../common/Config.sol";
+import {TooMuchGas, InvalidUpgradeTxn, UpgradeTxVerifyParam, PubdataGreaterThanLimit, ValidateTxnNotEnoughGas, TxnBodyGasLimitNotEnoughGas} from "../../common/L1ContractErrors.sol";
 
 /// @title ZKsync Library for validating L1 -> L2 transactions
 /// @author Matter Labs
@@ -27,39 +26,70 @@ library TransactionValidator {
         uint256 l2GasForTxBody = getTransactionBodyGasLimit(_transaction.gasLimit, _encoded.length);
 
         // Ensuring that the transaction is provable
-        require(l2GasForTxBody <= _priorityTxMaxGasLimit, "ui");
+        if (l2GasForTxBody > _priorityTxMaxGasLimit) {
+            revert TooMuchGas();
+        }
         // Ensuring that the transaction cannot output more pubdata than is processable
-        require(l2GasForTxBody / _transaction.gasPerPubdataByteLimit <= _priorityTxMaxPubdata, "uk");
+        if (l2GasForTxBody / _transaction.gasPerPubdataByteLimit > _priorityTxMaxPubdata) {
+            revert PubdataGreaterThanLimit(_priorityTxMaxPubdata, l2GasForTxBody / _transaction.gasPerPubdataByteLimit);
+        }
 
         // Ensuring that the transaction covers the minimal costs for its processing:
         // hashing its content, publishing the factory dependencies, etc.
-        require(
+        if (
             getMinimalPriorityTransactionGasLimit(
                 _encoded.length,
                 _transaction.factoryDeps.length,
                 _transaction.gasPerPubdataByteLimit
-            ) <= l2GasForTxBody,
-            "up"
-        );
+            ) > l2GasForTxBody
+        ) {
+            revert ValidateTxnNotEnoughGas();
+        }
     }
 
     /// @dev Used to validate upgrade transactions
     /// @param _transaction The transaction to validate
     function validateUpgradeTransaction(L2CanonicalTransaction memory _transaction) internal pure {
         // Restrict from to be within system contract range (0...2^16 - 1)
-        require(_transaction.from <= type(uint16).max, "ua");
-        require(_transaction.to <= type(uint160).max, "ub");
-        require(_transaction.paymaster == 0, "uc");
-        require(_transaction.value == 0, "ud");
-        require(_transaction.maxFeePerGas == 0, "uq");
-        require(_transaction.maxPriorityFeePerGas == 0, "ux");
-        require(_transaction.reserved[0] == 0, "ue");
-        require(_transaction.reserved[1] <= type(uint160).max, "uf");
-        require(_transaction.reserved[2] == 0, "ug");
-        require(_transaction.reserved[3] == 0, "uo");
-        require(_transaction.signature.length == 0, "uh");
-        require(_transaction.paymasterInput.length == 0, "ul1");
-        require(_transaction.reservedDynamic.length == 0, "um");
+        if (_transaction.from > type(uint16).max) {
+            revert InvalidUpgradeTxn(UpgradeTxVerifyParam.From);
+        }
+        if (_transaction.to > type(uint160).max) {
+            revert InvalidUpgradeTxn(UpgradeTxVerifyParam.To);
+        }
+        if (_transaction.paymaster != 0) {
+            revert InvalidUpgradeTxn(UpgradeTxVerifyParam.Paymaster);
+        }
+        if (_transaction.value != 0) {
+            revert InvalidUpgradeTxn(UpgradeTxVerifyParam.Value);
+        }
+        if (_transaction.maxFeePerGas != 0) {
+            revert InvalidUpgradeTxn(UpgradeTxVerifyParam.MaxFeePerGas);
+        }
+        if (_transaction.maxPriorityFeePerGas != 0) {
+            revert InvalidUpgradeTxn(UpgradeTxVerifyParam.MaxPriorityFeePerGas);
+        }
+        if (_transaction.reserved[0] != 0) {
+            revert InvalidUpgradeTxn(UpgradeTxVerifyParam.Reserved0);
+        }
+        if (_transaction.reserved[1] > type(uint160).max) {
+            revert InvalidUpgradeTxn(UpgradeTxVerifyParam.Reserved1);
+        }
+        if (_transaction.reserved[2] != 0) {
+            revert InvalidUpgradeTxn(UpgradeTxVerifyParam.Reserved2);
+        }
+        if (_transaction.reserved[3] != 0) {
+            revert InvalidUpgradeTxn(UpgradeTxVerifyParam.Reserved3);
+        }
+        if (_transaction.signature.length != 0) {
+            revert InvalidUpgradeTxn(UpgradeTxVerifyParam.Signature);
+        }
+        if (_transaction.paymasterInput.length != 0) {
+            revert InvalidUpgradeTxn(UpgradeTxVerifyParam.PaymasterInput);
+        }
+        if (_transaction.reservedDynamic.length != 0) {
+            revert InvalidUpgradeTxn(UpgradeTxVerifyParam.ReservedDynamic);
+        }
     }
 
     /// @dev Calculates the approximate minimum gas limit required for executing a priority transaction.
@@ -114,7 +144,10 @@ library TransactionValidator {
     ) internal pure returns (uint256 txBodyGasLimit) {
         uint256 overhead = getOverheadForTransaction(_encodingLength);
 
-        require(_totalGasLimit >= overhead, "my"); // provided gas limit doesn't cover transaction overhead
+        // provided gas limit doesn't cover transaction overhead
+        if (_totalGasLimit < overhead) {
+            revert TxnBodyGasLimitNotEnoughGas();
+        }
         unchecked {
             // We enforce the fact that `_totalGasLimit >= overhead` explicitly above.
             txBodyGasLimit = _totalGasLimit - overhead;

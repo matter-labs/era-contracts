@@ -2,13 +2,12 @@
 
 pragma solidity 0.8.24;
 
-// solhint-disable reason-string, gas-custom-errors
-
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager} from "./IStateTransitionManager.sol";
 import {PriorityOpsBatchInfo} from "./libraries/PriorityTree.sol";
+import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -65,18 +64,25 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @notice Checks if the caller is the admin of the chain.
     modifier onlyChainAdmin(uint256 _chainId) {
-        require(msg.sender == stateTransitionManager.getChainAdmin(_chainId), "ValidatorTimelock: only chain admin");
+        if (msg.sender != stateTransitionManager.getChainAdmin(_chainId)) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     /// @notice Checks if the caller is a validator.
     modifier onlyValidator(uint256 _chainId) {
-        require(validators[_chainId][msg.sender], "ValidatorTimelock: only validator");
+        if (!validators[_chainId][msg.sender]) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     /// @dev Sets a new state transition manager.
     function setStateTransitionManager(IStateTransitionManager _stateTransitionManager) external onlyOwner {
+        if (address(_stateTransitionManager) == address(0)) {
+            revert ZeroAddress();
+        }
         stateTransitionManager = _stateTransitionManager;
     }
 
@@ -111,15 +117,6 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @dev Records the timestamp for all provided committed batches and make
     /// a call to the hyperchain diamond contract with the same calldata.
-    function commitBatches(
-        StoredBatchInfo calldata,
-        CommitBatchInfo[] calldata _newBatchesData
-    ) external onlyValidator(ERA_CHAIN_ID) {
-        _commitBatchesInner(ERA_CHAIN_ID, _newBatchesData);
-    }
-
-    /// @dev Records the timestamp for all provided committed batches and make
-    /// a call to the hyperchain diamond contract with the same calldata.
     function commitBatchesSharedBridge(
         uint256 _chainId,
         StoredBatchInfo calldata,
@@ -133,6 +130,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
             uint32 timestamp = uint32(block.timestamp);
+            // We disable this check because calldata array length is cheap.
             // solhint-disable-next-line gas-length-in-loops
             for (uint256 i = 0; i < _newBatchesData.length; ++i) {
                 committedBatchTimestamp[_chainId].set(_newBatchesData[i].batchNumber, timestamp);
@@ -145,26 +143,8 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
-    function revertBatches(uint256) external onlyValidator(ERA_CHAIN_ID) {
-        _propagateToZkSyncHyperchain(ERA_CHAIN_ID);
-    }
-
-    /// @dev Make a call to the hyperchain diamond contract with the same calldata.
-    /// Note: If the batch is reverted, it needs to be committed first before the execution.
-    /// So it's safe to not override the committed batches.
     function revertBatchesSharedBridge(uint256 _chainId, uint256) external onlyValidator(_chainId) {
         _propagateToZkSyncHyperchain(_chainId);
-    }
-
-    /// @dev Make a call to the hyperchain diamond contract with the same calldata.
-    /// Note: We don't track the time when batches are proven, since all information about
-    /// the batch is known on the commit stage and the proved is not finalized (may be reverted).
-    function proveBatches(
-        StoredBatchInfo calldata,
-        StoredBatchInfo[] calldata,
-        ProofInput calldata
-    ) external onlyValidator(ERA_CHAIN_ID) {
-        _propagateToZkSyncHyperchain(ERA_CHAIN_ID);
     }
 
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
@@ -181,15 +161,6 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the hyperchain diamond contract with the same calldata.
-    function executeBatches(
-        StoredBatchInfo[] calldata _batchesData,
-        PriorityOpsBatchInfo[] calldata
-    ) external onlyValidator(ERA_CHAIN_ID) {
-        _executeBatchesInner(ERA_CHAIN_ID, _batchesData);
-    }
-
-    /// @dev Check that batches were committed at least X time ago and
-    /// make a call to the hyperchain diamond contract with the same calldata.
     function executeBatchesSharedBridge(
         uint256 _chainId,
         StoredBatchInfo[] calldata _newBatchesData,
@@ -201,6 +172,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     function _executeBatchesInner(uint256 _chainId, StoredBatchInfo[] calldata _newBatchesData) internal {
         uint256 delay = executionDelay; // uint32
         unchecked {
+            // We disable this check because calldata array length is cheap.
             // solhint-disable-next-line gas-length-in-loops
             for (uint256 i = 0; i < _newBatchesData.length; ++i) {
                 uint256 commitBatchTimestamp = committedBatchTimestamp[_chainId].get(_newBatchesData[i].batchNumber);
@@ -210,7 +182,9 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 // * The batch wasn't committed at all, so execution will fail in the ZKsync contract.
                 // We allow executing such batches.
 
-                require(block.timestamp >= commitBatchTimestamp + delay, "5c"); // The delay is not passed
+                if (block.timestamp < commitBatchTimestamp + delay) {
+                    revert TimeNotReached(commitBatchTimestamp + delay, block.timestamp);
+                }
             }
         }
         _propagateToZkSyncHyperchain(_chainId);

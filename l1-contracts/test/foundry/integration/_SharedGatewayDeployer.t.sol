@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {GatewayScript} from "deploy-scripts/Gateway.s.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts-v4/utils/Strings.sol";
 
 contract GatewayDeployer is L1ContractDeployer {
     GatewayScript gatewayScript;

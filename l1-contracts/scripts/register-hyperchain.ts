@@ -2,7 +2,7 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
 import { Command } from "commander";
-import { Wallet, utils } from "ethers";
+import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
@@ -66,7 +66,7 @@ async function main() {
     .option("--validium-mode")
     .option("--base-token-name <base-token-name>")
     .option("--base-token-address <base-token-address>")
-    .option("--use-governance <use-governance>")
+    .option("--use-governance")
     .option("--token-multiplier-setter-address <token-multiplier-setter-address>")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
@@ -92,20 +92,20 @@ async function main() {
         deployWallet,
         ownerAddress,
         verbose: true,
-        l1ChainId: process.env.CONTRACTS_ETH_CHAIN_ID || "31337",
+        l1ChainId: process.env.CONTRACTS_L1_CHAIN_ID || "31337",
       });
 
       const baseTokenAddress = await chooseBaseTokenAddress(cmd.baseTokenName, cmd.baseTokenAddress);
       await checkTokenAddress(baseTokenAddress);
       console.log(`Using base token address: ${baseTokenAddress}`);
       console.log(deployer.addresses.Bridgehub.BridgehubProxy);
-      const baseTokenAssetId = encodeNTVAssetId(deployer.l1ChainId, utils.hexZeroPad(baseTokenAddress, 32));
+      const baseTokenAssetId = encodeNTVAssetId(deployer.l1ChainId, baseTokenAddress);
       if (!(await deployer.bridgehubContract(deployWallet).assetIdIsRegistered(baseTokenAssetId))) {
         await deployer.registerTokenBridgehub(baseTokenAddress, cmd.useGovernance);
       }
       await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
       await deployer.registerHyperchain(
-        baseTokenAddress,
+        baseTokenAssetId,
         cmd.validiumMode,
         null,
         gasPrice,

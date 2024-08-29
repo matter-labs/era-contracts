@@ -9,6 +9,7 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {ReplaceFunctionFacetAddressZero, RemoveFunctionFacetAddressNotZero, FacetExists, SelectorsMustAllHaveSameFreezability, AddressHasNoCode, NonZeroAddress, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract FacetCutTest is DiamondCutTest {
     MailboxFacet private mailboxFacet;
@@ -19,10 +20,10 @@ contract FacetCutTest is DiamondCutTest {
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
-        selectors[0] = executorFacet1.commitBatches.selector;
-        selectors[1] = executorFacet1.proveBatches.selector;
-        selectors[2] = executorFacet1.executeBatches.selector;
-        selectors[3] = executorFacet1.revertBatches.selector;
+        selectors[0] = executorFacet1.commitBatchesSharedBridge.selector;
+        selectors[1] = executorFacet1.proveBatchesSharedBridge.selector;
+        selectors[2] = executorFacet1.executeBatchesSharedBridge.selector;
+        selectors[3] = executorFacet1.revertBatchesSharedBridge.selector;
         return selectors;
     }
 
@@ -88,7 +89,9 @@ contract FacetCutTest is DiamondCutTest {
 
         diamondCutTestContract.diamondCut(diamondCutData);
 
-        vm.expectRevert(abi.encodePacked("J"));
+        vm.expectRevert(
+            abi.encodeWithSelector(FacetExists.selector, Utils.getMailboxSelectors()[0], address(mailboxFacet))
+        );
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
@@ -107,7 +110,7 @@ contract FacetCutTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.expectRevert(abi.encodePacked("G"));
+        vm.expectRevert(abi.encodeWithSelector(AddressHasNoCode.selector, address(0)));
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
@@ -126,7 +129,7 @@ contract FacetCutTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.expectRevert(abi.encodePacked("L"));
+        vm.expectRevert(ReplaceFunctionFacetAddressZero.selector);
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
@@ -145,7 +148,7 @@ contract FacetCutTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.expectRevert(abi.encodePacked("a1"));
+        vm.expectRevert(abi.encodeWithSelector(RemoveFunctionFacetAddressNotZero.selector, address(mailboxFacet)));
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
@@ -288,7 +291,7 @@ contract FacetCutTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.expectRevert(abi.encodePacked("G"));
+        vm.expectRevert(abi.encodeWithSelector(AddressHasNoCode.selector, address(1)));
         diamondCutTestContract.diamondCut(diamondCutData1);
     }
 
@@ -310,7 +313,7 @@ contract FacetCutTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.expectRevert(abi.encodePacked("K"));
+        vm.expectRevert(abi.encodeWithSelector(AddressHasNoCode.selector, address(1)));
         diamondCutTestContract.diamondCut(diamondCutData1);
     }
 
@@ -341,7 +344,7 @@ contract FacetCutTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.expectRevert(abi.encodePacked("J1"));
+        vm.expectRevert(SelectorsMustAllHaveSameFreezability.selector);
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
@@ -377,7 +380,7 @@ contract FacetCutTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.expectRevert(abi.encodePacked("J1"));
+        vm.expectRevert(SelectorsMustAllHaveSameFreezability.selector);
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 

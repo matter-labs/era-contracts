@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.20;
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
 
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
 import {IL2AssetRouter} from "./bridge/interfaces/IL2AssetRouter.sol";
 import {IL2NativeTokenVault} from "./bridge/interfaces/IL2NativeTokenVault.sol";
-import {MalformedBytecode, BytecodeError} from "./L2ContractErrors.sol";
+import {MalformedBytecode, BytecodeError} from "./errors/L2ContractErrors.sol";
 
 /**
  * @author Matter Labs

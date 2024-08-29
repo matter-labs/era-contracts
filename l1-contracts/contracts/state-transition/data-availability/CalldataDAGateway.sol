@@ -31,6 +31,6 @@ abstract contract CalldataDAGateway is CalldataDA {
             _blobsProvided *
             BLOB_COMMITMENT_SIZE:];
 
-        cloneCalldata(blobCommitments, providedCommitments, _blobsProvided);
+        _cloneCalldata(blobCommitments, providedCommitments, _blobsProvided);
     }
 }

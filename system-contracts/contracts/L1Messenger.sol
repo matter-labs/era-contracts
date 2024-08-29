@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {IL1Messenger, L2ToL1Log, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE} from "./interfaces/IL1Messenger.sol";
 
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
@@ -25,7 +25,7 @@ import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
  * - The contract on L1 accepts all sent messages and if the message came from this system contract
  * it requires that the preimage of `value` be provided.
  */
-contract L1Messenger is IL1Messenger, ISystemContract {
+contract L1Messenger is IL1Messenger, SystemContractBase {
     /// @notice Sequential hash of logs sent in the current block.
     /// @dev Will be reset at the end of the block to zero value.
     bytes32 internal chainedLogsHash;
@@ -90,7 +90,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         // - at most 1 time keccakGasCost(64) when building the Merkle tree (as merkle tree can contain
         // ~2*N nodes, where the first N nodes are leaves the hash of which is calculated on the previous step).
         uint256 gasToPay = keccakGasCost(L2_TO_L1_LOG_SERIALIZE_SIZE) + 2 * keccakGasCost(64);
-        SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), 0);
+        SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), uint32(L2_TO_L1_LOG_SERIALIZE_SIZE));
     }
 
     /// @notice Internal function to send L2ToL1Log.
@@ -279,7 +279,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         }
 
         bytes32[] memory l2ToL1LogsTreeArray = new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES);
-        bytes32 reconstructedChainedLogsHash;
+        bytes32 reconstructedChainedLogsHash = bytes32(0);
         for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
             bytes32 hashedLog = EfficientCall.keccak(
                 _operatorInput[calldataPtr:calldataPtr + L2_TO_L1_LOG_SERIALIZE_SIZE]

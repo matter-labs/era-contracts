@@ -50,6 +50,7 @@ import {
   applyL1ToL2Alias,
   // priorityTxMaxGasLimit,
   encodeNTVAssetId,
+  ETH_ADDRESS_IN_CONTRACTS,
 } from "./utils";
 import type { ChainAdminCall } from "./utils";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
@@ -88,7 +89,7 @@ export interface DeployerConfig {
   defaultAccountBytecodeHash?: string;
   deployedLogPrefix?: string;
   l1Deployer?: Deployer;
-  l1ChainId: string;
+  l1ChainId?: string;
 }
 
 export interface Operation {
@@ -124,7 +125,7 @@ export class Deployer {
       : hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
     this.chainId = parseInt(process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID!);
-    this.l1ChainId = parseInt(config.l1ChainId);
+    this.l1ChainId = parseInt(config.l1ChainId || getNumberFromEnv("ETH_CLIENT_CHAIN_ID"));
     this.deployedLogPrefix = config.deployedLogPrefix ?? "CONTRACTS";
   }
 
@@ -188,7 +189,7 @@ export class Deployer {
       assetRouterZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2AssetRouter");
       nativeTokenVaultZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2NativeTokenVault");
       const l2TokenProxyBytecode = readBytecode(
-        "../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon",
+        "../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon",
         "BeaconProxy"
       );
       l2TokenProxyBytecodeHash = ethers.utils.hexlify(hashL2Bytecode(l2TokenProxyBytecode));
@@ -393,16 +394,25 @@ export class Deployer {
     if (this.isZkMode()) {
       // @ts-ignore
       // TODO try to make it work with zksync ethers
-      const artifact = hardhat.artifacts.readArtifactSync("ProxyAdmin");
       const zkWal = this.deployWallet as ZkWallet;
-      const contractFactory = new ZkContractFactory(artifact.abi, artifact.bytecode, zkWal);
+      // FIXME: this is a hack
+      const tmpContractFactory = await hardhat.ethers.getContractFactory(
+        "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin",
+        {
+          signer: this.deployWallet,
+        }
+      );
+      const contractFactory = new ZkContractFactory(tmpContractFactory.interface, tmpContractFactory.bytecode, zkWal);
       proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
       rec = await proxyAdmin.deployTransaction.wait();
     } else {
       ethTxOptions.gasLimit ??= 10_000_000;
-      const contractFactory = await hardhat.ethers.getContractFactory("ProxyAdmin", {
-        signer: this.deployWallet,
-      });
+      const contractFactory = await hardhat.ethers.getContractFactory(
+        "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin",
+        {
+          signer: this.deployWallet,
+        }
+      );
       proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
       rec = await proxyAdmin.deployTransaction.wait();
     }
@@ -449,7 +459,7 @@ export class Deployer {
     const initCalldata = bridgehub.encodeFunctionData("initialize", [this.addresses.Governance]);
 
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [this.addresses.Bridgehub.BridgehubImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
@@ -549,7 +559,7 @@ export class Deployer {
     ]);
 
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [
         this.addresses.StateTransition.StateTransitionImplementation,
         this.addresses.TransparentProxyAdmin,
@@ -792,7 +802,7 @@ export class Deployer {
       "initialize"
     );
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [this.addresses.Bridges.ERC20BridgeImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
@@ -833,7 +843,7 @@ export class Deployer {
       [this.addresses.Governance, 1, 1, 1, 0]
     );
     const contractAddress = await this.deployViaCreate2(
-      "TransparentUpgradeableProxy",
+      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
       [this.addresses.Bridges.SharedBridgeImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
@@ -966,7 +976,7 @@ export class Deployer {
     }
 
     /// registering ETH as a valid token, with address 1.
-    const baseTokenAssetId = encodeNTVAssetId(this.l1ChainId, ethers.utils.hexZeroPad(ADDRESS_ONE, 32));
+    const baseTokenAssetId = encodeNTVAssetId(this.l1ChainId, ETH_ADDRESS_IN_CONTRACTS);
     const upgradeData2 = bridgehub.interface.encodeFunctionData("addTokenAssetId", [baseTokenAssetId]);
     await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
     if (this.verbose) {
@@ -976,7 +986,7 @@ export class Deployer {
 
   public async registerTokenBridgehub(tokenAddress: string, useGovernance: boolean = false) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
-    const baseTokenAssetId = encodeNTVAssetId(this.l1ChainId, ethers.utils.hexZeroPad(tokenAddress, 32));
+    const baseTokenAssetId = encodeNTVAssetId(this.l1ChainId, tokenAddress);
     const receipt = await this.executeDirectOrGovernance(
       useGovernance,
       bridgehub,
@@ -996,7 +1006,7 @@ export class Deployer {
     const data = nativeTokenVault.interface.encodeFunctionData("registerToken", [token]);
     await this.executeUpgrade(this.addresses.Bridges.NativeTokenVaultProxy, 0, data);
     if (this.verbose) {
-      console.log("Native token vault registered with ETH");
+      console.log("Native token vault registered with token", token);
     }
   }
 
@@ -1225,7 +1235,7 @@ export class Deployer {
   }
 
   public async registerHyperchain(
-    baseTokenAddress: string,
+    baseTokenAssetId: string,
     validiumMode: boolean,
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,
@@ -1234,12 +1244,15 @@ export class Deployer {
     predefinedChainId?: string,
     useGovernance: boolean = false
   ) {
+    console.log(baseTokenAssetId);
     const txOptions = this.isZkMode() ? {} : { gasLimit: 10_000_000 };
 
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
     const bridgehub = this.bridgehubContract(this.deployWallet);
     const stateTransitionManager = this.stateTransitionManagerContract(this.deployWallet);
+    const ntv = this.nativeTokenVault(this.deployWallet);
+    const baseTokenAddress = await ntv.tokenAddress(baseTokenAssetId);
 
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const alreadyRegisteredInSTM =
@@ -1266,7 +1279,7 @@ export class Deployer {
       [
         inputChainId,
         this.addresses.StateTransition.StateTransitionProxy,
-        baseTokenAddress,
+        baseTokenAssetId,
         Date.now(),
         admin,
         initData,
@@ -1288,6 +1301,7 @@ export class Deployer {
     }
 
     this.addresses.BaseToken = baseTokenAddress;
+    this.addresses.BaseTokenAssetId = baseTokenAssetId;
 
     if (this.verbose) {
       console.log(`Hyperchain registered, gas used: ${receipt.gasUsed.toString()} and ${receipt.gasUsed.toString()}`);

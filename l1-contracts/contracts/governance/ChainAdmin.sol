@@ -2,9 +2,10 @@
 
 pragma solidity 0.8.24;
 
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
 import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
+import {NoCallsProvided, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -23,8 +24,9 @@ contract ChainAdmin is IChainAdmin, Ownable2Step {
     address public tokenMultiplierSetter;
 
     constructor(address _initialOwner, address _initialTokenMultiplierSetter) {
-        // solhint-disable-next-line gas-custom-errors, reason-string
-        require(_initialOwner != address(0), "Initial owner should be non zero address");
+        if (_initialOwner == address(0)) {
+            revert ZeroAddress();
+        }
         _transferOwnership(_initialOwner);
         // Can be zero if no one has this permission.
         tokenMultiplierSetter = _initialTokenMultiplierSetter;
@@ -51,8 +53,9 @@ contract ChainAdmin is IChainAdmin, Ownable2Step {
     /// @param _requireSuccess If true, reverts transaction on any call failure.
     /// @dev Intended for batch processing of contract interactions, managing gas efficiency and atomicity of operations.
     function multicall(Call[] calldata _calls, bool _requireSuccess) external payable onlyOwner {
-        // solhint-disable-next-line gas-custom-errors
-        require(_calls.length > 0, "No calls provided");
+        if (_calls.length == 0) {
+            revert NoCallsProvided();
+        }
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _calls.length; ++i) {
             // slither-disable-next-line arbitrary-send-eth
@@ -72,8 +75,9 @@ contract ChainAdmin is IChainAdmin, Ownable2Step {
     /// @param _nominator The numerator part of the token multiplier.
     /// @param _denominator The denominator part of the token multiplier.
     function setTokenMultiplier(IAdmin _chainContract, uint128 _nominator, uint128 _denominator) external {
-        // solhint-disable-next-line gas-custom-errors, reason-string
-        require(msg.sender == tokenMultiplierSetter, "Only the token multiplier setter can call this function");
+        if (msg.sender != tokenMultiplierSetter) {
+            revert Unauthorized(msg.sender);
+        }
         _chainContract.setTokenMultiplier(_nominator, _denominator);
     }
 

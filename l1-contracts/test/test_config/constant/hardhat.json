@@ -3,96 +3,96 @@
     "name": "DAI",
     "symbol": "DAI",
     "decimals": 18,
-    "address": "0x9F9Cd69A2a3b296B8C3b0E59A942d1B893c6c988"
+    "address": "0x0cF9F4F741BC64982B69b925dAB4Bae9624E882A"
   },
   {
     "name": "wBTC",
     "symbol": "wBTC",
     "decimals": 8,
-    "address": "0xe7B8C0dd29D50D54b9d75e923FB96562B7513A6f"
+    "address": "0x2F7063B72b83d05aCAF311B8B675e4C4C98a17E7"
   },
   {
     "name": "BAT",
     "symbol": "BAT",
     "decimals": 18,
-    "address": "0x4C56e415d1C59c69FE953aEd7C41686f5ee33B2c"
+    "address": "0x4e5261FDDB30B6FaC019ab8517119B06fb65A8D8"
   },
   {
     "name": "GNT",
     "symbol": "GNT",
     "decimals": 18,
-    "address": "0x7D12865902a998Ae6C7B8Bea02277dF1707bB7E2"
+    "address": "0xC04fcb89ea8AF6E0d7407304F6f8e2471975f676"
   },
   {
     "name": "MLTT",
     "symbol": "MLTT",
     "decimals": 18,
-    "address": "0xD4Ba730aA7b2E7Bb7515b265c39dd0796cF7d440"
+    "address": "0x0bADaf09ddaC0F1Fd1ef1bc6F9871F322245F075"
   },
   {
     "name": "DAIK",
     "symbol": "DAIK",
     "decimals": 18,
-    "address": "0xee80cFA1F62427E52A62197A86f76a16eA7b7627"
+    "address": "0x57E6A02f8622D71B293f9c291177C857a1d3FadB"
   },
   {
     "name": "wBTCK",
     "symbol": "wBTCK",
     "decimals": 8,
-    "address": "0x2dD8d8B7E8489E361fa3a455888a371eDcB645d4"
+    "address": "0x9F9Cd69A2a3b296B8C3b0E59A942d1B893c6c988"
   },
   {
     "name": "BATK",
     "symbol": "BATS",
     "decimals": 18,
-    "address": "0x3dE741Ebc93DbEC9C97eccbbA1aD2577b4335980"
+    "address": "0xe7B8C0dd29D50D54b9d75e923FB96562B7513A6f"
   },
   {
     "name": "GNTK",
     "symbol": "GNTS",
     "decimals": 18,
-    "address": "0x6989065500a6B9AAF59F3DCC4cf9e30d0ea9d394"
+    "address": "0x4C56e415d1C59c69FE953aEd7C41686f5ee33B2c"
   },
   {
     "name": "MLTTK",
     "symbol": "MLTTS",
     "decimals": 18,
-    "address": "0x18c1BC9b6049FCC6780549Ad2aA247426f81e916"
+    "address": "0x7D12865902a998Ae6C7B8Bea02277dF1707bB7E2"
   },
   {
     "name": "DAIL",
     "symbol": "DAIL",
     "decimals": 18,
-    "address": "0x75d34909F783D56B7B8Be71085fE63777Dc8fDFE"
+    "address": "0xD4Ba730aA7b2E7Bb7515b265c39dd0796cF7d440"
   },
   {
     "name": "wBTCL",
     "symbol": "wBTCP",
     "decimals": 8,
-    "address": "0x3577F97253469b560CD6442AB37A262a292003f3"
+    "address": "0xee80cFA1F62427E52A62197A86f76a16eA7b7627"
   },
   {
     "name": "BATL",
     "symbol": "BATW",
     "decimals": 18,
-    "address": "0x4A9D48Db0008F8778160dDF142b28a858c427B48"
+    "address": "0x2dD8d8B7E8489E361fa3a455888a371eDcB645d4"
   },
   {
     "name": "GNTL",
     "symbol": "GNTW",
     "decimals": 18,
-    "address": "0x8ce06E5aF9A1221a88282A5Ce65D750BE16b0079"
+    "address": "0x3dE741Ebc93DbEC9C97eccbbA1aD2577b4335980"
   },
   {
     "name": "MLTTL",
     "symbol": "MLTTW",
     "decimals": 18,
-    "address": "0xF1286aD858DeE56B79D5F23f14040849fA3631dA"
+    "address": "0x6989065500a6B9AAF59F3DCC4cf9e30d0ea9d394"
   },
   {
     "name": "Wrapped Ether",
     "symbol": "WETH",
     "decimals": 18,
-    "address": "0x9267631d42C7D2747f8e5573169BdceAE87535b8"
+    "address": "0x18c1BC9b6049FCC6780549Ad2aA247426f81e916"
   }
 ]

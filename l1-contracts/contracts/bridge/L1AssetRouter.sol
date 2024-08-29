@@ -4,11 +4,11 @@ pragma solidity 0.8.24;
 
 // solhint-disable reason-string, gas-custom-errors
 
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
@@ -33,6 +33,8 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../commo
 import {BridgeHelper} from "./BridgeHelper.sol";
 
 import {IL1AssetDeploymentTracker} from "../bridge/interfaces/IL1AssetDeploymentTracker.sol";
+
+import {AssetIdNotSupported, Unauthorized, ZeroAddress, SharedBridgeKey, TokenNotSupported, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -84,7 +86,7 @@ contract L1AssetRouter is
     /// We use this both for Eth and erc20 token deposits, so we need to update the diamond and bridge simultaneously.
     uint256 internal eraLegacyBridgeLastDepositBatch;
 
-    /// @dev The tx number in the _eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge.
+    /// @dev The tx number in the _eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge
     /// This variable (together with eraLegacyBridgeLastDepositBatch) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older txs
     /// than this value are considered to have been processed prior to the upgrade and handled separately.
     /// We use this both for Eth and erc20 token deposits, so we need to update the diamond and bridge simultaneously.
@@ -134,22 +136,25 @@ contract L1AssetRouter is
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
-        require(msg.sender == address(BRIDGE_HUB), "L1AR: not BH");
+        if (msg.sender != address(BRIDGE_HUB)) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub or zkSync Era Diamond Proxy.
+    /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
-        require(
-            msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY),
-            "L1AR: msg.sender not equal to bridgehub or era chain"
-        );
+        if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     /// @notice Checks that the message sender is the legacy bridge.
     modifier onlyLegacyBridge() {
-        require(msg.sender == address(legacyBridge), "L1AR: not legacy bridge");
+        if (msg.sender != address(legacyBridge)) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
@@ -172,9 +177,9 @@ contract L1AssetRouter is
     /// @dev Used for testing purposes only, as the contract has been initialized on mainnet.
     /// @param _owner The address which can change L2 token implementation and upgrade the bridge implementation.
     /// The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    /// @param _eraPostDiamondUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after diamond proxy upgrade.
-    /// @param _eraPostLegacyBridgeUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after legacy bridge upgrade.
-    /// @param _eraLegacyBridgeLastDepositBatch The the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge.
+    /// @param _eraPostDiamondUpgradeFirstBatch The first batch number on the ZKsync Era Diamond Proxy that was settled after diamond proxy upgrade.
+    /// @param _eraPostLegacyBridgeUpgradeFirstBatch The first batch number on the ZKsync Era Diamond Proxy that was settled after legacy bridge upgrade.
+    /// @param _eraLegacyBridgeLastDepositBatch The the ZKsync Era batch number that processes the last deposit tx initiated by the legacy bridge.
     /// @param _eraLegacyBridgeLastDepositTxNumber The tx number in the _eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge.
     function initialize(
         address _owner,
@@ -183,7 +188,9 @@ contract L1AssetRouter is
         uint256 _eraLegacyBridgeLastDepositBatch,
         uint256 _eraLegacyBridgeLastDepositTxNumber
     ) external reentrancyGuardInitializer initializer {
-        require(_owner != address(0), "L1AR: owner 0");
+        if (_owner == address(0)) {
+            revert ZeroAddress();
+        }
         _transferOwnership(_owner);
         if (eraPostDiamondUpgradeFirstBatch == 0) {
             eraPostDiamondUpgradeFirstBatch = _eraPostDiamondUpgradeFirstBatch;
@@ -233,8 +240,12 @@ contract L1AssetRouter is
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
     function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
-        require(address(legacyBridge) == address(0), "L1AR: legacy bridge already set");
-        require(_legacyBridge != address(0), "L1AR: legacy bridge 0");
+        if (address(legacyBridge) != address(0)) {
+            revert AddressAlreadyUsed(address(legacyBridge));
+        }
+        if (_legacyBridge == address(0)) {
+            revert ZeroAddress();
+        }
         legacyBridge = IL1ERC20Bridge(_legacyBridge);
     }
 
@@ -384,7 +395,9 @@ contract L1AssetRouter is
             (assetId, transferData) = _handleLegacyData(_data, _prevMsgSender);
         }
 
-        require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, "L1AR: baseToken deposit not supported");
+        if (BRIDGE_HUB.baseTokenAssetId(_chainId) == assetId) {
+            revert AssetIdNotSupported(assetId);
+        }
 
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
@@ -422,7 +435,9 @@ contract L1AssetRouter is
         bytes32 _txDataHash,
         bytes32 _txHash
     ) external override onlyBridgehub whenNotPaused {
-        require(depositHappened[_chainId][_txHash] == 0x00, "L1AR: tx hap");
+        if (depositHappened[_chainId][_txHash] != 0x00) {
+            revert DepositExists();
+        }
         depositHappened[_chainId][_txHash] = _txDataHash;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
@@ -499,7 +514,9 @@ contract L1AssetRouter is
                 _merkleProof: _merkleProof,
                 _status: TxStatus.Failure
             });
-            require(proofValid, "yn");
+            if (!proofValid) {
+                revert InvalidProof();
+            }
         }
 
         require(!_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch), "L1AR: legacy cFD");
@@ -511,7 +528,9 @@ contract L1AssetRouter is
             // Otherwise, perform the check using the new transaction data hash encoding.
             if (!isLegacyTxDataHash) {
                 bytes32 txDataHash = _encodeTxDataHash(NEW_ENCODING_VERSION, _depositSender, _assetId, _assetData);
-                require(dataHash == txDataHash, "L1AR: d.it not hap");
+                if (dataHash != txDataHash) {
+                    revert DepositDoesNotExist();
+                }
             }
         }
         delete depositHappened[_chainId][_l2TxHash];
@@ -585,10 +604,9 @@ contract L1AssetRouter is
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) internal nonReentrant whenNotPaused returns (address l1Receiver, bytes32 assetId, uint256 amount) {
-        require(
-            !isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex],
-            "L1AR: Withdrawal is already finalized"
-        );
+        if (isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex]) {
+            revert WithdrawalAlreadyFinalized();
+        }
         isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
         // Handling special case for withdrawal from ZKsync Era initiated before Shared Bridge.
@@ -605,7 +623,6 @@ contract L1AssetRouter is
             (assetId, transferData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
         }
         address l1AssetHandler = assetHandlerAddress[assetId];
-        // slither-disable-next-line unused-return
         IL1AssetHandler(l1AssetHandler).bridgeMint(_chainId, assetId, transferData);
         if (l1AssetHandler == address(nativeTokenVault)) {
             (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
@@ -696,12 +713,14 @@ contract L1AssetRouter is
         }
     }
 
-    /// @dev Determines if an eth withdrawal was initiated on zkSync Era before the upgrade to the Shared Bridge.
+    /// @dev Determines if an eth withdrawal was initiated on ZKsync Era before the upgrade to the Shared Bridge.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
     /// @return Whether withdrawal was initiated on ZKsync Era before diamond proxy upgrade.
     function _isEraLegacyEthWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
-        require((_chainId != ERA_CHAIN_ID) || eraPostDiamondUpgradeFirstBatch != 0, "L1AR: diamondUFB not set for Era");
+        if ((_chainId == ERA_CHAIN_ID) && eraPostDiamondUpgradeFirstBatch == 0) {
+            revert SharedBridgeValueNotSet(SharedBridgeKey.PostUpgradeFirstBatch);
+        }
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostDiamondUpgradeFirstBatch);
     }
 
@@ -710,10 +729,9 @@ contract L1AssetRouter is
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
     /// @return Whether withdrawal was initiated on ZKsync Era before Legacy Bridge upgrade.
     function _isEraLegacyTokenWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
-        require(
-            (_chainId != ERA_CHAIN_ID) || eraPostLegacyBridgeUpgradeFirstBatch != 0,
-            "L1AR: LegacyUFB not set for Era"
-        );
+        if ((_chainId == ERA_CHAIN_ID) && eraPostLegacyBridgeUpgradeFirstBatch == 0) {
+            revert SharedBridgeValueNotSet(SharedBridgeKey.LegacyBridgeFirstBatch);
+        }
         return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostLegacyBridgeUpgradeFirstBatch);
     }
 
@@ -760,7 +778,7 @@ contract L1AssetRouter is
         }
     }
 
-    /// @dev Determines if a deposit was initiated on zkSync Era before the upgrade to the Shared Bridge.
+    /// @dev Determines if a deposit was initiated on ZKsync Era before the upgrade to the Shared Bridge.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _l2BatchNumber The L2 batch number for the deposit where it was processed.
     /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the deposit was processed.
@@ -770,10 +788,9 @@ contract L1AssetRouter is
         uint256 _l2BatchNumber,
         uint256 _l2TxNumberInBatch
     ) internal view returns (bool) {
-        require(
-            (_chainId != ERA_CHAIN_ID) || (eraLegacyBridgeLastDepositBatch != 0),
-            "L1AR: last deposit time not set for Era"
-        );
+        if ((_chainId == ERA_CHAIN_ID) && (eraLegacyBridgeLastDepositBatch == 0)) {
+            revert SharedBridgeValueNotSet(SharedBridgeKey.LegacyBridgeLastDepositBatch);
+        }
         return
             (_chainId == ERA_CHAIN_ID) &&
             (_l2BatchNumber < eraLegacyBridgeLastDepositBatch ||
@@ -814,7 +831,10 @@ contract L1AssetRouter is
             _message: l2ToL1Message,
             _proof: _merkleProof
         });
-        require(success, "L1AR: withd w proof"); // withdrawal wrong proof
+        // withdrawal wrong proof
+        if (!success) {
+            revert InvalidProof();
+        }
     }
 
     /// @notice Parses the withdrawal message and returns withdrawal details.
@@ -842,7 +862,9 @@ contract L1AssetRouter is
             address l1Receiver;
 
             // The data is expected to be at least 56 bytes long.
-            require(_l2ToL1message.length >= 56, "L1AR: wrong msg len"); // wrong message length
+            if (_l2ToL1message.length < 56) {
+                revert L2WithdrawalMessageWrongLength(_l2ToL1message.length);
+            }
             // this message is a base token withdrawal
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             // slither-disable-next-line unused-return
@@ -859,7 +881,9 @@ contract L1AssetRouter is
             // Check that the message length is correct.
             // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
             // 76 (bytes).
-            require(_l2ToL1message.length == 76, "L1AR: wrong msg len 2");
+            if (_l2ToL1message.length != 76) {
+                revert L2WithdrawalMessageWrongLength(_l2ToL1message.length);
+            }
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             // slither-disable-next-line unused-return
@@ -873,7 +897,7 @@ contract L1AssetRouter is
             (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
             transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         } else {
-            revert("L1AR: Incorrect message function selector");
+            revert InvalidSelector(bytes4(functionSignature));
         }
     }
 
@@ -957,7 +981,9 @@ contract L1AssetRouter is
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 txHash) {
-        require(_l1Token != L1_WETH_TOKEN, "L1AR: WETH deposit not supported 2");
+        if (_l1Token == L1_WETH_TOKEN) {
+            revert TokenNotSupported(L1_WETH_TOKEN);
+        }
 
         bytes32 _assetId;
         bytes memory bridgeMintCalldata;
