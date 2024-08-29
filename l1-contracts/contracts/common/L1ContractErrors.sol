@@ -251,7 +251,7 @@ error STMNotRegistered();
 error SystemLogsSizeTooBig();
 // 0x08753982
 error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
-//
+// 0xa4861a97
 error TimeReached(uint256 expectedTimestamp, uint256 actualTimestamp);
 // 0x2d50c33b
 error TimestampError();
