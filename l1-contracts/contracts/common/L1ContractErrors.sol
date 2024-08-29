@@ -21,6 +21,8 @@ error AddressAlreadyUsed(address addr);
 error AddressHasNoCode(address);
 // 0x1eee5481
 error AddressTooLow(address);
+
+error AssetHandlerDoesNotExist(bytes32 assetId);
 // 0x6afd6c20
 error BadReturnData();
 // 0x6ef9a972

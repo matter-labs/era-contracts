@@ -4,7 +4,7 @@ import * as hardhat from "hardhat";
 import type { BytesLike } from "ethers/lib/utils";
 import { Interface } from "ethers/lib/utils";
 
-import type { Bridgehub, GettersFacet, MockExecutorFacet, L1Nullifier } from "../../typechain";
+import type { Bridgehub, GettersFacet, MockExecutorFacet } from "../../typechain";
 import {
   BridgehubFactory,
   TestnetERC20TokenFactory,
@@ -16,7 +16,6 @@ import {
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
 import type { IMailbox } from "../../typechain/IMailbox";
-import { IL1Nullifier } from "../../typechain/IL1Nullifier";
 
 import { ethTestConfig } from "../../src.ts/utils";
 import { Action, facetCut } from "../../src.ts/diamondCut";
@@ -102,7 +101,7 @@ describe("Legacy Era tests", function () {
     await erc20TestToken.connect(randomSigner).approve(l1ERC20BridgeAddress, ethers.utils.parseUnits("10000", 18));
 
     const sharedBridgeFactory = await hardhat.ethers.getContractFactory("L1AssetRouter");
-    const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
+    // const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const sharedBridge = await sharedBridgeFactory.deploy(
       // l1WethToken,
       deployer.addresses.Bridgehub.BridgehubProxy,

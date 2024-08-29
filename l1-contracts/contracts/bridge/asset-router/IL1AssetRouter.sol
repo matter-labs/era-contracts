@@ -20,11 +20,7 @@ interface IL1AssetRouter {
         bytes32 indexed l2DepositTxHash
     );
 
-    event ClaimedFailedDepositAssetRouter(
-        uint256 indexed chainId,
-        bytes32 indexed assetId,
-        bytes assetData
-    );
+    event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
     event WithdrawalFinalizedAssetRouter(
         uint256 indexed chainId,

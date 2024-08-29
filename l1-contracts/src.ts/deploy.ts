@@ -48,7 +48,7 @@ import {
   compileInitialCutHash,
   readBytecode,
   applyL1ToL2Alias,
-  BRIDGEHUB_STM_ASSET_DATA_ABI_STRING,
+  // BRIDGEHUB_STM_ASSET_DATA_ABI_STRING,
   // priorityTxMaxGasLimit,
   encodeNTVAssetId,
   ETH_ADDRESS_IN_CONTRACTS,

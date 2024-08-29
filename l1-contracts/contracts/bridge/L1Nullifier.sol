@@ -32,7 +32,7 @@ import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {AssetIdNotSupported, Unauthorized, ZeroAddress, SharedBridgeKey, TokenNotSupported, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet} from "../common/L1ContractErrors.sol";
+import {Unauthorized, SharedBridgeKey, TokenNotSupported, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -141,8 +141,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         }
         _;
     }
-
-
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -304,13 +302,13 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             // If the dataHash matches the legacy transaction hash, skip the next step.
             // Otherwise, perform the check using the new transaction data hash encoding.
             if (!isLegacyTxDataHash) {
-                bytes32 txDataHash = DataEncoding.encodeTxDataHash(
-                    NEW_ENCODING_VERSION,
-                    _depositSender,
-                    _assetId,
-                    address(0),
-                    _assetData
-                );
+                bytes32 txDataHash = DataEncoding.encodeTxDataHash({
+                    _encodingVersion: NEW_ENCODING_VERSION,
+                    _prevMsgSender: _depositSender,
+                    _assetId: _assetId,
+                    _nativeTokenVault: address(l1NativeTokenVault),
+                    _transferData: _assetData
+                });
                 if (dataHash != txDataHash) {
                     revert DepositDoesNotExist();
                 }
@@ -891,18 +889,14 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     ) external override onlyLegacyBridge returns (address l1Receiver, address l1Asset, uint256 amount) {
         bytes32 assetId;
         // (l1Receiver, assetId, amount) = // kl todo
-        this.finalizeWithdrawal(
-            // solhint-disable-next-line func-named-parameters
-            // FinalizeWithdrawalParams(
-            ERA_CHAIN_ID,
-            _l2BatchNumber,
-            _l2MessageIndex,
-            // L2_ASSET_ROUTER_ADDR,
-            _l2TxNumberInBatch,
-            _message,
-            _merkleProof
-            // )
-        );
+        this.finalizeWithdrawal({
+            _chainId: ERA_CHAIN_ID,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
+        });
         l1Asset = INativeTokenVault(address(l1NativeTokenVault)).tokenAddress(assetId);
     }
 

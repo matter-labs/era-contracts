@@ -9,7 +9,6 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
-// import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
@@ -17,17 +16,14 @@ import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {INativeTokenVault} from "./INativeTokenVault.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
-// import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
-// import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../../common/L2ContractAddresses.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 
-import {EmptyAddress, EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ZeroAddress, EmptyBytes32, ValueMismatch, WithdrawFailed, InsufficientChainBalance, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../../common/L1ContractErrors.sol";
+import {EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, WithdrawFailed, InsufficientChainBalance, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -327,7 +323,13 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes memory _erc20Data
     ) internal virtual returns (address _token) {
         address expectedToken = _assetIdCheck(_originChainId, _assetId, _originToken);
-        _token = _ensureTokenDeployedInner(_originChainId, _assetId, _originToken, _erc20Data, expectedToken);
+        _token = _ensureTokenDeployedInner({
+            _originChainId: _originChainId,
+            _assetId: _assetId,
+            _originToken: _originToken,
+            _erc20Data: _erc20Data,
+            _expectedToken: expectedToken
+        });
     }
 
     function _assetIdCheck(
@@ -348,15 +350,15 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes32 _assetId,
         address _originToken,
         bytes memory _erc20Data,
-        address expectedToken
+        address _expectedToken
     ) internal returns (address) {
         address deployedToken = _deployBridgedToken(_originChainId, _originToken, _erc20Data);
-        if (deployedToken != expectedToken) {
-            revert AddressMismatch(expectedToken, deployedToken);
+        if (deployedToken != _expectedToken) {
+            revert AddressMismatch(_expectedToken, deployedToken);
         }
         isTokenBridged[_assetId] = true;
-        tokenAddress[_assetId] = expectedToken;
-        return expectedToken;
+        tokenAddress[_assetId] = _expectedToken;
+        return _expectedToken;
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.

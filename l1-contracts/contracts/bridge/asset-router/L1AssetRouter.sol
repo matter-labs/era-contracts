@@ -29,7 +29,7 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 // import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 // import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../../common/L2ContractAddresses.sol";
-import {Unauthorized, ZeroAddress, AddressAlreadyUsed} from "../../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
@@ -290,7 +290,7 @@ contract L1AssetRouter is
         uint256 _chainId,
         address _depositSender,
         bytes32 _assetId,
-        bytes memory _assetData
+        bytes calldata _assetData
     ) external onlyNullifier nonReentrant whenNotPaused {
         IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(
             _chainId,
@@ -310,10 +310,7 @@ contract L1AssetRouter is
     /// @param _data The encoded transfer data (address _l1Token, uint256 _depositAmount, address _l2Receiver).
     // / @param _prevMsgSender The address of the deposit initiator.
     /// @return Tuple of asset ID and encoded transfer data to conform with new encoding standard.
-    function _handleLegacyData(
-        bytes calldata _data,
-        address 
-    ) internal override returns (bytes32, bytes memory) {
+    function _handleLegacyData(bytes calldata _data, address) internal override returns (bytes32, bytes memory) {
         (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
             _data,
             (address, uint256, address)

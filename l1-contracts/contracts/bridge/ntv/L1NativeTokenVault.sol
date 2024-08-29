@@ -4,10 +4,6 @@ pragma solidity 0.8.24;
 
 // solhint-disable reason-string, gas-custom-errors
 
-import "hardhat/console.sol";
-
-// import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-// import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
 
@@ -15,23 +11,14 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
-// import {INativeTokenVault} from "./INativeTokenVault.sol";
 import {NativeTokenVault} from "./NativeTokenVault.sol";
 
-// import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
-
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
-// import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
-// import {IAssetRouterBase} from "./interfaces/IAssetRouterBase.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 
-// import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
-// import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
-// import {BridgeHelper} from "./BridgeHelper.sol";
-
-import {Unauthorized, ZeroAddress, NoFundsTransferred, TokensWithFeesNotSupported, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, InsufficientChainBalance, WithdrawFailed} from "../../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -128,7 +115,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address _prevMsgSender,
         bytes calldata _data
     ) internal override returns (bytes memory _bridgeMintData) {
-        (uint256 _depositAmount, address _receiver) = abi.decode(_data, (uint256, address));
+        uint256 _depositAmount;
+        (_depositAmount, ) = abi.decode(_data, (uint256, address));
         L1_NULLIFIER.transferAllowanceToNTV(_assetId, _depositAmount, _prevMsgSender);
         _bridgeMintData = super._bridgeBurnNativeToken(_chainId, _assetId, _prevMsgSender, _data);
     }
@@ -194,7 +182,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             _token.allowance(address(L1_NULLIFIER), address(this)) >= _amount &&
             _token.allowance(_from, address(this)) < _amount
         ) {
-            console.log("kl todo _depositFunds");
             from = address(L1_NULLIFIER);
         }
         return super._depositFunds(from, _token, _amount);

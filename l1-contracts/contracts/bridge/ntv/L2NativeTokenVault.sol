@@ -2,28 +2,22 @@
 
 pragma solidity 0.8.24;
 
-// import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4//access/Ownable2StepUpgradeable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
-import {INativeTokenVault} from "./INativeTokenVault.sol";
 import {IL2NativeTokenVault} from "./IL2NativeTokenVault.sol";
 import {NativeTokenVault} from "./NativeTokenVault.sol";
 
-import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
-// import {IAssetHandler} from "./interfaces/IAssetHandler.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 
-// import {BridgedStandardERC20} from "./BridgedStandardERC20.sol";
-// import {IAssetRouterBase} from "l1-contracts-imported/bridge/asset-router/IAssetRouterBase.sol";
 import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2ContractHelper.sol";
 
 import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {EmptyAddress, EmptyBytes32, AddressMismatch, AssetIdMismatch, DeployFailed, AmountMustBeGreaterThanZero, InvalidCaller} from "../../common/L1ContractErrors.sol";
+import {EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -115,7 +109,13 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             tokenAddress[_assetId] = expectedToken;
             _token = expectedToken;
         } else {
-            _token = super._ensureTokenDeployedInner(_originChainId, _assetId, _originToken, _erc20Data, expectedToken);
+            _token = super._ensureTokenDeployedInner({
+                _originChainId: _originChainId,
+                _assetId: _assetId,
+                _originToken: _originToken,
+                _erc20Data: _erc20Data,
+                _expectedToken: expectedToken
+            });
         }
     }
 
