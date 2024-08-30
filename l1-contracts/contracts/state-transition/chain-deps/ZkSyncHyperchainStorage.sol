@@ -152,5 +152,5 @@ struct ZkSyncHyperchainStorage {
     /// @dev The optional address of the contract that has to be used for transaction filtering/whitelisting
     address transactionFilterer;
     /// @dev The amount of time in seconds since unix epoch we allow between the batch timestamp and current timestamp before rejecting the batch
-    uint256 batchCommitDeadline;
+    uint40 batchCommitDeadline;
 }

@@ -146,8 +146,8 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // - The timestamp of the last L2 block is not too big.
 
         // New batch timestamp is too small
-        if (block.timestamp - s.batchCommitDeadline > batchTimestamp) {
-            revert TimeReached(batchTimestamp, block.timestamp - s.batchCommitDeadline);
+        if (block.timestamp - uint256(s.batchCommitDeadline) > batchTimestamp) {
+            revert TimeReached(batchTimestamp, block.timestamp - uint256(s.batchCommitDeadline));
         }
         // The last L2 block timestamp is too big
         if (lastL2BlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {

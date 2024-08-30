@@ -307,6 +307,8 @@ error ZeroAddress();
 error ZeroBalance();
 // 0xc84885d4
 error ZeroChainId();
+// 0x58e0b9ce
+error ZeroBatchCommitDeadline();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

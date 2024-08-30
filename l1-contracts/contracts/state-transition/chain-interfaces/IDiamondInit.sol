@@ -40,7 +40,7 @@ struct InitializeData {
     uint256 priorityTxMaxGasLimit;
     FeeParams feeParams;
     address blobVersionedHashRetriever;
-    uint256 batchCommitDeadline;
+    uint40 batchCommitDeadline;
 }
 
 /// @param verifier address of Verifier contract
@@ -58,7 +58,7 @@ struct InitializeDataNewChain {
     uint256 priorityTxMaxGasLimit;
     FeeParams feeParams;
     address blobVersionedHashRetriever;
-    uint256 batchCommitDeadline;
+    uint40 batchCommitDeadline;
 }
 
 interface IDiamondInit {

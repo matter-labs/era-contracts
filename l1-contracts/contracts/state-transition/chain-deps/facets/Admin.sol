@@ -119,8 +119,8 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
         emit NewTransactionFilterer(oldTransactionFilterer, _transactionFilterer);
     }
 
-    function setBatchCommitDeadline(uint256 _newBatchCommitDeadline) external onlyAdmin {
-        uint256 oldBatchCommitDeadline  = s.batchCommitDeadline;
+    function setBatchCommitDeadline(uint40 _newBatchCommitDeadline) external onlyStateTransitionManager {
+        uint40 oldBatchCommitDeadline  = s.batchCommitDeadline;
         s.batchCommitDeadline = _newBatchCommitDeadline;
         emit NewBatchCommitDeadline(oldBatchCommitDeadline, _newBatchCommitDeadline);
     }

@@ -6,7 +6,7 @@ import {Diamond} from "../libraries/Diamond.sol";
 import {ZkSyncHyperchainBase} from "./facets/ZkSyncHyperchainBase.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
 import {InitializeData, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
-import {ZeroAddress, TooMuchGas} from "../../common/L1ContractErrors.sol";
+import {ZeroAddress, ZeroBatchCommitDeadline, TooMuchGas} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
@@ -46,6 +46,9 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
         if (_initializeData.blobVersionedHashRetriever == address(0)) {
             revert ZeroAddress();
         }
+        if (_initializeData.batchCommitDeadline == 0) {
+            revert ZeroBatchCommitDeadline();
+        }
 
         s.chainId = _initializeData.chainId;
         s.bridgehub = _initializeData.bridgehub;
@@ -65,13 +68,7 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
         s.priorityTxMaxGasLimit = _initializeData.priorityTxMaxGasLimit;
         s.feeParams = _initializeData.feeParams;
         s.blobVersionedHashRetriever = _initializeData.blobVersionedHashRetriever;
-
-        if (_initializeData.batchCommitDeadline == 0) {
-            s.batchCommitDeadline = 3 days;
-        } else {
-            s.batchCommitDeadline = _initializeData.batchCommitDeadline;
-        }
-
+        s.batchCommitDeadline = _initializeData.batchCommitDeadline;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
