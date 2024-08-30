@@ -95,14 +95,6 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
         _addNewChain(_chainId);
     }
 
-    /// @dev Adds a new chain to the message root if it has not been added yet.
-    /// @param _chainId the chainId of the chain
-    function addNewChainIfNeeded(uint256 _chainId) external onlyBridgehub {
-        if (!chainRegistered[_chainId]) {
-            _addNewChain(_chainId);
-        }
-    }
-
     /// @dev add a new chainBatchRoot to the chainTree
     function addChainBatchRoot(
         uint256 _chainId,

@@ -60,6 +60,12 @@ library PriorityTree {
         return _tree.tree.root();
     }
 
+    /// @param _root The root to check.
+    /// @return Returns true if the root is a historical root.
+    function isHistoricalRoot(Tree storage _tree, bytes32 _root) internal view returns (bool) {
+        return _tree.historicalRoots[_root];
+    }
+
     /// @notice Process the priority operations of a batch.
     function processBatch(Tree storage _tree, PriorityOpsBatchInfo calldata _priorityOpsData) internal {
         if (_priorityOpsData.itemHashes.length > 0) {
@@ -89,6 +95,20 @@ library PriorityTree {
             zero = Merkle.efficientHash(zero, zero);
         }
         _tree.historicalRoots[_tree.tree.root()] = true;
+    }
+
+    /// @notice Reinitialize the tree from a commitment on L1.
+    function checkL1Reinit(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal {
+        require(_tree.startIndex == _commitment.startIndex, "PT: invalid start index");
+        require(_tree.unprocessedIndex >= _commitment.unprocessedIndex, "PT: invalid unprocessed index");
+        require(_tree.tree._nextLeafIndex >= _commitment.nextLeafIndex, "PT: invalid next leaf index");
+    }
+
+    /// @notice Reinitialize the tree from a commitment on GW.
+    function checkGWReinit(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal {
+        require(_tree.startIndex == _commitment.startIndex, "PT: invalid start index");
+        require(_tree.unprocessedIndex <= _commitment.unprocessedIndex, "PT: invalid unprocessed index");
+        require(_tree.tree._nextLeafIndex <= _commitment.nextLeafIndex, "PT: invalid next leaf index");
     }
 
     /// @notice Returns the commitment to the priority tree.
