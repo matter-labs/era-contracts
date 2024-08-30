@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
+// import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 
