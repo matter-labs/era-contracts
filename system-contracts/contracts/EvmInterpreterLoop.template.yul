@@ -411,13 +411,7 @@ for { } true { } {
         size, sp := popStackItemWithoutCheck(sp)
 
         checkOverflow(destOffset, size, evmGasLeft)
-        checkOverflow(offset, size, evmGasLeft)
-        checkOverflow(add(offset, size), MEM_OFFSET_INNER(), evmGasLeft)
         checkMemOverflowByOffset(add(destOffset,size), evmGasLeft)
-
-        if gt(add(add(offset, size), MEM_OFFSET_INNER()), MAX_MEMORY_FRAME()) {
-            $llvm_AlwaysInline_llvm$_memsetToZero(add(destOffset, MEM_OFFSET_INNER()), size)
-        }
 
         // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
