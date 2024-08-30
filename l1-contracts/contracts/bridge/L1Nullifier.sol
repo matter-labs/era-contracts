@@ -923,7 +923,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge {
         bytes memory assetData = abi.encode(_amount, _depositSender);
-        bytes32 assetId = INativeTokenVault(address(l1NativeTokenVault)).getAssetId(block.chainid, _l1Asset); // kl todo this chain?
+        /// the legacy bridge can only be used with L1 native tokens.
+        bytes32 assetId = INativeTokenVault(address(l1NativeTokenVault)).getAssetId(block.chainid, _l1Asset);
 
         bridgeVerifyFailedTransfer({
             _depositSender: _depositSender,

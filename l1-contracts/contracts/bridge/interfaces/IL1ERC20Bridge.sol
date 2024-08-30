@@ -61,9 +61,9 @@ interface IL1ERC20Bridge {
 
     function l2TokenAddress(address _l1Token) external view returns (address);
 
-    function NULLIFIER() external view returns (IL1Nullifier);
+    function L1_NULLIFIER() external view returns (IL1Nullifier);
 
-    function NATIVE_TOKEN_VAULT() external view returns (IL1NativeTokenVault);
+    function L1_NATIVE_TOKEN_VAULT() external view returns (IL1NativeTokenVault);
 
     function l2TokenBeacon() external view returns (address);
 

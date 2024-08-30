@@ -23,9 +23,6 @@ jobs:
       - name: Build L1 artifacts
         run: yarn l1 build
 
-      - name: Create Symlink for l2 build
-        run: ln -s $GITHUB_WORKSPACE/contracts/l1-contracts/contracts $GITHUB_WORKSPACE/contracts/l1-contracts-imported
-
       - name: Build L2 artifacts
         run: yarn l2 build
 
