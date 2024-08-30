@@ -17,7 +17,7 @@ interface IL1GenesisUpgrade {
         address _l1GenesisUpgrade,
         uint256 _chainId,
         uint256 _protocolVersion,
-        address _stmDeployerAddress,
+        address _l1StmDeployerAddress,
         bytes calldata _forceDeployments,
         bytes[] calldata _factoryDeps
     ) external returns (bytes32);

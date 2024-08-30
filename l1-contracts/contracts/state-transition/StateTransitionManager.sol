@@ -428,7 +428,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // genesis upgrade, deploys some contracts, sets chainId
         IAdmin(hyperchainAddress).genesisUpgrade(
             l1GenesisUpgrade,
-            address(IBridgehub(BRIDGE_HUB).stmDeployer()),
+            address(IBridgehub(BRIDGE_HUB).l1StmDeployer()),
             _forceDeploymentData,
             _factoryDeps
         );
