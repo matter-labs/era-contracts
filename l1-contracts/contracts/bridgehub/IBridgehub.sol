@@ -42,6 +42,7 @@ struct L2TransactionRequestTwoBridgesInner {
 
 struct BridgehubMintSTMAssetData {
     uint256 chainId;
+    bytes32 baseTokenAssetId;
     bytes stmData;
     bytes chainData;
 }
