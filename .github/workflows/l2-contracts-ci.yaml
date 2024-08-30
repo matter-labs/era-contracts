@@ -63,6 +63,23 @@ jobs:
       - name: Lint
         run: yarn lint:check
 
+  check-verifier-generator-l2:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Generate Verifier.sol
+        working-directory: tools
+        run: cargo run --bin zksync_verifier_contract_generator --release -- --input_path data/scheduler_key.json --l2_mode
+
+      - name: Compare
+        run: diff tools/data/Verifier.sol l2-contracts/contracts/verifier/Verifier.sol
+
   test:
     needs: [build, lint]
     runs-on: ubuntu-latest

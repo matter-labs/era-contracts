@@ -33,7 +33,7 @@
   },
   "scripts": {
     "build": "hardhat compile",
-    "test:foundry": "forge test --zksync",
+    "test:foundry": "forge test --zksync --gas-limit 2000000000",
     "clean": "hardhat clean",
     "test": "hardhat test",
     "verify": "hardhat run src/verify.ts",
