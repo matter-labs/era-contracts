@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
-import {ERC1967Upgrade} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Upgrade.sol";
+import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
+import {ERC1967Upgrade} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Upgrade.sol";
 
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
-import {EmptyAddress, Unauthorized, NonSequentialVersion, Unimplemented} from "../L2ContractErrors.sol";
+import {ZeroAddress, Unauthorized, NonSequentialVersion} from "../errors/L2ContractErrors.sol";
 import {L2_NATIVE_TOKEN_VAULT} from "../L2ContractHelper.sol";
 
 /// @author Matter Labs
@@ -41,7 +41,7 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
 
     modifier onlyNTV() {
         if (msg.sender != address(L2_NATIVE_TOKEN_VAULT)) {
-            revert Unauthorized();
+            revert Unauthorized(msg.sender);
         }
         _;
     }
@@ -68,7 +68,7 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     /// In this case, it is packed `name`/`symbol`/`decimals` of the L1 token.
     function bridgeInitialize(address _l1Address, bytes calldata _data) external initializer {
         if (_l1Address == address(0)) {
-            revert EmptyAddress();
+            revert ZeroAddress();
         }
         l1Address = _l1Address;
 
@@ -139,7 +139,7 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
         // allow the governor of the beacon to reinitialize the token.
         address beaconAddress = _getBeacon();
         if (msg.sender != UpgradeableBeacon(beaconAddress).owner()) {
-            revert Unauthorized();
+            revert Unauthorized(msg.sender);
         }
 
         __ERC20_init_unchained(_newName, _newSymbol);
@@ -179,19 +179,22 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
 
     function name() public view override returns (string memory) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
-        if (availableGetters.ignoreName) revert Unimplemented();
+        // solhint-disable-next-line reason-string, gas-custom-errors
+        if (availableGetters.ignoreName) revert();
         return super.name();
     }
 
     function symbol() public view override returns (string memory) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
-        if (availableGetters.ignoreSymbol) revert Unimplemented();
+        // solhint-disable-next-line reason-string, gas-custom-errors
+        if (availableGetters.ignoreSymbol) revert();
         return super.symbol();
     }
 
     function decimals() public view override returns (uint8) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
-        if (availableGetters.ignoreDecimals) revert Unimplemented();
+        // solhint-disable-next-line reason-string, gas-custom-errors
+        if (availableGetters.ignoreDecimals) revert();
         return decimals_;
     }
 }

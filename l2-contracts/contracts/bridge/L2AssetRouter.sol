@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
 
 import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
@@ -13,7 +13,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, L2_NATIVE_TOKEN_VAULT} from "../L2ContractHelper.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
-import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero} from "../L2ContractErrors.sol";
+import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero} from "../errors/L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

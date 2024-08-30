@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
 import {StateTransitionManager} from "../../state-transition/StateTransitionManager.sol";
 

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.20;
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
 
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
 import {IL2AssetRouter} from "./bridge/interfaces/IL2AssetRouter.sol";
 import {IL2NativeTokenVault} from "./bridge/interfaces/IL2NativeTokenVault.sol";
-import {MalformedBytecode, BytecodeError} from "./L2ContractErrors.sol";
+import {MalformedBytecode, BytecodeError} from "./errors/L2ContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -56,6 +56,13 @@ interface IContractDeployer {
     /// @param _bytecodeHash the bytecodehash of the new contract to be deployed
     /// @param _input the calldata to be sent to the constructor of the new contract
     function create2(bytes32 _salt, bytes32 _bytecodeHash, bytes calldata _input) external returns (address);
+
+    function getNewAddressCreate2(
+        address _sender,
+        bytes32 _bytecodeHash,
+        bytes32 _salt,
+        bytes calldata _input
+    ) external view returns (address newAddress);
 }
 
 /**
@@ -188,6 +195,35 @@ library L2ContractHelper {
         hashedBytecode =
             EfficientCall.sha(_bytecode) &
             0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+        // Setting the version of the hash
+        hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));
+        // Setting the length
+        hashedBytecode = hashedBytecode | bytes32(bytecodeLenInWords << 224);
+    }
+
+    /// @notice Validate the bytecode format and calculate its hash.
+    /// @param _bytecode The bytecode to hash.
+    /// @return hashedBytecode The 32-byte hash of the bytecode.
+    /// Note: The function reverts the execution if the bytecode has non expected format:
+    /// - Bytecode bytes length is not a multiple of 32
+    /// - Bytecode bytes length is not less than 2^21 bytes (2^16 words)
+    /// - Bytecode words length is not odd
+    function hashL2BytecodeMemory(bytes memory _bytecode) internal view returns (bytes32 hashedBytecode) {
+        // Note that the length of the bytecode must be provided in 32-byte words.
+        if (_bytecode.length % 32 != 0) {
+            revert MalformedBytecode(BytecodeError.Length);
+        }
+
+        uint256 bytecodeLenInWords = _bytecode.length / 32;
+        // bytecode length must be less than 2^16 words
+        if (bytecodeLenInWords >= 2 ** 16) {
+            revert MalformedBytecode(BytecodeError.NumberOfWords);
+        }
+        // bytecode length in words must be odd
+        if (bytecodeLenInWords % 2 == 0) {
+            revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
+        }
+        hashedBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
         // Setting the version of the hash
         hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));
         // Setting the length

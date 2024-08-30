@@ -5,7 +5,7 @@ import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
@@ -43,14 +43,9 @@ contract L1AssetRouterTest is Test {
         bytes32 indexed l2DepositTxHash
     );
 
-    event WithdrawalFinalizedSharedBridge(
-        uint256 indexed chainId,
-        address indexed to,
-        bytes32 indexed assetId,
-        uint256 amount
-    );
+    event WithdrawalFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
-    event ClaimedFailedDepositSharedBridge(
+    event ClaimedFailedDepositAssetRouter(
         uint256 indexed chainId,
         address indexed to,
         bytes32 indexed assetId,

@@ -89,34 +89,38 @@ describe("ValidatorTimelock tests", function () {
 
   it("Should revert if non-validator commits batches", async () => {
     const revertReason = await getCallRevertReason(
-      validatorTimelock.connect(randomSigner).commitBatches(getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)])
+      validatorTimelock
+        .connect(randomSigner)
+        .commitBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)])
     );
 
-    expect(revertReason).equal("ValidatorTimelock: only validator");
+    expect(revertReason).contains("Unauthorized");
   });
 
   it("Should revert if non-validator proves batches", async () => {
     const revertReason = await getCallRevertReason(
       validatorTimelock
         .connect(randomSigner)
-        .proveBatches(getMockStoredBatchInfo(0), [getMockStoredBatchInfo(1)], MOCK_PROOF_INPUT)
+        .proveBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockStoredBatchInfo(1)], MOCK_PROOF_INPUT)
     );
 
-    expect(revertReason).equal("ValidatorTimelock: only validator");
+    expect(revertReason).contains("Unauthorized");
   });
 
   it("Should revert if non-validator revert batches", async () => {
-    const revertReason = await getCallRevertReason(validatorTimelock.connect(randomSigner).revertBatches(1));
+    const revertReason = await getCallRevertReason(
+      validatorTimelock.connect(randomSigner).revertBatchesSharedBridge(chainId, 1)
+    );
 
-    expect(revertReason).equal("ValidatorTimelock: only validator");
+    expect(revertReason).contains("Unauthorized");
   });
 
   it("Should revert if non-validator executes batches", async () => {
     const revertReason = await getCallRevertReason(
-      validatorTimelock.connect(randomSigner).executeBatches([getMockStoredBatchInfo(1)], [])
+      validatorTimelock.connect(randomSigner).executeBatchesSharedBridge(chainId, [getMockStoredBatchInfo(1)], [])
     );
 
-    expect(revertReason).equal("ValidatorTimelock: only validator");
+    expect(revertReason).contains("Unauthorized");
   });
 
   it("Should revert if not chain governor sets validator", async () => {
@@ -124,7 +128,7 @@ describe("ValidatorTimelock tests", function () {
       validatorTimelock.connect(randomSigner).addValidator(chainId, await randomSigner.getAddress())
     );
 
-    expect(revertReason).equal("ValidatorTimelock: only chain admin");
+    expect(revertReason).contains("Unauthorized");
   });
 
   it("Should revert if non-owner sets execution delay", async () => {
@@ -167,7 +171,7 @@ describe("ValidatorTimelock tests", function () {
       validatorTimelock.connect(validator).executeBatchesSharedBridge(chainId, [getMockStoredBatchInfo(1)], [])
     );
 
-    expect(revertReason).equal("5c");
+    expect(revertReason).contains("TimeNotReached");
   });
 
   it("Should successfully revert batches", async () => {

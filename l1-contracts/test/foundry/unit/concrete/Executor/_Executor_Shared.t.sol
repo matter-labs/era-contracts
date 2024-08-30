@@ -76,10 +76,10 @@ contract ExecutorTest is Test {
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](5);
-        selectors[0] = executor.commitBatches.selector;
-        selectors[1] = executor.proveBatches.selector;
-        selectors[2] = executor.executeBatches.selector;
-        selectors[3] = executor.revertBatches.selector;
+        selectors[0] = executor.commitBatchesSharedBridge.selector;
+        selectors[1] = executor.proveBatchesSharedBridge.selector;
+        selectors[2] = executor.executeBatchesSharedBridge.selector;
+        selectors[3] = executor.revertBatchesSharedBridge.selector;
         selectors[4] = executor.setPriorityTreeStartIndex.selector;
         return selectors;
     }
@@ -113,6 +113,7 @@ contract ExecutorTest is Test {
         selectors[24] = getters.isFacetFreezable.selector;
         selectors[25] = getters.getTotalBatchesCommitted.selector;
         selectors[26] = getters.getTotalBatchesVerified.selector;
+        selectors[27] = getters.storedBlockHash.selector;
         return selectors;
     }
 

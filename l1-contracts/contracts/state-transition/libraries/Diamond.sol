@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
-pragma solidity 0.8.24;
-
-// solhint-disable gas-custom-errors
-
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
+import {NoFunctionsForDiamondCut, UndefinedDiamondCutAction, AddressHasNoCode, FacetExists, RemoveFunctionFacetAddressZero, SelectorsMustAllHaveSameFreezability, NonEmptyCalldata, ReplaceFunctionFacetAddressZero, RemoveFunctionFacetAddressNotZero, DelegateCallFailed} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -107,7 +106,9 @@ library Diamond {
             bool isFacetFreezable = facetCuts[i].isFreezable;
             bytes4[] memory selectors = facetCuts[i].selectors;
 
-            require(selectors.length > 0, "B"); // no functions for diamond cut
+            if (selectors.length == 0) {
+                revert NoFunctionsForDiamondCut();
+            }
 
             if (action == Action.Add) {
                 _addFunctions(facet, selectors, isFacetFreezable);
@@ -116,7 +117,7 @@ library Diamond {
             } else if (action == Action.Remove) {
                 _removeFunctions(facet, selectors);
             } else {
-                revert("C"); // undefined diamond cut action
+                revert UndefinedDiamondCutAction();
             }
         }
 
@@ -132,7 +133,9 @@ library Diamond {
         // Facet with no code cannot be added.
         // This check also verifies that the facet does not have zero address, since it is the
         // address with which 0x00000000 selector is associated.
-        require(_facet.code.length > 0, "G");
+        if (_facet.code.length == 0) {
+            revert AddressHasNoCode(_facet);
+        }
 
         // Add facet to the list of facets if the facet address is new one
         _saveFacetIfNew(_facet);
@@ -141,7 +144,9 @@ library Diamond {
         for (uint256 i = 0; i < selectorsLength; i = i.uncheckedInc()) {
             bytes4 selector = _selectors[i];
             SelectorToFacet memory oldFacet = ds.selectorToFacet[selector];
-            require(oldFacet.facetAddress == address(0), "J"); // facet for this selector already exists
+            if (oldFacet.facetAddress != address(0)) {
+                revert FacetExists(selector, oldFacet.facetAddress);
+            }
 
             _addOneFunction(_facet, selector, _isFacetFreezable);
         }
@@ -155,13 +160,18 @@ library Diamond {
         // Facet with no code cannot be added.
         // This check also verifies that the facet does not have zero address, since it is the
         // address with which 0x00000000 selector is associated.
-        require(_facet.code.length > 0, "K");
+        if (_facet.code.length == 0) {
+            revert AddressHasNoCode(_facet);
+        }
 
         uint256 selectorsLength = _selectors.length;
         for (uint256 i = 0; i < selectorsLength; i = i.uncheckedInc()) {
             bytes4 selector = _selectors[i];
             SelectorToFacet memory oldFacet = ds.selectorToFacet[selector];
-            require(oldFacet.facetAddress != address(0), "L"); // it is impossible to replace the facet with zero address
+            // it is impossible to replace the facet with zero address
+            if (oldFacet.facetAddress == address(0)) {
+                revert ReplaceFunctionFacetAddressZero();
+            }
 
             _removeOneFunction(oldFacet.facetAddress, selector);
             // Add facet to the list of facets if the facet address is a new one
@@ -175,13 +185,19 @@ library Diamond {
     function _removeFunctions(address _facet, bytes4[] memory _selectors) private {
         DiamondStorage storage ds = getDiamondStorage();
 
-        require(_facet == address(0), "a1"); // facet address must be zero
+        // facet address must be zero
+        if (_facet != address(0)) {
+            revert RemoveFunctionFacetAddressNotZero(_facet);
+        }
 
         uint256 selectorsLength = _selectors.length;
         for (uint256 i = 0; i < selectorsLength; i = i.uncheckedInc()) {
             bytes4 selector = _selectors[i];
             SelectorToFacet memory oldFacet = ds.selectorToFacet[selector];
-            require(oldFacet.facetAddress != address(0), "a2"); // Can't delete a non-existent facet
+            // Can't delete a non-existent facet
+            if (oldFacet.facetAddress == address(0)) {
+                revert RemoveFunctionFacetAddressZero();
+            }
 
             _removeOneFunction(oldFacet.facetAddress, selector);
         }
@@ -215,7 +231,9 @@ library Diamond {
         // so all the selectors in a facet will have the same freezability
         if (selectorPosition != 0) {
             bytes4 selector0 = ds.facetToSelectors[_facet].selectors[0];
-            require(_isSelectorFreezable == ds.selectorToFacet[selector0].isFreezable, "J1");
+            if (_isSelectorFreezable != ds.selectorToFacet[selector0].isFreezable) {
+                revert SelectorsMustAllHaveSameFreezability();
+            }
         }
 
         ds.selectorToFacet[_selector] = SelectorToFacet({
@@ -280,14 +298,18 @@ library Diamond {
     /// @dev Used as a final step of diamond cut to execute the logic of the initialization for changed facets
     function _initializeDiamondCut(address _init, bytes memory _calldata) private {
         if (_init == address(0)) {
-            require(_calldata.length == 0, "H"); // Non-empty calldata for zero address
+            // Non-empty calldata for zero address
+            if (_calldata.length != 0) {
+                revert NonEmptyCalldata();
+            }
         } else {
             // Do not check whether `_init` is a contract since later we check that it returns data.
             (bool success, bytes memory data) = _init.delegatecall(_calldata);
             if (!success) {
                 // If the returndata is too small, we still want to produce some meaningful error
-                if (data.length <= 4) {
-                    revert("I"); // delegatecall failed
+
+                if (data.length < 4) {
+                    revert DelegateCallFailed(data);
                 }
 
                 assembly {
@@ -297,8 +319,12 @@ library Diamond {
 
             // Check that called contract returns magic value to make sure that contract logic
             // supposed to be used as diamond cut initializer.
-            require(data.length == 32, "lp");
-            require(abi.decode(data, (bytes32)) == DIAMOND_INIT_SUCCESS_RETURN_VALUE, "lp1");
+            if (data.length != 32) {
+                revert DelegateCallFailed(data);
+            }
+            if (abi.decode(data, (bytes32)) != DIAMOND_INIT_SUCCESS_RETURN_VALUE) {
+                revert DelegateCallFailed(data);
+            }
         }
     }
 }

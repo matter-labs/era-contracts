@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.24;
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
 /// @dev The number of bits dedicated to the "patch" portion of the protocol version.
 /// This also defines the bit starting from which the "minor" part is located.

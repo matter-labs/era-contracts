@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-
-pragma solidity 0.8.24;
+// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
@@ -43,14 +43,9 @@ interface IL1AssetRouter {
         bytes32 indexed l2DepositTxHash
     );
 
-    event WithdrawalFinalizedSharedBridge(
-        uint256 indexed chainId,
-        address indexed to,
-        bytes32 indexed assetId,
-        uint256 amount
-    );
+    event WithdrawalFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
-    event ClaimedFailedDepositSharedBridge(
+    event ClaimedFailedDepositAssetRouter(
         uint256 indexed chainId,
         address indexed to,
         bytes32 indexed assetId,

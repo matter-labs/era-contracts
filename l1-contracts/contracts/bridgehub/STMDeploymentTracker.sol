@@ -4,8 +4,8 @@ pragma solidity 0.8.24;
 
 // solhint-disable reason-string, gas-custom-errors
 
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
@@ -24,6 +24,9 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IL1AssetRouter public immutable override L1_ASSET_ROUTER;
+
+    /// @dev The encoding version of the data.
+    bytes1 internal constant ENCODING_VERSION = 0x01;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -89,7 +92,9 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         // solhint-disable-next-line gas-custom-errors
 
         require(_prevMsgSender == owner(), "STMDT: not owner");
-        (address _stmL1Address, address _stmL2Address) = abi.decode(_data, (address, address));
+        bytes1 encodingVersion = _data[0];
+        require(encodingVersion == ENCODING_VERSION, "STMDT: wrong encoding version");
+        (address _stmL1Address, address _stmL2Address) = abi.decode(_data[1:], (address, address));
 
         request = _registerSTMAssetOnL2Bridgehub(_chainId, _stmL1Address, _stmL2Address);
     }

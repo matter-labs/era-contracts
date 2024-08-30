@@ -7,8 +7,8 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 // import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
+import {IBridgehub, BridgehubBurnSTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 // import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 // import {Governance} from "contracts/governance/Governance.sol";
@@ -21,7 +21,6 @@ import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 // import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 
-import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 
 contract GatewayScript is Script {
@@ -117,10 +116,10 @@ contract GatewayScript is Script {
     }
 
     function registerGateway() public {
-        IStateTransitionManager stm = IStateTransitionManager(config.stateTransitionProxy);
-        Ownable ownable = Ownable(config.stateTransitionProxy);
+        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        Ownable ownable = Ownable(config.bridgehub);
         vm.prank(ownable.owner());
-        stm.registerSettlementLayer(config.gatewayChainId, true);
+        bridgehub.registerSettlementLayer(config.gatewayChainId, true);
         // bytes memory data = abi.encodeCall(stm.registerSettlementLayer, (config.chainChainId, true));
         // Utils.executeUpgrade({
         //     _governor: ownable.owner(),
@@ -155,8 +154,13 @@ contract GatewayScript is Script {
         bytes32 stmAssetId = bridgehub.stmAssetIdFromChainId(config.chainChainId);
         bytes memory diamondCutData = config.diamondCutData; // todo replace with config.zkDiamondCutData;
         bytes memory stmData = abi.encode(newAdmin, diamondCutData);
-        bytes memory chainData = abi.encode(address(1));
-        bytes memory bridgehubData = abi.encode(config.chainChainId, stmData, chainData);
+        bytes memory chainData = abi.encode(chain.getProtocolVersion());
+        BridgehubBurnSTMAssetData memory stmAssetData = BridgehubBurnSTMAssetData({
+            chainId: config.chainChainId,
+            stmData: stmData,
+            chainData: chainData
+        });
+        bytes memory bridgehubData = abi.encode(stmAssetData);
         bytes memory routerData = bytes.concat(bytes1(0x01), abi.encode(stmAssetId, bridgehubData));
 
         vm.startBroadcast(chain.getAdmin());
@@ -214,7 +218,10 @@ contract GatewayScript is Script {
             refundRecipient: ownable.owner(),
             secondBridgeAddress: config.stmDeploymentTracker,
             secondBridgeValue: 0,
-            secondBridgeCalldata: abi.encode(config.stateTransitionProxy, config.stateTransitionProxy)
+            secondBridgeCalldata: bytes.concat(
+                bytes1(0x01),
+                abi.encode(config.stateTransitionProxy, config.stateTransitionProxy)
+            )
         });
         vm.startBroadcast(ownable.owner());
         bridgehub.requestL2TransactionTwoBridges{value: expectedCost}(assetRouterRegistrationRequest);
