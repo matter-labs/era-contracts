@@ -53,9 +53,9 @@
     "zksync-ethers": "^5.9.0"
   },
   "scripts": {
-    "build": "hardhat compile & CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat compile ",
+    "build": "hardhat compile && CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat compile ",
     "build-l1": "hardhat compile",
-    "clean": "hardhat clean",
+    "clean": "hardhat clean && CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat clean",
     "clean:foundry": "forge clean",
     "test": "yarn workspace da-contracts build && hardhat test test/unit_tests/*.spec.ts --network hardhat",
     "test:foundry": "forge test --ffi",
