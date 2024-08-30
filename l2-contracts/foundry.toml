@@ -21,8 +21,7 @@ fs_permissions = [
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
     { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed" }
 ]
-gas_limit=2000000000
 
 [profile.default.zksync] 
 enable_eravm_extensions = true
-zksolc = "1.5.1"
+zksolc = "1.5.3"
