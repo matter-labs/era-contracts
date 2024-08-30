@@ -223,7 +223,7 @@ contract L1AssetRouter is
         bytes32 _txDataHash,
         bytes32 _txHash
     ) external override(AssetRouterBase) onlyBridgehub whenNotPaused {
-        L1_NULLIFIER.bridgehubConfirmL2Transaction(_chainId, _txDataHash, _txHash);
+        L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(_chainId, _txDataHash, _txHash);
     }
 
     function _getLegacyNTVCalldata(
@@ -431,7 +431,7 @@ contract L1AssetRouter is
         }
 
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-        L1_NULLIFIER.bridgehubConfirmL2Transaction(
+        L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(
             ERA_CHAIN_ID,
             keccak256(abi.encode(_prevMsgSender, _l1Token, _amount)),
             txHash

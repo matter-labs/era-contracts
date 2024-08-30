@@ -83,7 +83,7 @@ describe("Custom base token chain and bridge tests", () => {
 
   it("Should not allow direct legacy deposits", async () => {
     const revertReason = await getCallRevertReason(
-      l1Nullifier
+      l1SharedBridge
         .connect(randomSigner)
         .depositLegacyErc20Bridge(
           await randomSigner.getAddress(),

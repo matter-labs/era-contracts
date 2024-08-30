@@ -98,11 +98,11 @@ interface IL1Nullifier {
 
     function BRIDGE_HUB() external view returns (IBridgehub);
 
-    function legacyBridge() external view returns (IL1ERC20Bridge);
+    function legacyBridge() external view returns (address);
 
     function depositHappened(uint256 _chainId, bytes32 _l2TxHash) external view returns (bytes32);
 
-    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
+    function bridgehubConfirmL2TransactionForwarded(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 
     function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
 

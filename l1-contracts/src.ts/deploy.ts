@@ -673,15 +673,15 @@ export class Deployer {
   }
 
   public async setParametersSharedBridge() {
-    //   const sharedBridge = L1AssetRouterFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
-    //   const data1 = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
-    //     this.addresses.Bridges.ERC20BridgeProxy,
-    //   ]);
-    //   await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data1);
-    //   if (this.verbose) {
-    //     console.log("Shared bridge updated with ERC20Bridge address");
-    //   }
-  } // kl todo
+      const sharedBridge = L1AssetRouterFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
+      const data1 = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
+        this.addresses.Bridges.ERC20BridgeProxy,
+      ]);
+      await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data1);
+      if (this.verbose) {
+        console.log("Shared bridge updated with ERC20Bridge address");
+      }
+  } 
 
   public async executeDirectOrGovernance(
     useGovernance: boolean,
@@ -822,13 +822,13 @@ export class Deployer {
   }
 
   public async deployL1NullifierImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const tokens = getTokens();
-    const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
+    // const tokens = getTokens();
+    // const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const eraDiamondProxy = getAddressFromEnv("CONTRACTS_ERA_DIAMOND_PROXY_ADDR");
     const contractAddress = await this.deployViaCreate2(
       "L1Nullifier",
-      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, eraChainId, eraDiamondProxy],
+      [this.addresses.Bridgehub.BridgehubProxy, eraChainId, eraDiamondProxy],
       create2Salt,
       ethTxOptions
     );
@@ -863,11 +863,13 @@ export class Deployer {
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
+    const tokens = getTokens();
+    const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const eraDiamondProxy = getAddressFromEnv("CONTRACTS_ERA_DIAMOND_PROXY_ADDR");
     const contractAddress = await this.deployViaCreate2(
       "L1AssetRouter",
-      [this.addresses.Bridgehub.BridgehubProxy, this.addresses.Bridges.L1NullifierProxy, eraChainId, eraDiamondProxy],
+      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, this.addresses.Bridges.L1NullifierProxy, eraChainId, eraDiamondProxy],
       create2Salt,
       ethTxOptions
     );

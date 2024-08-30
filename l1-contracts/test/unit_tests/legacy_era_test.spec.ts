@@ -101,9 +101,9 @@ describe("Legacy Era tests", function () {
     await erc20TestToken.connect(randomSigner).approve(l1ERC20BridgeAddress, ethers.utils.parseUnits("10000", 18));
 
     const sharedBridgeFactory = await hardhat.ethers.getContractFactory("L1AssetRouter");
-    // const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
+    const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const sharedBridge = await sharedBridgeFactory.deploy(
-      // l1WethToken,
+      l1WethToken,
       deployer.addresses.Bridgehub.BridgehubProxy,
       deployer.addresses.Bridges.L1NullifierProxy,
       deployer.chainId,
