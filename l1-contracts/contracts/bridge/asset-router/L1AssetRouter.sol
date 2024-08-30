@@ -25,11 +25,11 @@ import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
 
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
-// import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-// import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 // import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../../common/L2ContractAddresses.sol";
-import {Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
@@ -49,11 +49,17 @@ contract L1AssetRouter is
 {
     using SafeERC20 for IERC20;
 
+    /// @dev The address of the WETH token on L1.
+    address public immutable override L1_WETH_TOKEN;
+
     /// @dev The address of ZKsync Era diamond proxy contract.
     address internal immutable ERA_DIAMOND_PROXY;
 
     /// @dev Address of nullifier.
     IL1Nullifier public immutable L1_NULLIFIER;
+
+    /// @dev Address of legacy bridge.
+    address public legacyBridge;
 
     /// @notice Checks that the message sender is the nullifier.
     modifier onlyNullifier() {
@@ -79,16 +85,17 @@ contract L1AssetRouter is
     }
 
     /// @notice Checks that the message sender is the legacy bridge.
-    // modifier onlyLegacyBridge() {
-    //     if (msg.sender != address(legacyBridge)) {
-    //         revert Unauthorized(msg.sender);
-    //     }
-    //     _;
-    // } // kl todo
+    modifier onlyLegacyBridge() {
+        if (msg.sender != address(legacyBridge)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
+        address _l1WethAddress,
         address _bridgehub,
         address _l1Nullifier,
         uint256 _eraChainId,
@@ -98,6 +105,7 @@ contract L1AssetRouter is
         AssetRouterBase(block.chainid, _eraChainId, IBridgehub(_bridgehub), ETH_TOKEN_ADDRESS)
     {
         _disableInitializers();
+        L1_WETH_TOKEN = _l1WethAddress;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;
         L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
     }
@@ -125,15 +133,15 @@ contract L1AssetRouter is
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
-    // function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
-    //     if (address(legacyBridge) != address(0)) {
-    //         revert AddressAlreadyUsed(address(legacyBridge));
-    //     }
-    //     if (_legacyBridge == address(0)) {
-    //         revert ZeroAddress();
-    //     }
-    //     legacyBridge = IL1ERC20Bridge(_legacyBridge);
-    // }
+    function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
+        if (address(legacyBridge) != address(0)) {
+            revert AddressAlreadyUsed(address(legacyBridge));
+        }
+        if (_legacyBridge == address(0)) {
+            revert ZeroAddress();
+        }
+        legacyBridge = _legacyBridge;
+    }
 
     /// @notice Used to set the assed deployment tracker address for given asset data.
     /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
@@ -335,10 +343,107 @@ contract L1AssetRouter is
                      Legacy Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Routes the request through l1 asset router, to minimize the number of addresses from with l2 asset router expects deposit.
+    /// @notice Initiates a deposit by locking funds on the contract and sending the request
+    /// of processing an L2 transaction where tokens would be minted.
+    /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
+    /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @param _l2Receiver The account address that should receive funds on L2.
+    /// @param _l1Token The L1 token address which is deposited.
+    /// @param _amount The total amount of tokens to be bridged.
+    /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction.
+    /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction.
+    /// @param _refundRecipient The address on L2 that will receive the refund for the transaction.
+    /// @dev If the L2 deposit finalization transaction fails, the `_refundRecipient` will receive the `_l2Value`.
+    /// Please note, the contract may change the refund recipient's address to eliminate sending funds to addresses
+    /// out of control.
+    /// - If `_refundRecipient` is a contract on L1, the refund will be sent to the aliased `_refundRecipient`.
+    /// - If `_refundRecipient` is set to `address(0)` and the sender has NO deployed bytecode on L1, the refund will
+    /// be sent to the `msg.sender` address.
+    /// - If `_refundRecipient` is set to `address(0)` and the sender has deployed bytecode on L1, the refund will be
+    /// sent to the aliased `msg.sender` address.
+    /// @dev The address aliasing of L1 contracts as refund recipient on L2 is necessary to guarantee that the funds
+    /// are controllable through the Mailbox, since the Mailbox applies address aliasing to the from address for the
+    /// L2 tx if the L1 msg.sender is a contract. Without address aliasing for L1 contracts as refund recipients they
+    /// would not be able to make proper L2 tx requests through the Mailbox to use or withdraw the funds from L2, and
+    /// the funds would be lost.
+    /// @return txHash The L2 transaction hash of deposit finalization.
     function depositLegacyErc20Bridge(
-        L2TransactionRequestDirect calldata _request
-    ) external payable override onlyNullifier nonReentrant whenNotPaused returns (bytes32 l2TxHash) {
-        return BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(_request);
+        address _prevMsgSender,
+        address _l2Receiver,
+        address _l1Token,
+        uint256 _amount,
+        uint256 _l2TxGasLimit,
+        uint256 _l2TxGasPerPubdataByte,
+        address _refundRecipient
+    ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 txHash) {
+        if (_l1Token == L1_WETH_TOKEN) {
+            revert TokenNotSupported(L1_WETH_TOKEN);
+        }
+
+        bytes32 _assetId;
+        bytes memory bridgeMintCalldata;
+
+        {
+            // Inner call to encode data to decrease local var numbers
+            _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
+            IERC20(_l1Token).forceApprove(address(nativeTokenVault), _amount);
+
+            // solhint-disable-next-line func-named-parameters
+            // bridgeMintCalldata = abi.encode(_amount, _prevMsgSender, _l2Receiver, getERC20Getters(_l1Token), _l1Token); // kl todo check correct
+            bridgeMintCalldata = DataEncoding.encodeBridgeMintData({
+                _prevMsgSender: _prevMsgSender,
+                _l2Receiver: _l2Receiver,
+                _l1Token: _l1Token,
+                _amount: _amount,
+                _erc20Metadata: nativeTokenVault.getERC20Getters(_l1Token)
+            }); // kl todo don't we care about backwards compatibility here?
+            // bridgeMintCalldata = _burn({
+            //     _chainId: ERA_CHAIN_ID,
+            //     _l2Value: 0,
+            //     _assetId: _assetId,
+            //     _prevMsgSender: _prevMsgSender,
+            //     _transferData: abi.encode(_amount, _l2Receiver),
+            //     _passValue: false
+            // });
+        }
+
+        {
+            bytes memory l2TxCalldata = getDepositCalldata(ERA_CHAIN_ID, _prevMsgSender, _assetId, bridgeMintCalldata);
+
+            // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
+            // Otherwise, the refund will be sent to the specified address.
+            // If the recipient is a contract on L1, the address alias will be applied.
+            address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, _prevMsgSender);
+
+            L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
+                chainId: ERA_CHAIN_ID,
+                l2Contract: L2_ASSET_ROUTER_ADDR,
+                mintValue: msg.value, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
+                l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
+                l2Calldata: l2TxCalldata,
+                l2GasLimit: _l2TxGasLimit,
+                l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
+                factoryDeps: new bytes[](0),
+                refundRecipient: refundRecipient
+            });
+            txHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
+        }
+
+        // Save the deposited amount to claim funds on L1 if the deposit failed on L2
+        L1_NULLIFIER.bridgehubConfirmL2Transaction(
+            ERA_CHAIN_ID,
+            keccak256(abi.encode(_prevMsgSender, _l1Token, _amount)),
+            txHash
+        );
+
+        emit LegacyDepositInitiated({
+            chainId: ERA_CHAIN_ID,
+            l2DepositTxHash: txHash,
+            from: _prevMsgSender,
+            to: _l2Receiver,
+            l1Asset: _l1Token,
+            amount: _amount
+        });
     }
 }

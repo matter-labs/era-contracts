@@ -14,9 +14,9 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 import {NEW_ENCODING_VERSION} from "./asset-router/IAssetRouterBase.sol";
 import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 
-import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
+// import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
-import {IAssetRouterBase} from "./asset-router/IAssetRouterBase.sol";
+// import {IAssetRouterBase} from "./asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "./ntv/INativeTokenVault.sol";
 
 import {IL1Nullifier, FinalizeWithdrawalParams} from "./interfaces/IL1Nullifier.sol";
@@ -29,10 +29,10 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 // import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
 
-import {IBridgehub, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {Unauthorized, SharedBridgeKey, TokenNotSupported, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet} from "../common/L1ContractErrors.sol";
+import {Unauthorized, SharedBridgeKey, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -40,9 +40,6 @@ import {Unauthorized, SharedBridgeKey, TokenNotSupported, DepositExists, Address
 /// @dev Designed for use with a proxy for upgradability.
 contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
-
-    /// @dev The address of the WETH token on L1.
-    address public immutable override L1_WETH_TOKEN;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
@@ -104,11 +101,11 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// NOTE: this function may be removed in the future, don't rely on it!
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 
-    /// @dev Address of native token vault.
-    IL1NativeTokenVault public l1NativeTokenVault;
-
     /// @dev Address of L1 asset router.
     IL1AssetRouter public l1AssetRouter;
+
+    /// @dev Address of native token vault.
+    IL1NativeTokenVault public l1NativeTokenVault;
 
     /// @notice Checks that the message sender is the asset router..
     modifier onlyAssetRouter() {
@@ -144,14 +141,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(
-        address _l1WethAddress,
-        IBridgehub _bridgehub,
-        uint256 _eraChainId,
-        address _eraDiamondProxy
-    ) reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgehub, uint256 _eraChainId, address _eraDiamondProxy) reentrancyGuardInitializer {
         _disableInitializers();
-        L1_WETH_TOKEN = _l1WethAddress;
         BRIDGE_HUB = _bridgehub;
         ERA_CHAIN_ID = _eraChainId;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;
@@ -210,17 +201,28 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         chainBalance[_chainId][_token] = 0;
     }
 
-    /// @notice Sets the L1ERC20Bridge contract address.
-
-    /// @dev Should be called only once by the owner.
-    /// @param _legacyBridge The address of the legacy bridge.
-    function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
-        require(address(legacyBridge) == address(0), "L1N: legacy bridge already set");
-        require(_legacyBridge != address(0), "L1N: legacy bridge 0");
-        legacyBridge = IL1ERC20Bridge(_legacyBridge);
+    /// @notice Legacy function used for migration, do not use!
+    /// @param _chainId The chain id on which the bridge is deployed.
+    // slither-disable-next-line uninitialized-state-variables
+    function l2BridgeAddress(uint256 _chainId) external view returns (address) {
+        // slither-disable-next-line uninitialized-state-variables
+        return __DEPRECATED_l2BridgeAddress[_chainId];
     }
 
     /// @notice Sets the L1ERC20Bridge contract address.
+    /// @dev Should be called only once by the owner.
+    /// @param _legacyBridge The address of the legacy bridge.
+    function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
+        if (address(legacyBridge) != address(0)) {
+            revert AddressAlreadyUsed(address(legacyBridge));
+        }
+        if (_legacyBridge == address(0)) {
+            revert ZeroAddress();
+        }
+        legacyBridge = IL1ERC20Bridge(_legacyBridge);
+    }
+
+    /// @notice Sets the nativeTokenVault contract address.
     /// @dev Should be called only once by the owner.
     /// @param _l1NativeTokenVault The address of the native token vault.
     function setL1NativeTokenVault(IL1NativeTokenVault _l1NativeTokenVault) external onlyOwner {
@@ -257,8 +259,36 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
+    /// @notice Finalize the withdrawal and release funds
+    /// @param _chainId The chain ID of the transaction to check
+    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
+    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
+    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
+    function finalizeWithdrawal(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external {
+        FinalizeWithdrawalParams memory finalizeWithdrawalParams = FinalizeWithdrawalParams({
+            chainId: _chainId,
+            l2BatchNumber: _l2BatchNumber,
+            l2MessageIndex: _l2MessageIndex,
+            l2Sender: L2_ASSET_ROUTER_ADDR,
+            l2TxNumberInBatch: _l2TxNumberInBatch,
+            message: _message,
+            merkleProof: _merkleProof
+        });
+        this.finalizeWithdrawalExternal(finalizeWithdrawalParams);
+    }
+
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     // / @param _checkedInLegacyBridge The boolean notifying in deposit was checked in legacy bridge.
+    /// @param _chainId The ZK chain id to which deposit was initiated.
     /// @param _depositSender The address of the entity that initiated the deposit.
     /// @param _assetId The address of the deposited L1 ERC20 token.
     /// @param _assetData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
@@ -268,7 +298,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent.
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
-    function bridgeVerifyFailedTransfer(
+    function _bridgeVerifyFailedTransfer(
         uint256 _chainId,
         address _depositSender,
         bytes32 _assetId,
@@ -278,7 +308,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
-    ) public onlyAssetRouter nonReentrant whenNotPaused {
+    ) internal {
         {
             bool proofValid = BRIDGE_HUB.proveL1ToL2TransactionStatus({
                 _chainId: _chainId,
@@ -317,31 +347,27 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         delete depositHappened[_chainId][_l2TxHash];
     }
 
-    /// @notice Finalize the withdrawal and release funds
-    /// @param _chainId The chain ID of the transaction to check
-    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
-    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
-    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
-    function finalizeWithdrawal(
-        uint256 _chainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external {
-        FinalizeWithdrawalParams memory finalizeWithdrawalParams = FinalizeWithdrawalParams({
-            chainId: _chainId,
-            l2BatchNumber: _l2BatchNumber,
-            l2MessageIndex: _l2MessageIndex,
-            l2Sender: L2_ASSET_ROUTER_ADDR,
-            l2TxNumberInBatch: _l2TxNumberInBatch,
-            message: _message,
-            merkleProof: _merkleProof
-        });
-        this.finalizeWithdrawalExternal(finalizeWithdrawalParams);
+    /// @notice Internal function that handles the logic for finalizing withdrawals, supporting both the current bridge system and the legacy ERC20 bridge.
+    /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
+    /// @return l1Receiver The address to receive bridged assets.
+    /// @return assetId The bridged asset ID.
+    /// @return amount The amount of asset bridged.
+    function _finalizeWithdrawal(
+        FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
+    ) internal nonReentrant whenNotPaused returns (address l1Receiver, bytes32 assetId, uint256 amount) {
+        bytes memory transferData;
+        (assetId, transferData) = _verifyAndGetWithdrawalData(_finalizeWithdrawalParams);
+
+        (l1Receiver, amount) = l1AssetRouter.finalizeWithdrawal(
+            _finalizeWithdrawalParams.chainId,
+            assetId,
+            transferData
+        );
+    }
+
+    function finalizeWithdrawalExternal(FinalizeWithdrawalParams calldata _finalizeWithdrawalParams) external {
+        require(msg.sender == address(this), "L1N: not self");
+        _finalizeWithdrawal(_finalizeWithdrawalParams);
     }
 
     /// @notice Transfers allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
@@ -410,27 +436,25 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         // }
     }
 
-    function finalizeWithdrawalExternal(FinalizeWithdrawalParams calldata _finalizeWithdrawalParams) external {
-        require(msg.sender == address(this), "L1N: not self");
-        _finalizeWithdrawal(_finalizeWithdrawalParams);
-    }
-
-    /// @notice Internal function that handles the logic for finalizing withdrawals, supporting both the current bridge system and the legacy ERC20 bridge.
-    /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
-    /// @return l1Receiver The address to receive bridged assets.
-    /// @return assetId The bridged asset ID.
-    /// @return amount The amount of asset bridged.
-    function _finalizeWithdrawal(
-        FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
-    ) internal nonReentrant whenNotPaused returns (address l1Receiver, bytes32 assetId, uint256 amount) {
-        bytes memory transferData;
-        (assetId, transferData) = _verifyAndGetWithdrawalData(_finalizeWithdrawalParams);
-
-        (l1Receiver, amount) = l1AssetRouter.finalizeWithdrawal(
-            _finalizeWithdrawalParams.chainId,
-            assetId,
-            transferData
-        );
+    /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
+    /// @param _encodingVersion EncodingVersion.
+    /// @param _prevMsgSender The address of the entity that initiated the deposit.
+    /// @param _assetId The unique identifier of the deposited L1 token.
+    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
+    /// @return txDataHash The resulting encoded transaction data hash.
+    function _encodeTxDataHash(
+        bytes1 _encodingVersion,
+        address _prevMsgSender,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal view returns (bytes32 txDataHash) {
+        DataEncoding.encodeTxDataHash({
+            _encodingVersion: _encodingVersion,
+            _prevMsgSender: _prevMsgSender,
+            _assetId: _assetId,
+            _nativeTokenVault: address(l1NativeTokenVault),
+            _transferData: _transferData
+        });
     }
 
     /// @dev Determines if a deposit was initiated on ZKsync Era before the upgrade to the Shared Bridge.
@@ -635,11 +659,11 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     //     emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _assetId, _assetData);
     // }
 
-    // struct MessageParams {
-    //     uint256 l2BatchNumber;
-    //     uint256 l2MessageIndex;
-    //     uint16 l2TxNumberInBatch;
-    // }
+    struct MessageParams {
+        uint256 l2BatchNumber;
+        uint256 l2MessageIndex;
+        uint16 l2TxNumberInBatch;
+    }
 
     /// @notice Internal function that handles the logic for finalizing withdrawals, supporting both the current bridge system and the legacy ERC20 bridge.
     /// @param _chainId The chain ID of the transaction to check.
@@ -668,18 +692,18 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     //     require(!_isEraLegacyEthWithdrawal(_chainId, _l2BatchNumber), "L1AR: legacy eth withdrawal");
     //     require(!_isEraLegacyTokenWithdrawal(_chainId, _l2BatchNumber), "L1AR: legacy token withdrawal");
 
-    // bytes memory transferData;
-    // {
-    //     MessageParams memory messageParams = MessageParams({
-    //         l2BatchNumber: _l2BatchNumber,
-    //         l2MessageIndex: _l2MessageIndex,
-    //         l2TxNumberInBatch: _l2TxNumberInBatch
-    //     });
-    //     (assetId, transferData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
-    // }
-    // address l1AssetHandler = assetHandlerAddress[assetId];
-    // IL1AssetHandler(l1AssetHandler).bridgeMint(_chainId, assetId, transferData);
-    // (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
+    //     bytes memory transferData;
+    //     {
+    //         MessageParams memory messageParams = MessageParams({
+    //             l2BatchNumber: _l2BatchNumber,
+    //             l2MessageIndex: _l2MessageIndex,
+    //             l2TxNumberInBatch: _l2TxNumberInBatch
+    //         });
+    //         (assetId, transferData) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
+    //     }
+    //     address l1AssetHandler = assetHandlerAddress[assetId];
+    //     IL1AssetHandler(l1AssetHandler).bridgeMint(_chainId, assetId, transferData);
+    //     (amount, l1Receiver) = abi.decode(transferData, (uint256, address));
 
     //     emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, assetId, amount);
     // }
@@ -713,7 +737,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         // bytes memory transferData = abi.encode(_amount, _depositSender);
         bytes memory assetData = abi.encode(_amount, address(0));
 
-        bridgeVerifyFailedTransfer({
+        _bridgeVerifyFailedTransfer({
             _depositSender: _depositSender,
             _chainId: _chainId,
             _assetId: assetId,
@@ -733,142 +757,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         });
     }
 
-    /// @notice Ensures that token is registered with native token vault.
-    /// @dev Only used when deposit is made with legacy data encoding format.
-    /// @param _l1Token The L1 token address which should be registered with native token vault.
-    /// @return assetId The asset ID of the token provided.
-    function _ensureTokenRegisteredWithNTV(address _l1Token) internal returns (bytes32 assetId) {
-        assetId = INativeTokenVault(address(l1NativeTokenVault)).getAssetId(block.chainid, _l1Token);
-        if (INativeTokenVault(address(l1NativeTokenVault)).tokenAddress(assetId) == address(0)) {
-            INativeTokenVault(address(l1NativeTokenVault)).registerToken(_l1Token);
-        }
-    }
-
-    /// @notice Receives and parses (name, symbol, decimals) from the token contract.
-    /// @param _token The address of token of interest.
-    /// @return Returns encoded name, symbol, and decimals for specific token.
-    function getERC20Getters(address _token) public view returns (bytes memory) {
-        if (_token == ETH_TOKEN_ADDRESS) {
-            bytes memory name = bytes("Ether");
-            bytes memory symbol = bytes("ETH");
-            bytes memory decimals = abi.encode(uint8(18));
-            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
-        }
-
-        (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
-        (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
-        (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
-        return abi.encode(data1, data2, data3);
-    }
-
     /*//////////////////////////////////////////////////////////////
                     ERA ERC20 LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-
-    /// @notice Initiates a deposit by locking funds on the contract and sending the request
-    /// of processing an L2 transaction where tokens would be minted.
-    /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
-    /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    /// @param _l2Receiver The account address that should receive funds on L2.
-    /// @param _l1Token The L1 token address which is deposited.
-    /// @param _amount The total amount of tokens to be bridged.
-    /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction.
-    /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction.
-    /// @param _refundRecipient The address on L2 that will receive the refund for the transaction.
-    /// @dev If the L2 deposit finalization transaction fails, the `_refundRecipient` will receive the `_l2Value`.
-    /// Please note, the contract may change the refund recipient's address to eliminate sending funds to addresses
-    /// out of control.
-    /// - If `_refundRecipient` is a contract on L1, the refund will be sent to the aliased `_refundRecipient`.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has NO deployed bytecode on L1, the refund will
-    /// be sent to the `msg.sender` address.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has deployed bytecode on L1, the refund will be
-    /// sent to the aliased `msg.sender` address.
-    /// @dev The address aliasing of L1 contracts as refund recipient on L2 is necessary to guarantee that the funds
-    /// are controllable through the Mailbox, since the Mailbox applies address aliasing to the from address for the
-    /// L2 tx if the L1 msg.sender is a contract. Without address aliasing for L1 contracts as refund recipients they
-    /// would not be able to make proper L2 tx requests through the Mailbox to use or withdraw the funds from L2, and
-    /// the funds would be lost.
-    /// @return txHash The L2 transaction hash of deposit finalization.
-    function depositLegacyErc20Bridge(
-        address _prevMsgSender,
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByte,
-        address _refundRecipient
-    ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 txHash) {
-        if (_l1Token == L1_WETH_TOKEN) {
-            revert TokenNotSupported(L1_WETH_TOKEN);
-        }
-
-        bytes32 _assetId;
-        bytes memory bridgeMintCalldata;
-
-        {
-            // Inner call to encode data to decrease local var numbers
-            _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-            IERC20(_l1Token).forceApprove(address(l1NativeTokenVault), _amount);
-
-            // solhint-disable-next-line func-named-parameters
-            // bridgeMintCalldata = abi.encode(_amount, _prevMsgSender, _l2Receiver, getERC20Getters(_l1Token), _l1Token); // kl todo check correct
-            bridgeMintCalldata = DataEncoding.encodeBridgeMintData({
-                _prevMsgSender: _prevMsgSender,
-                _l2Receiver: _l2Receiver,
-                _l1Token: _l1Token,
-                _amount: _amount,
-                _erc20Metadata: getERC20Getters(_l1Token)
-            }); // kl todo don't we care about backwards compatibility here?
-            // bridgeMintCalldata = _burn({
-            //     _chainId: ERA_CHAIN_ID,
-            //     _l2Value: 0,
-            //     _assetId: _assetId,
-            //     _prevMsgSender: _prevMsgSender,
-            //     _transferData: abi.encode(_amount, _l2Receiver),
-            //     _passValue: false
-            // });
-        }
-
-        {
-            bytes memory l2TxCalldata = IAssetRouterBase(address(l1AssetRouter)).getDepositCalldata(
-                ERA_CHAIN_ID,
-                _prevMsgSender,
-                _assetId,
-                bridgeMintCalldata
-            );
-
-            // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
-            // Otherwise, the refund will be sent to the specified address.
-            // If the recipient is a contract on L1, the address alias will be applied.
-            address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, _prevMsgSender);
-
-            L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
-                chainId: ERA_CHAIN_ID,
-                l2Contract: L2_ASSET_ROUTER_ADDR,
-                mintValue: msg.value, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
-                l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
-                l2Calldata: l2TxCalldata,
-                l2GasLimit: _l2TxGasLimit,
-                l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
-                factoryDeps: new bytes[](0),
-                refundRecipient: refundRecipient
-            });
-            txHash = l1AssetRouter.depositLegacyErc20Bridge{value: msg.value}(request);
-        }
-
-        // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-        depositHappened[ERA_CHAIN_ID][txHash] = keccak256(abi.encode(_prevMsgSender, _l1Token, _amount));
-
-        emit LegacyDepositInitiated({
-            chainId: ERA_CHAIN_ID,
-            l2DepositTxHash: txHash,
-            from: _prevMsgSender,
-            to: _l2Receiver,
-            l1Asset: _l1Token,
-            amount: _amount
-        });
-    }
 
     /// @notice Finalizes the withdrawal for transactions initiated via the legacy ERC20 bridge.
     /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed.
@@ -926,7 +817,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         /// the legacy bridge can only be used with L1 native tokens.
         bytes32 assetId = INativeTokenVault(address(l1NativeTokenVault)).getAssetId(block.chainid, _l1Asset);
 
-        bridgeVerifyFailedTransfer({
+        _bridgeVerifyFailedTransfer({
             _depositSender: _depositSender,
             _chainId: ERA_CHAIN_ID,
             _assetId: assetId,
@@ -945,14 +836,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _transferData: assetData
         });
     }
-
-    /// @notice Legacy function used for migration, do not use!
-    /// @param _chainId The chain id on which the bridge is deployed.
-    // slither-disable-next-line uninitialized-state-variables
-    // function l2BridgeAddress(uint256 _chainId) external view returns (address) {
-    //     // slither-disable-next-line uninitialized-state-variables
-    //     return __DEPRECATED_l2BridgeAddress[_chainId];
-    // } // kl todo
 
     /*//////////////////////////////////////////////////////////////
                             PAUSE

@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
+// import {L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
 // import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
@@ -34,6 +34,25 @@ interface IL1AssetRouter {
         address indexed assetDeploymentTracker,
         bytes32 indexed additionalData
     );
+
+    event LegacyDepositInitiated(
+        uint256 indexed chainId,
+        bytes32 indexed l2DepositTxHash,
+        address indexed from,
+        address to,
+        address l1Asset,
+        uint256 amount
+    );
+
+    function depositLegacyErc20Bridge(
+        address _msgSender,
+        address _l2Receiver,
+        address _l1Token,
+        uint256 _amount,
+        uint256 _l2TxGasLimit,
+        uint256 _l2TxGasPerPubdataByte,
+        address _refundRecipient
+    ) external payable returns (bytes32 txHash);
 
     // function isWithdrawalFinalized(
     //     uint256 _chainId,
@@ -82,7 +101,7 @@ interface IL1AssetRouter {
 
     function L1_NULLIFIER() external view returns (IL1Nullifier);
 
-    // function L1_WETH_TOKEN() external view returns (address);
+    function L1_WETH_TOKEN() external view returns (address);
 
     // function BRIDGE_HUB() external view returns (IBridgehub);
 
@@ -124,9 +143,10 @@ interface IL1AssetRouter {
         bytes calldata _transferData
     ) external;
 
-    function depositLegacyErc20Bridge(
-        L2TransactionRequestDirect calldata _request
-    ) external payable returns (bytes32 l2TxHash);
+    // function depositLegacyErc20Bridge(
+    //     L2TransactionRequestDirect calldata _request
+    // ) external payable returns (bytes32 l2TxHash);
+
     //     bytes calldata _assetData,
     //     bytes32 _l2TxHash,
     //     uint256 _l2BatchNumber,
