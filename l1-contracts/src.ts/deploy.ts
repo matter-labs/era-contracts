@@ -52,6 +52,7 @@ import {
   // priorityTxMaxGasLimit,
   encodeNTVAssetId,
   ETH_ADDRESS_IN_CONTRACTS,
+  L2_MESSAGE_ROOT_ADDRESS,
 } from "./utils";
 import type { ChainAdminCall } from "./utils";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
@@ -185,10 +186,12 @@ export class Deployer {
     let assetRouterZKBytecode = ethers.constants.HashZero;
     let nativeTokenVaultZKBytecode = ethers.constants.HashZero;
     let l2TokenProxyBytecodeHash = ethers.constants.HashZero;
+    let messageRootZKBytecode = ethers.constants.HashZero;
     if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
       bridgehubZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "Bridgehub");
       assetRouterZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2AssetRouter");
       nativeTokenVaultZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2NativeTokenVault");
+      messageRootZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "MessageRoot");
       const l2TokenProxyBytecode = readBytecode(
         "../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon",
         "BeaconProxy"
@@ -238,8 +241,15 @@ export class Deployer {
         ]
       ),
     };
+    const messageRootDeployment = {
+      bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(messageRootZKBytecode)),
+      newAddress: L2_MESSAGE_ROOT_ADDRESS,
+      callConstructor: true,
+      value: 0,
+      input: ethers.utils.defaultAbiCoder.encode(["address"], [L2_BRIDGEHUB_ADDRESS]),
+    };
 
-    const forceDeployments = [bridgehubDeployment, assetRouterDeployment, ntvDeployment];
+    const forceDeployments = [bridgehubDeployment, assetRouterDeployment, ntvDeployment, messageRootDeployment];
     return ethers.utils.defaultAbiCoder.encode([FORCE_DEPLOYMENT_ABI_STRING], [forceDeployments]);
   }
 

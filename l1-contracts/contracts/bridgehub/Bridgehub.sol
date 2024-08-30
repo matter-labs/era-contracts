@@ -96,6 +96,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice we store registered assetIds (for arbitrary base token)
     mapping(bytes32 baseTokenAssetId => bool) public assetIdIsRegistered;
 
+    /// @notice used to pause the migrations of chains. Used for upgrades.
+    bool public migrationPaused;
+
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
             revert Unauthorized(msg.sender);
@@ -124,6 +127,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
+    modifier whenMigrationsNotPaused() {
+        require(!migrationPaused, "BH: migrations paused");
+        _;
+    }
+
     /// @notice to avoid parity hack
     constructor(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfHyperchains) reentrancyGuardInitializer {
         _disableInitializers();
@@ -134,6 +142,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
+        whitelistedSettlementLayers[_l1ChainId] = true;
     }
 
     /// @notice used to initialize the contract
@@ -141,6 +150,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
+
+        whitelistedSettlementLayers[L1_CHAIN_ID] = true;
     }
 
     //// Initialization and registration
@@ -670,7 +681,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override onlyAssetRouter onlyL1 returns (bytes memory bridgehubMintData) {
+    ) external payable override onlyAssetRouter whenMigrationsNotPaused returns (bytes memory bridgehubMintData) {
         require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
 
         BridgehubBurnSTMAssetData memory bridgeData = abi.decode(_data, (BridgehubBurnSTMAssetData));
@@ -703,7 +714,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256, // originChainId
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
-    ) external payable override onlyAssetRouter {
+    ) external payable override onlyAssetRouter whenMigrationsNotPaused {
         BridgehubMintSTMAssetData memory bridgeData = abi.decode(_bridgehubMintData, (BridgehubMintSTMAssetData));
 
         address stm = stmAssetIdToAddress[_assetId];
@@ -712,16 +723,17 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         settlementLayer[bridgeData.chainId] = block.chainid;
         stateTransitionManager[bridgeData.chainId] = stm;
-        address hyperchain;
-        if (hyperchainMap.contains(bridgeData.chainId)) {
-            hyperchain = hyperchainMap.get(bridgeData.chainId);
-        } else {
+
+        address hyperchain = getHyperchain(bridgeData.chainId);
+        bool contractAlreadyDeployed = hyperchain != address(0);
+        if (!contractAlreadyDeployed) {
             hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(bridgeData.chainId, bridgeData.stmData);
+            require(hyperchain != address(0), "BH: chain not registered");
+            _registerNewHyperchain(bridgeData.chainId, hyperchain);
+            messageRoot.addNewChain(bridgeData.chainId);
         }
 
-        messageRoot.addNewChainIfNeeded(bridgeData.chainId);
-        _registerNewHyperchain(bridgeData.chainId, hyperchain);
-        IZkSyncHyperchain(hyperchain).forwardedBridgeMint(bridgeData.chainData);
+        IZkSyncHyperchain(hyperchain).forwardedBridgeMint(bridgeData.chainData, contractAlreadyDeployed);
 
         emit MigrationFinalized(bridgeData.chainId, _assetId, hyperchain);
     }
@@ -767,5 +779,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    /// @notice Pauses migration functions.
+    function pauseMigration() external onlyOwner {
+        migrationPaused = true;
+    }
+
+    /// @notice Unpauses migration functions.
+    function unpauseMigration() external onlyOwner {
+        migrationPaused = false;
     }
 }

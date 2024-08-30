@@ -218,7 +218,10 @@ contract GatewayScript is Script {
             refundRecipient: ownable.owner(),
             secondBridgeAddress: config.stmDeploymentTracker,
             secondBridgeValue: 0,
-            secondBridgeCalldata: abi.encode(config.stateTransitionProxy, config.stateTransitionProxy)
+            secondBridgeCalldata: bytes.concat(
+                bytes1(0x01),
+                abi.encode(config.stateTransitionProxy, config.stateTransitionProxy)
+            )
         });
         vm.startBroadcast(ownable.owner());
         bridgehub.requestL2TransactionTwoBridges{value: expectedCost}(assetRouterRegistrationRequest);
