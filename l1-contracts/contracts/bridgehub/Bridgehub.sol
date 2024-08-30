@@ -739,6 +739,19 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes calldata _data
     ) external payable override onlyAssetRouter onlyL1 {}
 
+    /// @dev Registers an already deployed chain with the bridgehub
+    /// @param _chainId The chain Id of the chain
+    /// @param _hyperchain Address of the hyperchain
+    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external onlyOwnerOrAdmin {
+        require(_hyperchain != address(0), "BH: hyperchain zero");
+        require(!hyperchainMap.contains(_chainId), "BH: Chain Id Already Exists");
+        require(IZkSyncHyperchain(_hyperchain).getChainId() == _chainId, "BH: Chain Id Mismatch");
+
+        _registerNewHyperchain(_chainId, _hyperchain);
+
+        emit NewHyperchain(_chainId, _hyperchain);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             PAUSE
     //////////////////////////////////////////////////////////////*/

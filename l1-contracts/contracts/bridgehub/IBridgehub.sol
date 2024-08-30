@@ -60,6 +60,9 @@ interface IBridgehub is IL1AssetHandler {
 
     event SettlementLayerRegistered(uint256 indexed chainId, bool indexed isWhitelisted);
 
+    /// @dev Emitted when a new Hyperchain is added
+    event NewHyperchain(uint256 indexed _chainId, address indexed _hyperchainContract);
+
     /// @notice Emitted when the bridging to the chain is started.
     /// @param chainId Chain ID of the hyperchain
     /// @param assetId Asset ID of the token for the hyperchain's STM
@@ -211,4 +214,6 @@ interface IBridgehub is IL1AssetHandler {
     function L1_CHAIN_ID() external view returns (uint256);
 
     function setLegacyBaseTokenAssetId(uint256 _chainId) external;
+
+    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external;
 }
