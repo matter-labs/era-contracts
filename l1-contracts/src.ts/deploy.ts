@@ -48,9 +48,11 @@ import {
   compileInitialCutHash,
   readBytecode,
   applyL1ToL2Alias,
+  BRIDGEHUB_STM_ASSET_DATA_ABI_STRING,
   // priorityTxMaxGasLimit,
   encodeNTVAssetId,
   ETH_ADDRESS_IN_CONTRACTS,
+  L2_MESSAGE_ROOT_ADDRESS,
 } from "./utils";
 import type { ChainAdminCall } from "./utils";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
@@ -184,10 +186,12 @@ export class Deployer {
     let assetRouterZKBytecode = ethers.constants.HashZero;
     let nativeTokenVaultZKBytecode = ethers.constants.HashZero;
     let l2TokenProxyBytecodeHash = ethers.constants.HashZero;
+    let messageRootZKBytecode = ethers.constants.HashZero;
     if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
       bridgehubZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "Bridgehub");
       assetRouterZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2AssetRouter");
       nativeTokenVaultZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2NativeTokenVault");
+      messageRootZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "MessageRoot");
       const l2TokenProxyBytecode = readBytecode(
         "../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon",
         "BeaconProxy"
@@ -237,8 +241,15 @@ export class Deployer {
         ]
       ),
     };
+    const messageRootDeployment = {
+      bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(messageRootZKBytecode)),
+      newAddress: L2_MESSAGE_ROOT_ADDRESS,
+      callConstructor: true,
+      value: 0,
+      input: ethers.utils.defaultAbiCoder.encode(["address"], [L2_BRIDGEHUB_ADDRESS]),
+    };
 
-    const forceDeployments = [bridgehubDeployment, assetRouterDeployment, ntvDeployment];
+    const forceDeployments = [bridgehubDeployment, assetRouterDeployment, ntvDeployment, messageRootDeployment];
     return ethers.utils.defaultAbiCoder.encode([FORCE_DEPLOYMENT_ABI_STRING], [forceDeployments]);
   }
 
@@ -1143,6 +1154,8 @@ export class Deployer {
 
   // Main function to move the current chain (that is hooked to l1), on top of the syncLayer chain.
   public async moveChainToGateway(gatewayChainId: string, gasPrice: BigNumberish) {
+    const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
+    const chainData = ethers.utils.defaultAbiCoder.encode(["uint256"], [protocolVersion]);
     const bridgehub = this.bridgehubContract(this.deployWallet);
     // Just some large gas limit that should always be enough
     const l2GasLimit = ethers.BigNumber.from(72_000_000);
@@ -1156,10 +1169,9 @@ export class Deployer {
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
     const stmData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [newAdmin, initialDiamondCut]);
-    const chainData = new ethers.utils.AbiCoder().encode(["uint256"], [ADDRESS_ONE]); // empty for now
     const bridgehubData = new ethers.utils.AbiCoder().encode(
-      ["uint256", "bytes", "bytes"],
-      [this.chainId, stmData, chainData]
+      [BRIDGEHUB_STM_ASSET_DATA_ABI_STRING],
+      [[this.chainId, stmData, chainData]]
     );
 
     // console.log("bridgehubData", bridgehubData)

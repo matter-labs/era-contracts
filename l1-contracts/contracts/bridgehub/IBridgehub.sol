@@ -40,6 +40,18 @@ struct L2TransactionRequestTwoBridgesInner {
     bytes32 txDataHash;
 }
 
+struct BridgehubMintSTMAssetData {
+    uint256 chainId;
+    bytes stmData;
+    bytes chainData;
+}
+
+struct BridgehubBurnSTMAssetData {
+    uint256 chainId;
+    bytes stmData;
+    bytes chainData;
+}
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IBridgehub is IL1AssetHandler {
@@ -103,6 +115,8 @@ interface IBridgehub is IL1AssetHandler {
     function getAllHyperchains() external view returns (address[] memory);
 
     function getAllHyperchainChainIDs() external view returns (uint256[] memory);
+
+    function migrationPaused() external view returns (bool);
 
     /// Mailbox forwarder
 

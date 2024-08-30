@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../../common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
@@ -23,7 +23,7 @@ contract DummyBridgehub {
             keccak256(
                 abi.encode(
                     block.chainid,
-                    L2_NATIVE_TOKEN_VAULT_ADDRESS,
+                    L2_NATIVE_TOKEN_VAULT_ADDR,
                     ETH_TOKEN_ADDRESS
                     // bytes32(uint256(uint160(IGetters(msg.sender).getBaseToken())))
                 )

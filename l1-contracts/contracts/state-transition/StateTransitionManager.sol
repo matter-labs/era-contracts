@@ -459,8 +459,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     ) external view override onlyBridgehub returns (bytes memory stmForwardedBridgeMintData) {
         // Note that the `_diamondCut` here is not for the current chain, for the chain where the migration
         // happens. The correctness of it will be checked on the STM on the new settlement layer.
-        (address _newGatewayAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
-        require(_newGatewayAdmin != address(0), "STM: admin zero");
+        (address _newSettlementLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
+        require(_newSettlementLayerAdmin != address(0), "STM: admin zero");
 
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
@@ -470,7 +470,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         return
             abi.encode(
                 IBridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId),
-                _newGatewayAdmin,
+                _newSettlementLayerAdmin,
                 protocolVersion,
                 _diamondCut
             );
@@ -501,16 +501,17 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @notice Called by the bridgehub during the failed migration of a chain.
-    /// @param _chainId the chainId of the chain
-    /// @param _assetInfo the assetInfo of the chain
-    /// @param _prevMsgSender the previous message sender
-    /// @param _data the data of the migration
-    function bridgeClaimFailedBurn(
-        uint256 _chainId,
-        bytes32 _assetInfo,
-        address _prevMsgSender,
-        bytes calldata _data
+    /// param _chainId the chainId of the chain
+    /// param _assetInfo the assetInfo of the chain
+    /// param _depositSender the address of that sent the deposit
+    /// param _stmData the data of the migration
+    function forwardedBridgeRecoverFailedTransfer(
+        uint256 /* _chainId */,
+        bytes32 /* _assetInfo */,
+        address /* _depositSender */,
+        bytes calldata /* _stmData */
     ) external {
-        // todo
+        // Function is empty due to the fact that when calling `forwardedBridgeBurn` there are no
+        // state updates that occur.
     }
 }

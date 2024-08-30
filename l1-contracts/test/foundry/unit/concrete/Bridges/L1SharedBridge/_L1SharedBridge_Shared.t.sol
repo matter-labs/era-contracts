@@ -16,7 +16,7 @@ import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVau
 import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract L1AssetRouterTest is Test {
@@ -43,14 +43,9 @@ contract L1AssetRouterTest is Test {
         bytes32 indexed l2DepositTxHash
     );
 
-    event WithdrawalFinalizedSharedBridge(
-        uint256 indexed chainId,
-        address indexed to,
-        bytes32 indexed assetId,
-        uint256 amount
-    );
+    event WithdrawalFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
-    event ClaimedFailedDepositSharedBridge(
+    event ClaimedFailedDepositAssetRouter(
         uint256 indexed chainId,
         address indexed to,
         bytes32 indexed assetId,
@@ -101,7 +96,7 @@ contract L1AssetRouterTest is Test {
     uint256 legacyBatchNumber = 0;
 
     uint256 isWithdrawalFinalizedStorageLocation = uint256(8 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1 + 50);
-    bytes32 ETH_TOKEN_ASSET_ID = keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, ETH_TOKEN_ADDRESS));
+    bytes32 ETH_TOKEN_ASSET_ID = keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDR, ETH_TOKEN_ADDRESS));
 
     function setUp() public {
         owner = makeAddr("owner");

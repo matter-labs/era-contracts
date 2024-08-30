@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, BridgehubMintSTMAssetData, BridgehubBurnSTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -23,12 +23,14 @@ import {L2Message} from "contracts/common/Messaging.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {TxStatus} from "contracts/common/Messaging.sol";
 
 contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -164,19 +166,103 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         vm.stopBroadcast();
     }
 
+    function test_recoverFromFailedChainMigration() public {
+        gatewayScript.registerGateway();
+        gatewayScript.moveChainToGateway();
+
+        // Setup
+        IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
+        IStateTransitionManager stm = IStateTransitionManager(l1Script.getSTM());
+        bytes32 assetId = bridgehub.stmAssetIdFromChainId(migratingChainId);
+        bytes memory transferData;
+
+        {
+            IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId));
+            bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
+            bytes memory chainData = abi.encode(chain.getProtocolVersion());
+            bytes memory stmData = abi.encode(address(1), msg.sender, stm.protocolVersion(), initialDiamondCut);
+            BridgehubBurnSTMAssetData memory data = BridgehubBurnSTMAssetData({
+                chainId: migratingChainId,
+                stmData: stmData,
+                chainData: chainData
+            });
+            transferData = abi.encode(data);
+        }
+
+        address chainAdmin = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId)).getAdmin();
+        IL1AssetRouter assetRouter = bridgehub.sharedBridge();
+        bytes32 l2TxHash = keccak256("l2TxHash");
+        uint256 l2BatchNumber = 5;
+        uint256 l2MessageIndex = 0;
+        uint16 l2TxNumberInBatch = 0;
+        bytes32[] memory merkleProof = new bytes32[](1);
+        bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(chainAdmin, assetId, transferData)));
+
+        // Mock Call for Msg Inclusion
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(
+                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                migratingChainId,
+                l2TxHash,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2TxNumberInBatch,
+                merkleProof,
+                TxStatus.Failure
+            ),
+            abi.encode(true)
+        );
+
+        // Set Deposit Happened
+        vm.startBroadcast(address(bridgeHub));
+        assetRouter.bridgehubConfirmL2Transaction({
+            _chainId: migratingChainId,
+            _txDataHash: txDataHash,
+            _txHash: l2TxHash
+        });
+        vm.stopBroadcast();
+
+        vm.startBroadcast();
+        assetRouter.bridgeRecoverFailedTransfer({
+            _chainId: migratingChainId,
+            _depositSender: chainAdmin,
+            _assetId: assetId,
+            _assetData: transferData,
+            _l2TxHash: l2TxHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _merkleProof: merkleProof
+        });
+        vm.stopBroadcast();
+    }
+
     function finishMoveChain() public {
         IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
         IStateTransitionManager stm = IStateTransitionManager(l1Script.getSTM());
-        IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId));
+        IZkSyncHyperchain migratingChain = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId));
         bytes32 assetId = bridgehub.stmAssetIdFromChainId(migratingChainId);
 
+        vm.startBroadcast(Ownable(address(bridgehub)).owner());
+        bridgehub.registerSettlementLayer(gatewayChainId, true);
+        vm.stopBroadcast();
+
         bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
-        bytes memory chainData = abi.encode(AdminFacet(address(chain)).prepareChainCommitment());
+        bytes memory chainData = abi.encode(AdminFacet(address(migratingChain)).prepareChainCommitment());
         bytes memory stmData = abi.encode(address(1), msg.sender, stm.protocolVersion(), initialDiamondCut);
-        bytes memory bridgehubMintData = abi.encode(mintChainId, stmData, chainData);
+        BridgehubMintSTMAssetData memory data = BridgehubMintSTMAssetData({
+            chainId: mintChainId,
+            stmData: stmData,
+            chainData: chainData
+        });
+        bytes memory bridgehubMintData = abi.encode(data);
         vm.startBroadcast(address(bridgehub.sharedBridge()));
+        uint256 currentChainId = block.chainid;
+        vm.chainId(migratingChainId);
         bridgehub.bridgeMint(gatewayChainId, assetId, bridgehubMintData);
         vm.stopBroadcast();
+        vm.chainId(currentChainId);
     }
 
     // add this to be excluded from coverage report
