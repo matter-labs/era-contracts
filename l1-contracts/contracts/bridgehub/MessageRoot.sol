@@ -91,7 +91,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     function chainRegistered(uint256 _chainId) public view returns (bool) {
         return (_chainId == block.chainid || chainIndex[_chainId] != 0);
     }
-    
+
     /// @dev add a new chainBatchRoot to the chainTree
     function addChainBatchRoot(
         uint256 _chainId,
