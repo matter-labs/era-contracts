@@ -59,6 +59,7 @@
     "clean:foundry": "forge clean",
     "test": "yarn workspace da-contracts build && hardhat test test/unit_tests/*.spec.ts --network hardhat",
     "test:foundry": "forge test --ffi",
+    "test:zkfoundry": "forge test --match-path ./foundry/l2 ",
     "test:fork": "TEST_CONTRACTS_FORK=1 yarn run hardhat test test/unit_tests/*.fork.ts --network hardhat",
     "coverage:foundry": "forge coverage --ffi",
     "deploy-no-build": "ts-node scripts/deploy.ts",
