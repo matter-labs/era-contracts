@@ -40,6 +40,18 @@ struct L2TransactionRequestTwoBridgesInner {
     bytes32 txDataHash;
 }
 
+struct BridgehubMintSTMAssetData {
+    uint256 chainId;
+    bytes stmData;
+    bytes chainData;
+}
+
+struct BridgehubBurnSTMAssetData {
+    uint256 chainId;
+    bytes stmData;
+    bytes chainData;
+}
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IBridgehub is IL1AssetHandler {
