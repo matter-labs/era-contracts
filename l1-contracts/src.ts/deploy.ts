@@ -48,7 +48,7 @@ import {
   compileInitialCutHash,
   readBytecode,
   applyL1ToL2Alias,
-  // BRIDGEHUB_STM_ASSET_DATA_ABI_STRING,
+  BRIDGEHUB_STM_ASSET_DATA_ABI_STRING,
   // priorityTxMaxGasLimit,
   encodeNTVAssetId,
   ETH_ADDRESS_IN_CONTRACTS,
@@ -1236,8 +1236,8 @@ export class Deployer {
 
     const stmData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [newAdmin, initialDiamondCut]);
     const bridgehubData = new ethers.utils.AbiCoder().encode(
-      ["uint256", "bytes", "bytes"],
-      [this.chainId, stmData, chainData]
+      [BRIDGEHUB_STM_ASSET_DATA_ABI_STRING],
+      [[this.chainId, stmData, chainData]]
     );
 
     // console.log("bridgehubData", bridgehubData)

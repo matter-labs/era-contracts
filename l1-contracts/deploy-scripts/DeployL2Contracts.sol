@@ -73,21 +73,19 @@ contract DeployL2Script is Script {
     function loadContracts() internal {
         //HACK: Meanwhile we are not integrated foundry zksync we use contracts that has been built using hardhat
         contracts.l2StandardErc20FactoryBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
+            "/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
         );
         contracts.beaconProxy = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
+            "/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
         );
         contracts.l2StandardErc20Bytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/BridgedStandardERC20.sol/BridgedStandardERC20.json"
+            "/artifacts-zk/contracts/bridge/BridgedStandardERC20.sol/BridgedStandardERC20.json"
         );
 
-        contracts.l2SharedBridgeBytecode = Utils.readFoundryBytecode(
-            "/../l2-contracts/zkout/L2SharedBridge.sol/L2SharedBridge.json"
-        );
+        contracts.l2SharedBridgeBytecode = Utils.readFoundryBytecode("/zkout/L2SharedBridge.sol/L2SharedBridge.json");
 
         contracts.l2SharedBridgeProxyBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
+            "/artifacts-zk/@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
         );
         contracts.forceDeployUpgrader = Utils.readFoundryBytecode(
             "/../l2-contracts/zkout/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
