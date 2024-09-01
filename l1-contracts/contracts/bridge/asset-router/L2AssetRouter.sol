@@ -107,7 +107,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
             IAssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
         } else {
             IAssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
-            // slither-disable-next-line reentrancy-vulnerabilities
+            // slither-disable-next-line reentrancy-vulnerabilities-1
             assetHandlerAddress[_assetId] = L2_NATIVE_TOKEN_VAULT_ADDR;
         }
 

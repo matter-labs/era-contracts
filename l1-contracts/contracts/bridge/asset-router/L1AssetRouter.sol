@@ -272,7 +272,7 @@ contract L1AssetRouter is
             IAssetHandler(assetHandler).bridgeMint(_chainId, _assetId, _transferData);
         } else {
             IAssetHandler(address(nativeTokenVault)).bridgeMint(_chainId, _assetId, _transferData); // Maybe it's better to receive amount and receiver here? transferData may have different encoding
-            // slither-disable-next-line reentrancy-vulnerabilities
+            // slither-disable-next-line reentrancy-vulnerabilities-1
             assetHandlerAddress[_assetId] = address(nativeTokenVault);
         }
 
