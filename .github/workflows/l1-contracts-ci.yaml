@@ -123,9 +123,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Use Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
