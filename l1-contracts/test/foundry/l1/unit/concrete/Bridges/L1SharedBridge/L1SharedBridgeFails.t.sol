@@ -85,14 +85,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_setNativeTokenVault_alreadySet() public {
         vm.prank(owner);
-        vm.expectRevert("L1AR: native token vault already set");
+        vm.expectRevert("AR: native token vault already set");
         sharedBridge.setNativeTokenVault(INativeTokenVault(address(0)));
     }
 
     function test_setNativeTokenVault_emptyAddressProvided() public {
         stdstore.target(address(sharedBridge)).sig(sharedBridge.nativeTokenVault.selector).checked_write(address(0));
         vm.prank(owner);
-        vm.expectRevert("L1AR: native token vault 0");
+        vm.expectRevert("AR: native token vault 0");
         sharedBridge.setNativeTokenVault(INativeTokenVault(address(0)));
     }
 

@@ -157,7 +157,7 @@ contract L1AssetRouterTest is Test {
             _l1AssetRouter: address(sharedBridge),
             _eraChainId: eraChainId,
             _l1Nullifier: l1Nullifier,
-            _wrappedTokenProxyBytecode: new bytes(0x00),
+            _bridgedTokenProxyBytecode: new bytes(0x00),
             _baseTokenAddress: ETH_TOKEN_ADDRESS
         });
         TransparentUpgradeableProxy nativeTokenVaultProxy = new TransparentUpgradeableProxy(
@@ -166,6 +166,13 @@ contract L1AssetRouterTest is Test {
             abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner)
         );
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
+
+        vm.prank(owner);
+        l1Nullifier.setL1AssetRouter(sharedBridge);
+        vm.prank(owner);
+        l1Nullifier.setL1NativeTokenVault(nativeTokenVault);
+        vm.prank(owner);
+        l1Nullifier.setL1Erc20Bridge(l1ERC20BridgeAddress);
         vm.prank(owner);
         sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));

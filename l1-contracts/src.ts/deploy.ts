@@ -924,7 +924,7 @@ export class Deployer {
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const tokens = getTokens();
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
-    const wrappedTokenProxyBytecode = ethers.constants.HashZero; // kl todo // getAddressFromEnv("CONTRACTS_L1_WRAPPED_TOKEN_PROXY_BYTECODE");
+    const bridgedTokenProxyBytecode = ethers.constants.HashZero; // kl todo // getAddressFromEnv("CONTRACTS_L1_WRAPPED_TOKEN_PROXY_BYTECODE");
     const contractAddress = await this.deployViaCreate2(
       "L1NativeTokenVault",
       [
@@ -932,7 +932,7 @@ export class Deployer {
         this.addresses.Bridges.SharedBridgeProxy,
         eraChainId,
         this.addresses.Bridges.L1NullifierProxy,
-        wrappedTokenProxyBytecode,
+        bridgedTokenProxyBytecode,
         ETH_ADDRESS_IN_CONTRACTS,
       ],
       create2Salt,

@@ -28,7 +28,7 @@ contract HyperchainDeployer is L1ContractDeployer {
     function _deployEra() internal {
         vm.setEnv(
             "HYPERCHAIN_CONFIG",
-            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-hyperchain-era.toml"
+            "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-hyperchain-era.toml"
         );
 
         deployScript = new RegisterHyperchainScript();
@@ -42,7 +42,7 @@ contract HyperchainDeployer is L1ContractDeployer {
         vm.setEnv(
             "HYPERCHAIN_CONFIG",
             string.concat(
-                "/test/foundry/integration/deploy-scripts/script-out/output-deploy-hyperchain-",
+                "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-hyperchain-",
                 Strings.toString(currentHyperChainId),
                 ".toml"
             )

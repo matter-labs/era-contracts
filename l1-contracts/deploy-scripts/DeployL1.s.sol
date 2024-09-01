@@ -7,6 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {Verifier} from "contracts/state-transition/Verifier.sol";
@@ -173,6 +174,7 @@ contract DeployL1Script is Script {
         deployBridgehubContract();
         deployMessageRootContract();
 
+        deployL1NullifierContracts();
         deploySharedBridgeContracts();
         deployL1NativeTokenVaultImplementation();
         deployL1NativeTokenVaultProxy();
@@ -647,6 +649,11 @@ contract DeployL1Script is Script {
         deploySharedBridgeProxy();
     }
 
+    function deployL1NullifierContracts() internal {
+        deployL1NullifierImplementation();
+        deployL1NullifierProxy();
+    }
+
     function deployL1NullifierImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(L1Nullifier).creationCode,
@@ -676,6 +683,7 @@ contract DeployL1Script is Script {
             abi.encode(
                 config.tokens.tokenWethAddress,
                 addresses.bridgehub.bridgehubProxy,
+                addresses.bridges.l1NullifierProxy,
                 config.eraChainId,
                 addresses.stateTransition.diamondProxy
             )
@@ -714,7 +722,12 @@ contract DeployL1Script is Script {
     function deployErc20BridgeImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(L1ERC20Bridge).creationCode,
-            abi.encode(addresses.bridges.sharedBridgeProxy, addresses.vaults.l1NativeTokenVaultProxy, config.eraChainId)
+            abi.encode(
+                addresses.bridges.l1NullifierProxy,
+                addresses.bridges.sharedBridgeProxy,
+                addresses.vaults.l1NativeTokenVaultProxy,
+                config.eraChainId
+            )
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("Erc20BridgeImplementation deployed at:", contractAddress);
@@ -742,7 +755,15 @@ contract DeployL1Script is Script {
     function deployL1NativeTokenVaultImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(L1NativeTokenVault).creationCode,
-            abi.encode(config.tokens.tokenWethAddress, addresses.bridges.sharedBridgeProxy, config.eraChainId)
+            // solhint-disable-next-line func-named-parameters
+            abi.encode(
+                config.tokens.tokenWethAddress,
+                addresses.bridges.sharedBridgeProxy,
+                config.eraChainId,
+                addresses.bridges.l1NullifierProxy,
+                type(BeaconProxy).creationCode,
+                Utils.ETH_ADDRESS_IN_CONTRACTS
+            )
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("L1NativeTokenVaultImplementation deployed at:", contractAddress);

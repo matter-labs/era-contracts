@@ -22,12 +22,7 @@ interface IL1AssetRouter {
 
     event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
-    event WithdrawalFinalizedAssetRouter(
-        uint256 indexed chainId,
-        address indexed to,
-        bytes32 indexed assetId,
-        uint256 amount
-    );
+    event WithdrawalFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
     event AssetDeploymentTrackerSet(
         bytes32 indexed assetId,

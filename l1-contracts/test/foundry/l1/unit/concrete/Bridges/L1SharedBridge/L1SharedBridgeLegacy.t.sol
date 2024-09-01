@@ -131,7 +131,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         );
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, false, false, address(sharedBridge));
-        emit WithdrawalFinalizedAssetRouter(eraChainId, tokenAssetId, message);
+        emit WithdrawalFinalizedAssetRouter(eraChainId, tokenAssetId, new bytes(0)); // kl todo
         vm.prank(l1ERC20BridgeAddress);
         l1Nullifier.finalizeWithdrawalLegacyErc20Bridge({
             _l2BatchNumber: l2BatchNumber,
