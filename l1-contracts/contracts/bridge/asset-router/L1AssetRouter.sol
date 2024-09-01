@@ -260,6 +260,7 @@ contract L1AssetRouter is
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _assetId The bridged asset ID.
     /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+    /// kl todo decide finalizeDeposit vs finalizeWithdrawal names, (if both then leave comments)
     function finalizeWithdrawal(
         uint256 _chainId,
         bytes32 _assetId,
@@ -271,6 +272,7 @@ contract L1AssetRouter is
             IAssetHandler(assetHandler).bridgeMint(_chainId, _assetId, _transferData);
         } else {
             IAssetHandler(address(nativeTokenVault)).bridgeMint(_chainId, _assetId, _transferData); // Maybe it's better to receive amount and receiver here? transferData may have different encoding
+            // slither-disable-next-line reentrancy-vulnerabilities
             assetHandlerAddress[_assetId] = address(nativeTokenVault);
         }
 

@@ -97,6 +97,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @notice Finalize the deposit and mint funds
     /// @param _assetId The encoding of the asset on L2
     /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken)
+    // kl todo. FinalizeDeposit functions.
     function finalizeDeposit(
         bytes32 _assetId,
         bytes memory _transferData
@@ -106,6 +107,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
             IAssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
         } else {
             IAssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
+            // slither-disable-next-line reentrancy-vulnerabilities
             assetHandlerAddress[_assetId] = L2_NATIVE_TOKEN_VAULT_ADDR;
         }
 
@@ -194,6 +196,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         });
 
         bytes memory message = _getL1WithdrawMessage(_assetId, _l1bridgeMintData);
+        // kl todo. Do we want to send message to L1 like this or via BH?
+        // slither-disable-next-line unused-return
         L2ContractHelper.sendMessageToL1(message);
 
         emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, _sender, _assetId, _assetData);

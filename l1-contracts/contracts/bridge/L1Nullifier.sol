@@ -299,7 +299,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32 _assetId,
         bytes calldata _transferData
     ) external view returns (bytes32 txDataHash) {
-        DataEncoding.encodeTxDataHash({
+        txDataHash = DataEncoding.encodeTxDataHash({
             _encodingVersion: _encodingVersion,
             _prevMsgSender: _prevMsgSender,
             _assetId: _assetId,

@@ -133,7 +133,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         address receiver;
         bytes memory erc20Data;
         address originToken;
-
+        // slither-disable-next-line unused-return
         (, receiver, originToken, amount, erc20Data) = DataEncoding.decodeBridgeMintData(_data);
 
         if (token == address(0)) {
