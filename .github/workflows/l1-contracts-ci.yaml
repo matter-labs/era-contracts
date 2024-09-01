@@ -149,7 +149,7 @@ jobs:
             l2-contracts/cache-zk
             l2-contracts/typechain
             l1-contracts/lib
-        
+
       - name: Install foundry zksync
         run: |
           wget https://github.com/matter-labs/foundry-zksync/releases/download/nightly-f908ce43834bc1ffb4de6576ea5600eaab49dddb/foundry_nightly_linux_amd64.tar.gz -O foundry-zksync.tar.gz
@@ -159,7 +159,7 @@ jobs:
           sudo chmod +x /usr/local/bin/forge
           sudo chmod +x /usr/local/bin/cast
           forge --version
-        
+
       - name: Run tests
         working-directory: ./l1-contracts
         run: FOUNDRY_PROFILE=default yarn test:zkfoundry
