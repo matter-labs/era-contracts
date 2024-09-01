@@ -395,10 +395,8 @@ async function registerSLContractsOnL1(deployer: Deployer) {
         refundRecipient: deployer.deployWallet.address,
         secondBridgeAddress: stmDeploymentTracker.address,
         secondBridgeValue: 0,
-        secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
-          ["address", "address"],
-          [l1STM.address, l2STMAddress]
-        ),
+        secondBridgeCalldata:
+          "0x01" + ethers.utils.defaultAbiCoder.encode(["address", "address"], [l1STM.address, l2STMAddress]).slice(2),
       },
     ])
   );

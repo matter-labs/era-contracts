@@ -13,7 +13,7 @@ if (!process.env.CHAIN_ETH_NETWORK) {
   require("dotenv").config();
 }
 
-const COMPILER_VERSION = "1.5.0";
+const COMPILER_VERSION = "1.5.3";
 const PRE_RELEASE_VERSION = "prerelease-a167aa3-code4rena";
 function getZksolcUrl(): string {
   // @ts-ignore

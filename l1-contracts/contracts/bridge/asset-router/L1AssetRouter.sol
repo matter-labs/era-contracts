@@ -28,7 +28,7 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
-// import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../../common/L2ContractAddresses.sol";
+// import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 

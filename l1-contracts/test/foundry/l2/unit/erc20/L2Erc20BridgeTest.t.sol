@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.20;
 
 // solhint-disable gas-custom-errors
 
@@ -14,7 +14,7 @@ import {IL2NativeTokenVaultCombined} from "contracts/bridge/ntv/IL2NativeTokenVa
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
@@ -85,7 +85,7 @@ contract L2Erc20BridgeTest is Test {
     function initializeTokenByDeposit() internal returns (address l2TokenAddress) {
         performDeposit(makeAddr("someDepositor"), makeAddr("someReeiver"), 1);
 
-        l2TokenAddress = IL2NativeTokenVaultCombined(L2_NATIVE_TOKEN_VAULT_ADDRESS).l2TokenAddress(L1_TOKEN_ADDRESS);
+        l2TokenAddress = IL2NativeTokenVaultCombined(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
         require(l2TokenAddress != address(0), "Token not initialized");
     }
 
@@ -95,7 +95,7 @@ contract L2Erc20BridgeTest is Test {
 
         performDeposit(depositor, receiver, 100);
 
-        address l2TokenAddress = IL2NativeTokenVaultCombined(L2_NATIVE_TOKEN_VAULT_ADDRESS).l2TokenAddress(
+        address l2TokenAddress = IL2NativeTokenVaultCombined(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(
             L1_TOKEN_ADDRESS
         );
 

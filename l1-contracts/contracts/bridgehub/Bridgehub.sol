@@ -753,7 +753,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _assetId,
         address _depositSender,
         bytes calldata _data
-    ) external payable override onlyAssetRouter whenMigrationsNotPaused {
+    ) external payable override onlyAssetRouter whenMigrationsNotPaused onlyL1 {
         BridgehubBurnSTMAssetData memory bridgehubData = abi.decode(_data, (BridgehubBurnSTMAssetData));
 
         delete settlementLayer[bridgehubData.chainId];

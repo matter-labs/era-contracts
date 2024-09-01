@@ -27,7 +27,7 @@ import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 // import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
-// import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
+// import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";

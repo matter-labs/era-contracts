@@ -19,7 +19,7 @@ import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_BRIDGEHUB_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero} from "../../common/L1ContractErrors.sol";
@@ -71,7 +71,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         if (_l1AssetRouter == address(0)) {
             revert EmptyAddress();
         }
-        nativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDRESS);
+        nativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
         l1AssetRouter = _l1AssetRouter;
 
         _disableInitializers();
@@ -105,8 +105,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         if (assetHandler != address(0)) {
             IAssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
         } else {
-            IAssetHandler(L2_NATIVE_TOKEN_VAULT_ADDRESS).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
-            assetHandlerAddress[_assetId] = L2_NATIVE_TOKEN_VAULT_ADDRESS;
+            IAssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
+            assetHandlerAddress[_assetId] = L2_NATIVE_TOKEN_VAULT_ADDR;
         }
 
         emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, _transferData);
@@ -226,7 +226,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @param _l1Token The address of token on L1.
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view returns (address) {
-        IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDRESS);
+        IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
         address currentlyDeployedAddress = l2NativeTokenVault.l2TokenAddress(_l1Token);
 
         if (currentlyDeployedAddress != address(0)) {

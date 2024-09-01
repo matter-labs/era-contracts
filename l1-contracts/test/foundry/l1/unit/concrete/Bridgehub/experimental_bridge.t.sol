@@ -21,7 +21,7 @@ import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
 import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {ISTMDeploymentTracker} from "contracts/bridgehub/ISTMDeploymentTracker.sol";
@@ -58,9 +58,7 @@ contract ExperimentalBridgeTest is Test {
     bytes32 private constant LOCK_FLAG_ADDRESS = 0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4;
 
     bytes32 ETH_TOKEN_ASSET_ID =
-        keccak256(
-            abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDRESS, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS))))
-        );
+        keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS)))));
 
     TestnetERC20Token testToken6;
     TestnetERC20Token testToken8;

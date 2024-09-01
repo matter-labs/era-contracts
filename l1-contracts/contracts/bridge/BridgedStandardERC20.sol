@@ -8,7 +8,7 @@ import {ERC1967Upgrade} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Up
 
 import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
 import {Unauthorized, NonSequentialVersion, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -40,7 +40,7 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
     address public override l1Address;
 
     modifier onlyNTV() {
-        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDRESS) {
+        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
             revert Unauthorized(msg.sender);
         }
         _;

@@ -7,7 +7,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 
 import {BridgedStandardERC20} from "./BridgedStandardERC20.sol";
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../common/L2ContractAddresses.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
 import {SystemContractsCaller} from "../common/libraries/SystemContractsCaller.sol";
 import {L2ContractHelper, IContractDeployer} from "../common/libraries/L2ContractHelper.sol";
 
@@ -44,7 +44,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
     address public override l1Bridge;
 
     modifier onlyNTV() {
-        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDRESS) {
+        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -108,7 +108,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
 
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view override returns (address) {
-        address token = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDRESS).l2TokenAddress(_l1Token);
+        address token = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(_l1Token);
         if (token != address(0)) {
             return token;
         }

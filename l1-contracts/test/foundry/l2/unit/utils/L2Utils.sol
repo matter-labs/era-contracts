@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity ^0.8.20;
 
 import {Vm} from "forge-std/Vm.sol";
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
@@ -125,7 +125,7 @@ library L2Utils {
         IContractDeployer.ForceDeployment[] memory deployments = new IContractDeployer.ForceDeployment[](1);
         deployments[0] = IContractDeployer.ForceDeployment({
             bytecodeHash: bytecodehash,
-            newAddress: L2_NATIVE_TOKEN_VAULT_ADDRESS,
+            newAddress: L2_NATIVE_TOKEN_VAULT_ADDR,
             callConstructor: true,
             value: 0,
             // solhint-disable-next-line func-named-parameters

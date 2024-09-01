@@ -17,7 +17,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 // import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {UnsupportedEncodingVersion, InvalidChainId, AssetIdNotSupported, Unauthorized, AssetHandlerDoesNotExist} from "../../common/L1ContractErrors.sol";
@@ -80,7 +80,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @param _assetHandlerAddress The address of the asset handler to be set for the provided asset.
     function setAssetHandlerAddressThisChain(bytes32 _assetRegistrationData, address _assetHandlerAddress) external {
         bool senderIsNTV = msg.sender == address(nativeTokenVault);
-        address sender = senderIsNTV ? L2_NATIVE_TOKEN_VAULT_ADDRESS : msg.sender;
+        address sender = senderIsNTV ? L2_NATIVE_TOKEN_VAULT_ADDR : msg.sender;
         bytes32 assetId = DataEncoding.encodeAssetId(block.chainid, _assetRegistrationData, sender);
         if (!senderIsNTV && msg.sender != assetDeploymentTracker[assetId]) {
             revert Unauthorized(msg.sender);

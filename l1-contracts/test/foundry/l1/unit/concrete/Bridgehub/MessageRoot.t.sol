@@ -5,6 +5,8 @@ pragma solidity 0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {Merkle} from "contracts/common/libraries/Merkle.sol";
+import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
@@ -26,7 +28,7 @@ contract MessageRootTest is Test {
     }
 
     function test_init() public {
-        assertEq(messageRoot.getAggregatedRoot(), CHAIN_TREE_EMPTY_ENTRY_HASH);
+        assertEq(messageRoot.getAggregatedRoot(), (MessageHashing.chainIdLeafHash(0x00, block.chainid)));
     }
 
     function test_RevertWhen_addChainNotBridgeHub() public {
@@ -110,6 +112,6 @@ contract MessageRootTest is Test {
 
         messageRoot.updateFullTree();
 
-        assertEq(messageRoot.getAggregatedRoot(), 0xbad7e1cf889e30252b8ce93820f79d50651b78587844bc1c588dea123effa4ea);
+        assertEq(messageRoot.getAggregatedRoot(), 0x0ef1ac67d77f177a33449c47a8f05f0283300a81adca6f063c92c774beed140c);
     }
 }
