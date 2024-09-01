@@ -102,6 +102,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     bool public migrationPaused;
 
     /// @dev The contract responsible for confirming l2 tx, and is withdrawal finalized mapping.
+    /// @dev Only used on the L1.
     IL1Nullifier public nullifier;
 
     modifier onlyOwnerOrAdmin() {

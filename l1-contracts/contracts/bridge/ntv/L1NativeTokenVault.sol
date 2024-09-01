@@ -37,20 +37,20 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    /// @param _wethAddress Address of WETH on deployed chain
+    /// @param _l1WethAddress Address of WETH on deployed chain
     /// @param _l1AssetRouter Address of Asset Router on L1.
     /// @param _eraChainId ID of Era.
     /// @param _l1Nullifier Address of the nullifier contract, which handles transaction progress between L1 and ZK chains.
     /// @param _wrappedTokenProxyBytecode The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _baseTokenAddress Address of Base token
     constructor(
-        address _wethAddress,
+        address _l1WethAddress,
         address _l1AssetRouter,
         uint256 _eraChainId,
         IL1Nullifier _l1Nullifier,
         bytes memory _wrappedTokenProxyBytecode,
         address _baseTokenAddress
-    ) NativeTokenVault(_wethAddress, _l1AssetRouter, _baseTokenAddress) {
+    ) NativeTokenVault(_l1WethAddress, _l1AssetRouter, _baseTokenAddress) {
         ERA_CHAIN_ID = _eraChainId;
         L1_NULLIFIER = _l1Nullifier;
         wrappedTokenProxyBytecode = _wrappedTokenProxyBytecode;

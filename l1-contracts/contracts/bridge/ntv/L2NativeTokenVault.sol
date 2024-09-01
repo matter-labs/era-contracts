@@ -27,13 +27,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @dev Chain ID of L1 for bridging reasons.
     uint256 public immutable L1_CHAIN_ID;
 
-    /// @dev The address of the L2 legacy shared bridge.
-    // IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE;
-
-    /// @dev Contract that stores the implementation address for token.
-    /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
-    UpgradeableBeacon public l2TokenBeacon;
-
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
 
@@ -42,7 +35,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
     /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
-    /// @param _l2TokenBeacon The address of the L2 token beacon for legacy chains.
+    /// @param _bridgedTokenBeacon The address of the L2 token beacon for legacy chains.
     /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed.
     /// @param _wethToken Address of WETH on deployed chain
     /// @param _baseTokenAddress Address of Base token
@@ -51,7 +44,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         address _aliasedOwner,
         bytes32 _l2TokenProxyBytecodeHash,
         address _legacySharedBridge,
-        address _l2TokenBeacon,
+        address _bridgedTokenBeacon,
         bool _contractsDeployedAlready,
         address _wethToken,
         address _baseTokenAddress
@@ -71,15 +64,17 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         _transferOwnership(_aliasedOwner);
 
         if (_contractsDeployedAlready) {
-            if (_l2TokenBeacon == address(0)) {
+            if (_bridgedTokenBeacon == address(0)) {
                 revert EmptyAddress();
             }
-            l2TokenBeacon = UpgradeableBeacon(_l2TokenBeacon);
+            bridgedTokenBeacon = UpgradeableBeacon(_bridgedTokenBeacon);
         } else {
             address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
-            l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
-            l2TokenBeacon.transferOwnership(owner());
-            emit L2TokenBeaconUpdated(_l2TokenBeacon, _l2TokenProxyBytecodeHash);
+
+            bridgedTokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
+
+            bridgedTokenBeacon.transferOwnership(owner());
+            emit L2TokenBeaconUpdated(_bridgedTokenBeacon, _l2TokenProxyBytecodeHash);
         }
     }
 
@@ -134,7 +129,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
                 0,
                 abi.encodeCall(
                     IContractDeployer.create2,
-                    (_salt, l2TokenProxyBytecodeHash, abi.encode(address(l2TokenBeacon), ""))
+                    (_salt, l2TokenProxyBytecodeHash, abi.encode(address(bridgedTokenBeacon), ""))
                 )
             );
 
@@ -161,7 +156,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         uint256 _originChainId,
         address _l1Token
     ) public view override returns (address) {
-        bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
+        bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
         address deployerAddress = address(L2_LEGACY_SHARED_BRIDGE) == address(0)
             ? address(this)

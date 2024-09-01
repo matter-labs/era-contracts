@@ -13,7 +13,7 @@ import {MurkyBase} from "murky/common/MurkyBase.sol";
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 import {TxStatus} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {MerkleTreeNoSort} from "test/foundry/unit/concrete/common/libraries/Merkle/MerkleTreeNoSort.sol";
+import {MerkleTreeNoSort} from "test/foundry/l1/unit/concrete/common/libraries/Merkle/MerkleTreeNoSort.sol";
 
 contract MailboxL2LogsProve is MailboxTest {
     bytes32[] elements;

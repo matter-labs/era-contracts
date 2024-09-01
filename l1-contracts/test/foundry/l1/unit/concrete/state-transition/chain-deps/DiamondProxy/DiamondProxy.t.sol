@@ -3,8 +3,8 @@ pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
-import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
-import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
+import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
+import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";

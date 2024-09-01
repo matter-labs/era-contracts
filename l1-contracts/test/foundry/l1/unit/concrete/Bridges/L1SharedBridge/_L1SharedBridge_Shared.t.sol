@@ -7,12 +7,14 @@ import "forge-std/console.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
+import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
+import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -65,10 +67,13 @@ contract L1AssetRouterTest is Test {
     L1AssetRouter sharedBridge;
     L1NativeTokenVault nativeTokenVaultImpl;
     L1NativeTokenVault nativeTokenVault;
+    L1Nullifier l1NullifierImpl;
+    L1Nullifier l1Nullifier;
     address bridgehubAddress;
     address l1ERC20BridgeAddress;
     address l1WethAddress;
     address l2SharedBridge;
+    address l1NullifierAddress;
     TestnetERC20Token token;
     bytes32 tokenAssetId;
     uint256 eraPostUpgradeFirstBatch;
@@ -123,21 +128,37 @@ contract L1AssetRouterTest is Test {
         eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
+        l1NullifierImpl = new L1Nullifier({
+            _bridgehub: IBridgehub(bridgehubAddress),
+            _eraChainId: eraChainId,
+            _eraDiamondProxy: eraDiamondProxy
+        });
+        TransparentUpgradeableProxy l1NullifierProxy = new TransparentUpgradeableProxy(
+            address(l1NullifierImpl),
+            admin,
+            abi.encodeWithSelector(L1Nullifier.initialize.selector, owner, 1, 1, 1, 0)
+        );
+        l1Nullifier = L1Nullifier(payable(l1NullifierProxy));
         sharedBridgeImpl = new L1AssetRouter({
             _l1WethAddress: l1WethAddress,
-            _bridgehub: IBridgehub(bridgehubAddress),
+            _bridgehub: bridgehubAddress,
+            _l1Nullifier: address(l1Nullifier),
             _eraChainId: eraChainId,
             _eraDiamondProxy: eraDiamondProxy
         });
         TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
             address(sharedBridgeImpl),
             admin,
-            abi.encodeWithSelector(L1AssetRouter.initialize.selector, owner, 1, 1, 1, 0)
+            abi.encodeWithSelector(L1AssetRouter.initialize.selector, owner)
         );
         sharedBridge = L1AssetRouter(payable(sharedBridgeProxy));
         nativeTokenVaultImpl = new L1NativeTokenVault({
             _l1WethAddress: l1WethAddress,
-            _l1SharedBridge: IL1AssetRouter(address(sharedBridge))
+            _l1AssetRouter: address(sharedBridge),
+            _eraChainId: eraChainId,
+            _l1Nullifier: l1Nullifier,
+            _wrappedTokenProxyBytecode: new bytes(0x00),
+            _baseTokenAddress: ETH_TOKEN_ADDRESS
         });
         TransparentUpgradeableProxy nativeTokenVaultProxy = new TransparentUpgradeableProxy(
             address(nativeTokenVaultImpl),
@@ -149,7 +170,7 @@ contract L1AssetRouterTest is Test {
         sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
         vm.prank(owner);
-        sharedBridge.setNativeTokenVault(IL1NativeTokenVault(address(nativeTokenVault)));
+        sharedBridge.setNativeTokenVault(INativeTokenVault(address(nativeTokenVault)));
         vm.prank(address(nativeTokenVault));
         nativeTokenVault.registerToken(address(token));
         nativeTokenVault.registerToken(ETH_TOKEN_ADDRESS);
@@ -225,8 +246,8 @@ contract L1AssetRouterTest is Test {
 
     function _setSharedBridgeDepositHappened(uint256 _chainId, bytes32 _txHash, bytes32 _txDataHash) internal {
         stdstore
-            .target(address(sharedBridge))
-            .sig(sharedBridge.depositHappened.selector)
+            .target(address(l1Nullifier))
+            .sig(l1Nullifier.depositHappened.selector)
             .with_key(_chainId)
             .with_key(_txHash)
             .checked_write(_txDataHash);
@@ -243,8 +264,8 @@ contract L1AssetRouterTest is Test {
 
     function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
         stdstore
-            .target(address(sharedBridge))
-            .sig(sharedBridge.chainBalance.selector)
+            .target(address(l1Nullifier))
+            .sig(l1Nullifier.chainBalance.selector)
             .with_key(_chainId)
             .with_key(_token)
             .checked_write(_value);

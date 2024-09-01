@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
 import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {Unauthorized, UnimplementedMessage, BRIDGE_MINT_NOT_IMPLEMENTED} from "contracts/errors/L2ContractErrors.sol";
+import {Unauthorized, UnimplementedMessage, BRIDGE_MINT_NOT_IMPLEMENTED} from "contracts/common/L1ContractErrors.sol";
 
 contract WethTest is Test {
     L2WrappedBaseToken internal weth;

@@ -113,6 +113,47 @@ jobs:
         working-directory: ./l1-contracts
         run: FOUNDRY_PROFILE=default yarn test:foundry
 
+  test-foundry-zksync:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            l1-contracts/artifacts
+            l1-contracts/artifacts-zk
+            l1-contracts/cache
+            l1-contracts/typechain
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
+            l2-contracts/typechain
+            l1-contracts/lib
+
+      - name: Run tests
+        working-directory: ./l1-contracts
+        run: FOUNDRY_PROFILE=default yarn test:zkfoundry
+
   test-hardhat:
     needs: [build, lint]
     runs-on: ubuntu-latest

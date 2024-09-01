@@ -140,7 +140,7 @@ interface IL1AssetRouter {
         uint256 _chainId,
         address _depositSender,
         bytes32 _assetId,
-        bytes calldata _transferData
+        bytes calldata _assetData
     ) external;
 
     // function depositLegacyErc20Bridge(

@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, BridgehubMintSTMAssetData, BridgehubBurnSTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -23,7 +23,8 @@ import {L2Message} from "contracts/common/Messaging.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1AssetRouterCombined} from "contracts/bridge/asset-router/IL1AssetRouterCombined.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
@@ -181,16 +182,18 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
             bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
             bytes memory chainData = abi.encode(chain.getProtocolVersion());
             bytes memory stmData = abi.encode(address(1), msg.sender, stm.protocolVersion(), initialDiamondCut);
-            BridgehubBurnSTMAssetData memory data = BridgehubBurnSTMAssetData({
-                chainId: migratingChainId,
-                stmData: stmData,
-                chainData: chainData
-            });
-            transferData = abi.encode(data);
+            // BridgehubBurnSTMAssetData memory data = BridgehubBurnSTMAssetData({
+            //     chainId: migratingChainId,
+            //     stmData: stmData,
+            //     chainData: chainData
+            // });
+            // transferData = abi.encode(data);
+
+            transferData = abi.encode(migratingChainId, stmData, chainData);
         }
 
         address chainAdmin = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId)).getAdmin();
-        IL1AssetRouter assetRouter = bridgehub.sharedBridge();
+        IL1AssetRouterCombined assetRouter = IL1AssetRouterCombined(address(bridgehub.sharedBridge()));
         bytes32 l2TxHash = keccak256("l2TxHash");
         uint256 l2BatchNumber = 5;
         uint256 l2MessageIndex = 0;
@@ -228,12 +231,12 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
             _chainId: migratingChainId,
             _depositSender: chainAdmin,
             _assetId: assetId,
-            _assetData: transferData,
-            _l2TxHash: l2TxHash,
-            _l2BatchNumber: l2BatchNumber,
-            _l2MessageIndex: l2MessageIndex,
-            _l2TxNumberInBatch: l2TxNumberInBatch,
-            _merkleProof: merkleProof
+            _assetData: transferData
+            // _l2TxHash: l2TxHash,
+            // _l2BatchNumber: l2BatchNumber,
+            // _l2MessageIndex: l2MessageIndex,
+            // _l2TxNumberInBatch: l2TxNumberInBatch,
+            // _merkleProof: merkleProof
         });
         vm.stopBroadcast();
     }
@@ -251,12 +254,14 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
         bytes memory chainData = abi.encode(AdminFacet(address(migratingChain)).prepareChainCommitment());
         bytes memory stmData = abi.encode(address(1), msg.sender, stm.protocolVersion(), initialDiamondCut);
-        BridgehubMintSTMAssetData memory data = BridgehubMintSTMAssetData({
-            chainId: mintChainId,
-            stmData: stmData,
-            chainData: chainData
-        });
-        bytes memory bridgehubMintData = abi.encode(data);
+        // BridgehubMintSTMAssetData memory data = BridgehubMintSTMAssetData({
+        //     chainId: mintChainId,
+        //     stmData: stmData,
+        //     chainData: chainData
+        // });
+        // bytes memory bridgehubMintData = abi.encode(data);
+
+        bytes memory bridgehubMintData = abi.encode(mintChainId, stmData, chainData);
         vm.startBroadcast(address(bridgehub.sharedBridge()));
         uint256 currentChainId = block.chainid;
         vm.chainId(migratingChainId);

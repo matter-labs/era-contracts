@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.20;
 
 import {IContractDeployer, DEPLOYER_SYSTEM_CONTRACT} from "./L2ContractHelper.sol";
 

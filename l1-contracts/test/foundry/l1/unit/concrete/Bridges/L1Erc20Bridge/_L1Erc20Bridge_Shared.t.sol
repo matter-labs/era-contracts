@@ -6,14 +6,15 @@ import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
-import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
+import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {FeeOnTransferToken} from "contracts/dev-contracts/FeeOnTransferToken.sol";
 import {ReenterL1ERC20Bridge} from "contracts/dev-contracts/test/ReenterL1ERC20Bridge.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
-import {Utils} from "../../Utils/Utils.sol";
+import {Utils, ETH_ADDRESS_IN_CONTRACTS} from "../../Utils/Utils.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
+import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
 contract L1Erc20BridgeTest is Test {
     L1ERC20Bridge internal bridge;
@@ -26,6 +27,7 @@ contract L1Erc20BridgeTest is Test {
     address internal randomSigner;
     address internal alice;
     address sharedBridgeAddress;
+    address l1NullifierAddress;
     bytes32 internal dummyL2DepositTxHash;
 
     constructor() {
@@ -33,17 +35,35 @@ contract L1Erc20BridgeTest is Test {
         dummyL2DepositTxHash = Utils.randomBytes32("dummyL2DepositTxHash");
         sharedBridgeAddress = makeAddr("sharedBridgeAddress");
         alice = makeAddr("alice");
+        l1NullifierAddress = makeAddr("l1NullifierAddress");
 
         uint256 eraChainId = 9;
-        bridge = new L1ERC20Bridge(IL1AssetRouter(sharedBridgeAddress), IL1NativeTokenVault(address(1)), eraChainId);
+        bridge = new L1ERC20Bridge(
+            IL1Nullifier(l1NullifierAddress),
+            IL1AssetRouter(sharedBridgeAddress),
+            IL1NativeTokenVault(address(1)),
+            eraChainId
+        );
 
         address weth = makeAddr("weth");
-        L1NativeTokenVault ntv = new L1NativeTokenVault(weth, IL1AssetRouter(sharedBridgeAddress));
+        L1NativeTokenVault ntv = new L1NativeTokenVault(
+            weth,
+            sharedBridgeAddress,
+            eraChainId,
+            IL1Nullifier(l1NullifierAddress),
+            new bytes(0x00),
+            ETH_ADDRESS_IN_CONTRACTS
+        );
 
         vm.store(address(bridge), bytes32(uint256(212)), bytes32(0));
 
         reenterL1ERC20Bridge = new ReenterL1ERC20Bridge();
-        bridgeReenterItself = new L1ERC20Bridge(IL1AssetRouter(address(reenterL1ERC20Bridge)), ntv, eraChainId);
+        bridgeReenterItself = new L1ERC20Bridge(
+            IL1Nullifier(l1NullifierAddress),
+            IL1AssetRouter(address(reenterL1ERC20Bridge)),
+            ntv,
+            eraChainId
+        );
         reenterL1ERC20Bridge.setBridge(bridgeReenterItself);
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);

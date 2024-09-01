@@ -6,6 +6,7 @@ import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {WithdrawalAlreadyFinalized} from "contracts/common/L1ContractErrors.sol";
+import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
 contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
     using stdStorage for StdStorage;
@@ -47,7 +48,7 @@ contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
         vm.mockCall(
             sharedBridgeAddress,
             abi.encodeWithSelector(
-                IL1AssetRouter.finalizeWithdrawalLegacyErc20Bridge.selector,
+                IL1Nullifier.finalizeWithdrawalLegacyErc20Bridge.selector,
                 l2BatchNumber,
                 l2MessageIndex,
                 txNumberInBatch,

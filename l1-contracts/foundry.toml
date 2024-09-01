@@ -17,9 +17,11 @@ fs_permissions = [
     { access = "read", path = "./out" },
     { access = "read", path = "./test/foundry/integration/deploy-scripts/script-config/" },
     { access = "read-write", path = "./test/foundry/integration/deploy-scripts/script-out/" },
+    { access = "read", path = "zkout" },
 ]
 ignored_error_codes = ["missing-receive-ether", "code-size"]
 ignored_warnings_from = ["test", "contracts/dev-contracts"]
+suppressed_warnings = ["txorigin"]
 remappings = [
     "forge-std/=./lib/forge-std/src/",
     "murky/=./lib/murky/src/",
@@ -29,3 +31,6 @@ remappings = [
     "@openzeppelin/contracts-v4/=./lib/openzeppelin-contracts-v4/contracts/",
     "@openzeppelin/contracts-upgradeable-v4/=./lib/openzeppelin-contracts-upgradeable-v4/contracts/",
 ]
+[profile.default.zksync] 
+enable_eravm_extensions = true
+zksolc = "1.5.1"

@@ -20,7 +20,7 @@ import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.so
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {STMDeploymentTracker} from "contracts/bridgehub/STMDeploymentTracker.sol";
-import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
+import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -32,15 +32,18 @@ import {IStateTransitionManager} from "contracts/state-transition/IStateTransiti
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
+// import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
+import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
 
 import {ISTMDeploymentTracker} from "contracts/bridgehub/ISTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 contract DeployL1Script is Script {
     using stdToml for string;
@@ -99,6 +102,8 @@ contract DeployL1Script is Script {
         address erc20BridgeProxy;
         address sharedBridgeImplementation;
         address sharedBridgeProxy;
+        address l1NullifierImplementation;
+        address l1NullifierProxy;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -194,6 +199,10 @@ contract DeployL1Script is Script {
 
     function getSharedBridgeProxyAddress() public view returns (address) {
         return addresses.bridges.sharedBridgeProxy;
+    }
+
+    function getL1NullifierProxyAddress() public view returns (address) {
+        return addresses.bridges.l1NullifierProxy;
     }
 
     function getOwnerAddress() public view returns (address) {
@@ -638,6 +647,28 @@ contract DeployL1Script is Script {
         deploySharedBridgeProxy();
     }
 
+    function deployL1NullifierImplementation() internal {
+        bytes memory bytecode = abi.encodePacked(
+            type(L1Nullifier).creationCode,
+            // solhint-disable-next-line func-named-parameters
+            abi.encode(addresses.bridgehub.bridgehubProxy, config.eraChainId, addresses.stateTransition.diamondProxy)
+        );
+        address contractAddress = deployViaCreate2(bytecode);
+        console.log("L1NullifierImplementation deployed at:", contractAddress);
+        addresses.bridges.l1NullifierImplementation = contractAddress;
+    }
+
+    function deployL1NullifierProxy() internal {
+        bytes memory initCalldata = abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
+        bytes memory bytecode = abi.encodePacked(
+            type(TransparentUpgradeableProxy).creationCode,
+            abi.encode(addresses.bridges.l1NullifierImplementation, addresses.transparentProxyAdmin, initCalldata)
+        );
+        address contractAddress = deployViaCreate2(bytecode);
+        console.log("L1NullifierProxy deployed at:", contractAddress);
+        addresses.bridges.l1NullifierProxy = contractAddress;
+    }
+
     function deploySharedBridgeImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(L1AssetRouter).creationCode,
@@ -655,7 +686,7 @@ contract DeployL1Script is Script {
     }
 
     function deploySharedBridgeProxy() internal {
-        bytes memory initCalldata = abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress, 1, 1, 1, 0));
+        bytes memory initCalldata = abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
         bytes memory bytecode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(addresses.bridges.sharedBridgeImplementation, addresses.transparentProxyAdmin, initCalldata)
@@ -671,7 +702,8 @@ contract DeployL1Script is Script {
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         // bridgehub.setSharedBridge(addresses.bridges.sharedBridgeProxy);
         bridgehub.setAddresses(
-            addresses.bridges.sharedBridgeProxy,
+            addresses.bridges.l1NullifierProxy,
+            IAssetRouterBase(addresses.bridges.sharedBridgeProxy),
             ISTMDeploymentTracker(addresses.bridgehub.stmDeploymentTrackerProxy),
             IMessageRoot(addresses.bridgehub.messageRootProxy)
         );
@@ -731,7 +763,7 @@ contract DeployL1Script is Script {
         // Ownable ownable = Ownable(addresses.bridges.sharedBridgeProxy);
 
         vm.broadcast(msg.sender);
-        sharedBridge.setNativeTokenVault(IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
+        sharedBridge.setNativeTokenVault(INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
         // bytes memory data = abi.encodeCall(sharedBridge.setNativeTokenVault, (IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy)));
         // Utils.executeUpgrade({
         //     _governor: ownable.owner(),

@@ -657,7 +657,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _chainId: _chainId,
             _depositSender: _depositSender,
             _assetId: assetId,
-            _transferData: assetData
+            _assetData: assetData
         });
     }
 
@@ -737,7 +737,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _chainId: ERA_CHAIN_ID,
             _depositSender: _depositSender,
             _assetId: assetId,
-            _transferData: assetData
+            _assetData: assetData
         });
     }
 

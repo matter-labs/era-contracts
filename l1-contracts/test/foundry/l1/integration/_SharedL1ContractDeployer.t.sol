@@ -7,7 +7,8 @@ import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
 import {GenerateForceDeploymentsData} from "deploy-scripts/GenerateForceDeploymentsData.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract L1ContractDeployer is Test {
@@ -19,6 +20,8 @@ contract L1ContractDeployer is Test {
 
     address public sharedBridgeProxyAddress;
     L1AssetRouter public sharedBridge;
+    address l1NullifierProxyAddress;
+    L1Nullifier public l1Nullifier;
 
     DeployL1Script l1Script;
     GenerateForceDeploymentsData forceDeploymentsScript;
@@ -44,6 +47,9 @@ contract L1ContractDeployer is Test {
 
         sharedBridgeProxyAddress = l1Script.getSharedBridgeProxyAddress();
         sharedBridge = L1AssetRouter(sharedBridgeProxyAddress);
+
+        l1NullifierProxyAddress = l1Script.getL1NullifierProxyAddress();
+        l1Nullifier = L1Nullifier(l1NullifierProxyAddress);
 
         _acceptOwnership();
         _setEraBatch();
@@ -81,8 +87,8 @@ contract L1ContractDeployer is Test {
 
     function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
         stdstore
-            .target(address(sharedBridge))
-            .sig(sharedBridge.chainBalance.selector)
+            .target(address(l1Nullifier))
+            .sig(l1Nullifier.chainBalance.selector)
             .with_key(_chainId)
             .with_key(_token)
             .checked_write(_value);
@@ -95,8 +101,8 @@ contract L1ContractDeployer is Test {
         bool _isFinalized
     ) internal {
         stdstore
-            .target(address(sharedBridge))
-            .sig(sharedBridge.isWithdrawalFinalized.selector)
+            .target(address(l1Nullifier))
+            .sig(l1Nullifier.isWithdrawalFinalized.selector)
             .with_key(_chainId)
             .with_key(_l2BatchNumber)
             .with_key(_l2ToL1MessageNumber)

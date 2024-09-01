@@ -15,8 +15,10 @@ import {DummyHyperchain} from "contracts/dev-contracts/test/DummyHyperchain.sol"
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubSetter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
-import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
 import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
@@ -28,6 +30,8 @@ import {L2TransactionRequestTwoBridgesInner} from "contracts/bridgehub/IBridgehu
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {ZeroChainId, AddressTooLow, ChainIdTooBig, WrongMagicValue, SharedBridgeNotSet, TokenNotRegistered, BridgeHubAlreadyRegistered, MsgValueMismatch, SlotOccupied, STMAlreadyRegistered, TokenAlreadyRegistered, Unauthorized, NonEmptyMsgValue, STMNotRegistered, InvalidChainId} from "contracts/common/L1ContractErrors.sol";
+import {ETH_ADDRESS_IN_CONTRACTS} from "../Utils/Utils.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -43,9 +47,11 @@ contract ExperimentalBridgeTest is Test {
     L1AssetRouter sharedBridge;
     address sharedBridgeAddress;
     address secondBridgeAddress;
+    address l1NullifierAddress;
     L1AssetRouter secondBridge;
     TestnetERC20Token testToken;
     L1NativeTokenVault ntv;
+    L1Nullifier l1Nullifier;
 
     bytes32 tokenAssetId;
 
@@ -101,7 +107,14 @@ contract ExperimentalBridgeTest is Test {
 
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
-        ntv = new L1NativeTokenVault(weth, IL1AssetRouter(address(mockSharedBridge)));
+        ntv = new L1NativeTokenVault(
+            weth,
+            address(mockSharedBridge),
+            eraChainId,
+            IL1Nullifier(address(0)),
+            new bytes(0x00),
+            ETH_ADDRESS_IN_CONTRACTS
+        );
         mockSharedBridge.setNativeTokenVault(ntv);
         mockSecondSharedBridge.setNativeTokenVault(ntv);
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
@@ -352,7 +365,12 @@ contract ExperimentalBridgeTest is Test {
 
     function test_addAssetId(address randomAddress) public {
         vm.startPrank(bridgeOwner);
-        bridgeHub.setAddresses(address(mockSharedBridge), ISTMDeploymentTracker(address(0)), IMessageRoot(address(0)));
+        bridgeHub.setAddresses(
+            address(l1Nullifier),
+            IAssetRouterBase(address(mockSharedBridge)),
+            ISTMDeploymentTracker(address(0)),
+            IMessageRoot(address(0))
+        );
         vm.stopPrank();
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, testTokenAddress);
@@ -385,7 +403,12 @@ contract ExperimentalBridgeTest is Test {
         uint256 randomValue
     ) public useRandomToken(randomValue) {
         vm.startPrank(bridgeOwner);
-        bridgeHub.setAddresses(address(mockSharedBridge), ISTMDeploymentTracker(address(0)), IMessageRoot(address(0)));
+        bridgeHub.setAddresses(
+            address(l1Nullifier),
+            IAssetRouterBase(address(mockSharedBridge)),
+            ISTMDeploymentTracker(address(0)),
+            IMessageRoot(address(0))
+        );
         vm.stopPrank();
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, testTokenAddress);

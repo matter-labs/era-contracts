@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
 
-import {IContractDeployer, DEPLOYER_SYSTEM_CONTRACT, L2ContractHelper, L2_ASSET_ROUTER, L2_NATIVE_TOKEN_VAULT} from "contracts/L2ContractHelper.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
+import {IContractDeployer, L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 
-import {L2AssetRouter} from "contracts/bridge/L2AssetRouter.sol";
-import {L2NativeTokenVault} from "contracts/bridge/L2NativeTokenVault.sol";
+import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 
-library Utils {
+address constant ETH_ADDRESS_IN_CONTRACTS = 0x0000000000000000000000000000000000000001;
+
+library L2Utils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     Vm internal constant vm = Vm(VM_ADDRESS);
 
@@ -71,12 +74,12 @@ library Utils {
 
         bytes memory bytecode = readEraBytecode("L2AssetRouter");
 
-        bytes32 bytecodehash = L2ContractHelper.hashL2BytecodeMemory(bytecode);
+        bytes32 bytecodehash = L2ContractHelper.hashL2Bytecode(bytecode);
 
         IContractDeployer.ForceDeployment[] memory deployments = new IContractDeployer.ForceDeployment[](1);
         deployments[0] = IContractDeployer.ForceDeployment({
             bytecodeHash: bytecodehash,
-            newAddress: address(L2_ASSET_ROUTER),
+            newAddress: L2_ASSET_ROUTER_ADDR,
             callConstructor: true,
             value: 0,
             input: abi.encode(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge)
@@ -108,19 +111,21 @@ library Utils {
                 _aliasedOwner: _aliasedOwner,
                 _l2TokenProxyBytecodeHash: _l2TokenProxyBytecodeHash,
                 _legacySharedBridge: _legacySharedBridge,
-                _l2TokenBeacon: _l2TokenBeacon,
-                _contractsDeployedAlready: _contractsDeployedAlready
+                _bridgedTokenBeacon: _l2TokenBeacon,
+                _contractsDeployedAlready: _contractsDeployedAlready,
+                _wethToken: address(0),
+                _baseTokenAddress: ETH_ADDRESS_IN_CONTRACTS
             });
         }
 
         bytes memory bytecode = readEraBytecode("L2NativeTokenVault");
 
-        bytes32 bytecodehash = L2ContractHelper.hashL2BytecodeMemory(bytecode);
+        bytes32 bytecodehash = L2ContractHelper.hashL2Bytecode(bytecode);
 
         IContractDeployer.ForceDeployment[] memory deployments = new IContractDeployer.ForceDeployment[](1);
         deployments[0] = IContractDeployer.ForceDeployment({
             bytecodeHash: bytecodehash,
-            newAddress: address(L2_NATIVE_TOKEN_VAULT),
+            newAddress: L2_NATIVE_TOKEN_VAULT_ADDRESS,
             callConstructor: true,
             value: 0,
             // solhint-disable-next-line func-named-parameters
@@ -130,7 +135,9 @@ library Utils {
                 _l2TokenProxyBytecodeHash,
                 _legacySharedBridge,
                 _l2TokenBeacon,
-                _contractsDeployedAlready
+                _contractsDeployedAlready,
+                address(0),
+                ETH_ADDRESS_IN_CONTRACTS
             )
         });
 

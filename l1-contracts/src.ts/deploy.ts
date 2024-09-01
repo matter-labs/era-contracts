@@ -1245,7 +1245,9 @@ export class Deployer {
 
     // The stmAssetIFromChainId gives us a unique 'asset' identifier for a given chain.
     const chainAssetId = await bridgehub.stmAssetIdFromChainId(this.chainId);
-    console.log("Chain asset id is: ", chainAssetId);
+    if (this.verbose) {
+      console.log("Chain asset id is: ", chainAssetId);
+    }
 
     let sharedBridgeData = ethers.utils.defaultAbiCoder.encode(
       ["bytes32", "bytes"],
@@ -1322,7 +1324,6 @@ export class Deployer {
     predefinedChainId?: string,
     useGovernance: boolean = false
   ) {
-    console.log(baseTokenAssetId);
     const txOptions = this.isZkMode() ? {} : { gasLimit: 10_000_000 };
 
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();

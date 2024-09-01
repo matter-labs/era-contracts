@@ -84,7 +84,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit WithdrawalFinalizedAssetRouter(eraChainId, ETH_TOKEN_ASSET_ID, message);
         vm.prank(l1ERC20BridgeAddress);
-        sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
+        l1Nullifier.finalizeWithdrawalLegacyErc20Bridge({
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,
@@ -133,7 +133,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         vm.expectEmit(true, true, false, false, address(sharedBridge));
         emit WithdrawalFinalizedAssetRouter(eraChainId, tokenAssetId, message);
         vm.prank(l1ERC20BridgeAddress);
-        sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
+        l1Nullifier.finalizeWithdrawalLegacyErc20Bridge({
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,

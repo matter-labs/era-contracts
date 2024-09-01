@@ -14,7 +14,7 @@ import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {L1NativeTokenVault} from "contracts/bridge/L1NativeTokenVault.sol";
+import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 contract L1AssetRouterTestBase is L1AssetRouterTest {
@@ -123,7 +123,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     function test_claimFailedDeposit_Erc() public {
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
-        require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
+        require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         vm.mockCall(
             bridgehubAddress,
@@ -149,10 +149,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
             assetId: tokenAssetId,
             assetData: abi.encode(bytes32(0))
         });
-        sharedBridge.claimFailedDeposit({
+        l1Nullifier.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
-            _l1Asset: address(token),
+            _l1Token: address(token),
             _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
@@ -165,7 +165,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     function test_claimFailedDeposit_Eth() public {
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
-        require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
+        require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         vm.mockCall(
             bridgehubAddress,
@@ -191,10 +191,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
             assetId: ETH_TOKEN_ASSET_ID,
             assetData: abi.encode(bytes32(0))
         });
-        sharedBridge.claimFailedDeposit({
+        l1Nullifier.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
-            _l1Asset: ETH_TOKEN_ADDRESS,
+            _l1Token: ETH_TOKEN_ADDRESS,
             _amount: amount,
             _l2TxHash: txHash,
             _l2BatchNumber: l2BatchNumber,
@@ -208,7 +208,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         bytes memory transferData = abi.encode(amount, alice);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
-        require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
+        require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         vm.mockCall(
             bridgehubAddress,
@@ -238,12 +238,12 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
             _chainId: chainId,
             _depositSender: alice,
             _assetId: ETH_TOKEN_ASSET_ID,
-            _assetData: transferData,
-            _l2TxHash: txHash,
-            _l2BatchNumber: l2BatchNumber,
-            _l2MessageIndex: l2MessageIndex,
-            _l2TxNumberInBatch: l2TxNumberInBatch,
-            _merkleProof: merkleProof
+            _assetData: transferData
+            // _l2TxHash: txHash,
+            // _l2BatchNumber: l2BatchNumber,
+            // _l2MessageIndex: l2MessageIndex,
+            // _l2TxNumberInBatch: l2TxNumberInBatch,
+            // _merkleProof: merkleProof
         });
     }
 
@@ -272,7 +272,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit WithdrawalFinalizedAssetRouter(chainId, ETH_TOKEN_ASSET_ID, message);
-        sharedBridge.finalizeWithdrawal({
+        l1Nullifier.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -312,7 +312,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit WithdrawalFinalizedAssetRouter(chainId, tokenAssetId, message);
-        sharedBridge.finalizeWithdrawal({
+        l1Nullifier.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -357,7 +357,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit WithdrawalFinalizedAssetRouter(chainId, ETH_TOKEN_ASSET_ID, message);
-        sharedBridge.finalizeWithdrawal({
+        l1Nullifier.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -399,7 +399,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit WithdrawalFinalizedAssetRouter(chainId, tokenAssetId, message);
-        sharedBridge.finalizeWithdrawal({
+        l1Nullifier.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -444,7 +444,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit WithdrawalFinalizedAssetRouter(chainId, tokenAssetId, message);
-        sharedBridge.finalizeWithdrawal({
+        l1Nullifier.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,

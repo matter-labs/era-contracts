@@ -486,7 +486,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         bytes32[] memory merkleProof = new bytes32[](1);
 
         _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
-        uint256 beforeChainBalance = sharedBridge.chainBalance(currentChainId, currentTokenAddress);
+        uint256 beforeChainBalance = l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
         uint256 beforeBalance = currentToken.balanceOf(sharedBridgeProxyAddress);
 
         if (beforeChainBalance < amountToWithdraw) {
@@ -522,7 +522,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
             abi.encode(true)
         );
 
-        sharedBridge.finalizeWithdrawal({
+        l1Nullifier.finalizeWithdrawal({
             _chainId: currentChainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -534,7 +534,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         // check if the balance was updated correctly
         if (beforeChainBalance > amountToWithdraw) {
             assertEq(
-                beforeChainBalance - sharedBridge.chainBalance(currentChainId, currentTokenAddress),
+                beforeChainBalance - l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
                 amountToWithdraw
             );
             assertEq(beforeBalance - currentToken.balanceOf(sharedBridgeProxyAddress), amountToWithdraw);
@@ -548,7 +548,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         bytes32[] memory merkleProof = new bytes32[](1);
 
         _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
-        uint256 beforeChainBalance = sharedBridge.chainBalance(currentChainId, currentTokenAddress);
+        uint256 beforeChainBalance = l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
         uint256 beforeBalance = sharedBridgeProxyAddress.balance;
 
         if (beforeChainBalance < amountToWithdraw) {
@@ -578,7 +578,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
             abi.encode(true)
         );
 
-        sharedBridge.finalizeWithdrawal({
+        l1Nullifier.finalizeWithdrawal({
             _chainId: currentChainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -590,7 +590,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         // check if the balance was updated correctly
         if (beforeChainBalance > amountToWithdraw) {
             assertEq(
-                beforeChainBalance - sharedBridge.chainBalance(currentChainId, currentTokenAddress),
+                beforeChainBalance - l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
                 amountToWithdraw
             );
             assertEq(beforeBalance - sharedBridgeProxyAddress.balance, amountToWithdraw);
