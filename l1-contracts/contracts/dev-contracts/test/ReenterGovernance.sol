@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IGovernance} from "../../governance/IGovernance.sol";
+import {OnlyOneCallSupported} from "../L1DevContractsErrors.sol";
 import {Call} from "../../governance/Common.sol";
 
 contract ReenterGovernance {
@@ -35,7 +36,9 @@ contract ReenterGovernance {
         FunctionToCall _functionToCall
     ) external {
         governance = _governance;
-        require(_op.calls.length == 1, "Only 1 calls supported");
+        if (_op.calls.length != 1) {
+            revert OnlyOneCallSupported();
+        }
         call = _op.calls[0];
         predecessor = _op.predecessor;
         salt = _op.salt;

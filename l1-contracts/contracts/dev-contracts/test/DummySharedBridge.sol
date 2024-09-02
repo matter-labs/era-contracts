@@ -12,6 +12,7 @@ import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 import {IL2Bridge} from "../../bridge/interfaces/IL2Bridge.sol";
 import {IL2BridgeLegacy} from "../../bridge/interfaces/IL2BridgeLegacy.sol";
+import {WithdrawFailed,nMsgValueNotEqualToAmount, WrongWithdrawAmount, MsgValueIsLessThenZeroForBridgehubDeposit, WithdrawAndDepositAmountsMismatch, LegacyBridgeAlreadySet, LegacyBridgeZero} from "../L1DevContractsErrors.sol";
 
 contract DummySharedBridge is PausableUpgradeable {
     using SafeERC20 for IERC20;
@@ -136,7 +137,9 @@ contract DummySharedBridge is PausableUpgradeable {
             assembly {
                 callSuccess := call(gas(), l1Receiver, amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "ShB: withdraw failed");
+            if (!callSuccess) {
+                revert WithdrawFailed();
+            }
         } else {
             // Withdraw funds
             IERC20(l1Token).safeTransfer(l1Receiver, amount);
@@ -150,7 +153,9 @@ contract DummySharedBridge is PausableUpgradeable {
         uint256 _amount
     ) external payable whenNotPaused {
         // Dummy bridge supports only working with ETH for simplicity.
-        require(msg.value == _amount, "L1AR: msg.value not equal to amount");
+        if (msg.value != _amount) {
+            revert MsgValueNotEqualToAmount();
+        }
 
         if (!hyperbridgingEnabled[_chainId]) {
             chainBalance[_chainId][address(1)] += _amount;
@@ -182,13 +187,19 @@ contract DummySharedBridge is PausableUpgradeable {
 
         if (_l1Token == ETH_TOKEN_ADDRESS) {
             amount = msg.value;
-            require(_depositAmount == 0, "ShB wrong withdraw amount");
+            if (_depositAmount != 0) {
+                revert WrongWithdrawAmount();
+            }
         } else {
-            require(msg.value == 0, "ShB m.v > 0 for BH d.it 2");
+            if (msg.value != 0) {
+                revert MsgValueIsMoreThenZeroForBridgehubDeposit();
+            }
             amount = _depositAmount;
 
             uint256 withdrawAmount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _depositAmount);
-            require(withdrawAmount == _depositAmount, "5T"); // The token has non-standard transfer logic
+            if (withdrawAmount != _depositAmount) {
+                revert WithdrawAndDepositAmountsMismatch();
+            }
         }
 
         bytes memory l2TxCalldata = abi.encodeCall(
@@ -210,8 +221,12 @@ contract DummySharedBridge is PausableUpgradeable {
 
     /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
     function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external {
-        require(address(nativeTokenVault) == address(0), "L1AR: legacy bridge already set");
-        require(address(_nativeTokenVault) != address(0), "L1AR: legacy bridge 0");
+        if (address(nativeTokenVault) != address(0)) {
+            revert LegacyBridgeAlreadySet();
+        }
+        if (address(_nativeTokenVault) == address(0)) {
+            revert LegacyBridgeZero();
+        }
         nativeTokenVault = _nativeTokenVault;
     }
 
