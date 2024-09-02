@@ -1,10 +1,10 @@
-# zkSync Era: System Contracts
+# ZKsync Era: System Contracts
 
 [![Logo](../eraLogo.svg)](https://zksync.io/)
 
-zkSync Era is a layer 2 rollup that uses zero-knowledge proofs to scale Ethereum without compromising on security or
+ZKsync Era is a layer 2 rollup that uses zero-knowledge proofs to scale Ethereum without compromising on security or
 decentralization. Since it's EVM compatible (Solidity/Vyper), 99% of Ethereum projects can redeploy without refactoring
-or re-auditing a single line of code. zkSync Era also uses an LLVM-based compiler that will eventually let developers
+or re-auditing a single line of code. ZKsync Era also uses an LLVM-based compiler that will eventually let developers
 write smart contracts in C++, Rust and other popular languages.
 
 ## system-contracts
@@ -17,7 +17,7 @@ the most commonly used contracts:
 each deployed contract is known. This contract also defines the derivation address. Whenever a contract is deployed, a
 ContractDeployed event is emitted.
 
-`L1Messenger` This contract is used to send messages from zkSync to Ethereum. For each message sent, the L1MessageSent
+`L1Messenger` This contract is used to send messages from ZKsync to Ethereum. For each message sent, the L1MessageSent
 event is emitted.
 
 `NonceHolder` This contract stores account nonces. The account nonces are stored in a single place for efficiency (the
@@ -43,7 +43,7 @@ Update the system contracts hashes: `yarn sc calculate-hashes:fix`
 
 ### Run tests
 
-The tests of the system contracts utilize the zkSync test node. In order to run the tests, execute the following commands in the root of the repository:
+The tests of the system contracts utilize the ZKsync test node. In order to run the tests, execute the following commands in the root of the repository:
 
 ```
 yarn test-node
@@ -150,7 +150,7 @@ changes.
 
 ## License
 
-The zkSync Era system-contracts are distributed under the terms of the MIT license.
+The ZKsync Era system-contracts are distributed under the terms of the MIT license.
 
 See [LICENSE-MIT](LICENSE-MIT) for details.
 
@@ -166,7 +166,7 @@ See [LICENSE-MIT](LICENSE-MIT) for details.
 
 ## Disclaimer
 
-zkSync Era has been through lots of testing and audits. Although it is live, it is still in alpha state and will go
+ZKsync Era has been through lots of testing and audits. Although it is live, it is still in alpha state and will go
 through more audits and bug bounties programs. We would love to hear our community's thoughts and suggestions about it!
 It is important to state that forking it now can potentially lead to missing important security updates, critical
 features, and performance improvements.

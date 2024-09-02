@@ -14,7 +14,7 @@ import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErr
 /// @dev The primary purpose of this contract is to provide a trustless means of delaying batch execution without
 /// modifying the main hyperchain diamond contract. As such, even if this contract is compromised, it will not impact the main
 /// contract.
-/// @dev zkSync actively monitors the chain activity and reacts to any suspicious activity by freezing the chain.
+/// @dev ZKsync actively monitors the chain activity and reacts to any suspicious activity by freezing the chain.
 /// This allows time for investigation and mitigation before resuming normal operations.
 /// @dev The contract overloads all of the 4 methods, that are used in state transition. When the batch is committed,
 /// the timestamp is stored for it. Later, when the owner calls the batch execution, the contract checks that batch
@@ -210,7 +210,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
                 // Note: if the `commitBatchTimestamp` is zero, that means either:
                 // * The batch was committed, but not through this contract.
-                // * The batch wasn't committed at all, so execution will fail in the zkSync contract.
+                // * The batch wasn't committed at all, so execution will fail in the ZKsync contract.
                 // We allow executing such batches.
 
                 if (block.timestamp < commitBatchTimestamp + delay) {

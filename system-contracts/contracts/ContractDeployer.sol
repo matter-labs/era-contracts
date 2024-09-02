@@ -15,7 +15,7 @@ import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, N
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice System smart contract that is responsible for deploying other smart contracts on zkSync.
+ * @notice System smart contract that is responsible for deploying other smart contracts on ZKsync.
  * @dev The contract is responsible for generating the address of the deployed smart contract,
  * incrementing the deployment nonce and making sure that the constructor is never called twice in a contract.
  * Note, contracts with bytecode that have already been published to L1 once
