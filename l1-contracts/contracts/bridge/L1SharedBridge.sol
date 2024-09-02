@@ -413,8 +413,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function _getERC20Getters(address _token) internal view returns (bytes memory) {
         if (_token == ETH_TOKEN_ADDRESS) {
-            bytes memory name = bytes("Ether");
-            bytes memory symbol = bytes("ETH");
+            bytes memory name = abi.encode("Ether");
+            bytes memory symbol = abi.encode("ETH");
             bytes memory decimals = abi.encode(uint8(18));
             return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
         }
