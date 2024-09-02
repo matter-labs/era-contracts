@@ -471,9 +471,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             );
         }
 
-        address hyperchain = hyperchainMap.get(_request.chainId);
-        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
-        canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(
+        canonicalTxHash = _sendRequest(
+            _request.chainId,
+            _request.refundRecipient,
             BridgehubL2TransactionRequest({
                 sender: msg.sender,
                 contractL2: _request.l2Contract,
@@ -483,7 +483,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                 l2GasLimit: _request.l2GasLimit,
                 l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
                 factoryDeps: _request.factoryDeps,
-                refundRecipient: refundRecipient
+                refundRecipient: address(0)
             })
         );
     }
@@ -531,8 +531,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             );
         }
 
-        address hyperchain = hyperchainMap.get(_request.chainId);
-
         if (_request.secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
             revert AddressTooLow(_request.secondBridgeAddress);
         }
@@ -550,9 +548,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             revert WrongMagicValue(uint256(TWO_BRIDGES_MAGIC_VALUE), uint256(outputRequest.magicValue));
         }
 
-        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
-        // kl todo enable L2->L1 txs here, ( we also need to add method to L1MessageSender)
-        canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(
+        canonicalTxHash = _sendRequest(
+            _request.chainId,
+            _request.refundRecipient,
             BridgehubL2TransactionRequest({
                 sender: _request.secondBridgeAddress,
                 contractL2: outputRequest.l2Contract,
@@ -562,7 +560,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                 l2GasLimit: _request.l2GasLimit,
                 l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
                 factoryDeps: outputRequest.factoryDeps,
-                refundRecipient: refundRecipient
+                refundRecipient: address(0)
             })
         );
 
@@ -571,6 +569,18 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             outputRequest.txDataHash,
             canonicalTxHash
         );
+    }
+
+    function _sendRequest(
+        uint256 _chainId,
+        address _refundRecipient,
+        BridgehubL2TransactionRequest memory _request
+    ) internal returns (bytes32 canonicalTxHash) {
+        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, msg.sender);
+        _request.refundRecipient = refundRecipient;
+        address hyperchain = hyperchainMap.get(_chainId);
+
+        canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(_request);
     }
 
     /// @notice Used to forward a transaction on the gateway to the chains mailbox (from L1).

@@ -2,11 +2,9 @@
 
 pragma solidity ^0.8.20;
 
-import {IAssetRouterBase} from "./IAssetRouterBase.sol";
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL2AssetRouter is IAssetRouterBase {
+interface IL2AssetRouter {
     event FinalizeDepositSharedBridge(uint256 chainId, bytes32 indexed assetId, bytes assetData);
 
     event WithdrawalInitiatedSharedBridge(
