@@ -39,8 +39,18 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
     /// @dev Address of the L1 token that can be deposited to mint this L2 token
     address public override l1Address;
 
+    /// @dev Address of the native token vault that is used as trustee who can mint/burn tokens
+    address public override nativeTokenVault;
+
+    /// @dev This also sets the native token vault to the default value if it is not set.
+    /// It is not set only on the L2s for legacy tokens.
     modifier onlyNTV() {
-        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
+        address ntv = nativeTokenVault;
+        if (ntv == address(0)) {
+            ntv = L2_NATIVE_TOKEN_VAULT_ADDR;
+            nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
+        }
+        if (msg.sender != ntv) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -72,7 +82,7 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         }
         l1Address = _l1Address;
 
-        l2Bridge = msg.sender;
+        nativeTokenVault = msg.sender;
 
         // We parse the data exactly as they were created on the L1 bridge
         (bytes memory nameBytes, bytes memory symbolBytes, bytes memory decimalsBytes) = abi.decode(

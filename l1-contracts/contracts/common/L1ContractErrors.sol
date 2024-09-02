@@ -75,6 +75,7 @@ error EmptyDeposit();
 error FacetExists(bytes4 selector, address);
 // 0x79e12cc3
 error FacetIsFrozen(bytes4 func);
+error FunctionNotSupported();
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
 // 0x6d4a7df8

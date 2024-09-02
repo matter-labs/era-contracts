@@ -22,7 +22,7 @@ import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero} from "../../common/L1ContractErrors.sol";
+import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero, FunctionNotSupported} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -98,7 +98,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256
     ) public payable virtual override onlyBridgehub whenNotPaused {
         // todo in the future we will make all L2->L1 messages go through the bridgehub
-        revert("not implemented");
+        revert FunctionNotSupported();
     }
 
     /// @inheritdoc IAssetRouterBase
@@ -117,7 +117,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         returns (L2TransactionRequestTwoBridgesInner memory)
     {
         // todo in the future we will make all L2->L1 messages go through the bridgehub
-        revert("not implemented");
+        revert FunctionNotSupported();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -146,6 +146,19 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /*//////////////////////////////////////////////////////////////
                             LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
+    /// where tokens would be unlocked
+    /// @dev A compatibility method to support legacy functionality for the SDK.
+    /// @param _l1Receiver The account address that should receive funds on L1
+    /// @param _l2Token The L2 token address which is withdrawn
+    /// @param _amount The total amount of tokens to be withdrawn
+    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
+        if (_amount == 0) {
+            revert AmountMustBeGreaterThanZero();
+        }
+        _withdrawLegacy(_l1Receiver, _l2Token, _amount, msg.sender);
+    }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked
@@ -201,19 +214,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);
         finalizeDeposit(assetId, data);
-    }
-
-    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
-    /// where tokens would be unlocked
-    /// @dev A compatibility method to support legacy functionality for the SDK.
-    /// @param _l1Receiver The account address that should receive funds on L1
-    /// @param _l2Token The L2 token address which is withdrawn
-    /// @param _amount The total amount of tokens to be withdrawn
-    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
-        if (_amount == 0) {
-            revert AmountMustBeGreaterThanZero();
-        }
-        _withdrawLegacy(_l1Receiver, _l2Token, _amount, msg.sender);
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1

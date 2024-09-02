@@ -117,6 +117,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes calldata _data
     ) external payable override onlyAssetRouter whenNotPaused {
         // Either it was locked before, therefore is not zero, or it is sent from remote chain and standard erc20 will be deployed
+        // Note: if the chainBalance has not been migrated and is 0, then the assetId check will fail as the token's origin chain is not chain that sent the message.
+        // Note: after interop is implemented this will not work.
         address token = tokenAddress[_assetId];
         if (chainBalance[_chainId][token] > 0) {
             _bridgeMintNativeToken(_chainId, _assetId, _data);
