@@ -248,11 +248,13 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         bridgehub.registerSettlementLayer(gatewayChainId, true);
         vm.stopBroadcast();
 
+        bytes32 baseTokenAssetId = keccak256("baseTokenAssetId");
         bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
         bytes memory chainData = abi.encode(AdminFacet(address(migratingChain)).prepareChainCommitment());
-        bytes memory stmData = abi.encode(address(1), msg.sender, stm.protocolVersion(), initialDiamondCut);
+        bytes memory stmData = abi.encode(baseTokenAssetId, msg.sender, stm.protocolVersion(), initialDiamondCut);
         BridgehubMintSTMAssetData memory data = BridgehubMintSTMAssetData({
             chainId: mintChainId,
+            baseTokenAssetId: baseTokenAssetId,
             stmData: stmData,
             chainData: chainData
         });
@@ -263,6 +265,10 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         bridgehub.bridgeMint(gatewayChainId, assetId, bridgehubMintData);
         vm.stopBroadcast();
         vm.chainId(currentChainId);
+    
+        assertEq(bridgehub.baseTokenAssetId(mintChainId), baseTokenAssetId);
+        IZkSyncHyperchain mintedHyperchain = IZkSyncHyperchain(bridgehub.getHyperchain(mintChainId));
+        assertEq(mintedHyperchain.getBaseTokenAssetId(), baseTokenAssetId);
     }
 
     // add this to be excluded from coverage report
