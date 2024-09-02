@@ -11,6 +11,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {PriorityQueue} from "../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../state-transition/libraries/PriorityTree.sol";
+import {GatewayUpgradeUpgradeExternal, GatewayUpgradeUpgradeFailed} from "./ZkSyncUpgradeErrors.sol";
 
 import {IGatewayUpgrade} from "./IGatewayUpgrade.sol";
 import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
@@ -53,14 +54,18 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
             abi.encodeWithSelector(IGatewayUpgrade.upgradeExternal.selector, proposedUpgrade)
         );
         // solhint-disable-next-line gas-custom-errors
-        require(success, "GatewayUpgrade: upgrade failed");
+        if (!success) {
+            revert GatewayUpgradeUpgradeFailed();
+        }
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
     /// @notice The function that will be called from this same contract, we need an external call to be able to modify _proposedUpgrade (memory/calldata).
     function upgradeExternal(ProposedUpgrade calldata _proposedUpgrade) external {
         // solhint-disable-next-line gas-custom-errors
-        require(msg.sender == address(this), "GatewayUpgrade: upgradeExternal");
+        if (msg.sender != address(this)) {
+            revert GatewayUpgradeUpgradeExternal();
+        }
         super.upgrade(_proposedUpgrade);
     }
 }
