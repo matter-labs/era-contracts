@@ -14,6 +14,7 @@ import {IBridgehub, IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.so
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
+import {NoEthAllowed, NotOwner, WrongCounterPart, WrongEncodingVersion} from "./L1BridgehubErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -61,9 +62,11 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     function registerCTMAssetOnL1(address _ctmAddress) external onlyOwner {
         // solhint-disable-next-line gas-custom-errors
 
-        require(BRIDGE_HUB.chainTypeManagerIsRegistered(_ctmAddress), "CTMDT: ctm not registered");
-        L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_ctmAddress))), address(BRIDGE_HUB));
-        BRIDGE_HUB.setAssetHandlerAddress(bytes32(uint256(uint160(_ctmAddress))), _ctmAddress);
+        if (!BRIDGE_HUB.chainTypeManagerIsRegistered(_ctmAddress)) {
+            revert StmNotRegistered();
+        }
+        L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_stmAddress))), address(BRIDGE_HUB));
+        BRIDGE_HUB.setAssetHandlerAddress(bytes32(uint256(uint160(_stmAddress))), _stmAddress);
     }
 
     /// @notice The function responsible for registering the L2 counterpart of an CTM asset on the L2 Bridgehub.
@@ -88,10 +91,14 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     ) external payable onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
         // solhint-disable-next-line gas-custom-errors
 
-        require(msg.value == 0, "CTMDT: no eth allowed");
+        if (msg.value != 0) {
+            revert NoEthAllowed();
+        }
         // solhint-disable-next-line gas-custom-errors
 
-        require(_prevMsgSender == owner(), "CTMDT: not owner");
+        if (_prevMsgSender != owner()) {
+            revert NotOwner();
+        }
         bytes1 encodingVersion = _data[0];
         require(encodingVersion == ENCODING_VERSION, "CTMDT: wrong encoding version");
         (address _ctmL1Address, address _ctmL2Address) = abi.decode(_data[1:], (address, address));
@@ -112,7 +119,9 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         address _prevMsgSender,
         address _assetHandlerAddressOnCounterpart
     ) external view override onlyOwnerViaRouter(_prevMsgSender) {
-        require(_assetHandlerAddressOnCounterpart == L2_BRIDGEHUB_ADDR, "CTMDT: wrong counter part");
+        if (_assetHandlerAddressOnCounterpart != L2_BRIDGEHUB_ADDR) {
+            revert WrongCounterPart();
+        }
     }
 
     function getAssetId(address _l1CTM) public view override returns (bytes32) {
