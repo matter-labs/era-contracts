@@ -3,6 +3,8 @@ pragma solidity 0.8.24;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {FacetIsFrozen} from "contracts/common/L1ContractErrors.sol";
 
 contract freezeChainTest is StateTransitionManagerTest {
     function setUp() public {
@@ -23,11 +25,11 @@ contract freezeChainTest is StateTransitionManagerTest {
         chainContractAddress.freezeChain(block.chainid);
 
         // Repeated call should revert
-        vm.expectRevert(bytes.concat("q1")); // storage frozen
+        vm.expectRevert(bytes("q1")); // storage frozen
         chainContractAddress.freezeChain(block.chainid);
 
         // Call fails as storage is frozen
-        vm.expectRevert(bytes.concat("q1"));
+        vm.expectRevert(bytes("q1"));
         isChainFrozen = gettersFacet.isDiamondStorageFrozen();
     }
 }

@@ -1,6 +1,6 @@
 pragma solidity 0.8.24;
 
-import "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
+import "openzeppelin-contracts/contracts/utils/Strings.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";

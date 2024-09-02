@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 import {Transaction, TransactionHelper, EIP_712_TX_TYPE, LEGACY_TX_TYPE, EIP_2930_TX_TYPE, EIP_1559_TX_TYPE} from "./libraries/TransactionHelper.sol";
@@ -177,7 +177,7 @@ contract BootloaderUtilities is IBootloaderUtilities {
             // Otherwise the length is not encoded at all.
         }
 
-        // On zkSync, access lists are always zero length (at least for now).
+        // On ZKsync, access lists are always zero length (at least for now).
         bytes memory encodedAccessListLength = RLPEncoder.encodeListLen(0);
 
         bytes memory rEncoded;
@@ -276,7 +276,7 @@ contract BootloaderUtilities is IBootloaderUtilities {
             // Otherwise the length is not encoded at all.
         }
 
-        // On zkSync, access lists are always zero length (at least for now).
+        // On ZKsync, access lists are always zero length (at least for now).
         bytes memory encodedAccessListLength = RLPEncoder.encodeListLen(0);
 
         bytes memory rEncoded;

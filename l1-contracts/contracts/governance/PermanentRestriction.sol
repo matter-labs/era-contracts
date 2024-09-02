@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {CallNotAllowed, ChainZeroAddress, NotAHyperchain, NotAnAdmin, RemovingPermanentRestriction, ZeroAddress, UnallowedImplementation} from "../common/L1ContractErrors.sol";
 
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {Call} from "./Common.sol";
 import {IRestriction} from "./IRestriction.sol";

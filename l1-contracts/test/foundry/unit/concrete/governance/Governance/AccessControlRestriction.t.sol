@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
-import "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
+import "openzeppelin-contracts/contracts/utils/Strings.sol";
 import "forge-std/console.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
@@ -47,6 +47,8 @@ contract AccessRestrictionTest is Test {
     }
 
     function test_setRequiredRoleForCallByNotDefaultAdmin(bytes32 role) public {
+        vm.assume(role != DEFAULT_ADMIN_ROLE);
+
         bytes4[] memory chainAdminSelectors = getChainAdminSelectors();
         string memory revertMsg = string(
             abi.encodePacked(
@@ -63,6 +65,8 @@ contract AccessRestrictionTest is Test {
     }
 
     function test_setRequiredRoleForCallAccessToFunctionDenied(bytes32 role) public {
+        vm.assume(role != DEFAULT_ADMIN_ROLE);
+
         bytes4[] memory chainAdminSelectors = getChainAdminSelectors();
 
         vm.startPrank(owner);
@@ -87,6 +91,8 @@ contract AccessRestrictionTest is Test {
     }
 
     function test_setRequiredRoleForCall(bytes32 role) public {
+        vm.assume(role != DEFAULT_ADMIN_ROLE);
+
         bytes4[] memory chainAdminSelectors = getChainAdminSelectors();
 
         vm.expectEmit(true, true, false, true);
@@ -106,6 +112,8 @@ contract AccessRestrictionTest is Test {
     }
 
     function test_setRequiredRoleForFallbackByNotDefaultAdmin(bytes32 role) public {
+        vm.assume(role != DEFAULT_ADMIN_ROLE);
+
         string memory revertMsg = string(
             abi.encodePacked(
                 "AccessControl: account ",
@@ -121,6 +129,8 @@ contract AccessRestrictionTest is Test {
     }
 
     function test_setRequiredRoleForFallbackAccessToFallbackDenied(bytes32 role) public {
+        vm.assume(role != DEFAULT_ADMIN_ROLE);
+
         vm.startPrank(owner);
         restriction.setRequiredRoleForFallback(address(chainAdmin), role);
         vm.stopPrank();
@@ -132,6 +142,8 @@ contract AccessRestrictionTest is Test {
     }
 
     function test_setRequiredRoleForFallback(bytes32 role) public {
+        vm.assume(role != DEFAULT_ADMIN_ROLE);
+
         vm.expectEmit(true, false, false, true);
         emit IAccessControlRestriction.FallbackRoleSet(address(chainAdmin), role);
 
@@ -145,6 +157,8 @@ contract AccessRestrictionTest is Test {
     }
 
     function test_validateCallFunction(bytes32 role) public {
+        vm.assume(role != DEFAULT_ADMIN_ROLE);
+
         bytes4[] memory chainAdminSelectors = getChainAdminSelectors();
         vm.startPrank(owner);
         restriction.setRequiredRoleForCall(address(chainAdmin), chainAdminSelectors[0], role);
@@ -160,6 +174,7 @@ contract AccessRestrictionTest is Test {
     }
 
     function test_validateCallFallback(bytes32 role) public {
+        vm.assume(role != DEFAULT_ADMIN_ROLE);
         vm.startPrank(owner);
         restriction.setRequiredRoleForFallback(address(chainAdmin), role);
         restriction.grantRole(role, randomCaller);

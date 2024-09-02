@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {AccessToFallbackDenied, AccessToFunctionDenied} from "../common/L1ContractErrors.sol";
 import {IAccessControlRestriction} from "./IAccessControlRestriction.sol";
-import {AccessControlDefaultAdminRules} from "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
+import {AccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access/AccessControlDefaultAdminRules.sol";
 import {IRestriction} from "./IRestriction.sol";
 import {Call} from "./Common.sol";
 

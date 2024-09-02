@@ -9,7 +9,7 @@ import {IChainAdmin} from "./IChainAdmin.sol";
 import {IRestriction} from "./IRestriction.sol";
 import {Call} from "./Common.sol";
 
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableSet} from "@openzeppelin/contracts-v4/utils/structs/EnumerableSet.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
 /// @author Matter Labs

@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
-import "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
+import "openzeppelin-contracts/contracts/utils/Strings.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
@@ -117,6 +117,8 @@ contract ChainAdminTest is Test {
     }
 
     function test_validateCallAccessToFunctionDenied(bytes32 role) public {
+        vm.assume(role != DEFAULT_ADMIN_ROLE);
+
         Call[] memory calls = new Call[](2);
         calls[0] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getAdmin, ())});
         calls[1] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getVerifier, ())});
@@ -137,6 +139,8 @@ contract ChainAdminTest is Test {
     }
 
     function test_validateCallAccessToFallbackDenied(bytes32 role) public {
+        vm.assume(role != DEFAULT_ADMIN_ROLE);
+
         Call[] memory calls = new Call[](2);
         calls[0] = Call({target: address(gettersFacet), value: 0, data: ""});
         calls[1] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getVerifier, ())});

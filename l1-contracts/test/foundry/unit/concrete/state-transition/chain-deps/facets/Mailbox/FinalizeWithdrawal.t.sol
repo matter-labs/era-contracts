@@ -8,6 +8,7 @@ import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
+import {OnlyEraSupported} from "contracts/common/L1ContractErrors.sol";
 
 contract MailboxFinalizeWithdrawal is MailboxTest {
     bytes32[] proof;
@@ -28,7 +29,7 @@ contract MailboxFinalizeWithdrawal is MailboxTest {
     function test_RevertWhen_notEra() public {
         utilsFacet.util_setChainId(eraChainId + 1);
 
-        vm.expectRevert("Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
+        vm.expectRevert(OnlyEraSupported.selector);
         mailboxFacet.finalizeEthWithdrawal({
             _l2BatchNumber: 0,
             _l2MessageIndex: 0,

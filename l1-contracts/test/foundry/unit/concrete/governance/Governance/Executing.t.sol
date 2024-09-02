@@ -7,6 +7,7 @@ import {Utils} from "../../Utils/Utils.sol";
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
 
 import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {OperationMustBeReady, OperationMustBePending, OperationExists, PreviousOperationNotExecuted, InvalidDelay} from "contracts/common/L1ContractErrors.sol";
 
 contract ExecutingTest is GovernanceTest {
     using stdStorage for StdStorage;
@@ -51,7 +52,7 @@ contract ExecutingTest is GovernanceTest {
         vm.startPrank(owner);
         IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(address(eventOnFallback), 0, "");
         governance.scheduleTransparent(op, 10000);
-        vm.expectRevert("Operation must be ready before execution");
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(op);
     }
 
@@ -65,7 +66,7 @@ contract ExecutingTest is GovernanceTest {
         governance.scheduleTransparent(validOp, 0);
 
         IGovernance.Operation memory invalidOp = operationWithOneCallZeroSaltAndPredecessor(address(0), 0, "");
-        vm.expectRevert("Operation must be ready before execution");
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(invalidOp);
     }
 
@@ -83,7 +84,7 @@ contract ExecutingTest is GovernanceTest {
             1,
             ""
         );
-        vm.expectRevert("Operation must be ready before execution");
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(invalidOp);
     }
 
@@ -101,7 +102,7 @@ contract ExecutingTest is GovernanceTest {
             0,
             "00"
         );
-        vm.expectRevert("Operation must be ready before execution");
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(invalidOp);
     }
 
@@ -133,7 +134,7 @@ contract ExecutingTest is GovernanceTest {
         invalidOp.predecessor = governance.hashOperation(executedOp);
 
         // Failed to execute operation that wasn't scheduled
-        vm.expectRevert("Operation must be ready before execution");
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(invalidOp);
     }
 
@@ -152,7 +153,7 @@ contract ExecutingTest is GovernanceTest {
             ""
         );
         invalidOp.salt = Utils.randomBytes32("wrongSalt");
-        vm.expectRevert("Operation must be ready before execution");
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(invalidOp);
     }
 
@@ -166,7 +167,7 @@ contract ExecutingTest is GovernanceTest {
         );
         invalidOp.predecessor = Utils.randomBytes32("randomPredecessor");
         governance.scheduleTransparent(invalidOp, 0);
-        vm.expectRevert("Predecessor operation not completed");
+        vm.expectRevert(PreviousOperationNotExecuted.selector);
         governance.execute(invalidOp);
     }
 
@@ -181,7 +182,7 @@ contract ExecutingTest is GovernanceTest {
         governance.scheduleTransparent(op, 0);
         executeOpAndCheck(op);
 
-        vm.expectRevert("Operation must be ready before execution");
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(op);
     }
 
@@ -193,7 +194,7 @@ contract ExecutingTest is GovernanceTest {
             0,
             "1122"
         );
-        vm.expectRevert("Operation must be ready before execution");
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(op);
     }
 
@@ -205,7 +206,7 @@ contract ExecutingTest is GovernanceTest {
             0,
             "1122"
         );
-        vm.expectRevert("Operation must be pending before execution");
+        vm.expectRevert(OperationMustBePending.selector);
         governance.executeInstant(op);
     }
 
@@ -219,7 +220,7 @@ contract ExecutingTest is GovernanceTest {
         );
         governance.scheduleTransparent(op, 0);
         governance.cancel(governance.hashOperation(op));
-        vm.expectRevert("Operation must be ready before execution");
+        vm.expectRevert(OperationMustBeReady.selector);
         governance.execute(op);
     }
 
@@ -247,7 +248,7 @@ contract ExecutingTest is GovernanceTest {
         );
         governance.scheduleTransparent(op, 0);
         executeOpAndCheck(op);
-        vm.expectRevert("Operation with this proposal id already exists");
+        vm.expectRevert(OperationExists.selector);
         governance.scheduleTransparent(op, 0);
     }
 
@@ -270,7 +271,7 @@ contract ExecutingTest is GovernanceTest {
     function test_RevertWhen_CancelNonExistingOperation() public {
         vm.startPrank(owner);
 
-        vm.expectRevert("Operation must be pending");
+        vm.expectRevert(OperationMustBePending.selector);
         governance.cancel(bytes32(0));
     }
 
@@ -279,7 +280,7 @@ contract ExecutingTest is GovernanceTest {
         stdstore.target(address(governance)).sig(governance.minDelay.selector).checked_write(1000);
         IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(address(revertFallback), 0, "");
 
-        vm.expectRevert("Proposed delay is less than minimum delay");
+        vm.expectRevert(InvalidDelay.selector);
         governance.scheduleTransparent(op, 0);
     }
 }
