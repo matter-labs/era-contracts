@@ -308,6 +308,8 @@ error ZeroChainId();
 
 error AssetIdNotSupported(bytes32 assetId);
 
+error AssetHandlerNotRegistered(bytes32 assetId);
+
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,

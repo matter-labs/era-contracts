@@ -23,7 +23,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {HyperchainLimitReached, Unauthorized, STMAlreadyRegistered, STMNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {AssetHandlerNotRegistered, HyperchainLimitReached, Unauthorized, STMAlreadyRegistered, STMNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -80,7 +80,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     mapping(uint256 chainId => bytes32) public baseTokenAssetId;
 
     /// @notice The deployment tracker for the state transition managers.
-    ISTMDeploymentTracker public stmDeployer;
+    /// @dev The L1 address of the stm deployer is provided.
+    ISTMDeploymentTracker public l1StmDeployer;
 
     /// @dev asset info used to identify chains in the Shared Bridge
     mapping(bytes32 stmAssetId => address stmAddress) public stmAssetIdToAddress;
@@ -140,7 +141,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
+        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
         whitelistedSettlementLayers[_l1ChainId] = true;
     }
@@ -189,15 +190,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice To set the addresses of some of the ecosystem contracts, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, other contracts, and then we call this.
     /// @param _sharedBridge the shared bridge address
-    /// @param _stmDeployer the stm deployment tracker address
+    /// @param _l1StmDeployer the stm deployment tracker address. Note, that the address of the L1 STM deployer is provided.
     /// @param _messageRoot the message root address
     function setAddresses(
         address _sharedBridge,
-        ISTMDeploymentTracker _stmDeployer,
+        ISTMDeploymentTracker _l1StmDeployer,
         IMessageRoot _messageRoot
     ) external onlyOwner {
         sharedBridge = IL1AssetRouter(_sharedBridge);
-        stmDeployer = _stmDeployer;
+        l1StmDeployer = _l1StmDeployer;
         messageRoot = _messageRoot;
     }
 
@@ -280,19 +281,19 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _assetAddress the asset handler address
     function setAssetHandlerAddress(bytes32 _additionalData, address _assetAddress) external {
         // It is a simplified version of the logic used by the AssetRouter to manage asset handlers.
-        // STM's assetId is `keccak256(abi.encode(L1_CHAIN_ID, stmDeployer, stmAddress))`.
-        // And the STMDeployer is considered the deployment tracker for the STM asset.
+        // STM's assetId is `keccak256(abi.encode(L1_CHAIN_ID, l1StmDeployer, stmAddress))`.
+        // And the l1StmDeployer is considered the deployment tracker for the STM asset.
         //
-        // The STMDeployer will call this method to set the asset handler address for the assetId.
+        // The l1StmDeployer will call this method to set the asset handler address for the assetId.
         // If the chain is not the same as L1, we assume that it is done via L1->L2 communication and so we unalias the sender.
         //
         // For simpler handling we allow anyone to call this method. It is okay, since during bridging operations
-        // it is double checked that `assetId` is indeed derived from the `stmDeployer`.
+        // it is double checked that `assetId` is indeed derived from the `l1StmDeployer`.
         // TODO(EVM-703): This logic should be revised once interchain communication is implemented.
 
         address sender = L1_CHAIN_ID == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);
-        // This method can be accessed by STMDeployer only
-        require(sender == address(stmDeployer), "BH: not stm deployer");
+        // This method can be accessed by l1StmDeployer only
+        require(sender == address(l1StmDeployer), "BH: not stm deployer");
         require(stateTransitionManagerIsRegistered[_assetAddress], "STM not registered");
 
         bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
@@ -341,9 +342,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             revert STMNotRegistered();
         }
 
-        // if (!tokenIsRegistered[_baseToken]) {
-        //     revert TokenNotRegistered(_baseToken);
-        // }
         require(assetIdIsRegistered[_baseTokenAssetId], "BH: asset id not registered");
 
         if (address(sharedBridge) == address(0)) {
@@ -389,10 +387,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice baseToken function, which takes chainId as input, reads assetHandler from AR, and tokenAddress from AH
     function baseToken(uint256 _chainId) public view returns (address) {
         bytes32 baseTokenAssetId = baseTokenAssetId[_chainId];
-        IL1BaseTokenAssetHandler assetHandlerAddress = IL1BaseTokenAssetHandler(
-            sharedBridge.assetHandlerAddress(baseTokenAssetId)
-        );
-        return assetHandlerAddress.tokenAddress(baseTokenAssetId);
+        address assetHandlerAddress = sharedBridge.assetHandlerAddress(baseTokenAssetId);
+
+        // It is possible that the asset handler is not deployed for a chain on the current layer.
+        // In this case we throw an error.
+        if (assetHandlerAddress == address(0)) {
+            revert AssetHandlerNotRegistered(baseTokenAssetId);
+        }
+        return IL1BaseTokenAssetHandler(assetHandlerAddress).tokenAddress(baseTokenAssetId);
     }
 
     /// @notice Returns all the registered hyperchain addresses
@@ -425,7 +427,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     function stmAssetId(address _stmAddress) public view override returns (bytes32) {
-        return keccak256(abi.encode(L1_CHAIN_ID, address(stmDeployer), bytes32(uint256(uint160(_stmAddress)))));
+        return keccak256(abi.encode(L1_CHAIN_ID, address(l1StmDeployer), bytes32(uint256(uint160(_stmAddress)))));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -702,6 +704,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         );
         BridgehubMintSTMAssetData memory bridgeMintStruct = BridgehubMintSTMAssetData({
             chainId: bridgeData.chainId,
+            baseTokenAssetId: baseTokenAssetId[bridgeData.chainId],
             stmData: stmMintData,
             chainData: chainMintData
         });
@@ -723,6 +726,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         settlementLayer[bridgeData.chainId] = block.chainid;
         stateTransitionManager[bridgeData.chainId] = stm;
+        baseTokenAssetId[bridgeData.chainId] = bridgeData.baseTokenAssetId;
+        // To keep `assetIdIsRegistered` consistent, we'll also automatically register the base token.
+        // It is assumed that if the bridging happened, the token was approved on L1 already.
+        assetIdIsRegistered[bridgeData.baseTokenAssetId] = true;
 
         address hyperchain = getHyperchain(bridgeData.chainId);
         bool contractAlreadyDeployed = hyperchain != address(0);

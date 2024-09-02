@@ -134,8 +134,11 @@ struct ZkSyncHyperchainStorage {
     address pendingAdmin;
     /// @dev Fee params used to derive gasPrice for the L1->L2 transactions. For L2 transactions,
     /// the bootloader gives enough freedom to the operator.
+    /// @dev The value is only for the L1 deployment of the ZK Chain, since payment for all the priority transactions is
+    /// charged at that level.
     FeeParams feeParams;
     /// @dev Address of the blob versioned hash getter smart contract used for EIP-4844 versioned hashes.
+    /// @dev Used only for testing.
     address blobVersionedHashRetriever;
     /// @dev The chainId of the chain
     uint256 chainId;

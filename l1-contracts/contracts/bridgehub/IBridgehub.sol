@@ -42,6 +42,7 @@ struct L2TransactionRequestTwoBridgesInner {
 
 struct BridgehubMintSTMAssetData {
     uint256 chainId;
+    bytes32 baseTokenAssetId;
     bytes stmData;
     bytes chainData;
 }
@@ -178,7 +179,7 @@ interface IBridgehub is IL1AssetHandler {
 
     function setAddresses(
         address _sharedBridge,
-        ISTMDeploymentTracker _stmDeployer,
+        ISTMDeploymentTracker _l1StmDeployer,
         IMessageRoot _messageRoot
     ) external;
 
@@ -216,7 +217,7 @@ interface IBridgehub is IL1AssetHandler {
 
     function stmAssetId(address _stmAddress) external view returns (bytes32);
 
-    function stmDeployer() external view returns (ISTMDeploymentTracker);
+    function l1StmDeployer() external view returns (ISTMDeploymentTracker);
 
     function stmAssetIdToAddress(bytes32 _assetInfo) external view returns (address);
 

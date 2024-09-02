@@ -9,6 +9,9 @@ import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
 /// @title The interface of the Getters Contract that implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @dev Most of the methods simply return the values that correspond to the current diamond proxy and possibly
+/// not to the ZK Chain as a whole. For example, if the chain is migrated to another settlement layer, the values returned
+/// by this facet will correspond to the values stored on this chain and possilbly not the canonical state of the chain.
 interface IGetters is IZkSyncHyperchainBase {
     /*//////////////////////////////////////////////////////////////
                             CUSTOM GETTERS
