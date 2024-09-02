@@ -28,6 +28,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDG
 import {IL1AssetRouter} from "../../../bridge/interfaces/IL1AssetRouter.sol";
 
 import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow} from "../../../common/L1ContractErrors.sol";
+import {UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBeZero, MailboxWrongStateTransitionManager, NotSettlementLayers, NotHyperchain} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -150,10 +151,9 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         if (metadataAsUint256 == 0) {
             // It is the new version
             bytes1 metadataVersion = bytes1(proofMetadata);
-            require(
-                uint256(uint8(metadataVersion)) == SUPPORTED_PROOF_METADATA_VERSION,
-                "Mailbox: unsupported proof metadata version"
-            );
+            if (uint256(uint8(metadataVersion)) != SUPPORTED_PROOF_METADATA_VERSION) {
+                revert UnsupportedProofMetadataVersion();
+            }
 
             proofStartIndex = 1;
             logLeafProofLen = uint256(uint8(proofMetadata[1]));
@@ -230,11 +230,15 @@ contract MailboxFacet is ZKChainBase, IMailbox {
                 }
 
                 bytes32 correctBatchRoot = s.l2LogsRootHashes[_batchNumber];
-                require(correctBatchRoot != bytes32(0), "local root is 0");
+                if (correctBatchRoot == bytes32(0)) {
+                    revert LocalRootIsZero();
+                }
                 return correctBatchRoot == batchSettlementRoot;
             }
 
-            require(s.l2LogsRootHashes[_batchNumber] == bytes32(0), "local root must be 0");
+            if (s.l2LogsRootHashes[_batchNumber] != bytes32(0)) {
+                revert LocalRootMustBeZero();
+            }
 
             // Now, we'll have to check that the Gateway included the message.
             bytes32 batchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, _batchNumber);
@@ -271,7 +275,9 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             // to a chain's message root only if the chain has indeed executed its batch on top of it.
             //
             // We trust all chains whitelisted by the Bridgehub governance.
-            require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(settlementLayerChainId), "Mailbox: wrong CTM");
+            if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(settlementLayerChainId)) {
+                revert MailboxWrongStateTransitionManager();
+            }
 
             settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(settlementLayerChainId);
         }
@@ -369,8 +375,12 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external override onlyL1 returns (bytes32 canonicalTxHash) {
-        require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId), "Mailbox SL: not SL");
-        require(IChainTypeManager(s.chainTypeManager).getZKChain(_chainId) == msg.sender, "Mailbox SL: not zkChain");
+        if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
+            revert NotSettlementLayers();
+        }
+        if (IChainTypeManager(s.chainTypeManager).getZKChain(_chainId) != msg.sender) {
+            revert NotHyperchain();
+        }
 
         BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest({
             _chainId: _chainId,

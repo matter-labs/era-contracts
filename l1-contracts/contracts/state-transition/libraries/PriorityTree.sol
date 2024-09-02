@@ -7,6 +7,7 @@ pragma solidity ^0.8.21;
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 import {Merkle} from "../../common/libraries/Merkle.sol";
 import {PriorityTreeCommitment} from "../../common/Config.sol";
+import {RootMismatch, InvalidCommitment} from "../L1StateTransitionErrors.sol";
 
 struct PriorityOpsBatchInfo {
     bytes32[] leftPath;
@@ -75,7 +76,9 @@ library PriorityTree {
                 _tree.unprocessedIndex,
                 _priorityOpsData.itemHashes
             );
-            require(_tree.historicalRoots[expectedRoot], "PT: root mismatch");
+            if (!_tree.historicalRoots[expectedRoot]) {
+                revert RootMismatch();
+            }
             _tree.unprocessedIndex += _priorityOpsData.itemHashes.length;
         }
     }
@@ -83,7 +86,9 @@ library PriorityTree {
     /// @notice Initialize a chain from a commitment.
     function initFromCommitment(Tree storage _tree, PriorityTreeCommitment memory _commitment) internal {
         uint256 height = _commitment.sides.length; // Height, including the root node.
-        require(height > 0, "PT: invalid commitment");
+        if (height <= 0) {
+            revert InvalidCommitment();
+        }
         _tree.startIndex = _commitment.startIndex;
         _tree.unprocessedIndex = _commitment.unprocessedIndex;
         _tree.tree._nextLeafIndex = _commitment.nextLeafIndex;
