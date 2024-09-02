@@ -15,6 +15,7 @@ import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {EthOnlyAcceptedFromSharedBridge, ZeroAmountToTransfer, WrongAmountTransferred, EmptyToken, ClaimFailedDepositFailed} from "./L1BridgeContractErrors.sol";
 
 import {BridgeHelper} from "./BridgeHelper.sol";
 
@@ -59,7 +60,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
 
     /// @dev Accepts ether only from the Shared Bridge.
     receive() external payable {
-        require(address(L1_SHARED_BRIDGE) == msg.sender, "NTV: ETH only accepted from Shared Bridge");
+        if (address(L1_SHARED_BRIDGE) != msg.sender) {
+            revert EthOnlyAcceptedFromSharedBridge();
+        }
     }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy
@@ -87,10 +90,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
         } else {
             uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
             uint256 sharedBridgeChainBalance = IERC20(_token).balanceOf(address(L1_SHARED_BRIDGE));
-            require(sharedBridgeChainBalance > 0, "NTV: 0 amount to transfer");
+            if (sharedBridgeChainBalance <= 0) {
+                revert ZeroAmountToTransfer();
+            }
             L1_SHARED_BRIDGE.transferTokenToNTV(_token);
             uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
-            require(balanceAfter - balanceBefore >= sharedBridgeChainBalance, "NTV: wrong amount transferred");
+            if (balanceAfter - balanceBefore < sharedBridgeChainBalance) {
+                revert WrongAmountTransferred();
+            }
         }
     }
 
@@ -109,10 +116,12 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
     /// @notice Allows the bridge to register a token address for the vault.
     /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
     function registerToken(address _l1Token) external {
-        if (_l1Token == L1_WETH_TOKEN) {
+        if (_l1Token != L1_WETH_TOKEN) {
             revert TokenNotSupported(L1_WETH_TOKEN);
         }
-        require(_l1Token == ETH_TOKEN_ADDRESS || _l1Token.code.length > 0, "NTV: empty token");
+        if (_l1Token != ETH_TOKEN_ADDRESS || _l1Token.code.length < 0) {
+            revert EmptyToken();
+        }
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
         L1_SHARED_BRIDGE.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_l1Token))), address(this));
         tokenAddress[assetId] = _l1Token;
@@ -238,7 +247,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
             assembly {
                 callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "NTV: claimFailedDeposit failed, no funds or cannot transfer to receiver");
+            if (!callSuccess) {
+                revert ClaimFailedDepositFailed();
+            }
         } else {
             IERC20(l1Token).safeTransfer(_depositSender, _amount);
             // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.

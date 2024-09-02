@@ -26,6 +26,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
+import {NotNTV, EthTransferFailed, NativeTokenVaultAlreadySet, NativeTokenVault0, LegacycFD, LegacyEthWithdrawal, LegacyTokenWithdrawal, WrongMsgLength, NotNTVorADT, AssetHandlerNotSet, NewEncodingFormatNotYetSupportedForNTV, AssetHandlerDoesNotExistForAssetId} from "./L1BridgeContractErrors.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
@@ -205,7 +206,9 @@ contract L1AssetRouter is
     /// @param _token The address of the token to be transferred to NTV.
     function transferTokenToNTV(address _token) external {
         address ntvAddress = address(nativeTokenVault);
-        require(msg.sender == ntvAddress, "L1AR: not NTV");
+        if (msg.sender != ntvAddress) {
+            revert NotNTV();
+        }
         if (ETH_TOKEN_ADDRESS == _token) {
             uint256 amount = address(this).balance;
             bool callSuccess;
@@ -213,7 +216,9 @@ contract L1AssetRouter is
             assembly {
                 callSuccess := call(gas(), ntvAddress, amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "L1AR: eth transfer failed");
+            if (!callSuccess) {
+                revert EthTransferFailed();
+            }
         } else {
             IERC20(_token).safeTransfer(ntvAddress, IERC20(_token).balanceOf(address(this)));
         }
@@ -224,7 +229,9 @@ contract L1AssetRouter is
     /// @param _chainId The ID of the ZK chain.
     /// @param _token The address of the token which was previously deposit to shared bridge.
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external {
-        require(msg.sender == address(nativeTokenVault), "L1AR: not NTV");
+        if (msg.sender == address(nativeTokenVault)) {
+            revert NotNTV();
+        }
         chainBalance[_chainId][_token] = 0;
     }
 
@@ -253,8 +260,12 @@ contract L1AssetRouter is
     /// @dev Should be called only once by the owner.
     /// @param _nativeTokenVault The address of the native token vault.
     function setNativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external onlyOwner {
-        require(address(nativeTokenVault) == address(0), "L1AR: native token vault already set");
-        require(address(_nativeTokenVault) != address(0), "L1AR: native token vault 0");
+        if (address(nativeTokenVault) != address(0)) {
+            revert NativeTokenVaultAlreadySet();
+        }
+        if (address(_nativeTokenVault) == address(0)) {
+            revert NativeTokenVault0();
+        }
         nativeTokenVault = _nativeTokenVault;
     }
 
@@ -282,7 +293,9 @@ contract L1AssetRouter is
         bool senderIsNTV = msg.sender == address(nativeTokenVault);
         address sender = senderIsNTV ? L2_NATIVE_TOKEN_VAULT_ADDR : msg.sender;
         bytes32 assetId = DataEncoding.encodeAssetId(block.chainid, _assetRegistrationData, sender);
-        require(senderIsNTV || msg.sender == assetDeploymentTracker[assetId], "ShB: not NTV or ADT");
+        if (!senderIsNTV || msg.sender != assetDeploymentTracker[assetId]) {
+            revert NotNTVorADT();
+        }
         assetHandlerAddress[assetId] = _assetHandlerAddress;
         if (senderIsNTV) {
             assetDeploymentTracker[assetId] = msg.sender;
@@ -335,7 +348,9 @@ contract L1AssetRouter is
         uint256 _amount
     ) external payable onlyBridgehubOrEra(_chainId) whenNotPaused {
         address l1AssetHandler = assetHandlerAddress[_assetId];
-        require(l1AssetHandler != address(0), "ShB: asset handler not set");
+        if (l1AssetHandler == address(0)) {
+            revert AssetHandlerNotSet();
+        }
 
         _transferAllowanceToNTV(_assetId, _amount, _prevMsgSender);
         // slither-disable-next-line unused-return
@@ -387,10 +402,9 @@ contract L1AssetRouter is
                 );
         } else if (encodingVersion == NEW_ENCODING_VERSION) {
             (assetId, transferData) = abi.decode(_data[1:], (bytes32, bytes));
-            require(
-                assetHandlerAddress[assetId] != address(nativeTokenVault),
-                "ShB: new encoding format not yet supported for NTV"
-            );
+            if (assetHandlerAddress[assetId] == address(nativeTokenVault)) {
+                revert NewEncodingFormatNotYetSupportedForNTV();
+            }
         } else {
             (assetId, transferData) = _handleLegacyData(_data, _prevMsgSender);
         }
@@ -519,7 +533,9 @@ contract L1AssetRouter is
             }
         }
 
-        require(!_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch), "L1AR: legacy cFD");
+        if (_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch)) {
+            revert LegacycFD();
+        }
         {
             bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
             // Determine if the given dataHash matches the calculated legacy transaction hash.
@@ -568,7 +584,9 @@ contract L1AssetRouter is
         bool _passValue
     ) internal returns (bytes memory bridgeMintCalldata) {
         address l1AssetHandler = assetHandlerAddress[_assetId];
-        require(l1AssetHandler != address(0), "ShB: asset handler does not exist for assetId");
+        if (l1AssetHandler == address(0)) {
+            revert AssetHandlerDoesNotExistForAssetId();
+        }
 
         uint256 msgValue = _passValue ? msg.value : 0;
         bridgeMintCalldata = IL1AssetHandler(l1AssetHandler).bridgeBurn{value: msgValue}({
@@ -610,8 +628,12 @@ contract L1AssetRouter is
         isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
         // Handling special case for withdrawal from ZKsync Era initiated before Shared Bridge.
-        require(!_isEraLegacyEthWithdrawal(_chainId, _l2BatchNumber), "L1AR: legacy eth withdrawal");
-        require(!_isEraLegacyTokenWithdrawal(_chainId, _l2BatchNumber), "L1AR: legacy token withdrawal");
+        if (_isEraLegacyEthWithdrawal(_chainId, _l2BatchNumber)) {
+            revert LegacyEthWithdrawal();
+        }
+        if (_isEraLegacyTokenWithdrawal(_chainId, _l2BatchNumber)) {
+            revert LegacyTokenWithdrawal();
+        }
 
         bytes memory transferData;
         {
@@ -893,7 +915,9 @@ contract L1AssetRouter is
             transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
             // The data is expected to be at least 36 bytes long to contain assetId.
-            require(_l2ToL1message.length >= 36, "L1AR: wrong msg len"); // wrong message length
+            if (_l2ToL1message.length < 36) {
+                revert WrongMsgLength();
+            }
             (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
             transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         } else {
