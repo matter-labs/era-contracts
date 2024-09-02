@@ -149,15 +149,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked
-    /// @dev A compatibility method to support legacy functionality for the SDK.
-    /// @param _l1Receiver The account address that should receive funds on L1
-    /// @param _l2Token The L2 token address which is withdrawn
-    /// @param _amount The total amount of tokens to be withdrawn
-    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
-        if (_amount == 0) {
-            revert AmountMustBeGreaterThanZero();
-        }
-        _withdrawLegacy(_l1Receiver, _l2Token, _amount, msg.sender);
+    /// @param _assetId The asset id of the withdrawn asset
+    /// @param _assetData The data that is passed to the asset handler contract
+    function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
+        _withdrawSender(_assetId, _assetData, msg.sender);
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -218,10 +213,15 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked
-    /// @param _assetId The asset id of the withdrawn asset
-    /// @param _assetData The data that is passed to the asset handler contract
-    function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
-        _withdrawSender(_assetId, _assetData, msg.sender);
+    /// @dev A compatibility method to support legacy functionality for the SDK.
+    /// @param _l1Receiver The account address that should receive funds on L1
+    /// @param _l2Token The L2 token address which is withdrawn
+    /// @param _amount The total amount of tokens to be withdrawn
+    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external {
+        if (_amount == 0) {
+            revert AmountMustBeGreaterThanZero();
+        }
+        _withdrawLegacy(_l1Receiver, _l2Token, _amount, msg.sender);
     }
 
     /// @notice Legacy withdraw.

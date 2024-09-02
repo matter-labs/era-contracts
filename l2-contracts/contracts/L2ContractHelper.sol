@@ -3,8 +3,6 @@
 pragma solidity ^0.8.20;
 
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
-// import {IL2AssetRouter} from "./bridge/interfaces/IL2AssetRouter.sol";
-// import {IL2NativeTokenVault} from "./bridge/interfaces/IL2NativeTokenVault.sol";
 import {MalformedBytecode, BytecodeError} from "./errors/L2ContractErrors.sol";
 
 /**
@@ -115,11 +113,6 @@ address constant DEPLOYER_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x
 
 address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
 
-// IL2AssetRouter constant L2_ASSET_ROUTER = IL2AssetRouter(address(USER_CONTRACTS_OFFSET + 0x03));
-
-/// @dev The contract responsible for handling tokens native to a single chain.
-// IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(address(USER_CONTRACTS_OFFSET + 0x04));
-
 uint256 constant L1_CHAIN_ID = 1;
 
 IL2Messenger constant L2_MESSENGER = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
@@ -131,10 +124,6 @@ ICompressor constant COMPRESSOR_CONTRACT = ICompressor(address(SYSTEM_CONTRACTS_
 IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher(
     address(SYSTEM_CONTRACTS_OFFSET + 0x11)
 );
-
-address constant ETH_TOKEN_ADDRESS = address(1);
-address constant NATIVE_TOKEN_VAULT_VIRTUAL_ADDRESS = address(2);
-bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
 
 /**
  * @author Matter Labs
