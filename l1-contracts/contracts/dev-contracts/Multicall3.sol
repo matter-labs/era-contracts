@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import {Multicall3CallFailed, Multicall3ValueMismatch} from "./L1DevContractsErrors.sol";
+
 /// @title Multicall3
 /// @notice Aggregate results from multiple function calls
 /// @dev Multicall & Multicall2 backwards-compatible
@@ -50,7 +52,9 @@ contract Multicall3 {
             bool success;
             call = calls[i];
             (success, returnData[i]) = call.target.call(call.callData);
-            require(success, "Multicall3: call failed");
+            if (!success) {
+                revert Multicall3CallFailed();
+            }
             unchecked {
                 ++i;
             }
@@ -73,7 +77,11 @@ contract Multicall3 {
             Result memory result = returnData[i];
             call = calls[i];
             (result.success, result.returnData) = call.target.call(call.callData);
-            if (requireSuccess) require(result.success, "Multicall3: call failed");
+            if (requireSuccess) {
+                if (!result.success) {
+                    revert Multicall3CallFailed();
+                }
+            }
             unchecked {
                 ++i;
             }
@@ -178,7 +186,9 @@ contract Multicall3 {
             }
         }
         // Finally, make sure the msg.value = SUM(call[0...i].value)
-        require(msg.value == valAccumulator, "Multicall3: value mismatch");
+        if (msg.value != valAccumulator) {
+            revert Multicall3ValueMismatch();
+        }
     }
 
     /// @notice Returns the block hash for the given block number
