@@ -265,7 +265,7 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         bridgehub.bridgeMint(gatewayChainId, assetId, bridgehubMintData);
         vm.stopBroadcast();
         vm.chainId(currentChainId);
-    
+
         assertEq(bridgehub.baseTokenAssetId(mintChainId), baseTokenAssetId);
         IZkSyncHyperchain mintedHyperchain = IZkSyncHyperchain(bridgehub.getHyperchain(mintChainId));
         assertEq(mintedHyperchain.getBaseTokenAssetId(), baseTokenAssetId);
