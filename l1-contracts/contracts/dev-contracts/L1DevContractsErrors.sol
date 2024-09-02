@@ -31,3 +31,15 @@ error Multicall3ValueMismatch();
 error Weth9WithdrawMoreThenBalance();
 
 error Weth9WithdrawMoreThenAllowance();
+
+DummyExecutorShouldRevertOnCommitBatches();
+DummyExecutorInvalidLastCommittedBatchNumber();
+DummyExecutorInvalidBatchNumber();
+DummyExecutorShouldRevertOnProveBatches();
+DummyExecutorInvalidPreviousBatchNumber();
+DummyExecutorCanProveOnlyOneBatch();
+DummyExecutorCannotProveBatchOutOfOrder();
+DummyExecutorProveMoreBatchesThanWereCommitted();
+DummyExecutorShouldRevertOnExecuteBatches();
+DummyExecutorCannotExecuteBatchesMoreThanCommittedAndProvenCurrently();
+DummyExecutorTheLastCommittedBatchIsLessThanNewLastBatch();
