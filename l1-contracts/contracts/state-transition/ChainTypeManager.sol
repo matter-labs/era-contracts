@@ -19,6 +19,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
 import {Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero} from "../common/L1ContractErrors.sol";
+import {InitialForceDeploymentMismatch, BadChainId, SyncLayerNotRegistered, AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
@@ -416,7 +417,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         {
             // check input
             bytes32 forceDeploymentHash = keccak256(abi.encode(_forceDeploymentData));
-            require(forceDeploymentHash == initialForceDeploymentHash, "CTM: initial force deployment mismatch");
+            if (forceDeploymentHash != initialForceDeploymentHash) {
+                revert InitialForceDeploymentMismatch();
+            }
         }
         // genesis upgrade, deploys some contracts, sets chainId
         IAdmin(zkChainAddress).genesisUpgrade(
@@ -435,10 +438,14 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @param _newSettlementLayerChainId the chainId of the chain
     /// @param _isWhitelisted whether the chain is whitelisted
     function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external onlyOwner {
-        require(_newSettlementLayerChainId != 0, "Bad chain id");
+        if (_newSettlementLayerChainId == 0) {
+            revert BadChainId();
+        }
 
-        // Currently, we require that the sync layer is deployed by the same CTM.
-        require(getZKChain(_newSettlementLayerChainId) != address(0), "CTM: sync layer not registered");
+        // Currently, we require that the sync layer is deployed by the same STM.
+        if (getZKChain(_newSettlementLayerChainId) == address(0)) {
+            revert SyncLayerNotRegistered();
+        }
 
         IBridgehub(BRIDGE_HUB).registerSettlementLayer(_newSettlementLayerChainId, _isWhitelisted);
     }
@@ -451,14 +458,18 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         bytes calldata _data
     ) external view override onlyBridgehub returns (bytes memory ctmForwardedBridgeMintData) {
         // Note that the `_diamondCut` here is not for the current chain, for the chain where the migration
-        // happens. The correctness of it will be checked on the CTM on the new settlement layer.
+        // happens. The correctness of it will be checked on the STM on the new settlement layer.
         (address _newSettlementLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
-        require(_newSettlementLayerAdmin != address(0), "CTM: admin zero");
+        if (_newSettlementLayerAdmin == address(0)) {
+            revert AdminZero();
+        }
 
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
         address zkChain = getZKChain(_chainId);
-        require(IZKChain(zkChain).getProtocolVersion() == protocolVersion, "CTM: outdated pv");
+        if (IZkSyncHyperchain(hyperchain).getProtocolVersion() != protocolVersion) {
+            revert OutdatedProtocolVersion();
+        }
 
         return
             abi.encode(
@@ -483,7 +494,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
-        require(_protocolVersion == protocolVersion, "CTM, outdated pv");
+        if (_protocolVersion != protocolVersion) {
+            revert OutdatedProtocolVersion();
+        }
         chainAddress = _deployNewChain({
             _chainId: _chainId,
             _baseTokenAssetId: _baseTokenAssetId,
