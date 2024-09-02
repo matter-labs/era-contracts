@@ -9,6 +9,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {PriorityQueue} from "../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../state-transition/libraries/PriorityTree.sol";
+import {GatewayUpgradeUpgradeExternal, GatewayUpgradeUpgradeFailed} from "./ZkSyncUpgradeErrors.sol";
 
 import {IGatewayUpgrade} from "./IGatewayUpgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
@@ -77,7 +78,9 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
             abi.encodeWithSelector(IGatewayUpgrade.upgradeExternal.selector, proposedUpgrade)
         );
         // solhint-disable-next-line gas-custom-errors
-        require(success, "GatewayUpgrade: upgrade failed");
+        if (!success) {
+            revert GatewayUpgradeUpgradeFailed();
+        }
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
