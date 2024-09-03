@@ -23,7 +23,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {AssetHandlerNotRegistered, ZKChainLimitReached, Unauthorized, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {NotChainStm, NotRelayedSenser, NotAssetRouter, TokenNotSet, ChainNotLegacy, ChainAlreadyMigrated, ChainNotLegacy2, AssetIdAlreadyRegistered, NotStmDeployer, StmNotRegistered, ChainIdMustNotMatchCurrentChainId, AssetIdNotRegistered, ChainIdNotRegistered, SecondBridgeAddressTooLow, NotInSyncLayerMode, SLNotWhitelisted, AssetInfo1, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AssetInfo2, AlreadyCurrentSL} from "./L1BridgehubErrors.sol";
+import {NotChainStm, NotL1, NotRelayedSenser, NotAssetRouter, TokenNotSet, ChainNotLegacy, ChainAlreadyMigrated, ChainNotLegacy2, AssetIdAlreadyRegistered, NotStmDeployer, StmNotRegistered, ChainIdMustNotMatchCurrentChainId, AssetIdNotRegistered, ChainIdNotRegistered, SecondBridgeAddressTooLow, NotInSyncLayerMode, SLNotWhitelisted, AssetInfo1, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AssetInfo2, AlreadyCurrentSL, OnlyOwner} from "./L1BridgehubErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -107,24 +107,32 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
-    modifier onlyChainCTM(uint256 _chainId) {
-        require(msg.sender == chainTypeManager[_chainId], "BH: not chain CTM");
+    modifier onlyChainSTM(uint256 _chainId) {
+        if (msg.sender != chainTypeManager[_chainId]) {
+            revert NotChainStm();
+        }
         _;
     }
 
     modifier onlyL1() {
-        require(L1_CHAIN_ID == block.chainid, "BH: not L1");
+        if (L1_CHAIN_ID != block.chainid) {
+            revert NotL1();
+        }
         _;
     }
 
     modifier onlySettlementLayerRelayedSender() {
         /// There is no sender for the wrapping, we use a virtual address.
-        require(msg.sender == SETTLEMENT_LAYER_RELAY_SENDER, "BH: not relayed senser");
+        if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
+            revert NotRelayedSenser();
+        }
         _;
     }
 
     modifier onlyAssetRouter() {
-        require(msg.sender == address(sharedBridge), "BH: not asset router");
+        if (msg.sender != address(sharedBridge)) {
+            revert NotAssetRouter();
+        }
         _;
     }
 

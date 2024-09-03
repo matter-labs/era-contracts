@@ -9,7 +9,7 @@ import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMe
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {ChainExists, MessageRootNotRegistered, ChainIdIsThisChain, TooManyChains} from "./L1BridgehubErrors.sol";
+import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered, ChainIdIsThisChain, TooManyChains} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
@@ -59,14 +59,18 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
 
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
-        require(msg.sender == address(BRIDGE_HUB), "MR: only bridgehub");
+        if (msg.sender != address(BRIDGE_HUB)) {
+            revert OnlyBridgehub();
+        }
         _;
     }
 
     /// @notice only the bridgehub can call
     /// @param _chainId the chainId of the chain
     modifier onlyChain(uint256 _chainId) {
-        require(msg.sender == BRIDGE_HUB.getZKChain(_chainId), "MR: only chain");
+        if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
+            revert OnlyChain();
+        }
         _;
     }
 
