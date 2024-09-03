@@ -770,14 +770,53 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev Registers an already deployed chain with the bridgehub
     /// @param _chainId The chain Id of the chain
     /// @param _hyperchain Address of the hyperchain
-    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external onlyOwnerOrAdmin {
+    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external onlyOwnerOrAdmin onlyL1 {
         require(_hyperchain != address(0), "BH: hyperchain zero");
         require(!hyperchainMap.contains(_chainId), "BH: Chain Id Already Exists");
         require(IZkSyncHyperchain(_hyperchain).getChainId() == _chainId, "BH: Chain Id Mismatch");
 
-        _registerNewHyperchain(_chainId, _hyperchain);
+        address stm = IZkSyncHyperchain(_hyperchain).getStateTransitionManager();
+        address chainAdmin = IZkSyncHyperchain(_hyperchain).getAdmin();
+        bytes32 chainBaseTokenAssetId = IZkSyncHyperchain(_hyperchain).getBaseTokenAssetId();
+        
+        if (_chainId == 0) {
+            revert ZeroChainId();
+        }
+        
+        if (_chainId > type(uint48).max) {
+            revert ChainIdTooBig();
+        }
 
-        emit NewHyperchain(_chainId, _hyperchain);
+        require(_chainId != block.chainid, "BH: chain id must not match current chainid");
+        if (stm == address(0)) {
+            revert ZeroAddress();
+        }
+        if (chainBaseTokenAssetId == bytes32(0)) {
+            revert ZeroAddress();
+        }
+
+        if (!stateTransitionManagerIsRegistered[stm]) {
+            revert STMNotRegistered();
+        }
+
+        require(assetIdIsRegistered[chainBaseTokenAssetId], "BH: asset id not registered");
+
+        if (address(sharedBridge) == address(0)) {
+            revert SharedBridgeNotSet();
+        }
+        if (stateTransitionManager[_chainId] != address(0)) {
+            revert BridgeHubAlreadyRegistered();
+        }
+
+        stateTransitionManager[_chainId] = stm;
+
+        baseTokenAssetId[_chainId] = chainBaseTokenAssetId;
+        settlementLayer[_chainId] = block.chainid;
+        
+        _registerNewHyperchain(_chainId, _hyperchain);
+        messageRoot.addNewChain(_chainId);
+
+        emit NewChain(_chainId, stm, chainAdmin);
     }
 
     /*//////////////////////////////////////////////////////////////
