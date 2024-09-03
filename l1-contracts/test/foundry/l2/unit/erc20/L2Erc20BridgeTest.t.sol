@@ -13,6 +13,7 @@ import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol"
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {TokenNotInitialized} from "contracts/L2ContractsErrors.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
@@ -86,7 +87,9 @@ contract L2Erc20BridgeTest is Test {
         performDeposit(makeAddr("someDepositor"), makeAddr("someReeiver"), 1);
 
         l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
-        require(l2TokenAddress != address(0), "Token not initialized");
+        if (l2TokenAddress == address(0)) {
+            revert TokenNotInitialized();
+        }
     }
 
     function test_shouldFinalizeERC20Deposit() public {

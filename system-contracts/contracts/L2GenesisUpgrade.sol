@@ -7,6 +7,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {IL2GenesisUpgrade} from "./interfaces/IL2GenesisUpgrade.sol";
 
 import {L2GatewayUpgradeHelper} from "./L2GatewayUpgradeHelper.sol";
+import {InvalidChainId} from "contracts/L2ContractsErrors.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
@@ -19,7 +20,9 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
         bytes calldata _additionalForceDeploymentsData
     ) external payable {
         // solhint-disable-next-line gas-custom-errors
-        require(_chainId != 0, "Invalid chainId");
+        if (_chainId == 0) {
+            revert InvalidChainId();
+        }
         ISystemContext(SYSTEM_CONTEXT_CONTRACT).setChainId(_chainId);
 
         L2GatewayUpgradeHelper.performGatewayContractsInit(
