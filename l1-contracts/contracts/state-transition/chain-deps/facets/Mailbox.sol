@@ -30,7 +30,7 @@ import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow} from "../../../common/L1ContractErrors.sol";
-import {UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBeZero, MailboxWrongStateTransitionManager, NotSettlementLayers, NotHyperchain} from "../../L1StateTransitionErrors.sol";
+import {MailboxFacetNotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBeZero, MailboxWrongStateTransitionManager, NotSettlementLayers, NotHyperchain} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -54,7 +54,9 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     uint256 internal immutable L1_CHAIN_ID;
 
     modifier onlyL1() {
-        require(block.chainid == L1_CHAIN_ID, "MailboxFacet: not L1");
+        if (block.chainid != L1_CHAIN_ID) {
+            revert MailboxFacetNotL1();
+        }
         _;
     }
 

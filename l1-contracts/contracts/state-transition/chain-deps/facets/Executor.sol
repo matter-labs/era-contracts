@@ -18,7 +18,7 @@ import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
-import {MissmatchL2DAValidator, InvalidEightBit, MissmatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsZero, PriorityOpsDataItemHashesLengthIsZero} from "../../L1StateTransitionErrors.sol";
+import {ChainWasMigrated, MissmatchL2DAValidator, InvalidEightBit, MissmatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsZero, PriorityOpsDataItemHashesLengthIsZero} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -36,7 +36,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     /// @dev Checks that the chain is connected to the current bridehub and not migrated away.
     modifier chainOnCurrentBridgehub() {
-        require(s.settlementLayer == address(0), "Chain was migrated");
+        if (s.settlementLayer != address(0)) {
+            revert ChainWasMigrated();
+        }
         _;
     }
 
