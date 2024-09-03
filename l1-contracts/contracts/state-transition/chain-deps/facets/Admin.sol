@@ -260,6 +260,12 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
 
+        if(block.chainid != L1_CHAIN_ID) {
+            // We assume that GW -> L1 transactions can never fail and provide no recovery mechanism from it.
+            // That's why we need to bound the gas that can be consumed during such a migration.
+            require(s.totalBatchesCommitted == s.totalBatchesExecuted, "Af: not all batches executed");
+        }
+
         s.settlementLayer = _settlementLayer;
         chainBridgeMintData = abi.encode(prepareChainCommitment());
     }
@@ -391,37 +397,4 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         commitment.batchHashes = batchHashes;
     }
-
-    // function recoverFromFailedMigrationToGateway(
-    //     uint256 _settlementLayerChainId,
-    //     uint256 _l2BatchNumber,
-    //     uint256 _l2MessageIndex,
-    //     uint16 _l2TxNumberInBatch,
-    //     bytes32[] calldata _merkleProof
-    // ) external onlyAdmin {
-    //     require(s.settlementLayerState == SettlementLayerState.MigratedFromL1, "not migrated L1");
-
-    //     bytes32 migrationHash = s.settlementLayerMigrationHash;
-    //     require(migrationHash != bytes32(0), "can not recover when there is no migration");
-
-    //     require(
-    //         IBridgehub(s.bridgehub).proveL1ToL2TransactionStatus(
-    //             _settlementLayerChainId,
-    //             migrationHash,
-    //             _l2BatchNumber,
-    //             _l2MessageIndex,
-    //             _l2TxNumberInBatch,
-    //             _merkleProof,
-    //             TxStatus.Failure
-    //         ),
-    //         "Migration not failed"
-    //     );
-
-    //     s.settlementLayerState = SettlementLayerState.ActiveOnL1;
-    //     s.settlementLayerChainId = 0;
-    //     s.settlementLayerMigrationHash = bytes32(0);
-
-    //     // We do not need to perform any additional actions, since no changes related to the chain commitment can be performed
-    //     // while the chain is in the "migrated" state.
-    // }
 }
