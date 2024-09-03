@@ -3,6 +3,8 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.1;
 
+import {AddressInsufficientBalance, AddressUnableToSendValue, AddressInsufficientBalanceForCall, AddressCallToNonContract} from "system-contracts/contracts/SystemContractsErrors.sol";
+
 /**
  * @dev Collection of functions related to the address type
  */
@@ -58,16 +60,14 @@ library Address {
      * https://solidity.readthedocs.io/en/v0.5.11/security-considerations.html#use-the-checks-effects-interactions-pattern[checks-effects-interactions pattern].
      */
     function sendValue(address payable recipient, uint256 amount) internal {
-        require(
-            address(this).balance >= amount,
-            "Address: insufficient balance"
-        );
+        if (address(this).balance < amount) {
+            revert AddressInsufficientBalance();
+        }
 
         (bool success, ) = recipient.call{value: amount}("");
-        require(
-            success,
-            "Address: unable to send value, recipient may have reverted"
-        );
+        if (!success) {
+            revert AddressUnableToSendValue();
+        }
     }
 
     /**
@@ -152,10 +152,9 @@ library Address {
         uint256 value,
         string memory errorMessage
     ) internal returns (bytes memory) {
-        require(
-            address(this).balance >= value,
-            "Address: insufficient balance for call"
-        );
+        if (address(this).balance < value) {
+            revert AddressInsufficientBalanceForCall();
+        }
         (bool success, bytes memory returndata) = target.call{value: value}(
             data
         );
@@ -263,7 +262,9 @@ library Address {
             if (returndata.length == 0) {
                 // only check isContract if the call was successful and the return data is empty
                 // otherwise we already know that it was a contract
-                require(isContract(target), "Address: call to non-contract");
+                if (!isContract(target)) {
+                    revert AddressCallToNonContract();
+                }
             }
             return returndata;
         } else {

@@ -6,6 +6,7 @@ pragma solidity ^0.8.0;
 import {IERC20} from "../IERC20.sol";
 import {IERC20Permit} from "../extensions/IERC20Permit.sol";
 import {Address} from "../../../utils/Address.sol";
+import {SafeERC20ApproveFromNonZeroToNonZeroAllowance, SafeERC20DecreasedAllowanceBelowZero, SafeERC20PermitDidNotSucceed, SafeERC20OperationDidNotSucceed} from "system-contracts/contracts/SystemContractsErrors.sol";
 
 /**
  * @title SafeERC20
@@ -57,10 +58,9 @@ library SafeERC20 {
         // safeApprove should only be called when setting an initial allowance,
         // or when resetting it to zero. To increase and decrease it, use
         // 'safeIncreaseAllowance' and 'safeDecreaseAllowance'
-        require(
-            (value == 0) || (token.allowance(address(this), spender) == 0),
-            "SafeERC20: approve from non-zero to non-zero allowance"
-        );
+        if ((value != 0) && (token.allowance(address(this), spender) != 0)) {
+            revert SafeERC20ApproveFromNonZeroToNonZeroAllowance();
+        }
         _callOptionalReturn(
             token,
             abi.encodeWithSelector(token.approve.selector, spender, value)
@@ -90,10 +90,9 @@ library SafeERC20 {
     ) internal {
         unchecked {
             uint256 oldAllowance = token.allowance(address(this), spender);
-            require(
-                oldAllowance >= value,
-                "SafeERC20: decreased allowance below zero"
-            );
+            if (oldAllowance < value) {
+                revert SafeERC20DecreasedAllowanceBelowZero();
+            }
             uint256 newAllowance = oldAllowance - value;
             _callOptionalReturn(
                 token,
@@ -119,10 +118,9 @@ library SafeERC20 {
         uint256 nonceBefore = token.nonces(owner);
         token.permit({owner: owner, spender: spender, value: value, deadline : deadline, v: v, r: r, s: s});
         uint256 nonceAfter = token.nonces(owner);
-        require(
-            nonceAfter == nonceBefore + 1,
-            "SafeERC20: permit did not succeed"
-        );
+        if (nonceAfter != nonceBefore + 1) {
+            revert SafeERC20PermitDidNotSucceed();
+        }
     }
 
     /**
@@ -142,10 +140,9 @@ library SafeERC20 {
         );
         if (returndata.length > 0) {
             // Return data is optional
-            require(
-                abi.decode(returndata, (bool)),
-                "SafeERC20: ERC20 operation did not succeed"
-            );
+            if (!abi.decode(returndata, (bool))) {
+                revert SafeERC20OperationDidNotSucceed();
+            }
         }
     }
 }
