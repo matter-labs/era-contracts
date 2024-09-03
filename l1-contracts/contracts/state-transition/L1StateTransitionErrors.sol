@@ -81,3 +81,9 @@ error SyncLayerNotRegistered();
 error AdminZero();
 
 error OutdatedProtocolVersion();
+
+error ChainWasMigrated();
+
+error MailboxFacetNotL1();
+
+error AdminFacetNotL1();

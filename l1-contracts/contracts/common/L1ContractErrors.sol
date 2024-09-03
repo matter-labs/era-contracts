@@ -353,6 +353,16 @@ error AssetIdNotSupported(bytes32 assetId);
 // 0x64107968
 error AssetHandlerNotRegistered(bytes32 assetId);
 
+error MerklePathLengthMismatch();
+
+error MerkleNothingToProve();
+
+error MerkleIndexOrHeightMismatch();
+
+error MerkleWrongIndex();
+
+error MerkleWrongLength();
+
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,
