@@ -5,6 +5,7 @@ pragma solidity 0.8.20;
 import {MAX_SYSTEM_CONTRACT_ADDRESS} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 
 import {CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_PUBDATA_PUBLISHED_OFFSET, META_CALL_ADDRESS, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
+import {ThereAreOnly10AccessibleRegisters, FailedToChargeGas} from "gas-bound-caller/contracts/test-contracts/GasBoundCallerErrors.sol";
 
 uint256 constant UINT32_MASK = type(uint32).max;
 uint256 constant UINT64_MASK = type(uint64).max;
@@ -318,7 +319,9 @@ library SystemContractHelper {
     /// @dev It is equal to the value of the (N+2)-th register
     /// at the start of the call.
     function getExtraAbiData(uint256 index) internal view returns (uint256 extraAbiData) {
-        require(index < 10, "There are only 10 accessible registers");
+        if (index >= 10) {
+            revert ThereAreOnly10AccessibleRegisters();
+        }
 
         address callAddr = GET_EXTRA_ABI_DATA_ADDRESS;
         assembly {
@@ -350,6 +353,8 @@ library SystemContractHelper {
             _gasToPay,
             _pubdataToSpend
         );
-        require(precompileCallSuccess, "Failed to charge gas");
+        if (!precompileCallSuccess) {
+            revert FailedToChargeGas();
+        }
     }
 }
