@@ -17,3 +17,23 @@ error NonEmptyBlobVersionHash(uint256 index);
 error PointEvalCallFailed(bytes);
 // 0x4daa985d
 error PointEvalFailed(bytes);
+
+error OperatorDAInputLengthTooSmall();
+
+error InvalidNumberOfBlobs();
+
+error InvalidBlobsHashes();
+
+error InvalidL2DAOutputHash();
+
+error OneBlobWithCalldata();
+
+error PubdataInputTooSmall();
+
+error PubdataLengthTooBig();
+
+error InvalidPubdataHash();
+
+error BlobCommitmentNotPublished();
+
+error ValL1DAWrongInputLength();
