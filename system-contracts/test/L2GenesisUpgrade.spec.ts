@@ -40,7 +40,7 @@ describe("L2GenesisUpgrade tests", function () {
     await setResult(
       "IBridgehub",
       "setAddresses",
-      [REAL_L2_ASSET_ROUTER_ADDRESS, stmDeployerAddress, REAL_L2_MESSAGE_ROOT_ADDRESS],
+      [ethers.constants.AddressZero, REAL_L2_ASSET_ROUTER_ADDRESS, stmDeployerAddress, REAL_L2_MESSAGE_ROOT_ADDRESS],
       {
         failure: false,
         returnData: "0x",
