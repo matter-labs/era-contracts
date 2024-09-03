@@ -11,6 +11,7 @@ import {L2AssetRouter} from "contracts/bridge/L2AssetRouter.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {TokenNotInitialized} from "contracts/L2ContractsErrors.sol";
 
 import {L2_ASSET_ROUTER, L2_NATIVE_TOKEN_VAULT} from "contracts/L2ContractHelper.sol";
 
@@ -84,7 +85,9 @@ contract L2Erc20BridgeTest is Test {
         performDeposit(makeAddr("someDepositor"), makeAddr("someReeiver"), 1);
 
         l2TokenAddress = L2_NATIVE_TOKEN_VAULT.l2TokenAddress(L1_TOKEN_ADDRESS);
-        require(l2TokenAddress != address(0), "Token not initialized");
+        if (l2TokenAddress == address(0)) {
+            revert TokenNotInitialized();
+        }
     }
 
     function test_shouldFinalizeERC20Deposit() public {

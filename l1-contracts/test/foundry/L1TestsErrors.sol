@@ -10,5 +10,7 @@ error FeeParamsWereNotChangedCorrectly();
 error EventOnFallbackTargetExpected();
 
 error OverheadForTransactionMustBeEqualToTxSlotOverhead(uint256 overheadForTransaction);
-InvalidBlobCommitmentsLength
-InvalidBlobHashesLength
+
+error InvalidBlobCommitmentsLength();
+
+error InvalidBlobHashesLength();
