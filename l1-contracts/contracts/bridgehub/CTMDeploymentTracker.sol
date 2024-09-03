@@ -14,7 +14,7 @@ import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
-import {NoEthAllowed, NotOwner, WrongCounterPart, WrongEncodingVersion} from "./L1BridgehubErrors.sol";
+import {OnlyBridgehub, NotOwnerViaRouter ,NoEthAllowed, NotOwner, WrongCounterPart, WrongEncodingVersion} from "./L1BridgehubErrors.sol";
 
 /// @dev The encoding version of the data.
 bytes1 constant CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION = 0x01;
@@ -32,14 +32,18 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
         // solhint-disable-next-line gas-custom-errors
-        require(msg.sender == address(BRIDGE_HUB), "CTM DT: not BH");
+        if (msg.sender != address(BRIDGE_HUB)) {
+            revert OnlyBridgehub();
+        }
         _;
     }
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyOwnerViaRouter(address _originalCaller) {
         // solhint-disable-next-line gas-custom-errors
-        require(msg.sender == address(L1_ASSET_ROUTER) && _originalCaller == owner(), "CTM DT: not owner via router");
+        if (msg.sender != address(L1_ASSET_ROUTER) || _originalCaller != owner()) {
+            revert NotOwnerViaRouter();
+        }
         _;
     }
 

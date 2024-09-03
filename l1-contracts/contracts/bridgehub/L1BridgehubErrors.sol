@@ -59,3 +59,11 @@ error NoEthAllowed();
 error NotOwner();
 
 error WrongCounterPart();
+
+error NotL1();
+
+error OnlyBridgehub();
+
+error OnlyChain();
+
+error NotOwnerViaRouter();

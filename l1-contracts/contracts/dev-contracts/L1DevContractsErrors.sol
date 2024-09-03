@@ -32,14 +32,26 @@ error Weth9WithdrawMoreThenBalance();
 
 error Weth9WithdrawMoreThenAllowance();
 
-DummyExecutorShouldRevertOnCommitBatches();
-DummyExecutorInvalidLastCommittedBatchNumber();
-DummyExecutorInvalidBatchNumber();
-DummyExecutorShouldRevertOnProveBatches();
-DummyExecutorInvalidPreviousBatchNumber();
-DummyExecutorCanProveOnlyOneBatch();
-DummyExecutorCannotProveBatchOutOfOrder();
-DummyExecutorProveMoreBatchesThanWereCommitted();
-DummyExecutorShouldRevertOnExecuteBatches();
-DummyExecutorCannotExecuteBatchesMoreThanCommittedAndProvenCurrently();
-DummyExecutorTheLastCommittedBatchIsLessThanNewLastBatch();
+error DummyExecutorShouldRevertOnCommitBatches();
+
+error DummyExecutorInvalidLastCommittedBatchNumber();
+
+error DummyExecutorInvalidBatchNumber();
+
+error DummyExecutorShouldRevertOnProveBatches();
+
+error DummyExecutorInvalidPreviousBatchNumber();
+
+error DummyExecutorCanProveOnlyOneBatch();
+
+error DummyExecutorCannotProveBatchOutOfOrder();
+
+error DummyExecutorProveMoreBatchesThanWereCommitted();
+
+error DummyExecutorShouldRevertOnExecuteBatches();
+
+error DummyExecutorCannotExecuteBatchesMoreThanCommittedAndProvenCurrently();
+
+error DummyExecutorTheLastCommittedBatchIsLessThanNewLastBatch();
+
+error OnlyOwner();
