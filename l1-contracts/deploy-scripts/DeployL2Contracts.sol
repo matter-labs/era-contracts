@@ -76,9 +76,7 @@ contract DeployL2Script is Script {
         contracts.l2StandardErc20FactoryBytecode = Utils.readFoundryBytecode(
             "/../l2-contracts/zkout/UpgradeableBeacon.sol/UpgradeableBeacon.json"
         );
-        contracts.beaconProxy = Utils.readFoundryBytecode(
-            "/../l2-contracts/zkout/BeaconProxy.sol/BeaconProxy.json"
-        );
+        contracts.beaconProxy = Utils.readFoundryBytecode("/../l2-contracts/zkout/BeaconProxy.sol/BeaconProxy.json");
         contracts.l2StandardErc20Bytecode = Utils.readFoundryBytecode(
             "/../l2-contracts/zkout/L2StandardERC20.sol/L2StandardERC20.json"
         );
