@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 
 import {GasBoundCaller} from "../GasBoundCaller.sol";
 import {SystemContractHelper} from "./SystemContractHelper.sol";
+import {EntryOverheadIsIncorrect, GasBoundCallerCallFailed, ReturnDataIsIncorrect, PubdataGasIsIncorrect} from "gas-bound-caller/contracts/test-contracts/GasBoundCallerErrors.sol";
 
 /**
  * @author Matter Labs
@@ -15,7 +16,9 @@ contract GasBoundCallerTester is GasBoundCaller {
 
     function testEntryOverheadInner(uint256 _expectedGas) external payable {
         // `2/3` to ensure that the constant is good with sufficient overhead
-        require(gasleft() + (2 * CALL_ENTRY_OVERHEAD) / 3 >= _expectedGas, "Entry overhead is incorrect");
+        if (gasleft() + (2 * CALL_ENTRY_OVERHEAD) / 3 < _expectedGas) {
+            revert EntryOverheadIsIncorrect();
+        }
 
         lastRecordedGasLeft = gasleft();
     }
@@ -33,7 +36,9 @@ contract GasBoundCallerTester is GasBoundCaller {
             (bool success, bytes memory returnData) = address(this).call(
                 abi.encodeWithSignature("testReturndataOverheadInner(bool,uint256)", true, _len)
             );
-            require(success, "Call failed");
+            if (!success) {
+                revert GasBoundCallerCallFailed();
+            }
 
             // It is not needed to query the exact value for the test.
             uint256 pubdataGas = 100;
@@ -84,11 +89,17 @@ contract GasBoundCallerTester is GasBoundCaller {
             abi.encodeWithSelector(GasBoundCaller.gasBoundCall.selector, _to, _maxTotalGas, _data)
         );
 
-        require(success);
+        if (!success) {
+            revert GasBoundCallerCallFailed();
+        }
 
         (bytes memory realReturnData, uint256 pubdataGas) = abi.decode(returnData, (bytes, uint256));
 
-        require(keccak256(expectedReturndata) == keccak256(realReturnData), "Return data is incorrect");
-        require(pubdataGas == expectedPubdataGas, "Pubdata gas is incorrect");
+        if (keccak256(expectedReturndata) != keccak256(realReturnData)) {
+            revert ReturnDataIsIncorrect();
+        }
+        if (pubdataGas != expectedPubdataGas) {
+            revert PubdataGasIsIncorrect();
+        }
     }
 }
