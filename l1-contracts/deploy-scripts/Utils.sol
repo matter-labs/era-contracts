@@ -113,17 +113,6 @@ library Utils {
     }
 
     /**
-     * @dev Read hardhat bytecodes
-     */
-    function readHardhatBytecode(string memory artifactPath) internal view returns (bytes memory) {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, artifactPath);
-        string memory json = vm.readFile(path);
-        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode");
-        return bytecode;
-    }
-
-    /**
      * @dev Returns the bytecode of a given system contract.
      */
     function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
