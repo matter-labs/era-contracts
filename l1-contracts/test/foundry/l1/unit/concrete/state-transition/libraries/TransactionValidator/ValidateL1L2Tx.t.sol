@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {TransactionValidatorSharedTest} from "./_TransactionValidator_Shared.t.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {PubdataGreaterThanLimit, TxnBodyGasLimitNotEnoughGas, ValidateTxnNotEnoughGas, NotEnoughGas, TooMuchGas, InvalidPubdataLength} from "contracts/common/L1ContractErrors.sol";
+import {OverheadForTransactionMustBeEqualToTxSlotOverhead} from "test/foundry/L1TestsErrors.sol";
 
 contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
     function test_BasicRequestL1L2() public pure {
@@ -79,16 +80,14 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
     }
 
     function test_ShouldReturnCorrectOverhead_ShortTx() public pure {
-        require(
-            getOverheadForTransaction(32) == 10_000,
-            "The overhead for short transaction must be equal to the tx slot overhead"
-        );
+        if (getOverheadForTransaction(32) != 10_000) {
+            revert OverheadForTransactionMustBeEqualToTxSlotOverhead(getOverheadForTransaction(32));
+        }
     }
 
     function test_ShouldReturnCorrectOverhead_LongTx() public pure {
-        require(
-            getOverheadForTransaction(1000000) == 1000000 * 10,
-            "The overhead for long transaction must be equal to the tx slot overhead"
-        );
+        if (getOverheadForTransaction(1000000) != 1000000 * 10) {
+            revert OverheadForTransactionMustBeEqualToTxSlotOverhead(getOverheadForTransaction(1000000));
+        }
     }
 }

@@ -23,6 +23,7 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAdd
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {AddressAlreadyUsed, WithdrawFailed, Unauthorized, AssetIdNotSupported, SharedBridgeKey, SharedBridgeValueNotSet, L2WithdrawalMessageWrongLength, InsufficientChainBalance, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, L2BridgeNotDeployed, InvalidProof, NoFundsTransferred, InsufficientFunds, DepositDoesNotExist, WithdrawalAlreadyFinalized, InsufficientFunds, MalformedMessage, InvalidSelector, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
+import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
 
 /// We are testing all the specified revert and require cases.
 contract L1AssetRouterFailTest is L1AssetRouterTest {
@@ -279,7 +280,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         bytes memory transferData = abi.encode(amount, alice);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
-        require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
+        if (l1Nullifier.depositHappened(chainId, txHash) != txDataHash) {
+            revert DepositNotSet();
+        }
 
         vm.mockCall(
             bridgehubAddress,
@@ -317,7 +320,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         bytes memory transferData = abi.encode(amount, alice);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
-        require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
+        if (l1Nullifier.depositHappened(chainId, txHash) != txDataHash) {
+            revert DepositNotSet();
+        }
 
         vm.mockCall(
             bridgehubAddress,
@@ -358,7 +363,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         bytes memory transferData = abi.encode(amount, alice);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(eraChainId, txHash, txDataHash);
-        require(l1Nullifier.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");
+        if (l1Nullifier.depositHappened(eraChainId, txHash) != txDataHash) {
+            revert DepositNotSet();
+        }
         console.log("txDataHash", uint256(txDataHash));
 
         vm.mockCall(
@@ -488,7 +495,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
-        require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
+        if (l1Nullifier.depositHappened(chainId, txHash) != txDataHash) {
+            revert DepositNotSet();
+        }
 
         vm.mockCall(
             bridgehubAddress,
