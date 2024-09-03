@@ -224,7 +224,7 @@ export const EIP712_DOMAIN = {
   name: "zkSync",
   version: "2",
   chainId: CHAIN_ID,
-  // zkSync contract doesn't verify EIP712 signatures.
+  // ZKsync contract doesn't verify EIP712 signatures.
 };
 
 export interface TransactionData {

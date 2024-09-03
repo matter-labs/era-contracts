@@ -478,6 +478,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         request.refundRecipient = AddressAliasHelper.actualRefundRecipient(request.refundRecipient, request.sender);
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently ZKsync address derivation is different from Ethereum one, but it may be changed in the future.
+        // solhint-disable avoid-tx-origin
         // slither-disable-next-line tx-origin
         if (request.sender != tx.origin) {
             request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
