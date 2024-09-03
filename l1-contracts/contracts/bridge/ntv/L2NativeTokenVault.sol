@@ -38,7 +38,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @param _bridgedTokenBeacon The address of the L2 token beacon for legacy chains.
     /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed.
     /// @param _wethToken Address of WETH on deployed chain
-    /// @param _baseTokenAddress Address of Base token
     constructor(
         uint256 _l1ChainId,
         address _aliasedOwner,
@@ -46,9 +45,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         address _legacySharedBridge,
         address _bridgedTokenBeacon,
         bool _contractsDeployedAlready,
-        address _wethToken,
-        address _baseTokenAddress
-    ) NativeTokenVault(_wethToken, L2_ASSET_ROUTER_ADDR, _baseTokenAddress) {
+        address _wethToken
+    ) NativeTokenVault(_wethToken, L2_ASSET_ROUTER_ADDR) {
         L1_CHAIN_ID = _l1ChainId;
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
@@ -74,7 +72,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             bridgedTokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
 
             bridgedTokenBeacon.transferOwnership(owner());
-            emit L2TokenBeaconUpdated(_bridgedTokenBeacon, _l2TokenProxyBytecodeHash);
+            emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
         }
     }
 

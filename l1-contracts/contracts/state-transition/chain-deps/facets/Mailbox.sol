@@ -618,7 +618,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         if (s.chainId != ERA_CHAIN_ID) {
             revert OnlyEraSupported();
         }
-        IL1AssetRouter(s.baseTokenBridge).L1_NULLIFIER().finalizeWithdrawal({
+        IL1AssetRouter(s.baseTokenBridge).finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,

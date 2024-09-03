@@ -5,12 +5,13 @@ import "forge-std/console.sol";
 
 import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {BASE_TOKEN_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {FinalizeWithdrawalParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 contract L1AssetRouterLegacyTest is L1AssetRouterTest {
     function test_depositLegacyERC20Bridge() public {
@@ -52,11 +53,11 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
-        _setNativeTokenVaultChainBalance(eraChainId, ETH_TOKEN_ADDRESS, amount);
+        _setNativeTokenVaultChainBalance(eraChainId, BASE_TOKEN_VIRTUAL_ADDRESS, amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
-            abi.encode(ETH_TOKEN_ADDRESS)
+            abi.encode(BASE_TOKEN_VIRTUAL_ADDRESS)
         );
 
         bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, alice, amount);
@@ -84,13 +85,16 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit WithdrawalFinalizedAssetRouter(eraChainId, ETH_TOKEN_ASSET_ID, message);
         vm.prank(l1ERC20BridgeAddress);
-        l1Nullifier.finalizeWithdrawalLegacyErc20Bridge({
-            _l2BatchNumber: l2BatchNumber,
-            _l2MessageIndex: l2MessageIndex,
-            _l2TxNumberInBatch: l2TxNumberInBatch,
-            _message: message,
-            _merkleProof: merkleProof
+        FinalizeWithdrawalParams memory finalizeWithdrawalParams = FinalizeWithdrawalParams({
+            chainId: eraChainId,
+            l2BatchNumber: l2BatchNumber,
+            l2MessageIndex: l2MessageIndex,
+            l2Sender: L2_ASSET_ROUTER_ADDR,
+            l2TxNumberInBatch: l2TxNumberInBatch,
+            message: message,
+            merkleProof: merkleProof
         });
+        l1Nullifier.finalizeWithdrawalLegacyContracts(finalizeWithdrawalParams);
     }
 
     function test_finalizeWithdrawalLegacyErc20Bridge_ErcOnEth() public {
@@ -133,12 +137,22 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         vm.expectEmit(true, true, false, false, address(sharedBridge));
         emit WithdrawalFinalizedAssetRouter(eraChainId, tokenAssetId, new bytes(0)); // kl todo
         vm.prank(l1ERC20BridgeAddress);
-        l1Nullifier.finalizeWithdrawalLegacyErc20Bridge({
-            _l2BatchNumber: l2BatchNumber,
-            _l2MessageIndex: l2MessageIndex,
-            _l2TxNumberInBatch: l2TxNumberInBatch,
-            _message: message,
-            _merkleProof: merkleProof
+        // sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
+        //     _l2BatchNumber: l2BatchNumber,
+        //     _l2MessageIndex: l2MessageIndex,
+        //     _l2TxNumberInBatch: l2TxNumberInBatch,
+        //     _message: message,
+        //     _merkleProof: merkleProof
+        // });
+        FinalizeWithdrawalParams memory finalizeWithdrawalParams = FinalizeWithdrawalParams({
+            chainId: eraChainId,
+            l2BatchNumber: l2BatchNumber,
+            l2MessageIndex: l2MessageIndex,
+            l2Sender: L2_ASSET_ROUTER_ADDR,
+            l2TxNumberInBatch: l2TxNumberInBatch,
+            message: message,
+            merkleProof: merkleProof
         });
+        l1Nullifier.finalizeWithdrawalLegacyContracts(finalizeWithdrawalParams);
     }
 }

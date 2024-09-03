@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {RegisterHyperchainScript} from "deploy-scripts/RegisterHyperchain.s.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {BASE_TOKEN_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 
@@ -32,7 +32,7 @@ contract HyperchainDeployer is L1ContractDeployer {
         );
 
         deployScript = new RegisterHyperchainScript();
-        saveHyperchainConfig(_getDefaultDescription(eraHyperchainId, ETH_TOKEN_ADDRESS, eraHyperchainId));
+        saveHyperchainConfig(_getDefaultDescription(eraHyperchainId, BASE_TOKEN_VIRTUAL_ADDRESS, eraHyperchainId));
         vm.warp(100);
         deployScript.run();
         hyperchainIds.push(eraHyperchainId);

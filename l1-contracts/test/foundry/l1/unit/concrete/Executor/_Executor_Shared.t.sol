@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_VALIDATOR_ADDRESS} from "../Utils/Utils.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, BASE_TOKEN_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
 import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
@@ -196,7 +196,7 @@ contract ExecutorTest is Test {
             protocolVersion: 0,
             admin: owner,
             validatorTimelock: validator,
-            baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
+            baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, BASE_TOKEN_VIRTUAL_ADDRESS),
             baseTokenBridge: address(sharedBridge),
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
             verifier: IVerifier(testnetVerifier), // verifier

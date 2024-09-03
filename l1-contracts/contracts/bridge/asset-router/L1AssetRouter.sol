@@ -17,8 +17,8 @@ import {AssetRouterBase} from "./AssetRouterBase.sol";
 import {IL2Bridge} from "../interfaces/IL2Bridge.sol";
 // import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
-import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
-import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
+// import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
+import {IL1Nullifier, FinalizeWithdrawalParams} from "../interfaces/IL1Nullifier.sol";
 // import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 // import {IL1SharedBridgeLegacy} from "./interfaces/IL1SharedBridgeLegacy.sol";
@@ -27,7 +27,7 @@ import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegac
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
-import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {TWO_BRIDGES_MAGIC_VALUE, BASE_TOKEN_VIRTUAL_ADDRESS} from "../../common/Config.sol";
 // import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
@@ -92,6 +92,14 @@ contract L1AssetRouter is
         _;
     }
 
+    /// @notice Checks that the message sender is the native token vault.
+    modifier onlyNativeTokenVault() {
+        if (msg.sender != address(nativeTokenVault)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
@@ -102,7 +110,7 @@ contract L1AssetRouter is
         address _eraDiamondProxy
     )
         reentrancyGuardInitializer
-        AssetRouterBase(block.chainid, _eraChainId, IBridgehub(_bridgehub), ETH_TOKEN_ADDRESS)
+        AssetRouterBase(block.chainid, _eraChainId, IBridgehub(_bridgehub), BASE_TOKEN_VIRTUAL_ADDRESS)
     {
         _disableInitializers();
         L1_WETH_TOKEN = _l1WethAddress;
@@ -256,30 +264,6 @@ contract L1AssetRouter is
         (l1Receiver, amount) = super.finalizeDeposit(_chainId, _assetId, _transferData);
     }
 
-    /// @notice Finalize the withdrawal and release funds.
-    /// @param _chainId The chain ID of the transaction to check.
-    /// @param _assetId The bridged asset ID.
-    /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-    /// kl todo decide finalizeDeposit vs finalizeWithdrawal names, (if both then leave comments)
-    function finalizeWithdrawal(
-        uint256 _chainId,
-        bytes32 _assetId,
-        bytes calldata _transferData
-    ) external override onlyNullifier returns (address l1Receiver, uint256 amount) {
-        address assetHandler = assetHandlerAddress[_assetId];
-
-        if (assetHandler != address(0)) {
-            IAssetHandler(assetHandler).bridgeMint(_chainId, _assetId, _transferData);
-        } else {
-            assetHandlerAddress[_assetId] = address(nativeTokenVault);
-            IAssetHandler(address(nativeTokenVault)).bridgeMint(_chainId, _assetId, _transferData); // Maybe it's better to receive amount and receiver here? transferData may have different encoding
-        }
-
-        (amount, l1Receiver) = abi.decode(_transferData, (uint256, address));
-
-        emit WithdrawalFinalizedAssetRouter(_chainId, _assetId, new bytes(0)); // kl todo
-    }
-
     /*//////////////////////////////////////////////////////////////
                             CLAIM FAILED DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
@@ -337,6 +321,33 @@ contract L1AssetRouter is
         assetId = nativeTokenVault.getAssetId(block.chainid, _token);
         if (nativeTokenVault.tokenAddress(assetId) == address(0)) {
             nativeTokenVault.registerToken(_token);
+        }
+    }
+
+    /// @notice Transfers allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
+    /// @dev assetId is not the padded address, but the correct encoded id (NTV stores respective format for IDs)
+    /// @param _amount The asset amount to be transferred to native token vault.
+    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    function transferAllowanceToNTV(
+        bytes32 _assetId,
+        uint256 _amount,
+        address _prevMsgSender
+    ) external onlyNativeTokenVault {
+        address l1TokenAddress = INativeTokenVault(address(nativeTokenVault)).tokenAddress(_assetId);
+        if (l1TokenAddress == address(0) || l1TokenAddress == BASE_TOKEN_VIRTUAL_ADDRESS) {
+            return;
+        }
+        IERC20 l1Token = IERC20(l1TokenAddress);
+
+        // Do the transfer if allowance to Shared bridge is bigger than amount
+        // And if there is not enough allowance for the NTV
+        if (
+            l1Token.allowance(_prevMsgSender, address(this)) >= _amount &&
+            l1Token.allowance(_prevMsgSender, address(nativeTokenVault)) < _amount
+        ) {
+            // slither-disable-next-line arbitrary-send-erc20
+            l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
+            l1Token.forceApprove(address(nativeTokenVault), _amount);
         }
     }
 
@@ -445,6 +456,66 @@ contract L1AssetRouter is
             to: _l2Receiver,
             l1Asset: _l1Token,
             amount: _amount
+        });
+    }
+
+    /// @notice Finalize the withdrawal and release funds
+    /// @param _chainId The chain ID of the transaction to check
+    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
+    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
+    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
+    function finalizeWithdrawal(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external {
+        FinalizeWithdrawalParams memory finalizeWithdrawalParams = FinalizeWithdrawalParams({
+            chainId: _chainId,
+            l2BatchNumber: _l2BatchNumber,
+            l2MessageIndex: _l2MessageIndex,
+            l2Sender: L2_ASSET_ROUTER_ADDR,
+            l2TxNumberInBatch: _l2TxNumberInBatch,
+            message: _message,
+            merkleProof: _merkleProof
+        });
+        L1_NULLIFIER.finalizeWithdrawalLegacyContracts(finalizeWithdrawalParams);
+    }
+
+    /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
+    /// @param _depositSender The address of the deposit initiator.
+    /// @param _l1Token The address of the deposited L1 ERC20 token.
+    /// @param _amount The amount of the deposit that failed.
+    /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization.
+    /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed.
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+    /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent.
+    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
+    function claimFailedDeposit(
+        uint256 _chainId,
+        address _depositSender,
+        address _l1Token,
+        uint256 _amount,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external {
+        L1_NULLIFIER.claimFailedDeposit({
+            _chainId: _chainId,
+            _depositSender: _depositSender,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _merkleProof: _merkleProof
         });
     }
 }

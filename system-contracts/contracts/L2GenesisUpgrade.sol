@@ -32,7 +32,7 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
 
         bytes memory data = abi.encodeCall(
             L2_BRIDDGE_HUB.setAddresses,
-            (L2_ASSET_ROUTER, _stmDeployer, address(L2_MESSAGE_ROOT))
+            (address(0), L2_ASSET_ROUTER, _stmDeployer, address(L2_MESSAGE_ROOT))
         );
 
         (bool success, bytes memory returnData) = SystemContractHelper.mimicCall(

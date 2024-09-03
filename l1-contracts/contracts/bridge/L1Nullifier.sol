@@ -16,6 +16,7 @@ import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
+import {IL1AssetRouterCombined} from "./asset-router/IL1AssetRouterCombined.sol";
 // import {IAssetRouterBase} from "./asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "./ntv/INativeTokenVault.sol";
 
@@ -26,7 +27,7 @@ import {L2Message, TxStatus} from "../common/Messaging.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 // import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {BASE_TOKEN_VIRTUAL_ADDRESS} from "../common/Config.sol";
 // import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
@@ -102,7 +103,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 
     /// @dev Address of L1 asset router.
-    IL1AssetRouter public l1AssetRouter;
+    IL1AssetRouterCombined public l1AssetRouter;
 
     /// @dev Address of native token vault.
     IL1NativeTokenVault public l1NativeTokenVault;
@@ -134,6 +135,14 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @notice Checks that the message sender is the legacy bridge.
     modifier onlyLegacyBridge() {
         if (msg.sender != legacyBridge) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice Checks that the message sender is the legacy bridge.
+    modifier onlyAssetRouterOrErc20Bridge() {
+        if (msg.sender != address(l1AssetRouter) && msg.sender != legacyBridge) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -179,7 +188,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     function transferTokenToNTV(address _token) external {
         address ntvAddress = address(l1NativeTokenVault);
         require(msg.sender == ntvAddress, "L1AR: not NTV");
-        if (ETH_TOKEN_ADDRESS == _token) {
+        if (BASE_TOKEN_VIRTUAL_ADDRESS == _token) {
             uint256 amount = address(this).balance;
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
@@ -234,12 +243,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @notice Sets the L1 asset router contract address.
     /// @dev Should be called only once by the owner.
     /// @param _l1AssetRouter The address of the asset router.
-    function setL1AssetRouter(IL1AssetRouter _l1AssetRouter) external onlyOwner {
+    function setL1AssetRouter(address _l1AssetRouter) external onlyOwner {
         if (address(l1AssetRouter) != address(0)) {
             revert AddressAlreadyUsed(address(_l1AssetRouter));
         }
-        require(address(_l1AssetRouter) != address(0), "ShB: nullifier 0");
-        l1AssetRouter = _l1AssetRouter;
+        require(_l1AssetRouter != address(0), "ShB: nullifier 0");
+        l1AssetRouter = IL1AssetRouterCombined(_l1AssetRouter);
     }
 
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
@@ -257,33 +266,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         }
         depositHappened[_chainId][_txHash] = _txDataHash;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
-    }
-
-    /// @notice Finalize the withdrawal and release funds
-    /// @param _chainId The chain ID of the transaction to check
-    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
-    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
-    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
-    function finalizeWithdrawal(
-        uint256 _chainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external {
-        FinalizeWithdrawalParams memory finalizeWithdrawalParams = FinalizeWithdrawalParams({
-            chainId: _chainId,
-            l2BatchNumber: _l2BatchNumber,
-            l2MessageIndex: _l2MessageIndex,
-            l2Sender: L2_ASSET_ROUTER_ADDR,
-            l2TxNumberInBatch: _l2TxNumberInBatch,
-            message: _message,
-            merkleProof: _merkleProof
-        });
-        this.finalizeWithdrawalExternal(finalizeWithdrawalParams);
     }
 
     /// @dev Calls the internal `_encodeTxDataHash`. Used as a wrapped for try / catch case.
@@ -379,11 +361,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes memory transferData;
         (assetId, transferData) = _verifyAndGetWithdrawalData(_finalizeWithdrawalParams);
 
-        (l1Receiver, amount) = l1AssetRouter.finalizeWithdrawal(
-            _finalizeWithdrawalParams.chainId,
-            assetId,
-            transferData
-        );
+        (l1Receiver, amount) = l1AssetRouter.finalizeDeposit(_finalizeWithdrawalParams.chainId, assetId, transferData);
     }
 
     /// @notice Internal function that handles the logic for finalizing withdrawals, supporting both the current bridge system and the legacy ERC20 bridge.
@@ -415,34 +393,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         );
 
         (assetId, transferData) = _checkWithdrawal(_finalizeWithdrawalParams);
-    }
-
-    function finalizeWithdrawalExternal(FinalizeWithdrawalParams calldata _finalizeWithdrawalParams) external {
-        require(msg.sender == address(this), "L1N: not self");
-        _finalizeWithdrawal(_finalizeWithdrawalParams);
-    }
-
-    /// @notice Transfers allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
-    /// @dev assetId is not the padded address, but the correct encoded id (NTV stores respective format for IDs)
-    /// @param _amount The asset amount to be transferred to native token vault.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    function transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) external onlyL1NTV {
-        address l1TokenAddress = INativeTokenVault(address(l1NativeTokenVault)).tokenAddress(_assetId);
-        if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
-            return;
-        }
-        IERC20 l1Token = IERC20(l1TokenAddress);
-
-        // Do the transfer if allowance to Shared bridge is bigger than amount
-        // And if there is not enough allowance for the NTV
-        if (
-            l1Token.allowance(_prevMsgSender, address(this)) >= _amount &&
-            l1Token.allowance(_prevMsgSender, address(l1NativeTokenVault)) < _amount
-        ) {
-            // slither-disable-next-line arbitrary-send-erc20
-            l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
-            l1Token.forceApprove(address(l1NativeTokenVault), _amount);
-        }
     }
 
     /// @dev Determines if an eth withdrawal was initiated on ZKsync Era before the upgrade to the Shared Bridge.
@@ -666,32 +616,40 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Finalizes the withdrawal for transactions initiated via the legacy ERC20 bridge.
-    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed.
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent.
-    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message.
-    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization.
+    // / @param _l2BatchNumber The L2 batch number where the withdrawal was processed.
+    // / @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+    // / @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent.
+    // / @param _message The L2 withdraw data, stored in an L2 -> L1 message.
+    // / @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization.
     ///
     /// @return l1Receiver The address on L1 that will receive the withdrawn funds.
     /// @return l1Asset The address of the L1 token being withdrawn.
     /// @return amount The amount of the token being withdrawn.
-    function finalizeWithdrawalLegacyErc20Bridge(
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external override onlyLegacyBridge returns (address l1Receiver, address l1Asset, uint256 amount) {
+    // function finalizeWithdrawalLegacyErc20Bridge(
+    //     uint256 _l2BatchNumber,
+    //     uint256 _l2MessageIndex,
+    //     uint16 _l2TxNumberInBatch,
+    //     bytes calldata _message,
+    //     bytes32[] calldata _merkleProof
+    // ) external override onlyLegacyBridge returns (address l1Receiver, address l1Asset, uint256 amount) {
+    //     bytes32 assetId;
+    //     // (l1Receiver, assetId, amount) = // kl todo
+    //     this.finalizeWithdrawal({
+    //         _chainId: ERA_CHAIN_ID,
+    //         _l2BatchNumber: _l2BatchNumber,
+    //         _l2MessageIndex: _l2MessageIndex,
+    //         _l2TxNumberInBatch: _l2TxNumberInBatch,
+    //         _message: _message,
+    //         _merkleProof: _merkleProof
+    //     });
+    // }
+
+    function finalizeWithdrawalLegacyContracts(
+        FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
+    ) external onlyAssetRouterOrErc20Bridge returns (address l1Receiver, address l1Asset, uint256 amount) {
         bytes32 assetId;
         // (l1Receiver, assetId, amount) = // kl todo
-        this.finalizeWithdrawal({
-            _chainId: ERA_CHAIN_ID,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _message: _message,
-            _merkleProof: _merkleProof
-        });
+        _finalizeWithdrawal(_finalizeWithdrawalParams);
         l1Asset = INativeTokenVault(address(l1NativeTokenVault)).tokenAddress(assetId);
     }
 

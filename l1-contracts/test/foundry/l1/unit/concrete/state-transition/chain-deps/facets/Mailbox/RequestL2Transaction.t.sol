@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, BASE_TOKEN_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
 import {TransactionFiltererTrue} from "contracts/dev-contracts/test/DummyTransactionFiltererTrue.sol";
 import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransactionFiltererFalse.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
@@ -149,6 +149,6 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
         (canonicalTxHash, mintValue) = _requestL2Transaction(randomValue, baseCost, l2GasLimit);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
         assertEq(baseTokenBridgeAddress.balance, mintValue);
-        assertEq(l1SharedBridge.chainBalance(eraChainId, ETH_TOKEN_ADDRESS), mintValue);
+        assertEq(l1SharedBridge.chainBalance(eraChainId, BASE_TOKEN_VIRTUAL_ADDRESS), mintValue);
     }
 }

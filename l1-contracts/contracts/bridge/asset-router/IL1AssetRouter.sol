@@ -125,11 +125,11 @@ interface IL1AssetRouter {
     //     bytes calldata _transferData
     // ) external returns (L2TransactionRequestTwoBridgesInner memory request);
 
-    function finalizeWithdrawal(
-        uint256 _chainId,
-        bytes32 _assetId,
-        bytes calldata _transferData
-    ) external returns (address l1Receiver, uint256 amount);
+    // function finalizeDeposit(
+    //     uint256 _chainId,
+    //     bytes32 _assetId,
+    //     bytes calldata _transferData
+    // ) external returns (address l1Receiver, uint256 amount);
 
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
@@ -153,4 +153,15 @@ interface IL1AssetRouter {
     // function chainBalance(uint256 _chainId, address _l1Token) external view returns (uint256);
 
     // function transferTokenToNTV(address _token) external;
+
+    function transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) external;
+
+    function finalizeWithdrawal(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external;
 }

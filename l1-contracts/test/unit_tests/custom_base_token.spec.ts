@@ -10,8 +10,8 @@ import type { IL1AssetRouter } from "../../typechain/IL1AssetRouter";
 import { IL1AssetRouterFactory } from "../../typechain/IL1AssetRouterFactory";
 import type { IL1NativeTokenVaultCombined } from "../../typechain/IL1NativeTokenVaultCombined";
 import { IL1NativeTokenVaultCombinedFactory } from "../../typechain/IL1NativeTokenVaultCombinedFactory";
-import type { IL1Nullifier } from "../../typechain/IL1Nullifier";
-import { IL1NullifierFactory } from "../../typechain/IL1NullifierFactory";
+// import type { IL1Nullifier } from "../../typechain/IL1Nullifier";
+// import { IL1NullifierFactory } from "../../typechain/IL1NullifierFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
@@ -26,7 +26,7 @@ describe("Custom base token chain and bridge tests", () => {
   let deployWallet: Wallet;
   let deployer: Deployer;
   let l1SharedBridge: IL1AssetRouter;
-  let l1Nullifier: IL1Nullifier;
+  // let l1Nullifier: IL1Nullifier;
   let bridgehub: IBridgehub;
   let nativeTokenVault: IL1NativeTokenVaultCombined;
   let baseToken: TestnetERC20Token;
@@ -67,7 +67,7 @@ describe("Custom base token chain and bridge tests", () => {
 
     // prepare the bridge
     l1SharedBridge = IL1AssetRouterFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
-    l1Nullifier = IL1NullifierFactory.connect(deployer.addresses.Bridges.L1NullifierProxy, deployWallet);
+    // l1Nullifier = IL1NullifierFactory.connect(deployer.addresses.Bridges.L1NullifierProxy, deployWallet);
 
     nativeTokenVault = IL1NativeTokenVaultCombinedFactory.connect(
       deployer.addresses.Bridges.NativeTokenVaultProxy,
@@ -102,7 +102,7 @@ describe("Custom base token chain and bridge tests", () => {
   it("Should deposit base token successfully direct via bridgehub", async () => {
     await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), ethers.utils.parseUnits("800", 18));
     await (
-      await baseToken.connect(randomSigner).approve(l1Nullifier.address, ethers.utils.parseUnits("800", 18))
+      await baseToken.connect(randomSigner).approve(l1SharedBridge.address, ethers.utils.parseUnits("800", 18))
     ).wait();
     await bridgehub.connect(randomSigner).requestL2TransactionDirect({
       chainId,
@@ -123,10 +123,10 @@ describe("Custom base token chain and bridge tests", () => {
     const baseTokenAmount = ethers.utils.parseUnits("800", 18);
 
     await altToken.connect(randomSigner).mint(await randomSigner.getAddress(), altTokenAmount);
-    await (await altToken.connect(randomSigner).approve(l1Nullifier.address, altTokenAmount)).wait();
+    await (await altToken.connect(randomSigner).approve(l1SharedBridge.address, altTokenAmount)).wait();
 
     await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), baseTokenAmount);
-    await (await baseToken.connect(randomSigner).approve(l1Nullifier.address, baseTokenAmount)).wait();
+    await (await baseToken.connect(randomSigner).approve(l1SharedBridge.address, baseTokenAmount)).wait();
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges({
       chainId,
       mintValue: baseTokenAmount,
@@ -150,14 +150,14 @@ describe("Custom base token chain and bridge tests", () => {
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
     const mailboxFunctionSignature = "0x6c0960f9";
     const revertReason = await getCallRevertReason(
-      l1Nullifier.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [])
+      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, mailboxFunctionSignature, [])
     );
     expect(revertReason).contains("L2WithdrawalMessageWrongLength");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {
     const revertReason = await getCallRevertReason(
-      l1Nullifier.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
+      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
     );
     expect(revertReason).contains("InvalidSelector");
   });

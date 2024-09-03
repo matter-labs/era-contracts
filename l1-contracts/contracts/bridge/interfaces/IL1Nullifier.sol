@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 // import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
-import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
+// import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 
 /// @param chainId The chain ID of the transaction to check.
 /// @param l2BatchNumber The L2 batch number where the withdrawal was processed.
@@ -63,12 +63,8 @@ interface IL1Nullifier {
         bytes32[] calldata _merkleProof
     ) external;
 
-    function finalizeWithdrawalLegacyErc20Bridge(
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
+    function finalizeWithdrawalLegacyContracts(
+        FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
     ) external returns (address l1Receiver, address l1Token, uint256 amount);
 
     // function bridgeVerifyFailedTransfer(
@@ -87,15 +83,6 @@ interface IL1Nullifier {
     //     FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
     // ) external returns (address l1Receiver, bytes32 assetId, uint256 amount);
 
-    function finalizeWithdrawal(
-        uint256 _chainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external;
-
     function BRIDGE_HUB() external view returns (IBridgehub);
 
     function legacyBridge() external view returns (address);
@@ -110,13 +97,11 @@ interface IL1Nullifier {
 
     function setL1NativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external;
 
-    function setL1AssetRouter(IL1AssetRouter _l1AssetRouter) external;
+    function setL1AssetRouter(address _l1AssetRouter) external;
 
     function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
 
     function transferTokenToNTV(address _token) external;
 
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external;
-
-    function transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) external;
 }

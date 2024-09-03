@@ -19,9 +19,6 @@ interface INativeTokenVault {
     /// @notice The AssetRouter contract
     function ASSET_ROUTER() external view returns (IAssetRouterBase);
 
-    /// @notice The Base token address
-    function BASE_TOKEN_ADDRESS() external view returns (address);
-
     /// @notice Returns the total number of specific tokens locked for some chain
     function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
 

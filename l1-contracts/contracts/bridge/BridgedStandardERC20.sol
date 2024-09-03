@@ -40,7 +40,7 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
     address public override l1Address;
 
     /// @dev Address of the native token vault that is used as trustee who can mint/burn tokens
-    address public override nativeTokenVault;
+    address public nativeTokenVault;
 
     /// @dev This also sets the native token vault to the default value if it is not set.
     /// It is not set only on the L2s for legacy tokens.

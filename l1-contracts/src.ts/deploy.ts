@@ -190,11 +190,11 @@ export class Deployer {
     let messageRootZKBytecode = ethers.constants.HashZero;
     if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
       bridgehubZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "Bridgehub");
-      assetRouterZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2AssetRouter");
-      nativeTokenVaultZKBytecode = readBytecode("../l2-contracts/artifacts-zk/contracts/bridge", "L2NativeTokenVault");
+      assetRouterZKBytecode = readBytecode("./artifacts-zk/contracts/bridge/asset-router", "L2AssetRouter");
+      nativeTokenVaultZKBytecode = readBytecode("./artifacts-zk/contracts/bridge/ntv", "L2NativeTokenVault");
       messageRootZKBytecode = readBytecode("./artifacts-zk/contracts/bridgehub", "MessageRoot");
       const l2TokenProxyBytecode = readBytecode(
-        "../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon",
+        "./artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon",
         "BeaconProxy"
       );
       l2TokenProxyBytecodeHash = ethers.utils.hexlify(hashL2Bytecode(l2TokenProxyBytecode));
@@ -225,13 +225,15 @@ export class Deployer {
         [getNumberFromEnv("ETH_CLIENT_CHAIN_ID"), eraChainId, this.addresses.Bridges.SharedBridgeProxy, ADDRESS_ONE]
       ),
     };
+    const tokens = getTokens();
+    const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const ntvDeployment = {
       bytecodeHash: ethers.utils.hexlify(hashL2Bytecode(nativeTokenVaultZKBytecode)),
       newAddress: L2_NATIVE_TOKEN_VAULT_ADDRESS,
       callConstructor: true,
       value: 0,
       input: ethers.utils.defaultAbiCoder.encode(
-        ["uint256", "address", "bytes32", "address", "address", "bool"],
+        ["uint256", "address", "bytes32", "address", "address", "bool", "address"],
         [
           getNumberFromEnv("ETH_CLIENT_CHAIN_ID"),
           applyL1ToL2Alias(this.addresses.Governance),
@@ -239,6 +241,7 @@ export class Deployer {
           ethers.constants.AddressZero,
           ethers.constants.AddressZero,
           false,
+          l1WethToken,
         ]
       ),
     };
@@ -250,7 +253,7 @@ export class Deployer {
       input: ethers.utils.defaultAbiCoder.encode(["address"], [L2_BRIDGEHUB_ADDRESS]),
     };
 
-    const forceDeployments = [bridgehubDeployment, assetRouterDeployment, ntvDeployment, messageRootDeployment];
+    const forceDeployments = [messageRootDeployment, bridgehubDeployment, assetRouterDeployment, ntvDeployment];
     return ethers.utils.defaultAbiCoder.encode([FORCE_DEPLOYMENT_ABI_STRING], [forceDeployments]);
   }
 
@@ -933,7 +936,6 @@ export class Deployer {
         eraChainId,
         this.addresses.Bridges.L1NullifierProxy,
         bridgedTokenProxyBytecode,
-        ETH_ADDRESS_IN_CONTRACTS,
       ],
       create2Salt,
       ethTxOptions

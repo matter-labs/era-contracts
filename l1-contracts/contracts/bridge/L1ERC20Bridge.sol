@@ -6,12 +6,13 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
-import {IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
+import {IL1Nullifier, FinalizeWithdrawalParams} from "./interfaces/IL1Nullifier.sol";
 import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
 
 import {EmptyDeposit, WithdrawalAlreadyFinalized, TokensWithFeesNotSupported} from "../common/L1ContractErrors.sol";
 
@@ -172,13 +173,18 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         }
         // We don't need to set finalizeWithdrawal here, as we set it in the shared bridge
 
-        (address l1Receiver, address l1Token, uint256 amount) = L1_NULLIFIER.finalizeWithdrawalLegacyErc20Bridge({
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _message: _message,
-            _merkleProof: _merkleProof
+        FinalizeWithdrawalParams memory finalizeWithdrawalParams = FinalizeWithdrawalParams({
+            chainId: ERA_CHAIN_ID,
+            l2BatchNumber: _l2BatchNumber,
+            l2MessageIndex: _l2MessageIndex,
+            l2Sender: L2_ASSET_ROUTER_ADDR,
+            l2TxNumberInBatch: _l2TxNumberInBatch,
+            message: _message,
+            merkleProof: _merkleProof
         });
+        (address l1Receiver, address l1Token, uint256 amount) = L1_NULLIFIER.finalizeWithdrawalLegacyContracts(
+            finalizeWithdrawalParams
+        );
         emit WithdrawalFinalized(l1Receiver, l1Token, amount);
     }
 

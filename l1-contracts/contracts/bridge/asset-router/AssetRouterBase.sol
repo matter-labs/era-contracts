@@ -258,6 +258,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _assetId The bridged asset ID.
     /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+    /// kl todo decide finalizeDeposit vs finalizeWithdrawal names, (if both then leave comments)
     function finalizeDeposit(
         uint256 _chainId,
         bytes32 _assetId,
@@ -275,6 +276,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         (amount, l1Receiver) = abi.decode(_transferData, (uint256, address));
 
         emit DepositFinalizedAssetRouter(_chainId, l1Receiver, _assetId, amount);
+        // emit WithdrawalFinalizedAssetRouter(_chainId, _assetId, new bytes(0)); // kl todo
     }
 
     /*//////////////////////////////////////////////////////////////

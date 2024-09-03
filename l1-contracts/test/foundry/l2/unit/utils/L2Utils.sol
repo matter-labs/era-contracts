@@ -113,8 +113,7 @@ library L2Utils {
                 _legacySharedBridge: _legacySharedBridge,
                 _bridgedTokenBeacon: _l2TokenBeacon,
                 _contractsDeployedAlready: _contractsDeployedAlready,
-                _wethToken: address(0),
-                _baseTokenAddress: ETH_ADDRESS_IN_CONTRACTS
+                _wethToken: address(0)
             });
         }
 

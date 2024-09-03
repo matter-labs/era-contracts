@@ -15,8 +15,9 @@ import {NativeTokenVault} from "./NativeTokenVault.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
+import {IL1AssetRouterCombined} from "../asset-router/IL1AssetRouterCombined.sol";
 
-import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {BASE_TOKEN_VIRTUAL_ADDRESS} from "../../common/Config.sol";
 
 import {Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance} from "../../common/L1ContractErrors.sol";
 
@@ -42,15 +43,13 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _eraChainId ID of Era.
     /// @param _l1Nullifier Address of the nullifier contract, which handles transaction progress between L1 and ZK chains.
     /// @param _bridgedTokenProxyBytecode The bytecode hash of the proxy for tokens deployed by the bridge.
-    /// @param _baseTokenAddress Address of Base token
     constructor(
         address _l1WethAddress,
         address _l1AssetRouter,
         uint256 _eraChainId,
         IL1Nullifier _l1Nullifier,
-        bytes memory _bridgedTokenProxyBytecode,
-        address _baseTokenAddress
-    ) NativeTokenVault(_l1WethAddress, _l1AssetRouter, _baseTokenAddress) {
+        bytes memory _bridgedTokenProxyBytecode
+    ) NativeTokenVault(_l1WethAddress, _l1AssetRouter) {
         ERA_CHAIN_ID = _eraChainId;
         L1_NULLIFIER = _l1Nullifier;
         bridgedTokenProxyBytecode = _bridgedTokenProxyBytecode;
@@ -78,7 +77,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Calling second time for the same token will revert.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     function transferFundsFromSharedBridge(address _token) external {
-        if (_token == ETH_TOKEN_ADDRESS) {
+        if (_token == BASE_TOKEN_VIRTUAL_ADDRESS) {
             uint256 balanceBefore = address(this).balance;
             L1_NULLIFIER.transferTokenToNTV(_token);
             uint256 balanceAfter = address(this).balance;
@@ -117,7 +116,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     ) internal override returns (bytes memory _bridgeMintData) {
         uint256 _depositAmount;
         (_depositAmount, ) = abi.decode(_data, (uint256, address));
-        L1_NULLIFIER.transferAllowanceToNTV(_assetId, _depositAmount, _prevMsgSender);
+        IL1AssetRouterCombined(address(ASSET_ROUTER)).transferAllowanceToNTV(_assetId, _depositAmount, _prevMsgSender);
         _bridgeMintData = super._bridgeBurnNativeToken(_chainId, _assetId, _prevMsgSender, _data);
     }
 
@@ -140,7 +139,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         }
         chainBalance[_chainId][l1Token] -= _amount;
 
-        if (l1Token == ETH_TOKEN_ADDRESS) {
+        if (l1Token == BASE_TOKEN_VIRTUAL_ADDRESS) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
             assembly {
@@ -179,10 +178,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address from = _from;
         // in the legacy scenario the SharedBridge = L1Nullifier was granting the allowance, we have to transfer from them instead of the user
         if (
-            _token.allowance(address(L1_NULLIFIER), address(this)) >= _amount &&
+            _token.allowance(address(ASSET_ROUTER), address(this)) >= _amount &&
             _token.allowance(_from, address(this)) < _amount
         ) {
-            from = address(L1_NULLIFIER);
+            from = address(ASSET_ROUTER);
         }
         return super._depositFunds(from, _token, _amount);
     }

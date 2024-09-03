@@ -17,7 +17,7 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {BASE_TOKEN_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
@@ -101,7 +101,8 @@ contract L1AssetRouterTest is Test {
     uint256 legacyBatchNumber = 0;
 
     uint256 isWithdrawalFinalizedStorageLocation = uint256(8 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1 + 50);
-    bytes32 ETH_TOKEN_ASSET_ID = keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDR, ETH_TOKEN_ADDRESS));
+    bytes32 ETH_TOKEN_ASSET_ID =
+        keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDR, BASE_TOKEN_VIRTUAL_ADDRESS));
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -157,8 +158,7 @@ contract L1AssetRouterTest is Test {
             _l1AssetRouter: address(sharedBridge),
             _eraChainId: eraChainId,
             _l1Nullifier: l1Nullifier,
-            _bridgedTokenProxyBytecode: new bytes(0x00),
-            _baseTokenAddress: ETH_TOKEN_ADDRESS
+            _bridgedTokenProxyBytecode: new bytes(0x00)
         });
         TransparentUpgradeableProxy nativeTokenVaultProxy = new TransparentUpgradeableProxy(
             address(nativeTokenVaultImpl),
@@ -168,7 +168,7 @@ contract L1AssetRouterTest is Test {
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
 
         vm.prank(owner);
-        l1Nullifier.setL1AssetRouter(sharedBridge);
+        l1Nullifier.setL1AssetRouter(address(sharedBridge));
         vm.prank(owner);
         l1Nullifier.setL1NativeTokenVault(nativeTokenVault);
         vm.prank(owner);
@@ -180,7 +180,7 @@ contract L1AssetRouterTest is Test {
         sharedBridge.setNativeTokenVault(INativeTokenVault(address(nativeTokenVault)));
         vm.prank(address(nativeTokenVault));
         nativeTokenVault.registerToken(address(token));
-        nativeTokenVault.registerToken(ETH_TOKEN_ADDRESS);
+        nativeTokenVault.registerToken(BASE_TOKEN_VIRTUAL_ADDRESS);
 
         vm.store(
             address(sharedBridge),
@@ -220,10 +220,10 @@ contract L1AssetRouterTest is Test {
 
         /// storing chainBalance
         _setNativeTokenVaultChainBalance(chainId, address(token), 1000 * amount);
-        _setNativeTokenVaultChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
+        _setNativeTokenVaultChainBalance(chainId, BASE_TOKEN_VIRTUAL_ADDRESS, amount);
         // console.log("chainBalance %s, %s", address(token), nativeTokenVault.chainBalance(chainId, address(token)));
         _setSharedBridgeChainBalance(chainId, address(token), amount);
-        _setSharedBridgeChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
+        _setSharedBridgeChainBalance(chainId, BASE_TOKEN_VIRTUAL_ADDRESS, amount);
 
         vm.deal(bridgehubAddress, amount);
         vm.deal(address(sharedBridge), amount);
@@ -247,7 +247,7 @@ contract L1AssetRouterTest is Test {
         vm.mockCall(
             address(nativeTokenVault),
             abi.encodeWithSelector(IL1BaseTokenAssetHandler.tokenAddress.selector, ETH_TOKEN_ASSET_ID),
-            abi.encode(address(ETH_TOKEN_ADDRESS))
+            abi.encode(address(BASE_TOKEN_VIRTUAL_ADDRESS))
         );
     }
 

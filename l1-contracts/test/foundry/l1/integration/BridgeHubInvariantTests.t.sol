@@ -14,7 +14,7 @@ import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {HyperchainDeployer} from "./_SharedHyperchainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {BASE_TOKEN_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {L2Message} from "contracts/common/Messaging.sol";
@@ -50,7 +50,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
     address public currentUser;
     uint256 public currentChainId;
     address public currentChainAddress;
-    address public currentTokenAddress = ETH_TOKEN_ADDRESS;
+    address public currentTokenAddress = BASE_TOKEN_VIRTUAL_ADDRESS;
     TestnetERC20Token currentToken;
 
     // Amounts deposited by each user, mapped by user address and token address
@@ -110,7 +110,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
     modifier useERC20Token(uint256 tokenIndexSeed) {
         currentTokenAddress = tokens[bound(tokenIndexSeed, 0, tokens.length - 1)];
 
-        while (currentTokenAddress == ETH_TOKEN_ADDRESS) {
+        while (currentTokenAddress == BASE_TOKEN_VIRTUAL_ADDRESS) {
             tokenIndexSeed += 1;
             currentTokenAddress = tokens[bound(tokenIndexSeed, 0, tokens.length - 1)];
         }
@@ -202,7 +202,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
 
         assertEq(contractAddress, receiver);
 
-        if (tokenAddress == ETH_TOKEN_ADDRESS) {
+        if (tokenAddress == BASE_TOKEN_VIRTUAL_ADDRESS) {
             uint256 balanceBefore = contractAddress.balance;
             vm.deal(contractAddress, toSend + balanceBefore);
 
@@ -278,9 +278,9 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         assertNotEq(request.txHash, bytes32(0));
         _handleRequestByMockL2Contract(request, RequestType.TWO_BRIDGES);
 
-        depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += mintValue;
-        depositsBridge[currentChainAddress][ETH_TOKEN_ADDRESS] += mintValue;
-        tokenSumDeposit[ETH_TOKEN_ADDRESS] += mintValue;
+        depositsUsers[currentUser][BASE_TOKEN_VIRTUAL_ADDRESS] += mintValue;
+        depositsBridge[currentChainAddress][BASE_TOKEN_VIRTUAL_ADDRESS] += mintValue;
+        tokenSumDeposit[BASE_TOKEN_VIRTUAL_ADDRESS] += mintValue;
 
         depositsUsers[currentUser][currentTokenAddress] += l2Value;
         depositsBridge[currentChainAddress][currentTokenAddress] += l2Value;
@@ -307,7 +307,11 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         currentToken.mint(currentUser, mintValue);
         currentToken.approve(address(sharedBridge), mintValue);
 
-        bytes memory secondBridgeCallData = abi.encode(ETH_TOKEN_ADDRESS, uint256(0), chainContracts[currentChainId]);
+        bytes memory secondBridgeCallData = abi.encode(
+            BASE_TOKEN_VIRTUAL_ADDRESS,
+            uint256(0),
+            chainContracts[currentChainId]
+        );
         L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
             _chainId: currentChainId,
             _mintValue: mintValue,
@@ -328,10 +332,10 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         assertNotEq(request.txHash, bytes32(0));
         _handleRequestByMockL2Contract(request, RequestType.TWO_BRIDGES);
 
-        depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += l2Value;
-        depositsBridge[currentChainAddress][ETH_TOKEN_ADDRESS] += l2Value;
-        tokenSumDeposit[ETH_TOKEN_ADDRESS] += l2Value;
-        l2ValuesSum[ETH_TOKEN_ADDRESS] += l2Value;
+        depositsUsers[currentUser][BASE_TOKEN_VIRTUAL_ADDRESS] += l2Value;
+        depositsBridge[currentChainAddress][BASE_TOKEN_VIRTUAL_ADDRESS] += l2Value;
+        tokenSumDeposit[BASE_TOKEN_VIRTUAL_ADDRESS] += l2Value;
+        l2ValuesSum[BASE_TOKEN_VIRTUAL_ADDRESS] += l2Value;
 
         depositsUsers[currentUser][currentTokenAddress] += mintValue;
         depositsBridge[currentChainAddress][currentTokenAddress] += mintValue;
@@ -429,10 +433,10 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         assertNotEq(request.txHash, bytes32(0));
         _handleRequestByMockL2Contract(request, RequestType.DIRECT);
 
-        depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += mintValue;
-        depositsBridge[currentChainAddress][ETH_TOKEN_ADDRESS] += mintValue;
-        tokenSumDeposit[ETH_TOKEN_ADDRESS] += mintValue;
-        l2ValuesSum[ETH_TOKEN_ADDRESS] += l2Value;
+        depositsUsers[currentUser][BASE_TOKEN_VIRTUAL_ADDRESS] += mintValue;
+        depositsBridge[currentChainAddress][BASE_TOKEN_VIRTUAL_ADDRESS] += mintValue;
+        tokenSumDeposit[BASE_TOKEN_VIRTUAL_ADDRESS] += mintValue;
+        l2ValuesSum[BASE_TOKEN_VIRTUAL_ADDRESS] += l2Value;
     }
 
     // deposits base ERC20 token to the bridge
@@ -522,7 +526,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
             abi.encode(true)
         );
 
-        l1Nullifier.finalizeWithdrawal({
+        sharedBridge.finalizeWithdrawal({
             _chainId: currentChainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -578,7 +582,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
             abi.encode(true)
         );
 
-        l1Nullifier.finalizeWithdrawal({
+        sharedBridge.finalizeWithdrawal({
             _chainId: currentChainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
@@ -602,7 +606,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         uint256 chainIndexSeed,
         uint256 l2Value
     ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) useBaseToken {
-        if (currentTokenAddress == ETH_TOKEN_ADDRESS) {
+        if (currentTokenAddress == BASE_TOKEN_VIRTUAL_ADDRESS) {
             depositEthBase(l2Value);
         } else {
             depositEthToERC20Chain(l2Value);
@@ -617,7 +621,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
     ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) useERC20Token(tokenIndexSeed) {
         address chainBaseToken = getHyperchainBaseToken(currentChainId);
 
-        if (chainBaseToken == ETH_TOKEN_ADDRESS) {
+        if (chainBaseToken == BASE_TOKEN_VIRTUAL_ADDRESS) {
             depositERC20ToEthChain(l2Value, currentTokenAddress);
         } else {
             if (currentTokenAddress == chainBaseToken) {
@@ -635,9 +639,9 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
     ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) {
         address token = getHyperchainBaseToken(currentChainId);
 
-        if (token != ETH_TOKEN_ADDRESS) {
+        if (token != BASE_TOKEN_VIRTUAL_ADDRESS) {
             withdrawERC20Token(amountToWithdraw, token);
-        } else if (token == ETH_TOKEN_ADDRESS) {
+        } else if (token == BASE_TOKEN_VIRTUAL_ADDRESS) {
             withdrawETHToken(amountToWithdraw, token);
         }
     }
@@ -669,8 +673,8 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         _registerNewTokens(tokens);
 
         _deployEra();
-        _deployHyperchain(ETH_TOKEN_ADDRESS);
-        _deployHyperchain(ETH_TOKEN_ADDRESS);
+        _deployHyperchain(BASE_TOKEN_VIRTUAL_ADDRESS);
+        _deployHyperchain(BASE_TOKEN_VIRTUAL_ADDRESS);
         _deployHyperchain(tokens[0]);
         _deployHyperchain(tokens[0]);
         _deployHyperchain(tokens[1]);

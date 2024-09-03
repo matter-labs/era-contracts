@@ -103,7 +103,7 @@ uint256 constant MEMORY_OVERHEAD_GAS = 10;
 uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 
 /// @dev the address used to identify eth as the base token for chains.
-address constant ETH_TOKEN_ADDRESS = address(1);
+address constant BASE_TOKEN_VIRTUAL_ADDRESS = address(1);
 
 /// @dev the value returned in bridgehubDeposit in the TwoBridges function.
 bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);

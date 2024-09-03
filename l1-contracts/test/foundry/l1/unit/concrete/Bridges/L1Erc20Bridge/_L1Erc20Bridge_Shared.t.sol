@@ -29,6 +29,7 @@ contract L1Erc20BridgeTest is Test {
     address sharedBridgeAddress;
     address l1NullifierAddress;
     bytes32 internal dummyL2DepositTxHash;
+    uint256 eraChainId = 9;
 
     constructor() {
         randomSigner = makeAddr("randomSigner");
@@ -37,7 +38,6 @@ contract L1Erc20BridgeTest is Test {
         alice = makeAddr("alice");
         l1NullifierAddress = makeAddr("l1NullifierAddress");
 
-        uint256 eraChainId = 9;
         bridge = new L1ERC20Bridge(
             IL1Nullifier(l1NullifierAddress),
             IL1AssetRouter(sharedBridgeAddress),
@@ -51,8 +51,7 @@ contract L1Erc20BridgeTest is Test {
             sharedBridgeAddress,
             eraChainId,
             IL1Nullifier(l1NullifierAddress),
-            new bytes(0x00),
-            ETH_ADDRESS_IN_CONTRACTS
+            new bytes(0x00)
         );
 
         vm.store(address(bridge), bytes32(uint256(212)), bytes32(0));
