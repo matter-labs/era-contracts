@@ -8,8 +8,6 @@ import {PriorityOpsBatchInfo} from "../libraries/PriorityTree.sol";
 /// @dev Enum used by L2 System Contracts to differentiate logs.
 enum SystemLogKey {
     L2_TO_L1_LOGS_TREE_ROOT_KEY,
-    TOTAL_L2_TO_L1_PUBDATA_KEY,
-    STATE_DIFF_HASH_KEY,
     PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
     PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,

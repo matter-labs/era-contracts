@@ -45,7 +45,7 @@
     "contractName": "DefaultAccount",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/DefaultAccount.sol/DefaultAccount.json",
     "sourceCodePath": "contracts-preprocessed/DefaultAccount.sol",
-    "bytecodeHash": "0x0100055da05bf3eb2d670dec0f54ebbdacdfc0dba488f0c0b57738a69127a5d0",
+    "bytecodeHash": "0x0100055d71c830bdcb955bdcd22efc094f69ea23db2e0d836c19e42ab6e44920",
     "sourceCodeHash": "0xebffe840ebbd9329edb1ebff8ca50f6935e7dabcc67194a896fcc2e968d46dfb"
   },
   {
@@ -213,7 +213,7 @@
     "contractName": "proved_batch",
     "bytecodePath": "bootloader/build/artifacts/proved_batch.yul.zbin",
     "sourceCodePath": "bootloader/build/proved_batch.yul",
-    "bytecodeHash": "0x010008c79a8fece61d5d29508af0214834522fb17f3419f7df7400cd2776a9d5",
+    "bytecodeHash": "0x010008c7591803478575584570eee45758361608846977940b41bf88b20d844a",
     "sourceCodeHash": "0x8fcc2982eed10ca9dde7e31a2c1dfc815ab1cb5d49c95c14946a7c2228562efb"
   }
 ]
