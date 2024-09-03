@@ -778,11 +778,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address stm = IZkSyncHyperchain(_hyperchain).getStateTransitionManager();
         address chainAdmin = IZkSyncHyperchain(_hyperchain).getAdmin();
         bytes32 chainBaseTokenAssetId = IZkSyncHyperchain(_hyperchain).getBaseTokenAssetId();
-        
+
         if (_chainId == 0) {
             revert ZeroChainId();
         }
-        
+
         if (_chainId > type(uint48).max) {
             revert ChainIdTooBig();
         }
@@ -812,7 +812,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         baseTokenAssetId[_chainId] = chainBaseTokenAssetId;
         settlementLayer[_chainId] = block.chainid;
-        
+
         _registerNewHyperchain(_chainId, _hyperchain);
         messageRoot.addNewChain(_chainId);
 
