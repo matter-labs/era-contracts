@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {OperatorDAInputLengthTooSmall, InvalidNumberOfBlobs, InvalidBlobsHashes, InvalidL2DAOutputHash, OneBlobWithCalldata, PubdataInputTooSmall, PubdataLengthTooBig, InvalidPubdataHash} from "contracts/DAContractsErrors.sol";
+import {OperatorDAInputLengthTooSmall, InvalidNumberOfBlobs, InvalidBlobsHashes, InvalidL2DAOutputHash, OneBlobWithCalldata, PubdataInputTooSmall, PubdataLengthTooBig, InvalidPubdataHash} from "./DAContractsErrors.sol";
 
 // solhint-disable gas-custom-errors, reason-string
 
