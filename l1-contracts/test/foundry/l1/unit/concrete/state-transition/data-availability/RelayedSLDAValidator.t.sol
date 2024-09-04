@@ -10,7 +10,7 @@ import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2Contra
 import {IL1Messenger} from "contracts/common/interfaces/IL1Messenger.sol";
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {PubdataTooSmall} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {PubdataTooSmall, L1DAValidatorInvalidSender} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract RelayedSLDAValidatorTest is Test {
     uint256 constant CHAIN_ID = 193;
@@ -96,7 +96,7 @@ contract RelayedSLDAValidatorTest is Test {
 
         bytes memory operatorDAInput = abi.encodePacked(daInput, pubdataSource, l1DaInput);
 
-        vm.expectRevert("l1-da-validator/invalid-sender");
+        vm.expectRevert(L1DAValidatorInvalidSender.selector);
         daValidator.checkDA(CHAIN_ID, 0, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
     }
 
