@@ -229,7 +229,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
         vm.blobhashes(defaultBlobVersionedHashes);
 
-        vm.expectRevert(abi.encodeWithSelector(LogAlreadyProcessed.selector, 3));
+        vm.expectRevert(abi.encodeWithSelector(LogAlreadyProcessed.selector, 1));
         executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
     }
 

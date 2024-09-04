@@ -45,7 +45,7 @@ contract UtilsTest is Test {
     function test_CreateSystemLogs() public {
         bytes[] memory logs = Utils.createSystemLogs(bytes32(0));
 
-        assertEq(logs.length, 9, "logs length should be correct");
+        assertEq(logs.length, 7, "logs length should be correct");
 
         assertEq(
             logs[0],
@@ -66,7 +66,7 @@ contract UtilsTest is Test {
                 uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
                 bytes32("")
             ),
-            "log[3] should be correct"
+            "log[1] should be correct"
         );
 
         assertEq(
@@ -77,7 +77,7 @@ contract UtilsTest is Test {
                 uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
                 bytes32("")
             ),
-            "log[4] should be correct"
+            "log[2] should be correct"
         );
 
         assertEq(
@@ -88,7 +88,7 @@ contract UtilsTest is Test {
                 uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
                 keccak256("")
             ),
-            "log[5] should be correct"
+            "log[3] should be correct"
         );
 
         assertEq(
@@ -99,7 +99,7 @@ contract UtilsTest is Test {
                 uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
                 bytes32("")
             ),
-            "log[6] should be correct"
+            "log[4] should be correct"
         );
 
         assertEq(
@@ -110,7 +110,7 @@ contract UtilsTest is Test {
                 uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY),
                 bytes32(0)
             ),
-            "log[7] should be correct"
+            "log[5] should be correct"
         );
 
         assertEq(
@@ -121,7 +121,7 @@ contract UtilsTest is Test {
                 uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
                 bytes32(uint256(uint160(L2_DA_VALIDATOR_ADDRESS)))
             ),
-            "log[8] should be correct"
+            "log[6] should be correct"
         );
     }
 
