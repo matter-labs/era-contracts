@@ -330,9 +330,7 @@ contract CommittingTest is ExecutorTest {
     }
 
     function test_RevertWhen_SystemLogIsFromIncorrectAddress() public {
-        bytes32[9] memory values = [
-            bytes32(""),
-            bytes32(""),
+        bytes32[7] memory values = [
             bytes32(""),
             bytes32(""),
             bytes32(""),
@@ -342,26 +340,7 @@ contract CommittingTest is ExecutorTest {
             bytes32("")
         ];
 
-        bytes[9] memory errors = [
-            bytes.concat("lm"),
-            bytes.concat(""),
-            bytes.concat(""),
-            bytes.concat("sc"),
-            bytes.concat("sv"),
-            bytes.concat("bl"),
-            bytes.concat("bk"),
-            bytes.concat("lp2"),
-            bytes.concat("vk")
-        ];
-
         for (uint256 i = 0; i < values.length; i++) {
-            // these logs are not checked by the executor, thus they can't cause a revert
-            if (
-                i == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY) || i == uint256(SystemLogKey.STATE_DIFF_HASH_KEY)
-            ) {
-                continue;
-            }
-
             bytes[] memory wrongL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
             address wrongAddress = makeAddr("randomAddress");
             wrongL2Logs[i] = Utils.constructL2Log(true, wrongAddress, i, values[i]);

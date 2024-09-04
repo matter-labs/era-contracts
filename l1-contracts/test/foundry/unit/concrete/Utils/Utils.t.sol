@@ -62,23 +62,6 @@ contract UtilsTest is Test {
             logs[1],
             Utils.constructL2Log(
                 true,
-                L2_TO_L1_MESSENGER,
-                uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY),
-                0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563
-            ),
-            "log[1] should be correct"
-        );
-
-        assertEq(
-            logs[2],
-            Utils.constructL2Log(true, L2_TO_L1_MESSENGER, uint256(SystemLogKey.STATE_DIFF_HASH_KEY), bytes32("")),
-            "log[2] should be correct"
-        );
-
-        assertEq(
-            logs[3],
-            Utils.constructL2Log(
-                true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
                 uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
                 bytes32("")
@@ -87,7 +70,7 @@ contract UtilsTest is Test {
         );
 
         assertEq(
-            logs[4],
+            logs[2],
             Utils.constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
@@ -98,7 +81,7 @@ contract UtilsTest is Test {
         );
 
         assertEq(
-            logs[5],
+            logs[3],
             Utils.constructL2Log(
                 true,
                 L2_BOOTLOADER_ADDRESS,
@@ -109,7 +92,7 @@ contract UtilsTest is Test {
         );
 
         assertEq(
-            logs[6],
+            logs[4],
             Utils.constructL2Log(
                 true,
                 L2_BOOTLOADER_ADDRESS,
@@ -120,7 +103,7 @@ contract UtilsTest is Test {
         );
 
         assertEq(
-            logs[7],
+            logs[5],
             Utils.constructL2Log(
                 true,
                 L2_TO_L1_MESSENGER,
@@ -131,7 +114,7 @@ contract UtilsTest is Test {
         );
 
         assertEq(
-            logs[8],
+            logs[6],
             Utils.constructL2Log(
                 true,
                 L2_TO_L1_MESSENGER,
