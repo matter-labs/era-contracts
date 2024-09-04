@@ -28,6 +28,7 @@ import {L2TransactionRequestTwoBridgesInner} from "contracts/bridgehub/IBridgehu
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {ZeroChainId, AddressTooLow, ChainIdTooBig, WrongMagicValue, SharedBridgeNotSet, TokenNotRegistered, BridgeHubAlreadyRegistered, MsgValueMismatch, SlotOccupied, CTMAlreadyRegistered, TokenAlreadyRegistered, Unauthorized, NonEmptyMsgValue, CTMNotRegistered, InvalidChainId} from "contracts/common/L1ContractErrors.sol";
+import {AssetIdAlreadyRegistered} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -374,7 +375,7 @@ contract ExperimentalBridgeTest is Test {
 
         // An already registered token cannot be registered again
         vm.prank(bridgeOwner);
-        vm.expectRevert("BH: asset id already registered");
+        vm.expectRevert(AssetIdAlreadyRegistered.selector);
         bridgeHub.addTokenAssetId(assetId);
     }
 
@@ -407,7 +408,7 @@ contract ExperimentalBridgeTest is Test {
         // An already registered token cannot be registered again by randomCaller
         if (randomCaller != bridgeOwner) {
             vm.prank(bridgeOwner);
-            vm.expectRevert("BH: asset id already registered");
+            vm.expectRevert(AssetIdAlreadyRegistered.selector);
             bridgeHub.addTokenAssetId(assetId);
         }
     }

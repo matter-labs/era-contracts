@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 import {MerkleTreeNoSort} from "./MerkleTreeNoSort.sol";
-import {MerklePathEmpty, MerkleIndexOutOfBounds, MerklePathOutOfBounds} from "contracts/common/L1ContractErrors.sol";
+import {MerklePathEmpty, MerkleIndexOutOfBounds, MerklePathOutOfBounds, MerklePathLengthMismatch, MerkleIndexOrHeightMismatch, MerkleNothingToProve} from "contracts/common/L1ContractErrors.sol";
 
 contract MerkleTestTest is Test {
     MerkleTreeNoSort merkleTree;
@@ -97,7 +97,7 @@ contract MerkleTestTest is Test {
         (, bytes32[] memory right, bytes32[] memory leaves) = prepareRangeProof(10, 13);
         bytes32[] memory leftShortened = new bytes32[](right.length - 1);
 
-        vm.expectRevert(bytes("Merkle: path length mismatch"));
+        vm.expectRevert(MerklePathLengthMismatch.selector);
         merkleTest.calculateRoot(leftShortened, right, 10, leaves);
     }
 
@@ -112,7 +112,7 @@ contract MerkleTestTest is Test {
 
     function testRangeProofWrongIndex_shouldRevert() public {
         (bytes32[] memory left, bytes32[] memory right, bytes32[] memory leaves) = prepareRangeProof(10, 13);
-        vm.expectRevert(bytes("Merkle: index/height mismatch"));
+        vm.expectRevert(MerkleIndexOrHeightMismatch.selector);
         merkleTest.calculateRoot(left, right, 128, leaves);
     }
 
@@ -126,7 +126,7 @@ contract MerkleTestTest is Test {
         bytes32[] memory left = merkleTree.getProof(elements, 10);
         bytes32[] memory right = merkleTree.getProof(elements, 10);
         bytes32[] memory leaves;
-        vm.expectRevert(bytes("Merkle: nothing to prove"));
+        vm.expectRevert(MerkleNothingToProve.selector);
         merkleTest.calculateRoot(left, right, 10, leaves);
     }
 
