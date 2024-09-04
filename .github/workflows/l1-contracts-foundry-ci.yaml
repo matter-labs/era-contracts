@@ -90,6 +90,7 @@ jobs:
         working-directory: ./l1-contracts
         run: |
           cp -r deploy-script-config-template/ script-config
+          ls -a ./deploy-script-config-template
           ls -a ./script-config
 
       - name: Run anvil
