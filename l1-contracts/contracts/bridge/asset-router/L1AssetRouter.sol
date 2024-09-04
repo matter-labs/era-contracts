@@ -14,10 +14,10 @@ import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
-import {IL2Bridge} from "../interfaces/IL2Bridge.sol";
+// import {IL2Bridge} from "../interfaces/IL2Bridge.sol";
 // import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
-// import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
+import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IL1Nullifier, FinalizeWithdrawalParams} from "../interfaces/IL1Nullifier.sol";
 // import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
@@ -194,8 +194,8 @@ contract L1AssetRouter is
         );
 
         bytes memory l2Calldata = abi.encodeCall(
-            IL2Bridge.setAssetHandlerAddress,
-            (_assetId, _assetHandlerAddressOnCounterpart)
+            IAssetRouterBase.setAssetHandlerAddress,
+            (block.chainid, _assetId, _assetHandlerAddressOnCounterpart)
         );
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
@@ -256,12 +256,25 @@ contract L1AssetRouter is
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _assetId The bridged asset ID.
     /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+    /// kl todo decide finalizeDeposit vs finalizeWithdrawal names, (if both then leave comments)
     function finalizeDeposit(
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _transferData
     ) public override onlyNullifier returns (address l1Receiver, uint256 amount) {
-        (l1Receiver, amount) = super.finalizeDeposit(_chainId, _assetId, _transferData);
+        address assetHandler = assetHandlerAddress[_assetId];
+
+        if (assetHandler != address(0)) {
+            IAssetHandler(assetHandler).bridgeMint(_chainId, _assetId, _transferData);
+        } else {
+            assetHandlerAddress[_assetId] = address(nativeTokenVault);
+            IAssetHandler(address(nativeTokenVault)).bridgeMint(_chainId, _assetId, _transferData); // ToDo: Maybe it's better to receive amount and receiver here? transferData may have different encoding
+        }
+
+        (amount, l1Receiver) = abi.decode(_transferData, (uint256, address));
+
+        emit DepositFinalizedAssetRouter(_chainId, l1Receiver, _assetId, amount);
+        // emit WithdrawalFinalizedAssetRouter(_chainId, _assetId, new bytes(0)); // kl todo
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -421,7 +434,7 @@ contract L1AssetRouter is
         }
 
         {
-            bytes memory l2TxCalldata = getDepositCalldata(ERA_CHAIN_ID, _prevMsgSender, _assetId, bridgeMintCalldata);
+            bytes memory l2TxCalldata = getDepositCalldata(_prevMsgSender, _assetId, bridgeMintCalldata);
 
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
             // Otherwise, the refund will be sent to the specified address.

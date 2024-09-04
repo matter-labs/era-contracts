@@ -325,7 +325,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
     l1Bridgehub.interface.encodeFunctionData("registerSettlementLayer", [chainId, true])
   );
 
-  console.log("Registering Bridgehub counter part on the Gateway", receipt1.transactionHash);
+  console.log("Registering Gateway as settlement layer on the L1", receipt1.transactionHash);
 
   const gasPrice = (await deployer.deployWallet.provider.getGasPrice()).mul(GAS_MULTIPLIER);
   const value = (
@@ -367,6 +367,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
     ])
   );
   const l2TxHash = zkUtils.getL2HashFromPriorityOp(receipt2, gatewayAddress);
+  console.log("STM asset registered in L2SharedBridge on SL tx hash: ", receipt2.transactionHash);
   console.log("STM asset registered in L2SharedBridge on SL l2 tx hash: ", l2TxHash);
 
   const l2STMAddress = getAddressFromEnv("GATEWAY_STATE_TRANSITION_PROXY_ADDR");
@@ -379,7 +380,9 @@ async function registerSLContractsOnL1(deployer: Deployer) {
     l1Bridgehub.interface.encodeFunctionData("addStateTransitionManager", [l2STMAddress]),
     priorityTxMaxGasLimit
   );
+  const l2TxHash2dot5 = zkUtils.getL2HashFromPriorityOp(receipt3, gatewayAddress);
   console.log(`L2 STM address ${l2STMAddress} registered on gateway, txHash: ${receipt3.transactionHash}`);
+  console.log(`L2 STM , txHash: ${l2TxHash2dot5}`);
 
   // Setting the corresponding STM address on L2.
   const receipt4 = await deployer.executeUpgrade(
@@ -401,7 +404,8 @@ async function registerSLContractsOnL1(deployer: Deployer) {
     ])
   );
   const l2TxHash3 = zkUtils.getL2HashFromPriorityOp(receipt4, gatewayAddress);
-  console.log("STM asset registered in L2 Bridgehub on SL", l2TxHash3);
+  console.log("STM asset registered in L2 Bridgehub on SL", receipt4.transactionHash);
+  console.log("STM l2TxHash", l2TxHash3);
 }
 
 // TODO: maybe move it to SDK

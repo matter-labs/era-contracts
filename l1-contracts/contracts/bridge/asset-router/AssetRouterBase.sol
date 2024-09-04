@@ -11,6 +11,7 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 // import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 // import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
 import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
+import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -103,6 +104,13 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes32 _assetId,
         address _assetHandlerAddressOnCounterpart
     ) internal virtual returns (L2TransactionRequestTwoBridgesInner memory request) {}
+
+    /// @inheritdoc IAssetRouterBase
+    function setAssetHandlerAddress(
+        uint256 _originChainId,
+        bytes32 _assetId,
+        address _assetAddress
+    ) external virtual override {}
 
     /*//////////////////////////////////////////////////////////////
                             INITIATTE DEPOSIT Functions
@@ -198,7 +206,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
         bytes32 txDataHash = _encodeTxDataHash(encodingVersion, _prevMsgSender, assetId, transferData);
         request = _requestToBridge({
-            _chainId: _chainId,
             _prevMsgSender: _prevMsgSender,
             _assetId: assetId,
             _bridgeMintCalldata: bridgeMintCalldata,
@@ -218,7 +225,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
     /// @inheritdoc IAssetRouterBase
     function getDepositCalldata(
-        uint256 _chainId,
         address _sender,
         bytes32 _assetId,
         bytes memory _assetData
@@ -226,7 +232,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         // First branch covers the case when asset is not registered with NTV (custom asset handler)
         // Second branch handles tokens registered with NTV and uses legacy calldata encoding
         if (nativeTokenVault.tokenAddress(_assetId) == address(0)) {
-            return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (_chainId, _assetId, _assetData));
+            return abi.encodeCall(IL1AssetRouter.finalizeDeposit, (block.chainid, _assetId, _assetData));
         } else {
             // slither-disable-next-line unused-return
             (, address _receiver, address _parsedNativeToken, uint256 _amount, bytes memory _gettersData) = DataEncoding
@@ -254,51 +260,23 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Finalize the withdrawal and release funds.
-    /// @param _chainId The chain ID of the transaction to check.
-    /// @param _assetId The bridged asset ID.
-    /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-    /// kl todo decide finalizeDeposit vs finalizeWithdrawal names, (if both then leave comments)
-    function finalizeDeposit(
-        uint256 _chainId,
-        bytes32 _assetId,
-        bytes calldata _transferData
-    ) public virtual override returns (address l1Receiver, uint256 amount) {
-        address assetHandler = assetHandlerAddress[_assetId];
-
-        if (assetHandler != address(0)) {
-            IAssetHandler(assetHandler).bridgeMint(_chainId, _assetId, _transferData);
-        } else {
-            assetHandlerAddress[_assetId] = address(nativeTokenVault);
-            IAssetHandler(address(nativeTokenVault)).bridgeMint(_chainId, _assetId, _transferData); // ToDo: Maybe it's better to receive amount and receiver here? transferData may have different encoding
-        }
-
-        (amount, l1Receiver) = abi.decode(_transferData, (uint256, address));
-
-        emit DepositFinalizedAssetRouter(_chainId, l1Receiver, _assetId, amount);
-        // emit WithdrawalFinalizedAssetRouter(_chainId, _assetId, new bytes(0)); // kl todo
-    }
-
     /*//////////////////////////////////////////////////////////////
                             Internal Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @dev The request data that is passed to the bridgehub.
-    /// @param _chainId The chain ID of the ZK chain to which deposit.
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
     /// @param _assetId The deposited asset ID.
     /// @param _bridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
     /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
     /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
     function _requestToBridge(
-        // solhint-disable-next-line no-unused-vars
-        uint256 _chainId,
         address _prevMsgSender,
         bytes32 _assetId,
         bytes memory _bridgeMintCalldata,
         bytes32 _txDataHash
     ) internal view virtual returns (L2TransactionRequestTwoBridgesInner memory request) {
-        bytes memory l2TxCalldata = getDepositCalldata(_chainId, _prevMsgSender, _assetId, _bridgeMintCalldata);
+        bytes memory l2TxCalldata = getDepositCalldata(_prevMsgSender, _assetId, _bridgeMintCalldata);
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,

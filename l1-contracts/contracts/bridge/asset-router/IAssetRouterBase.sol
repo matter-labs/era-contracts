@@ -89,12 +89,6 @@ interface IAssetRouterBase {
 
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 
-    function finalizeDeposit(
-        uint256 _chainId,
-        bytes32 _assetId,
-        bytes memory _transferData
-    ) external returns (address l1Receiver, uint256 amount);
-
     function setAssetHandlerAddressThisChain(bytes32 _additionalData, address _assetHandlerAddress) external;
 
     function assetHandlerAddress(bytes32 _assetId) external view returns (address);
@@ -102,15 +96,18 @@ interface IAssetRouterBase {
     function nativeTokenVault() external view returns (INativeTokenVault);
 
     /// @notice Generates a calldata for calling the deposit finalization on the L2 native token contract.
-    /// @param _chainId The chain ID of the ZK chain to which deposit.
+    // / @param _chainId The chain ID of the ZK chain to which deposit.
     /// @param _sender The address of the deposit initiator.
     /// @param _assetId The deposited asset ID.
     /// @param _assetData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
     /// @return Returns calldata used on ZK chain.
     function getDepositCalldata(
-        uint256 _chainId,
         address _sender,
         bytes32 _assetId,
         bytes memory _assetData
     ) external view returns (bytes memory);
+
+    /// @dev Used to set the assedAddress for a given assetId.
+    /// @dev Will be used by ZK Gateway
+    function setAssetHandlerAddress(uint256 _originChainId, bytes32 _assetId, address _assetAddress) external;
 }

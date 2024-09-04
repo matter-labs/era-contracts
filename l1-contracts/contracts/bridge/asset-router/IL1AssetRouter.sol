@@ -164,4 +164,10 @@ interface IL1AssetRouter {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external;
+
+    function finalizeDeposit(
+        uint256 _chainId,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) external returns (address l1Receiver, uint256 amount);
 }

@@ -77,12 +77,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         _disableInitializers();
     }
 
-    ///  @inheritdoc IL2AssetRouter
+    ///  @inheritdoc IAssetRouterBase
     function setAssetHandlerAddress(
         uint256 _originChainId,
         bytes32 _assetId,
         address _assetAddress
-    ) external onlyAssetRouterCounterpart(_originChainId) {
+    ) external override onlyAssetRouterCounterpart(_originChainId) {
         _setAssetHandlerAddress(_assetId, _assetAddress);
     }
 
@@ -132,6 +132,27 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         bytes32 _assetId,
         bytes memory _transferData
     ) public override onlyAssetRouterCounterpart(L1_CHAIN_ID) {
+        address assetHandler = assetHandlerAddress[_assetId];
+        if (assetHandler != address(0)) {
+            IAssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
+        } else {
+            assetHandlerAddress[_assetId] = L2_NATIVE_TOKEN_VAULT_ADDR;
+            IAssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
+        }
+
+        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, _transferData);
+    }
+
+    /// @notice Finalize the deposit and mint funds
+    /// @param _assetId The encoding of the asset on L2
+    /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken)
+    // kl todo. FinalizeDeposit functions.
+    function finalizeDeposit(
+        // solhint-disable-next-line no-unused-vars
+        uint256,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) public onlyAssetRouterCounterpart(L1_CHAIN_ID) {
         address assetHandler = assetHandlerAddress[_assetId];
         if (assetHandler != address(0)) {
             IAssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
