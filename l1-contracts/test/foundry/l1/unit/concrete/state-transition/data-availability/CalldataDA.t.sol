@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {Utils} from "../../Utils/Utils.sol";
 import {TestCalldataDA} from "contracts/dev-contracts/test/TestCalldataDA.sol";
 import {BLOB_SIZE_BYTES} from "contracts/state-transition/data-availability/CalldataDA.sol";
-import {OperatorDAInputLengthTooSmall, InvalidNumberOfBlobs, InvalidBlobsHashes, InvalidL2DAOutputHash, OneBlobWithCalldata, PubdataInputTooSmall, PubdataLengthTooBig, InvalidPubdataHash, BlobCommitmentNotPublished, ValL1DAWrongInputLength} from "da-contracts/contracts/DAContractsErrors.sol";
+import {OperatorDAInputLengthTooSmall, InvalidNumberOfBlobs, InvalidBlobsHashes, InvalidL2DAOutputHash, OneBlobWithCalldata, PubdataInputTooSmall, PubdataLengthTooBig, InvalidPubdataHash, BlobCommitmentNotPublished, ValL1DAWrongInputLength} from "../../../../../../../da-contracts/contracts/DAContractsErrors.sol";
 
 contract CalldataDATest is Test {
     TestCalldataDA calldataDA;
