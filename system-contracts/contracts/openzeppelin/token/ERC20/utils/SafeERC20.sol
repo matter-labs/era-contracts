@@ -6,7 +6,7 @@ pragma solidity ^0.8.0;
 import {IERC20} from "../IERC20.sol";
 import {IERC20Permit} from "../extensions/IERC20Permit.sol";
 import {Address} from "../../../utils/Address.sol";
-import {SafeERC20ApproveFromNonZeroToNonZeroAllowance, SafeERC20DecreasedAllowanceBelowZero, SafeERC20PermitDidNotSucceed, SafeERC20OperationDidNotSucceed} from "system-contracts/contracts/SystemContractsErrors.sol";
+import {SafeERC20ApproveFromNonZeroToNonZeroAllowance, SafeERC20DecreasedAllowanceBelowZero, SafeERC20PermitDidNotSucceed, SafeERC20OperationDidNotSucceed} from "contracts/SystemContractErrors.sol";
 
 /**
  * @title SafeERC20
