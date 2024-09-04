@@ -73,8 +73,8 @@ describe("ValidatorTimelock tests", function () {
       validatorTimelockContract.address,
       validatorTimelockContract.signer
     );
-    const setSTMtx = await validatorTimelock.setChainTypeManager(dummyChainTypeManager.address);
-    await setSTMtx.wait();
+    const setCTMtx = await validatorTimelock.setChainTypeManager(dummyChainTypeManager.address);
+    await setCTMtx.wait();
   });
 
   it("Should check deployment", async () => {

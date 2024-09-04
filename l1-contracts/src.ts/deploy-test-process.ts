@@ -185,8 +185,8 @@ export async function initialPreUpgradeContractsDeployment(
   // note we should also deploy the old ERC20Bridge here, but we can do that later.
 
   // // for Era we first deploy the DiamondProxy manually, set the vars manually,
-  // // and register it in the system via STM.registerAlreadyDeployedStateTransition and bridgehub.createNewChain(ERA_CHAIN_ID, ..)
-  // // note we just deploy the STM to get the storedBatchZero
+  // // and register it in the system via CTM.registerAlreadyDeployedStateTransition and bridgehub.createNewChain(ERA_CHAIN_ID, ..)
+  // // note we just deploy the CTM to get the storedBatchZero
 
   await deployer.deployDiamondProxy(extraFacets, {});
   // we have to know the address of the diamond proxy in the mailbox so we separate the deployment

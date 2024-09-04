@@ -48,7 +48,7 @@ import {
   compileInitialCutHash,
   readBytecode,
   applyL1ToL2Alias,
-  BRIDGEHUB_STM_ASSET_DATA_ABI_STRING,
+  BRIDGEHUB_CTM_ASSET_DATA_ABI_STRING,
   // priorityTxMaxGasLimit,
   encodeNTVAssetId,
   ETH_ADDRESS_IN_CONTRACTS,
@@ -72,7 +72,7 @@ import { BridgehubFactory, ChainAdminFactory, ERC20Factory, ChainTypeManagerFact
 
 import { IL1AssetRouterFactory } from "../typechain/IL1AssetRouterFactory";
 import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
-import { ISTMDeploymentTrackerFactory } from "../typechain/ISTMDeploymentTrackerFactory";
+import { ICTMDeploymentTrackerFactory } from "../typechain/ICTMDeploymentTrackerFactory";
 
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
 
@@ -172,9 +172,9 @@ export class Deployer {
         this.deployWallet
       );
 
-      const hashFromSTM = await ctm.initialCutHash();
-      if (hash != hashFromSTM) {
-        throw new Error(`Has from STM ${hashFromSTM} does not match the computed hash ${hash}`);
+      const hashFromCTM = await ctm.initialCutHash();
+      if (hash != hashFromCTM) {
+        throw new Error(`Has from CTM ${hashFromCTM} does not match the computed hash ${hash}`);
       }
     }
 
@@ -918,48 +918,48 @@ export class Deployer {
     }
   }
 
-  public async deploySTMDeploymentTrackerImplementation(
+  public async deployCTMDeploymentTrackerImplementation(
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
     const contractAddress = await this.deployViaCreate2(
-      "STMDeploymentTracker",
+      "CTMDeploymentTracker",
       [this.addresses.Bridgehub.BridgehubProxy, this.addresses.Bridges.SharedBridgeProxy],
       create2Salt,
       ethTxOptions
     );
 
     if (this.verbose) {
-      console.log(`CONTRACTS_STM_DEPLOYMENT_TRACKER_IMPL_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_CTM_DEPLOYMENT_TRACKER_IMPL_ADDR=${contractAddress}`);
     }
 
-    this.addresses.Bridgehub.STMDeploymentTrackerImplementation = contractAddress;
+    this.addresses.Bridgehub.CTMDeploymentTrackerImplementation = contractAddress;
   }
 
-  public async deploySTMDeploymentTrackerProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployCTMDeploymentTrackerProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const initCalldata = new Interface(
-      hardhat.artifacts.readArtifactSync("STMDeploymentTracker").abi
+      hardhat.artifacts.readArtifactSync("CTMDeploymentTracker").abi
     ).encodeFunctionData("initialize", [this.addresses.Governance]);
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
-      [this.addresses.Bridgehub.STMDeploymentTrackerImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
+      [this.addresses.Bridgehub.CTMDeploymentTrackerImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
     );
 
     if (this.verbose) {
-      console.log(`CONTRACTS_STM_DEPLOYMENT_TRACKER_PROXY_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_CTM_DEPLOYMENT_TRACKER_PROXY_ADDR=${contractAddress}`);
     }
 
-    this.addresses.Bridgehub.STMDeploymentTrackerProxy = contractAddress;
+    this.addresses.Bridgehub.CTMDeploymentTrackerProxy = contractAddress;
 
     // const bridgehub = this.bridgehubContract(this.deployWallet);
-    // const data0 = bridgehub.interface.encodeFunctionData("setSTMDeployer", [
-    //   this.addresses.Bridgehub.STMDeploymentTrackerProxy,
+    // const data0 = bridgehub.interface.encodeFunctionData("setCTMDeployer", [
+    //   this.addresses.Bridgehub.CTMDeploymentTrackerProxy,
     // ]);
     // await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, data0);
     // if (this.verbose) {
-    //   console.log("STM DT registered in Bridgehub");
+    //   console.log("CTM DT registered in Bridgehub");
     // }
   }
 
@@ -978,7 +978,7 @@ export class Deployer {
 
     const upgradeData1 = await bridgehub.interface.encodeFunctionData("setAddresses", [
       this.addresses.Bridges.SharedBridgeProxy,
-      this.addresses.Bridgehub.STMDeploymentTrackerProxy,
+      this.addresses.Bridgehub.CTMDeploymentTrackerProxy,
       this.addresses.Bridgehub.MessageRootProxy,
     ]);
     await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData1);
@@ -1120,23 +1120,23 @@ export class Deployer {
         ]);
         const receipt2 = await this.executeUpgrade(l1AssetRouter.address, 0, whitelistData);
         if (this.verbose) {
-          console.log("STM deployment tracker whitelisted in L1 Shared Bridge", receipt2.gasUsed.toString());
+          console.log("CTM deployment tracker whitelisted in L1 Shared Bridge", receipt2.gasUsed.toString());
           console.log(
-            `CONTRACTS_STM_ASSET_INFO=${await bridgehub.ctmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
+            `CONTRACTS_CTM_ASSET_INFO=${await bridgehub.ctmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
           );
         }
 
-        const data1 = ctmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL1", [
+        const data1 = ctmDeploymentTracker.interface.encodeFunctionData("registerCTMAssetOnL1", [
           this.addresses.StateTransition.StateTransitionProxy,
         ]);
-        const receipt3 = await this.executeUpgrade(this.addresses.Bridgehub.STMDeploymentTrackerProxy, 0, data1);
+        const receipt3 = await this.executeUpgrade(this.addresses.Bridgehub.CTMDeploymentTrackerProxy, 0, data1);
         if (this.verbose) {
           console.log(
-            "STM asset registered in L1 Shared Bridge via STM Deployment Tracker",
+            "CTM asset registered in L1 Shared Bridge via CTM Deployment Tracker",
             receipt3.gasUsed.toString()
           );
           console.log(
-            `CONTRACTS_STM_ASSET_INFO=${await bridgehub.ctmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
+            `CONTRACTS_CTM_ASSET_INFO=${await bridgehub.ctmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
           );
         }
       }
@@ -1170,7 +1170,7 @@ export class Deployer {
 
     const ctmData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [newAdmin, initialDiamondCut]);
     const bridgehubData = new ethers.utils.AbiCoder().encode(
-      [BRIDGEHUB_STM_ASSET_DATA_ABI_STRING],
+      [BRIDGEHUB_CTM_ASSET_DATA_ABI_STRING],
       [[this.chainId, ctmData, chainData]]
     );
 
@@ -1267,7 +1267,7 @@ export class Deployer {
     const baseTokenAddress = await ntv.tokenAddress(baseTokenAssetId);
 
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
-    const alreadyRegisteredInSTM =
+    const alreadyRegisteredInCTM =
       (await chainTypeManager.getHyperchain(inputChainId)) != ethers.constants.AddressZero;
 
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
@@ -1324,7 +1324,7 @@ export class Deployer {
       console.log(`CONTRACTS_BASE_TOKEN_ADDR=${baseTokenAddress}`);
     }
 
-    if (!alreadyRegisteredInSTM) {
+    if (!alreadyRegisteredInCTM) {
       const diamondProxyAddress =
         "0x" +
         receipt.logs
@@ -1440,8 +1440,8 @@ export class Deployer {
     await this.deploySharedBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
     await this.deployNativeTokenVaultImplementation(create2Salt, { gasPrice, nonce: nonce + 2 });
     await this.deployNativeTokenVaultProxy(create2Salt, { gasPrice });
-    await this.deploySTMDeploymentTrackerImplementation(create2Salt, { gasPrice });
-    await this.deploySTMDeploymentTrackerProxy(create2Salt, { gasPrice });
+    await this.deployCTMDeploymentTrackerImplementation(create2Salt, { gasPrice });
+    await this.deployCTMDeploymentTrackerProxy(create2Salt, { gasPrice });
     await this.registerAddresses();
   }
 
@@ -1590,7 +1590,7 @@ export class Deployer {
   }
 
   public ctmDeploymentTracker(signerOrProvider: Signer | providers.Provider) {
-    return ISTMDeploymentTrackerFactory.connect(this.addresses.Bridgehub.STMDeploymentTrackerProxy, signerOrProvider);
+    return ICTMDeploymentTrackerFactory.connect(this.addresses.Bridgehub.CTMDeploymentTrackerProxy, signerOrProvider);
   }
 
   public baseTokenContract(signerOrProvider: Signer | providers.Provider) {

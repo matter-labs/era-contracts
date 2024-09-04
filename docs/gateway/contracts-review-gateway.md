@@ -10,7 +10,7 @@ List of changes and new features:
 - Custom Data Availability contracts. This is needed to handle the relayed data availability on the Gateway.
 - L1 -> Gateway -> ZKChain transactions. This is done by forwarding transactions to Chain's Mailbox on the Gateway via the Gateway's Mailbox.
 - ZKChain -> Gateway -> L1 transactions. This is done by aggregating the logs of different chains in the MessageRoot contract, and sending a single log to L1.
-- Migration of chains to and from the Gateway. This is done using our Custom Asset Bridging framework, each STM has an assetId and is managed by a shared STMDeploymentTracker, the L2AssetRouter = L2SharedBridge is deployed on the Gateway, but only holds the chains as assets, with the Bridgehub as the AssetHandler.
+- Migration of chains to and from the Gateway. This is done using our Custom Asset Bridging framework, each CTM has an assetId and is managed by a shared CTMDeploymentTracker, the L2AssetRouter = L2SharedBridge is deployed on the Gateway, but only holds the chains as assets, with the Bridgehub as the AssetHandler.
 
 Other smaller changes:
 
@@ -56,7 +56,7 @@ Known issues, and features that still need to be implemented:
 The majority of the rest of the changes. This makes the scope quite big, so please focus on the initial scope in more detail, and if you have time include the later scope.
 
 - MessageRoot.sol
-- STMDeploymentTracker.sol
+- CTMDeploymentTracker.sol
 - Bridgehub.sol
 - Config.sol
 - L2ContractAddresses.sol

@@ -306,7 +306,7 @@ async function main() {
 }
 
 async function registerSLContractsOnL1(deployer: Deployer) {
-  /// STM asset info
+  /// CTM asset info
   /// l2Bridgehub in L1Bridghub
 
   const chainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
@@ -314,11 +314,11 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   console.log(`Gateway chain Id: ${chainId}`);
 
   const l1Bridgehub = deployer.bridgehubContract(deployer.deployWallet);
-  const l1STM = deployer.chainTypeManagerContract(deployer.deployWallet);
+  const l1CTM = deployer.chainTypeManagerContract(deployer.deployWallet);
   console.log(deployer.addresses.StateTransition.StateTransitionProxy);
   const gatewayAddress = await l1Bridgehub.getHyperchain(chainId);
   // this script only works when owner is the deployer
-  console.log("Registering Gateway chain id on the STM");
+  console.log("Registering Gateway chain id on the CTM");
   const receipt1 = await deployer.executeUpgrade(
     l1Bridgehub.address,
     0,
@@ -346,7 +346,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   const assetRouter = deployer.defaultSharedBridge(deployer.deployWallet);
   const assetId = await l1Bridgehub.ctmAssetIdFromChainId(chainId);
 
-  // Setting the L2 bridgehub as the counterpart for the STM asset
+  // Setting the L2 bridgehub as the counterpart for the CTM asset
   const receipt2 = await deployer.executeUpgrade(
     l1Bridgehub.address,
     ethIsBaseToken ? value : 0,
@@ -367,21 +367,21 @@ async function registerSLContractsOnL1(deployer: Deployer) {
     ])
   );
   const l2TxHash = zkUtils.getL2HashFromPriorityOp(receipt2, gatewayAddress);
-  console.log("STM asset registered in L2SharedBridge on SL l2 tx hash: ", l2TxHash);
+  console.log("CTM asset registered in L2SharedBridge on SL l2 tx hash: ", l2TxHash);
 
-  const l2STMAddress = getAddressFromEnv("GATEWAY_STATE_TRANSITION_PROXY_ADDR");
+  const l2CTMAddress = getAddressFromEnv("GATEWAY_STATE_TRANSITION_PROXY_ADDR");
 
-  // Whitelisting the STM address on L2
+  // Whitelisting the CTM address on L2
   const receipt3 = await deployer.executeUpgradeOnL2(
     chainId,
     L2_BRIDGEHUB_ADDRESS,
     gasPrice,
-    l1Bridgehub.interface.encodeFunctionData("addChainTypeManager", [l2STMAddress]),
+    l1Bridgehub.interface.encodeFunctionData("addChainTypeManager", [l2CTMAddress]),
     priorityTxMaxGasLimit
   );
-  console.log(`L2 STM address ${l2STMAddress} registered on gateway, txHash: ${receipt3.transactionHash}`);
+  console.log(`L2 CTM address ${l2CTMAddress} registered on gateway, txHash: ${receipt3.transactionHash}`);
 
-  // Setting the corresponding STM address on L2.
+  // Setting the corresponding CTM address on L2.
   const receipt4 = await deployer.executeUpgrade(
     l1Bridgehub.address,
     value,
@@ -396,12 +396,12 @@ async function registerSLContractsOnL1(deployer: Deployer) {
         secondBridgeAddress: ctmDeploymentTracker.address,
         secondBridgeValue: 0,
         secondBridgeCalldata:
-          "0x01" + ethers.utils.defaultAbiCoder.encode(["address", "address"], [l1STM.address, l2STMAddress]).slice(2),
+          "0x01" + ethers.utils.defaultAbiCoder.encode(["address", "address"], [l1CTM.address, l2CTMAddress]).slice(2),
       },
     ])
   );
   const l2TxHash3 = zkUtils.getL2HashFromPriorityOp(receipt4, gatewayAddress);
-  console.log("STM asset registered in L2 Bridgehub on SL", l2TxHash3);
+  console.log("CTM asset registered in L2 Bridgehub on SL", l2TxHash3);
 }
 
 // TODO: maybe move it to SDK

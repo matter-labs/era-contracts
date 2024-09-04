@@ -133,7 +133,7 @@ describe("Gateway", function () {
         },
       ])
     );
-    // console.log("STM asset registered in L2 Bridgehub on SL");
+    // console.log("CTM asset registered in L2 Bridgehub on SL");
   });
 
   it("Check start message to L3 on L1", async () => {

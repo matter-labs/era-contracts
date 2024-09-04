@@ -14,7 +14,7 @@ import { encodeNTVAssetId } from "../src.ts/utils";
 
 // Things that still have to be manually double checked:
 // 1. Contracts must be verified.
-// 2. Getter methods in STM.
+// 2. Getter methods in CTM.
 
 // List the contracts that should become the upgrade targets
 const genesisUpgrade = process.env.CONTRACTS_GENESIS_UPGRADE_ADDR!;
@@ -278,7 +278,7 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
     throw new Error("L2 default account bytecode hash is not correct");
   }
 
-  console.log("STM init data correct!");
+  console.log("CTM init data correct!");
 }
 
 async function checkValidatorTimelock() {
@@ -338,12 +338,12 @@ async function checkBridgehub() {
     throw new Error("Bridgehub sharedBridge is not correct");
   }
 
-  const usedSTM = await contract.chainTypeManager(eraChainId);
-  if (usedSTM.toLowerCase() != ctm.toLowerCase()) {
+  const usedCTM = await contract.chainTypeManager(eraChainId);
+  if (usedCTM.toLowerCase() != ctm.toLowerCase()) {
     throw new Error("Bridgehub chainTypeManager is not correct");
   }
 
-  const isRegistered = await contract.chainTypeManagerIsRegistered(usedSTM);
+  const isRegistered = await contract.chainTypeManagerIsRegistered(usedCTM);
   if (!isRegistered) {
     throw new Error("Bridgehub chainTypeManager is not registered");
   }
@@ -368,45 +368,45 @@ async function checkMailbox() {
   console.log("Mailbox is correct!");
 }
 
-async function checkSTMImpl() {
+async function checkCTMImpl() {
   const artifact = await hardhat.artifacts.readArtifact("ChainTypeManager");
   const contract = new ethers.Contract(ctmImpl, artifact.abi, l1Provider);
 
   await checkCorrectInitCode(ctmImplDeployTx, contract, artifact.bytecode, [bridgeHub, maxNumberOfHyperchains]);
 
-  console.log("STM impl correct!");
+  console.log("CTM impl correct!");
 }
 
-async function checkSTM() {
+async function checkCTM() {
   const artifact = await hardhat.artifacts.readArtifact("ChainTypeManager");
 
   const contract = new ethers.Contract(ctm, artifact.abi, l1Provider);
 
   const usedBH = await contract.BRIDGE_HUB();
   if (usedBH.toLowerCase() != bridgeHub.toLowerCase()) {
-    throw new Error("STM bridgeHub is not correct");
+    throw new Error("CTM bridgeHub is not correct");
   }
   const usedMaxNumberOfHyperchains = (await contract.MAX_NUMBER_OF_HYPERCHAINS()).toNumber();
   if (usedMaxNumberOfHyperchains != maxNumberOfHyperchains) {
-    throw new Error("STM maxNumberOfHyperchains is not correct");
+    throw new Error("CTM maxNumberOfHyperchains is not correct");
   }
 
   const genUpgrade = await contract.genesisUpgrade();
   if (genUpgrade.toLowerCase() != genesisUpgrade.toLowerCase()) {
-    throw new Error("STM genesisUpgrade is not correct");
+    throw new Error("CTM genesisUpgrade is not correct");
   }
 
   const storedBatchHashZero = await contract.storedBatchZero();
   if (storedBatchHashZero.toLowerCase() != expectedStoredBatchHashZero.toLowerCase()) {
-    throw new Error("STM storedBatchHashZero is not correct");
+    throw new Error("CTM storedBatchHashZero is not correct");
   }
 
   const currentOwner = await contract.owner();
   if (currentOwner.toLowerCase() != expectedOwner.toLowerCase()) {
-    throw new Error("STM owner is not correct");
+    throw new Error("CTM owner is not correct");
   }
 
-  console.log("STM is correct!");
+  console.log("CTM is correct!");
 
   await extractProxyInitializationData(contract, (await l1Provider.getTransaction(ctmDeployTx)).data);
 }
@@ -502,8 +502,8 @@ async function main() {
 
     await checkLegacyBridge();
 
-    await checkSTMImpl();
-    await checkSTM();
+    await checkCTMImpl();
+    await checkCTM();
   });
 
   await program.parseAsync(process.argv);
