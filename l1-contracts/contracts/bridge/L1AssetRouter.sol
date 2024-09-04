@@ -229,7 +229,7 @@ contract L1AssetRouter is
     /// @param _chainId The ID of the ZK chain.
     /// @param _token The address of the token which was previously deposit to shared bridge.
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external {
-        if (msg.sender == address(nativeTokenVault)) {
+        if (msg.sender != address(nativeTokenVault)) {
             revert NotNTV();
         }
         chainBalance[_chainId][_token] = 0;

@@ -116,7 +116,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
     /// @notice Allows the bridge to register a token address for the vault.
     /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
     function registerToken(address _l1Token) external {
-        if (_l1Token != L1_WETH_TOKEN) {
+        if (_l1Token == L1_WETH_TOKEN) {
             revert TokenNotSupported(L1_WETH_TOKEN);
         }
         if (_l1Token != ETH_TOKEN_ADDRESS && _l1Token.code.length <= 0) {
