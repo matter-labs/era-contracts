@@ -60,7 +60,7 @@ The majority of the rest of the changes. This makes the scope quite big, so plea
 - Bridgehub.sol
 - Config.sol
 - L2ContractAddresses.sol
-- StateTransitionManager.sol
+- ChainTypeManager.sol
 - ValidatorTimelock.sol
 - DiamondInit.sol
 - ZkSyncHyperchainStorage.sol

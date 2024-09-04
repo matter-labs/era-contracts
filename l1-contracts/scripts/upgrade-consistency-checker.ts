@@ -36,10 +36,10 @@ const gettersFacet = process.env.CONTRACTS_GETTERS_FACET_ADDR!;
 
 const diamondInit = process.env.CONTRACTS_DIAMOND_INIT_ADDR!;
 
-const stmImplDeployTx = "0xe01c0bb497017a25c92bfc712e370e8f900554b107fe0b6022976d05c349f2b6";
-const stmImpl = process.env.CONTRACTS_STATE_TRANSITION_IMPL_ADDR!;
-const stmDeployTx = "0x514bbf46d227eee8567825bf5c8ee1855aa8a1916f7fee7b191e2e3d5ecba849";
-const stm = process.env.CONTRACTS_STATE_TRANSITION_PROXY_ADDR!;
+const ctmImplDeployTx = "0xe01c0bb497017a25c92bfc712e370e8f900554b107fe0b6022976d05c349f2b6";
+const ctmImpl = process.env.CONTRACTS_STATE_TRANSITION_IMPL_ADDR!;
+const ctmDeployTx = "0x514bbf46d227eee8567825bf5c8ee1855aa8a1916f7fee7b191e2e3d5ecba849";
+const ctm = process.env.CONTRACTS_STATE_TRANSITION_PROXY_ADDR!;
 
 const sharedBridgeImplDeployTx = "0x074204db79298c2f6beccae881c2ad7321c331e97fb4bd93adce2eb23bf17a17";
 const sharedBridgeImpl = process.env.CONTRACTS_L1_SHARED_BRIDGE_IMPL_ADDR!;
@@ -290,9 +290,9 @@ async function checkValidatorTimelock() {
     throw new Error("ValidatorTimelock owner is not correct");
   }
 
-  const usedStm = await contract.stateTransitionManager();
-  if (usedStm.toLowerCase() != stm.toLowerCase()) {
-    throw new Error("ValidatorTimelock stateTransitionManager is not correct");
+  const usedCtm = await contract.chainTypeManager();
+  if (usedCtm.toLowerCase() != ctm.toLowerCase()) {
+    throw new Error("ValidatorTimelock chainTypeManager is not correct");
   }
 
   const validatorOneIsSet = await contract.validators(eraChainId, validatorOne);
@@ -338,14 +338,14 @@ async function checkBridgehub() {
     throw new Error("Bridgehub sharedBridge is not correct");
   }
 
-  const usedSTM = await contract.stateTransitionManager(eraChainId);
-  if (usedSTM.toLowerCase() != stm.toLowerCase()) {
-    throw new Error("Bridgehub stateTransitionManager is not correct");
+  const usedSTM = await contract.chainTypeManager(eraChainId);
+  if (usedSTM.toLowerCase() != ctm.toLowerCase()) {
+    throw new Error("Bridgehub chainTypeManager is not correct");
   }
 
-  const isRegistered = await contract.stateTransitionManagerIsRegistered(usedSTM);
+  const isRegistered = await contract.chainTypeManagerIsRegistered(usedSTM);
   if (!isRegistered) {
-    throw new Error("Bridgehub stateTransitionManager is not registered");
+    throw new Error("Bridgehub chainTypeManager is not registered");
   }
 
   const baseTokenAssetId = encodeNTVAssetId(
@@ -369,18 +369,18 @@ async function checkMailbox() {
 }
 
 async function checkSTMImpl() {
-  const artifact = await hardhat.artifacts.readArtifact("StateTransitionManager");
-  const contract = new ethers.Contract(stmImpl, artifact.abi, l1Provider);
+  const artifact = await hardhat.artifacts.readArtifact("ChainTypeManager");
+  const contract = new ethers.Contract(ctmImpl, artifact.abi, l1Provider);
 
-  await checkCorrectInitCode(stmImplDeployTx, contract, artifact.bytecode, [bridgeHub, maxNumberOfHyperchains]);
+  await checkCorrectInitCode(ctmImplDeployTx, contract, artifact.bytecode, [bridgeHub, maxNumberOfHyperchains]);
 
   console.log("STM impl correct!");
 }
 
 async function checkSTM() {
-  const artifact = await hardhat.artifacts.readArtifact("StateTransitionManager");
+  const artifact = await hardhat.artifacts.readArtifact("ChainTypeManager");
 
-  const contract = new ethers.Contract(stm, artifact.abi, l1Provider);
+  const contract = new ethers.Contract(ctm, artifact.abi, l1Provider);
 
   const usedBH = await contract.BRIDGE_HUB();
   if (usedBH.toLowerCase() != bridgeHub.toLowerCase()) {
@@ -408,7 +408,7 @@ async function checkSTM() {
 
   console.log("STM is correct!");
 
-  await extractProxyInitializationData(contract, (await l1Provider.getTransaction(stmDeployTx)).data);
+  await extractProxyInitializationData(contract, (await l1Provider.getTransaction(ctmDeployTx)).data);
 }
 
 async function checkL1AssetRouterImpl() {

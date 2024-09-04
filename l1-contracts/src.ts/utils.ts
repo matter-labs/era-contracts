@@ -38,7 +38,7 @@ export const DIAMOND_CUT_DATA_ABI_STRING =
   "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)";
 export const FORCE_DEPLOYMENT_ABI_STRING =
   "tuple(bytes32 bytecodeHash, address newAddress, bool callConstructor, uint256 value, bytes input)[]";
-export const BRIDGEHUB_STM_ASSET_DATA_ABI_STRING = "tuple(uint256 chainId, bytes stmData, bytes chainData)";
+export const BRIDGEHUB_STM_ASSET_DATA_ABI_STRING = "tuple(uint256 chainId, bytes ctmData, bytes chainData)";
 
 export function applyL1ToL2Alias(address: string): string {
   return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
@@ -302,7 +302,7 @@ export function compileInitialCutHash(
     {
       chainId: "0x0000000000000000000000000000000000000000000000000000000000000001",
       bridgehub: "0x0000000000000000000000000000000000001234",
-      stateTransitionManager: "0x0000000000000000000000000000000000002234",
+      chainTypeManager: "0x0000000000000000000000000000000000002234",
       protocolVersion: "0x0000000000000000000000000000000000002234",
       admin: "0x0000000000000000000000000000000000003234",
       validatorTimelock: "0x0000000000000000000000000000000000004234",

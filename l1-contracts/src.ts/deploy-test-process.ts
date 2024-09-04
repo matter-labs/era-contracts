@@ -329,7 +329,7 @@ export class EraDeployer extends Deployer {
       {
         chainId: this.chainId, // era chain Id
         bridgehub: this.addresses.Bridgehub.BridgehubProxy,
-        stateTransitionManager: this.addresses.StateTransition.StateTransitionProxy,
+        chainTypeManager: this.addresses.StateTransition.StateTransitionProxy,
         protocolVersion: CONTRACTS_GENESIS_PROTOCOL_VERSION,
         admin: this.ownerAddress,
         validatorTimelock: ADDRESS_ONE,

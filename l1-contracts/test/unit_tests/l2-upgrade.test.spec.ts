@@ -5,7 +5,7 @@ import * as ethers from "ethers";
 import * as hardhat from "hardhat";
 import { hashBytecode } from "zksync-ethers/build/utils";
 
-import type { AdminFacet, ExecutorFacet, GettersFacet, StateTransitionManager } from "../../typechain";
+import type { AdminFacet, ExecutorFacet, GettersFacet, ChainTypeManager } from "../../typechain";
 import {
   AdminFacetFactory,
   DummyAdminFacetFactory,
@@ -13,7 +13,7 @@ import {
   DefaultUpgradeFactory,
   ExecutorFacetFactory,
   GettersFacetFactory,
-  StateTransitionManagerFactory,
+  ChainTypeManagerFactory,
 } from "../../typechain";
 
 import { Ownable2StepFactory } from "../../typechain/Ownable2StepFactory";
@@ -49,7 +49,7 @@ describe("L2 upgrade test", function () {
   let proxyAdmin: AdminFacet;
   let proxyGetters: GettersFacet;
 
-  let stateTransitionManager: StateTransitionManager;
+  let chainTypeManager: ChainTypeManager;
 
   let owner: ethers.Signer;
 
@@ -115,7 +115,7 @@ describe("L2 upgrade test", function () {
       deployWallet
     );
 
-    stateTransitionManager = StateTransitionManagerFactory.connect(
+    chainTypeManager = ChainTypeManagerFactory.connect(
       deployer.addresses.StateTransition.StateTransitionProxy,
       deployWallet
     );
@@ -159,7 +159,7 @@ describe("L2 upgrade test", function () {
     expect(await proxyGetters.getL2SystemContractsUpgradeTxHash()).to.equal(ethers.constants.HashZero);
 
     await (
-      await executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      await executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 1, 0),
         l2ProtocolUpgradeTx: noopUpgradeTransaction,
       })
@@ -176,7 +176,7 @@ describe("L2 upgrade test", function () {
     const { 0: major, 1: minor, 2: patch } = await proxyGetters.getSemverProtocolVersion();
 
     const bootloaderRevertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         newProtocolVersion: packSemver(major, minor, patch + 1),
         bootloaderHash: ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32))),
         l2ProtocolUpgradeTx: noopUpgradeTransaction,
@@ -185,7 +185,7 @@ describe("L2 upgrade test", function () {
     expect(bootloaderRevertReason).to.contain("PatchUpgradeCantSetBootloader");
 
     const defaultAccountRevertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         newProtocolVersion: packSemver(major, minor, patch + 1),
         defaultAccountHash: ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32))),
         l2ProtocolUpgradeTx: noopUpgradeTransaction,
@@ -203,7 +203,7 @@ describe("L2 upgrade test", function () {
     });
 
     const bootloaderRevertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         newProtocolVersion: packSemver(major, minor, patch + 1),
         l2ProtocolUpgradeTx: someTx,
       })
@@ -221,7 +221,7 @@ describe("L2 upgrade test", function () {
     });
 
     const bootloaderRevertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         newProtocolVersion: newVersion,
         l2ProtocolUpgradeTx: someTx,
       })
@@ -232,14 +232,14 @@ describe("L2 upgrade test", function () {
   it("Timestamp should behave correctly", async () => {
     // Upgrade was scheduled for now should work fine
     const timeNow = (await hardhat.ethers.provider.getBlock("latest")).timestamp;
-    await executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+    await executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
       upgradeTimestamp: ethers.BigNumber.from(timeNow),
       l2ProtocolUpgradeTx: noopUpgradeTransaction,
     });
 
     // Upgrade that was scheduled for the future should not work now
     const revertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         upgradeTimestamp: ethers.BigNumber.from(timeNow).mul(2),
         l2ProtocolUpgradeTx: noopUpgradeTransaction,
       })
@@ -252,7 +252,7 @@ describe("L2 upgrade test", function () {
       txType: 255,
     });
     const revertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         l2ProtocolUpgradeTx: wrongTx,
         newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 3, 0),
       })
@@ -268,7 +268,7 @@ describe("L2 upgrade test", function () {
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         l2ProtocolUpgradeTx: wrongTx,
         newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 4, 0),
       })
@@ -284,7 +284,7 @@ describe("L2 upgrade test", function () {
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         l2ProtocolUpgradeTx: wrongTx,
         newProtocolVersion: 0,
       })
@@ -300,7 +300,7 @@ describe("L2 upgrade test", function () {
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         l2ProtocolUpgradeTx: wrongTx,
         newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 10000, 0),
       })
@@ -316,7 +316,7 @@ describe("L2 upgrade test", function () {
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         l2ProtocolUpgradeTx: wrongTx,
         newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 4, 0),
       })
@@ -332,7 +332,7 @@ describe("L2 upgrade test", function () {
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         l2ProtocolUpgradeTx: wrongTx,
         newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 4, 0),
       })
@@ -349,7 +349,7 @@ describe("L2 upgrade test", function () {
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         l2ProtocolUpgradeTx: wrongTx,
         newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 4, 0),
       })
@@ -367,7 +367,7 @@ describe("L2 upgrade test", function () {
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         l2ProtocolUpgradeTx: wrongTx,
         factoryDeps: [myFactoryDep],
         newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 4, 0),
@@ -385,7 +385,7 @@ describe("L2 upgrade test", function () {
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         l2ProtocolUpgradeTx: wrongTx,
         factoryDeps: [myFactoryDep],
         newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 4, 0),
@@ -405,7 +405,7 @@ describe("L2 upgrade test", function () {
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         l2ProtocolUpgradeTx: wrongTx,
         factoryDeps: Array(33).fill(myFactoryDep),
         newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 4, 0),
@@ -447,7 +447,7 @@ describe("L2 upgrade test", function () {
     };
 
     const upgradeReceipt = await (
-      await executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, upgrade)
+      await executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, upgrade)
     ).wait();
 
     const defaultUpgradeFactory = await hardhat.ethers.getContractFactory("DefaultUpgrade");
@@ -534,7 +534,7 @@ describe("L2 upgrade test", function () {
     };
 
     const upgradeReceipt = await (
-      await executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, upgrade)
+      await executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, upgrade)
     ).wait();
 
     const defaultUpgradeFactory = await hardhat.ethers.getContractFactory("DefaultUpgrade");
@@ -612,11 +612,11 @@ describe("L2 upgrade test", function () {
       newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 5 + 1, 0),
     };
     const revertReason = await getCallRevertReason(
-      executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, upgrade)
+      executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, upgrade)
     );
     await rollBackToVersion(
       addToProtocolVersion(initialProtocolVersion, 5, 1).toString(),
-      stateTransitionManager,
+      chainTypeManager,
       upgrade
     );
     expect(revertReason).to.contains("PreviousUpgradeNotFinalized");
@@ -788,7 +788,7 @@ describe("L2 upgrade test", function () {
   it("Should successfully commit a sequential upgrade", async () => {
     expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(0);
     await (
-      await executeUpgrade(chainId, proxyGetters, stateTransitionManager, proxyAdmin, {
+      await executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, {
         newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 5 + 1, 0),
         l2ProtocolUpgradeTx: noopUpgradeTransaction,
       })
@@ -829,7 +829,7 @@ describe("L2 upgrade test", function () {
 
   it("Should successfully commit custom upgrade", async () => {
     const upgradeReceipt = await (
-      await executeCustomUpgrade(chainId, proxyGetters, proxyAdmin, stateTransitionManager, {
+      await executeCustomUpgrade(chainId, proxyGetters, proxyAdmin, chainTypeManager, {
         newProtocolVersion: addToProtocolVersion(initialProtocolVersion, 6 + 1, 0),
         l2ProtocolUpgradeTx: noopUpgradeTransaction,
       })
@@ -982,7 +982,7 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
 async function executeUpgrade(
   chainId: BigNumberish,
   proxyGetters: GettersFacet,
-  stateTransitionManager: StateTransitionManager,
+  chainTypeManager: ChainTypeManager,
   proxyAdmin: AdminFacet,
   partialUpgrade: Partial<ProposedUpgrade>,
   contractFactory?: ethers.ethers.ContractFactory
@@ -1008,7 +1008,7 @@ async function executeUpgrade(
   const oldProtocolVersion = await proxyGetters.getProtocolVersion();
   // This promise will be handled in the tests
   (
-    await stateTransitionManager.setNewVersionUpgrade(
+    await chainTypeManager.setNewVersionUpgrade(
       diamondCutData,
       oldProtocolVersion,
       999999999999,
@@ -1021,7 +1021,7 @@ async function executeUpgrade(
 // we rollback the protocolVersion ( we don't clear the upgradeHash mapping, but that is ok)
 async function rollBackToVersion(
   protocolVersion: string,
-  stateTransition: StateTransitionManager,
+  stateTransition: ChainTypeManager,
   partialUpgrade: Partial<ProposedUpgrade>
 ) {
   partialUpgrade.newProtocolVersion = protocolVersion;
@@ -1052,7 +1052,7 @@ async function executeCustomUpgrade(
   chainId: BigNumberish,
   proxyGetters: GettersFacet,
   proxyAdmin: AdminFacet,
-  stateTransition: StateTransitionManager,
+  stateTransition: ChainTypeManager,
   partialUpgrade: Partial<ProposedUpgrade>,
   contractFactory?: ethers.ethers.ContractFactory
 ) {

@@ -1,8 +1,8 @@
 import { expect } from "chai";
 import { ethers } from "ethers";
 import * as hardhat from "hardhat";
-import type { DummyExecutor, ValidatorTimelock, DummyStateTransitionManager } from "../../typechain";
-import { DummyExecutorFactory, ValidatorTimelockFactory, DummyStateTransitionManagerFactory } from "../../typechain";
+import type { DummyExecutor, ValidatorTimelock, DummyChainTypeManager } from "../../typechain";
+import { DummyExecutorFactory, ValidatorTimelockFactory, DummyChainTypeManagerFactory } from "../../typechain";
 import { getCallRevertReason } from "./utils";
 
 describe("ValidatorTimelock tests", function () {
@@ -11,7 +11,7 @@ describe("ValidatorTimelock tests", function () {
   let randomSigner: ethers.Signer;
   let validatorTimelock: ValidatorTimelock;
   let dummyExecutor: DummyExecutor;
-  let dummyStateTransitionManager: DummyStateTransitionManager;
+  let dummyChainTypeManager: DummyChainTypeManager;
   const chainId: number = 270;
 
   const MOCK_PROOF_INPUT = {
@@ -55,16 +55,16 @@ describe("ValidatorTimelock tests", function () {
     const dummyExecutorContract = await dummyExecutorFactory.deploy();
     dummyExecutor = DummyExecutorFactory.connect(dummyExecutorContract.address, dummyExecutorContract.signer);
 
-    const dummyStateTransitionManagerFactory = await hardhat.ethers.getContractFactory(
-      "DummyStateTransitionManagerForValidatorTimelock"
+    const dummyChainTypeManagerFactory = await hardhat.ethers.getContractFactory(
+      "DummyChainTypeManagerForValidatorTimelock"
     );
-    const dummyStateTransitionManagerContract = await dummyStateTransitionManagerFactory.deploy(
+    const dummyChainTypeManagerContract = await dummyChainTypeManagerFactory.deploy(
       await owner.getAddress(),
       dummyExecutor.address
     );
-    dummyStateTransitionManager = DummyStateTransitionManagerFactory.connect(
-      dummyStateTransitionManagerContract.address,
-      dummyStateTransitionManagerContract.signer
+    dummyChainTypeManager = DummyChainTypeManagerFactory.connect(
+      dummyChainTypeManagerContract.address,
+      dummyChainTypeManagerContract.signer
     );
 
     const validatorTimelockFactory = await hardhat.ethers.getContractFactory("ValidatorTimelock");
@@ -73,7 +73,7 @@ describe("ValidatorTimelock tests", function () {
       validatorTimelockContract.address,
       validatorTimelockContract.signer
     );
-    const setSTMtx = await validatorTimelock.setStateTransitionManager(dummyStateTransitionManager.address);
+    const setSTMtx = await validatorTimelock.setChainTypeManager(dummyChainTypeManager.address);
     await setSTMtx.wait();
   });
 
@@ -81,9 +81,9 @@ describe("ValidatorTimelock tests", function () {
     expect(await validatorTimelock.owner()).equal(await owner.getAddress());
     expect(await validatorTimelock.executionDelay()).equal(0);
     expect(await validatorTimelock.validators(chainId, ethers.constants.AddressZero)).equal(false);
-    expect(await validatorTimelock.stateTransitionManager()).equal(dummyStateTransitionManager.address);
-    expect(await dummyStateTransitionManager.getHyperchain(chainId)).equal(dummyExecutor.address);
-    expect(await dummyStateTransitionManager.getChainAdmin(chainId)).equal(await owner.getAddress());
+    expect(await validatorTimelock.chainTypeManager()).equal(dummyChainTypeManager.address);
+    expect(await dummyChainTypeManager.getHyperchain(chainId)).equal(dummyExecutor.address);
+    expect(await dummyChainTypeManager.getChainAdmin(chainId)).equal(await owner.getAddress());
     expect(await dummyExecutor.getAdmin()).equal(await owner.getAddress());
   });
 

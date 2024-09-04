@@ -11,7 +11,7 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
-import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Utils} from "./Utils.sol";
 
@@ -141,7 +141,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         config.stateTransitionProxy = toml.readAddress("$.deployed_addresses.state_transition_proxy_addr");
         config.erc20BridgeProxy = toml.readAddress("$.deployed_addresses.erc20_bridge_proxy_addr");
 
-        ecosystem.bridgehub = IStateTransitionManager(config.stateTransitionProxy).BRIDGE_HUB();
+        ecosystem.bridgehub = IChainTypeManager(config.stateTransitionProxy).BRIDGE_HUB();
         ecosystem.l1SharedBridgeProxy = address(Bridgehub(ecosystem.bridgehub).sharedBridge());
         ecosystem.governance = Bridgehub(ecosystem.bridgehub).owner();
 

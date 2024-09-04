@@ -19,7 +19,7 @@ import {
 } from "../src.ts/utils";
 
 import { Wallet as ZkWallet, Provider as ZkProvider, utils as zkUtils } from "zksync-ethers";
-import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
+import { IChainTypeManagerFactory } from "../typechain/IChainTypeManagerFactory";
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
 import { BOOTLOADER_FORMAL_ADDRESS } from "zksync-ethers/build/utils";
 
@@ -146,7 +146,7 @@ async function main() {
 
       const currentChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
 
-      const stm = deployer.stateTransitionManagerContract(deployer.deployWallet);
+      const ctm = deployer.chainTypeManagerContract(deployer.deployWallet);
 
       const counterPart = getAddressFromEnv("GATEWAY_STATE_TRANSITION_PROXY_ADDR");
 
@@ -161,7 +161,7 @@ async function main() {
 
       const receipt = await deployer.moveChainToGateway(gatewayChainId, gasPrice);
 
-      const gatewayAddress = await stm.getHyperchain(gatewayChainId);
+      const gatewayAddress = await ctm.getHyperchain(gatewayChainId);
 
       const l2TxHash = zkUtils.getL2HashFromPriorityOp(receipt, gatewayAddress);
 
@@ -176,8 +176,8 @@ async function main() {
       const receiptOnSL = await (await txL2Handle).wait();
       console.log("Finalized on SL with hash:", receiptOnSL.transactionHash);
 
-      const stmOnSL = IStateTransitionManagerFactory.connect(counterPart, gatewayProvider);
-      const hyperchainAddress = await stmOnSL.getHyperchain(currentChainId);
+      const ctmOnSL = IChainTypeManagerFactory.connect(counterPart, gatewayProvider);
+      const hyperchainAddress = await ctmOnSL.getHyperchain(currentChainId);
       console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${hyperchainAddress}`);
 
       console.log("Success!");
@@ -314,7 +314,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   console.log(`Gateway chain Id: ${chainId}`);
 
   const l1Bridgehub = deployer.bridgehubContract(deployer.deployWallet);
-  const l1STM = deployer.stateTransitionManagerContract(deployer.deployWallet);
+  const l1STM = deployer.chainTypeManagerContract(deployer.deployWallet);
   console.log(deployer.addresses.StateTransition.StateTransitionProxy);
   const gatewayAddress = await l1Bridgehub.getHyperchain(chainId);
   // this script only works when owner is the deployer
@@ -342,9 +342,9 @@ async function registerSLContractsOnL1(deployer: Deployer) {
       baseToken.interface.encodeFunctionData("approve", [this.addresses.Bridges.SharedBridgeProxy, value.mul(2)])
     );
   }
-  const stmDeploymentTracker = deployer.stmDeploymentTracker(deployer.deployWallet);
+  const ctmDeploymentTracker = deployer.ctmDeploymentTracker(deployer.deployWallet);
   const assetRouter = deployer.defaultSharedBridge(deployer.deployWallet);
-  const assetId = await l1Bridgehub.stmAssetIdFromChainId(chainId);
+  const assetId = await l1Bridgehub.ctmAssetIdFromChainId(chainId);
 
   // Setting the L2 bridgehub as the counterpart for the STM asset
   const receipt2 = await deployer.executeUpgrade(
@@ -376,7 +376,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
     chainId,
     L2_BRIDGEHUB_ADDRESS,
     gasPrice,
-    l1Bridgehub.interface.encodeFunctionData("addStateTransitionManager", [l2STMAddress]),
+    l1Bridgehub.interface.encodeFunctionData("addChainTypeManager", [l2STMAddress]),
     priorityTxMaxGasLimit
   );
   console.log(`L2 STM address ${l2STMAddress} registered on gateway, txHash: ${receipt3.transactionHash}`);
@@ -393,7 +393,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
         l2GasLimit: priorityTxMaxGasLimit,
         l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
         refundRecipient: deployer.deployWallet.address,
-        secondBridgeAddress: stmDeploymentTracker.address,
+        secondBridgeAddress: ctmDeploymentTracker.address,
         secondBridgeValue: 0,
         secondBridgeCalldata:
           "0x01" + ethers.utils.defaultAbiCoder.encode(["address", "address"], [l1STM.address, l2STMAddress]).slice(2),

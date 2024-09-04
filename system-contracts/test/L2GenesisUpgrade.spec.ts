@@ -17,7 +17,7 @@ describe("L2GenesisUpgrade tests", function () {
   let complexUpgrader: ComplexUpgrader;
   const chainId = 270;
 
-  const stmDeployerAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+  const ctmDeployerAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
   const bridgehubOwnerAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
 
   const forceDeployments = [
@@ -40,7 +40,7 @@ describe("L2GenesisUpgrade tests", function () {
     await setResult(
       "IBridgehub",
       "setAddresses",
-      [REAL_L2_ASSET_ROUTER_ADDRESS, stmDeployerAddress, REAL_L2_MESSAGE_ROOT_ADDRESS],
+      [REAL_L2_ASSET_ROUTER_ADDRESS, ctmDeployerAddress, REAL_L2_MESSAGE_ROOT_ADDRESS],
       {
         failure: false,
         returnData: "0x",
@@ -71,7 +71,7 @@ describe("L2GenesisUpgrade tests", function () {
 
       const data = l2GenesisUpgrade.interface.encodeFunctionData("genesisUpgrade", [
         chainId,
-        stmDeployerAddress,
+        ctmDeployerAddress,
         forceDeploymentsData,
       ]);
 
