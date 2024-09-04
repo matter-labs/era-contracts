@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
 import {ISystemContext} from "./ISystemContext.sol";
-import {GasLimitIsTooLow, NotEnoughGasForPubdata} from "gas-bound-caller/contracts/test-contracts/GasBoundCallerErrors.sol";
+import {GasLimitIsTooLow, NotEnoughGasForPubdata} from "contracts/test-contracts/GasBoundCallerErrors.sol";
 
 ISystemContext constant SYSTEM_CONTEXT_CONTRACT = ISystemContext(address(0x800b));
 

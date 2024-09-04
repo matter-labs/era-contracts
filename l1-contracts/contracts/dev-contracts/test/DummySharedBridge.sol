@@ -12,7 +12,7 @@ import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 import {IL2Bridge} from "../../bridge/interfaces/IL2Bridge.sol";
 import {IL2BridgeLegacy} from "../../bridge/interfaces/IL2BridgeLegacy.sol";
-import {WithdrawFailed, nMsgValueNotEqualToAmount, WrongWithdrawAmount, MsgValueIsLessThenZeroForBridgehubDeposit, WithdrawAndDepositAmountsMismatch, LegacyBridgeAlreadySet, LegacyBridgeZero} from "../L1DevContractsErrors.sol";
+import {WithdrawFailed, MsgValueNotEqualToAmount, MsgValueIsMoreThenZeroForBridgehubDeposit, WrongWithdrawAmount, WithdrawAndDepositAmountsMismatch, LegacyBridgeAlreadySet, LegacyBridgeZero} from "../L1DevContractsErrors.sol";
 
 contract DummySharedBridge is PausableUpgradeable {
     using SafeERC20 for IERC20;

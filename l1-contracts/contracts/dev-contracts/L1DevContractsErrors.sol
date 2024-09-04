@@ -8,7 +8,7 @@ error MsgValueNotEqualToAmount();
 
 error WrongWithdrawAmount();
 
-error MsgValueIsLessThenZeroForBridgehubDeposit();
+error MsgValueIsMoreThenZeroForBridgehubDeposit();
 
 error WithdrawAndDepositAmountsMismatch();
 

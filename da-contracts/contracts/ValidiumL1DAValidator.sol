@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 // solhint-disable gas-custom-errors, reason-string
 
 import {IL1DAValidator, L1DAValidatorOutput} from "./IL1DAValidator.sol";
-import {ValL1DAWrongInputLength} from "da-contracts/contracts/DAContractsErrors.sol";
+import {ValL1DAWrongInputLength} from "contracts/DAContractsErrors.sol";
 
 contract ValidiumL1DAValidator is IL1DAValidator {
     function checkDA(

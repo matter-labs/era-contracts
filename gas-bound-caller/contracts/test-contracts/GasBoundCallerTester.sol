@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {GasBoundCaller} from "../GasBoundCaller.sol";
 import {SystemContractHelper} from "./SystemContractHelper.sol";
-import {EntryOverheadIsIncorrect, GasBoundCallerCallFailed, ReturnDataIsIncorrect, PubdataGasIsIncorrect} from "gas-bound-caller/contracts/test-contracts/GasBoundCallerErrors.sol";
+import {EntryOverheadIsIncorrect, GasBoundCallerCallFailed, ReturnDataIsIncorrect, PubdataGasIsIncorrect} from "contracts/test-contracts/GasBoundCallerErrors.sol";
 
 /**
  * @author Matter Labs
