@@ -10,8 +10,6 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
-// import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, BridgehubMintSTMAssetData, BridgehubBurnSTMAssetData} from "./IBridgehub.sol";
 import {IL1BaseTokenAssetHandler} from "../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
@@ -100,10 +98,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
-
-    /// @dev The contract responsible for confirming l2 tx, and is withdrawal finalized mapping.
-    /// @dev Only used on the L1.
-    IL1Nullifier public nullifier;
 
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
@@ -198,13 +192,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _stmDeployer the stm deployment tracker address
     /// @param _messageRoot the message root address
     function setAddresses(
-        address _nullifier,
         IAssetRouterBase _sharedBridge,
         ISTMDeploymentTracker _stmDeployer,
         IMessageRoot _messageRoot
     ) external onlyOwner {
         sharedBridge = _sharedBridge;
-        nullifier = IL1Nullifier(_nullifier);
         stmDeployer = _stmDeployer;
         messageRoot = _messageRoot;
     }

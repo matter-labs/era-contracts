@@ -178,7 +178,6 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     function addTokenAssetId(bytes32 _baseTokenAssetId) external;
 
     function setAddresses(
-        address _l1Nullifier,
         IAssetRouterBase _sharedBridge,
         ISTMDeploymentTracker _stmDeployer,
         IMessageRoot _messageRoot

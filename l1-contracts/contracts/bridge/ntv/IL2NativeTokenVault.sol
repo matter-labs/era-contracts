@@ -2,9 +2,6 @@
 
 pragma solidity ^0.8.20;
 
-// import {INativeTokenVault} from "./INativeTokenVault.sol";
-// import {IAssetHandler} from "./IAssetHandler.sol";
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL2NativeTokenVault {
@@ -24,9 +21,5 @@ interface IL2NativeTokenVault {
 
     event L2TokenBeaconUpdated(address indexed l2TokenBeacon, bytes32 indexed l2TokenProxyBytecodeHash);
 
-    // function tokenAddress(bytes32 _assetId) external view returns (address);
-
     function l2TokenAddress(address _l1Token) external view returns (address);
-
-    // function calculateCreate2TokenAddress(address _l1Token) external view returns (address);
 }

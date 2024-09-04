@@ -365,7 +365,6 @@ contract ExperimentalBridgeTest is Test {
     function test_addAssetId(address randomAddress) public {
         vm.startPrank(bridgeOwner);
         bridgeHub.setAddresses(
-            address(l1Nullifier),
             IAssetRouterBase(address(mockSharedBridge)),
             ISTMDeploymentTracker(address(0)),
             IMessageRoot(address(0))
@@ -403,7 +402,6 @@ contract ExperimentalBridgeTest is Test {
     ) public useRandomToken(randomValue) {
         vm.startPrank(bridgeOwner);
         bridgeHub.setAddresses(
-            address(l1Nullifier),
             IAssetRouterBase(address(mockSharedBridge)),
             ISTMDeploymentTracker(address(0)),
             IMessageRoot(address(0))

@@ -710,7 +710,6 @@ contract DeployL1Script is Script {
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         // bridgehub.setSharedBridge(addresses.bridges.sharedBridgeProxy);
         bridgehub.setAddresses(
-            addresses.bridges.l1NullifierProxy,
             IAssetRouterBase(addresses.bridges.sharedBridgeProxy),
             ISTMDeploymentTracker(addresses.bridgehub.stmDeploymentTrackerProxy),
             IMessageRoot(addresses.bridgehub.messageRootProxy)

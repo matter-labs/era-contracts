@@ -616,34 +616,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Finalizes the withdrawal for transactions initiated via the legacy ERC20 bridge.
-    // / @param _l2BatchNumber The L2 batch number where the withdrawal was processed.
-    // / @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-    // / @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent.
-    // / @param _message The L2 withdraw data, stored in an L2 -> L1 message.
-    // / @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization.
-    ///
     /// @return l1Receiver The address on L1 that will receive the withdrawn funds.
     /// @return l1Asset The address of the L1 token being withdrawn.
     /// @return amount The amount of the token being withdrawn.
-    // function finalizeWithdrawalLegacyErc20Bridge(
-    //     uint256 _l2BatchNumber,
-    //     uint256 _l2MessageIndex,
-    //     uint16 _l2TxNumberInBatch,
-    //     bytes calldata _message,
-    //     bytes32[] calldata _merkleProof
-    // ) external override onlyLegacyBridge returns (address l1Receiver, address l1Asset, uint256 amount) {
-    //     bytes32 assetId;
-    //     // (l1Receiver, assetId, amount) = // kl todo
-    //     this.finalizeWithdrawal({
-    //         _chainId: ERA_CHAIN_ID,
-    //         _l2BatchNumber: _l2BatchNumber,
-    //         _l2MessageIndex: _l2MessageIndex,
-    //         _l2TxNumberInBatch: _l2TxNumberInBatch,
-    //         _message: _message,
-    //         _merkleProof: _merkleProof
-    //     });
-    // }
-
     function finalizeWithdrawalLegacyContracts(
         FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
     ) external onlyAssetRouterOrErc20Bridge returns (address l1Receiver, address l1Asset, uint256 amount) {

@@ -1054,7 +1054,6 @@ export class Deployer {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
     const upgradeData1 = await bridgehub.interface.encodeFunctionData("setAddresses", [
-      this.addresses.Bridges.L1NullifierProxy,
       this.addresses.Bridges.SharedBridgeProxy,
       this.addresses.Bridgehub.STMDeploymentTrackerProxy,
       this.addresses.Bridgehub.MessageRootProxy,

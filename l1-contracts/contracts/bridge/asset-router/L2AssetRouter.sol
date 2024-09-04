@@ -13,7 +13,6 @@ import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {IL2NativeTokenVaultCombined} from "../ntv/IL2NativeTokenVaultCombined.sol";
 
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
-// import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";

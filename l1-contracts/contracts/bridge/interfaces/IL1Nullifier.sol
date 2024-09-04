@@ -3,9 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-// import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
-// import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 
 /// @param chainId The chain ID of the transaction to check.
 /// @param l2BatchNumber The L2 batch number where the withdrawal was processed.
@@ -66,22 +64,6 @@ interface IL1Nullifier {
     function finalizeWithdrawalLegacyContracts(
         FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
     ) external returns (address l1Receiver, address l1Token, uint256 amount);
-
-    // function bridgeVerifyFailedTransfer(
-    //     uint256 _chainId,
-    //     address _depositSender,
-    //     bytes32 _assetId,
-    //     bytes memory _transferData,
-    //     bytes32 _l2TxHash,
-    //     uint256 _l2BatchNumber,
-    //     uint256 _l2MessageIndex,
-    //     uint16 _l2TxNumberInBatch,
-    //     bytes32[] calldata _merkleProof
-    // ) external;
-
-    // function finalizeWithdrawal(
-    //     FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
-    // ) external returns (address l1Receiver, bytes32 assetId, uint256 amount);
 
     function BRIDGE_HUB() external view returns (IBridgehub);
 

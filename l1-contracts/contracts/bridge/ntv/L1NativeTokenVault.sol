@@ -192,18 +192,4 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address proxyAddress = Create2.deploy(0, _salt, bridgedTokenProxyBytecode);
         return BeaconProxy(payable(proxyAddress));
     }
-
-    /*//////////////////////////////////////////////////////////////
-                            PAUSE
-    //////////////////////////////////////////////////////////////*/
-
-    //     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
-    //     function pause() external onlyOwner {
-    //         _pause();
-    //     }
-
-    //     /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
-    //     function unpause() external onlyOwner {
-    //         _unpause();
-    //     }
 }

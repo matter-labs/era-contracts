@@ -16,6 +16,4 @@ interface IBridgedStandardToken {
     function l1Address() external view returns (address);
 
     function l2Bridge() external view returns (address);
-
-    // function nativeTokenVault() external view returns (address);
 }

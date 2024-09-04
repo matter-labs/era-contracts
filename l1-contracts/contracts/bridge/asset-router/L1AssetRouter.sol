@@ -4,9 +4,6 @@ pragma solidity 0.8.24;
 
 // solhint-disable reason-string, gas-custom-errors
 
-// import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-// import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
-
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
@@ -14,27 +11,20 @@ import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
-// import {IL2Bridge} from "../interfaces/IL2Bridge.sol";
-// import {IL2BridgeLegacy} from "./interfaces/IL2BridgeLegacy.sol";
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IL1Nullifier, FinalizeWithdrawalParams} from "../interfaces/IL1Nullifier.sol";
-// import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
-// import {IL1SharedBridgeLegacy} from "./interfaces/IL1SharedBridgeLegacy.sol";
 import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
 
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, BASE_TOKEN_VIRTUAL_ADDRESS} from "../../common/Config.sol";
-// import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
-
-// import {BridgeHelper} from "./BridgeHelper.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 
@@ -486,7 +476,7 @@ contract L1AssetRouter is
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external {
+    ) external returns (address l1Receiver, address l1Token, uint256 amount) {
         FinalizeWithdrawalParams memory finalizeWithdrawalParams = FinalizeWithdrawalParams({
             chainId: _chainId,
             l2BatchNumber: _l2BatchNumber,
@@ -496,7 +486,7 @@ contract L1AssetRouter is
             message: _message,
             merkleProof: _merkleProof
         });
-        L1_NULLIFIER.finalizeWithdrawalLegacyContracts(finalizeWithdrawalParams);
+        (l1Receiver, l1Token, amount) = L1_NULLIFIER.finalizeWithdrawalLegacyContracts(finalizeWithdrawalParams);
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.

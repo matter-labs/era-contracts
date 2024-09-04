@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// import {IAssetHandler} from "./IAssetHandler.sol";
-
 /// @title L1 Asset Handler contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
