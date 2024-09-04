@@ -293,7 +293,7 @@ contract L1AssetRouter is
         bool senderIsNTV = msg.sender == address(nativeTokenVault);
         address sender = senderIsNTV ? L2_NATIVE_TOKEN_VAULT_ADDR : msg.sender;
         bytes32 assetId = DataEncoding.encodeAssetId(block.chainid, _assetRegistrationData, sender);
-        if (!senderIsNTV || msg.sender != assetDeploymentTracker[assetId]) {
+        if (!senderIsNTV && msg.sender != assetDeploymentTracker[assetId]) {
             revert NotNTVorADT();
         }
         assetHandlerAddress[assetId] = _assetHandlerAddress;

@@ -84,7 +84,7 @@ library Merkle {
         }
         uint256 levelLen = _itemHashes.length;
         // Edge case: we want to be able to prove an element in a single-node tree.
-        if (pathLength == 0 && (_startIndex != 0 || levelLen != 1)) {
+        if (pathLength == 0 || (_startIndex != 0 && levelLen != 1)) {
             revert MerklePathEmpty();
         }
         if (levelLen <= 0) {

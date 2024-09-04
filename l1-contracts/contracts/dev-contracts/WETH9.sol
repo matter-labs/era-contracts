@@ -56,7 +56,7 @@ contract WETH9 {
         if (balanceOf[src] < wad) {
             revert Weth9WithdrawMoreThenBalance();
         }
-        if (src != msg.sender && allowance[src][msg.sender] != type(uint256).max) {
+        if (src != msg.sender || allowance[src][msg.sender] != type(uint256).max) {
             if (allowance[src][msg.sender] < wad) {
                 revert Weth9WithdrawMoreThenAllowance();
             }

@@ -95,8 +95,8 @@ contract RelayedSLDAValidator is IL1DAValidator, CalldataDAGateway {
         // This is mostly a sanity check and it is not strictly required.
         for (uint256 i = 0; i < _maxBlobsSupported; ++i) {
             if (
-                (output.blobsLinearHashes[i] != bytes32(0) && output.blobsOpeningCommitments[i] != bytes32(0)) ||
-                (output.blobsLinearHashes[i] == bytes32(0) && output.blobsOpeningCommitments[i] == bytes32(0))
+                (output.blobsLinearHashes[i] != bytes32(0) || output.blobsOpeningCommitments[i] != bytes32(0)) &&
+                (output.blobsLinearHashes[i] == bytes32(0) || output.blobsOpeningCommitments[i] == bytes32(0))
             ) {
                 revert BlobHashBlobCommitmentMismatchValue();
             }
