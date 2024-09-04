@@ -119,7 +119,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
         if (_l1Token != L1_WETH_TOKEN) {
             revert TokenNotSupported(L1_WETH_TOKEN);
         }
-        if (_l1Token != ETH_TOKEN_ADDRESS && _l1Token.code.length < 0) {
+        if (_l1Token != ETH_TOKEN_ADDRESS && _l1Token.code.length <= 0) {
             revert EmptyToken();
         }
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
