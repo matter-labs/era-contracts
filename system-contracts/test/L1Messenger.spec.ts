@@ -17,11 +17,12 @@ import { expect } from "chai";
 import { BigNumber } from "ethers";
 import { randomBytes } from "crypto";
 
+const EXPECTED_DA_INPUT_OFFSET = 160;
 const L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
 const L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
 const L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = '0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba';
 
-describe("L1Messenger tests", () => {
+describe.only("L1Messenger tests", () => {
   let l1Messenger: L1Messenger;
   let wallet: Wallet;
   let l1MessengerAccount: ethers.Signer;
@@ -97,6 +98,14 @@ describe("L1Messenger tests", () => {
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
 
+    it("should revert Invalid input DA signature", async () => {
+      await expect(
+        l1Messenger
+          .connect(bootloaderAccount)
+          .publishPubdataAndClearState(ethers.constants.AddressZero, emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { l2DaValidatorFunctionSig: '0x12121212' }))
+      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+    });
+
     it("should revert logshashes mismatch", async () => {
       await (
         await l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(logData.isService, logData.key, logData.value)
@@ -116,6 +125,42 @@ describe("L1Messenger tests", () => {
         l1Messenger
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(ethers.constants.AddressZero, emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, overrideData))
+      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+    });
+
+    it("should revert Invalid input msgs hash", async () => {
+      const correctChainedMessagesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 2);
+
+      await expect(
+        l1Messenger
+          .connect(bootloaderAccount)
+          .publishPubdataAndClearState(ethers.constants.AddressZero, emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { chainedMessagesHash: ethers.utils.keccak256(correctChainedMessagesHash) }))
+      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+    });
+
+    it("should revert Invalid bytecodes hash", async () => {
+      const correctChainedBytecodesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 3);
+
+      await expect(
+        l1Messenger
+          .connect(bootloaderAccount)
+          .publishPubdataAndClearState(ethers.constants.AddressZero, emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { chainedBytecodeHash: ethers.utils.keccak256(correctChainedBytecodesHash) }))
+      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+    });
+
+    it("should revert Invalid offset", async () => {
+      await expect(
+        l1Messenger
+          .connect(bootloaderAccount)
+          .publishPubdataAndClearState(ethers.constants.AddressZero, emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { operatorDataOffset: EXPECTED_DA_INPUT_OFFSET + 1 }))
+      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+    });
+
+    it("should revert Invalid length", async () => {
+      await expect(
+        l1Messenger
+          .connect(bootloaderAccount)
+          .publishPubdataAndClearState(ethers.constants.AddressZero, emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { operatorDataLength: 1 }))
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
   });
@@ -304,8 +349,8 @@ class L1MessengerPubdataEmulator implements EmulatorData {
   l2DaValidatorFunctionSig: string;
   chainedLogsHash: string;
   chainedLogsRootHash: string;
-  operatorDataOffset: string;
-  operatorDataLength: string;
+  operatorDataOffset: number;
+  operatorDataLength: number;
 
   // These two fields are always zero, we need
   // them just to extend the interface.
@@ -325,7 +370,7 @@ class L1MessengerPubdataEmulator implements EmulatorData {
 
     this.chainedLogsHash = ethers.constants.HashZero;
     this.chainedLogsRootHash = ethers.constants.HashZero;
-    this.operatorDataOffset = ethers.utils.defaultAbiCoder.encode(["uint256"], [160]);
+    this.operatorDataOffset = EXPECTED_DA_INPUT_OFFSET;
   }
 
   addLog(log: string): void {
@@ -355,7 +400,7 @@ class L1MessengerPubdataEmulator implements EmulatorData {
       chainedLogsRootHash,
       chainedMessagesHash,
       chainedBytecodeHash,
-      operatorDataOffset,
+      ethers.utils.defaultAbiCoder.encode(["uint256"], [operatorDataOffset]),
       ethers.utils.defaultAbiCoder.encode(["uint256"], [operatorDataLength]),
       ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4),
       ...encodedLogs,
@@ -369,8 +414,8 @@ interface EmulatorData {
   chainedLogsRootHash: string;
   chainedMessagesHash: string;
   chainedBytecodeHash: string;
-  operatorDataOffset: string;
-  operatorDataLength: string;
+  operatorDataOffset: number;
+  operatorDataLength: number;
   numberOfLogs: number;
   encodedLogs: string[];
 }
