@@ -260,7 +260,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
 
-        if(block.chainid != L1_CHAIN_ID) {
+        if (block.chainid != L1_CHAIN_ID) {
             // We assume that GW -> L1 transactions can never fail and provide no recovery mechanism from it.
             // That's why we need to bound the gas that can be consumed during such a migration.
             require(s.totalBatchesCommitted == s.totalBatchesExecuted, "Af: not all batches executed");

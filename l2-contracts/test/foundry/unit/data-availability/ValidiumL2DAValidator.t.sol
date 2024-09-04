@@ -12,13 +12,7 @@ contract L2Erc20BridgeTest is Test {
     function test_callValidiumDAValidator(address depositor, address receiver, uint256 amount) internal {
         ValidiumL2DAValidator validator = new ValidiumL2DAValidator();
 
-        bytes32 outputHash = validator.validatePubdata(
-            bytes32(0),
-            bytes32(0),
-            bytes32(0),
-            bytes32(0),
-            hex""
-        );
+        bytes32 outputHash = validator.validatePubdata(bytes32(0), bytes32(0), bytes32(0), bytes32(0), hex"");
 
         assertEq(outputHash, bytes32(0));
     }

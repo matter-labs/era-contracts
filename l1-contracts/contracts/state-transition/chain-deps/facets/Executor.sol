@@ -225,7 +225,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             }
         } else if (processedLogs != 255) {
             revert MissingSystemLogs(255, processedLogs);
-
         }
     }
 
