@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
-// import {IStateTransitionManager} from "../IStateTransitionManager.sol";
+// import {IChainTypeManager} from "../IChainTypeManager.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
 
@@ -69,7 +69,7 @@ struct FeeParams {
 struct ZkSyncHyperchainStorage {
     /// @dev Storage of variables needed for deprecated diamond cut facet
     uint256[7] __DEPRECATED_diamondCutStorage;
-    /// @notice Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing). Replaced by STM
+    /// @notice Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing). Replaced by CTM
     address __DEPRECATED_governor;
     /// @notice Address that the governor proposed as one that will replace it
     address __DEPRECATED_pendingGovernor;
@@ -144,8 +144,8 @@ struct ZkSyncHyperchainStorage {
     uint256 chainId;
     /// @dev The address of the bridgehub
     address bridgehub;
-    /// @dev The address of the StateTransitionManager
-    address stateTransitionManager;
+    /// @dev The address of the ChainTypeManager
+    address chainTypeManager;
     /// @dev The address of the baseToken contract. Eth is address(1)
     address __DEPRECATED_baseToken;
     /// @dev The address of the baseTokenbridge. Eth also uses the shared bridge

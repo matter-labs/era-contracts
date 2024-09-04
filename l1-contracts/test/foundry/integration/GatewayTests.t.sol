@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, BridgehubMintSTMAssetData, BridgehubBurnSTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, BridgehubMintCTMAssetData, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -27,7 +27,7 @@ import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
@@ -172,18 +172,18 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
 
         // Setup
         IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
-        IStateTransitionManager stm = IStateTransitionManager(l1Script.getSTM());
-        bytes32 assetId = bridgehub.stmAssetIdFromChainId(migratingChainId);
+        IChainTypeManager ctm = IChainTypeManager(l1Script.getCTM());
+        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         bytes memory transferData;
 
         {
             IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId));
             bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
             bytes memory chainData = abi.encode(chain.getProtocolVersion());
-            bytes memory stmData = abi.encode(address(1), msg.sender, stm.protocolVersion(), initialDiamondCut);
-            BridgehubBurnSTMAssetData memory data = BridgehubBurnSTMAssetData({
+            bytes memory ctmData = abi.encode(address(1), msg.sender, ctm.protocolVersion(), initialDiamondCut);
+            BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
                 chainId: migratingChainId,
-                stmData: stmData,
+                ctmData: ctmData,
                 chainData: chainData
             });
             transferData = abi.encode(data);
@@ -240,9 +240,9 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
 
     function finishMoveChain() public {
         IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
-        IStateTransitionManager stm = IStateTransitionManager(l1Script.getSTM());
+        IChainTypeManager ctm = IChainTypeManager(l1Script.getCTM());
         IZkSyncHyperchain migratingChain = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId));
-        bytes32 assetId = bridgehub.stmAssetIdFromChainId(migratingChainId);
+        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
 
         vm.startBroadcast(Ownable(address(bridgehub)).owner());
         bridgehub.registerSettlementLayer(gatewayChainId, true);
@@ -251,11 +251,11 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         bytes32 baseTokenAssetId = keccak256("baseTokenAssetId");
         bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
         bytes memory chainData = abi.encode(AdminFacet(address(migratingChain)).prepareChainCommitment());
-        bytes memory stmData = abi.encode(baseTokenAssetId, msg.sender, stm.protocolVersion(), initialDiamondCut);
-        BridgehubMintSTMAssetData memory data = BridgehubMintSTMAssetData({
+        bytes memory ctmData = abi.encode(baseTokenAssetId, msg.sender, ctm.protocolVersion(), initialDiamondCut);
+        BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
             chainId: mintChainId,
             baseTokenAssetId: baseTokenAssetId,
-            stmData: stmData,
+            ctmData: ctmData,
             chainData: chainData
         });
         bytes memory bridgehubMintData = abi.encode(data);

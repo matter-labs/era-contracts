@@ -11,7 +11,7 @@ import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
+import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
 
@@ -67,20 +67,20 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setValidator(address _validator, bool _active) external onlyStateTransitionManager {
+    function setValidator(address _validator, bool _active) external onlyChainTypeManager {
         s.validators[_validator] = _active;
         emit ValidatorStatusUpdate(_validator, _active);
     }
 
     /// @inheritdoc IAdmin
-    function setPorterAvailability(bool _zkPorterIsAvailable) external onlyStateTransitionManager {
+    function setPorterAvailability(bool _zkPorterIsAvailable) external onlyChainTypeManager {
         // Change the porter availability
         s.zkPorterIsAvailable = _zkPorterIsAvailable;
         emit IsPorterAvailableStatusUpdate(_zkPorterIsAvailable);
     }
 
     /// @inheritdoc IAdmin
-    function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyStateTransitionManager {
+    function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyChainTypeManager {
         if (_newPriorityTxMaxGasLimit > MAX_GAS_PER_TRANSACTION) {
             revert TooMuchGas();
         }
@@ -91,7 +91,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function changeFeeParams(FeeParams calldata _newFeeParams) external onlyAdminOrStateTransitionManager onlyL1 {
+    function changeFeeParams(FeeParams calldata _newFeeParams) external onlyAdminOrChainTypeManager onlyL1 {
         // Double checking that the new fee params are valid, i.e.
         // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
         if (_newFeeParams.maxPubdataPerBatch < _newFeeParams.priorityTxMaxPubdata) {
@@ -111,7 +111,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrStateTransitionManager {
+    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyAdminOrChainTypeManager {
         if (_denominator == 0) {
             revert DenominatorIsZero();
         }
@@ -168,9 +168,9 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     function upgradeChainFromVersion(
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
-    ) external onlyAdminOrStateTransitionManager {
+    ) external onlyAdminOrChainTypeManager {
         bytes32 cutHashInput = keccak256(abi.encode(_diamondCut));
-        bytes32 upgradeCutHash = IStateTransitionManager(s.stateTransitionManager).upgradeCutHash(_oldProtocolVersion);
+        bytes32 upgradeCutHash = IChainTypeManager(s.chainTypeManager).upgradeCutHash(_oldProtocolVersion);
         if (cutHashInput != upgradeCutHash) {
             revert HashMismatch(upgradeCutHash, cutHashInput);
         }
@@ -186,7 +186,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external onlyStateTransitionManager {
+    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external onlyChainTypeManager {
         Diamond.diamondCut(_diamondCut);
         emit ExecuteUpgrade(_diamondCut);
     }
@@ -194,17 +194,17 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
     function genesisUpgrade(
         address _l1GenesisUpgrade,
-        address _stmDeployer,
+        address _ctmDeployer,
         bytes calldata _forceDeploymentData,
         bytes[] calldata _factoryDeps
-    ) external onlyStateTransitionManager {
+    ) external onlyChainTypeManager {
         Diamond.FacetCut[] memory emptyArray;
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
             facetCuts: emptyArray,
             initAddress: _l1GenesisUpgrade,
             initCalldata: abi.encodeCall(
                 IL1GenesisUpgrade.genesisUpgrade,
-                (_l1GenesisUpgrade, s.chainId, s.protocolVersion, _stmDeployer, _forceDeploymentData, _factoryDeps)
+                (_l1GenesisUpgrade, s.chainId, s.protocolVersion, _ctmDeployer, _forceDeploymentData, _factoryDeps)
             )
         });
 
@@ -216,7 +216,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAdmin
-    function freezeDiamond() external onlyStateTransitionManager {
+    function freezeDiamond() external onlyChainTypeManager {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         // diamond proxy is frozen already
@@ -229,7 +229,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function unfreezeDiamond() external onlyStateTransitionManager {
+    function unfreezeDiamond() external onlyChainTypeManager {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         // diamond proxy is not frozen
@@ -258,7 +258,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         uint256 currentProtocolVersion = s.protocolVersion;
 
-        require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
+        require(currentProtocolVersion == protocolVersion, "CTM: protocolVersion not up to date");
 
         s.settlementLayer = _settlementLayer;
         chainBridgeMintData = abi.encode(prepareChainCommitment());
@@ -271,11 +271,11 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
     ) external payable override onlyBridgehub {
         HyperchainCommitment memory _commitment = abi.decode(_data, (HyperchainCommitment));
 
-        IStateTransitionManager stm = IStateTransitionManager(s.stateTransitionManager);
+        IChainTypeManager ctm = IChainTypeManager(s.chainTypeManager);
 
         uint256 currentProtocolVersion = s.protocolVersion;
-        uint256 protocolVersion = stm.protocolVersion();
-        require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
+        uint256 protocolVersion = ctm.protocolVersion();
+        require(currentProtocolVersion == protocolVersion, "CTM: protocolVersion not up to date");
 
         uint256 batchesExecuted = _commitment.totalBatchesExecuted;
         uint256 batchesVerified = _commitment.totalBatchesVerified;
@@ -351,7 +351,7 @@ contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
 
         uint256 currentProtocolVersion = s.protocolVersion;
 
-        require(currentProtocolVersion == protocolVersion, "STM: protocolVersion not up to date");
+        require(currentProtocolVersion == protocolVersion, "CTM: protocolVersion not up to date");
 
         s.settlementLayer = address(0);
     }

@@ -28,8 +28,8 @@ contract GettersFacetWrapper is GettersFacet {
         s.bridgehub = _bridgehub;
     }
 
-    function util_setStateTransitionManager(address _stateTransitionManager) external {
-        s.stateTransitionManager = _stateTransitionManager;
+    function util_setChainTypeManager(address _chainTypeManager) external {
+        s.chainTypeManager = _chainTypeManager;
     }
 
     function util_setBaseToken(bytes32 _baseTokenAssetId) external {

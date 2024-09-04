@@ -7,7 +7,7 @@ interface IL2GenesisUpgrade {
 
     function genesisUpgrade(
         uint256 _chainId,
-        address _stmDeployer,
+        address _ctmDeployer,
         bytes calldata _forceDeploymentsData
     ) external payable;
 }

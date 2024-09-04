@@ -21,7 +21,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -72,7 +72,7 @@ contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeploye
         IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
         address newChainAddress = bridgehub.getHyperchain(chainId);
         address admin = IZkSyncHyperchain(bridgehub.getHyperchain(chainId)).getAdmin();
-        IStateTransitionManager stm = IStateTransitionManager(bridgehub.stateTransitionManager(chainId));
+        IChainTypeManager ctm = IChainTypeManager(bridgehub.chainTypeManager(chainId));
 
         assertNotEq(admin, address(0));
         assertNotEq(newChainAddress, address(0));
@@ -85,7 +85,7 @@ contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeploye
         assertEq(chainIds.length, 1);
         assertEq(chainIds[0], chainId);
 
-        uint256 protocolVersion = stm.getProtocolVersion(chainId);
+        uint256 protocolVersion = ctm.getProtocolVersion(chainId);
         assertEq(protocolVersion, 0);
     }
 

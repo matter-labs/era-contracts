@@ -30,8 +30,8 @@ contract ZkSyncHyperchainBase is ReentrancyGuard {
         _;
     }
 
-    modifier onlyStateTransitionManager() {
-        if (msg.sender != s.stateTransitionManager) {
+    modifier onlyChainTypeManager() {
+        if (msg.sender != s.chainTypeManager) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -44,15 +44,15 @@ contract ZkSyncHyperchainBase is ReentrancyGuard {
         _;
     }
 
-    modifier onlyAdminOrStateTransitionManager() {
-        if (msg.sender != s.admin && msg.sender != s.stateTransitionManager) {
+    modifier onlyAdminOrChainTypeManager() {
+        if (msg.sender != s.admin && msg.sender != s.chainTypeManager) {
             revert Unauthorized(msg.sender);
         }
         _;
     }
 
-    modifier onlyValidatorOrStateTransitionManager() {
-        if (!s.validators[msg.sender] && msg.sender != s.stateTransitionManager) {
+    modifier onlyValidatorOrChainTypeManager() {
+        if (!s.validators[msg.sender] && msg.sender != s.chainTypeManager) {
             revert Unauthorized(msg.sender);
         }
         _;

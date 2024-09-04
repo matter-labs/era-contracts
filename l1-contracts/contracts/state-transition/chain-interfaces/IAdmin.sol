@@ -61,12 +61,12 @@ interface IAdmin is IZkSyncHyperchainBase {
     function freezeDiamond() external;
 
     /// @notice Unpause the functionality of all freezable facets & their selectors
-    /// @dev Both the admin and the STM can unfreeze Diamond Proxy
+    /// @dev Both the admin and the CTM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
 
     function genesisUpgrade(
         address _l1GenesisUpgrade,
-        address _stmDeployer,
+        address _ctmDeployer,
         bytes calldata _forceDeploymentData,
         bytes[] calldata _factoryDeps
     ) external;

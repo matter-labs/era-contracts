@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
-import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol
+import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
-contract AdminTest is StateTransitionManagerTest {
+contract AdminTest is ChainTypeManagerTest {
     function test_setPendingAdmin() public {
         address newAdmin = makeAddr("newAdmin");
 
         vm.expectEmit(true, true, true, false);
-        emit IStateTransitionManager.NewPendingAdmin(address(0), newAdmin);
+        emit IChainTypeManager.NewPendingAdmin(address(0), newAdmin);
         chainContractAddress.setPendingAdmin(newAdmin);
     }
 
@@ -22,9 +22,9 @@ contract AdminTest is StateTransitionManagerTest {
         vm.stopPrank();
         vm.prank(newAdmin);
         vm.expectEmit(true, true, true, false);
-        emit IStateTransitionManager.NewPendingAdmin(newAdmin, address(0));
+        emit IChainTypeManager.NewPendingAdmin(newAdmin, address(0));
         vm.expectEmit(true, true, true, false);
-        emit IStateTransitionManager.NewAdmin(address(0), newAdmin);
+        emit IChainTypeManager.NewAdmin(address(0), newAdmin);
         chainContractAddress.acceptAdmin();
 
         address currentAdmin = chainContractAddress.admin();

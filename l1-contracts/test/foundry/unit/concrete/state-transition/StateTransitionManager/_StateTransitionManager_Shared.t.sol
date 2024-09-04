@@ -16,16 +16,16 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade as GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
-import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ChainTypeManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
-contract StateTransitionManagerTest is Test {
-    StateTransitionManager internal stateTransitionManager;
-    StateTransitionManager internal chainContractAddress;
+contract ChainTypeManagerTest is Test {
+    ChainTypeManager internal chainTypeManager;
+    ChainTypeManager internal chainContractAddress;
     GenesisUpgrade internal genesisUpgradeContract;
     address internal bridgehub;
     address internal diamondInit;
@@ -46,7 +46,7 @@ contract StateTransitionManagerTest is Test {
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(bridgehub);
-        stateTransitionManager = new StateTransitionManager(address(IBridgehub(address(bridgehub))));
+        chainTypeManager = new ChainTypeManager(address(IBridgehub(address(bridgehub))));
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new GenesisUpgrade();
 
@@ -92,7 +92,7 @@ contract StateTransitionManagerTest is Test {
             forceDeploymentsData: bytes("")
         });
 
-        StateTransitionManagerInitializeData memory stmInitializeDataNoGovernor = StateTransitionManagerInitializeData({
+        ChainTypeManagerInitializeData memory ctmInitializeDataNoGovernor = ChainTypeManagerInitializeData({
             owner: address(0),
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
@@ -101,12 +101,12 @@ contract StateTransitionManagerTest is Test {
 
         vm.expectRevert(ZeroAddress.selector);
         new TransparentUpgradeableProxy(
-            address(stateTransitionManager),
+            address(chainTypeManager),
             admin,
-            abi.encodeCall(StateTransitionManager.initialize, stmInitializeDataNoGovernor)
+            abi.encodeCall(ChainTypeManager.initialize, ctmInitializeDataNoGovernor)
         );
 
-        StateTransitionManagerInitializeData memory stmInitializeData = StateTransitionManagerInitializeData({
+        ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
@@ -114,11 +114,11 @@ contract StateTransitionManagerTest is Test {
         });
 
         TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(
-            address(stateTransitionManager),
+            address(chainTypeManager),
             admin,
-            abi.encodeCall(StateTransitionManager.initialize, stmInitializeData)
+            abi.encodeCall(ChainTypeManager.initialize, ctmInitializeData)
         );
-        chainContractAddress = StateTransitionManager(address(transparentUpgradeableProxy));
+        chainContractAddress = ChainTypeManager(address(transparentUpgradeableProxy));
 
         vm.stopPrank();
         vm.startPrank(governor);

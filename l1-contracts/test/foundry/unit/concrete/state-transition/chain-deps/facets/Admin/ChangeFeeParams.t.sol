@@ -25,8 +25,8 @@ contract ChangeFeeParamsTest is AdminTest {
         );
     }
 
-    function test_revertWhen_calledByNonStateTransitionManager() public {
-        address nonStateTransitionManager = makeAddr("nonStateTransitionManager");
+    function test_revertWhen_calledByNonChainTypeManagerlic {
+        address nonChainTypeManagereAddr("nonChainTChainTypeManager
         FeeParams memory newFeeParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Rollup,
             batchOverheadL1Gas: 1_000_000,
@@ -36,14 +36,14 @@ contract ChangeFeeParamsTest is AdminTest {
             minimalL2GasPrice: 250_000_000
         });
 
-        vm.startPrank(nonStateTransitionManager);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonStateTransitionManager));
+        vm.startPrank(nonChainTypeManager
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonChainTypeManager
 
         adminFacet.changeFeeParams(newFeeParams);
     }
 
     function test_revertWhen_newMaxPubdataPerBatchIsLessThanMaxPubdataPerTransaction() public {
-        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
+        address chainTypeManager = utilsFacet.util_getChainTypeManager
         uint32 priorityTxMaxPubdata = 88_000;
         uint32 maxPubdataPerBatch = priorityTxMaxPubdata - 1;
         FeeParams memory newFeeParams = FeeParams({
@@ -57,12 +57,12 @@ contract ChangeFeeParamsTest is AdminTest {
 
         vm.expectRevert(PriorityTxPubdataExceedsMaxPubDataPerBatch.selector);
 
-        vm.startPrank(stateTransitionManager);
+        vm.startPrank(chainTypeManager);
         adminFacet.changeFeeParams(newFeeParams);
     }
 
     function test_successfulChange() public {
-        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
+        address chainTypeManager = utilsFacet.util_getChainTypeManager
         FeeParams memory oldFeeParams = utilsFacet.util_getFeeParams();
         FeeParams memory newFeeParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Rollup,
@@ -77,7 +77,7 @@ contract ChangeFeeParamsTest is AdminTest {
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit NewFeeParams(oldFeeParams, newFeeParams);
 
-        vm.startPrank(stateTransitionManager);
+        vm.startPrank(chainTypeManager);
         adminFacet.changeFeeParams(newFeeParams);
 
         bytes32 newFeeParamsHash = keccak256(abi.encode(newFeeParams));

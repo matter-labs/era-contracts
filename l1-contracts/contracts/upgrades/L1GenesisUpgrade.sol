@@ -26,7 +26,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
         address _l1GenesisUpgrade,
         uint256 _chainId,
         uint256 _protocolVersion,
-        address _l1StmDeployerAddress,
+        address _l1CtmDeployerAddress,
         bytes calldata _forceDeploymentsData,
         bytes[] calldata _factoryDeps
     ) public override returns (bytes32) {
@@ -37,7 +37,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
             {
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,
-                    (_chainId, _l1StmDeployerAddress, _forceDeploymentsData)
+                    (_chainId, _l1CtmDeployerAddress, _forceDeploymentsData)
                 );
                 complexUpgraderCalldata = abi.encodeCall(
                     IComplexUpgrader.upgrade,

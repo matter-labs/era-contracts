@@ -7,7 +7,7 @@ import {FeeParams} from "../chain-deps/ZkSyncHyperchainStorage.sol";
 
 /// @param chainId the id of the chain
 /// @param bridgehub the address of the bridgehub contract
-/// @param stateTransitionManager contract's address
+/// @param chainTypeManager contract's address
 /// @param protocolVersion initial protocol version
 /// @param validatorTimelock address of the validator timelock that delays execution
 /// @param admin address who can manage the contract
@@ -25,7 +25,7 @@ import {FeeParams} from "../chain-deps/ZkSyncHyperchainStorage.sol";
 struct InitializeData {
     uint256 chainId;
     address bridgehub;
-    address stateTransitionManager;
+    address chainTypeManager;
     uint256 protocolVersion;
     address admin;
     address validatorTimelock;

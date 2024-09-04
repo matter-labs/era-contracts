@@ -4,8 +4,8 @@ pragma solidity 0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {ValidatorTimelock, IExecutor} from "contracts/state-transition/ValidatorTimelock.sol";
-import {DummyStateTransitionManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyStateTransitionManagerForValidatorTimelock.sol";
-import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
+import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Unauthorized, TimeNotReached} from "contracts/common/L1ContractErrors.sol";
 
 contract ValidatorTimelockTest is Test {
@@ -22,7 +22,7 @@ contract ValidatorTimelockTest is Test {
     error ValidatorDoesNotExist(uint256 _chainId);
 
     ValidatorTimelock validator;
-    DummyStateTransitionManagerForValidatorTimelock stateTransitionManager;
+    DummyChainTypeManagerForValidatorTimelock chainTypeManager;
 
     address owner;
     address zkSync;
@@ -45,10 +45,10 @@ contract ValidatorTimelockTest is Test {
         lastBatchNumber = 123;
         executionDelay = 10;
 
-        stateTransitionManager = new DummyStateTransitionManagerForValidatorTimelock(owner, zkSync);
+        chainTypeManager = new DummyChainTypeManagerForValidatorTimelock(owner, zkSync);
         validator = new ValidatorTimelock(owner, executionDelay, eraChainId);
         vm.prank(owner);
-        validator.setStateTransitionManager(IStateTransitionManager(address(stateTransitionManager)));
+        validator.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
         vm.prank(owner);
         validator.addValidator(chainId, alice);
         vm.prank(owner);
@@ -95,17 +95,17 @@ contract ValidatorTimelockTest is Test {
         validator.commitBatchesSharedBridge(chainId, storedBatch, batchesToCommit);
     }
 
-    function test_setStateTransitionManager() public {
-        assert(validator.stateTransitionManager() == IStateTransitionManager(address(stateTransitionManager)));
+    function test_setChainTypeManager() public {
+        assert(validator.chainTypeManager() == IChainTypeManager(address(chainTypeManager)));
 
-        DummyStateTransitionManagerForValidatorTimelock newManager = new DummyStateTransitionManagerForValidatorTimelock(
+        DummyChainTypeManagerForValidatorTimelock newManager = new DummyChainTypeManagerForValidatorTimelock(
                 bob,
                 zkSync
             );
         vm.prank(owner);
-        validator.setStateTransitionManager(IStateTransitionManager(address(newManager)));
+        validator.setChainTypeManager(IChainTypeManager(address(newManager)));
 
-        assert(validator.stateTransitionManager() == IStateTransitionManager(address(newManager)));
+        assert(validator.chainTypeManager() == IChainTypeManager(address(newManager)));
     }
 
     function test_setExecutionDelay() public {
@@ -268,9 +268,9 @@ contract ValidatorTimelockTest is Test {
         validator.commitBatchesSharedBridge(chainId, storedBatch, batchesToCommit);
     }
 
-    function test_RevertWhen_setStateTransitionManagerNotOwner() public {
+    function test_RevertWhen_setChainTypeManagerNotOwner() public {
         vm.expectRevert("Ownable: caller is not the owner");
-        validator.setStateTransitionManager(IStateTransitionManager(address(stateTransitionManager)));
+        validator.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
     }
 
     function test_RevertWhen_revertBatchesNotValidator() public {

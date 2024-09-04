@@ -120,12 +120,12 @@ contract UtilsFacet is ZkSyncHyperchainBase {
         return s.zkPorterIsAvailable;
     }
 
-    function util_setStateTransitionManager(address _stateTransitionManager) external {
-        s.stateTransitionManager = _stateTransitionManager;
+    function util_setChainTypeManager(address _chainTypeManager) external {
+        s.chainTypeManager = _chainTypeManager;
     }
 
-    function util_getStateTransitionManager() external view returns (address) {
-        return s.stateTransitionManager;
+    function util_getChainTypeManager() external view returns (address) {
+        return s.chainTypeManager;
     }
 
     function util_setPriorityTxMaxGasLimit(uint256 _priorityTxMaxGasLimit) external {

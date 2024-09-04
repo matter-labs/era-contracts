@@ -15,15 +15,15 @@ contract TestBaseFacet is ZkSyncHyperchainBase {
 
     function functionWithOnlyValidatorModifier() external onlyValidator {}
 
-    function functionWithOnlyStateTransitionManagerModifier() external onlyStateTransitionManager {}
+    function functionWithOnlyChainTypeManagerModifier() external onlyChainTypeManager {}
 
     function functionWithOnlyBridgehubModifier() external onlyBridgehub {}
 
-    function functionWithOnlyAdminOrStateTransitionManagerModifier() external onlyAdminOrStateTransitionManager {}
+    function functionWithOnlyAdminOrChainTypeManagerModifier() external onlyAdminOrChainTypeManager {}
 
-    function functionWithonlyValidatorOrStateTransitionManagerModifier()
+    function functionWithonlyValidatorOrChainTypeManagerModifier()
         external
-        onlyValidatorOrStateTransitionManager
+        onlyValidatorOrChainTypeManager
     {}
 
     // add this to be excluded from coverage report
@@ -46,10 +46,10 @@ contract ZkSyncHyperchainBaseTest is Test {
         selectors = new bytes4[](6);
         selectors[0] = TestBaseFacet.functionWithOnlyAdminModifier.selector;
         selectors[1] = TestBaseFacet.functionWithOnlyValidatorModifier.selector;
-        selectors[2] = TestBaseFacet.functionWithOnlyStateTransitionManagerModifier.selector;
+        selectors[2] = TestBaseFacet.functionWithOnlyChainTypeManagerModifier.selector;
         selectors[3] = TestBaseFacet.functionWithOnlyBridgehubModifier.selector;
-        selectors[4] = TestBaseFacet.functionWithOnlyAdminOrStateTransitionManagerModifier.selector;
-        selectors[5] = TestBaseFacet.functionWithonlyValidatorOrStateTransitionManagerModifier.selector;
+        selectors[4] = TestBaseFacet.functionWithOnlyAdminOrChainTypeManagerModifier.selector;
+        selectors[5] = TestBaseFacet.functionWithonlyValidatorOrChainTypeManagerModifier.selector;
     }
 
     function setUp() public virtual {

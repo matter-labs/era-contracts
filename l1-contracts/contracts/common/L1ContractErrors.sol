@@ -244,9 +244,9 @@ error SharedBridgeValueAlreadySet(SharedBridgeKey);
 // 0xdf3a8fdd
 error SlotOccupied();
 // 0xd0bc70cf
-error STMAlreadyRegistered();
+error CTMAlreadyRegistered();
 // 0x09865e10
-error STMNotRegistered();
+error CTMNotRegistered();
 // 0xae43b424
 error SystemLogsSizeTooBig();
 // 0x08753982

@@ -8,13 +8,13 @@ import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 
 // import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
-/// @notice Struct that holds all data needed for initializing STM Proxy.
+/// @notice Struct that holds all data needed for initializing CTM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
 /// @param owner The address who can manage non-critical updates in the contract
 /// @param validatorTimelock The address that serves as consensus, i.e. can submit blocks to be processed
 /// @param chainCreationParams The struct that contains the fields that define how a new chain should be created
 /// @param protocolVersion The initial protocol version on the newly deployed chain
-struct StateTransitionManagerInitializeData {
+struct ChainTypeManagerInitializeData {
     address owner;
     address validatorTimelock;
     ChainCreationParams chainCreationParams;
@@ -22,7 +22,7 @@ struct StateTransitionManagerInitializeData {
 }
 
 /// @notice The struct that contains the fields that define how a new chain should be created
-/// within this STM.
+/// within this CTM.
 /// @param genesisUpgrade The address that is used in the diamond cut initialize address on chain creation
 /// @param genesisBatchHash Batch hash of the genesis (initial) batch
 /// @param genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for the genesis batch
@@ -38,7 +38,7 @@ struct ChainCreationParams {
     bytes forceDeploymentsData;
 }
 
-interface IStateTransitionManager {
+interface IChainTypeManager {
     /// @dev Emitted when a new Hyperchain is added
     event NewHyperchain(uint256 indexed _chainId, address indexed _hyperchainContract);
 
@@ -104,7 +104,7 @@ interface IStateTransitionManager {
 
     function getProtocolVersion(uint256 _chainId) external view returns (uint256);
 
-    function initialize(StateTransitionManagerInitializeData calldata _initializeData) external;
+    function initialize(ChainTypeManagerInitializeData calldata _initializeData) external;
 
     function setValidatorTimelock(address _validatorTimelock) external;
 
@@ -169,6 +169,6 @@ interface IStateTransitionManager {
         uint256 _chainId,
         bytes32 _assetInfo,
         address _depositSender,
-        bytes calldata _stmData
+        bytes calldata _ctmData
     ) external;
 }

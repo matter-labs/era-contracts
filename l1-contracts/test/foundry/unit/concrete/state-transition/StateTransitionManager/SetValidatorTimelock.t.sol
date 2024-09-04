@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
+import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
-contract setValidatorTimelockTest is StateTransitionManagerTest {
+contract setValidatorTimelockTest is ChainTypeManagerTest {
     function test_SettingValidatorTimelock() public {
         assertEq(
             chainContractAddress.validatorTimelock(),

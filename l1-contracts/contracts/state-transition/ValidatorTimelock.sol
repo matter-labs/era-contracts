@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
-import {IStateTransitionManager} from "./IStateTransitionManager.sol";
+import {IChainTypeManager} from "./IChainTypeManager.sol";
 import {PriorityOpsBatchInfo} from "./libraries/PriorityTree.sol";
 import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErrors.sol";
 
@@ -41,8 +41,8 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @notice Error for when an address is not a validator.
     error ValidatorDoesNotExist(uint256 _chainId);
 
-    /// @dev The stateTransitionManager smart contract.
-    IStateTransitionManager public stateTransitionManager;
+    /// @dev The chainTypeManager smart contract.
+    IChainTypeManager public chainTypeManager;
 
     /// @dev The mapping of L2 chainId => batch number => timestamp when it was committed.
     mapping(uint256 chainId => LibMap.Uint32Map batchNumberToTimestampMapping) internal committedBatchTimestamp;
@@ -64,7 +64,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @notice Checks if the caller is the admin of the chain.
     modifier onlyChainAdmin(uint256 _chainId) {
-        if (msg.sender != stateTransitionManager.getChainAdmin(_chainId)) {
+        if (msg.sender != chainTypeManager.getChainAdmin(_chainId)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -79,11 +79,11 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     }
 
     /// @dev Sets a new state transition manager.
-    function setStateTransitionManager(IStateTransitionManager _stateTransitionManager) external onlyOwner {
-        if (address(_stateTransitionManager) == address(0)) {
+    function setChainTypeManager(IChainTypeManager _chainTypeManager) external onlyOwner {
+        if (address(_chainTypeManager) == address(0)) {
             revert ZeroAddress();
         }
-        stateTransitionManager = _stateTransitionManager;
+        chainTypeManager = _chainTypeManager;
     }
 
     /// @dev Sets an address as a validator.
@@ -193,7 +193,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev Call the hyperchain diamond contract with the same calldata as this contract was called.
     /// Note: it is called the hyperchain diamond contract, not delegatecalled!
     function _propagateToZkSyncHyperchain(uint256 _chainId) internal {
-        address contractAddress = stateTransitionManager.getHyperchain(_chainId);
+        address contractAddress = chainTypeManager.getHyperchain(_chainId);
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())
