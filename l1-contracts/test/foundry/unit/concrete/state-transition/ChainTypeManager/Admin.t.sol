@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
 contract AdminTest is ChainTypeManagerTest {
