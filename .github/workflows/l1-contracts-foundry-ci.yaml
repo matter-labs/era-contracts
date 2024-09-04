@@ -89,7 +89,7 @@ jobs:
       - name: Copy configs from template
         working-directory: ./l1-contracts
         run: |
-          cp -r deploy-script-config-template/ ./script-config
+          cp -r deploy-script-config-template/* ./script-config/**
           ls -a ./deploy-script-config-template
           ls -a ./script-config
 
