@@ -66,6 +66,7 @@
     "preprocess:system-contracts": "rm -rf ./contracts-preprocessed && ts-node scripts/preprocess-system-contracts.ts",
     "verify-on-explorer": "hardhat run scripts/verify-on-explorer.ts",
     "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode",
+    "tnd": "hardhat test --network zkSyncTestNode",
     "test-node": "hardhat node-zksync --tag v0.0.1-vm1.5.0",
     "test:bootloader": "cd bootloader/test_infra && cargo run"
   }
