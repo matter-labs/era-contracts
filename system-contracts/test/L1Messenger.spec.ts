@@ -22,7 +22,7 @@ const L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
 const L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
 const L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = '0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba';
 
-describe.only("L1Messenger tests", () => {
+describe("L1Messenger tests", () => {
   let l1Messenger: L1Messenger;
   let wallet: Wallet;
   let l1MessengerAccount: ethers.Signer;
@@ -161,6 +161,14 @@ describe.only("L1Messenger tests", () => {
         l1Messenger
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(ethers.constants.AddressZero, emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { operatorDataLength: 1 }))
+      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+    });
+
+    it("should revert Invalid root hash", async () => {
+      await expect(
+        l1Messenger
+          .connect(bootloaderAccount)
+          .publishPubdataAndClearState(ethers.constants.AddressZero, emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { chainedLogsRootHash: ethers.constants.HashZero }))
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
   });
