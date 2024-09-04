@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {OperatorDAInputTooSmall, InvalidNumberOfBlobs, OperatorDAInputTooShort, InvalidL2DAOutputHash, OnlyOneBlobWithCalldata, PubdataTooSmall, PubdataTooLong, InvalidPubdataHash} from "../L1StateTransitionErrors.sol";
+import {OperatorDAInputTooSmall, InvalidNumberOfBlobs, InvalidL2DAOutputHash, OnlyOneBlobWithCalldata, PubdataTooSmall, PubdataTooLong, InvalidPubdataHash} from "../L1StateTransitionErrors.sol";
 
 // solhint-disable gas-custom-errors, reason-string
 
