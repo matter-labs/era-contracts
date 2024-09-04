@@ -116,9 +116,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     }
 
     /// @dev initialize
-    function initialize(
-        ChainTypeManagerInitializeData calldata _initializeData
-    ) external reentrancyGuardInitializer {
+    function initialize(ChainTypeManagerInitializeData calldata _initializeData) external reentrancyGuardInitializer {
         if (_initializeData.owner == address(0)) {
             revert ZeroAddress();
         }

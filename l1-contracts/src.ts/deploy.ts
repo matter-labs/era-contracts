@@ -1267,8 +1267,7 @@ export class Deployer {
     const baseTokenAddress = await ntv.tokenAddress(baseTokenAssetId);
 
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
-    const alreadyRegisteredInCTM =
-      (await chainTypeManager.getHyperchain(inputChainId)) != ethers.constants.AddressZero;
+    const alreadyRegisteredInCTM = (await chainTypeManager.getHyperchain(inputChainId)) != ethers.constants.AddressZero;
 
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets, compareDiamondCutHash);

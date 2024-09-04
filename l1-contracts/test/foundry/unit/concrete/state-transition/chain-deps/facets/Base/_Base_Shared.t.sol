@@ -21,10 +21,7 @@ contract TestBaseFacet is ZkSyncHyperchainBase {
 
     function functionWithOnlyAdminOrChainTypeManagerModifier() external onlyAdminOrChainTypeManager {}
 
-    function functionWithonlyValidatorOrChainTypeManagerModifier()
-        external
-        onlyValidatorOrChainTypeManager
-    {}
+    function functionWithonlyValidatorOrChainTypeManagerModifier() external onlyValidatorOrChainTypeManager {}
 
     // add this to be excluded from coverage report
     function test() internal virtual {}

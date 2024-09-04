@@ -605,9 +605,7 @@ contract DeployL1Script is Script {
     function setChainTypeManagerInValidatorTimelock() internal {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
         vm.broadcast(msg.sender);
-        validatorTimelock.setChainTypeManager(
-            IChainTypeManager(addresses.stateTransition.stateTransitionProxy)
-        );
+        validatorTimelock.setChainTypeManager(IChainTypeManager(addresses.stateTransition.stateTransitionProxy));
         console.log("ChainTypeManager set in ValidatorTimelock");
     }
 

@@ -99,9 +99,9 @@ contract ValidatorTimelockTest is Test {
         assert(validator.chainTypeManager() == IChainTypeManager(address(chainTypeManager)));
 
         DummyChainTypeManagerForValidatorTimelock newManager = new DummyChainTypeManagerForValidatorTimelock(
-                bob,
-                zkSync
-            );
+            bob,
+            zkSync
+        );
         vm.prank(owner);
         validator.setChainTypeManager(IChainTypeManager(address(newManager)));
 

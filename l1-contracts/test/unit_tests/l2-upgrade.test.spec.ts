@@ -614,11 +614,7 @@ describe("L2 upgrade test", function () {
     const revertReason = await getCallRevertReason(
       executeUpgrade(chainId, proxyGetters, chainTypeManager, proxyAdmin, upgrade)
     );
-    await rollBackToVersion(
-      addToProtocolVersion(initialProtocolVersion, 5, 1).toString(),
-      chainTypeManager,
-      upgrade
-    );
+    await rollBackToVersion(addToProtocolVersion(initialProtocolVersion, 5, 1).toString(), chainTypeManager, upgrade);
     expect(revertReason).to.contains("PreviousUpgradeNotFinalized");
   });
 
