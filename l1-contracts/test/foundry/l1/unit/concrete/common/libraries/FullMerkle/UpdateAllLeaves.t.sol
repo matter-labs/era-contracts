@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {FullMerkleTest} from "./_FullMerkle_Shared.t.sol";
-import {MerkleWrongLength} from "l1-contracts/contracts/common/L1ContractErrors.sol";
+import {MerkleWrongLength} from "contracts/common/L1ContractErrors.sol";
 
 contract UpdateAllLeavesTest is FullMerkleTest {
     function test_revertWhen_wrongLength() public {

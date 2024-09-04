@@ -10,7 +10,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {EventOnFallback} from "contracts/dev-contracts/EventOnFallback.sol";
 import {Forwarder} from "contracts/dev-contracts/Forwarder.sol";
 import {RevertFallback} from "contracts/dev-contracts/RevertFallback.sol";
-import {EventOnFallbackTargetExpected} from "tests/foundry/L1TestsErrors.sol";
+import {EventOnFallbackTargetExpected} from "../../../L1TestsErrors.sol";
 
 contract GovernanceTest is Test, EventOnFallback {
     address internal owner;
