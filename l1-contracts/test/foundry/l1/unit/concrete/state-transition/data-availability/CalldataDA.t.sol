@@ -6,6 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {Utils} from "../../Utils/Utils.sol";
 import {TestCalldataDA} from "contracts/dev-contracts/test/TestCalldataDA.sol";
 import {BLOB_SIZE_BYTES} from "contracts/state-transition/data-availability/CalldataDA.sol";
+import {OperatorDAInputLengthTooSmall, InvalidNumberOfBlobs, InvalidBlobsHashes, InvalidL2DAOutputHash, OneBlobWithCalldata, PubdataInputTooSmall, PubdataLengthTooBig, InvalidPubdataHash, BlobCommitmentNotPublished,   ValL1DAWrongInputLength} from "da-contracts/contracts/DAContractsErrors.sol";
 
 contract CalldataDATest is Test {
     TestCalldataDA calldataDA;
@@ -23,7 +24,7 @@ contract CalldataDATest is Test {
         uint256 maxBlobsSupported = 1;
         bytes memory operatorDAInput = hex"";
 
-        vm.expectRevert("too small");
+        vm.expectRevert(OperatorDAInputLengthTooSmall.selector);
         calldataDA.processL2RollupDAValidatorOutputHash(l2DAValidatorOutputHash, maxBlobsSupported, operatorDAInput);
     }
 
@@ -37,7 +38,7 @@ contract CalldataDATest is Test {
 
         bytes memory operatorDAInput = abi.encodePacked(stateDiffHash, fullPubdataHash, blobsProvided);
 
-        vm.expectRevert("invalid number of blobs");
+        vm.expectRevert(InvalidNumberOfBlobs.selector);
         calldataDA.processL2RollupDAValidatorOutputHash(l2DAValidatorOutputHash, maxBlobsSupported, operatorDAInput);
     }
 
@@ -51,7 +52,7 @@ contract CalldataDATest is Test {
 
         bytes memory operatorDAInput = abi.encodePacked(stateDiffHash, fullPubdataHash, blobsProvided);
 
-        vm.expectRevert("invalid blobs hashes");
+        vm.expectRevert(InvalidBlobsHashes.selector);
         calldataDA.processL2RollupDAValidatorOutputHash(l2DAValidatorOutputHash, maxBlobsSupported, operatorDAInput);
     }
 
@@ -66,7 +67,7 @@ contract CalldataDATest is Test {
 
         bytes memory operatorDAInput = abi.encodePacked(stateDiffHash, fullPubdataHash, blobsProvided, blobLinearHash);
 
-        vm.expectRevert("invalid l2 DA output hash");
+        vm.expectRevert(InvalidL2DAOutputHash.selector);
         calldataDA.processL2RollupDAValidatorOutputHash(l2DAValidatorOutputHash, maxBlobsSupported, operatorDAInput);
     }
 
@@ -108,7 +109,7 @@ contract CalldataDATest is Test {
         uint256 maxBlobsSupported = 6;
         bytes memory pubdataInput = "";
 
-        vm.expectRevert("only one blob with calldata");
+        vm.expectRevert(OneBlobWithCalldata.selector);
         calldataDA.processCalldataDA(blobsProvided, fullPubdataHash, maxBlobsSupported, pubdataInput);
     }
 
@@ -118,7 +119,7 @@ contract CalldataDATest is Test {
         bytes calldata pubdataInput = makeBytesArrayOfLength(BLOB_SIZE_BYTES + 33);
         bytes32 fullPubdataHash = keccak256(pubdataInput);
 
-        vm.expectRevert(bytes("cz"));
+        vm.expectRevert(PubdataLengthTooBig.selector);
         calldataDA.processCalldataDA(blobsProvided, fullPubdataHash, maxBlobsSupported, pubdataInput);
     }
 
@@ -128,7 +129,7 @@ contract CalldataDATest is Test {
         bytes calldata pubdataInput = makeBytesArrayOfLength(31);
         bytes32 fullPubdataHash = keccak256(pubdataInput);
 
-        vm.expectRevert(bytes("pubdata too small"));
+        vm.expectRevert(PubdataInputTooSmall.selector);
         calldataDA.processCalldataDA(blobsProvided, fullPubdataHash, maxBlobsSupported, pubdataInput);
     }
 
@@ -140,7 +141,7 @@ contract CalldataDATest is Test {
         bytes memory pubdataInput = abi.encodePacked(pubdataInputWithoutBlobCommitment, blobCommitment);
         bytes32 fullPubdataHash = keccak256(pubdataInput);
 
-        vm.expectRevert(bytes("wp"));
+        vm.expectRevert(InvalidPubdataHash.selector);
         calldataDA.processCalldataDA(blobsProvided, fullPubdataHash, maxBlobsSupported, pubdataInput);
     }
 

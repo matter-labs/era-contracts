@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {FullMerkleTest} from "./_FullMerkle_Shared.t.sol";
+import {MerkleWrongLength} from "l1-contracts/contracts/common/L1ContractErrors.sol";
 
 contract UpdateAllLeavesTest is FullMerkleTest {
     function test_revertWhen_wrongLength() public {
@@ -18,7 +19,7 @@ contract UpdateAllLeavesTest is FullMerkleTest {
         newLeaves[2] = keccak256("New Leaf 2");
 
         // Updating all leaves with wrong length
-        vm.expectRevert(bytes("FMT, wrong length"));
+        vm.expectRevert(MerkleWrongLength.selector);
         merkleTest.updateAllLeaves(newLeaves);
     }
 
