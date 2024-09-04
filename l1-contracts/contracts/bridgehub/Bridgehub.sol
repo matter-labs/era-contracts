@@ -312,10 +312,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address sender = L1_CHAIN_ID == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);
         // This method can be accessed by l1CtmDeployer only
         if (sender != address(l1CtmDeployer)) {
-            revert NotStmDeployer();      
+            revert NotStmDeployer();
         }
         if (!chainTypeManagerIsRegistered[_assetAddress]) {
-            revert StmNotRegistered();   
+            revert StmNotRegistered();
         }
 
         bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
@@ -707,7 +707,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (!whitelistedSettlementLayers[_settlementChainId]) {
             revert SLNotWhitelisted();
         }
-
 
         BridgehubBurnCTMAssetData memory bridgeData = abi.decode(_data, (BridgehubBurnCTMAssetData));
         if (_assetId != ctmAssetIdFromChainId(bridgeData.chainId)) {

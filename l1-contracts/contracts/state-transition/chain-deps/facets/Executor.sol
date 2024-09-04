@@ -18,7 +18,7 @@ import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
-import {ChainWasMigrated, MissmatchL2DAValidator, InvalidEightBit, MissmatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsZero, PriorityOpsDataItemHashesLengthIsZero} from "../../L1StateTransitionErrors.sol";
+import {ChainWasMigrated, MismatchL2DAValidator, InvalidEightBit, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsZero, PriorityOpsDataItemHashesLengthIsZero} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -203,7 +203,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
-                    revert MissmatchL2DAValidator();
+                    revert MismatchL2DAValidator();
                 }
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
@@ -419,7 +419,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _executedBatchIdx
     ) internal {
         if (_priorityOpsData.itemHashes.length != _storedBatch.numberOfLayer1Txs) {
-            revert MissmatchNumberOfLayer1Txs();
+            revert MismatchNumberOfLayer1Txs();
         }
         bytes32 priorityOperationsHash = _rollingHash(_priorityOpsData.itemHashes);
         _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash);
