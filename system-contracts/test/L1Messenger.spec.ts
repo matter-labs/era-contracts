@@ -57,7 +57,7 @@ describe("L1Messenger tests", () => {
       .connect(bootloaderAccount)
       .publishPubdataAndClearState(
         ethers.constants.AddressZero,
-        emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger)
+        await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger)
       );
     await network.provider.request({
       method: "hardhat_stopImpersonatingAccount",
@@ -87,7 +87,7 @@ describe("L1Messenger tests", () => {
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(
             ethers.constants.AddressZero,
-            emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger),
+            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger),
             { gasLimit: 1000000000 }
           )
       ).wait();
@@ -100,7 +100,7 @@ describe("L1Messenger tests", () => {
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(
             ethers.constants.AddressZero,
-            emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { numberOfLogs: 0x4002 })
+            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { numberOfLogs: 0x4002 })
           )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
@@ -111,7 +111,7 @@ describe("L1Messenger tests", () => {
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(
             ethers.constants.AddressZero,
-            emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { l2DaValidatorFunctionSig: "0x12121212" })
+            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { l2DaValidatorFunctionSig: "0x12121212" })
           )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
@@ -136,7 +136,7 @@ describe("L1Messenger tests", () => {
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(
             ethers.constants.AddressZero,
-            emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, overrideData)
+            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, overrideData)
           )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
@@ -147,7 +147,7 @@ describe("L1Messenger tests", () => {
       await expect(
         l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
           ethers.constants.AddressZero,
-          emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
+          await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
             chainedMessagesHash: ethers.utils.keccak256(correctChainedMessagesHash),
           })
         )
@@ -160,7 +160,7 @@ describe("L1Messenger tests", () => {
       await expect(
         l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
           ethers.constants.AddressZero,
-          emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
+          await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
             chainedBytecodeHash: ethers.utils.keccak256(correctChainedBytecodesHash),
           })
         )
@@ -171,7 +171,7 @@ describe("L1Messenger tests", () => {
       await expect(
         l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
           ethers.constants.AddressZero,
-          emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
+          await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
             operatorDataOffset: EXPECTED_DA_INPUT_OFFSET + 1,
           })
         )
@@ -184,7 +184,7 @@ describe("L1Messenger tests", () => {
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(
             ethers.constants.AddressZero,
-            emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { operatorDataLength: 1 })
+            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { operatorDataLength: 1 })
           )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
@@ -193,7 +193,7 @@ describe("L1Messenger tests", () => {
       await expect(
         l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
           ethers.constants.AddressZero,
-          emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
+          await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
             chainedLogsRootHash: ethers.constants.HashZero,
           })
         )
@@ -416,7 +416,7 @@ class L1MessengerPubdataEmulator implements EmulatorData {
   async buildTotalL2ToL1PubdataAndStateDiffs(
     l1Messenger: L1Messenger,
     overrideData: EmulatorOverrideData = {}
-  ): string {
+  ): Promise<string> {
     const storedChainedMessagesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 2);
     const storedChainedBytecodesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 3);
 
