@@ -42,7 +42,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     mapping(address account => mapping(address l1Token => mapping(bytes32 depositL2TxHash => uint256 amount)))
         public depositAmount;
 
-    /// @dev The address that is used as a L2 Shared Bridge in ZKsync Era.
+    /// @dev The address that is used as a L2 bridge counterpart in ZKsync Era.
     // slither-disable-next-line uninitialized-state
     address public l2Bridge;
 
