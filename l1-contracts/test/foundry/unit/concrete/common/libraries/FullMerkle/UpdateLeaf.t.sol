@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {FullMerkleTest} from "./_FullMerkle_Shared.t.sol";
-import {MerkleWrongIndex} from "l1-contracts/contracts/common/L1ContractErrors.sol";
+import {MerkleWrongIndex} from "contracts/common/L1ContractErrors.sol";
 
 contract UpdateLeafTest is FullMerkleTest {
     function test_revertWhen_wrongIndex() public {
