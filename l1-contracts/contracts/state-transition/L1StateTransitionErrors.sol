@@ -34,11 +34,11 @@ error NotSettlementLayers();
 
 error NotHyperchain();
 
-error MissmatchL2DAValidator();
+error MismatchL2DAValidator();
 
 error InvalidExpectedSystemContractUpgradeTXHashKey();
 
-error MissmatchNumberOfLayer1Txs();
+error MismatchNumberOfLayer1Txs();
 
 error InvalidBatchesDataLength();
 
@@ -64,7 +64,7 @@ error PubdataTooLong();
 
 error InvalidPubdataHash();
 
-error BlobHashBlobCommitmentMissmatchValue();
+error BlobHashBlobCommitmentMismatchValue();
 
 error L1DAValidatorInvalidSender();
 

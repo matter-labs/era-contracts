@@ -14,7 +14,7 @@ import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
-import {OnlyBridgehub, NotOwnerViaRouter ,NoEthAllowed, NotOwner, WrongCounterPart, WrongEncodingVersion} from "./L1BridgehubErrors.sol";
+import {OnlyBridgehub, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart, WrongEncodingVersion} from "./L1BridgehubErrors.sol";
 
 /// @dev The encoding version of the data.
 bytes1 constant CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION = 0x01;

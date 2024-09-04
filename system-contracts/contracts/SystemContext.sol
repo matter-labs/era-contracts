@@ -254,7 +254,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         if (_l2BlockNumber <= 0) {
             revert L2BlockNumberIsNeverExpectedToBeZero();
         }
-        
+
         unchecked {
             bytes32 correctPrevBlockHash = _calculateLegacyL2BlockHash(_l2BlockNumber - 1);
             if (correctPrevBlockHash != _expectedPrevL2BlockHash) {
@@ -478,7 +478,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         if (previousBatchNumber + 1 != _expectedNewNumber) {
             revert ProvidedBatchNumberIsNotCorrect();
         }
-        
+
         _ensureBatchConsistentWithL2Block(_newTimestamp);
 
         batchHashes[previousBatchNumber] = _prevBatchHash;

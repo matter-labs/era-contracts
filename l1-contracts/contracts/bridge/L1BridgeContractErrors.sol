@@ -35,5 +35,3 @@ error WrongAmountTransferred();
 error EmptyToken();
 
 error ClaimFailedDepositFailed();
-
-

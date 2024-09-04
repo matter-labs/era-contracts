@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
-
 // solhint-disable gas-custom-errors
 
 import {Test} from "forge-std/Test.sol";
@@ -124,7 +123,7 @@ contract L2Erc20BridgeTest is Test {
         assertEq(BridgedStandardERC20(l2TokenAddress).decimals(), 18);
     }
 
-    function test_governanceShouldNotBeAbleToSkipInitializerVersions() public {
+    function test_governanceShouldlNotBeAbleToSkipInitializerVersions() public {
         address l2TokenAddress = initializeTokenByDeposit();
 
         BridgedStandardERC20.ERC20Getters memory getters = BridgedStandardERC20.ERC20Getters({
