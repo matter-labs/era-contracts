@@ -60,7 +60,7 @@ library Utils {
     }
 
     function createSystemLogs(bytes32 _outputHash) public returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](9);
+        bytes[] memory logs = new bytes[](7);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -69,43 +69,36 @@ library Utils {
         );
         logs[1] = constructL2Log(
             true,
-            L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY),
-            0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563
-        );
-        logs[2] = constructL2Log(true, L2_TO_L1_MESSENGER, uint256(SystemLogKey.STATE_DIFF_HASH_KEY), bytes32(""));
-        logs[3] = constructL2Log(
-            true,
             L2_SYSTEM_CONTEXT_ADDRESS,
             uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
             bytes32("")
         );
-        logs[4] = constructL2Log(
+        logs[2] = constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
             uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32("")
         );
-        logs[5] = constructL2Log(
+        logs[3] = constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
             keccak256("")
         );
-        logs[6] = constructL2Log(
+        logs[4] = constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
             bytes32("")
         );
 
-        logs[7] = constructL2Log(
+        logs[5] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
             uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY),
             _outputHash
         );
-        logs[8] = constructL2Log(
+        logs[6] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
             uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),

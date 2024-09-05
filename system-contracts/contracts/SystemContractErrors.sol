@@ -129,8 +129,6 @@ enum PubdataField {
     LogsHash,
     MsgHash,
     Bytecode,
-    StateDiffCompressionVersion,
-    ExtraData,
     InputDAFunctionSig,
     InputLogsHash,
     InputLogsRootHash,

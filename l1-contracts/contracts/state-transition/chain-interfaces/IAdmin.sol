@@ -115,7 +115,7 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
 
-    /// TODO: maybe include some params
+    /// @notice Emitted when the migration to the new settlement layer is complete.
     event MigrationComplete();
 
     /// @notice Emitted when the contract is frozen.

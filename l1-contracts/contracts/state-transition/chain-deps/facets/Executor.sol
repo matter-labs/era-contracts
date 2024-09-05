@@ -16,7 +16,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTE
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
+import {MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -216,16 +216,15 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             }
         }
 
-        // FIXME: temporarily old logs were kept for backwards compatibility. This check cannot work now.
-        //
         // We only require 8 logs to be checked, the 9th is if we are expecting a protocol upgrade
         // Without the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
         // With the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
-            // require(processedLogs == 255, "b7");
-        } else {
-            // FIXME: do restore this code to the one that was before
-            require(_checkBit(processedLogs, uint8(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)), "b8");
+            if (processedLogs != 127) {
+                revert MissingSystemLogs(127, processedLogs);
+            }
+        } else if (processedLogs != 255) {
+            revert MissingSystemLogs(255, processedLogs);
         }
     }
 
