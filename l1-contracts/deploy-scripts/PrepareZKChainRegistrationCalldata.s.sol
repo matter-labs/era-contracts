@@ -118,7 +118,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
             calls = new IGovernance.Call[](1);
         }
 
-        IGovernance.Call memory registerChainCall = prepareRegisterHyperchainCall();
+        IGovernance.Call memory registerChainCall = prepareRegisterZKChainCall();
         calls[cnt] = registerChainCall;
         ++cnt;
 
@@ -267,7 +267,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         return proxyContractAddress;
     }
 
-    function prepareRegisterHyperchainCall() internal view returns (IGovernance.Call memory) {
+    function prepareRegisterZKChainCall() internal view returns (IGovernance.Call memory) {
         Bridgehub bridgehub = Bridgehub(ecosystem.bridgehub);
 
         bytes memory data = abi.encodeCall(

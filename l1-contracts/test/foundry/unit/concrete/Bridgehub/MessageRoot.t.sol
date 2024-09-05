@@ -66,7 +66,7 @@ contract MessageRootTest is Test {
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, alphaChainId),
+            abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
 
@@ -80,7 +80,7 @@ contract MessageRootTest is Test {
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, alphaChainId),
+            abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
 
@@ -100,7 +100,7 @@ contract MessageRootTest is Test {
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, alphaChainId),
+            abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
 

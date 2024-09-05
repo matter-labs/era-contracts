@@ -11,9 +11,9 @@ import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErr
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Intermediate smart contract between the validator EOA account and the hyperchains state transition diamond smart contract.
+/// @notice Intermediate smart contract between the validator EOA account and the zkChains state transition diamond smart contract.
 /// @dev The primary purpose of this contract is to provide a trustless means of delaying batch execution without
-/// modifying the main hyperchain diamond contract. As such, even if this contract is compromised, it will not impact the main
+/// modifying the main zkChain diamond contract. As such, even if this contract is compromised, it will not impact the main
 /// contract.
 /// @dev ZKsync actively monitors the chain activity and reacts to any suspicious activity by freezing the chain.
 /// This allows time for investigation and mitigation before resuming normal operations.
@@ -116,7 +116,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     }
 
     /// @dev Records the timestamp for all provided committed batches and make
-    /// a call to the hyperchain diamond contract with the same calldata.
+    /// a call to the zkChain diamond contract with the same calldata.
     function commitBatchesSharedBridge(
         uint256 _chainId,
         StoredBatchInfo calldata,
@@ -137,17 +137,17 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
             }
         }
 
-        _propagateToZkSyncHyperchain(_chainId);
+        _propagateToZkSyncZKChain(_chainId);
     }
 
-    /// @dev Make a call to the hyperchain diamond contract with the same calldata.
+    /// @dev Make a call to the zkChain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
     function revertBatchesSharedBridge(uint256 _chainId, uint256) external onlyValidator(_chainId) {
-        _propagateToZkSyncHyperchain(_chainId);
+        _propagateToZkSyncZKChain(_chainId);
     }
 
-    /// @dev Make a call to the hyperchain diamond contract with the same calldata.
+    /// @dev Make a call to the zkChain diamond contract with the same calldata.
     /// Note: We don't track the time when batches are proven, since all information about
     /// the batch is known on the commit stage and the proved is not finalized (may be reverted).
     function proveBatchesSharedBridge(
@@ -156,11 +156,11 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         StoredBatchInfo[] calldata,
         ProofInput calldata
     ) external onlyValidator(_chainId) {
-        _propagateToZkSyncHyperchain(_chainId);
+        _propagateToZkSyncZKChain(_chainId);
     }
 
     /// @dev Check that batches were committed at least X time ago and
-    /// make a call to the hyperchain diamond contract with the same calldata.
+    /// make a call to the zkChain diamond contract with the same calldata.
     function executeBatchesSharedBridge(
         uint256 _chainId,
         StoredBatchInfo[] calldata _newBatchesData,
@@ -187,17 +187,17 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 }
             }
         }
-        _propagateToZkSyncHyperchain(_chainId);
+        _propagateToZkSyncZKChain(_chainId);
     }
 
-    /// @dev Call the hyperchain diamond contract with the same calldata as this contract was called.
-    /// Note: it is called the hyperchain diamond contract, not delegatecalled!
-    function _propagateToZkSyncHyperchain(uint256 _chainId) internal {
-        address contractAddress = chainTypeManager.getHyperchain(_chainId);
+    /// @dev Call the zkChain diamond contract with the same calldata as this contract was called.
+    /// Note: it is called the zkChain diamond contract, not delegatecalled!
+    function _propagateToZkSyncZKChain(uint256 _chainId) internal {
+        address contractAddress = chainTypeManager.getZKChain(_chainId);
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())
-            // Call method of the hyperchain diamond contract returns 0 on error
+            // Call method of the zkChain diamond contract returns 0 on error
             let result := call(gas(), contractAddress, 0, 0, calldatasize(), 0, 0)
             // Get the size of the last return data
             let size := returndatasize()

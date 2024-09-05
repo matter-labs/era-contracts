@@ -4,8 +4,8 @@ pragma solidity 0.8.24;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
-import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
-import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
+import {ZKChainBase} from "./ZKChainBase.sol";
+import {PubdataPricingMode} from "../ZKChainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
@@ -18,17 +18,17 @@ import {InvalidSelector} from "../../../common/L1ContractErrors.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
-import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
+import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 
 /// @title Getters Contract implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
+contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
-    /// @inheritdoc IZkSyncHyperchainBase
+    /// @inheritdoc IZKChainBase
     string public constant override getName = "GettersFacet";
 
     /*//////////////////////////////////////////////////////////////

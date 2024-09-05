@@ -12,7 +12,7 @@ import {ZeroAddress, Unauthorized, OperationMustBeReady, OperationMustBePending,
 /// @notice This contract manages operations (calls with preconditions) for governance tasks.
 /// The contract allows for operations to be scheduled, executed, and canceled with
 /// appropriate permissions and delays. It is used for managing and coordinating upgrades
-/// and changes in all ZKsync hyperchain governed contracts.
+/// and changes in all ZKsync zkChain governed contracts.
 ///
 /// Operations can be proposed as either fully transparent upgrades with on-chain data,
 /// or "shadow" upgrades where upgrade data is not published on-chain before execution. Proposed operations

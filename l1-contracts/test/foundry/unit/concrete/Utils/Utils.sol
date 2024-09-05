@@ -12,8 +12,8 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";

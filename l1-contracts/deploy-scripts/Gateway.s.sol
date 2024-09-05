@@ -9,11 +9,11 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
-import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 // import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 // import {Governance} from "contracts/governance/Governance.sol";
 // import {Utils} from "./Utils.sol";
-// import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+// import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 // import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
@@ -21,13 +21,13 @@ import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 // import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 
-import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 contract GatewayScript is Script {
     using stdToml for string;
 
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
+    bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewZKChain(uint256,address)");
 
     // solhint-disable-next-line gas-struct-packing
     struct Config {
@@ -67,7 +67,7 @@ contract GatewayScript is Script {
     function initializeConfig() internal {
         // Grab config from output of l1 deployment
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, vm.envString("L1_OUTPUT")); //"/script-config/register-hyperchain.toml");
+        string memory path = string.concat(root, vm.envString("L1_OUTPUT")); //"/script-config/register-zkChain.toml");
         string memory toml = vm.readFile(path);
 
         config.deployerAddress = msg.sender;
@@ -89,7 +89,7 @@ contract GatewayScript is Script {
         config.ctmDeploymentTracker = toml.readAddress(
             "$.deployed_addresses.bridgehub.ctm_deployment_tracker_proxy_addr"
         );
-        path = string.concat(root, vm.envString("HYPERCHAIN_CONFIG"));
+        path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
         toml = vm.readFile(path);
 
         config.ownerAddress = toml.readAddress("$.owner_address");
@@ -149,8 +149,8 @@ contract GatewayScript is Script {
 
         address newAdmin = ownable.owner();
         console.log("newAdmin", newAdmin);
-        IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(config.chainChainId));
-        console.log("chainAdmin", bridgehub.getHyperchain(config.chainChainId), chain.getAdmin());
+        IZKChain chain = IZKChain(bridgehub.getZKChain(config.chainChainId));
+        console.log("chainAdmin", bridgehub.getZKChain(config.chainChainId), chain.getAdmin());
         bytes32 ctmAssetId = bridgehub.ctmAssetIdFromChainId(config.chainChainId);
         bytes memory diamondCutData = config.diamondCutData; // todo replace with config.zkDiamondCutData;
         bytes memory ctmData = abi.encode(newAdmin, diamondCutData);

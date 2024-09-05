@@ -27,7 +27,7 @@ contract DummySharedBridge is PausableUpgradeable {
 
     bytes32 dummyL2DepositTxHash;
 
-    /// @dev Maps token balances for each chain to prevent unauthorized spending across hyperchains.
+    /// @dev Maps token balances for each chain to prevent unauthorized spending across zkChains.
     /// This serves as a security measure until hyperbridging is implemented.
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 

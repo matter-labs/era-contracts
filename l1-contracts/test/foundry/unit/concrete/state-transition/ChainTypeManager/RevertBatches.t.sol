@@ -29,7 +29,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
     // function test_SuccessfulBatchReverting() public {
     //     createNewChain(getDiamondCutData(diamondInit));
 
-    //     address newChainAddress = chainContractAddress.getHyperchain(chainId);
+    //     address newChainAddress = chainContractAddress.getZKChain(chainId);
 
     //     executorFacet = ExecutorFacet(address(newChainAddress));
     //     gettersFacet = GettersFacet(address(newChainAddress));

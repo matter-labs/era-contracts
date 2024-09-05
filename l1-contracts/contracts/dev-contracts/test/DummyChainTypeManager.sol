@@ -14,12 +14,12 @@ contract DummyChainTypeManager is ChainTypeManager {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
-    address hyperchain;
+    address zkChain;
 
     /// @notice Constructor
     constructor() ChainTypeManager(address(0)) {}
 
-    function setHyperchain(uint256 _chainId, address _hyperchain) external {
-        hyperchain = _hyperchain;
+    function setZKChain(uint256 _chainId, address _zkChain) external {
+        zkChain = _zkChain;
     }
 }

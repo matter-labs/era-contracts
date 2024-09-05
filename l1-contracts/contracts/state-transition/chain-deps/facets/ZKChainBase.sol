@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {ZkSyncHyperchainStorage} from "../ZkSyncHyperchainStorage.sol";
+import {ZKChainStorage} from "../ZKChainStorage.sol";
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 
 import {Unauthorized} from "../../../common/L1ContractErrors.sol";
@@ -10,9 +10,9 @@ import {Unauthorized} from "../../../common/L1ContractErrors.sol";
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract ZkSyncHyperchainBase is ReentrancyGuard {
+contract ZKChainBase is ReentrancyGuard {
     // slither-disable-next-line uninitialized-state
-    ZkSyncHyperchainStorage internal s;
+    ZKChainStorage internal s;
 
     /// @notice Checks that the message sender is an active admin
     modifier onlyAdmin() {

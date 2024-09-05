@@ -112,7 +112,7 @@ bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGE
 address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint16).max));
 
 /// @dev the maximum number of supported chains, this is an arbitrary limit.
-uint256 constant MAX_NUMBER_OF_HYPERCHAINS = 100;
+uint256 constant MAX_NUMBER_OF_ZK_CHAINS = 100;
 
 /// @dev Used as the `msg.sender` for transactions that relayed via a settlement layer.
 address constant SETTLEMENT_LAYER_RELAY_SENDER = address(uint160(0x1111111111111111111111111111111111111111));
@@ -128,7 +128,7 @@ struct PriorityTreeCommitment {
 }
 
 // Info that allows to restore a chain.
-struct HyperchainCommitment {
+struct ZKChainCommitment {
     /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch
     /// (batch 0 is genesis)
     uint256 totalBatchesExecuted;

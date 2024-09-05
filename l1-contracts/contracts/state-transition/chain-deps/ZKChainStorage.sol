@@ -60,13 +60,13 @@ struct FeeParams {
     uint64 minimalL2GasPrice;
 }
 
-/// @dev storing all storage variables for hyperchain diamond facets
+/// @dev storing all storage variables for zkChain diamond facets
 /// NOTE: It is used in a proxy, so it is possible to add new variables to the end
 /// but NOT to modify already existing variables or change their order.
 /// NOTE: variables prefixed with '__DEPRECATED_' are deprecated and shouldn't be used.
 /// Their presence is maintained for compatibility and to prevent storage collision.
 // solhint-disable-next-line gas-struct-packing
-struct ZkSyncHyperchainStorage {
+struct ZKChainStorage {
     /// @dev Storage of variables needed for deprecated diamond cut facet
     uint256[7] __DEPRECATED_diamondCutStorage;
     /// @notice Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing). Replaced by CTM

@@ -12,7 +12,7 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
-import {HyperchainDeployer} from "./_SharedHyperchainDeployer.t.sol";
+import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
@@ -20,10 +20,10 @@ import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol"
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker {
+contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -46,18 +46,18 @@ contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeploye
         _registerNewTokens(tokens);
 
         _deployEra();
-        // _deployHyperchain(ETH_TOKEN_ADDRESS);
-        // _deployHyperchain(ETH_TOKEN_ADDRESS);
-        // _deployHyperchain(tokens[0]);
-        // _deployHyperchain(tokens[0]);
-        // _deployHyperchain(tokens[1]);
-        // _deployHyperchain(tokens[1]);
+        // _deployZKChain(ETH_TOKEN_ADDRESS);
+        // _deployZKChain(ETH_TOKEN_ADDRESS);
+        // _deployZKChain(tokens[0]);
+        // _deployZKChain(tokens[0]);
+        // _deployZKChain(tokens[1]);
+        // _deployZKChain(tokens[1]);
 
-        for (uint256 i = 0; i < hyperchainIds.length; i++) {
+        for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
             l2ContractAddresses.push(contractAddress);
 
-            _addL2ChainContract(hyperchainIds[i], contractAddress);
+            _addL2ChainContract(zkChainIds[i], contractAddress);
         }
     }
 
@@ -68,20 +68,20 @@ contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeploye
     // Check whether the sum of ETH deposits from tests, updated on each deposit and withdrawal,
     // equals the balance of L1Shared bridge.
     function test_initialDeployment() public {
-        uint256 chainId = hyperchainIds[0];
+        uint256 chainId = zkChainIds[0];
         IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
-        address newChainAddress = bridgehub.getHyperchain(chainId);
-        address admin = IZkSyncHyperchain(bridgehub.getHyperchain(chainId)).getAdmin();
+        address newChainAddress = bridgehub.getZKChain(chainId);
+        address admin = IZKChain(bridgehub.getZKChain(chainId)).getAdmin();
         IChainTypeManager ctm = IChainTypeManager(bridgehub.chainTypeManager(chainId));
 
         assertNotEq(admin, address(0));
         assertNotEq(newChainAddress, address(0));
 
-        address[] memory chainAddresses = bridgehub.getAllHyperchains();
+        address[] memory chainAddresses = bridgehub.getAllZKChains();
         assertEq(chainAddresses.length, 1);
         assertEq(chainAddresses[0], newChainAddress);
 
-        uint256[] memory chainIds = bridgehub.getAllHyperchainChainIDs();
+        uint256[] memory chainIds = bridgehub.getAllZKChainChainIDs();
         assertEq(chainIds.length, 1);
         assertEq(chainIds[0], chainId);
 

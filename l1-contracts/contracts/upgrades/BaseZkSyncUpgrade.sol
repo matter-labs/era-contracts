@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
-import {ZkSyncHyperchainBase} from "../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
+import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol";
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
@@ -44,7 +44,7 @@ struct ProposedUpgrade {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
-abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
+abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);
 
@@ -304,7 +304,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         // must be ensured in the other parts of the upgrade that the upgrade transaction is not overridden.
         if (!patchOnly) {
             // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
-            // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
+            // Note it is important to keep this check, as otherwise zkChains might skip upgrades by overwriting
             if (s.l2SystemContractsUpgradeTxHash != bytes32(0)) {
                 revert PreviousUpgradeNotFinalized(s.l2SystemContractsUpgradeTxHash);
             }

@@ -14,7 +14,7 @@ import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
 
-import {MAX_NUMBER_OF_HYPERCHAINS} from "../common/Config.sol";
+import {MAX_NUMBER_OF_ZK_CHAINS} from "../common/Config.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
@@ -66,7 +66,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     /// @notice only the bridgehub can call
     /// @param _chainId the chainId of the chain
     modifier onlyChain(uint256 _chainId) {
-        require(msg.sender == BRIDGE_HUB.getHyperchain(_chainId), "MR: only chain");
+        require(msg.sender == BRIDGE_HUB.getZKChain(_chainId), "MR: only chain");
         _;
     }
 
@@ -145,7 +145,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     /// @param _chainId the chainId of the chain
     function _addNewChain(uint256 _chainId) internal {
         uint256 cachedChainCount = chainCount;
-        require(cachedChainCount < MAX_NUMBER_OF_HYPERCHAINS, "MR: too many chains");
+        require(cachedChainCount < MAX_NUMBER_OF_ZK_CHAINS, "MR: too many chains");
 
         ++chainCount;
         chainIndex[_chainId] = cachedChainCount;

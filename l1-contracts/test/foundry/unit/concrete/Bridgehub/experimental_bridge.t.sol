@@ -11,7 +11,7 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
-import {DummyHyperchain} from "contracts/dev-contracts/test/DummyHyperchain.sol";
+import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubSetter.sol";
 import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
@@ -37,7 +37,7 @@ contract ExperimentalBridgeTest is Test {
     address public bridgeOwner;
     address public testTokenAddress;
     DummyChainTypeManagerWBH mockCTM;
-    DummyHyperchain mockChainContract;
+    DummyZKChain mockChainContract;
     DummySharedBridge mockSharedBridge;
     DummySharedBridge mockSecondSharedBridge;
     L1AssetRouter sharedBridge;
@@ -90,7 +90,7 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub = Bridgehub(address(dummyBridgehub));
         address weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgeHub));
-        mockChainContract = new DummyHyperchain(address(bridgeHub), eraChainId, block.chainid);
+        mockChainContract = new DummyZKChain(address(bridgeHub), eraChainId, block.chainid);
 
         mockL2Contract = makeAddr("mockL2Contract");
         // mocks to use in bridges instead of using a dummy one
@@ -703,8 +703,8 @@ contract ExperimentalBridgeTest is Test {
 
     //     // bridgeHub.createNewChain => chainTypeManager.createNewChain => this function sets the stateTransition mapping
     //     // of `chainId`, let's emulate that using foundry cheatcodes or let's just use the extra function we introduced in our mockCTM
-    //     mockCTM.setHyperchain(chainId, address(mockChainContract));
-    //     assertTrue(mockCTM.getHyperchain(chainId) == address(mockChainContract));
+    //     mockCTM.setZKChain(chainId, address(mockChainContract));
+    //     assertTrue(mockCTM.getZKChain(chainId) == address(mockChainContract));
 
     // vm.startPrank(deployerAddress);
     // vm.mockCall(
@@ -740,14 +740,14 @@ contract ExperimentalBridgeTest is Test {
     //     assertTrue(bridgeHub.baseToken(newChainId) == testTokenAddress);
     // }
 
-    // function test_getHyperchain(uint256 mockChainId) public {
-    //     mockChainId = _setUpHyperchainForChainId(mockChainId);
+    // function test_getZKChain(uint256 mockChainId) public {
+    //     mockChainId = _setUpZKChainForChainId(mockChainId);
 
     //     // Now the following statements should be true as well:
     //     assertTrue(bridgeHub.chainTypeManager(mockChainId) == address(mockCTM));
-    //     address returnedHyperchain = bridgeHub.getHyperchain(mockChainId);
+    //     address returnedZKChain = bridgeHub.getZKChain(mockChainId);
 
-    //     assertEq(returnedHyperchain, address(mockChainContract));
+    //     assertEq(returnedZKChain, address(mockChainContract));
     // }
 
     // function test_proveL2MessageInclusion(
@@ -759,11 +759,11 @@ contract ExperimentalBridgeTest is Test {
     //     address randomSender,
     //     bytes memory randomData
     // ) public {
-    //     mockChainId = _setUpHyperchainForChainId(mockChainId);
+    //     mockChainId = _setUpZKChainForChainId(mockChainId);
 
     //     // Now the following statements should be true as well:
     //     assertTrue(bridgeHub.chainTypeManager(mockChainId) == address(mockCTM));
-    //     assertTrue(bridgeHub.getHyperchain(mockChainId) == address(mockChainContract));
+    //     assertTrue(bridgeHub.getZKChain(mockChainId) == address(mockChainContract));
 
     //     // Creating a random L2Message::l2Message so that we pass the correct parameters to `proveL2MessageInclusion`
     //     L2Message memory l2Message = _createMockL2Message(randomTxNumInBatch, randomSender, randomData);
@@ -807,11 +807,11 @@ contract ExperimentalBridgeTest is Test {
         bytes32 randomKey,
         bytes32 randomValue
     ) public {
-        mockChainId = _setUpHyperchainForChainId(mockChainId);
+        mockChainId = _setUpZKChainForChainId(mockChainId);
 
         // Now the following statements should be true as well:
         assertTrue(bridgeHub.chainTypeManager(mockChainId) == address(mockCTM));
-        assertTrue(bridgeHub.getHyperchain(mockChainId) == address(mockChainContract));
+        assertTrue(bridgeHub.getZKChain(mockChainId) == address(mockChainContract));
 
         // Creating a random L2Log::l2Log so that we pass the correct parameters to `proveL2LogInclusion`
         L2Log memory l2Log = _createMockL2Log({
@@ -860,7 +860,7 @@ contract ExperimentalBridgeTest is Test {
         bool randomResultantBool,
         bool txStatusBool
     ) public {
-        randomChainId = _setUpHyperchainForChainId(randomChainId);
+        randomChainId = _setUpZKChainForChainId(randomChainId);
 
         TxStatus txStatus;
 
@@ -905,7 +905,7 @@ contract ExperimentalBridgeTest is Test {
         uint256 mockL2GasPerPubdataByteLimit,
         uint256 mockL2TxnCost
     ) public {
-        mockChainId = _setUpHyperchainForChainId(mockChainId);
+        mockChainId = _setUpZKChainForChainId(mockChainId);
 
         vm.mockCall(
             address(mockChainContract),
@@ -953,7 +953,7 @@ contract ExperimentalBridgeTest is Test {
     //         mockRefundRecipient: address(0)
     //     });
 
-    //     l2TxnReqDirect.chainId = _setUpHyperchainForChainId(l2TxnReqDirect.chainId);
+    //     l2TxnReqDirect.chainId = _setUpZKChainForChainId(l2TxnReqDirect.chainId);
 
     //     assertTrue(!(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS));
     //     _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, true, address(0));
@@ -962,7 +962,7 @@ contract ExperimentalBridgeTest is Test {
     //     _setUpSharedBridge();
     //     _setUpSharedBridgeL2(mockChainId);
 
-    //     assertTrue(bridgeHub.getHyperchain(l2TxnReqDirect.chainId) == address(mockChainContract));
+    //     assertTrue(bridgeHub.getZKChain(l2TxnReqDirect.chainId) == address(mockChainContract));
     //     bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
 
     //     vm.mockCall(
@@ -1076,13 +1076,13 @@ contract ExperimentalBridgeTest is Test {
     //         mockRefundRecipient: address(0)
     //     });
 
-    //     l2TxnReqDirect.chainId = _setUpHyperchainForChainId(l2TxnReqDirect.chainId);
+    //     l2TxnReqDirect.chainId = _setUpZKChainForChainId(l2TxnReqDirect.chainId);
 
     //     _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, false, address(testToken));
     //     _setUpSharedBridge();
     //     _setUpSharedBridgeL2(mockChainId);
 
-    //     assertTrue(bridgeHub.getHyperchain(l2TxnReqDirect.chainId) == address(mockChainContract));
+    //     assertTrue(bridgeHub.getZKChain(l2TxnReqDirect.chainId) == address(mockChainContract));
     //     bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
 
     //     vm.mockCall(
@@ -1142,7 +1142,7 @@ contract ExperimentalBridgeTest is Test {
     //         secondBridgeCalldata: secondBridgeCalldata
     //     });
 
-    //     l2TxnReq2BridgeOut.chainId = _setUpHyperchainForChainId(l2TxnReq2BridgeOut.chainId);
+    //     l2TxnReq2BridgeOut.chainId = _setUpZKChainForChainId(l2TxnReq2BridgeOut.chainId);
 
     //     _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true, address(0));
     //     assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == ETH_TOKEN_ADDRESS);
@@ -1150,7 +1150,7 @@ contract ExperimentalBridgeTest is Test {
     //     _setUpSharedBridge();
     //     _setUpSharedBridgeL2(chainId);
 
-    //     assertTrue(bridgeHub.getHyperchain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
+    //     assertTrue(bridgeHub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
 
     //     uint256 callerMsgValue = l2TxnReq2BridgeOut.mintValue + l2TxnReq2BridgeOut.secondBridgeValue;
     //     address randomCaller = makeAddr("RANDOM_CALLER");
@@ -1202,7 +1202,7 @@ contract ExperimentalBridgeTest is Test {
     //         secondBridgeCalldata: secondBridgeCalldata
     //     });
 
-    //     l2TxnReq2BridgeOut.chainId = _setUpHyperchainForChainId(l2TxnReq2BridgeOut.chainId);
+    //     l2TxnReq2BridgeOut.chainId = _setUpZKChainForChainId(l2TxnReq2BridgeOut.chainId);
 
     //     _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true, address(0));
     //     assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == ETH_TOKEN_ADDRESS);
@@ -1210,7 +1210,7 @@ contract ExperimentalBridgeTest is Test {
     //     _setUpSharedBridge();
     //     _setUpSharedBridgeL2(chainId);
 
-    //     assertTrue(bridgeHub.getHyperchain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
+    //     assertTrue(bridgeHub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
 
     //     uint256 callerMsgValue = l2TxnReq2BridgeOut.mintValue + l2TxnReq2BridgeOut.secondBridgeValue;
     //     address randomCaller = makeAddr("RANDOM_CALLER");
@@ -1270,7 +1270,7 @@ contract ExperimentalBridgeTest is Test {
     //     l2Value = bound(l2Value, 1, type(uint256).max);
     //     bytes memory secondBridgeCalldata = abi.encode(erc20TokenAddress, l2Value, l2Receiver);
 
-    //     chainId = _setUpHyperchainForChainId(chainId);
+    //     chainId = _setUpZKChainForChainId(chainId);
 
     //     L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
     //         chainId: chainId,
@@ -1291,7 +1291,7 @@ contract ExperimentalBridgeTest is Test {
     //     _setUpSharedBridge();
 
     //     _setUpSharedBridgeL2(chainId);
-    //     assertTrue(bridgeHub.getHyperchain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
+    //     assertTrue(bridgeHub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
     //     mockChainContract.setBridgeHubAddress(address(bridgeHub));
 
     //     vm.mockCall(
@@ -1343,7 +1343,7 @@ contract ExperimentalBridgeTest is Test {
     //     secondBridgeValue = bound(secondBridgeValue, 1, type(uint256).max);
     //     bytes memory secondBridgeCalldata = abi.encode(ETH_TOKEN_ADDRESS, 0, l2Receiver);
 
-    //     chainId = _setUpHyperchainForChainId(chainId);
+    //     chainId = _setUpZKChainForChainId(chainId);
 
     //     L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
     //         chainId: chainId,
@@ -1361,7 +1361,7 @@ contract ExperimentalBridgeTest is Test {
 
     //     _setUpSharedBridge();
     //     _setUpSharedBridgeL2(chainId);
-    //     assertTrue(bridgeHub.getHyperchain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
+    //     assertTrue(bridgeHub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
 
     //     address randomCaller = makeAddr("RANDOM_CALLER");
 
@@ -1506,7 +1506,7 @@ contract ExperimentalBridgeTest is Test {
         return abi.encode(abi.encode(diamondCutData), bytes(""));
     }
 
-    function _setUpHyperchainForChainId(uint256 mockChainId) internal returns (uint256 mockChainIdInRange) {
+    function _setUpZKChainForChainId(uint256 mockChainId) internal returns (uint256 mockChainIdInRange) {
         mockChainId = bound(mockChainId, 1, type(uint48).max);
         mockChainIdInRange = mockChainId;
         vm.prank(bridgeOwner);
@@ -1518,7 +1518,7 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(!(bridgeHub.chainTypeManager(mockChainId) == address(mockCTM)));
 
         dummyBridgehub.setCTM(mockChainId, address(mockCTM));
-        dummyBridgehub.setHyperchain(mockChainId, address(mockChainContract));
+        dummyBridgehub.setZKChain(mockChainId, address(mockChainContract));
     }
 
     function _setUpBaseTokenForChainId(uint256 mockChainId, bool tokenIsETH, address token) internal {

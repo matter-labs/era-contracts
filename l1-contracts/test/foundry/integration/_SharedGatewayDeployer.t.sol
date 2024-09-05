@@ -13,12 +13,12 @@ contract GatewayDeployer is L1ContractDeployer {
         vm.setEnv("L1_CONFIG", "/test/foundry/integration/deploy-scripts/script-config/config-deploy-l1.toml");
         vm.setEnv("L1_OUTPUT", "/test/foundry/integration/deploy-scripts/script-out/output-deploy-l1.toml");
         vm.setEnv(
-            "HYPERCHAIN_CONFIG",
-            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-hyperchain-10.toml"
+            "ZK_CHAIN_CONFIG",
+            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-zkChain-10.toml"
         );
         vm.setEnv(
             "GATEWAY_CONFIG",
-            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-hyperchain-11.toml"
+            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-zkChain-11.toml"
         );
 
         gatewayScript = new GatewayScript();

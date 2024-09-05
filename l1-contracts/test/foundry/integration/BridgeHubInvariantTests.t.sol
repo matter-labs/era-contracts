@@ -12,7 +12,7 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
-import {HyperchainDeployer} from "./_SharedHyperchainDeployer.t.sol";
+import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
@@ -23,7 +23,7 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAdd
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker {
+contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
 
     bytes32 constant NEW_PRIORITY_REQUEST_HASH =
@@ -55,7 +55,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
 
     // Amounts deposited by each user, mapped by user address and token address
     mapping(address user => mapping(address token => uint256 deposited)) public depositsUsers;
-    // Amounts deposited into the bridge, mapped by hyperchain address and token address
+    // Amounts deposited into the bridge, mapped by zkChain address and token address
     mapping(address chain => mapping(address token => uint256 deposited)) public depositsBridge;
     // Total sum of deposits into the bridge, mapped by token address
     mapping(address token => uint256 deposited) public tokenSumDeposit;
@@ -63,7 +63,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
     mapping(address token => uint256 deposited) public tokenSumWithdrawal;
     // Total sum of L2 values transferred to mock contracts, mapped by token address
     mapping(address token => uint256 deposited) public l2ValuesSum;
-    // Deposits into the hyperchains contract, mapped by L2 contract address and token address
+    // Deposits into the zkChains contract, mapped by L2 contract address and token address
     mapping(address l2contract => mapping(address token => uint256 balance)) public contractDeposits;
     // Total sum of deposits into all L2 contracts, mapped by token address
     mapping(address token => uint256 deposited) public contractDepositsSum;
@@ -76,10 +76,10 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         vm.stopPrank();
     }
 
-    // gets random hyperchain from hyperchain ids, set contract variables
-    modifier useHyperchain(uint256 chainIndexSeed) {
-        currentChainId = hyperchainIds[bound(chainIndexSeed, 0, hyperchainIds.length - 1)];
-        currentChainAddress = getHyperchainAddress(currentChainId);
+    // gets random zkChain from zkChain ids, set contract variables
+    modifier useZKChain(uint256 chainIndexSeed) {
+        currentChainId = zkChainIds[bound(chainIndexSeed, 0, zkChainIds.length - 1)];
+        currentChainAddress = getZKChainAddress(currentChainId);
         _;
     }
 
@@ -100,7 +100,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
     // use base token as main token
     // watch out, do not use with ETH
     modifier useBaseToken() {
-        currentToken = TestnetERC20Token(getHyperchainBaseToken(currentChainId));
+        currentToken = TestnetERC20Token(getZKChainBaseToken(currentChainId));
         currentTokenAddress = address(currentToken);
         _;
     }
@@ -135,7 +135,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
     function _commitBatchInfo(uint256 _chainId) internal {
         //vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
 
-        GettersFacet hyperchainGetters = GettersFacet(getHyperchainAddress(_chainId));
+        GettersFacet zkChainGetters = GettersFacet(getZKChainAddress(_chainId));
 
         IExecutor.StoredBatchInfo memory batchZero;
 
@@ -149,7 +149,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         batchZero.commitment = vm.parseBytes32("0x0000000000000000000000000000000000000000000000000000000000000000");
 
         bytes32 hashedZeroBatch = keccak256(abi.encode(batchZero));
-        assertEq(hyperchainGetters.storedBatchHash(0), hashedZeroBatch);
+        assertEq(zkChainGetters.storedBatchHash(0), hashedZeroBatch);
     }
 
     // use mailbox interface to return exact amount to use as a gas on l2 side,
@@ -160,7 +160,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
     ) public view returns (uint256) {
-        MailboxFacet chainMailBox = MailboxFacet(getHyperchainAddress(_chainId));
+        MailboxFacet chainMailBox = MailboxFacet(getZKChainAddress(_chainId));
 
         return chainMailBox.l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
     }
@@ -236,7 +236,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         }
     }
 
-    // deposits ERC20 token to the hyperchain where base token is ETH
+    // deposits ERC20 token to the zkChain where base token is ETH
     // this function use requestL2TransactionTwoBridges function from shared bridge.
     // tokenAddress should be any ERC20 token, excluding ETH
     function depositERC20ToEthChain(uint256 l2Value, address tokenAddress) private useGivenToken(tokenAddress) {
@@ -339,7 +339,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
     }
 
     // deposits ERC20 to token with base being also ERC20
-    // there are no modifiers so watch out, baseTokenAddress should be base of hyperchain
+    // there are no modifiers so watch out, baseTokenAddress should be base of zkChain
     // currentToken should be different from base
     function depositERC20ToERC20Chain(uint256 l2Value, address baseTokenAddress) private {
         uint256 gasPrice = 10000000;
@@ -393,7 +393,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         l2ValuesSum[currentTokenAddress] += l2Value;
     }
 
-    // deposits ETH to hyperchain where base is ETH
+    // deposits ETH to zkChain where base is ETH
     function depositEthBase(uint256 l2Value) private {
         uint256 gasPrice = 10000000;
         vm.txGasPrice(gasPrice);
@@ -601,7 +601,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         uint256 userIndexSeed,
         uint256 chainIndexSeed,
         uint256 l2Value
-    ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) useBaseToken {
+    ) public virtual useUser(userIndexSeed) useZKChain(chainIndexSeed) useBaseToken {
         if (currentTokenAddress == ETH_TOKEN_ADDRESS) {
             depositEthBase(l2Value);
         } else {
@@ -614,8 +614,8 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         uint256 chainIndexSeed,
         uint256 tokenIndexSeed,
         uint256 l2Value
-    ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) useERC20Token(tokenIndexSeed) {
-        address chainBaseToken = getHyperchainBaseToken(currentChainId);
+    ) public virtual useUser(userIndexSeed) useZKChain(chainIndexSeed) useERC20Token(tokenIndexSeed) {
+        address chainBaseToken = getZKChainBaseToken(currentChainId);
 
         if (chainBaseToken == ETH_TOKEN_ADDRESS) {
             depositERC20ToEthChain(l2Value, currentTokenAddress);
@@ -632,8 +632,8 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         uint256 userIndexSeed,
         uint256 chainIndexSeed,
         uint256 amountToWithdraw
-    ) public virtual useUser(userIndexSeed) useHyperchain(chainIndexSeed) {
-        address token = getHyperchainBaseToken(currentChainId);
+    ) public virtual useUser(userIndexSeed) useZKChain(chainIndexSeed) {
+        address token = getZKChainBaseToken(currentChainId);
 
         if (token != ETH_TOKEN_ADDRESS) {
             withdrawERC20Token(amountToWithdraw, token);
@@ -654,8 +654,8 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
             addressesToExclude.push(l2ContractAddresses[i]);
         }
 
-        for (uint256 i = 0; i < hyperchainIds.length; i++) {
-            addressesToExclude.push(getHyperchainAddress(hyperchainIds[i]));
+        for (uint256 i = 0; i < zkChainIds.length; i++) {
+            addressesToExclude.push(getZKChainAddress(zkChainIds[i]));
         }
 
         return addressesToExclude;
@@ -669,18 +669,18 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
         _registerNewTokens(tokens);
 
         _deployEra();
-        _deployHyperchain(ETH_TOKEN_ADDRESS);
-        _deployHyperchain(ETH_TOKEN_ADDRESS);
-        _deployHyperchain(tokens[0]);
-        _deployHyperchain(tokens[0]);
-        _deployHyperchain(tokens[1]);
-        _deployHyperchain(tokens[1]);
+        _deployZKChain(ETH_TOKEN_ADDRESS);
+        _deployZKChain(ETH_TOKEN_ADDRESS);
+        _deployZKChain(tokens[0]);
+        _deployZKChain(tokens[0]);
+        _deployZKChain(tokens[1]);
+        _deployZKChain(tokens[1]);
 
-        for (uint256 i = 0; i < hyperchainIds.length; i++) {
+        for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
             l2ContractAddresses.push(contractAddress);
 
-            _addL2ChainContract(hyperchainIds[i], contractAddress);
+            _addL2ChainContract(zkChainIds[i], contractAddress);
         }
     }
 
@@ -722,7 +722,7 @@ contract BoundedBridgeHubInvariantTests is BridgeHubInvariantTests {
     function testBoundedBridgeHubInvariant() internal {}
 }
 
-contract InvariantTesterHyperchains is Test {
+contract InvariantTesterZKChains is Test {
     BoundedBridgeHubInvariantTests tests;
 
     function setUp() public {
