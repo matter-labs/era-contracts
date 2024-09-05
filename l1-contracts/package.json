@@ -61,7 +61,7 @@
     "test:foundry": "forge test --ffi --match-path 'test/foundry/l1/*'",
     "test:zkfoundry": "forge test --zksync --match-path 'test/foundry/l2/*'",
     "test:fork": "TEST_CONTRACTS_FORK=1 yarn run hardhat test test/unit_tests/*.fork.ts --network hardhat",
-    "coverage:foundry": "forge coverage --ffi --match-path 'test/foundry/l1/*'",
+    "coverage:foundry": "forge coverage --ffi --match-path 'test/foundry/l1/*' --no-match-coverage 'contracts/bridge/(asset-router/L2AssetRouter|ntv/L2NativeTokenVault)\\.sol'",
     "deploy-no-build": "ts-node scripts/deploy.ts",
     "register-hyperchain": "ts-node scripts/register-hyperchain.ts",
     "deploy-weth-bridges": "ts-node scripts/deploy-weth-bridges.ts",
