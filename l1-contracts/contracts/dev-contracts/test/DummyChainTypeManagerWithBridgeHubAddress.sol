@@ -11,12 +11,12 @@ import {ChainTypeManager} from "../../state-transition/ChainTypeManager.sol";
 contract DummyChainTypeManagerWBH is ChainTypeManager {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
-    address hyperchain;
+    address zkChain;
     /// @notice Constructor
     constructor(address bridgeHub) ChainTypeManager(bridgeHub) {}
 
-    function setHyperchain(uint256 _chainId, address _hyperchain) external {
-        hyperchain = _hyperchain;
+    function setZKChain(uint256 _chainId, address _zkChain) external {
+        zkChain = _zkChain;
     }
 
     // add this to be excluded from coverage report

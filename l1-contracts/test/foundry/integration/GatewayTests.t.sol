@@ -13,7 +13,7 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
-import {HyperchainDeployer} from "./_SharedHyperchainDeployer.t.sol";
+import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
@@ -26,13 +26,13 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 
-contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
+contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -59,21 +59,21 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         _registerNewTokens(tokens);
 
         _deployEra();
-        _deployHyperchain(ETH_TOKEN_ADDRESS);
+        _deployZKChain(ETH_TOKEN_ADDRESS);
         acceptPendingAdmin();
-        _deployHyperchain(ETH_TOKEN_ADDRESS);
+        _deployZKChain(ETH_TOKEN_ADDRESS);
         acceptPendingAdmin();
-        // _deployHyperchain(tokens[0]);
-        // _deployHyperchain(tokens[0]);
-        // _deployHyperchain(tokens[1]);
-        // _deployHyperchain(tokens[1]);
+        // _deployZKChain(tokens[0]);
+        // _deployZKChain(tokens[0]);
+        // _deployZKChain(tokens[1]);
+        // _deployZKChain(tokens[1]);
 
-        for (uint256 i = 0; i < hyperchainIds.length; i++) {
+        for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
             l2ContractAddresses.push(contractAddress);
 
-            _addL2ChainContract(hyperchainIds[i], contractAddress);
-            // _registerL2SharedBridge(hyperchainIds[i], contractAddress);
+            _addL2ChainContract(zkChainIds[i], contractAddress);
+            // _registerL2SharedBridge(zkChainIds[i], contractAddress);
         }
 
         _initializeGatewayScript();
@@ -81,12 +81,8 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         // console.log("KL todo", Ownable(l1Script.getBridgehubProxyAddress()).owner(), l1Script.getBridgehubProxyAddress());
         vm.deal(Ownable(l1Script.getBridgehubProxyAddress()).owner(), 100000000000000000000000000000000000);
         vm.deal(l1Script.getOwnerAddress(), 100000000000000000000000000000000000);
-        IZkSyncHyperchain chain = IZkSyncHyperchain(
-            IBridgehub(l1Script.getBridgehubProxyAddress()).getHyperchain(migratingChainId)
-        );
-        IZkSyncHyperchain chain2 = IZkSyncHyperchain(
-            IBridgehub(l1Script.getBridgehubProxyAddress()).getHyperchain(gatewayChainId)
-        );
+        IZKChain chain = IZKChain(IBridgehub(l1Script.getBridgehubProxyAddress()).getZKChain(migratingChainId));
+        IZKChain chain2 = IZKChain(IBridgehub(l1Script.getBridgehubProxyAddress()).getZKChain(gatewayChainId));
         vm.deal(chain.getAdmin(), 100000000000000000000000000000000000);
         vm.deal(chain2.getAdmin(), 100000000000000000000000000000000000);
 
@@ -177,7 +173,7 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         bytes memory transferData;
 
         {
-            IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId));
+            IZKChain chain = IZKChain(bridgehub.getZKChain(migratingChainId));
             bytes memory initialDiamondCut = l1Script.getInitialDiamondCutData();
             bytes memory chainData = abi.encode(chain.getProtocolVersion());
             bytes memory ctmData = abi.encode(address(1), msg.sender, ctm.protocolVersion(), initialDiamondCut);
@@ -189,7 +185,7 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
             transferData = abi.encode(data);
         }
 
-        address chainAdmin = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId)).getAdmin();
+        address chainAdmin = IZKChain(bridgehub.getZKChain(migratingChainId)).getAdmin();
         IL1AssetRouter assetRouter = bridgehub.sharedBridge();
         bytes32 l2TxHash = keccak256("l2TxHash");
         uint256 l2BatchNumber = 5;
@@ -241,7 +237,7 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
     function finishMoveChain() public {
         IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
         IChainTypeManager ctm = IChainTypeManager(l1Script.getCTM());
-        IZkSyncHyperchain migratingChain = IZkSyncHyperchain(bridgehub.getHyperchain(migratingChainId));
+        IZKChain migratingChain = IZKChain(bridgehub.getZKChain(migratingChainId));
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
 
         vm.startBroadcast(Ownable(address(bridgehub)).owner());
@@ -267,8 +263,8 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         vm.chainId(currentChainId);
 
         assertEq(bridgehub.baseTokenAssetId(mintChainId), baseTokenAssetId);
-        IZkSyncHyperchain mintedHyperchain = IZkSyncHyperchain(bridgehub.getHyperchain(mintChainId));
-        assertEq(mintedHyperchain.getBaseTokenAssetId(), baseTokenAssetId);
+        IZKChain mintedZKChain = IZKChain(bridgehub.getZKChain(mintChainId));
+        assertEq(mintedZKChain.getBaseTokenAssetId(), baseTokenAssetId);
     }
 
     // add this to be excluded from coverage report

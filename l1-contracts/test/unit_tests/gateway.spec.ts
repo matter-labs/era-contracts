@@ -9,7 +9,7 @@ import { BridgehubFactory } from "../../typechain";
 import {
   initialTestnetDeploymentProcess,
   defaultDeployerForTests,
-  registerHyperchainWithBridgeRegistration,
+  registerZKChainWithBridgeRegistration,
 } from "../../src.ts/deploy-test-process";
 import {
   ethTestConfig,
@@ -62,7 +62,7 @@ describe("Gateway", function () {
 
     gatewayDeployer = await defaultDeployerForTests(deployWallet, ownerAddress);
     gatewayDeployer.chainId = 10;
-    await registerHyperchainWithBridgeRegistration(
+    await registerZKChainWithBridgeRegistration(
       gatewayDeployer,
       false,
       [],

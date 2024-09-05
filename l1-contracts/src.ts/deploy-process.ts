@@ -98,7 +98,7 @@ export async function initialBridgehubDeployment(
   await deployer.setChainTypeManagerInValidatorTimelock({ gasPrice });
 }
 
-export async function registerHyperchain(
+export async function registerZKChain(
   deployer: Deployer,
   validiumMode: boolean,
   extraFacets: FacetCut[],
@@ -118,7 +118,7 @@ export async function registerHyperchain(
     await deployer.registerTokenBridgehub(baseTokenAddress, useGovernance);
   }
   await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
-  await deployer.registerHyperchain(
+  await deployer.registerZKChain(
     encodeNTVAssetId(deployer.l1ChainId, ethers.utils.hexZeroPad(baseTokenAddress, 32)),
     validiumMode,
     extraFacets,

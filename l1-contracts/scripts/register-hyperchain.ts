@@ -55,7 +55,7 @@ const chooseBaseTokenAddress = async (name?: string, address?: string) => {
 async function main() {
   const program = new Command();
 
-  program.version("0.1.0").name("register-hyperchain").description("register hyperchains");
+  program.version("0.1.0").name("register-zk-chain").description("register zk-chains");
 
   program
     .option("--private-key <private-key>")
@@ -104,7 +104,7 @@ async function main() {
         await deployer.registerTokenBridgehub(baseTokenAddress, cmd.useGovernance);
       }
       await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
-      await deployer.registerHyperchain(
+      await deployer.registerZKChain(
         baseTokenAssetId,
         cmd.validiumMode,
         null,

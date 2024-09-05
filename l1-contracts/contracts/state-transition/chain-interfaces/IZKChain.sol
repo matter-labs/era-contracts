@@ -9,7 +9,7 @@ import {IMailbox} from "./IMailbox.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 
-interface IZkSyncHyperchain is IAdmin, IExecutor, IGetters, IMailbox {
+interface IZKChain is IAdmin, IExecutor, IGetters, IMailbox {
     // We need this structure for the server for now
     event ProposeTransparentUpgrade(
         Diamond.DiamondCutData diamondCut,

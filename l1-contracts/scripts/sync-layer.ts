@@ -161,7 +161,7 @@ async function main() {
 
       const receipt = await deployer.moveChainToGateway(gatewayChainId, gasPrice);
 
-      const gatewayAddress = await ctm.getHyperchain(gatewayChainId);
+      const gatewayAddress = await ctm.getZKChain(gatewayChainId);
 
       const l2TxHash = zkUtils.getL2HashFromPriorityOp(receipt, gatewayAddress);
 
@@ -177,8 +177,8 @@ async function main() {
       console.log("Finalized on SL with hash:", receiptOnSL.transactionHash);
 
       const ctmOnSL = IChainTypeManagerFactory.connect(counterPart, gatewayProvider);
-      const hyperchainAddress = await ctmOnSL.getHyperchain(currentChainId);
-      console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${hyperchainAddress}`);
+      const zkChainAddress = await ctmOnSL.getZKChain(currentChainId);
+      console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${zkChainAddress}`);
 
       console.log("Success!");
     });
@@ -214,14 +214,14 @@ async function main() {
         verbose: true,
       });
 
-      const hyperchain = deployer.stateTransitionContract(deployer.deployWallet);
+      const zkChain = deployer.stateTransitionContract(deployer.deployWallet);
 
-      console.log(await hyperchain.getAdmin());
+      console.log(await zkChain.getAdmin());
 
       console.log("Executing recovery...");
 
       await (
-        await hyperchain.recoverFromFailedMigrationToGateway(
+        await zkChain.recoverFromFailedMigrationToGateway(
           gatewayChainId,
           proof.l2BatchNumber,
           proof.l2MessageIndex,
@@ -291,13 +291,13 @@ async function main() {
       );
       deployer.addresses.Bridgehub.BridgehubProxy = getAddressFromEnv("GATEWAY_BRIDGEHUB_PROXY_ADDR");
 
-      const hyperchain = deployer.stateTransitionContract(deployer.deployWallet);
+      const zkChain = deployer.stateTransitionContract(deployer.deployWallet);
 
       console.log("Setting SL DA validators");
       // This logic should be distinctive between Validium and Rollup
       const l1DaValidator = getAddressFromEnv("GATEWAY_L1_RELAYED_SL_DA_VALIDATOR");
       const l2DaValidator = getAddressFromEnv("CONTRACTS_L2_DA_VALIDATOR_ADDR");
-      await (await hyperchain.setDAValidatorPair(l1DaValidator, l2DaValidator)).wait();
+      await (await zkChain.setDAValidatorPair(l1DaValidator, l2DaValidator)).wait();
 
       console.log("Success!");
     });
@@ -316,7 +316,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
   const l1Bridgehub = deployer.bridgehubContract(deployer.deployWallet);
   const l1CTM = deployer.chainTypeManagerContract(deployer.deployWallet);
   console.log(deployer.addresses.StateTransition.StateTransitionProxy);
-  const gatewayAddress = await l1Bridgehub.getHyperchain(chainId);
+  const gatewayAddress = await l1Bridgehub.getZKChain(chainId);
   // this script only works when owner is the deployer
   console.log("Registering Gateway chain id on the CTM");
   const receipt1 = await deployer.executeUpgrade(

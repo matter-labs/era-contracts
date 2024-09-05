@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.24;
 
-import {ZkSyncHyperchainBaseTest} from "./_Base_Shared.t.sol";
+import {ZKChainBaseTest} from "./_Base_Shared.t.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
-contract OnlyChainTypeManagerTest is ZkSyncHyperchainBaseTest {
+contract OnlyChainTypeManagerTest is ZKChainBaseTest {
     function test_revertWhen_calledByNonChainTypeManager() public {
         address nonChainTypeManager = makeAddr("nonChainTypeManager");
 

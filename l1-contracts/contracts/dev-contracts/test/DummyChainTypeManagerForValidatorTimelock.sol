@@ -9,22 +9,22 @@ contract DummyChainTypeManagerForValidatorTimelock {
     function test() internal virtual {}
 
     address public chainAdmin;
-    address public hyperchainAddress;
+    address public zkChainAddress;
 
-    constructor(address _chainAdmin, address _hyperchain) {
+    constructor(address _chainAdmin, address _zkChain) {
         chainAdmin = _chainAdmin;
-        hyperchainAddress = _hyperchain;
+        zkChainAddress = _zkChain;
     }
 
     function getChainAdmin(uint256) external view returns (address) {
         return chainAdmin;
     }
 
-    function getHyperchain(uint256) external view returns (address) {
-        return hyperchainAddress;
+    function getZKChain(uint256) external view returns (address) {
+        return zkChainAddress;
     }
 
-    function setHyperchain(uint256, address _hyperchain) external {
-        hyperchainAddress = _hyperchain;
+    function setZKChain(uint256, address _zkChain) external {
+        zkChainAddress = _zkChain;
     }
 }

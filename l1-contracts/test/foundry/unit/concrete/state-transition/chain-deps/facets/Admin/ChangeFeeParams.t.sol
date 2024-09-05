@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {Unauthorized, PriorityTxPubdataExceedsMaxPubDataPerBatch} from "contracts/common/L1ContractErrors.sol";
 
 contract ChangeFeeParamsTest is AdminTest {

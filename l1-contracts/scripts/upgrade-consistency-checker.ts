@@ -20,7 +20,7 @@ import { encodeNTVAssetId } from "../src.ts/utils";
 const genesisUpgrade = process.env.CONTRACTS_GENESIS_UPGRADE_ADDR!;
 const validatorTimelockDeployTx = "0xde4ef2b77241b605acaa1658ff8815df0911bf81555a80c9cbdde42fbcaaea30";
 const validatorTimelock = process.env.CONTRACTS_VALIDATOR_TIMELOCK_ADDR!;
-const upgradeHyperchains = process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR!;
+const upgradeZKChains = process.env.CONTRACTS_ZK_CHAIN_UPGRADE_ADDR!;
 
 const verifier = process.env.CONTRACTS_VERIFIER_ADDR!;
 const proxyAdmin = process.env.CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR!;
@@ -55,8 +55,8 @@ const expectedDelay = "75600";
 const eraChainId = process.env.CONTRACTS_ERA_CHAIN_ID!;
 const l1ChainId = process.env.CONTRACTS_L1_CHAIN_ID!;
 const expectedSalt = "0x0000000000000000000000000000000000000000000000000000000000000001";
-const expectedHyperchainAddr = "0x32400084c286cf3e17e7b677ea9583e60a000324";
-const maxNumberOfHyperchains = 100;
+const expectedZKChainAddr = "0x32400084c286cf3e17e7b677ea9583e60a000324";
+const maxNumberOfZKChains = 100;
 const expectedStoredBatchHashZero = "0x1574fa776dec8da2071e5f20d71840bfcbd82c2bca9ad68680edfedde1710bc4";
 const expectedL2BridgeAddress = "0x11f943b2c77b743AB90f4A0Ae7d5A4e7FCA3E102";
 const expectedL1LegacyBridge = "0x57891966931Eb4Bb6FB81430E6cE0A03AAbDe063";
@@ -328,9 +328,9 @@ async function checkBridgehub() {
     throw new Error("Bridgehub baseToken is not correct");
   }
 
-  const hyperchain = await contract.getHyperchain(eraChainId);
-  if (hyperchain.toLowerCase() != expectedHyperchainAddr.toLowerCase()) {
-    throw new Error("Bridgehub hyperchain is not correct");
+  const zkChain = await contract.getZKChain(eraChainId);
+  if (zkChain.toLowerCase() != expectedZKChainAddr.toLowerCase()) {
+    throw new Error("Bridgehub zkChain is not correct");
   }
 
   const sharedBridge = await contract.sharedBridge();
@@ -372,7 +372,7 @@ async function checkCTMImpl() {
   const artifact = await hardhat.artifacts.readArtifact("ChainTypeManager");
   const contract = new ethers.Contract(ctmImpl, artifact.abi, l1Provider);
 
-  await checkCorrectInitCode(ctmImplDeployTx, contract, artifact.bytecode, [bridgeHub, maxNumberOfHyperchains]);
+  await checkCorrectInitCode(ctmImplDeployTx, contract, artifact.bytecode, [bridgeHub, maxNumberOfZKChains]);
 
   console.log("CTM impl correct!");
 }
@@ -386,9 +386,9 @@ async function checkCTM() {
   if (usedBH.toLowerCase() != bridgeHub.toLowerCase()) {
     throw new Error("CTM bridgeHub is not correct");
   }
-  const usedMaxNumberOfHyperchains = (await contract.MAX_NUMBER_OF_HYPERCHAINS()).toNumber();
-  if (usedMaxNumberOfHyperchains != maxNumberOfHyperchains) {
-    throw new Error("CTM maxNumberOfHyperchains is not correct");
+  const usedMaxNumberOfZKChains = (await contract.MAX_NUMBER_OF_ZK_CHAINS()).toNumber();
+  if (usedMaxNumberOfZKChains != maxNumberOfZKChains) {
+    throw new Error("CTM maxNumberOfZKChains is not correct");
   }
 
   const genUpgrade = await contract.genesisUpgrade();
@@ -419,7 +419,7 @@ async function checkL1AssetRouterImpl() {
     expectedL1WethAddress,
     bridgeHub,
     eraChainId,
-    expectedHyperchainAddr,
+    expectedZKChainAddr,
   ]);
 
   console.log("L1 shared bridge impl correct!");
@@ -482,7 +482,7 @@ async function main() {
 
   program.action(async () => {
     await checkIdenticalBytecode(genesisUpgrade, "GenesisUpgrade");
-    await checkIdenticalBytecode(upgradeHyperchains, "UpgradeHyperchains");
+    await checkIdenticalBytecode(upgradeZKChains, "UpgradeZKChains");
     await checkIdenticalBytecode(executorFacet, "ExecutorFacet");
     await checkIdenticalBytecode(gettersFacet, "GettersFacet");
     await checkIdenticalBytecode(adminFacet, "AdminFacet");

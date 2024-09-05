@@ -29,7 +29,7 @@ Known issues, and features that still need to be implemented:
 - Bridgehub setAssetHandlerAddress `address sender` might be an issue.
 - MessageRoot should be renamed to MessageRootAggregator
 
-![Untitled](./Hyperchain-scheme.png)
+![Untitled](./ZKChain-scheme.png)
 
 ## Initial Scope
 
@@ -63,6 +63,6 @@ The majority of the rest of the changes. This makes the scope quite big, so plea
 - ChainTypeManager.sol
 - ValidatorTimelock.sol
 - DiamondInit.sol
-- ZkSyncHyperchainStorage.sol
+- ZKChainStorage.sol
 - Admin.sol
 - L1GenesisUpgrade.sol

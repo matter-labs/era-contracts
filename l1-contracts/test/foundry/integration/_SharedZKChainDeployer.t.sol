@@ -2,16 +2,16 @@
 pragma solidity 0.8.24;
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {RegisterHyperchainScript} from "deploy-scripts/RegisterHyperchain.s.sol";
+import {RegisterZKChainScript} from "deploy-scripts/RegisterZKChain.s.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
-import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
-contract HyperchainDeployer is L1ContractDeployer {
-    RegisterHyperchainScript deployScript;
+contract ZKChainDeployer is L1ContractDeployer {
+    RegisterZKChainScript deployScript;
 
-    struct HyperchainDescription {
-        uint256 hyperchainChainId;
+    struct ZKChainDescription {
+        uint256 zkChainChainId;
         address baseToken;
         uint256 bridgehubCreateNewChainSalt;
         bool validiumMode;
@@ -21,35 +21,35 @@ contract HyperchainDeployer is L1ContractDeployer {
         uint128 baseTokenGasPriceMultiplierDenominator;
     }
 
-    uint256 currentHyperChainId = 10;
-    uint256 eraHyperchainId = 9;
-    uint256[] public hyperchainIds;
+    uint256 currentZKChainId = 10;
+    uint256 eraZKChainId = 9;
+    uint256[] public zkChainIds;
 
     function _deployEra() internal {
         vm.setEnv(
-            "HYPERCHAIN_CONFIG",
-            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-hyperchain-era.toml"
+            "ZK_CHAIN_CONFIG",
+            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml"
         );
 
-        deployScript = new RegisterHyperchainScript();
-        saveHyperchainConfig(_getDefaultDescription(eraHyperchainId, ETH_TOKEN_ADDRESS, eraHyperchainId));
+        deployScript = new RegisterZKChainScript();
+        saveZKChainConfig(_getDefaultDescription(eraZKChainId, ETH_TOKEN_ADDRESS, eraZKChainId));
         vm.warp(100);
         deployScript.run();
-        hyperchainIds.push(eraHyperchainId);
+        zkChainIds.push(eraZKChainId);
     }
 
-    function _deployHyperchain(address _baseToken) internal {
+    function _deployZKChain(address _baseToken) internal {
         vm.setEnv(
-            "HYPERCHAIN_CONFIG",
+            "ZK_CHAIN_CONFIG",
             string.concat(
-                "/test/foundry/integration/deploy-scripts/script-out/output-deploy-hyperchain-",
-                Strings.toString(currentHyperChainId),
+                "/test/foundry/integration/deploy-scripts/script-out/output-deploy-zk-chain-",
+                Strings.toString(currentZKChainId),
                 ".toml"
             )
         );
-        hyperchainIds.push(currentHyperChainId);
-        saveHyperchainConfig(_getDefaultDescription(currentHyperChainId, _baseToken, currentHyperChainId));
-        currentHyperChainId++;
+        zkChainIds.push(currentZKChainId);
+        saveZKChainConfig(_getDefaultDescription(currentZKChainId, _baseToken, currentZKChainId));
+        currentZKChainId++;
         deployScript.run();
     }
 
@@ -57,9 +57,9 @@ contract HyperchainDeployer is L1ContractDeployer {
         uint256 __chainId,
         address __baseToken,
         uint256 __salt
-    ) internal returns (HyperchainDescription memory description) {
-        description = HyperchainDescription({
-            hyperchainChainId: __chainId,
+    ) internal returns (ZKChainDescription memory description) {
+        description = ZKChainDescription({
+            zkChainChainId: __chainId,
             baseToken: __baseToken,
             bridgehubCreateNewChainSalt: __salt,
             validiumMode: false,
@@ -70,11 +70,11 @@ contract HyperchainDeployer is L1ContractDeployer {
         });
     }
 
-    function saveHyperchainConfig(HyperchainDescription memory description) public {
+    function saveZKChainConfig(ZKChainDescription memory description) public {
         string memory serialized;
 
         vm.serializeAddress("toml1", "owner_address", 0x70997970C51812dc3A010C7d01b50e0d17dc79C8);
-        vm.serializeUint("chain", "chain_chain_id", description.hyperchainChainId);
+        vm.serializeUint("chain", "chain_chain_id", description.zkChainChainId);
         vm.serializeAddress("chain", "base_token_addr", description.baseToken);
         vm.serializeUint("chain", "bridgehub_create_new_chain_salt", description.bridgehubCreateNewChainSalt);
 
@@ -110,20 +110,20 @@ contract HyperchainDeployer is L1ContractDeployer {
         );
 
         string memory toml = vm.serializeString("toml1", "chain", single_serialized);
-        string memory path = string.concat(vm.projectRoot(), vm.envString("HYPERCHAIN_CONFIG"));
+        string memory path = string.concat(vm.projectRoot(), vm.envString("ZK_CHAIN_CONFIG"));
         vm.writeToml(toml, path);
     }
 
-    function getHyperchainAddress(uint256 _chainId) public view returns (address) {
-        return bridgeHub.getHyperchain(_chainId);
+    function getZKChainAddress(uint256 _chainId) public view returns (address) {
+        return bridgeHub.getZKChain(_chainId);
     }
 
-    function getHyperchainBaseToken(uint256 _chainId) public view returns (address) {
+    function getZKChainBaseToken(uint256 _chainId) public view returns (address) {
         return bridgeHub.baseToken(_chainId);
     }
 
     function acceptPendingAdmin() public {
-        IZkSyncHyperchain chain = IZkSyncHyperchain(bridgeHub.getHyperchain(currentHyperChainId - 1));
+        IZKChain chain = IZKChain(bridgeHub.getZKChain(currentZKChainId - 1));
         address admin = chain.getPendingAdmin();
         vm.startBroadcast(admin);
         chain.acceptAdmin();
@@ -132,5 +132,5 @@ contract HyperchainDeployer is L1ContractDeployer {
     }
 
     // add this to be excluded from coverage report
-    function testHyperchainDeployer() internal {}
+    function testZKChainDeployer() internal {}
 }

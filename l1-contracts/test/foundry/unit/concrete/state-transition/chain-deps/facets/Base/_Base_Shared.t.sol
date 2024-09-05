@@ -7,10 +7,10 @@ import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {ZkSyncHyperchainBase} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
-contract TestBaseFacet is ZkSyncHyperchainBase {
+contract TestBaseFacet is ZKChainBase {
     function functionWithOnlyAdminModifier() external onlyAdmin {}
 
     function functionWithOnlyValidatorModifier() external onlyValidator {}
@@ -27,14 +27,14 @@ contract TestBaseFacet is ZkSyncHyperchainBase {
     function test() internal virtual {}
 }
 
-bytes constant ERROR_ONLY_ADMIN = "Hyperchain: not admin";
-bytes constant ERROR_ONLY_VALIDATOR = "Hyperchain: not validator";
-bytes constant ERROR_ONLY_STATE_TRANSITION_MANAGER = "Hyperchain: not state transition manager";
-bytes constant ERROR_ONLY_BRIDGEHUB = "Hyperchain: not bridgehub";
-bytes constant ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER = "Hyperchain: Only by admin or state transition manager";
-bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "Hyperchain: Only by validator or state transition manager";
+bytes constant ERROR_ONLY_ADMIN = "ZKChain: not admin";
+bytes constant ERROR_ONLY_VALIDATOR = "ZKChain: not validator";
+bytes constant ERROR_ONLY_STATE_TRANSITION_MANAGER = "ZKChain: not state transition manager";
+bytes constant ERROR_ONLY_BRIDGEHUB = "ZKChain: not bridgehub";
+bytes constant ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by admin or state transition manager";
+bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by validator or state transition manager";
 
-contract ZkSyncHyperchainBaseTest is Test {
+contract ZKChainBaseTest is Test {
     TestBaseFacet internal testBaseFacet;
     UtilsFacet internal utilsFacet;
     address internal testnetVerifier = address(new TestnetVerifier());

@@ -13,8 +13,8 @@ import {IAdmin} from "./chain-interfaces/IAdmin.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData, ChainCreationParams} from "./IChainTypeManager.sol";
-import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
-import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
+import {IZKChain} from "./chain-interfaces/IZKChain.sol";
+import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
@@ -31,8 +31,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice Address of the bridgehub
     address public immutable BRIDGE_HUB;
 
-    /// @notice The map from chainId => hyperchain contract
-    EnumerableMap.UintToAddressMap internal __DEPRECATED_hyperchainMap;
+    /// @notice The map from chainId => zkChain contract
+    EnumerableMap.UintToAddressMap internal __DEPRECATED_zkChainMap;
 
     /// @dev The batch zero hash, calculated at initialization
     bytes32 public storedBatchZero;
@@ -97,22 +97,22 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     }
 
     /// @notice return the chain contract address for a chainId
-    function getHyperchain(uint256 _chainId) public view returns (address) {
-        return IBridgehub(BRIDGE_HUB).getHyperchain(_chainId);
+    function getZKChain(uint256 _chainId) public view returns (address) {
+        return IBridgehub(BRIDGE_HUB).getZKChain(_chainId);
     }
 
     /// @notice return the chain contract address for a chainId
-    /// @notice Do not use! use getHyperchain instead. This will be removed.
-    function getHyperchainLegacy(uint256 _chainId) public view returns (address chainAddress) {
+    /// @notice Do not use! use getZKChain instead. This will be removed.
+    function getZKChainLegacy(uint256 _chainId) public view returns (address chainAddress) {
         // slither-disable-next-line unused-return
-        (, chainAddress) = __DEPRECATED_hyperchainMap.tryGet(_chainId);
+        (, chainAddress) = __DEPRECATED_zkChainMap.tryGet(_chainId);
     }
 
-    /// @notice Returns the address of the hyperchain admin with the corresponding chainID.
+    /// @notice Returns the address of the ZK chain admin with the corresponding chainID.
     /// @notice Not related to the CTM, but it is here for legacy reasons.
     /// @param _chainId the chainId of the chain
     function getChainAdmin(uint256 _chainId) external view override returns (address) {
-        return IZkSyncHyperchain(getHyperchain(_chainId)).getAdmin();
+        return IZKChain(getZKChain(_chainId)).getAdmin();
     }
 
     /// @dev initialize
@@ -267,20 +267,20 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev freezes the specified chain
     /// @param _chainId the chainId of the chain
     function freezeChain(uint256 _chainId) external onlyOwner {
-        IZkSyncHyperchain(getHyperchain(_chainId)).freezeDiamond();
+        IZKChain(getZKChain(_chainId)).freezeDiamond();
     }
 
     /// @dev freezes the specified chain
     /// @param _chainId the chainId of the chain
     function unfreezeChain(uint256 _chainId) external onlyOwner {
-        IZkSyncHyperchain(getHyperchain(_chainId)).unfreezeDiamond();
+        IZKChain(getZKChain(_chainId)).unfreezeDiamond();
     }
 
     /// @dev reverts batches on the specified chain
     /// @param _chainId the chainId of the chain
     /// @param _newLastBatch the new last batch
     function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
-        IZkSyncHyperchain(getHyperchain(_chainId)).revertBatchesSharedBridge(_chainId, _newLastBatch);
+        IZKChain(getZKChain(_chainId)).revertBatchesSharedBridge(_chainId, _newLastBatch);
     }
 
     /// @dev execute predefined upgrade
@@ -292,21 +292,21 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
     ) external onlyOwner {
-        IZkSyncHyperchain(getHyperchain(_chainId)).upgradeChainFromVersion(_oldProtocolVersion, _diamondCut);
+        IZKChain(getZKChain(_chainId)).upgradeChainFromVersion(_oldProtocolVersion, _diamondCut);
     }
 
     /// @dev executes upgrade on chain
     /// @param _chainId the chainId of the chain
     /// @param _diamondCut the diamond cut data
     function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
-        IZkSyncHyperchain(getHyperchain(_chainId)).executeUpgrade(_diamondCut);
+        IZKChain(getZKChain(_chainId)).executeUpgrade(_diamondCut);
     }
 
     /// @dev setPriorityTxMaxGasLimit for the specified chain
     /// @param _chainId the chainId of the chain
     /// @param _maxGasLimit the new max gas limit
     function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
-        IZkSyncHyperchain(getHyperchain(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
+        IZKChain(getZKChain(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// @dev setTokenMultiplier for the specified chain
@@ -314,14 +314,14 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @param _nominator the new nominator of the token multiplier
     /// @param _denominator the new denominator of the token multiplier
     function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
-        IZkSyncHyperchain(getHyperchain(_chainId)).setTokenMultiplier(_nominator, _denominator);
+        IZKChain(getZKChain(_chainId)).setTokenMultiplier(_nominator, _denominator);
     }
 
     /// @dev changeFeeParams for the specified chain
     /// @param _chainId the chainId of the chain
     /// @param _newFeeParams the new fee params
     function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external onlyOwner {
-        IZkSyncHyperchain(getHyperchain(_chainId)).changeFeeParams(_newFeeParams);
+        IZKChain(getZKChain(_chainId)).changeFeeParams(_newFeeParams);
     }
 
     /// @dev setValidator for the specified chain
@@ -329,14 +329,14 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @param _validator the new validator
     /// @param _active whether the validator is active
     function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwnerOrAdmin {
-        IZkSyncHyperchain(getHyperchain(_chainId)).setValidator(_validator, _active);
+        IZKChain(getZKChain(_chainId)).setValidator(_validator, _active);
     }
 
     /// @dev setPorterAvailability for the specified chain
     /// @param _chainId the chainId of the chain
     /// @param _zkPorterIsAvailable whether the zkPorter mode is available
     function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
-        IZkSyncHyperchain(getHyperchain(_chainId)).setPorterAvailability(_zkPorterIsAvailable);
+        IZKChain(getZKChain(_chainId)).setPorterAvailability(_zkPorterIsAvailable);
     }
 
     /// registration
@@ -353,10 +353,10 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         address _sharedBridge,
         address _admin,
         bytes memory _diamondCut
-    ) internal returns (address hyperchainAddress) {
-        if (getHyperchain(_chainId) != address(0)) {
-            // Hyperchain already registered
-            return getHyperchain(_chainId);
+    ) internal returns (address zkChainAddress) {
+        if (getZKChain(_chainId) != address(0)) {
+            // ZKChain already registered
+            return getZKChain(_chainId);
         }
 
         // check not registered
@@ -389,12 +389,12 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         );
 
         diamondCut.initCalldata = initData;
-        // deploy hyperchainContract
+        // deploy zkChainContract
         // slither-disable-next-line reentrancy-no-eth
-        DiamondProxy hyperchainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
+        DiamondProxy zkChainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
         // save data
-        hyperchainAddress = address(hyperchainContract);
-        emit NewHyperchain(_chainId, hyperchainAddress);
+        zkChainAddress = address(zkChainContract);
+        emit NewZKChain(_chainId, zkChainAddress);
     }
 
     /// @notice called by Bridgehub when a chain registers
@@ -412,11 +412,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         address _admin,
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
-    ) external onlyBridgehub returns (address hyperchainAddress) {
+    ) external onlyBridgehub returns (address zkChainAddress) {
         (bytes memory _diamondCut, bytes memory _forceDeploymentData) = abi.decode(_initData, (bytes, bytes));
 
         // solhint-disable-next-line func-named-parameters
-        hyperchainAddress = _deployNewChain(_chainId, _baseTokenAssetId, _sharedBridge, _admin, _diamondCut);
+        zkChainAddress = _deployNewChain(_chainId, _baseTokenAssetId, _sharedBridge, _admin, _diamondCut);
 
         {
             // check input
@@ -424,7 +424,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             require(forceDeploymentHash == initialForceDeploymentHash, "CTM: initial force deployment mismatch");
         }
         // genesis upgrade, deploys some contracts, sets chainId
-        IAdmin(hyperchainAddress).genesisUpgrade(
+        IAdmin(zkChainAddress).genesisUpgrade(
             l1GenesisUpgrade,
             address(IBridgehub(BRIDGE_HUB).l1CtmDeployer()),
             _forceDeploymentData,
@@ -434,7 +434,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @param _chainId the chainId of the chain
     function getProtocolVersion(uint256 _chainId) public view returns (uint256) {
-        return IZkSyncHyperchain(getHyperchain(_chainId)).getProtocolVersion();
+        return IZKChain(getZKChain(_chainId)).getProtocolVersion();
     }
 
     /// @param _newSettlementLayerChainId the chainId of the chain
@@ -443,7 +443,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         require(_newSettlementLayerChainId != 0, "Bad chain id");
 
         // Currently, we require that the sync layer is deployed by the same CTM.
-        require(getHyperchain(_newSettlementLayerChainId) != address(0), "CTM: sync layer not registered");
+        require(getZKChain(_newSettlementLayerChainId) != address(0), "CTM: sync layer not registered");
 
         IBridgehub(BRIDGE_HUB).registerSettlementLayer(_newSettlementLayerChainId, _isWhitelisted);
     }
@@ -462,8 +462,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
-        address hyperchain = getHyperchain(_chainId);
-        require(IZkSyncHyperchain(hyperchain).getProtocolVersion() == protocolVersion, "CTM: outdated pv");
+        address zkChain = getZKChain(_chainId);
+        require(IZKChain(zkChain).getProtocolVersion() == protocolVersion, "CTM: outdated pv");
 
         return
             abi.encode(
@@ -511,5 +511,14 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ) external {
         // Function is empty due to the fact that when calling `forwardedBridgeBurn` there are no
         // state updates that occur.
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Legacy functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice return the chain contract address for a chainId
+    function getHyperchain(uint256 _chainId) public view returns (address) {
+        return getZKChain(_chainId);
     }
 }

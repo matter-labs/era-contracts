@@ -7,7 +7,7 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 interface IL1GenesisUpgrade {
     /// @dev emitted when a chain registers and a GenesisUpgrade happens
     event GenesisUpgrade(
-        address indexed _hyperchain,
+        address indexed _zkChain,
         L2CanonicalTransaction _l2Transaction,
         uint256 indexed _protocolVersion,
         bytes[] _factoryDeps

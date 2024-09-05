@@ -22,7 +22,7 @@ contract RelayedSLDAValidator is IL1DAValidator, CalldataDAGateway {
     function _ensureOnlyChainSender(uint256 _chainId) internal view {
         // Note that this contract is only supposed to be deployed on L2, where the
         // bridgehub is predeployed at `L2_BRIDGEHUB_ADDR` address.
-        require(IBridgehub(L2_BRIDGEHUB_ADDR).getHyperchain(_chainId) == msg.sender, "l1-da-validator/invalid-sender");
+        require(IBridgehub(L2_BRIDGEHUB_ADDR).getZKChain(_chainId) == msg.sender, "l1-da-validator/invalid-sender");
     }
 
     /// @dev Relays the calldata to L1.

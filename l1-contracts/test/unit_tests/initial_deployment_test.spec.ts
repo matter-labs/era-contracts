@@ -59,10 +59,10 @@ describe("Initial deployment test", function () {
     expect(chainTypeManagerAddress1.toLowerCase()).equal(chainTypeManagerAddress2.toLowerCase());
 
     const stateTransitionAddress1 = deployer.addresses.StateTransition.DiamondProxy;
-    const stateTransitionAddress2 = await stateTransition.getHyperchain(chainId);
+    const stateTransitionAddress2 = await stateTransition.getZKChain(chainId);
     expect(stateTransitionAddress1.toLowerCase()).equal(stateTransitionAddress2.toLowerCase());
 
-    const stateTransitionAddress3 = await bridgehub.getHyperchain(chainId);
+    const stateTransitionAddress3 = await bridgehub.getZKChain(chainId);
     expect(stateTransitionAddress1.toLowerCase()).equal(stateTransitionAddress3.toLowerCase());
   });
 });

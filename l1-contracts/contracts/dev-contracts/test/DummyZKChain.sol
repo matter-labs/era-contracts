@@ -2,9 +2,9 @@
 pragma solidity 0.8.24;
 
 import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol";
-import {FeeParams, PubdataPricingMode} from "../../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {FeeParams, PubdataPricingMode} from "../../state-transition/chain-deps/ZKChainStorage.sol";
 
-contract DummyHyperchain is MailboxFacet {
+contract DummyZKChain is MailboxFacet {
     constructor(
         address bridgeHubAddress,
         uint256 _eraChainId,

@@ -9,7 +9,7 @@ import {FacetIsFrozen} from "contracts/common/L1ContractErrors.sol";
 contract freezeChainTest is ChainTypeManagerTest {
     // function test_FreezingChain() public {
     //     createNewChain(getDiamondCutData(diamondInit));
-    //     address newChainAddress = chainContractAddress.getHyperchain(chainId);
+    //     address newChainAddress = chainContractAddress.getZKChain(chainId);
     //     GettersFacet gettersFacet = GettersFacet(newChainAddress);
     //     bool isChainFrozen = gettersFacet.isDiamondStorageFrozen();
     //     assertEq(isChainFrozen, false);
