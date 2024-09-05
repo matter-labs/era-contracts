@@ -123,6 +123,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         _bridgehubDepositBaseToken(_chainId, _assetId, _prevMsgSender, _amount);
     }
 
+    /// @notice Deposits the base token to the bridgehub internal. Used for access management.
     function _bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,
@@ -130,7 +131,9 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         uint256 _amount
     ) internal {
         address assetHandler = assetHandlerAddress[_assetId];
-        // require(l1AssetHandler != address(0), "AR: asset handler not set");
+        if (assetHandler == address(0)) {
+            revert AssetHandlerDoesNotExist(_assetId);
+        }
 
         // slither-disable-next-line unused-return
         IAssetHandler(assetHandler).bridgeBurn{value: msg.value}({
@@ -181,6 +184,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             }
         } else if (encodingVersion == LEGACY_ENCODING_VERSION) {
             if (block.chainid != L1_CHAIN_ID) {
+                /// @dev Legacy bridging is only supported for L1->L2 native token transfers.
                 revert InvalidChainId();
             }
             (assetId, transferData) = _handleLegacyData(_data, _prevMsgSender);
@@ -218,7 +222,12 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         });
     }
 
-    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external virtual {}
+    /// @inheritdoc IAssetRouterBase
+    function bridgehubConfirmL2Transaction(
+        uint256 _chainId,
+        bytes32 _txDataHash,
+        bytes32 _txHash
+    ) external virtual override {}
 
     /// @inheritdoc IAssetRouterBase
     function getDepositCalldata(

@@ -76,12 +76,19 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
     }
 
+    /// @notice Sets the legacy token asset ID for the given L2 token address.
     function setLegacyTokenAssetId(address _l2TokenAddress) public {
         address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress);
         tokenAddress[assetId] = _l2TokenAddress;
     }
 
+    /// @notice Ensures that the token is deployed.
+    /// @param _originChainId The chain ID of the origin chain.
+    /// @param _assetId The asset ID.
+    /// @param _originToken The origin token address.
+    /// @param _erc20Data The ERC20 data.
+    /// @return _token The token address.
     function _ensureTokenDeployed(
         uint256 _originChainId,
         bytes32 _assetId,
@@ -168,6 +175,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             );
     }
 
+    /// @notice Calculates the salt for the Create2 deployment of the L2 token.
     function _getCreate2Salt(uint256 _originChainId, address _l1Token) internal view override returns (bytes32 salt) {
         salt = _originChainId == L1_CHAIN_ID
             ? bytes32(uint256(uint160(_l1Token)))

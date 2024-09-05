@@ -56,8 +56,6 @@ interface IL1AssetRouter {
     /// @dev Will be used by ZK Gateway
     function setAssetHandlerAddress(address _sender, bytes32 _assetId, address _assetAddress) external;
 
-    // function setL1Nullifier(IL1Nullifier _l1Nullifier) external;
-
     function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external;
 
     function bridgeRecoverFailedTransfer(
