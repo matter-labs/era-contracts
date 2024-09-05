@@ -207,7 +207,7 @@ contract RegisterZKChainScript is Script {
             _value: 0,
             _delay: 0
         });
-        console.log("ZKChain registered");
+        console.log("ZK chain registered");
 
         // Get new diamond proxy address from emitted events
         Vm.Log[] memory logs = vm.getRecordedLogs();

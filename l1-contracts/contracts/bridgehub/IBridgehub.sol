@@ -74,15 +74,15 @@ interface IBridgehub is IL1AssetHandler {
     event SettlementLayerRegistered(uint256 indexed chainId, bool indexed isWhitelisted);
 
     /// @notice Emitted when the bridging to the chain is started.
-    /// @param chainId Chain ID of the zkChain
+    /// @param chainId Chain ID of the ZK chain
     /// @param assetId Asset ID of the token for the zkChain's CTM
     /// @param settlementLayerChainId The chain id of the settlement layer the chain migrates to.
     event MigrationStarted(uint256 indexed chainId, bytes32 indexed assetId, uint256 indexed settlementLayerChainId);
 
     /// @notice Emitted when the bridging to the chain is complete.
-    /// @param chainId Chain ID of the zkChain
+    /// @param chainId Chain ID of the ZK chain
     /// @param assetId Asset ID of the token for the zkChain's CTM
-    /// @param zkChain The address of the zkChain on the chain where it is migrated to.
+    /// @param zkChain The address of the ZK chain on the chain where it is migrated to.
     event MigrationFinalized(uint256 indexed chainId, bytes32 indexed assetId, address indexed zkChain);
 
     /// @notice Starts the transfer of admin rights. Only the current admin or owner can propose a new pending one.

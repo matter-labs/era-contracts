@@ -19,7 +19,7 @@ import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice This upgrade will be used to migrate Era to be part of the zkChain ecosystem contracts.
+/// @notice This upgrade will be used to migrate Era to be part of the ZK chain ecosystem contracts.
 contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;

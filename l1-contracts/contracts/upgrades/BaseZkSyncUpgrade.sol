@@ -304,7 +304,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         // must be ensured in the other parts of the upgrade that the upgrade transaction is not overridden.
         if (!patchOnly) {
             // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
-            // Note it is important to keep this check, as otherwise zkChains might skip upgrades by overwriting
+            // Note it is important to keep this check, as otherwise ZK chains might skip upgrades by overwriting
             if (s.l2SystemContractsUpgradeTxHash != bytes32(0)) {
                 revert PreviousUpgradeNotFinalized(s.l2SystemContractsUpgradeTxHash);
             }

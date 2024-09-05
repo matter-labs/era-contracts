@@ -20,7 +20,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
     constructor() reentrancyGuardInitializer {}
 
-    /// @notice zkChain diamond contract initialization
+    /// @notice ZK chain diamond contract initialization
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
     /// initializer
     function initialize(InitializeData calldata _initializeData) external reentrancyGuardInitializer returns (bytes32) {

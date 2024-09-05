@@ -28,7 +28,7 @@ contract ZKChainDeployer is L1ContractDeployer {
     function _deployEra() internal {
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
-            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-zkChain-era.toml"
+            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml"
         );
 
         deployScript = new RegisterZKChainScript();
@@ -42,7 +42,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
             string.concat(
-                "/test/foundry/integration/deploy-scripts/script-out/output-deploy-zkChain-",
+                "/test/foundry/integration/deploy-scripts/script-out/output-deploy-zk-chain-",
                 Strings.toString(currentZKChainId),
                 ".toml"
             )

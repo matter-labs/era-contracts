@@ -108,7 +108,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         (, chainAddress) = __DEPRECATED_zkChainMap.tryGet(_chainId);
     }
 
-    /// @notice Returns the address of the zkChain admin with the corresponding chainID.
+    /// @notice Returns the address of the ZK chain admin with the corresponding chainID.
     /// @notice Not related to the CTM, but it is here for legacy reasons.
     /// @param _chainId the chainId of the chain
     function getChainAdmin(uint256 _chainId) external view override returns (address) {
@@ -511,5 +511,14 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ) external {
         // Function is empty due to the fact that when calling `forwardedBridgeBurn` there are no
         // state updates that occur.
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Legacy functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice return the chain contract address for a chainId
+    function getHyperchain(uint256 _chainId) public view returns (address) {
+        return IBridgehub(BRIDGE_HUB).getHyperchain(_chainId);
     }
 }

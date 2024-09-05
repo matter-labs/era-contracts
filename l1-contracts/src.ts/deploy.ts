@@ -1315,8 +1315,8 @@ export class Deployer {
     this.addresses.BaseTokenAssetId = baseTokenAssetId;
 
     if (this.verbose) {
-      console.log(`ZKChain registered, gas used: ${receipt.gasUsed.toString()} and ${receipt.gasUsed.toString()}`);
-      console.log(`ZKChain registration tx hash: ${receipt.transactionHash}`);
+      console.log(`ZK chain registered, gas used: ${receipt.gasUsed.toString()} and ${receipt.gasUsed.toString()}`);
+      console.log(`ZK chain registration tx hash: ${receipt.transactionHash}`);
 
       console.log(`CHAIN_ETH_ZKSYNC_NETWORK_ID=${parseInt(chainId, 16)}`);
 

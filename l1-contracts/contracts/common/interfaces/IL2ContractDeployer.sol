@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 
 /**
  * @author Matter Labs
- * @notice System smart contract that is responsible for deploying other smart contracts on a ZKsync zkChain.
+ * @notice System smart contract that is responsible for deploying other smart contracts on a ZK chain.
  */
 interface IL2ContractDeployer {
     /// @notice A struct that describes a forced deployment on an address.

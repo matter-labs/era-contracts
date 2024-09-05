@@ -14,11 +14,11 @@ contract GatewayDeployer is L1ContractDeployer {
         vm.setEnv("L1_OUTPUT", "/test/foundry/integration/deploy-scripts/script-out/output-deploy-l1.toml");
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
-            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-zkChain-10.toml"
+            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-zk-chain-10.toml"
         );
         vm.setEnv(
             "GATEWAY_CONFIG",
-            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-zkChain-11.toml"
+            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-zk-chain-11.toml"
         );
 
         gatewayScript = new GatewayScript();

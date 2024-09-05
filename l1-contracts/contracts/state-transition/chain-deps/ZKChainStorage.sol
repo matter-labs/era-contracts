@@ -60,7 +60,7 @@ struct FeeParams {
     uint64 minimalL2GasPrice;
 }
 
-/// @dev storing all storage variables for zkChain diamond facets
+/// @dev storing all storage variables for ZK chain diamond facets
 /// NOTE: It is used in a proxy, so it is possible to add new variables to the end
 /// but NOT to modify already existing variables or change their order.
 /// NOTE: variables prefixed with '__DEPRECATED_' are deprecated and shouldn't be used.

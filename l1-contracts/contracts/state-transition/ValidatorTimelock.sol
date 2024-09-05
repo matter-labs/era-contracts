@@ -11,7 +11,7 @@ import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErr
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Intermediate smart contract between the validator EOA account and the zkChains state transition diamond smart contract.
+/// @notice Intermediate smart contract between the validator EOA account and the ZK chains state transition diamond smart contract.
 /// @dev The primary purpose of this contract is to provide a trustless means of delaying batch execution without
 /// modifying the main zkChain diamond contract. As such, even if this contract is compromised, it will not impact the main
 /// contract.
@@ -197,7 +197,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())
-            // Call method of the zkChain diamond contract returns 0 on error
+            // Call method of the ZK chain diamond contract returns 0 on error
             let result := call(gas(), contractAddress, 0, 0, calldatasize(), 0, 0)
             // Get the size of the last return data
             let size := returndatasize()

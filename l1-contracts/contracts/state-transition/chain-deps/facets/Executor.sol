@@ -21,7 +21,7 @@ import {MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, H
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 
-/// @title ZKsync zkChain Executor contract capable of processing events emitted in the ZKsync zkChain protocol.
+/// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract ExecutorFacet is ZKChainBase, IExecutor {

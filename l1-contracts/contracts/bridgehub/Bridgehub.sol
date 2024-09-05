@@ -42,7 +42,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// L1 that is at the most base layer.
     uint256 public immutable L1_CHAIN_ID;
 
-    /// @notice The total number of zkChains can be created/connected to this CTM.
+    /// @notice The total number of ZK chains can be created/connected to this CTM.
     /// This is the temporary security measure.
     uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
 
@@ -412,9 +412,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return zkChainMap.keys();
     }
 
-    /// @notice Returns the address of the zkChain with the corresponding chainID
+    /// @notice Returns the address of the ZK chain with the corresponding chainID
     /// @param _chainId the chainId of the chain
-    /// @return chainAddress the address of the zkChain
+    /// @return chainAddress the address of the ZK chain
     function getZKChain(uint256 _chainId) public view override returns (address chainAddress) {
         // slither-disable-next-line unused-return
         (, chainAddress) = zkChainMap.tryGet(_chainId);
@@ -442,7 +442,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
-        // Note: If the zkChain with corresponding `chainId` is not yet created,
+        // Note: If the ZK chain with corresponding `chainId` is not yet created,
         // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
         {
             bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
@@ -591,7 +591,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
-    /// @param _chainId The chain ID of the zkChain where to prove L2 message inclusion.
+    /// @param _chainId The chain ID of the ZK chain where to prove L2 message inclusion.
     /// @param _batchNumber The executed L2 batch number in which the message appeared
     /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message
     /// @param _message Information about the sent message: sender address, the message itself, tx index in the L2 batch where the message was sent
@@ -609,7 +609,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
-    /// @param _chainId The chain ID of the zkChain where to prove L2 log inclusion.
+    /// @param _chainId The chain ID of the ZK chain where to prove L2 log inclusion.
     /// @param _batchNumber The executed L2 batch number in which the log appeared
     /// @param _index The position of the l2log in the L2 logs Merkle tree
     /// @param _log Information about the sent log
@@ -627,7 +627,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
-    /// @param _chainId The chain ID of the zkChain where to prove L1->L2 tx status.
+    /// @param _chainId The chain ID of the ZK chain where to prove L1->L2 tx status.
     /// @param _l2TxHash The L2 canonical transaction hash
     /// @param _l2BatchNumber The L2 batch number where the transaction was processed
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
@@ -799,4 +799,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function unpauseMigration() external onlyOwner {
         migrationPaused = false;
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            Legacy functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice return the ZK chain contract for a chainId
+    function getHyperchain(uint256 _chainId) public view returns (address) {
+        return getZKChain(_chainId);
+    }
+
 }

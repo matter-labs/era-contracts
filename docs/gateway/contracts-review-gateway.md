@@ -63,6 +63,6 @@ The majority of the rest of the changes. This makes the scope quite big, so plea
 - ChainTypeManager.sol
 - ValidatorTimelock.sol
 - DiamondInit.sol
-- ZkSyncZKChainStorage.sol
+- ZKChainStorage.sol
 - Admin.sol
 - L1GenesisUpgrade.sol

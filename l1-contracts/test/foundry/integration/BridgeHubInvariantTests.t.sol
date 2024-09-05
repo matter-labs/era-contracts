@@ -55,7 +55,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
     // Amounts deposited by each user, mapped by user address and token address
     mapping(address user => mapping(address token => uint256 deposited)) public depositsUsers;
-    // Amounts deposited into the bridge, mapped by zkChain address and token address
+    // Amounts deposited into the bridge, mapped by ZK chain address and token address
     mapping(address chain => mapping(address token => uint256 deposited)) public depositsBridge;
     // Total sum of deposits into the bridge, mapped by token address
     mapping(address token => uint256 deposited) public tokenSumDeposit;
@@ -63,7 +63,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
     mapping(address token => uint256 deposited) public tokenSumWithdrawal;
     // Total sum of L2 values transferred to mock contracts, mapped by token address
     mapping(address token => uint256 deposited) public l2ValuesSum;
-    // Deposits into the zkChains contract, mapped by L2 contract address and token address
+    // Deposits into the ZK chains contract, mapped by L2 contract address and token address
     mapping(address l2contract => mapping(address token => uint256 balance)) public contractDeposits;
     // Total sum of deposits into all L2 contracts, mapped by token address
     mapping(address token => uint256 deposited) public contractDepositsSum;
@@ -76,7 +76,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         vm.stopPrank();
     }
 
-    // gets random zkChain from zkChain ids, set contract variables
+    // gets random ZK chain from ZK chain ids, set contract variables
     modifier useZKChain(uint256 chainIndexSeed) {
         currentChainId = zkChainIds[bound(chainIndexSeed, 0, zkChainIds.length - 1)];
         currentChainAddress = getZKChainAddress(currentChainId);
@@ -339,7 +339,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
     }
 
     // deposits ERC20 to token with base being also ERC20
-    // there are no modifiers so watch out, baseTokenAddress should be base of zkChain
+    // there are no modifiers so watch out, baseTokenAddress should be base of ZK chain
     // currentToken should be different from base
     function depositERC20ToERC20Chain(uint256 l2Value, address baseTokenAddress) private {
         uint256 gasPrice = 10000000;
@@ -393,7 +393,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         l2ValuesSum[currentTokenAddress] += l2Value;
     }
 
-    // deposits ETH to zkChain where base is ETH
+    // deposits ETH to ZK chain where base is ETH
     function depositEthBase(uint256 l2Value) private {
         uint256 gasPrice = 10000000;
         vm.txGasPrice(gasPrice);
