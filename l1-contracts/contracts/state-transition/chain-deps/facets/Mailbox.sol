@@ -569,10 +569,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, _expirationTimestamp, _transaction, _factoryDeps);
     }
 
-    function _writePriorityOpHash(
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) internal {
+    function _writePriorityOpHash(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) internal {
         if (s.priorityTree.startIndex > s.priorityQueue.getFirstUnprocessedPriorityTx()) {
             s.priorityQueue.pushBack(
                 PriorityOperation({
