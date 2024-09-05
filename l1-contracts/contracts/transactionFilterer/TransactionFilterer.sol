@@ -5,15 +5,14 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {AlreadyWhitelisted, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
-
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Filters transactions received by the Mailbox
 /// @dev Only allows whitelisted senders to deposit to Gateway
 contract TransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ownable2StepUpgradeable {
-    
     /// @dev Event emitted when sender is whitelisted
     event whitelistGranted(address indexed sender);
 
@@ -25,16 +24,16 @@ contract TransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ownable2S
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(
-    ) reentrancyGuardInitializer {
+    constructor() reentrancyGuardInitializer {
         _disableInitializers();
     }
 
     /// @dev Initializes a contract filterer for later use. Expected to be used in the proxy.
     /// @param _owner The address which can upgrade the implementation.
-    function initialize(
-        address _owner,
-    ) external reentrancyGuardInitializer initializer {
+    function initialize(address _owner) external reentrancyGuardInitializer initializer {
+        if (_owner == address(0)) {
+            revert ZeroAddress();
+        }
         require(_owner != address(0), "TxFilterer: owner 0");
         _transferOwnership(_owner);
     }
@@ -42,7 +41,9 @@ contract TransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ownable2S
     /// @dev Whitelist the sender.
     /// @param sender Address of the tx sender.
     function grantWhitelist(address sender) external onlyOwner {
-        require(!whitelistedSenders[sender], "TxFilterer: already whitelisted");
+        if (whitelistedSenders[sender]) {
+            revert AlreadyWhitelisted(sender);
+        }
         whitelistedSenders[sender] = true;
         emit whitelistGranted(sender);
     }
@@ -50,7 +51,9 @@ contract TransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ownable2S
     /// @dev Revoke the sender from whitelist.
     /// @param sender Address of the tx sender.
     function revokeWhitelist(address sender) external onlyOwner {
-        require(whitelistedSenders[sender], "TxFilterer: not whitelisted");
+        if (!whitelistedSenders[sender]) {
+            revert NotWhitelisted(sender);
+        }
         whitelistedSenders[sender] = false;
         emit whitelistRevoked(sender);
     }
