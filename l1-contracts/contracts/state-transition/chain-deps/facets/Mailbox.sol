@@ -366,8 +366,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     /// @inheritdoc IMailbox
     function requestL2TransactionToGatewayMailbox(
         uint256 _chainId,
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external override onlyL1 returns (bytes32 canonicalTxHash) {
@@ -379,8 +377,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
         BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest({
             _chainId: _chainId,
-            _transaction: _transaction,
-            _factoryDeps: _factoryDeps,
             _canonicalTxHash: _canonicalTxHash,
             _expirationTimestamp: _expirationTimestamp
         });
@@ -398,8 +394,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
     function _wrapRequest(
         uint256 _chainId,
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) internal view returns (BridgehubL2TransactionRequest memory) {
@@ -493,8 +487,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             // slither-disable-next-line unused-return
             IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
                 _chainId: s.chainId,
-                _transaction: transaction,
-                _factoryDeps: _params.request.factoryDeps,
                 _canonicalTxHash: canonicalTxHash,
                 _expirationTimestamp: _params.expirationTimestamp
             });
