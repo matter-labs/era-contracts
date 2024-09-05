@@ -39,12 +39,16 @@ contract TransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ownable2S
         _transferOwnership(_owner);
     }
 
+    /// @dev Whitelist the sender.
+    /// @param sender Address of the tx sender.
     function grantWhitelist(address sender) external onlyOwner {
         require(!whitelistedSenders[sender], "TxFilterer: already whitelisted");
         whitelistedSenders[sender] = true;
         emit whitelistGranted(sender);
     }
 
+    /// @dev Revoke the sender from whitelist.
+    /// @param sender Address of the tx sender.
     function revokeWhitelist(address sender) external onlyOwner {
         require(whitelistedSenders[sender], "TxFilterer: not whitelisted");
         whitelistedSenders[sender] = false;
