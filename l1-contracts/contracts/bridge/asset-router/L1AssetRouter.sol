@@ -263,8 +263,8 @@ contract L1AssetRouter is
 
         (amount, l1Receiver) = abi.decode(_transferData, (uint256, address));
 
-        emit DepositFinalizedAssetRouter(_chainId, l1Receiver, _assetId, amount);
-        // emit WithdrawalFinalizedAssetRouter(_chainId, _assetId, new bytes(0)); // kl todo
+        // emit DepositFinalizedAssetRouter(_chainId, l1Receiver, _assetId, amount);
+        emit WithdrawalFinalizedAssetRouter(_chainId, _assetId, new bytes(0)); // kl todo
     }
 
     /*//////////////////////////////////////////////////////////////

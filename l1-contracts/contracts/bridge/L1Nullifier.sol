@@ -290,6 +290,35 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         });
     }
 
+    /// @inheritdoc IL1Nullifier
+    function bridgeRecoverFailedTransfer(
+        uint256 _chainId,
+        address _depositSender,
+        bytes32 _assetId,
+        bytes memory _assetData,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) public nonReentrant whenNotPaused {
+        _bridgeVerifyFailedTransfer({
+            _chainId: _chainId,
+            _depositSender: _depositSender,
+            _assetId: _assetId,
+            _assetData: _assetData,
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _merkleProof: _merkleProof
+        });
+
+        l1AssetRouter.bridgeRecoverFailedTransfer(_chainId, _depositSender, _assetId, _assetData);
+
+        // TODO: emit event
+    }
+
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// @param _chainId The ZK chain id to which deposit was initiated.
     /// @param _depositSender The address of the entity that initiated the deposit.

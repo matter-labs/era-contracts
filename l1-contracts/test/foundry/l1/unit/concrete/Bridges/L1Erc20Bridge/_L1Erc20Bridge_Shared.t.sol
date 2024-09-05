@@ -58,7 +58,7 @@ contract L1Erc20BridgeTest is Test {
 
         reenterL1ERC20Bridge = new ReenterL1ERC20Bridge();
         bridgeReenterItself = new L1ERC20Bridge(
-            IL1Nullifier(l1NullifierAddress),
+            IL1Nullifier(address(reenterL1ERC20Bridge)),
             IL1AssetRouter(address(reenterL1ERC20Bridge)),
             ntv,
             eraChainId

@@ -618,6 +618,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         if (s.chainId != ERA_CHAIN_ID) {
             revert OnlyEraSupported();
         }
+        // slither-disable-next-line unused-return
         IL1AssetRouter(s.baseTokenBridge).finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
             _l2BatchNumber: _l2BatchNumber,
@@ -626,14 +627,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             _message: _message,
             _merkleProof: _merkleProof
         });
-        // IL1AssetRouter(s.baseTokenBridge).L1_NULLIFIER().finalizeWithdrawal(
-        //     ERA_CHAIN_ID,
-        //     _l2BatchNumber,
-        //     _l2MessageIndex,
-        //     _l2TxNumberInBatch,
-        //     _message,
-        //     _merkleProof
-        // );
     }
 
     ///  @inheritdoc IMailbox

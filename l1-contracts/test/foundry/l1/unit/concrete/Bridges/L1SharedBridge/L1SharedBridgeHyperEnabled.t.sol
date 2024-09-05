@@ -83,7 +83,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
 
     function test_bridgehubConfirmL2Transaction() public {
         // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, true, address(sharedBridge));
+        vm.expectEmit(true, true, true, true, address(l1Nullifier));
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         emit BridgehubDepositFinalized(chainId, txDataHash, txHash);
         vm.prank(bridgehubAddress);
@@ -118,7 +118,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit ClaimedFailedDepositAssetRouter(chainId, alice, tokenAssetId, abi.encode(bytes32(0)));
+        emit ClaimedFailedDepositAssetRouter(chainId, tokenAssetId, abi.encode(bytes32(0)));
         vm.prank(bridgehubAddress);
         l1Nullifier.claimFailedDeposit({
             _chainId: chainId,
@@ -161,7 +161,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit ClaimedFailedDepositAssetRouter(chainId, alice, ETH_TOKEN_ASSET_ID, abi.encode(bytes32(0)));
+        emit ClaimedFailedDepositAssetRouter(chainId, ETH_TOKEN_ASSET_ID, abi.encode(bytes32(0)));
         vm.prank(bridgehubAddress);
         l1Nullifier.claimFailedDeposit({
             _chainId: chainId,

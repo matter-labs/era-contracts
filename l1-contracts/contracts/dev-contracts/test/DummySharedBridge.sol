@@ -128,8 +128,8 @@ contract DummySharedBridge is PausableUpgradeable {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external {
-        (address l1Receiver, address l1Token, uint256 amount) = _parseL2WithdrawalMessage(_message);
+    ) external returns (address l1Receiver, address l1Token, uint256 amount) {
+        (l1Receiver, l1Token, amount) = _parseL2WithdrawalMessage(_message);
 
         if (l1Token == address(1)) {
             bool callSuccess;

@@ -118,7 +118,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
     function test_bridgehubConfirmL2Transaction() public {
         // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, false, address(sharedBridge));
+        vm.expectEmit(true, true, true, false, address(l1Nullifier));
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         emit BridgehubDepositFinalized(chainId, txDataHash, txHash);
         vm.prank(bridgehubAddress);
@@ -150,7 +150,6 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit ClaimedFailedDepositAssetRouter({
             chainId: chainId,
-            to: alice,
             assetId: tokenAssetId,
             assetData: abi.encode(bytes32(0))
         });
@@ -192,7 +191,6 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit ClaimedFailedDepositAssetRouter({
             chainId: chainId,
-            to: alice,
             assetId: ETH_TOKEN_ASSET_ID,
             assetData: abi.encode(bytes32(0))
         });
@@ -235,20 +233,19 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit ClaimedFailedDepositAssetRouter({
             chainId: chainId,
-            to: alice,
             assetId: ETH_TOKEN_ASSET_ID,
             assetData: abi.encode(bytes32(0))
         });
-        sharedBridge.bridgeRecoverFailedTransfer({
+        l1Nullifier.bridgeRecoverFailedTransfer({
             _chainId: chainId,
             _depositSender: alice,
             _assetId: ETH_TOKEN_ASSET_ID,
-            _assetData: transferData
-            // _l2TxHash: txHash,
-            // _l2BatchNumber: l2BatchNumber,
-            // _l2MessageIndex: l2MessageIndex,
-            // _l2TxNumberInBatch: l2TxNumberInBatch,
-            // _merkleProof: merkleProof
+            _assetData: transferData,
+            _l2TxHash: txHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _merkleProof: merkleProof
         });
     }
 
@@ -404,6 +401,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit WithdrawalFinalizedAssetRouter(chainId, tokenAssetId, message);
+
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
@@ -463,7 +461,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, address(token));
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, false, true, address(token));
-        emit IERC20.Transfer(address(sharedBridge), address(nativeTokenVault), amount);
+        emit IERC20.Transfer(address(l1Nullifier), address(nativeTokenVault), amount);
         nativeTokenVault.transferFundsFromSharedBridge(address(token));
         nativeTokenVault.updateChainBalancesFromSharedBridge(address(token), chainId);
         uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, address(token));

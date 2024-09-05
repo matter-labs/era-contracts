@@ -86,4 +86,27 @@ interface IL1Nullifier {
     function transferTokenToNTV(address _token) external;
 
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external;
+
+    /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
+    /// @param _chainId The ZK chain id to which deposit was initiated.
+    /// @param _depositSender The address of the entity that initiated the deposit.
+    /// @param _assetId The unique identifier of the deposited L1 token.
+    /// @param _assetData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver. Might include extra information.
+    /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization.
+    /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed.
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+    /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent.
+    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
+    /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
+    function bridgeRecoverFailedTransfer(
+        uint256 _chainId,
+        address _depositSender,
+        bytes32 _assetId,
+        bytes memory _assetData,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external;
 }

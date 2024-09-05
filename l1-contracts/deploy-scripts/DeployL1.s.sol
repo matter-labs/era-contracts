@@ -38,9 +38,10 @@ import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-// import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
+import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 
 import {ISTMDeploymentTracker} from "contracts/bridgehub/ISTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
@@ -780,10 +781,16 @@ contract DeployL1Script is Script {
         addresses.vaults.l1NativeTokenVaultProxy = contractAddress;
 
         IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.sharedBridgeProxy);
+        IL1Nullifier l1Nullifier = IL1Nullifier(addresses.bridges.l1NullifierProxy);
         // Ownable ownable = Ownable(addresses.bridges.sharedBridgeProxy);
 
         vm.broadcast(msg.sender);
         sharedBridge.setNativeTokenVault(INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
+        vm.broadcast(msg.sender);
+        l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
+        vm.broadcast(msg.sender);
+        l1Nullifier.setL1AssetRouter(addresses.bridges.sharedBridgeProxy);
+
         // bytes memory data = abi.encodeCall(sharedBridge.setNativeTokenVault, (IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy)));
         // Utils.executeUpgrade({
         //     _governor: ownable.owner(),

@@ -47,12 +47,7 @@ contract L1AssetRouterTest is Test {
 
     event WithdrawalFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
-    event ClaimedFailedDepositAssetRouter(
-        uint256 indexed chainId,
-        address indexed to,
-        bytes32 indexed assetId,
-        bytes assetData
-    );
+    event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
     event LegacyDepositInitiated(
         uint256 indexed chainId,
@@ -62,6 +57,8 @@ contract L1AssetRouterTest is Test {
         address l1Token,
         uint256 amount
     );
+
+    event DepositFinalizedAssetRouter(uint256 chainId, address receiver, bytes32 indexed assetId, uint256 amount);
 
     L1AssetRouter sharedBridgeImpl;
     L1AssetRouter sharedBridge;
@@ -227,14 +224,18 @@ contract L1AssetRouterTest is Test {
 
         vm.deal(bridgehubAddress, amount);
         vm.deal(address(sharedBridge), amount);
+        vm.deal(address(l1Nullifier), amount);
         vm.deal(address(nativeTokenVault), amount);
         token.mint(alice, amount);
         token.mint(address(sharedBridge), amount);
         token.mint(address(nativeTokenVault), amount);
+        token.mint(address(l1Nullifier), amount);
         vm.prank(alice);
         token.approve(address(sharedBridge), amount);
         vm.prank(alice);
         token.approve(address(nativeTokenVault), amount);
+        vm.prank(alice);
+        token.approve(address(l1Nullifier), amount);
 
         _setBaseTokenAssetId(ETH_TOKEN_ASSET_ID);
         _setNativeTokenVaultChainBalance(chainId, address(token), amount);

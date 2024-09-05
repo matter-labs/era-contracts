@@ -56,7 +56,7 @@ contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
             merkleProof: merkleProof
         });
         vm.mockCall(
-            sharedBridgeAddress,
+            l1NullifierAddress,
             abi.encodeWithSelector(IL1Nullifier.finalizeWithdrawalLegacyContracts.selector, finalizeWithdrawalParams),
             abi.encode(alice, address(token), amount)
         );
