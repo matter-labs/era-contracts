@@ -59,7 +59,7 @@ import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 import { ProxyAdminFactory } from "../typechain/ProxyAdminFactory";
 
-import { IZkSyncHyperchainFactory } from "../typechain/IZkSyncHyperchainFactory";
+import { IZkSyncZKChainFactory } from "../typechain/IZkSyncZKChainFactory";
 import { L1AssetRouterFactory } from "../typechain/L1AssetRouterFactory";
 
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
@@ -131,7 +131,7 @@ export class Deployer {
     this.deployedLogPrefix = config.deployedLogPrefix ?? "CONTRACTS";
   }
 
-  public async initialZkSyncHyperchainDiamondCut(extraFacets?: FacetCut[], compareDiamondCutHash: boolean = false) {
+  public async initialZkSyncZKChainDiamondCut(extraFacets?: FacetCut[], compareDiamondCutHash: boolean = false) {
     let facetCuts: FacetCut[] = Object.values(
       await getCurrentFacetCutsForAdd(
         this.addresses.StateTransition.AdminFacet,
@@ -209,7 +209,7 @@ export class Deployer {
         [
           getNumberFromEnv("ETH_CLIENT_CHAIN_ID"),
           applyL1ToL2Alias(this.addresses.Governance),
-          getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_HYPERCHAINS"),
+          getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_ZK_CHAINS"),
         ]
       ),
     };
@@ -452,7 +452,7 @@ export class Deployer {
   public async deployBridgehubImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const contractAddress = await this.deployViaCreate2(
       "Bridgehub",
-      [await this.getL1ChainId(), this.addresses.Governance, getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_HYPERCHAINS")],
+      [await this.getL1ChainId(), this.addresses.Governance, getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_ZK_CHAINS")],
       create2Salt,
       ethTxOptions
     );
@@ -546,7 +546,7 @@ export class Deployer {
     const genesisBatchHash = getHashFromEnv("CONTRACTS_GENESIS_ROOT"); // TODO: confusing name
     const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
     const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
-    const diamondCut = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
+    const diamondCut = await this.initialZkSyncZKChainDiamondCut(extraFacets);
     const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
 
     const chainTypeManager = new Interface(hardhat.artifacts.readArtifactSync("ChainTypeManager").abi);
@@ -1044,11 +1044,11 @@ export class Deployer {
     this.addresses.StateTransition.DefaultUpgrade = contractAddress;
   }
 
-  public async deployHyperchainsUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    const contractAddress = await this.deployViaCreate2("UpgradeHyperchains", [], create2Salt, ethTxOptions);
+  public async deployZKChainsUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    const contractAddress = await this.deployViaCreate2("UpgradeZKChains", [], create2Salt, ethTxOptions);
 
     if (this.verbose) {
-      console.log(`CONTRACTS_HYPERCHAIN_UPGRADE_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_ZK_CHAIN_UPGRADE_ADDR=${contractAddress}`);
     }
 
     this.addresses.StateTransition.DefaultUpgrade = contractAddress;
@@ -1165,7 +1165,7 @@ export class Deployer {
 
     // We are creating the new DiamondProxy for our chain, to be deployed on top of sync Layer.
     const newAdmin = this.deployWallet.address;
-    const diamondCutData = await this.initialZkSyncHyperchainDiamondCut();
+    const diamondCutData = await this.initialZkSyncZKChainDiamondCut();
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
     const ctmData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [newAdmin, initialDiamondCut]);
@@ -1246,7 +1246,7 @@ export class Deployer {
     }
   }
 
-  public async registerHyperchain(
+  public async registerZKChain(
     baseTokenAssetId: string,
     validiumMode: boolean,
     extraFacets?: FacetCut[],
@@ -1267,10 +1267,10 @@ export class Deployer {
     const baseTokenAddress = await ntv.tokenAddress(baseTokenAssetId);
 
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
-    const alreadyRegisteredInCTM = (await chainTypeManager.getHyperchain(inputChainId)) != ethers.constants.AddressZero;
+    const alreadyRegisteredInCTM = (await chainTypeManager.getZKChain(inputChainId)) != ethers.constants.AddressZero;
 
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
-    const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets, compareDiamondCutHash);
+    const diamondCutData = await this.initialZkSyncZKChainDiamondCut(extraFacets, compareDiamondCutHash);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
     const forceDeploymentsData = await this.genesisForceDeploymentsData();
     const initData = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes"], [initialDiamondCut, forceDeploymentsData]);
@@ -1315,8 +1315,8 @@ export class Deployer {
     this.addresses.BaseTokenAssetId = baseTokenAssetId;
 
     if (this.verbose) {
-      console.log(`Hyperchain registered, gas used: ${receipt.gasUsed.toString()} and ${receipt.gasUsed.toString()}`);
-      console.log(`Hyperchain registration tx hash: ${receipt.transactionHash}`);
+      console.log(`ZKChain registered, gas used: ${receipt.gasUsed.toString()} and ${receipt.gasUsed.toString()}`);
+      console.log(`ZKChain registration tx hash: ${receipt.transactionHash}`);
 
       console.log(`CHAIN_ETH_ZKSYNC_NETWORK_ID=${parseInt(chainId, 16)}`);
 
@@ -1327,7 +1327,7 @@ export class Deployer {
       const diamondProxyAddress =
         "0x" +
         receipt.logs
-          .find((log) => log.topics[0] == chainTypeManager.interface.getEventTopic("NewHyperchain"))
+          .find((log) => log.topics[0] == chainTypeManager.interface.getEventTopic("NewZKChain"))
           .topics[2].slice(26);
       this.addresses.StateTransition.DiamondProxy = diamondProxyAddress;
       if (this.verbose) {
@@ -1410,18 +1410,18 @@ export class Deployer {
 
   public async transferAdminFromDeployerToChainAdmin() {
     const ctm = this.chainTypeManagerContract(this.deployWallet);
-    const diamondProxyAddress = await ctm.getHyperchain(this.chainId);
-    const hyperchain = IZkSyncHyperchainFactory.connect(diamondProxyAddress, this.deployWallet);
+    const diamondProxyAddress = await ctm.getZKChain(this.chainId);
+    const zkChain = IZkSyncZKChainFactory.connect(diamondProxyAddress, this.deployWallet);
 
-    const receipt = await (await hyperchain.setPendingAdmin(this.addresses.ChainAdmin)).wait();
+    const receipt = await (await zkChain.setPendingAdmin(this.addresses.ChainAdmin)).wait();
     if (this.verbose) {
       console.log(`ChainAdmin set as pending admin, gas used: ${receipt.gasUsed.toString()}`);
     }
 
-    const acceptAdminData = hyperchain.interface.encodeFunctionData("acceptAdmin");
+    const acceptAdminData = zkChain.interface.encodeFunctionData("acceptAdmin");
     await this.executeChainAdminMulticall([
       {
-        target: hyperchain.address,
+        target: zkChain.address,
         value: 0,
         data: acceptAdminData,
       },
@@ -1569,7 +1569,7 @@ export class Deployer {
   }
 
   public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
-    return IZkSyncHyperchainFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
+    return IZkSyncZKChainFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
   }
 
   public governanceContract(signerOrProvider: Signer | providers.Provider) {

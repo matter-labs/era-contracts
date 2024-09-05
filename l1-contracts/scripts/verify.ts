@@ -88,7 +88,7 @@ async function main() {
   const promise3 = verifyPromise(process.env.CONTRACTS_DEFAULT_UPGRADE_ADDR);
   promises.push(promise3);
 
-  const promise4 = verifyPromise(process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR);
+  const promise4 = verifyPromise(process.env.CONTRACTS_ZK_CHAIN_UPGRADE_ADDR);
   promises.push(promise4);
 
   const promise5 = verifyPromise(addresses.TransparentProxyAdmin);
@@ -127,7 +127,7 @@ async function main() {
 
   const promise8 = verifyPromise(addresses.StateTransition.StateTransitionImplementation, [
     addresses.Bridgehub.BridgehubProxy,
-    getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_HYPERCHAINS"),
+    getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_ZK_CHAINS"),
   ]);
   promises.push(promise8);
 
@@ -135,7 +135,7 @@ async function main() {
   const genesisBatchHash = getHashFromEnv("CONTRACTS_GENESIS_ROOT"); // TODO: confusing name
   const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
   const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
-  const diamondCut = await deployer.initialZkSyncHyperchainDiamondCut([]);
+  const diamondCut = await deployer.initialZkSyncZKChainDiamondCut([]);
   const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
 
   const initCalldata2 = chainTypeManager.encodeFunctionData("initialize", [

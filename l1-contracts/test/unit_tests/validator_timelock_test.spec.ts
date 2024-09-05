@@ -82,7 +82,7 @@ describe("ValidatorTimelock tests", function () {
     expect(await validatorTimelock.executionDelay()).equal(0);
     expect(await validatorTimelock.validators(chainId, ethers.constants.AddressZero)).equal(false);
     expect(await validatorTimelock.chainTypeManager()).equal(dummyChainTypeManager.address);
-    expect(await dummyChainTypeManager.getHyperchain(chainId)).equal(dummyExecutor.address);
+    expect(await dummyChainTypeManager.getZKChain(chainId)).equal(dummyExecutor.address);
     expect(await dummyChainTypeManager.getChainAdmin(chainId)).equal(await owner.getAddress());
     expect(await dummyExecutor.getAdmin()).equal(await owner.getAddress());
   });

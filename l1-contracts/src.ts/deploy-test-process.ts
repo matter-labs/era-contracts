@@ -15,7 +15,7 @@ import {
   L2_BOOTLOADER_BYTECODE_HASH,
   L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
   initialBridgehubDeployment,
-  registerHyperchain,
+  registerZKChain,
 } from "./deploy-process";
 import { deployTokens, getTokens } from "./deploy-token";
 
@@ -110,12 +110,12 @@ export async function initialTestnetDeploymentProcess(
   // deploy the verifier first
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true);
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false);
-  await registerHyperchainWithBridgeRegistration(deployer, false, extraFacets, gasPrice, baseTokenName);
+  await registerZKChainWithBridgeRegistration(deployer, false, extraFacets, gasPrice, baseTokenName);
   await registerTestDAValidators(deployer);
   return deployer;
 }
 
-export async function registerHyperchainWithBridgeRegistration(
+export async function registerZKChainWithBridgeRegistration(
   deployer: Deployer,
   onlyVerifier: boolean,
   extraFacets: FacetCut[],
@@ -124,7 +124,7 @@ export async function registerHyperchainWithBridgeRegistration(
   chainId?: string
 ) {
   chainId = chainId ?? deployer.chainId.toString();
-  await registerHyperchain(deployer, onlyVerifier, extraFacets, gasPrice, baseTokenName, chainId, true);
+  await registerZKChain(deployer, onlyVerifier, extraFacets, gasPrice, baseTokenName, chainId, true);
   await registerTestDAValidators(deployer);
 }
 
@@ -139,7 +139,7 @@ async function registerTestDAValidators(deployer: Deployer) {
   ).wait();
 }
 
-// This is used to deploy the diamond and bridge such that they can be upgraded using UpgradeHyperchain.sol
+// This is used to deploy the diamond and bridge such that they can be upgraded using UpgradeZKChain.sol
 // This should be deleted after the migration
 export async function initialPreUpgradeContractsDeployment(
   deployWallet: Wallet,
@@ -196,7 +196,7 @@ export async function initialPreUpgradeContractsDeployment(
   );
 
   await deployer.deployStateTransitionDiamondFacets(create2Salt);
-  await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZkSyncHyperchainDiamondCut());
+  await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZkSyncZKChainDiamondCut());
   return deployer;
 }
 
@@ -232,9 +232,9 @@ export async function initialEraTestnetDeploymentProcess(
     "DummyAdminFacetNoOverlap",
     deployer.addresses.StateTransition.DiamondProxy
   );
-  await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZkSyncHyperchainDiamondCut());
+  await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZkSyncZKChainDiamondCut());
 
-  await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString(), true);
+  await registerZKChain(deployer, false, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString(), true);
   return deployer;
 }
 
@@ -277,7 +277,7 @@ export class EraDeployer extends Deployer {
     await tx.wait();
   }
 
-  public async upgradeZkSyncHyperchainDiamondCut(extraFacets?: FacetCut[]) {
+  public async upgradeZkSyncZKChainDiamondCut(extraFacets?: FacetCut[]) {
     let facetCuts: FacetCut[] = Object.values(
       await getCurrentFacetCutsForAdd(
         this.addresses.StateTransition.AdminFacet,

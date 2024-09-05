@@ -119,11 +119,11 @@ jobs:
         working-directory: ./l1-contracts
         run: forge script ./deploy-scripts/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
 # TODO restore scripts verification
-#      - name: Run RegisterHyperchain script
+#      - name: Run RegisterZKChain script
 #        working-directory: ./l1-contracts
 #        run: |
-#          cat ./script-out/output-deploy-l1.toml >> ./script-config/register-hyperchain.toml
-#          forge script ./deploy-scripts/RegisterHyperchain.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+#          cat ./script-out/output-deploy-l1.toml >> ./script-config/register-zk-chain.toml
+#          forge script ./deploy-scripts/RegisterZKChain.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
 #      - name: Run InitializeL2WethToken script
 #        working-directory: ./l1-contracts-foundry
 #        run: forge script ./deploy-scripts/InitializeL2WethToken.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY

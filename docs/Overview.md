@@ -157,7 +157,7 @@ this trick:
 #### L1 -> L2 Transaction filtering
 
 There is a mechanism for applying custom filters to the L1 -> L2 communication. It is achieved by having an address of
-the `TransactionFilterer` contract in the `ZkSyncHyperchainStorage`. If the filterer exists, it is being called in
+the `TransactionFilterer` contract in the `ZkSyncZKChainStorage`. If the filterer exists, it is being called in
 the `Mailbox` facet with the tx details and has to return whether the transaction can be executed or not. The filterer
 has to implement the `ITransactionFilterer` interface. The ones intended to use this feature, have to deploy the
 contract that implements `ITransactionFilterer` and use `setTransactionFilterer` function of `AdminFacet` to set the
