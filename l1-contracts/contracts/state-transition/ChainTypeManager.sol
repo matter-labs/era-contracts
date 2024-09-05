@@ -12,7 +12,7 @@ import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
 import {IAdmin} from "./chain-interfaces/IAdmin.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
-import {IStateTransitionManager, StateTransitionManagerInitializeData, ChainCreationParams} from "./IStateTransitionManager.sol";
+import {IChainTypeManager, ChainTypeManagerInitializeData, ChainCreationParams} from "./IChainTypeManager.sol";
 import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
@@ -25,7 +25,7 @@ import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 /// @title State Transition Manager contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Ownable2StepUpgradeable {
+contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /// @notice Address of the bridgehub
@@ -109,16 +109,14 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @notice Returns the address of the hyperchain admin with the corresponding chainID.
-    /// @notice Not related to the STM, but it is here for legacy reasons.
+    /// @notice Not related to the CTM, but it is here for legacy reasons.
     /// @param _chainId the chainId of the chain
     function getChainAdmin(uint256 _chainId) external view override returns (address) {
         return IZkSyncHyperchain(getHyperchain(_chainId)).getAdmin();
     }
 
     /// @dev initialize
-    function initialize(
-        StateTransitionManagerInitializeData calldata _initializeData
-    ) external reentrancyGuardInitializer {
+    function initialize(ChainTypeManagerInitializeData calldata _initializeData) external reentrancyGuardInitializer {
         if (_initializeData.owner == address(0)) {
             revert ZeroAddress();
         }
@@ -211,7 +209,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         emit NewAdmin(previousAdmin, currentPendingAdmin);
     }
 
-    /// @dev set validatorTimelock. Cannot do it during initialization, as validatorTimelock is deployed after STM
+    /// @dev set validatorTimelock. Cannot do it during initialization, as validatorTimelock is deployed after CTM
     /// @param _validatorTimelock the new validatorTimelock address
     function setValidatorTimelock(address _validatorTimelock) external onlyOwnerOrAdmin {
         address oldValidatorTimelock = validatorTimelock;
@@ -423,12 +421,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         {
             // check input
             bytes32 forceDeploymentHash = keccak256(abi.encode(_forceDeploymentData));
-            require(forceDeploymentHash == initialForceDeploymentHash, "STM: initial force deployment mismatch");
+            require(forceDeploymentHash == initialForceDeploymentHash, "CTM: initial force deployment mismatch");
         }
         // genesis upgrade, deploys some contracts, sets chainId
         IAdmin(hyperchainAddress).genesisUpgrade(
             l1GenesisUpgrade,
-            address(IBridgehub(BRIDGE_HUB).l1StmDeployer()),
+            address(IBridgehub(BRIDGE_HUB).l1CtmDeployer()),
             _forceDeploymentData,
             _factoryDeps
         );
@@ -444,8 +442,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external onlyOwner {
         require(_newSettlementLayerChainId != 0, "Bad chain id");
 
-        // Currently, we require that the sync layer is deployed by the same STM.
-        require(getHyperchain(_newSettlementLayerChainId) != address(0), "STM: sync layer not registered");
+        // Currently, we require that the sync layer is deployed by the same CTM.
+        require(getHyperchain(_newSettlementLayerChainId) != address(0), "CTM: sync layer not registered");
 
         IBridgehub(BRIDGE_HUB).registerSettlementLayer(_newSettlementLayerChainId, _isWhitelisted);
     }
@@ -456,16 +454,16 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function forwardedBridgeBurn(
         uint256 _chainId,
         bytes calldata _data
-    ) external view override onlyBridgehub returns (bytes memory stmForwardedBridgeMintData) {
+    ) external view override onlyBridgehub returns (bytes memory ctmForwardedBridgeMintData) {
         // Note that the `_diamondCut` here is not for the current chain, for the chain where the migration
-        // happens. The correctness of it will be checked on the STM on the new settlement layer.
+        // happens. The correctness of it will be checked on the CTM on the new settlement layer.
         (address _newSettlementLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
-        require(_newSettlementLayerAdmin != address(0), "STM: admin zero");
+        require(_newSettlementLayerAdmin != address(0), "CTM: admin zero");
 
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
         address hyperchain = getHyperchain(_chainId);
-        require(IZkSyncHyperchain(hyperchain).getProtocolVersion() == protocolVersion, "STM: outdated pv");
+        require(IZkSyncHyperchain(hyperchain).getProtocolVersion() == protocolVersion, "CTM: outdated pv");
 
         return
             abi.encode(
@@ -478,19 +476,19 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @notice Called by the bridgehub during the migration of a chain to the current settlement layer.
     /// @param _chainId The chain id of the chain to be migrated.
-    /// @param _stmData The data returned from `forwardedBridgeBurn` for the chain.
+    /// @param _ctmData The data returned from `forwardedBridgeBurn` for the chain.
     function forwardedBridgeMint(
         uint256 _chainId,
-        bytes calldata _stmData
+        bytes calldata _ctmData
     ) external override onlyBridgehub returns (address chainAddress) {
         (bytes32 _baseTokenAssetId, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
-            _stmData,
+            _ctmData,
             (bytes32, address, uint256, bytes)
         );
 
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
-        require(_protocolVersion == protocolVersion, "STM, outdated pv");
+        require(_protocolVersion == protocolVersion, "CTM, outdated pv");
         chainAddress = _deployNewChain({
             _chainId: _chainId,
             _baseTokenAssetId: _baseTokenAssetId,
@@ -504,12 +502,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// param _chainId the chainId of the chain
     /// param _assetInfo the assetInfo of the chain
     /// param _depositSender the address of that sent the deposit
-    /// param _stmData the data of the migration
+    /// param _ctmData the data of the migration
     function forwardedBridgeRecoverFailedTransfer(
         uint256 /* _chainId */,
         bytes32 /* _assetInfo */,
         address /* _depositSender */,
-        bytes calldata /* _stmData */
+        bytes calldata /* _ctmData */
     ) external {
         // Function is empty due to the fact that when calling `forwardedBridgeBurn` there are no
         // state updates that occur.

@@ -9,10 +9,10 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, BridgehubMintSTMAssetData, BridgehubBurnSTMAssetData} from "./IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, BridgehubMintCTMAssetData, BridgehubBurnCTMAssetData} from "./IBridgehub.sol";
 import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {IL1BaseTokenAssetHandler} from "../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
-import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
+import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
@@ -21,9 +21,9 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
+import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {AssetHandlerNotRegistered, HyperchainLimitReached, Unauthorized, STMAlreadyRegistered, STMNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {AssetHandlerNotRegistered, HyperchainLimitReached, Unauthorized, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -42,21 +42,21 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// L1 that is at the most base layer.
     uint256 public immutable L1_CHAIN_ID;
 
-    /// @notice The total number of hyperchains can be created/connected to this STM.
+    /// @notice The total number of hyperchains can be created/connected to this CTM.
     /// This is the temporary security measure.
     uint256 public immutable MAX_NUMBER_OF_HYPERCHAINS;
 
     /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by this shared Bridge.
     IL1AssetRouter public sharedBridge;
 
-    /// @notice StateTransitionManagers that are registered, and ZKchains that use these STMs can use this bridgehub as settlement layer.
-    mapping(address stateTransitionManager => bool) public stateTransitionManagerIsRegistered;
+    /// @notice ChainTypeManagers that are registered, and ZKchains that use these CTMs can use this bridgehub as settlement layer.
+    mapping(address chainTypeManager => bool) public chainTypeManagerIsRegistered;
 
     /// @notice we store registered tokens (for arbitrary base token)
     mapping(address baseToken => bool) public __DEPRECATED_tokenIsRegistered;
 
-    /// @notice chainID => StateTransitionManager contract address, STM that is managing rules for a given ZKchain.
-    mapping(uint256 chainId => address) public stateTransitionManager;
+    /// @notice chainID => ChainTypeManager contract address, CTM that is managing rules for a given ZKchain.
+    mapping(uint256 chainId => address) public chainTypeManager;
 
     /// @notice chainID => baseToken contract address, token that is used as 'base token' by a given child chain.
     // slither-disable-next-line uninitialized-state
@@ -80,11 +80,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     mapping(uint256 chainId => bytes32) public baseTokenAssetId;
 
     /// @notice The deployment tracker for the state transition managers.
-    /// @dev The L1 address of the stm deployer is provided.
-    ISTMDeploymentTracker public l1StmDeployer;
+    /// @dev The L1 address of the ctm deployer is provided.
+    ICTMDeploymentTracker public l1CtmDeployer;
 
     /// @dev asset info used to identify chains in the Shared Bridge
-    mapping(bytes32 stmAssetId => address stmAddress) public stmAssetIdToAddress;
+    mapping(bytes32 ctmAssetId => address ctmAddress) public ctmAssetIdToAddress;
 
     /// @dev used to indicate the currently active settlement layer for a given chainId
     mapping(uint256 chainId => uint256 activeSettlementLayerChainId) public settlementLayer;
@@ -107,8 +107,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
-    modifier onlyChainSTM(uint256 _chainId) {
-        require(msg.sender == stateTransitionManager[_chainId], "BH: not chain STM");
+    modifier onlyChainCTM(uint256 _chainId) {
+        require(msg.sender == chainTypeManager[_chainId], "BH: not chain CTM");
         _;
     }
 
@@ -190,15 +190,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice To set the addresses of some of the ecosystem contracts, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, other contracts, and then we call this.
     /// @param _sharedBridge the shared bridge address
-    /// @param _l1StmDeployer the stm deployment tracker address. Note, that the address of the L1 STM deployer is provided.
+    /// @param _l1CtmDeployer the ctm deployment tracker address. Note, that the address of the L1 CTM deployer is provided.
     /// @param _messageRoot the message root address
     function setAddresses(
         address _sharedBridge,
-        ISTMDeploymentTracker _l1StmDeployer,
+        ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot
     ) external onlyOwner {
         sharedBridge = IL1AssetRouter(_sharedBridge);
-        l1StmDeployer = _l1StmDeployer;
+        l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
     }
 
@@ -216,11 +216,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice Used to set the legacy chain address for the upgrade.
     /// @param _chainId The chainId of the legacy chain we are migrating.
     function setLegacyChainAddress(uint256 _chainId) external {
-        address stm = stateTransitionManager[_chainId];
-        require(stm != address(0), "BH: chain not legacy");
+        address ctm = chainTypeManager[_chainId];
+        require(ctm != address(0), "BH: chain not legacy");
         require(!hyperchainMap.contains(_chainId), "BH: chain already migrated");
-        /// Note we have to do this before STM is upgraded.
-        address chainAddress = IStateTransitionManager(stm).getHyperchainLegacy(_chainId);
+        /// Note we have to do this before CTM is upgraded.
+        address chainAddress = IChainTypeManager(ctm).getHyperchainLegacy(_chainId);
         require(chainAddress != address(0), "BH: chain not legacy 2");
         _registerNewHyperchain(_chainId, chainAddress);
     }
@@ -228,32 +228,32 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     //// Registry
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
-    /// @param _stateTransitionManager the state transition manager address to be added
-    function addStateTransitionManager(address _stateTransitionManager) external onlyOwner {
-        if (_stateTransitionManager == address(0)) {
+    /// @param _chainTypeManager the state transition manager address to be added
+    function addChainTypeManager(address _chainTypeManager) external onlyOwner {
+        if (_chainTypeManager == address(0)) {
             revert ZeroAddress();
         }
-        if (stateTransitionManagerIsRegistered[_stateTransitionManager]) {
-            revert STMAlreadyRegistered();
+        if (chainTypeManagerIsRegistered[_chainTypeManager]) {
+            revert CTMAlreadyRegistered();
         }
-        stateTransitionManagerIsRegistered[_stateTransitionManager] = true;
+        chainTypeManagerIsRegistered[_chainTypeManager] = true;
 
-        emit StateTransitionManagerAdded(_stateTransitionManager);
+        emit ChainTypeManagerAdded(_chainTypeManager);
     }
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
     /// @notice this stops new Chains from using the STF, old chains are not affected
-    /// @param _stateTransitionManager the state transition manager address to be removed
-    function removeStateTransitionManager(address _stateTransitionManager) external onlyOwner {
-        if (_stateTransitionManager == address(0)) {
+    /// @param _chainTypeManager the state transition manager address to be removed
+    function removeChainTypeManager(address _chainTypeManager) external onlyOwner {
+        if (_chainTypeManager == address(0)) {
             revert ZeroAddress();
         }
-        if (!stateTransitionManagerIsRegistered[_stateTransitionManager]) {
-            revert STMNotRegistered();
+        if (!chainTypeManagerIsRegistered[_chainTypeManager]) {
+            revert CTMNotRegistered();
         }
-        stateTransitionManagerIsRegistered[_stateTransitionManager] = false;
+        chainTypeManagerIsRegistered[_chainTypeManager] = false;
 
-        emit StateTransitionManagerRemoved(_stateTransitionManager);
+        emit ChainTypeManagerRemoved(_chainTypeManager);
     }
 
     /// @notice asset id can represent any token contract with the appropriate interface/functionality
@@ -281,23 +281,23 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _assetAddress the asset handler address
     function setAssetHandlerAddress(bytes32 _additionalData, address _assetAddress) external {
         // It is a simplified version of the logic used by the AssetRouter to manage asset handlers.
-        // STM's assetId is `keccak256(abi.encode(L1_CHAIN_ID, l1StmDeployer, stmAddress))`.
-        // And the l1StmDeployer is considered the deployment tracker for the STM asset.
+        // CTM's assetId is `keccak256(abi.encode(L1_CHAIN_ID, l1CtmDeployer, ctmAddress))`.
+        // And the l1CtmDeployer is considered the deployment tracker for the CTM asset.
         //
-        // The l1StmDeployer will call this method to set the asset handler address for the assetId.
+        // The l1CtmDeployer will call this method to set the asset handler address for the assetId.
         // If the chain is not the same as L1, we assume that it is done via L1->L2 communication and so we unalias the sender.
         //
         // For simpler handling we allow anyone to call this method. It is okay, since during bridging operations
-        // it is double checked that `assetId` is indeed derived from the `l1StmDeployer`.
+        // it is double checked that `assetId` is indeed derived from the `l1CtmDeployer`.
         // TODO(EVM-703): This logic should be revised once interchain communication is implemented.
 
         address sender = L1_CHAIN_ID == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);
-        // This method can be accessed by l1StmDeployer only
-        require(sender == address(l1StmDeployer), "BH: not stm deployer");
-        require(stateTransitionManagerIsRegistered[_assetAddress], "STM not registered");
+        // This method can be accessed by l1CtmDeployer only
+        require(sender == address(l1CtmDeployer), "BH: not ctm deployer");
+        require(chainTypeManagerIsRegistered[_assetAddress], "CTM not registered");
 
         bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
-        stmAssetIdToAddress[assetInfo] = _assetAddress;
+        ctmAssetIdToAddress[assetInfo] = _assetAddress;
         emit AssetRegistered(assetInfo, _assetAddress, _additionalData, msg.sender);
     }
 
@@ -308,7 +308,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice register new chain. New chains can be only registered on Bridgehub deployed on L1. Later they can be moved to any other layer.
     /// @notice for Eth the baseToken address is 1
     /// @param _chainId the chainId of the chain
-    /// @param _stateTransitionManager the state transition manager address
+    /// @param _chainTypeManager the state transition manager address
     /// @param _baseTokenAssetId the base token asset id of the chain
     /// @param _salt the salt for the chainId, currently not used
     /// @param _admin the admin of the chain
@@ -316,7 +316,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _factoryDeps the factory dependencies for the chain's deployment
     function createNewChain(
         uint256 _chainId,
-        address _stateTransitionManager,
+        address _chainTypeManager,
         bytes32 _baseTokenAssetId,
         // solhint-disable-next-line no-unused-vars
         uint256 _salt,
@@ -331,15 +331,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             revert ChainIdTooBig();
         }
         require(_chainId != block.chainid, "BH: chain id must not match current chainid");
-        if (_stateTransitionManager == address(0)) {
+        if (_chainTypeManager == address(0)) {
             revert ZeroAddress();
         }
         if (_baseTokenAssetId == bytes32(0)) {
             revert ZeroAddress();
         }
 
-        if (!stateTransitionManagerIsRegistered[_stateTransitionManager]) {
-            revert STMNotRegistered();
+        if (!chainTypeManagerIsRegistered[_chainTypeManager]) {
+            revert CTMNotRegistered();
         }
 
         require(assetIdIsRegistered[_baseTokenAssetId], "BH: asset id not registered");
@@ -347,16 +347,16 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         if (address(sharedBridge) == address(0)) {
             revert SharedBridgeNotSet();
         }
-        if (stateTransitionManager[_chainId] != address(0)) {
+        if (chainTypeManager[_chainId] != address(0)) {
             revert BridgeHubAlreadyRegistered();
         }
 
-        stateTransitionManager[_chainId] = _stateTransitionManager;
+        chainTypeManager[_chainId] = _chainTypeManager;
 
         baseTokenAssetId[_chainId] = _baseTokenAssetId;
         settlementLayer[_chainId] = block.chainid;
 
-        address chainAddress = IStateTransitionManager(_stateTransitionManager).createNewChain({
+        address chainAddress = IChainTypeManager(_chainTypeManager).createNewChain({
             _chainId: _chainId,
             _baseTokenAssetId: _baseTokenAssetId,
             _sharedBridge: address(sharedBridge),
@@ -367,7 +367,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _registerNewHyperchain(_chainId, chainAddress);
         messageRoot.addNewChain(_chainId);
 
-        emit NewChain(_chainId, _stateTransitionManager, _admin);
+        emit NewChain(_chainId, _chainTypeManager, _admin);
         return _chainId;
     }
 
@@ -420,14 +420,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         (, chainAddress) = hyperchainMap.tryGet(_chainId);
     }
 
-    function stmAssetIdFromChainId(uint256 _chainId) public view override returns (bytes32) {
-        address stmAddress = stateTransitionManager[_chainId];
-        require(stmAddress != address(0), "chain id not registered");
-        return stmAssetId(stateTransitionManager[_chainId]);
+    function ctmAssetIdFromChainId(uint256 _chainId) public view override returns (bytes32) {
+        address ctmAddress = chainTypeManager[_chainId];
+        require(ctmAddress != address(0), "chain id not registered");
+        return ctmAssetId(chainTypeManager[_chainId]);
     }
 
-    function stmAssetId(address _stmAddress) public view override returns (bytes32) {
-        return keccak256(abi.encode(L1_CHAIN_ID, address(l1StmDeployer), bytes32(uint256(uint160(_stmAddress)))));
+    function ctmAssetId(address _ctmAddress) public view override returns (bytes32) {
+        return keccak256(abi.encode(L1_CHAIN_ID, address(l1CtmDeployer), bytes32(uint256(uint160(_ctmAddress)))));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -674,7 +674,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice IL1AssetHandler interface, used to migrate (transfer) a chain to the settlement layer.
     /// @param _settlementChainId the chainId of the settlement chain, i.e. where the message and the migrating chain is sent.
-    /// @param _assetId the assetId of the migrating chain's STM
+    /// @param _assetId the assetId of the migrating chain's CTM
     /// @param _prevMsgSender the previous message sender
     /// @param _data the data for the migration
     function bridgeBurn(
@@ -686,8 +686,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) external payable override onlyAssetRouter whenMigrationsNotPaused returns (bytes memory bridgehubMintData) {
         require(whitelistedSettlementLayers[_settlementChainId], "BH: SL not whitelisted");
 
-        BridgehubBurnSTMAssetData memory bridgeData = abi.decode(_data, (BridgehubBurnSTMAssetData));
-        require(_assetId == stmAssetIdFromChainId(bridgeData.chainId), "BH: assetInfo 1");
+        BridgehubBurnCTMAssetData memory bridgeData = abi.decode(_data, (BridgehubBurnCTMAssetData));
+        require(_assetId == ctmAssetIdFromChainId(bridgeData.chainId), "BH: assetInfo 1");
         require(settlementLayer[bridgeData.chainId] == block.chainid, "BH: not current SL");
         settlementLayer[bridgeData.chainId] = _settlementChainId;
 
@@ -695,17 +695,19 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(hyperchain != address(0), "BH: hyperchain not registered");
         require(_prevMsgSender == IZkSyncHyperchain(hyperchain).getAdmin(), "BH: incorrect sender");
 
-        bytes memory stmMintData = IStateTransitionManager(stateTransitionManager[bridgeData.chainId])
-            .forwardedBridgeBurn(bridgeData.chainId, bridgeData.stmData);
+        bytes memory ctmMintData = IChainTypeManager(chainTypeManager[bridgeData.chainId]).forwardedBridgeBurn(
+            bridgeData.chainId,
+            bridgeData.ctmData
+        );
         bytes memory chainMintData = IZkSyncHyperchain(hyperchain).forwardedBridgeBurn(
             hyperchainMap.get(_settlementChainId),
             _prevMsgSender,
             bridgeData.chainData
         );
-        BridgehubMintSTMAssetData memory bridgeMintStruct = BridgehubMintSTMAssetData({
+        BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgeData.chainId,
             baseTokenAssetId: baseTokenAssetId[bridgeData.chainId],
-            stmData: stmMintData,
+            ctmData: ctmMintData,
             chainData: chainMintData
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
@@ -718,14 +720,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
     ) external payable override onlyAssetRouter whenMigrationsNotPaused {
-        BridgehubMintSTMAssetData memory bridgeData = abi.decode(_bridgehubMintData, (BridgehubMintSTMAssetData));
+        BridgehubMintCTMAssetData memory bridgeData = abi.decode(_bridgehubMintData, (BridgehubMintCTMAssetData));
 
-        address stm = stmAssetIdToAddress[_assetId];
-        require(stm != address(0), "BH: assetInfo 2");
+        address ctm = ctmAssetIdToAddress[_assetId];
+        require(ctm != address(0), "BH: assetInfo 2");
         require(settlementLayer[bridgeData.chainId] != block.chainid, "BH: already current SL");
 
         settlementLayer[bridgeData.chainId] = block.chainid;
-        stateTransitionManager[bridgeData.chainId] = stm;
+        chainTypeManager[bridgeData.chainId] = ctm;
         baseTokenAssetId[bridgeData.chainId] = bridgeData.baseTokenAssetId;
         // To keep `assetIdIsRegistered` consistent, we'll also automatically register the base token.
         // It is assumed that if the bridging happened, the token was approved on L1 already.
@@ -734,7 +736,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address hyperchain = getHyperchain(bridgeData.chainId);
         bool contractAlreadyDeployed = hyperchain != address(0);
         if (!contractAlreadyDeployed) {
-            hyperchain = IStateTransitionManager(stm).forwardedBridgeMint(bridgeData.chainId, bridgeData.stmData);
+            hyperchain = IChainTypeManager(ctm).forwardedBridgeMint(bridgeData.chainId, bridgeData.ctmData);
             require(hyperchain != address(0), "BH: chain not registered");
             _registerNewHyperchain(bridgeData.chainId, hyperchain);
             messageRoot.addNewChain(bridgeData.chainId);
@@ -747,7 +749,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
     /// @param _chainId the chainId of the chain
-    /// @param _assetId the assetId of the chain's STM
+    /// @param _assetId the assetId of the chain's CTM
     /// @param _data the data for the recovery.
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
@@ -755,22 +757,22 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address _depositSender,
         bytes calldata _data
     ) external payable override onlyAssetRouter onlyL1 {
-        BridgehubBurnSTMAssetData memory stmAssetData = abi.decode(_data, (BridgehubBurnSTMAssetData));
+        BridgehubBurnCTMAssetData memory ctmAssetData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
         delete settlementLayer[_chainId];
 
-        IStateTransitionManager(stateTransitionManager[_chainId]).forwardedBridgeRecoverFailedTransfer({
+        IChainTypeManager(chainTypeManager[_chainId]).forwardedBridgeRecoverFailedTransfer({
             _chainId: _chainId,
             _assetInfo: _assetId,
             _depositSender: _depositSender,
-            _stmData: stmAssetData.stmData
+            _ctmData: ctmAssetData.ctmData
         });
 
         IZkSyncHyperchain(getHyperchain(_chainId)).forwardedBridgeRecoverFailedTransfer({
             _chainId: _chainId,
             _assetInfo: _assetId,
             _prevMsgSender: _depositSender,
-            _chainData: stmAssetData.chainData
+            _chainData: ctmAssetData.chainData
         });
     }
 

@@ -8,7 +8,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
-import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
+import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 
 import {IBridgehub, IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -18,7 +18,7 @@ import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Contract to be deployed on L1, can link together other contracts based on AssetInfo.
-contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
@@ -31,14 +31,14 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
         // solhint-disable-next-line gas-custom-errors
-        require(msg.sender == address(BRIDGE_HUB), "STM DT: not BH");
+        require(msg.sender == address(BRIDGE_HUB), "CTM DT: not BH");
         _;
     }
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyOwnerViaRouter(address _prevMsgSender) {
         // solhint-disable-next-line gas-custom-errors
-        require(msg.sender == address(L1_ASSET_ROUTER) && _prevMsgSender == owner(), "STM DT: not owner via router");
+        require(msg.sender == address(L1_ASSET_ROUTER) && _prevMsgSender == owner(), "CTM DT: not owner via router");
         _;
     }
 
@@ -56,21 +56,21 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         _transferOwnership(_owner);
     }
 
-    /// @notice Used to register the stm asset in L1 contracts, AssetRouter and Bridgehub.
-    /// @param _stmAddress the address of the stm asset
-    function registerSTMAssetOnL1(address _stmAddress) external onlyOwner {
+    /// @notice Used to register the ctm asset in L1 contracts, AssetRouter and Bridgehub.
+    /// @param _ctmAddress the address of the ctm asset
+    function registerCTMAssetOnL1(address _ctmAddress) external onlyOwner {
         // solhint-disable-next-line gas-custom-errors
 
-        require(BRIDGE_HUB.stateTransitionManagerIsRegistered(_stmAddress), "STMDT: stm not registered");
-        L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_stmAddress))), address(BRIDGE_HUB));
-        BRIDGE_HUB.setAssetHandlerAddress(bytes32(uint256(uint160(_stmAddress))), _stmAddress);
+        require(BRIDGE_HUB.chainTypeManagerIsRegistered(_ctmAddress), "CTMDT: ctm not registered");
+        L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_ctmAddress))), address(BRIDGE_HUB));
+        BRIDGE_HUB.setAssetHandlerAddress(bytes32(uint256(uint160(_ctmAddress))), _ctmAddress);
     }
 
-    /// @notice The function responsible for registering the L2 counterpart of an STM asset on the L2 Bridgehub.
+    /// @notice The function responsible for registering the L2 counterpart of an CTM asset on the L2 Bridgehub.
     /// @dev The function is called by the Bridgehub contract during the `Bridgehub.requestL2TransactionTwoBridges`.
     /// @dev Since the L2 settlement layers `_chainId` might potentially have ERC20 tokens as native assets,
     /// there are two ways to perform the L1->L2 transaction:
-    /// - via the `Bridgehub.requestL2TransactionDirect`. However, this would require the STMDeploymentTracker to
+    /// - via the `Bridgehub.requestL2TransactionDirect`. However, this would require the CTMDeploymentTracker to
     /// handle the ERC20 balances to be used in the transaction.
     /// - via the `Bridgehub.requestL2TransactionTwoBridges`. This way it will be the sender that provides the funds
     /// for the L2 transaction.
@@ -88,22 +88,22 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
     ) external payable onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
         // solhint-disable-next-line gas-custom-errors
 
-        require(msg.value == 0, "STMDT: no eth allowed");
+        require(msg.value == 0, "CTMDT: no eth allowed");
         // solhint-disable-next-line gas-custom-errors
 
-        require(_prevMsgSender == owner(), "STMDT: not owner");
+        require(_prevMsgSender == owner(), "CTMDT: not owner");
         bytes1 encodingVersion = _data[0];
-        require(encodingVersion == ENCODING_VERSION, "STMDT: wrong encoding version");
-        (address _stmL1Address, address _stmL2Address) = abi.decode(_data[1:], (address, address));
+        require(encodingVersion == ENCODING_VERSION, "CTMDT: wrong encoding version");
+        (address _ctmL1Address, address _ctmL2Address) = abi.decode(_data[1:], (address, address));
 
-        request = _registerSTMAssetOnL2Bridgehub(_chainId, _stmL1Address, _stmL2Address);
+        request = _registerCTMAssetOnL2Bridgehub(_chainId, _ctmL1Address, _ctmL2Address);
     }
 
     /// @notice The function called by the Bridgehub after the L2 transaction has been initiated.
     /// @dev Not used in this contract. In case the transaction fails, we can just re-try it.
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {}
 
-    /// @notice Used to register the stm asset in L2 AssetRouter.
+    /// @notice Used to register the ctm asset in L2 AssetRouter.
     /// @param _prevMsgSender the address that called the Router
     /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
     function bridgeCheckCounterpartAddress(
@@ -112,24 +112,24 @@ contract STMDeploymentTracker is ISTMDeploymentTracker, ReentrancyGuard, Ownable
         address _prevMsgSender,
         address _assetHandlerAddressOnCounterpart
     ) external view override onlyOwnerViaRouter(_prevMsgSender) {
-        require(_assetHandlerAddressOnCounterpart == L2_BRIDGEHUB_ADDR, "STMDT: wrong counter part");
+        require(_assetHandlerAddressOnCounterpart == L2_BRIDGEHUB_ADDR, "CTMDT: wrong counter part");
     }
 
-    function getAssetId(address _l1STM) public view override returns (bytes32) {
-        return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1STM)))));
+    function getAssetId(address _l1CTM) public view override returns (bytes32) {
+        return keccak256(abi.encode(block.chainid, address(this), bytes32(uint256(uint160(_l1CTM)))));
     }
 
-    /// @notice Used to register the stm asset in L2 Bridgehub.
+    /// @notice Used to register the ctm asset in L2 Bridgehub.
     /// @param _chainId the chainId of the chain
-    function _registerSTMAssetOnL2Bridgehub(
+    function _registerCTMAssetOnL2Bridgehub(
         // solhint-disable-next-line no-unused-vars
         uint256 _chainId,
-        address _stmL1Address,
-        address _stmL2Address
+        address _ctmL1Address,
+        address _ctmL2Address
     ) internal pure returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes memory l2TxCalldata = abi.encodeCall(
             IBridgehub.setAssetHandlerAddress,
-            (bytes32(uint256(uint160(_stmL1Address))), _stmL2Address)
+            (bytes32(uint256(uint160(_ctmL1Address))), _ctmL2Address)
         );
 
         request = L2TransactionRequestTwoBridgesInner({

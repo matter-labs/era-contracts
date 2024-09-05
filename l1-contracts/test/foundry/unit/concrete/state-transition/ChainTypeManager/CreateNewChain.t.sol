@@ -1,12 +1,12 @@
 // // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
+import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {Unauthorized, HashMismatch} from "contracts/common/L1ContractErrors.sol";
 
-contract createNewChainTest is StateTransitionManagerTest {
+contract createNewChainTest is ChainTypeManagerTest {
     function test_RevertWhen_InitialDiamondCutHashMismatch() public {
         Diamond.DiamondCutData memory initialDiamondCutData = getDiamondCutData(sharedBridge);
         Diamond.DiamondCutData memory correctDiamondCutData = getDiamondCutData(address(diamondInit));

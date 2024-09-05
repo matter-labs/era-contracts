@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {Vm} from "forge-std/Test.sol";
 
 import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../../Utils/Utils.sol";
-import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
+import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
 import {COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -13,7 +13,7 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
-contract revertBatchesTest is StateTransitionManagerTest {
+contract revertBatchesTest is ChainTypeManagerTest {
     // Items for logs & commits
     uint256 internal currentTimestamp;
     IExecutor.CommitBatchInfo internal newCommitBatchInfo;
@@ -127,7 +127,7 @@ contract revertBatchesTest is StateTransitionManagerTest {
 
     //     executorFacet.proveBatches(genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
 
-    //     // Test batch revert triggered from STM
+    //     // Test batch revert triggered from CTM
     //     vm.stopPrank();
     //     vm.startPrank(governor);
 

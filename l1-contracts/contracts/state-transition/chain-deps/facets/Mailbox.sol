@@ -7,7 +7,7 @@ pragma solidity 0.8.24;
 import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
-import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
+import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
@@ -271,7 +271,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             // to a chain's message root only if the chain has indeed executed its batch on top of it.
             //
             // We trust all chains whitelisted by the Bridgehub governance.
-            require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(settlementLayerChainId), "Mailbox: wrong STM");
+            require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(settlementLayerChainId), "Mailbox: wrong CTM");
 
             settlementLayerAddress = IBridgehub(s.bridgehub).getHyperchain(settlementLayerChainId);
         }
@@ -373,7 +373,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     ) external override onlyL1 returns (bytes32 canonicalTxHash) {
         require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId), "Mailbox SL: not SL");
         require(
-            IStateTransitionManager(s.stateTransitionManager).getHyperchain(_chainId) == msg.sender,
+            IChainTypeManager(s.chainTypeManager).getHyperchain(_chainId) == msg.sender,
             "Mailbox SL: not hyperchain"
         );
 

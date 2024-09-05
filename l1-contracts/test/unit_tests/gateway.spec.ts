@@ -23,7 +23,7 @@ import type { Deployer } from "../../src.ts/deploy";
 
 describe("Gateway", function () {
   let bridgehub: Bridgehub;
-  // let stateTransition: StateTransitionManager;
+  // let stateTransition: ChainTypeManager;
   let owner: ethers.Signer;
   let migratingDeployer: Deployer;
   let gatewayDeployer: Deployer;
@@ -86,15 +86,15 @@ describe("Gateway", function () {
   });
 
   it("Check l2 registration", async () => {
-    const stm = migratingDeployer.stateTransitionManagerContract(migratingDeployer.deployWallet);
+    const ctm = migratingDeployer.chainTypeManagerContract(migratingDeployer.deployWallet);
     const gasPrice = await migratingDeployer.deployWallet.provider.getGasPrice();
     const value = (
       await bridgehub.l2TransactionBaseCost(chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
     ).mul(10);
 
-    const stmDeploymentTracker = migratingDeployer.stmDeploymentTracker(migratingDeployer.deployWallet);
+    const ctmDeploymentTracker = migratingDeployer.ctmDeploymentTracker(migratingDeployer.deployWallet);
     const assetRouter = migratingDeployer.defaultSharedBridge(migratingDeployer.deployWallet);
-    const assetId = await bridgehub.stmAssetIdFromChainId(chainId);
+    const assetId = await bridgehub.ctmAssetIdFromChainId(chainId);
 
     await migratingDeployer.executeUpgrade(
       bridgehub.address,
@@ -126,14 +126,14 @@ describe("Gateway", function () {
           l2GasLimit: priorityTxMaxGasLimit,
           l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
           refundRecipient: migratingDeployer.deployWallet.address,
-          secondBridgeAddress: stmDeploymentTracker.address,
+          secondBridgeAddress: ctmDeploymentTracker.address,
           secondBridgeValue: 0,
           secondBridgeCalldata:
-            "0x01" + ethers.utils.defaultAbiCoder.encode(["address", "address"], [stm.address, stm.address]).slice(2),
+            "0x01" + ethers.utils.defaultAbiCoder.encode(["address", "address"], [ctm.address, ctm.address]).slice(2),
         },
       ])
     );
-    // console.log("STM asset registered in L2 Bridgehub on SL");
+    // console.log("CTM asset registered in L2 Bridgehub on SL");
   });
 
   it("Check start message to L3 on L1", async () => {

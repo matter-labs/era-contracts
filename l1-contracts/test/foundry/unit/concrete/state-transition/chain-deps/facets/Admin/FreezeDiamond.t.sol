@@ -8,12 +8,12 @@ import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 contract FreezeDiamondTest is AdminTest {
     event Freeze();
 
-    function test_revertWhen_calledByNonStateTransitionManager() public {
-        address nonStateTransitionManager = makeAddr("nonStateTransitionManager");
+    function test_revertWhen_calledByNonChainTypeManager() public {
+        address nonChainTypeManager = makeAddr("nonChainTypeManager");
 
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonStateTransitionManager));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonChainTypeManager));
 
-        vm.startPrank(nonStateTransitionManager);
+        vm.startPrank(nonChainTypeManager);
         adminFacet.freezeDiamond();
     }
 }

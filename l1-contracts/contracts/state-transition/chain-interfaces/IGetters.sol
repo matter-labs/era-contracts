@@ -30,7 +30,7 @@ interface IGetters is IZkSyncHyperchainBase {
     function getBridgehub() external view returns (address);
 
     /// @return The address of the state transition
-    function getStateTransitionManager() external view returns (address);
+    function getChainTypeManager() external view returns (address);
 
     /// @return The chain ID
     function getChainId() external view returns (uint256);

@@ -19,7 +19,7 @@ contract DummyBridgehubSetter is Bridgehub {
         _registerNewHyperchain(_chainId, _hyperchain);
     }
 
-    function setSTM(uint256 _chainId, address _stm) external {
-        stateTransitionManager[_chainId] = _stm;
+    function setCTM(uint256 _chainId, address _ctm) external {
+        chainTypeManager[_chainId] = _ctm;
     }
 }

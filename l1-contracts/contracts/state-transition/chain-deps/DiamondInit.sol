@@ -39,7 +39,7 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
         if (_initializeData.bridgehub == address(0)) {
             revert ZeroAddress();
         }
-        if (_initializeData.stateTransitionManager == address(0)) {
+        if (_initializeData.chainTypeManager == address(0)) {
             revert ZeroAddress();
         }
         if (_initializeData.baseTokenAssetId == bytes32(0)) {
@@ -54,7 +54,7 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
 
         s.chainId = _initializeData.chainId;
         s.bridgehub = _initializeData.bridgehub;
-        s.stateTransitionManager = _initializeData.stateTransitionManager;
+        s.chainTypeManager = _initializeData.chainTypeManager;
         s.baseTokenAssetId = _initializeData.baseTokenAssetId;
         s.baseTokenBridge = _initializeData.baseTokenBridge;
         s.protocolVersion = _initializeData.protocolVersion;

@@ -56,8 +56,8 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getStateTransitionManager() external view returns (address) {
-        return s.stateTransitionManager;
+    function getChainTypeManager() external view returns (address) {
+        return s.chainTypeManager;
     }
 
     /// @inheritdoc IGetters

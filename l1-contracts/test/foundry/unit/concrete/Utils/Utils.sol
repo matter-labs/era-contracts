@@ -275,8 +275,8 @@ library Utils {
         selectors[23] = UtilsFacet.util_getValidator.selector;
         selectors[24] = UtilsFacet.util_setZkPorterAvailability.selector;
         selectors[25] = UtilsFacet.util_getZkPorterAvailability.selector;
-        selectors[26] = UtilsFacet.util_setStateTransitionManager.selector;
-        selectors[27] = UtilsFacet.util_getStateTransitionManager.selector;
+        selectors[26] = UtilsFacet.util_setChainTypeManager.selector;
+        selectors[27] = UtilsFacet.util_getChainTypeManager.selector;
         selectors[28] = UtilsFacet.util_setPriorityTxMaxGasLimit.selector;
         selectors[29] = UtilsFacet.util_getPriorityTxMaxGasLimit.selector;
         selectors[30] = UtilsFacet.util_setFeeParams.selector;
@@ -321,7 +321,7 @@ library Utils {
             InitializeData({
                 chainId: 1,
                 bridgehub: address(dummyBridgehub),
-                stateTransitionManager: address(0x1234567890876543567890),
+                chainTypeManager: address(0x1234567890876543567890),
                 protocolVersion: 0,
                 admin: address(0x32149872498357874258787),
                 validatorTimelock: address(0x85430237648403822345345),

@@ -94,8 +94,8 @@ export async function initialBridgehubDeployment(
   } else {
     await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
   }
-  await deployer.deployStateTransitionManagerContract(create2Salt, extraFacets, gasPrice);
-  await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
+  await deployer.deployChainTypeManagerContract(create2Salt, extraFacets, gasPrice);
+  await deployer.setChainTypeManagerInValidatorTimelock({ gasPrice });
 }
 
 export async function registerHyperchain(

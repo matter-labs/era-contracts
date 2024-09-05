@@ -48,7 +48,7 @@ import {
   compileInitialCutHash,
   readBytecode,
   applyL1ToL2Alias,
-  BRIDGEHUB_STM_ASSET_DATA_ABI_STRING,
+  BRIDGEHUB_CTM_ASSET_DATA_ABI_STRING,
   // priorityTxMaxGasLimit,
   encodeNTVAssetId,
   ETH_ADDRESS_IN_CONTRACTS,
@@ -68,11 +68,11 @@ import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory"
 import type { FacetCut } from "./diamondCut";
 import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
-import { BridgehubFactory, ChainAdminFactory, ERC20Factory, StateTransitionManagerFactory } from "../typechain";
+import { BridgehubFactory, ChainAdminFactory, ERC20Factory, ChainTypeManagerFactory } from "../typechain";
 
 import { IL1AssetRouterFactory } from "../typechain/IL1AssetRouterFactory";
 import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
-import { ISTMDeploymentTrackerFactory } from "../typechain/ISTMDeploymentTrackerFactory";
+import { ICTMDeploymentTrackerFactory } from "../typechain/ICTMDeploymentTrackerFactory";
 
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
 
@@ -167,14 +167,14 @@ export class Deployer {
       );
 
       console.log(`Diamond cut hash: ${hash}`);
-      const stm = StateTransitionManagerFactory.connect(
+      const ctm = ChainTypeManagerFactory.connect(
         this.addresses.StateTransition.StateTransitionProxy,
         this.deployWallet
       );
 
-      const hashFromSTM = await stm.initialCutHash();
-      if (hash != hashFromSTM) {
-        throw new Error(`Has from STM ${hashFromSTM} does not match the computed hash ${hash}`);
+      const hashFromCTM = await ctm.initialCutHash();
+      if (hash != hashFromCTM) {
+        throw new Error(`Has from CTM ${hashFromCTM} does not match the computed hash ${hash}`);
       }
     }
 
@@ -517,12 +517,12 @@ export class Deployer {
     this.addresses.Bridgehub.MessageRootProxy = contractAddress;
   }
 
-  public async deployStateTransitionManagerImplementation(
+  public async deployChainTypeManagerImplementation(
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
     const contractAddress = await this.deployViaCreate2(
-      "StateTransitionManager",
+      "ChainTypeManager",
       [this.addresses.Bridgehub.BridgehubProxy],
       create2Salt,
       {
@@ -538,7 +538,7 @@ export class Deployer {
     this.addresses.StateTransition.StateTransitionImplementation = contractAddress;
   }
 
-  public async deployStateTransitionManagerProxy(
+  public async deployChainTypeManagerProxy(
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest,
     extraFacets?: FacetCut[]
@@ -549,7 +549,7 @@ export class Deployer {
     const diamondCut = await this.initialZkSyncHyperchainDiamondCut(extraFacets);
     const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
 
-    const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
+    const chainTypeManager = new Interface(hardhat.artifacts.readArtifactSync("ChainTypeManager").abi);
     const forceDeploymentsData = await this.genesisForceDeploymentsData();
     const chainCreationParams = {
       genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
@@ -560,7 +560,7 @@ export class Deployer {
       forceDeploymentsData,
     };
 
-    const initCalldata = stateTransitionManager.encodeFunctionData("initialize", [
+    const initCalldata = chainTypeManager.encodeFunctionData("initialize", [
       {
         owner: this.addresses.Governance,
         validatorTimelock: this.addresses.ValidatorTimeLock,
@@ -581,7 +581,7 @@ export class Deployer {
     );
 
     if (this.verbose) {
-      console.log(`StateTransitionManagerProxy deployed, with protocol version: ${protocolVersion}`);
+      console.log(`ChainTypeManagerProxy deployed, with protocol version: ${protocolVersion}`);
       console.log(`CONTRACTS_STATE_TRANSITION_PROXY_ADDR=${contractAddress}`);
     }
 
@@ -918,48 +918,48 @@ export class Deployer {
     }
   }
 
-  public async deploySTMDeploymentTrackerImplementation(
+  public async deployCTMDeploymentTrackerImplementation(
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
     const contractAddress = await this.deployViaCreate2(
-      "STMDeploymentTracker",
+      "CTMDeploymentTracker",
       [this.addresses.Bridgehub.BridgehubProxy, this.addresses.Bridges.SharedBridgeProxy],
       create2Salt,
       ethTxOptions
     );
 
     if (this.verbose) {
-      console.log(`CONTRACTS_STM_DEPLOYMENT_TRACKER_IMPL_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_CTM_DEPLOYMENT_TRACKER_IMPL_ADDR=${contractAddress}`);
     }
 
-    this.addresses.Bridgehub.STMDeploymentTrackerImplementation = contractAddress;
+    this.addresses.Bridgehub.CTMDeploymentTrackerImplementation = contractAddress;
   }
 
-  public async deploySTMDeploymentTrackerProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployCTMDeploymentTrackerProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const initCalldata = new Interface(
-      hardhat.artifacts.readArtifactSync("STMDeploymentTracker").abi
+      hardhat.artifacts.readArtifactSync("CTMDeploymentTracker").abi
     ).encodeFunctionData("initialize", [this.addresses.Governance]);
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
-      [this.addresses.Bridgehub.STMDeploymentTrackerImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
+      [this.addresses.Bridgehub.CTMDeploymentTrackerImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
     );
 
     if (this.verbose) {
-      console.log(`CONTRACTS_STM_DEPLOYMENT_TRACKER_PROXY_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_CTM_DEPLOYMENT_TRACKER_PROXY_ADDR=${contractAddress}`);
     }
 
-    this.addresses.Bridgehub.STMDeploymentTrackerProxy = contractAddress;
+    this.addresses.Bridgehub.CTMDeploymentTrackerProxy = contractAddress;
 
     // const bridgehub = this.bridgehubContract(this.deployWallet);
-    // const data0 = bridgehub.interface.encodeFunctionData("setSTMDeployer", [
-    //   this.addresses.Bridgehub.STMDeploymentTrackerProxy,
+    // const data0 = bridgehub.interface.encodeFunctionData("setCTMDeployer", [
+    //   this.addresses.Bridgehub.CTMDeploymentTrackerProxy,
     // ]);
     // await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, data0);
     // if (this.verbose) {
-    //   console.log("STM DT registered in Bridgehub");
+    //   console.log("CTM DT registered in Bridgehub");
     // }
   }
 
@@ -978,7 +978,7 @@ export class Deployer {
 
     const upgradeData1 = await bridgehub.interface.encodeFunctionData("setAddresses", [
       this.addresses.Bridges.SharedBridgeProxy,
-      this.addresses.Bridgehub.STMDeploymentTrackerProxy,
+      this.addresses.Bridgehub.CTMDeploymentTrackerProxy,
       this.addresses.Bridgehub.MessageRootProxy,
     ]);
     await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData1);
@@ -1073,7 +1073,7 @@ export class Deployer {
     await this.deployMessageRootProxy(create2Salt, { gasPrice });
   }
 
-  public async deployStateTransitionManagerContract(
+  public async deployChainTypeManagerContract(
     create2Salt: string,
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,
@@ -1081,9 +1081,9 @@ export class Deployer {
   ) {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
     await this.deployStateTransitionDiamondFacets(create2Salt, gasPrice, nonce);
-    await this.deployStateTransitionManagerImplementation(create2Salt, { gasPrice });
-    await this.deployStateTransitionManagerProxy(create2Salt, { gasPrice }, extraFacets);
-    await this.registerStateTransitionManager();
+    await this.deployChainTypeManagerImplementation(create2Salt, { gasPrice });
+    await this.deployChainTypeManagerProxy(create2Salt, { gasPrice }, extraFacets);
+    await this.registerChainTypeManager();
   }
 
   public async deployStateTransitionDiamondFacets(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
@@ -1096,11 +1096,11 @@ export class Deployer {
     await this.deployStateTransitionDiamondInit(create2Salt, { gasPrice, nonce: nonce + 4 });
   }
 
-  public async registerStateTransitionManager() {
+  public async registerChainTypeManager() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
-    if (!(await bridgehub.stateTransitionManagerIsRegistered(this.addresses.StateTransition.StateTransitionProxy))) {
-      const upgradeData = bridgehub.interface.encodeFunctionData("addStateTransitionManager", [
+    if (!(await bridgehub.chainTypeManagerIsRegistered(this.addresses.StateTransition.StateTransitionProxy))) {
+      const upgradeData = bridgehub.interface.encodeFunctionData("addChainTypeManager", [
         this.addresses.StateTransition.StateTransitionProxy,
       ]);
 
@@ -1111,32 +1111,32 @@ export class Deployer {
           console.log(`StateTransition System registered, gas used: ${receipt1.gasUsed.toString()}`);
         }
 
-        const stmDeploymentTracker = this.stmDeploymentTracker(this.deployWallet);
+        const ctmDeploymentTracker = this.ctmDeploymentTracker(this.deployWallet);
 
         const l1AssetRouter = this.defaultSharedBridge(this.deployWallet);
         const whitelistData = l1AssetRouter.interface.encodeFunctionData("setAssetDeploymentTracker", [
           ethers.utils.hexZeroPad(this.addresses.StateTransition.StateTransitionProxy, 32),
-          stmDeploymentTracker.address,
+          ctmDeploymentTracker.address,
         ]);
         const receipt2 = await this.executeUpgrade(l1AssetRouter.address, 0, whitelistData);
         if (this.verbose) {
-          console.log("STM deployment tracker whitelisted in L1 Shared Bridge", receipt2.gasUsed.toString());
+          console.log("CTM deployment tracker whitelisted in L1 Shared Bridge", receipt2.gasUsed.toString());
           console.log(
-            `CONTRACTS_STM_ASSET_INFO=${await bridgehub.stmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
+            `CONTRACTS_CTM_ASSET_INFO=${await bridgehub.ctmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
           );
         }
 
-        const data1 = stmDeploymentTracker.interface.encodeFunctionData("registerSTMAssetOnL1", [
+        const data1 = ctmDeploymentTracker.interface.encodeFunctionData("registerCTMAssetOnL1", [
           this.addresses.StateTransition.StateTransitionProxy,
         ]);
-        const receipt3 = await this.executeUpgrade(this.addresses.Bridgehub.STMDeploymentTrackerProxy, 0, data1);
+        const receipt3 = await this.executeUpgrade(this.addresses.Bridgehub.CTMDeploymentTrackerProxy, 0, data1);
         if (this.verbose) {
           console.log(
-            "STM asset registered in L1 Shared Bridge via STM Deployment Tracker",
+            "CTM asset registered in L1 Shared Bridge via CTM Deployment Tracker",
             receipt3.gasUsed.toString()
           );
           console.log(
-            `CONTRACTS_STM_ASSET_INFO=${await bridgehub.stmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
+            `CONTRACTS_CTM_ASSET_INFO=${await bridgehub.ctmAssetId(this.addresses.StateTransition.StateTransitionProxy)}`
           );
         }
       }
@@ -1168,17 +1168,17 @@ export class Deployer {
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut();
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
-    const stmData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [newAdmin, initialDiamondCut]);
+    const ctmData = new ethers.utils.AbiCoder().encode(["uint256", "bytes"], [newAdmin, initialDiamondCut]);
     const bridgehubData = new ethers.utils.AbiCoder().encode(
-      [BRIDGEHUB_STM_ASSET_DATA_ABI_STRING],
-      [[this.chainId, stmData, chainData]]
+      [BRIDGEHUB_CTM_ASSET_DATA_ABI_STRING],
+      [[this.chainId, ctmData, chainData]]
     );
 
     // console.log("bridgehubData", bridgehubData)
     // console.log("this.addresses.ChainAssetInfo", this.addresses.ChainAssetInfo)
 
-    // The stmAssetIFromChainId gives us a unique 'asset' identifier for a given chain.
-    const chainAssetId = await bridgehub.stmAssetIdFromChainId(this.chainId);
+    // The ctmAssetIFromChainId gives us a unique 'asset' identifier for a given chain.
+    const chainAssetId = await bridgehub.ctmAssetIdFromChainId(this.chainId);
     console.log("Chain asset id is: ", chainAssetId);
 
     let sharedBridgeData = ethers.utils.defaultAbiCoder.encode(
@@ -1225,7 +1225,7 @@ export class Deployer {
     // const sharedBridgeData = ethers.utils.defaultAbiCoder.encode(
     //   ["bytes32", "bytes"],
 
-    //   [await bridgehub.stmAssetInfoFromChainId(this.chainId), bridgehubData]
+    //   [await bridgehub.ctmAssetInfoFromChainId(this.chainId), bridgehubData]
     // );
     const l2BatchNumber = 1;
     const l2MsgIndex = 1;
@@ -1262,13 +1262,12 @@ export class Deployer {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
     const bridgehub = this.bridgehubContract(this.deployWallet);
-    const stateTransitionManager = this.stateTransitionManagerContract(this.deployWallet);
+    const chainTypeManager = this.chainTypeManagerContract(this.deployWallet);
     const ntv = this.nativeTokenVault(this.deployWallet);
     const baseTokenAddress = await ntv.tokenAddress(baseTokenAssetId);
 
     const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
-    const alreadyRegisteredInSTM =
-      (await stateTransitionManager.getHyperchain(inputChainId)) != ethers.constants.AddressZero;
+    const alreadyRegisteredInCTM = (await chainTypeManager.getHyperchain(inputChainId)) != ethers.constants.AddressZero;
 
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
     const diamondCutData = await this.initialZkSyncHyperchainDiamondCut(extraFacets, compareDiamondCutHash);
@@ -1324,11 +1323,11 @@ export class Deployer {
       console.log(`CONTRACTS_BASE_TOKEN_ADDR=${baseTokenAddress}`);
     }
 
-    if (!alreadyRegisteredInSTM) {
+    if (!alreadyRegisteredInCTM) {
       const diamondProxyAddress =
         "0x" +
         receipt.logs
-          .find((log) => log.topics[0] == stateTransitionManager.interface.getEventTopic("NewHyperchain"))
+          .find((log) => log.topics[0] == chainTypeManager.interface.getEventTopic("NewHyperchain"))
           .topics[2].slice(26);
       this.addresses.StateTransition.DiamondProxy = diamondProxyAddress;
       if (this.verbose) {
@@ -1410,8 +1409,8 @@ export class Deployer {
   }
 
   public async transferAdminFromDeployerToChainAdmin() {
-    const stm = this.stateTransitionManagerContract(this.deployWallet);
-    const diamondProxyAddress = await stm.getHyperchain(this.chainId);
+    const ctm = this.chainTypeManagerContract(this.deployWallet);
+    const diamondProxyAddress = await ctm.getHyperchain(this.chainId);
     const hyperchain = IZkSyncHyperchainFactory.connect(diamondProxyAddress, this.deployWallet);
 
     const receipt = await (await hyperchain.setPendingAdmin(this.addresses.ChainAdmin)).wait();
@@ -1440,8 +1439,8 @@ export class Deployer {
     await this.deploySharedBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
     await this.deployNativeTokenVaultImplementation(create2Salt, { gasPrice, nonce: nonce + 2 });
     await this.deployNativeTokenVaultProxy(create2Salt, { gasPrice });
-    await this.deploySTMDeploymentTrackerImplementation(create2Salt, { gasPrice });
-    await this.deploySTMDeploymentTrackerProxy(create2Salt, { gasPrice });
+    await this.deployCTMDeploymentTrackerImplementation(create2Salt, { gasPrice });
+    await this.deployCTMDeploymentTrackerProxy(create2Salt, { gasPrice });
     await this.registerAddresses();
   }
 
@@ -1461,15 +1460,15 @@ export class Deployer {
     this.addresses.ValidatorTimeLock = contractAddress;
   }
 
-  public async setStateTransitionManagerInValidatorTimelock(ethTxOptions: ethers.providers.TransactionRequest) {
+  public async setChainTypeManagerInValidatorTimelock(ethTxOptions: ethers.providers.TransactionRequest) {
     const validatorTimelock = this.validatorTimelock(this.deployWallet);
-    const tx = await validatorTimelock.setStateTransitionManager(
+    const tx = await validatorTimelock.setChainTypeManager(
       this.addresses.StateTransition.StateTransitionProxy,
       ethTxOptions
     );
     const receipt = await tx.wait();
     if (this.verbose) {
-      console.log(`StateTransitionManager was set in ValidatorTimelock, gas used: ${receipt.gasUsed.toString()}`);
+      console.log(`ChainTypeManager was set in ValidatorTimelock, gas used: ${receipt.gasUsed.toString()}`);
     }
   }
 
@@ -1565,8 +1564,8 @@ export class Deployer {
     return BridgehubFactory.connect(this.addresses.Bridgehub.BridgehubProxy, signerOrProvider);
   }
 
-  public stateTransitionManagerContract(signerOrProvider: Signer | providers.Provider) {
-    return StateTransitionManagerFactory.connect(this.addresses.StateTransition.StateTransitionProxy, signerOrProvider);
+  public chainTypeManagerContract(signerOrProvider: Signer | providers.Provider) {
+    return ChainTypeManagerFactory.connect(this.addresses.StateTransition.StateTransitionProxy, signerOrProvider);
   }
 
   public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
@@ -1589,8 +1588,8 @@ export class Deployer {
     return IL1NativeTokenVaultFactory.connect(this.addresses.Bridges.NativeTokenVaultProxy, signerOrProvider);
   }
 
-  public stmDeploymentTracker(signerOrProvider: Signer | providers.Provider) {
-    return ISTMDeploymentTrackerFactory.connect(this.addresses.Bridgehub.STMDeploymentTrackerProxy, signerOrProvider);
+  public ctmDeploymentTracker(signerOrProvider: Signer | providers.Provider) {
+    return ICTMDeploymentTrackerFactory.connect(this.addresses.Bridgehub.CTMDeploymentTrackerProxy, signerOrProvider);
   }
 
   public baseTokenContract(signerOrProvider: Signer | providers.Provider) {

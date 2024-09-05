@@ -102,8 +102,8 @@ export interface DeployedAddresses {
   Bridgehub: {
     BridgehubProxy: string;
     BridgehubImplementation: string;
-    STMDeploymentTrackerImplementation: string;
-    STMDeploymentTrackerProxy: string;
+    CTMDeploymentTrackerImplementation: string;
+    CTMDeploymentTrackerProxy: string;
     MessageRootImplementation: string;
     MessageRootProxy: string;
   };
@@ -161,8 +161,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     Bridgehub: {
       BridgehubProxy: getAddressFromEnv("CONTRACTS_BRIDGEHUB_PROXY_ADDR"),
       BridgehubImplementation: getAddressFromEnv("CONTRACTS_BRIDGEHUB_IMPL_ADDR"),
-      STMDeploymentTrackerImplementation: getAddressFromEnv("CONTRACTS_STM_DEPLOYMENT_TRACKER_IMPL_ADDR"),
-      STMDeploymentTrackerProxy: getAddressFromEnv("CONTRACTS_STM_DEPLOYMENT_TRACKER_PROXY_ADDR"),
+      CTMDeploymentTrackerImplementation: getAddressFromEnv("CONTRACTS_CTM_DEPLOYMENT_TRACKER_IMPL_ADDR"),
+      CTMDeploymentTrackerProxy: getAddressFromEnv("CONTRACTS_CTM_DEPLOYMENT_TRACKER_PROXY_ADDR"),
       MessageRootImplementation: getAddressFromEnv("CONTRACTS_MESSAGE_ROOT_IMPL_ADDR"),
       MessageRootProxy: getAddressFromEnv("CONTRACTS_MESSAGE_ROOT_PROXY_ADDR"),
     },

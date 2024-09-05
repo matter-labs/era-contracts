@@ -5,34 +5,34 @@ pragma solidity 0.8.24;
 import {ZkSyncHyperchainBaseTest} from "./_Base_Shared.t.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
-contract OnlyAdminOrStateTransitionManagerTest is ZkSyncHyperchainBaseTest {
+contract OnlyAdminOrChainTypeManagerTest is ZkSyncHyperchainBaseTest {
     function test_revertWhen_calledByNonAdmin() public {
         address nonAdmin = makeAddr("nonAdmin");
 
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonAdmin));
         vm.startPrank(nonAdmin);
-        testBaseFacet.functionWithOnlyAdminOrStateTransitionManagerModifier();
+        testBaseFacet.functionWithOnlyAdminOrChainTypeManagerModifier();
     }
 
-    function test_revertWhen_calledByNonStateTransitionManager() public {
-        address nonStateTransitionManager = makeAddr("nonStateTransitionManager");
+    function test_revertWhen_calledByNonChainTypeManager() public {
+        address nonChainTypeManager = makeAddr("nonChainTypeManager");
 
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonStateTransitionManager));
-        vm.startPrank(nonStateTransitionManager);
-        testBaseFacet.functionWithOnlyAdminOrStateTransitionManagerModifier();
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonChainTypeManager));
+        vm.startPrank(nonChainTypeManager);
+        testBaseFacet.functionWithOnlyAdminOrChainTypeManagerModifier();
     }
 
     function test_successfulCallWhenCalledByAdmin() public {
         address admin = utilsFacet.util_getAdmin();
 
         vm.startPrank(admin);
-        testBaseFacet.functionWithOnlyAdminOrStateTransitionManagerModifier();
+        testBaseFacet.functionWithOnlyAdminOrChainTypeManagerModifier();
     }
 
-    function test_successfulCallWhenCalledByStateTransitionManager() public {
-        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
+    function test_successfulCallWhenCalledByChainTypeManager() public {
+        address chainTypeManager = utilsFacet.util_getChainTypeManager();
 
-        vm.startPrank(stateTransitionManager);
-        testBaseFacet.functionWithOnlyAdminOrStateTransitionManagerModifier();
+        vm.startPrank(chainTypeManager);
+        testBaseFacet.functionWithOnlyAdminOrChainTypeManagerModifier();
     }
 }

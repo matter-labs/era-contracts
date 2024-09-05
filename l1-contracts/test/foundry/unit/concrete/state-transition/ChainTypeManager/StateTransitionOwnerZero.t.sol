@@ -2,13 +2,13 @@
 pragma solidity 0.8.24;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
-import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
-import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
+import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ChainTypeManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
-contract initializingSTMOwnerZeroTest is StateTransitionManagerTest {
-    function test_InitializingSTMWithGovernorZeroShouldRevert() public {
+contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {
+    function test_InitializingCTMWithGovernorZeroShouldRevert() public {
         ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: address(genesisUpgradeContract),
             genesisBatchHash: bytes32(uint256(0x01)),
@@ -18,7 +18,7 @@ contract initializingSTMOwnerZeroTest is StateTransitionManagerTest {
             forceDeploymentsData: bytes("")
         });
 
-        StateTransitionManagerInitializeData memory stmInitializeDataNoOwner = StateTransitionManagerInitializeData({
+        ChainTypeManagerInitializeData memory ctmInitializeDataNoOwner = ChainTypeManagerInitializeData({
             owner: address(0),
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
@@ -27,9 +27,9 @@ contract initializingSTMOwnerZeroTest is StateTransitionManagerTest {
 
         vm.expectRevert(ZeroAddress.selector);
         new TransparentUpgradeableProxy(
-            address(stateTransitionManager),
+            address(chainTypeManager),
             admin,
-            abi.encodeCall(StateTransitionManager.initialize, stmInitializeDataNoOwner)
+            abi.encodeCall(ChainTypeManager.initialize, ctmInitializeDataNoOwner)
         );
     }
 }

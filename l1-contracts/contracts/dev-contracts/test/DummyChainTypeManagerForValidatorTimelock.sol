@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.24;
 
-/// @title DummyStateTransitionManagerForValidatorTimelock
+/// @title DummyChainTypeManagerForValidatorTimelock
 /// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
-contract DummyStateTransitionManagerForValidatorTimelock {
+contract DummyChainTypeManagerForValidatorTimelock {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
