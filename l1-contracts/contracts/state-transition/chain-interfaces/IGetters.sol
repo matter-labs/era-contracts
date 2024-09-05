@@ -156,6 +156,6 @@ interface IGetters is IZkSyncHyperchainBase {
     /// @return isFreezable Whether the facet can be frozen by the admin or always accessible
     function isFacetFreezable(address _facet) external view returns (bool isFreezable);
 
-    /// TODO
+    /// @return The address of the current settlement layer.
     function getSettlementLayer() external view returns (address);
 }
