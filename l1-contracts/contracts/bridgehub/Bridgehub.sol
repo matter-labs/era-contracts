@@ -567,22 +567,16 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice Used to forward a transaction on the gateway to the chains mailbox (from L1).
     /// @param _chainId the chainId of the chain
-    /// @param _transaction the transaction to be forwarded
-    /// @param _factoryDeps the factory dependencies for the transaction
     /// @param _canonicalTxHash the canonical transaction hash
     /// @param _expirationTimestamp the expiration timestamp for the transaction
     function forwardTransactionOnGateway(
         uint256 _chainId,
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external override onlySettlementLayerRelayedSender {
         require(L1_CHAIN_ID != block.chainid, "BH: not in sync layer mode");
         address hyperchain = hyperchainMap.get(_chainId);
         IZkSyncHyperchain(hyperchain).bridgehubRequestL2TransactionOnGateway(
-            _transaction,
-            _factoryDeps,
             _canonicalTxHash,
             _expirationTimestamp
         );

@@ -102,8 +102,6 @@ interface IMailbox is IZkSyncHyperchainBase {
 
     /// @dev On the Gateway the chain's mailbox receives the tx from the bridgehub.
     function bridgehubRequestL2TransactionOnGateway(
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external;
@@ -174,5 +172,18 @@ interface IMailbox is IZkSyncHyperchainBase {
         uint64 expirationTimestamp,
         L2CanonicalTransaction transaction,
         bytes[] factoryDeps
+    );
+
+    /// @notice New relayed priority request event. It is emitted on a chain that is deployed
+    /// on top of the gateway when it receives a request relayed via the Bridgehub.  
+    /// @dev IMPORTANT: this event most likely will be removed in the future, so 
+    /// noone should rely on it for indexing purposes.
+    /// @param txId Serial number of the priority operation
+    /// @param txHash keccak256 hash of encoded transaction representation
+    /// @param expirationTimestamp Timestamp up to which priority request should be processed
+    event NewRelayedPriorityTransaction(
+        uint256 txId,
+        bytes32 txHash,
+        uint64 expirationTimestamp
     );
 }

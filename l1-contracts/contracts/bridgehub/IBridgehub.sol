@@ -206,8 +206,6 @@ interface IBridgehub is IL1AssetHandler {
 
     function forwardTransactionOnGateway(
         uint256 _chainId,
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external;

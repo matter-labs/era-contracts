@@ -107,11 +107,7 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getTotalPriorityTxs() external view returns (uint256) {
-        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
-            return s.priorityTree.getTotalPriorityTxs();
-        } else {
-            return s.priorityQueue.getTotalPriorityTxs();
-        }
+        return _getTotalPriorityTxs();
     }
 
     /// @inheritdoc IGetters
