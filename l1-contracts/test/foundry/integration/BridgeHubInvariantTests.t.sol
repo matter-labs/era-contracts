@@ -236,7 +236,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         }
     }
 
-    // deposits ERC20 token to the zkChain where base token is ETH
+    // deposits ERC20 token to the ZK chain where base token is ETH
     // this function use requestL2TransactionTwoBridges function from shared bridge.
     // tokenAddress should be any ERC20 token, excluding ETH
     function depositERC20ToEthChain(uint256 l2Value, address tokenAddress) private useGivenToken(tokenAddress) {

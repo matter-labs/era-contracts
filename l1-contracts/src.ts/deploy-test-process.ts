@@ -196,7 +196,7 @@ export async function initialPreUpgradeContractsDeployment(
   );
 
   await deployer.deployStateTransitionDiamondFacets(create2Salt);
-  await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZkSyncZKChainDiamondCut());
+  await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZKChainDiamondCut());
   return deployer;
 }
 
@@ -232,7 +232,7 @@ export async function initialEraTestnetDeploymentProcess(
     "DummyAdminFacetNoOverlap",
     deployer.addresses.StateTransition.DiamondProxy
   );
-  await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZkSyncZKChainDiamondCut());
+  await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZKChainDiamondCut());
 
   await registerZKChain(deployer, false, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString(), true);
   return deployer;
@@ -277,7 +277,7 @@ export class EraDeployer extends Deployer {
     await tx.wait();
   }
 
-  public async upgradeZkSyncZKChainDiamondCut(extraFacets?: FacetCut[]) {
+  public async upgradeZKChainDiamondCut(extraFacets?: FacetCut[]) {
     let facetCuts: FacetCut[] = Object.values(
       await getCurrentFacetCutsForAdd(
         this.addresses.StateTransition.AdminFacet,
