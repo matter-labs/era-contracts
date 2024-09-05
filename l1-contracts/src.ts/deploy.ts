@@ -59,7 +59,7 @@ import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 import { ProxyAdminFactory } from "../typechain/ProxyAdminFactory";
 
-import { IZkSyncZKChainFactory } from "../typechain/IZkSyncZKChainFactory";
+import { IZKChainFactory } from "../typechain/IZKChainFactory";
 import { L1AssetRouterFactory } from "../typechain/L1AssetRouterFactory";
 
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
@@ -1411,7 +1411,7 @@ export class Deployer {
   public async transferAdminFromDeployerToChainAdmin() {
     const ctm = this.chainTypeManagerContract(this.deployWallet);
     const diamondProxyAddress = await ctm.getZKChain(this.chainId);
-    const zkChain = IZkSyncZKChainFactory.connect(diamondProxyAddress, this.deployWallet);
+    const zkChain = IZKChainFactory.connect(diamondProxyAddress, this.deployWallet);
 
     const receipt = await (await zkChain.setPendingAdmin(this.addresses.ChainAdmin)).wait();
     if (this.verbose) {
@@ -1569,7 +1569,7 @@ export class Deployer {
   }
 
   public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
-    return IZkSyncZKChainFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
+    return IZKChainFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
   }
 
   public governanceContract(signerOrProvider: Signer | providers.Provider) {
