@@ -13,7 +13,7 @@ const preprocess = require("preprocess");
 const SYSTEM_PARAMS = require("../../SystemConfig.json");
 /* eslint-enable@typescript-eslint/no-var-requires */
 
-const OUTPUT_DIR = "bootloader/build";
+const OUTPUT_DIR = "contracts-preprocessed/bootloader";
 
 const PREPROCCESING_MODES = ["proved_batch", "playground_batch"];
 
