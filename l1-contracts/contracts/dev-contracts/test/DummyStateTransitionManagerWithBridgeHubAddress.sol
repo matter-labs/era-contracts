@@ -6,7 +6,7 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 
 import {StateTransitionManager} from "../../state-transition/StateTransitionManager.sol";
 
-/// @title DummyExecutor
+/// @title DummyStateTransitionManagerWBH
 /// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
 contract DummyStateTransitionManagerWBH is StateTransitionManager {
     using EnumerableMap for EnumerableMap.UintToAddressMap;

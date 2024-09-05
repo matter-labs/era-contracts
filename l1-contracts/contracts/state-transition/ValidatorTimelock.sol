@@ -10,9 +10,9 @@ import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErr
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Intermediate smart contract between the validator EOA account and the hyperchains state transition diamond smart contract.
+/// @notice Intermediate smart contract between the validator EOA account and the ZK Chain state transition diamond smart contract.
 /// @dev The primary purpose of this contract is to provide a trustless means of delaying batch execution without
-/// modifying the main hyperchain diamond contract. As such, even if this contract is compromised, it will not impact the main
+/// modifying the main ZK Chain diamond contract. As such, even if this contract is compromised, it will not impact the main
 /// contract.
 /// @dev ZKsync actively monitors the chain activity and reacts to any suspicious activity by freezing the chain.
 /// This allows time for investigation and mitigation before resuming normal operations.
@@ -117,96 +117,95 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev Records the timestamp for all provided committed batches and make
     /// a call to the hyperchain diamond contract with the same calldata.
     function commitBatches(
-        StoredBatchInfo calldata,
-        CommitBatchInfo[] calldata _newBatchesData
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo,
+        bytes calldata
     ) external onlyValidator(ERA_CHAIN_ID) {
-        _commitBatchesInner(ERA_CHAIN_ID, _newBatchesData);
+        _commitBatchesInner(ERA_CHAIN_ID, _processBatchFrom, _processBatchTo);
     }
 
     /// @dev Records the timestamp for all provided committed batches and make
     /// a call to the hyperchain diamond contract with the same calldata.
     function commitBatchesSharedBridge(
         uint256 _chainId,
-        StoredBatchInfo calldata,
-        CommitBatchInfo[] calldata _newBatchesData
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo,
+        bytes calldata
     ) external onlyValidator(_chainId) {
-        _commitBatchesInner(_chainId, _newBatchesData);
+        _commitBatchesInner(_chainId, _processBatchFrom, _processBatchTo);
     }
 
-    function _commitBatchesInner(uint256 _chainId, CommitBatchInfo[] calldata _newBatchesData) internal {
+    function _commitBatchesInner(uint256 _chainId, uint256 _processBatchFrom, uint256 _processBatchTo) internal {
         unchecked {
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
             uint32 timestamp = uint32(block.timestamp);
             // We disable this check because calldata array length is cheap.
             // solhint-disable-next-line gas-length-in-loops
-            for (uint256 i = 0; i < _newBatchesData.length; ++i) {
-                committedBatchTimestamp[_chainId].set(_newBatchesData[i].batchNumber, timestamp);
+            for (uint256 i = _processBatchFrom; i < _processBatchTo; ++i) {
+                committedBatchTimestamp[_chainId].set(i, timestamp);
             }
         }
 
-        _propagateToZkSyncHyperchain(_chainId);
+        _propagateToZkChain(_chainId);
     }
 
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
     function revertBatches(uint256) external onlyValidator(ERA_CHAIN_ID) {
-        _propagateToZkSyncHyperchain(ERA_CHAIN_ID);
+        _propagateToZkChain(ERA_CHAIN_ID);
     }
 
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
     function revertBatchesSharedBridge(uint256 _chainId, uint256) external onlyValidator(_chainId) {
-        _propagateToZkSyncHyperchain(_chainId);
+        _propagateToZkChain(_chainId);
     }
 
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: We don't track the time when batches are proven, since all information about
     /// the batch is known on the commit stage and the proved is not finalized (may be reverted).
-    function proveBatches(
-        StoredBatchInfo calldata,
-        StoredBatchInfo[] calldata,
-        ProofInput calldata
-    ) external onlyValidator(ERA_CHAIN_ID) {
-        _propagateToZkSyncHyperchain(ERA_CHAIN_ID);
+    function proveBatches(bytes calldata) external onlyValidator(ERA_CHAIN_ID) {
+        _propagateToZkChain(ERA_CHAIN_ID);
     }
 
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: We don't track the time when batches are proven, since all information about
     /// the batch is known on the commit stage and the proved is not finalized (may be reverted).
-    function proveBatchesSharedBridge(
-        uint256 _chainId,
-        StoredBatchInfo calldata,
-        StoredBatchInfo[] calldata,
-        ProofInput calldata
-    ) external onlyValidator(_chainId) {
-        _propagateToZkSyncHyperchain(_chainId);
+    function proveBatchesSharedBridge(uint256 _chainId, bytes calldata) external onlyValidator(_chainId) {
+        _propagateToZkChain(_chainId);
     }
 
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the hyperchain diamond contract with the same calldata.
-    function executeBatches(StoredBatchInfo[] calldata _newBatchesData) external onlyValidator(ERA_CHAIN_ID) {
-        _executeBatchesInner(ERA_CHAIN_ID, _newBatchesData);
+    function executeBatches(
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo,
+        bytes calldata
+    ) external onlyValidator(ERA_CHAIN_ID) {
+        _executeBatchesInner(ERA_CHAIN_ID, _processBatchFrom, _processBatchTo);
     }
 
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the hyperchain diamond contract with the same calldata.
     function executeBatchesSharedBridge(
         uint256 _chainId,
-        StoredBatchInfo[] calldata _newBatchesData
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo,
+        bytes calldata
     ) external onlyValidator(_chainId) {
-        _executeBatchesInner(_chainId, _newBatchesData);
+        _executeBatchesInner(_chainId, _processBatchFrom, _processBatchTo);
     }
 
-    function _executeBatchesInner(uint256 _chainId, StoredBatchInfo[] calldata _newBatchesData) internal {
+    function _executeBatchesInner(uint256 _chainId, uint256 _processBatchFrom, uint256 _processBatchTo) internal {
         uint256 delay = executionDelay; // uint32
         unchecked {
             // We disable this check because calldata array length is cheap.
             // solhint-disable-next-line gas-length-in-loops
-            for (uint256 i = 0; i < _newBatchesData.length; ++i) {
-                uint256 commitBatchTimestamp = committedBatchTimestamp[_chainId].get(_newBatchesData[i].batchNumber);
+            for (uint256 i = _processBatchFrom; i < _processBatchTo; ++i) {
+                uint256 commitBatchTimestamp = committedBatchTimestamp[_chainId].get(i);
 
                 // Note: if the `commitBatchTimestamp` is zero, that means either:
                 // * The batch was committed, but not through this contract.
@@ -218,12 +217,12 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 }
             }
         }
-        _propagateToZkSyncHyperchain(_chainId);
+        _propagateToZkChain(_chainId);
     }
 
-    /// @dev Call the hyperchain diamond contract with the same calldata as this contract was called.
-    /// Note: it is called the hyperchain diamond contract, not delegatecalled!
-    function _propagateToZkSyncHyperchain(uint256 _chainId) internal {
+    /// @dev Call the ZK chain diamond contract with the same calldata as this contract was called.
+    /// Note: it is called the ZK chain diamond contract, not delegatecalled!
+    function _propagateToZkChain(uint256 _chainId) internal {
         address contractAddress = stateTransitionManager.getHyperchain(_chainId);
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position

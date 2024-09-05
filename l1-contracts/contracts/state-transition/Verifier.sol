@@ -343,8 +343,7 @@ contract Verifier is IVerifier {
     /// @inheritdoc IVerifier
     function verify(
         uint256[] calldata, // _publicInputs
-        uint256[] calldata, // _proof
-        uint256[] calldata // _recursiveAggregationInput
+        uint256[] calldata // _proof
     ) public view virtual returns (bool) {
         // No memory was accessed yet, so keys can be loaded into the right place and not corrupt any other memory.
         _loadVerificationKey();

@@ -141,47 +141,41 @@ interface IExecutor is IZkSyncHyperchainBase {
     /// - Verifying the correctness of their timestamps.
     /// - Processing their L2->L1 logs.
     /// - Storing batch commitments.
-    /// @param _lastCommittedBatchData Stored data of the last committed batch.
-    /// @param _newBatchesData Data of the new batches to be committed.
-    function commitBatches(
-        StoredBatchInfo calldata _lastCommittedBatchData,
-        CommitBatchInfo[] calldata _newBatchesData
-    ) external;
+    /// Todoparam  _lastCommittedBatchData Stored data of the last committed batch.
+    /// Todoparam  _newBatchesData Data of the new batches to be committed.
+    function commitBatches(uint256 _processFrom, uint256 _processTo, bytes calldata _commitData) external;
 
     /// @notice same as `commitBatches` but with the chainId so ValidatorTimelock can sort the inputs.
     function commitBatchesSharedBridge(
         uint256 _chainId,
-        StoredBatchInfo calldata _lastCommittedBatchData,
-        CommitBatchInfo[] calldata _newBatchesData
+        uint256 _processFrom,
+        uint256 _processTo,
+        bytes calldata _commitData
     ) external;
 
     /// @notice Batches commitment verification.
     /// @dev Only verifies batch commitments without any other processing.
-    /// @param _prevBatch Stored data of the last committed batch.
-    /// @param _committedBatches Stored data of the committed batches.
-    /// @param _proof The zero knowledge proof.
-    function proveBatches(
-        StoredBatchInfo calldata _prevBatch,
-        StoredBatchInfo[] calldata _committedBatches,
-        ProofInput calldata _proof
-    ) external;
+    /// Todoparam  _prevBatch Stored data of the last committed batch.
+    /// Todoparam  _committedBatches Stored data of the committed batches.
+    /// Todoparam  _proof The zero knowledge proof.
+    function proveBatches(bytes calldata _proofData) external;
 
     /// @notice same as `proveBatches` but with the chainId so ValidatorTimelock can sort the inputs.
-    function proveBatchesSharedBridge(
-        uint256 _chainId,
-        StoredBatchInfo calldata _prevBatch,
-        StoredBatchInfo[] calldata _committedBatches,
-        ProofInput calldata _proof
-    ) external;
+    function proveBatchesSharedBridge(uint256 _chainId, bytes calldata _proofData) external;
 
     /// @notice The function called by the operator to finalize (execute) batches. It is responsible for:
     /// - Processing all pending operations (commpleting priority requests).
     /// - Finalizing this batch (i.e. allowing to withdraw funds from the system)
-    /// @param _batchesData Data of the batches to be executed.
-    function executeBatches(StoredBatchInfo[] calldata _batchesData) external;
+    /// @ Todoparam _batchesData Data of the batches to be executed.
+    function executeBatches(uint256 _processFrom, uint256 _processTo, bytes calldata _executeData) external;
 
     /// @notice same as `executeBatches` but with the chainId so ValidatorTimelock can sort the inputs.
-    function executeBatchesSharedBridge(uint256 _chainId, StoredBatchInfo[] calldata _batchesData) external;
+    function executeBatchesSharedBridge(
+        uint256 _chainId,
+        uint256 _processFrom,
+        uint256 _processTo,
+        bytes calldata _executeData
+    ) external;
 
     /// @notice Reverts unexecuted batches
     /// @param _newLastBatch batch number after which batches should be reverted
