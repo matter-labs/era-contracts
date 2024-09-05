@@ -808,5 +808,4 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function getHyperchain(uint256 _chainId) public view returns (address) {
         return getZKChain(_chainId);
     }
-
 }

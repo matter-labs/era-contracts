@@ -81,12 +81,8 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         // console.log("KL todo", Ownable(l1Script.getBridgehubProxyAddress()).owner(), l1Script.getBridgehubProxyAddress());
         vm.deal(Ownable(l1Script.getBridgehubProxyAddress()).owner(), 100000000000000000000000000000000000);
         vm.deal(l1Script.getOwnerAddress(), 100000000000000000000000000000000000);
-        IZKChain chain = IZKChain(
-            IBridgehub(l1Script.getBridgehubProxyAddress()).getZKChain(migratingChainId)
-        );
-        IZKChain chain2 = IZKChain(
-            IBridgehub(l1Script.getBridgehubProxyAddress()).getZKChain(gatewayChainId)
-        );
+        IZKChain chain = IZKChain(IBridgehub(l1Script.getBridgehubProxyAddress()).getZKChain(migratingChainId));
+        IZKChain chain2 = IZKChain(IBridgehub(l1Script.getBridgehubProxyAddress()).getZKChain(gatewayChainId));
         vm.deal(chain.getAdmin(), 100000000000000000000000000000000000);
         vm.deal(chain2.getAdmin(), 100000000000000000000000000000000000);
 

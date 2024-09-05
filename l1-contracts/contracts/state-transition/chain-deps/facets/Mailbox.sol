@@ -372,10 +372,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         uint64 _expirationTimestamp
     ) external override onlyL1 returns (bytes32 canonicalTxHash) {
         require(IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId), "Mailbox SL: not SL");
-        require(
-            IChainTypeManager(s.chainTypeManager).getZKChain(_chainId) == msg.sender,
-            "Mailbox SL: not zkChain"
-        );
+        require(IChainTypeManager(s.chainTypeManager).getZKChain(_chainId) == msg.sender, "Mailbox SL: not zkChain");
 
         BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest({
             _chainId: _chainId,
