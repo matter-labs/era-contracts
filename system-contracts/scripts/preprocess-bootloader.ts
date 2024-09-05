@@ -228,11 +228,16 @@ async function main() {
     mkdirSync(OUTPUT_DIR);
   }
 
+  const transferTest = readFileSync("bootloader/tests/transfer_test.yul").toString();
+  const dummy = readFileSync("bootloader/tests/dummy.yul").toString();
+
   writeFileSync(`${OUTPUT_DIR}/bootloader_test.yul`, provedBootloaderWithTests);
   writeFileSync(`${OUTPUT_DIR}/proved_batch.yul`, provedBatchBootloader);
   writeFileSync(`${OUTPUT_DIR}/playground_batch.yul`, playgroundBatchBootloader);
   writeFileSync(`${OUTPUT_DIR}/gas_test.yul`, gasTestBootloader);
   writeFileSync(`${OUTPUT_DIR}/fee_estimate.yul`, feeEstimationBootloader);
+  writeFileSync(`${OUTPUT_DIR}/dummy.yul`, dummy);
+  writeFileSync(`${OUTPUT_DIR}/transfer_test.yul`, transferTest);
 
   console.log("Bootloader preprocessing done!");
 }
