@@ -115,6 +115,8 @@ interface IBridgehub is IL1AssetHandler {
 
     function migrationPaused() external view returns (bool);
 
+    function admin() external view returns (address);
+
     /// Mailbox forwarder
 
     function proveL2MessageInclusion(

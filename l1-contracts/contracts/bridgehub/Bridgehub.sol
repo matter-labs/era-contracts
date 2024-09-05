@@ -23,7 +23,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {HyperchainLimitReached, Unauthorized, STMAlreadyRegistered, STMNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {HyperchainLimitReached, Unauthorized, STMAlreadyRegistered, STMNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -323,35 +323,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
     ) external onlyOwnerOrAdmin nonReentrant whenNotPaused onlyL1 returns (uint256) {
-        if (_chainId == 0) {
-            revert ZeroChainId();
-        }
-        if (_chainId > type(uint48).max) {
-            revert ChainIdTooBig();
-        }
-        require(_chainId != block.chainid, "BH: chain id must not match current chainid");
-        if (_stateTransitionManager == address(0)) {
-            revert ZeroAddress();
-        }
-        if (_baseTokenAssetId == bytes32(0)) {
-            revert ZeroAddress();
-        }
-
-        if (!stateTransitionManagerIsRegistered[_stateTransitionManager]) {
-            revert STMNotRegistered();
-        }
-
-        // if (!tokenIsRegistered[_baseToken]) {
-        //     revert TokenNotRegistered(_baseToken);
-        // }
-        require(assetIdIsRegistered[_baseTokenAssetId], "BH: asset id not registered");
-
-        if (address(sharedBridge) == address(0)) {
-            revert SharedBridgeNotSet();
-        }
-        if (stateTransitionManager[_chainId] != address(0)) {
-            revert BridgeHubAlreadyRegistered();
-        }
+        _validateChainParams({
+            _chainId: _chainId,
+            _assetId: _baseTokenAssetId,
+            _stateTransitionManager: _stateTransitionManager
+        });
 
         stateTransitionManager[_chainId] = _stateTransitionManager;
 
@@ -770,43 +746,22 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @dev Registers an already deployed chain with the bridgehub
     /// @param _chainId The chain Id of the chain
     /// @param _hyperchain Address of the hyperchain
-    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external onlyOwnerOrAdmin onlyL1 {
-        require(_hyperchain != address(0), "BH: hyperchain zero");
-        require(!hyperchainMap.contains(_chainId), "BH: Chain Id Already Exists");
-        require(IZkSyncHyperchain(_hyperchain).getChainId() == _chainId, "BH: Chain Id Mismatch");
+    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external onlyOwner onlyL1 {
+        if (_hyperchain == address(0)) {
+            revert ZeroAddress();
+        }
+        if (hyperchainMap.contains(_chainId)) {
+            revert ChainIdAlreadyExists();
+        }
+        if (IZkSyncHyperchain(_hyperchain).getChainId() != _chainId) {
+            revert ChainIdMismatch();
+        }
 
         address stm = IZkSyncHyperchain(_hyperchain).getStateTransitionManager();
         address chainAdmin = IZkSyncHyperchain(_hyperchain).getAdmin();
         bytes32 chainBaseTokenAssetId = IZkSyncHyperchain(_hyperchain).getBaseTokenAssetId();
 
-        if (_chainId == 0) {
-            revert ZeroChainId();
-        }
-
-        if (_chainId > type(uint48).max) {
-            revert ChainIdTooBig();
-        }
-
-        require(_chainId != block.chainid, "BH: chain id must not match current chainid");
-        if (stm == address(0)) {
-            revert ZeroAddress();
-        }
-        if (chainBaseTokenAssetId == bytes32(0)) {
-            revert ZeroAddress();
-        }
-
-        if (!stateTransitionManagerIsRegistered[stm]) {
-            revert STMNotRegistered();
-        }
-
-        require(assetIdIsRegistered[chainBaseTokenAssetId], "BH: asset id not registered");
-
-        if (address(sharedBridge) == address(0)) {
-            revert SharedBridgeNotSet();
-        }
-        if (stateTransitionManager[_chainId] != address(0)) {
-            revert BridgeHubAlreadyRegistered();
-        }
+        _validateChainParams({_chainId: _chainId, _assetId: chainBaseTokenAssetId, _stateTransitionManager: stm});
 
         stateTransitionManager[_chainId] = stm;
 
@@ -817,6 +772,42 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         messageRoot.addNewChain(_chainId);
 
         emit NewChain(_chainId, stm, chainAdmin);
+    }
+
+    function _validateChainParams(uint256 _chainId, bytes32 _assetId, address _stateTransitionManager) internal view {
+        if (_chainId == 0) {
+            revert ZeroChainId();
+        }
+
+        if (_chainId > type(uint48).max) {
+            revert ChainIdTooBig();
+        }
+
+        if (_chainId == block.chainid) {
+            revert ChainIdCantBeCurrentChain();
+        }
+
+        if (_stateTransitionManager == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_assetId == bytes32(0)) {
+            revert EmptyAssetId();
+        }
+
+        if (!stateTransitionManagerIsRegistered[_stateTransitionManager]) {
+            revert STMNotRegistered();
+        }
+
+        if (!assetIdIsRegistered[_assetId]) {
+            revert AssetIdNotSupported(_assetId);
+        }
+
+        if (address(sharedBridge) == address(0)) {
+            revert SharedBridgeNotSet();
+        }
+        if (stateTransitionManager[_chainId] != address(0)) {
+            revert BridgeHubAlreadyRegistered();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
