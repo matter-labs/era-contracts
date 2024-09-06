@@ -32,6 +32,8 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+
 contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
@@ -235,6 +237,31 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
             _l2TxNumberInBatch: l2TxNumberInBatch,
             _merkleProof: merkleProof
         });
+        vm.stopBroadcast();
+    }
+
+    function test_registerAlreadyDeployedHyperchain() public {
+        gatewayScript.registerGateway();
+        IStateTransitionManager stm = IStateTransitionManager(l1Script.getSTM());
+        IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
+        address owner = Ownable(address(bridgeHub)).owner();
+
+        address chain = _deployZkChain(
+            currentHyperChainId++,
+            ETH_TOKEN_ADDRESS,
+            address(bridgehub.sharedBridge()),
+            owner,
+            stm.protocolVersion(),
+            stm.storedBatchZero()
+        );
+        address stmAddr = IZkSyncHyperchain(chain).getStateTransitionManager();
+
+        uint256 chainId = currentHyperChainId - 1;
+
+        vm.startBroadcast(owner);
+        bridgeHub.addStateTransitionManager(stmAddr);
+        bridgeHub.addTokenAssetId(DataEncoding.encodeNTVAssetId(chainId, ETH_TOKEN_ADDRESS));
+        bridgeHub.registerAlreadyDeployedHyperchain(chainId, chain);
         vm.stopBroadcast();
     }
 

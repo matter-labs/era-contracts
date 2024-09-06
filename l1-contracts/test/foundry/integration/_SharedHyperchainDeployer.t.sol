@@ -1,13 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
+
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {RegisterHyperchainScript} from "deploy-scripts/RegisterHyperchain.s.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
 contract HyperchainDeployer is L1ContractDeployer {
+    using stdStorage for StdStorage;
+
     RegisterHyperchainScript deployScript;
 
     struct HyperchainDescription {
@@ -133,4 +141,39 @@ contract HyperchainDeployer is L1ContractDeployer {
 
     // add this to be excluded from coverage report
     function testHyperchainDeployer() internal {}
+
+    function _deployZkChain(
+        uint256 _chainId,
+        address _baseTokenAddress,
+        address _sharedBridge,
+        address _admin,
+        uint256 _protocolVersion,
+        bytes32 _storedBatchZero
+    ) internal returns (address) {
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(_chainId, _baseTokenAddress);
+        Diamond.DiamondCutData memory diamondCut = abi.decode(
+            l1Script.getInitialDiamondCutData(),
+            (Diamond.DiamondCutData)
+        );
+        bytes memory initData;
+
+        {
+            initData = bytes.concat(
+                IDiamondInit.initialize.selector,
+                bytes32(_chainId),
+                bytes32(uint256(uint160(address(bridgeHub)))),
+                bytes32(uint256(uint160(address(this)))),
+                bytes32(_protocolVersion),
+                bytes32(uint256(uint160(_admin))),
+                bytes32(uint256(uint160(address(0x1337)))),
+                baseTokenAssetId,
+                bytes32(uint256(uint160(_sharedBridge))),
+                _storedBatchZero,
+                diamondCut.initCalldata
+            );
+        }
+        diamondCut.initCalldata = initData;
+        DiamondProxy hyperchainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
+        return address(hyperchainContract);
+    }
 }
