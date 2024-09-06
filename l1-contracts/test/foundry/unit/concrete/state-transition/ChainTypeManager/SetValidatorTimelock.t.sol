@@ -9,7 +9,7 @@ contract setValidatorTimelockTest is ChainTypeManagerTest {
     function setUp() public {
         deploy();
     }
-    
+
     function test_SettingValidatorTimelock() public {
         assertEq(
             chainContractAddress.validatorTimelock(),

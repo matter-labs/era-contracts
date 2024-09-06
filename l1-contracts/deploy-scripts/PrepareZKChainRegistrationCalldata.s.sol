@@ -182,7 +182,10 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
     function prepareRegisterBaseTokenCall() internal view returns (IGovernance.Call memory) {
         Bridgehub bridgehub = Bridgehub(ecosystem.bridgehub);
 
-        bytes memory data = abi.encodeCall(bridgehub.addTokenAssetId, (DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken)));
+        bytes memory data = abi.encodeCall(
+            bridgehub.addTokenAssetId,
+            (DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken))
+        );
 
         return IGovernance.Call({target: ecosystem.bridgehub, value: 0, data: data});
     }

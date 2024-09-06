@@ -43,11 +43,7 @@ contract ChainTypeManagerTest is Test {
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
-        bridgehub = new Bridgehub(
-            block.chainid,
-            governor,
-            type(uint256).max
-        );
+        bridgehub = new Bridgehub(block.chainid, governor, type(uint256).max);
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(address(bridgehub));
