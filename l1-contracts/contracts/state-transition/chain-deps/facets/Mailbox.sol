@@ -366,8 +366,6 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     /// @inheritdoc IMailbox
     function requestL2TransactionToGatewayMailbox(
         uint256 _chainId,
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external override onlyL1 returns (bytes32 canonicalTxHash) {
@@ -376,8 +374,6 @@ contract MailboxFacet is ZKChainBase, IMailbox {
 
         BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest({
             _chainId: _chainId,
-            _transaction: _transaction,
-            _factoryDeps: _factoryDeps,
             _canonicalTxHash: _canonicalTxHash,
             _expirationTimestamp: _expirationTimestamp
         });
@@ -386,25 +382,22 @@ contract MailboxFacet is ZKChainBase, IMailbox {
 
     /// @inheritdoc IMailbox
     function bridgehubRequestL2TransactionOnGateway(
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external override onlyBridgehub {
-        _writePriorityOp(_transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp);
+        _writePriorityOpHash(_canonicalTxHash, _expirationTimestamp);
+        emit NewRelayedPriorityTransaction(_getTotalPriorityTxs(), _canonicalTxHash, _expirationTimestamp);
     }
 
     function _wrapRequest(
         uint256 _chainId,
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) internal view returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encodeCall(
             IBridgehub(s.bridgehub).forwardTransactionOnGateway,
-            (_chainId, _transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp)
+            (_chainId, _canonicalTxHash, _expirationTimestamp)
         );
         return
             BridgehubL2TransactionRequest({
@@ -492,8 +485,6 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             // slither-disable-next-line unused-return
             IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
                 _chainId: s.chainId,
-                _transaction: transaction,
-                _factoryDeps: _params.request.factoryDeps,
                 _canonicalTxHash: canonicalTxHash,
                 _expirationTimestamp: _params.expirationTimestamp
             });
@@ -569,6 +560,14 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) internal {
+        _writePriorityOpHash(_canonicalTxHash, _expirationTimestamp);
+
+        // Data that is needed for the operator to simulate priority queue offchain
+        // solhint-disable-next-line func-named-parameters
+        emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, _expirationTimestamp, _transaction, _factoryDeps);
+    }
+
+    function _writePriorityOpHash(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) internal {
         if (s.priorityTree.startIndex > s.priorityQueue.getFirstUnprocessedPriorityTx()) {
             s.priorityQueue.pushBack(
                 PriorityOperation({
@@ -579,10 +578,6 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             );
         }
         s.priorityTree.push(_canonicalTxHash);
-
-        // Data that is needed for the operator to simulate priority queue offchain
-        // solhint-disable-next-line func-named-parameters
-        emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, _expirationTimestamp, _transaction, _factoryDeps);
     }
 
     /// @notice Hashes the L2 bytecodes and returns them in the format in which they are processed by the bootloader

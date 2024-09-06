@@ -137,28 +137,9 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         finishMoveChain();
 
         IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
-        L2CanonicalTransaction memory tx = L2CanonicalTransaction({
-            txType: 255,
-            from: uint256(0),
-            to: uint256(0),
-            gasLimit: 72000000,
-            gasPerPubdataByteLimit: 800,
-            maxFeePerGas: 1,
-            maxPriorityFeePerGas: 0,
-            paymaster: 0,
-            // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
-            nonce: 0,
-            value: 0,
-            reserved: [uint256(0), 0, 0, 0],
-            data: "0x",
-            signature: new bytes(0),
-            factoryDeps: new uint256[](0),
-            paymasterInput: "0x",
-            reservedDynamic: "0x"
-        });
         vm.chainId(12345);
         vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
-        bridgehub.forwardTransactionOnGateway(mintChainId, tx, new bytes[](0), bytes32(0), 0);
+        bridgehub.forwardTransactionOnGateway(mintChainId, bytes32(0), 0);
         vm.stopBroadcast();
     }
 

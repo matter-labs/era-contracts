@@ -22,7 +22,6 @@ import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {AssetHandlerNotRegistered, ZKChainLimitReached, Unauthorized, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
@@ -569,25 +568,16 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice Used to forward a transaction on the gateway to the chains mailbox (from L1).
     /// @param _chainId the chainId of the chain
-    /// @param _transaction the transaction to be forwarded
-    /// @param _factoryDeps the factory dependencies for the transaction
     /// @param _canonicalTxHash the canonical transaction hash
     /// @param _expirationTimestamp the expiration timestamp for the transaction
     function forwardTransactionOnGateway(
         uint256 _chainId,
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external override onlySettlementLayerRelayedSender {
         require(L1_CHAIN_ID != block.chainid, "BH: not in sync layer mode");
         address zkChain = zkChainMap.get(_chainId);
-        IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(
-            _transaction,
-            _factoryDeps,
-            _canonicalTxHash,
-            _expirationTimestamp
-        );
+        IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
