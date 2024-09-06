@@ -3,13 +3,7 @@ import * as ethers from "ethers";
 import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
-import type {
-  Bridgehub,
-  ChainTypeManager,
-  L1NativeTokenVault,
-  L1AssetRouter,
-  L1Nullifier,
-} from "../../typechain";
+import type { Bridgehub, ChainTypeManager, L1NativeTokenVault, L1AssetRouter, L1Nullifier } from "../../typechain";
 import {
   BridgehubFactory,
   ChainTypeManagerFactory,

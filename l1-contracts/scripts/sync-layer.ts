@@ -404,8 +404,8 @@ async function registerSLContractsOnL1(deployer: Deployer) {
     ])
   );
   const l2TxHash3 = zkUtils.getL2HashFromPriorityOp(receipt4, gatewayAddress);
-console.log("CTM asset registered in L2 Bridgehub on SL", receipt4.transactionHash);
-console.log("CTM asset registered in L2 Bridgehub on SL l2TxHash", l2TxHash3);
+  console.log("CTM asset registered in L2 Bridgehub on SL", receipt4.transactionHash);
+  console.log("CTM asset registered in L2 Bridgehub on SL l2TxHash", l2TxHash3);
 }
 
 // TODO: maybe move it to SDK
