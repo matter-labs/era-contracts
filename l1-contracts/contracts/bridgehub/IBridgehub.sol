@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
-import {L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
@@ -208,8 +208,6 @@ interface IBridgehub is IL1AssetHandler {
 
     function forwardTransactionOnGateway(
         uint256 _chainId,
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external;
