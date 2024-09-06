@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
-
-// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
 import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
@@ -118,8 +117,6 @@ uint256 constant STATE_DIFF_ENTRY_SIZE = 272;
 
 enum SystemLogKey {
     L2_TO_L1_LOGS_TREE_ROOT_KEY,
-    TOTAL_L2_TO_L1_PUBDATA_KEY,
-    STATE_DIFF_HASH_KEY,
     PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
     PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,

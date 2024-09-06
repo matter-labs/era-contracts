@@ -3,9 +3,9 @@
 pragma solidity 0.8.24;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {DummyHyperchain} from "contracts/dev-contracts/test/DummyHyperchain.sol";
+import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
 import {BaseTokenGasPriceDenominatorNotSet} from "contracts/common/L1ContractErrors.sol";
 
 contract MailboxBaseTests is MailboxTest {
@@ -16,7 +16,7 @@ contract MailboxBaseTests is MailboxTest {
     }
 
     function test_mailboxConstructor() public {
-        DummyHyperchain h = new DummyHyperchain(address(0), eraChainId, block.chainid);
+        DummyZKChain h = new DummyZKChain(address(0), eraChainId, block.chainid);
         assertEq(h.getEraChainId(), eraChainId);
     }
 

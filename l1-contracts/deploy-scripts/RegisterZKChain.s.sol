@@ -9,21 +9,21 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {Utils} from "./Utils.sol";
-import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-// import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
+import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-contract RegisterHyperchainScript is Script {
+contract RegisterZKChainScript is Script {
     using stdToml for string;
 
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
+    bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewZKChain(uint256,address)");
 
     // solhint-disable-next-line gas-struct-packing
     struct Config {
@@ -54,7 +54,7 @@ contract RegisterHyperchainScript is Script {
     Config internal config;
 
     function run() public {
-        console.log("Deploying Hyperchain");
+        console.log("Deploying ZKChain");
 
         initializeConfig();
 
@@ -63,7 +63,7 @@ contract RegisterHyperchainScript is Script {
         checkTokenAddress();
         registerAssetIdOnBridgehub();
         registerTokenOnNTV();
-        registerHyperchain();
+        registerZKChain();
         addValidators();
         configureZkSyncStateTransition();
         setPendingAdmin();
@@ -74,7 +74,7 @@ contract RegisterHyperchainScript is Script {
     function initializeConfig() internal {
         // Grab config from output of l1 deployment
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, vm.envString("L1_OUTPUT")); //"/script-config/register-hyperchain.toml");
+        string memory path = string.concat(root, vm.envString("L1_OUTPUT")); //"/script-config/register-zkChain.toml");
         string memory toml = vm.readFile(path);
 
         config.deployerAddress = msg.sender;
@@ -92,7 +92,7 @@ contract RegisterHyperchainScript is Script {
         config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
-        path = string.concat(root, vm.envString("HYPERCHAIN_CONFIG"));
+        path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
         toml = vm.readFile(path);
 
         config.ownerAddress = toml.readAddress("$.owner_address");
@@ -178,12 +178,17 @@ contract RegisterHyperchainScript is Script {
 
     function deployChainAdmin() internal {
         vm.broadcast();
-        ChainAdmin chainAdmin = new ChainAdmin(config.ownerAddress, address(0));
-        console.log("ChainAdmin deployed at:", address(chainAdmin));
+        AccessControlRestriction restriction = new AccessControlRestriction(0, config.ownerAddress);
+
+        address[] memory restrictions = new address[](1);
+        restrictions[0] = address(restriction);
+
+        vm.broadcast();
+        ChainAdmin chainAdmin = new ChainAdmin(restrictions);
         config.chainAdmin = address(chainAdmin);
     }
 
-    function registerHyperchain() internal {
+    function registerZKChain() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         Ownable ownable = Ownable(config.bridgehub);
 
@@ -208,7 +213,7 @@ contract RegisterHyperchainScript is Script {
             _value: 0,
             _delay: 0
         });
-        console.log("Hyperchain registered");
+        console.log("ZK chain registered");
 
         // Get new diamond proxy address from emitted events
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -224,7 +229,7 @@ contract RegisterHyperchainScript is Script {
             revert("Diamond proxy address not found");
         }
         config.newDiamondProxy = diamondProxyAddress;
-        console.log("Hyperchain diamond proxy deployed at:", diamondProxyAddress);
+        console.log("ZKChain diamond proxy deployed at:", diamondProxyAddress);
     }
 
     function addValidators() internal {
@@ -239,16 +244,16 @@ contract RegisterHyperchainScript is Script {
     }
 
     function configureZkSyncStateTransition() internal {
-        IZkSyncHyperchain hyperchain = IZkSyncHyperchain(config.newDiamondProxy);
+        IZKChain zkChain = IZKChain(config.newDiamondProxy);
 
         vm.startBroadcast(msg.sender);
-        hyperchain.setTokenMultiplier(
+        zkChain.setTokenMultiplier(
             config.baseTokenGasPriceMultiplierNominator,
             config.baseTokenGasPriceMultiplierDenominator
         );
 
         if (config.validiumMode) {
-            hyperchain.setPubdataPricingMode(PubdataPricingMode.Validium);
+            zkChain.setPubdataPricingMode(PubdataPricingMode.Validium);
         }
 
         vm.stopBroadcast();
@@ -256,10 +261,10 @@ contract RegisterHyperchainScript is Script {
     }
 
     function setPendingAdmin() internal {
-        IZkSyncHyperchain hyperchain = IZkSyncHyperchain(config.newDiamondProxy);
+        IZKChain zkChain = IZKChain(config.newDiamondProxy);
 
         vm.startBroadcast(msg.sender);
-        hyperchain.setPendingAdmin(config.chainAdmin);
+        zkChain.setPendingAdmin(config.chainAdmin);
         vm.stopBroadcast();
         console.log("Owner for ", config.newDiamondProxy, "set to", config.chainAdmin);
     }
@@ -269,7 +274,7 @@ contract RegisterHyperchainScript is Script {
         vm.serializeAddress("root", "chain_admin_addr", config.chainAdmin);
         string memory toml = vm.serializeAddress("root", "governance_addr", config.governance);
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-out/output-register-hyperchain.toml");
+        string memory path = string.concat(root, "/script-out/output-register-zkChain.toml");
         vm.writeToml(toml, path);
         console.log("Output saved at:", path);
     }

@@ -6,11 +6,11 @@ import {Test} from "forge-std/Test.sol";
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_VALIDATOR_ADDRESS} from "../Utils/Utils.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, BASE_TOKEN_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
-import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
-import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
+import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {TestExecutor} from "contracts/dev-contracts/test/TestExecutor.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -165,10 +165,10 @@ contract ExecutorTest is Test {
         executor = new TestExecutor();
         mailbox = new MailboxFacet(eraChainId, block.chainid);
 
-        DummyStateTransitionManager stateTransitionManager = new DummyStateTransitionManager();
+        DummyChainTypeManager chainTypeManager = new DummyChainTypeManager();
         vm.mockCall(
-            address(stateTransitionManager),
-            abi.encodeWithSelector(IStateTransitionManager.protocolVersionIsActive.selector),
+            address(chainTypeManager),
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
             abi.encode(bool(true))
         );
         DiamondInit diamondInit = new DiamondInit();
@@ -192,7 +192,7 @@ contract ExecutorTest is Test {
             // TODO REVIEW
             chainId: eraChainId,
             bridgehub: address(dummyBridgehub),
-            stateTransitionManager: address(stateTransitionManager),
+            chainTypeManager: address(chainTypeManager),
             protocolVersion: 0,
             admin: owner,
             validatorTimelock: validator,
@@ -255,7 +255,7 @@ contract ExecutorTest is Test {
         admin = AdminFacet(address(diamondProxy));
 
         // Initiate the token multiplier to enable L1 -> L2 transactions.
-        vm.prank(address(stateTransitionManager));
+        vm.prank(address(chainTypeManager));
         admin.setTokenMultiplier(1, 1);
         vm.prank(address(owner));
         admin.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_VALIDATOR_ADDRESS);

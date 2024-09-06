@@ -56,7 +56,7 @@
     "test-node": "hardhat node-zksync --tag v0.0.1-vm1.5.0",
     "check-canonical-bytecode": "ts-node ./scripts/check-canonical-bytecode.ts",
     "verify": "hardhat run scripts/verify.ts",
-    "deploy-on-hyperchain": "ts-node ./scripts/deploy-on-hyperchain.ts",
+    "deploy-on-zk-chain": "ts-node ./scripts/deploy-on-zk-chain.ts",
     "deploy-on-localhost": "hardhat deploy --network localhost"
   }
 }

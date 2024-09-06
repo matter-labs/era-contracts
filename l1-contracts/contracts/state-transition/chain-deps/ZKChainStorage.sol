@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
-// import {IStateTransitionManager} from "../IStateTransitionManager.sol";
+// import {IChainTypeManager} from "../IChainTypeManager.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
 
@@ -60,16 +60,16 @@ struct FeeParams {
     uint64 minimalL2GasPrice;
 }
 
-/// @dev storing all storage variables for hyperchain diamond facets
+/// @dev storing all storage variables for ZK chain diamond facets
 /// NOTE: It is used in a proxy, so it is possible to add new variables to the end
 /// but NOT to modify already existing variables or change their order.
 /// NOTE: variables prefixed with '__DEPRECATED_' are deprecated and shouldn't be used.
 /// Their presence is maintained for compatibility and to prevent storage collision.
 // solhint-disable-next-line gas-struct-packing
-struct ZkSyncHyperchainStorage {
+struct ZKChainStorage {
     /// @dev Storage of variables needed for deprecated diamond cut facet
     uint256[7] __DEPRECATED_diamondCutStorage;
-    /// @notice Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing). Replaced by STM
+    /// @notice Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing). Replaced by CTM
     address __DEPRECATED_governor;
     /// @notice Address that the governor proposed as one that will replace it
     address __DEPRECATED_pendingGovernor;
@@ -134,15 +134,18 @@ struct ZkSyncHyperchainStorage {
     address pendingAdmin;
     /// @dev Fee params used to derive gasPrice for the L1->L2 transactions. For L2 transactions,
     /// the bootloader gives enough freedom to the operator.
+    /// @dev The value is only for the L1 deployment of the ZK Chain, since payment for all the priority transactions is
+    /// charged at that level.
     FeeParams feeParams;
     /// @dev Address of the blob versioned hash getter smart contract used for EIP-4844 versioned hashes.
+    /// @dev Used only for testing.
     address blobVersionedHashRetriever;
     /// @dev The chainId of the chain
     uint256 chainId;
     /// @dev The address of the bridgehub
     address bridgehub;
-    /// @dev The address of the StateTransitionManager
-    address stateTransitionManager;
+    /// @dev The address of the ChainTypeManager
+    address chainTypeManager;
     /// @dev The address of the baseToken contract. Eth is address(1)
     address __DEPRECATED_baseToken;
     /// @dev The address of the baseTokenbridge. Eth also uses the shared bridge

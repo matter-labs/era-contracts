@@ -26,7 +26,7 @@ contract RelayedSLDAValidatorTest is Test {
         );
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.getHyperchain.selector, (CHAIN_ID)),
+            abi.encodeWithSelector(IBridgehub.getZKChain.selector, (CHAIN_ID)),
             abi.encode(CHAIN_ADDRESS)
         );
     }

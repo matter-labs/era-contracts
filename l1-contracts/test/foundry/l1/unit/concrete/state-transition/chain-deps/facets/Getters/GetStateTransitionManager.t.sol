@@ -4,13 +4,13 @@ pragma solidity 0.8.24;
 
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 
-contract GetStateTransitionManagerTest is GettersFacetTest {
+contract GetChainTypeManagerTest is GettersFacetTest {
     function test() public {
-        address expected = makeAddr("stateTransitionManager");
-        gettersFacetWrapper.util_setStateTransitionManager(expected);
+        address expected = makeAddr("chainTypeManager");
+        gettersFacetWrapper.util_setChainTypeManager(expected);
 
-        address received = gettersFacet.getStateTransitionManager();
+        address received = gettersFacet.getChainTypeManager();
 
-        assertEq(expected, received, "StateTransitionManager address is incorrect");
+        assertEq(expected, received, "ChainTypeManager address is incorrect");
     }
 }

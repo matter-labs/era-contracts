@@ -7,37 +7,34 @@ import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {ZkSyncHyperchainBase} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
-contract TestBaseFacet is ZkSyncHyperchainBase {
+contract TestBaseFacet is ZKChainBase {
     function functionWithOnlyAdminModifier() external onlyAdmin {}
 
     function functionWithOnlyValidatorModifier() external onlyValidator {}
 
-    function functionWithOnlyStateTransitionManagerModifier() external onlyStateTransitionManager {}
+    function functionWithOnlyChainTypeManagerModifier() external onlyChainTypeManager {}
 
     function functionWithOnlyBridgehubModifier() external onlyBridgehub {}
 
-    function functionWithOnlyAdminOrStateTransitionManagerModifier() external onlyAdminOrStateTransitionManager {}
+    function functionWithOnlyAdminOrChainTypeManagerModifier() external onlyAdminOrChainTypeManager {}
 
-    function functionWithonlyValidatorOrStateTransitionManagerModifier()
-        external
-        onlyValidatorOrStateTransitionManager
-    {}
+    function functionWithonlyValidatorOrChainTypeManagerModifier() external onlyValidatorOrChainTypeManager {}
 
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }
 
-bytes constant ERROR_ONLY_ADMIN = "Hyperchain: not admin";
-bytes constant ERROR_ONLY_VALIDATOR = "Hyperchain: not validator";
-bytes constant ERROR_ONLY_STATE_TRANSITION_MANAGER = "Hyperchain: not state transition manager";
-bytes constant ERROR_ONLY_BRIDGEHUB = "Hyperchain: not bridgehub";
-bytes constant ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER = "Hyperchain: Only by admin or state transition manager";
-bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "Hyperchain: Only by validator or state transition manager";
+bytes constant ERROR_ONLY_ADMIN = "ZKChain: not admin";
+bytes constant ERROR_ONLY_VALIDATOR = "ZKChain: not validator";
+bytes constant ERROR_ONLY_STATE_TRANSITION_MANAGER = "ZKChain: not state transition manager";
+bytes constant ERROR_ONLY_BRIDGEHUB = "ZKChain: not bridgehub";
+bytes constant ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by admin or state transition manager";
+bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by validator or state transition manager";
 
-contract ZkSyncHyperchainBaseTest is Test {
+contract ZKChainBaseTest is Test {
     TestBaseFacet internal testBaseFacet;
     UtilsFacet internal utilsFacet;
     address internal testnetVerifier = address(new TestnetVerifier());
@@ -46,10 +43,10 @@ contract ZkSyncHyperchainBaseTest is Test {
         selectors = new bytes4[](6);
         selectors[0] = TestBaseFacet.functionWithOnlyAdminModifier.selector;
         selectors[1] = TestBaseFacet.functionWithOnlyValidatorModifier.selector;
-        selectors[2] = TestBaseFacet.functionWithOnlyStateTransitionManagerModifier.selector;
+        selectors[2] = TestBaseFacet.functionWithOnlyChainTypeManagerModifier.selector;
         selectors[3] = TestBaseFacet.functionWithOnlyBridgehubModifier.selector;
-        selectors[4] = TestBaseFacet.functionWithOnlyAdminOrStateTransitionManagerModifier.selector;
-        selectors[5] = TestBaseFacet.functionWithonlyValidatorOrStateTransitionManagerModifier.selector;
+        selectors[4] = TestBaseFacet.functionWithOnlyAdminOrChainTypeManagerModifier.selector;
+        selectors[5] = TestBaseFacet.functionWithonlyValidatorOrChainTypeManagerModifier.selector;
     }
 
     function setUp() public virtual {

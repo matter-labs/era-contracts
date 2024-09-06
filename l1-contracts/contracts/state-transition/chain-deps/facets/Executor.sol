@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
-import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
+import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
@@ -13,23 +13,23 @@ import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.so
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
-import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
+import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
+import {MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
-import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
+import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 
-/// @title ZKsync hyperchain Executor contract capable of processing events emitted in the ZKsync hyperchain protocol.
+/// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
+contract ExecutorFacet is ZKChainBase, IExecutor {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
-    /// @inheritdoc IZkSyncHyperchainBase
+    /// @inheritdoc IZKChainBase
     string public constant override getName = "ExecutorFacet";
 
     /// @dev Checks that the chain is connected to the current bridehub and not migrated away.
@@ -216,16 +216,15 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             }
         }
 
-        // FIXME: temporarily old logs were kept for backwards compatibility. This check cannot work now.
-        //
         // We only require 8 logs to be checked, the 9th is if we are expecting a protocol upgrade
         // Without the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
         // With the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
-            // require(processedLogs == 255, "b7");
-        } else {
-            // FIXME: do restore this code to the one that was before
-            require(_checkBit(processedLogs, uint8(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)), "b8");
+            if (processedLogs != 127) {
+                revert MissingSystemLogs(127, processedLogs);
+            }
+        } else if (processedLogs != 255) {
+            revert MissingSystemLogs(255, processedLogs);
         }
     }
 
@@ -249,7 +248,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // 2. A chain might become out of sync if it launches while we are in the middle of a protocol upgrade. This would mean they cannot process their genesis upgrade
         // as their protocolversion would be outdated, and they also cannot process the protocol upgrade tx as they have a pending upgrade.
         // 3. The protocol upgrade is increased in the BaseZkSyncUpgrade, in the executor only the systemContractsUpgradeTxHash is checked
-        if (!IStateTransitionManager(s.stateTransitionManager).protocolVersionIsActive(s.protocolVersion)) {
+        if (!IChainTypeManager(s.chainTypeManager).protocolVersionIsActive(s.protocolVersion)) {
             revert InvalidProtocolVersion();
         }
         // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.

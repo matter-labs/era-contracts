@@ -8,16 +8,16 @@ import {Unauthorized, DiamondFreezeIncorrectState, DiamondNotFrozen} from "contr
 contract UnfreezeDiamondTest is AdminTest {
     event Unfreeze();
 
-    function test_revertWhen_calledByNonStateTransitionManager() public {
-        address nonStateTransitionManager = makeAddr("nonStateTransitionManager");
+    function test_revertWhen_calledByNonChainTypeManager() public {
+        address nonChainTypeManager = makeAddr("nonChainTypeManager");
 
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonStateTransitionManager));
-        vm.startPrank(nonStateTransitionManager);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonChainTypeManager));
+        vm.startPrank(nonChainTypeManager);
         adminFacet.unfreezeDiamond();
     }
 
     function test_revertWhen_diamondIsNotFrozen() public {
-        address admin = utilsFacet.util_getStateTransitionManager();
+        address admin = utilsFacet.util_getChainTypeManager();
 
         utilsFacet.util_setIsFrozen(false);
 

@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT
-// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
+import {IZKChainBase} from "./IZKChainBase.sol";
 import {PriorityOpsBatchInfo} from "../libraries/PriorityTree.sol";
 
 /// @dev Enum used by L2 System Contracts to differentiate logs.
 enum SystemLogKey {
     L2_TO_L1_LOGS_TREE_ROOT_KEY,
-    TOTAL_L2_TO_L1_PUBDATA_KEY,
-    STATE_DIFF_HASH_KEY,
     PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
     PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,
@@ -50,7 +48,7 @@ uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
 /// @title The interface of the ZKsync Executor contract capable of processing events emitted in the ZKsync protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IExecutor is IZkSyncHyperchainBase {
+interface IExecutor is IZKChainBase {
     /// @notice Rollup batch stored data
     /// @param batchNumber Rollup batch number
     /// @param batchHash Hash of L2 batch

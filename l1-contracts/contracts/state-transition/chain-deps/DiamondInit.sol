@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {Diamond} from "../libraries/Diamond.sol";
-import {ZkSyncHyperchainBase} from "./facets/ZkSyncHyperchainBase.sol";
+import {ZKChainBase} from "./facets/ZKChainBase.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
 import {InitializeData, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
@@ -13,14 +13,14 @@ import {ZeroAddress, TooMuchGas} from "../../common/L1ContractErrors.sol";
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
 /// @dev The deployment process takes care of this contract's initialization.
-contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
+contract DiamondInit is ZKChainBase, IDiamondInit {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
     constructor() reentrancyGuardInitializer {}
 
-    /// @notice hyperchain diamond contract initialization
+    /// @notice ZK chain diamond contract initialization
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
     /// initializer
     function initialize(InitializeData calldata _initializeData) external reentrancyGuardInitializer returns (bytes32) {
@@ -39,7 +39,7 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
         if (_initializeData.bridgehub == address(0)) {
             revert ZeroAddress();
         }
-        if (_initializeData.stateTransitionManager == address(0)) {
+        if (_initializeData.chainTypeManager == address(0)) {
             revert ZeroAddress();
         }
         if (_initializeData.baseTokenAssetId == bytes32(0)) {
@@ -54,7 +54,7 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
 
         s.chainId = _initializeData.chainId;
         s.bridgehub = _initializeData.bridgehub;
-        s.stateTransitionManager = _initializeData.stateTransitionManager;
+        s.chainTypeManager = _initializeData.chainTypeManager;
         s.baseTokenAssetId = _initializeData.baseTokenAssetId;
         s.baseTokenBridge = _initializeData.baseTokenBridge;
         s.protocolVersion = _initializeData.protocolVersion;

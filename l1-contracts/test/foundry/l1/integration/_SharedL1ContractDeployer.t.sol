@@ -30,8 +30,8 @@ contract L1ContractDeployer is Test {
         vm.setEnv("L1_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml");
         vm.setEnv("L1_OUTPUT", "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml");
         vm.setEnv(
-            "HYPERCHAIN_CONFIG",
-            "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-hyperchain-era.toml"
+            "ZK_CHAIN_CONFIG",
+            "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml"
         );
         vm.setEnv(
             "FORCE_DEPLOYMENTS_CONFIG",

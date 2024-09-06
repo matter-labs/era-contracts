@@ -8,7 +8,7 @@ import {IL1AssetDeploymentTracker} from "../bridge/interfaces/IL1AssetDeployment
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface ISTMDeploymentTracker is IL1AssetDeploymentTracker {
+interface ICTMDeploymentTracker is IL1AssetDeploymentTracker {
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
@@ -20,7 +20,7 @@ interface ISTMDeploymentTracker is IL1AssetDeploymentTracker {
 
     function L1_ASSET_ROUTER() external view returns (IAssetRouterBase);
 
-    function registerSTMAssetOnL1(address _stmAddress) external;
+    function registerCTMAssetOnL1(address _ctmAddress) external;
 
-    function getAssetId(address _l1STM) external view returns (bytes32);
+    function getAssetId(address _l1CTM) external view returns (bytes32);
 }

@@ -10,11 +10,11 @@ import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamo
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {ZkSyncHyperchainBase} from "contracts/state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
+import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {FacetIsFrozen, ValueMismatch, InvalidSelector} from "contracts/common/L1ContractErrors.sol";
 
-contract TestFacet is ZkSyncHyperchainBase {
+contract TestFacet is ZKChainBase {
     function func() public pure returns (bool) {
         return true;
     }

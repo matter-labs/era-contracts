@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT
-// We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
+import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 
 // import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
-/// @notice Struct that holds all data needed for initializing STM Proxy.
+/// @notice Struct that holds all data needed for initializing CTM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
 /// @param owner The address who can manage non-critical updates in the contract
 /// @param validatorTimelock The address that serves as consensus, i.e. can submit blocks to be processed
 /// @param chainCreationParams The struct that contains the fields that define how a new chain should be created
 /// @param protocolVersion The initial protocol version on the newly deployed chain
-struct StateTransitionManagerInitializeData {
+struct ChainTypeManagerInitializeData {
     address owner;
     address validatorTimelock;
     ChainCreationParams chainCreationParams;
@@ -22,7 +22,7 @@ struct StateTransitionManagerInitializeData {
 }
 
 /// @notice The struct that contains the fields that define how a new chain should be created
-/// within this STM.
+/// within this CTM.
 /// @param genesisUpgrade The address that is used in the diamond cut initialize address on chain creation
 /// @param genesisBatchHash Batch hash of the genesis (initial) batch
 /// @param genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for the genesis batch
@@ -38,13 +38,13 @@ struct ChainCreationParams {
     bytes forceDeploymentsData;
 }
 
-interface IStateTransitionManager {
-    /// @dev Emitted when a new Hyperchain is added
-    event NewHyperchain(uint256 indexed _chainId, address indexed _hyperchainContract);
+interface IChainTypeManager {
+    /// @dev Emitted when a new ZKChain is added
+    event NewZKChain(uint256 indexed _chainId, address indexed _zkChainContract);
 
     /// @dev emitted when an chain registers and a GenesisUpgrade happens
     event GenesisUpgrade(
-        address indexed _hyperchain,
+        address indexed _zkChain,
         L2CanonicalTransaction _l2Transaction,
         uint256 indexed _protocolVersion
     );
@@ -84,9 +84,9 @@ interface IStateTransitionManager {
 
     function acceptAdmin() external;
 
-    function getHyperchain(uint256 _chainId) external view returns (address);
+    function getZKChain(uint256 _chainId) external view returns (address);
 
-    function getHyperchainLegacy(uint256 _chainId) external view returns (address);
+    function getZKChainLegacy(uint256 _chainId) external view returns (address);
 
     function storedBatchZero() external view returns (bytes32);
 
@@ -104,7 +104,7 @@ interface IStateTransitionManager {
 
     function getProtocolVersion(uint256 _chainId) external view returns (uint256);
 
-    function initialize(StateTransitionManagerInitializeData calldata _initializeData) external;
+    function initialize(ChainTypeManagerInitializeData calldata _initializeData) external;
 
     function setValidatorTimelock(address _validatorTimelock) external;
 
@@ -169,6 +169,6 @@ interface IStateTransitionManager {
         uint256 _chainId,
         bytes32 _assetInfo,
         address _depositSender,
-        bytes calldata _stmData
+        bytes calldata _ctmData
     ) external;
 }
