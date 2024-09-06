@@ -119,6 +119,16 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         revert FunctionNotSupported();
     }
 
+    function _getLegacyNTVCalldata(
+        address,
+        address,
+        address,
+        uint256,
+        bytes memory
+    ) internal view override returns (bytes memory) {
+        revert FunctionNotSupported();
+    }
+
     /*//////////////////////////////////////////////////////////////
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/

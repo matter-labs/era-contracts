@@ -892,7 +892,6 @@ contract DeployL1Script is Script {
         );
         console.log("kl todo 97 ");
 
-
         vm.serializeUint(
             "contracts_config",
             "diamond_init_pubdata_pricing_mode",
