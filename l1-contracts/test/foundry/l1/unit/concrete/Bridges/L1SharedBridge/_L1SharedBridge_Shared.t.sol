@@ -154,8 +154,7 @@ contract L1AssetRouterTest is Test {
             _l1WethAddress: l1WethAddress,
             _l1AssetRouter: address(sharedBridge),
             _eraChainId: eraChainId,
-            _l1Nullifier: l1Nullifier,
-            _bridgedTokenProxyBytecode: new bytes(0x00)
+            _l1Nullifier: l1Nullifier
         });
         TransparentUpgradeableProxy nativeTokenVaultProxy = new TransparentUpgradeableProxy(
             address(nativeTokenVaultImpl),

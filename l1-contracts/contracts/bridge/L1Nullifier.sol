@@ -20,7 +20,7 @@ import {IL1AssetRouterCombined} from "./asset-router/IL1AssetRouterCombined.sol"
 // import {IAssetRouterBase} from "./asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "./ntv/INativeTokenVault.sol";
 
-import {IL1Nullifier, FinalizeWithdrawalParams} from "./interfaces/IL1Nullifier.sol";
+import {IL1Nullifier, FinalizeL1DepositParams} from "./interfaces/IL1Nullifier.sol";
 
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {L2Message, TxStatus} from "../common/Messaging.sol";
@@ -172,7 +172,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint256 __eraLegacyBridgeLastDepositBatch,
         uint256 __eraLegacyBridgeLastDepositTxNumber
     ) external reentrancyGuardInitializer initializer {
-        require(_owner != address(0), "L1N owner 0");
+        if (_owner == address(0)) {
+            revert ZeroAddress();
+        }
         _transferOwnership(_owner);
         if (_eraPostDiamondUpgradeFirstBatch == 0) {
             _eraPostDiamondUpgradeFirstBatch = __eraPostDiamondUpgradeFirstBatch;
@@ -187,7 +189,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _token The address of the token to be transferred to NTV.
     function transferTokenToNTV(address _token) external {
         address ntvAddress = address(l1NativeTokenVault);
-        require(msg.sender == ntvAddress, "L1AR: not NTV");
+        require(msg.sender == ntvAddress, "L1N: not NTV");
         if (BASE_TOKEN_VIRTUAL_ADDRESS == _token) {
             uint256 amount = address(this).balance;
             bool callSuccess;
@@ -195,7 +197,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             assembly {
                 callSuccess := call(gas(), ntvAddress, amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "L1AR: eth transfer failed");
+            require(callSuccess, "L1N: eth transfer failed");
         } else {
             IERC20(_token).safeTransfer(ntvAddress, IERC20(_token).balanceOf(address(this)));
         }
@@ -206,7 +208,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _chainId The ID of the ZK chain.
     /// @param _token The address of the token which was previously deposit to shared bridge.
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external {
-        require(msg.sender == address(l1NativeTokenVault), "L1AR: not NTV");
+        require(msg.sender == address(l1NativeTokenVault), "L1N: not NTV");
         chainBalance[_chainId][_token] = 0;
     }
 
@@ -235,8 +237,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Should be called only once by the owner.
     /// @param _l1NativeTokenVault The address of the native token vault.
     function setL1NativeTokenVault(IL1NativeTokenVault _l1NativeTokenVault) external onlyOwner {
-        require(address(l1NativeTokenVault) == address(0), "Nullifier: native token vault already set");
-        require(address(_l1NativeTokenVault) != address(0), "Nullifier: native token vault 0");
+        require(address(l1NativeTokenVault) == address(0), "L1N: native token vault already set");
+        require(address(_l1NativeTokenVault) != address(0), "L1N: native token vault 0");
         l1NativeTokenVault = _l1NativeTokenVault;
     }
 
@@ -356,7 +358,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             }
         }
 
-        require(!_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch), "L1AR: legacy cFD");
+        require(!_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch), "L1N: legacy cFD");
         {
             bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
             // Determine if the given dataHash matches the calculated legacy transaction hash.
@@ -379,13 +381,21 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         delete depositHappened[_chainId][_l2TxHash];
     }
 
+    /// @notice Finalize the withdrawal and release funds.
+    /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
+    /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
+    /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
+    function finalizeDeposit(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) public {
+        _finalizeDeposit(_finalizeWithdrawalParams);
+    }
+
     /// @notice Internal function that handles the logic for finalizing withdrawals, supporting both the current bridge system and the legacy ERC20 bridge.
     /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
     /// @return l1Receiver The address to receive bridged assets.
     /// @return assetId The bridged asset ID.
     /// @return amount The amount of asset bridged.
-    function _finalizeWithdrawal(
-        FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
+    function _finalizeDeposit(
+        FinalizeL1DepositParams calldata _finalizeWithdrawalParams
     ) internal nonReentrant whenNotPaused returns (address l1Receiver, bytes32 assetId, uint256 amount) {
         bytes memory transferData;
         (assetId, transferData) = _verifyAndGetWithdrawalData(_finalizeWithdrawalParams);
@@ -398,7 +408,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @return assetId The bridged asset ID.
     /// @return transferData The encoded transfer data.
     function _verifyAndGetWithdrawalData(
-        FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
+        FinalizeL1DepositParams calldata _finalizeWithdrawalParams
     ) internal whenNotPaused returns (bytes32 assetId, bytes memory transferData) {
         if (
             isWithdrawalFinalized[_finalizeWithdrawalParams.chainId][_finalizeWithdrawalParams.l2BatchNumber][
@@ -492,7 +502,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @return assetId The ID of the bridged asset.
     /// @return transferData The transfer data used to finalize withdawal.
     function _checkWithdrawal(
-        FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
+        FinalizeL1DepositParams calldata _finalizeWithdrawalParams
     ) internal view returns (bytes32 assetId, bytes memory transferData) {
         (assetId, transferData) = _parseL2WithdrawalMessage(
             _finalizeWithdrawalParams.chainId,
@@ -503,10 +513,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             bool baseTokenWithdrawal = (assetId == BRIDGE_HUB.baseTokenAssetId(_finalizeWithdrawalParams.chainId));
             if (baseTokenWithdrawal) {
                 require(
-                    // for legacy function calls we hardcode the sender, so we have to allow that option.
+                    /// @dev for legacy function calls we hardcode the sender as the L2AssetRouter as we don't know if it is
+                    /// a base token or erc20 token withdrawal beforehand,
+                    /// so we have to allow that option even if we override it.
                     _finalizeWithdrawalParams.l2Sender == L2_ASSET_ROUTER_ADDR ||
                         _finalizeWithdrawalParams.l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-                    "Nullifier: wrong l2 sender"
+                    "L1N: wrong l2 sender"
                 );
             }
 
@@ -581,9 +593,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
             assetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);
             transferData = abi.encode(amount, l1Receiver);
-        } else if (bytes4(functionSignature) == IL1AssetRouter.finalizeWithdrawal.selector) {
+        } else if (bytes4(functionSignature) == IL1AssetRouter.finalizeDeposit.selector) {
             // The data is expected to be at least 36 bytes long to contain assetId.
-            require(_l2ToL1message.length >= 36, "L1AR: wrong msg len"); // wrong message length
+            require(_l2ToL1message.length >= 36, "L1N: wrong msg len"); // wrong message length
+            (, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
             (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
             transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
         } else {
@@ -649,11 +662,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @return l1Asset The address of the L1 token being withdrawn.
     /// @return amount The amount of the token being withdrawn.
     function finalizeWithdrawalLegacyContracts(
-        FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
+        FinalizeL1DepositParams calldata _finalizeWithdrawalParams
     ) external onlyAssetRouterOrErc20Bridge returns (address l1Receiver, address l1Asset, uint256 amount) {
         bytes32 assetId;
-        // (l1Receiver, assetId, amount) = // kl todo
-        _finalizeWithdrawal(_finalizeWithdrawalParams);
+        (l1Receiver, assetId, amount) = _finalizeDeposit(_finalizeWithdrawalParams);
         l1Asset = INativeTokenVault(address(l1NativeTokenVault)).tokenAddress(assetId);
     }
 

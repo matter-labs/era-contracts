@@ -50,8 +50,7 @@ contract L1Erc20BridgeTest is Test {
             weth,
             sharedBridgeAddress,
             eraChainId,
-            IL1Nullifier(l1NullifierAddress),
-            new bytes(0x00)
+            IL1Nullifier(l1NullifierAddress)
         );
 
         vm.store(address(bridge), bytes32(uint256(212)), bytes32(0));

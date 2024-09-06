@@ -5,10 +5,12 @@ pragma solidity 0.8.24;
 // solhint-disable reason-string, gas-custom-errors
 
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
+import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 
 import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
 import {NativeTokenVault} from "./NativeTokenVault.sol";
@@ -34,25 +36,20 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Era's chainID
     uint256 public immutable ERA_CHAIN_ID;
 
-    bytes public bridgedTokenProxyBytecode;
-
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @param _l1WethAddress Address of WETH on deployed chain
     /// @param _l1AssetRouter Address of Asset Router on L1.
     /// @param _eraChainId ID of Era.
     /// @param _l1Nullifier Address of the nullifier contract, which handles transaction progress between L1 and ZK chains.
-    /// @param _bridgedTokenProxyBytecode The bytecode hash of the proxy for tokens deployed by the bridge.
     constructor(
         address _l1WethAddress,
         address _l1AssetRouter,
         uint256 _eraChainId,
-        IL1Nullifier _l1Nullifier,
-        bytes memory _bridgedTokenProxyBytecode
+        IL1Nullifier _l1Nullifier
     ) NativeTokenVault(_l1WethAddress, _l1AssetRouter) {
         ERA_CHAIN_ID = _eraChainId;
         L1_NULLIFIER = _l1Nullifier;
-        bridgedTokenProxyBytecode = _bridgedTokenProxyBytecode;
     }
 
     /// @dev Accepts ether only from the contract that was the shared Bridge.
@@ -69,6 +66,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         if (_owner == address(0)) {
             revert ZeroAddress();
         }
+        address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
+
+        bridgedTokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
         _transferOwnership(_owner);
     }
 
@@ -163,10 +163,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address _l1Token
     ) public view override returns (address) {
         bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
-        bytes32 hash = keccak256(
-            abi.encodePacked(bytes1(0xff), address(this), salt, keccak256(bridgedTokenProxyBytecode))
-        );
-        return address(uint160(uint256(hash)));
+        return
+            Create2.computeAddress(
+                salt,
+                keccak256(abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, "")))
+            );
     }
 
     /// @notice Transfers tokens from the depositor address to the smart contract address.
@@ -189,7 +190,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     // kl todo move to beacon proxy here as well
     function _deployBeaconProxy(bytes32 _salt) internal override returns (BeaconProxy proxy) {
         // Use CREATE2 to deploy the BeaconProxy
-        address proxyAddress = Create2.deploy(0, _salt, bridgedTokenProxyBytecode);
+        address proxyAddress = Create2.deploy(
+            0,
+            _salt,
+            abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, ""))
+        );
         return BeaconProxy(payable(proxyAddress));
     }
 }

@@ -9,6 +9,7 @@ import {GenerateForceDeploymentsData} from "deploy-scripts/GenerateForceDeployme
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract L1ContractDeployer is Test {
@@ -18,10 +19,9 @@ contract L1ContractDeployer is Test {
     address bridgehubOwnerAddress;
     Bridgehub bridgeHub;
 
-    address public sharedBridgeProxyAddress;
     L1AssetRouter public sharedBridge;
-    address l1NullifierProxyAddress;
     L1Nullifier public l1Nullifier;
+    L1NativeTokenVault public l1NativeTokenVault;
 
     DeployL1Script l1Script;
     GenerateForceDeploymentsData forceDeploymentsScript;
@@ -45,11 +45,14 @@ contract L1ContractDeployer is Test {
         bridgehubProxyAddress = l1Script.getBridgehubProxyAddress();
         bridgeHub = Bridgehub(bridgehubProxyAddress);
 
-        sharedBridgeProxyAddress = l1Script.getSharedBridgeProxyAddress();
+        address sharedBridgeProxyAddress = l1Script.getSharedBridgeProxyAddress();
         sharedBridge = L1AssetRouter(sharedBridgeProxyAddress);
 
-        l1NullifierProxyAddress = l1Script.getL1NullifierProxyAddress();
+        address l1NullifierProxyAddress = l1Script.getL1NullifierProxyAddress();
         l1Nullifier = L1Nullifier(l1NullifierProxyAddress);
+
+        address l1NativeTokenVaultProxyAddress = l1Script.getNativeTokenVaultProxyAddress();
+        l1NativeTokenVault = L1NativeTokenVault(payable(l1NativeTokenVaultProxyAddress));
 
         _acceptOwnership();
         _setEraBatch();

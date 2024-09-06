@@ -11,7 +11,7 @@ import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
-import {FinalizeWithdrawalParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 contract L1AssetRouterLegacyTest is L1AssetRouterTest {
     function test_depositLegacyERC20Bridge() public {
@@ -85,7 +85,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit WithdrawalFinalizedAssetRouter(eraChainId, ETH_TOKEN_ASSET_ID, message);
         vm.prank(l1ERC20BridgeAddress);
-        FinalizeWithdrawalParams memory finalizeWithdrawalParams = FinalizeWithdrawalParams({
+        FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
             chainId: eraChainId,
             l2BatchNumber: l2BatchNumber,
             l2MessageIndex: l2MessageIndex,
@@ -144,7 +144,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         //     _message: message,
         //     _merkleProof: merkleProof
         // });
-        FinalizeWithdrawalParams memory finalizeWithdrawalParams = FinalizeWithdrawalParams({
+        FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
             chainId: eraChainId,
             l2BatchNumber: l2BatchNumber,
             l2MessageIndex: l2MessageIndex,

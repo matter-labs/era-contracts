@@ -287,7 +287,8 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     function test_finalizeWithdrawal_ErcOnEth() public {
         _setNativeTokenVaultChainBalance(chainId, address(token), amount);
         bytes memory message = abi.encodePacked(
-            IL1AssetRouter.finalizeWithdrawal.selector,
+            IL1AssetRouter.finalizeDeposit.selector,
+            chainId,
             tokenAssetId,
             abi.encode(amount, alice)
         );
@@ -332,7 +333,8 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         vm.prank(bridgehubAddress);
 
         bytes memory message = abi.encodePacked(
-            IL1AssetRouter.finalizeWithdrawal.selector,
+            IL1AssetRouter.finalizeDeposit.selector,
+            chainId,
             ETH_TOKEN_ASSET_ID,
             abi.encode(amount, alice)
         );
@@ -374,7 +376,8 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         vm.prank(bridgehubAddress);
 
         bytes memory message = abi.encodePacked(
-            IL1AssetRouter.finalizeWithdrawal.selector,
+            IL1AssetRouter.finalizeDeposit.selector,
+            chainId,
             tokenAssetId,
             abi.encode(amount, alice)
         );
@@ -414,7 +417,8 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
     function test_finalizeWithdrawal_NonBaseErcOnErc() public {
         bytes memory message = abi.encodePacked(
-            IL1AssetRouter.finalizeWithdrawal.selector,
+            IL1AssetRouter.finalizeDeposit.selector,
+            chainId,
             tokenAssetId,
             abi.encode(amount, alice)
         );

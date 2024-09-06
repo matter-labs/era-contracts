@@ -13,7 +13,7 @@ import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
-import {IL1Nullifier, FinalizeWithdrawalParams} from "../interfaces/IL1Nullifier.sol";
+import {IL1Nullifier, FinalizeL1DepositParams} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
 
@@ -246,7 +246,8 @@ contract L1AssetRouter is
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _assetId The bridged asset ID.
     /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-    /// kl todo decide finalizeDeposit vs finalizeWithdrawal names, (if both then leave comments)
+    /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
+    /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
     function finalizeDeposit(
         uint256 _chainId,
         bytes32 _assetId,
@@ -405,7 +406,6 @@ contract L1AssetRouter is
             IERC20(_l1Token).forceApprove(address(nativeTokenVault), _amount);
 
             // solhint-disable-next-line func-named-parameters
-            // bridgeMintCalldata = abi.encode(_amount, _prevMsgSender, _l2Receiver, getERC20Getters(_l1Token), _l1Token); // kl todo check correct
             bridgeMintCalldata = DataEncoding.encodeBridgeMintData({
                 _prevMsgSender: _prevMsgSender,
                 _l2Receiver: _l2Receiver,
@@ -477,7 +477,7 @@ contract L1AssetRouter is
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external returns (address l1Receiver, address l1Token, uint256 amount) {
-        FinalizeWithdrawalParams memory finalizeWithdrawalParams = FinalizeWithdrawalParams({
+        FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
             chainId: _chainId,
             l2BatchNumber: _l2BatchNumber,
             l2MessageIndex: _l2MessageIndex,

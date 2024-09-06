@@ -40,7 +40,7 @@ interface IAssetRouterBase {
         bytes32 assetDataHash // Todo: What's the point of emitting hash?
     );
 
-    event DepositFinalizedAssetRouter(uint256 chainId, address receiver, bytes32 indexed assetId, uint256 amount); // why hash? shall we make it similar to WithdrawalFinalizedAssetRouter?
+    // event DepositFinalizedAssetRouter(uint256 chainId, address receiver, bytes32 indexed assetId, uint256 amount); // why hash? shall we make it similar to WithdrawalFinalizedAssetRouter?
 
     event AssetHandlerRegisteredInitial(
         bytes32 indexed assetId,

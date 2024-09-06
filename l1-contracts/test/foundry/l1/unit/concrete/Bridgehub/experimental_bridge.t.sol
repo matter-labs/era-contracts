@@ -107,13 +107,7 @@ contract ExperimentalBridgeTest is Test {
 
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
-        ntv = new L1NativeTokenVault(
-            weth,
-            address(mockSharedBridge),
-            eraChainId,
-            IL1Nullifier(address(0)),
-            new bytes(0x00)
-        );
+        ntv = new L1NativeTokenVault(weth, address(mockSharedBridge), eraChainId, IL1Nullifier(address(0)));
         mockSharedBridge.setNativeTokenVault(ntv);
         mockSecondSharedBridge.setNativeTokenVault(ntv);
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);

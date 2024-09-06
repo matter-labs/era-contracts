@@ -12,7 +12,7 @@ import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 /// @param l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent.
 /// @param message The L2 withdraw data, stored in an L2 -> L1 message.
 /// @param merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization.
-struct FinalizeWithdrawalParams {
+struct FinalizeL1DepositParams {
     uint256 chainId;
     uint256 l2BatchNumber;
     uint256 l2MessageIndex;
@@ -62,7 +62,7 @@ interface IL1Nullifier {
     ) external;
 
     function finalizeWithdrawalLegacyContracts(
-        FinalizeWithdrawalParams calldata _finalizeWithdrawalParams
+        FinalizeL1DepositParams calldata _finalizeWithdrawalParams
     ) external returns (address l1Receiver, address l1Token, uint256 amount);
 
     function BRIDGE_HUB() external view returns (IBridgehub);

@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
-import {IL1Nullifier, FinalizeWithdrawalParams} from "./interfaces/IL1Nullifier.sol";
+import {IL1Nullifier, FinalizeL1DepositParams} from "./interfaces/IL1Nullifier.sol";
 import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 
@@ -173,7 +173,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         }
         // We don't need to set finalizeWithdrawal here, as we set it in the shared bridge
 
-        FinalizeWithdrawalParams memory finalizeWithdrawalParams = FinalizeWithdrawalParams({
+        FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
             chainId: ERA_CHAIN_ID,
             l2BatchNumber: _l2BatchNumber,
             l2MessageIndex: _l2MessageIndex,

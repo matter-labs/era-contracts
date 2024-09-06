@@ -491,7 +491,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
 
         _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
         uint256 beforeChainBalance = l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
-        uint256 beforeBalance = currentToken.balanceOf(sharedBridgeProxyAddress);
+        uint256 beforeBalance = currentToken.balanceOf(address(sharedBridge));
 
         if (beforeChainBalance < amountToWithdraw) {
             vm.expectRevert("L1AR: not enough funds 2");
@@ -541,7 +541,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
                 beforeChainBalance - l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
                 amountToWithdraw
             );
-            assertEq(beforeBalance - currentToken.balanceOf(sharedBridgeProxyAddress), amountToWithdraw);
+            assertEq(beforeBalance - currentToken.balanceOf(address(sharedBridge)), amountToWithdraw);
         }
     }
 
@@ -553,7 +553,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
 
         _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
         uint256 beforeChainBalance = l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
-        uint256 beforeBalance = sharedBridgeProxyAddress.balance;
+        uint256 beforeBalance = address(sharedBridge).balance;
 
         if (beforeChainBalance < amountToWithdraw) {
             vm.expectRevert("L1AR: not enough funds 2");
@@ -597,7 +597,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
                 beforeChainBalance - l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
                 amountToWithdraw
             );
-            assertEq(beforeBalance - sharedBridgeProxyAddress.balance, amountToWithdraw);
+            assertEq(beforeBalance - address(sharedBridge).balance, amountToWithdraw);
         }
     }
 
@@ -648,7 +648,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, HyperchainDeployer, Toke
 
     function getAddressesToExclude() public returns (address[] memory) {
         addressesToExclude.push(bridgehubProxyAddress);
-        addressesToExclude.push(sharedBridgeProxyAddress);
+        addressesToExclude.push(address(sharedBridge));
 
         for (uint256 i = 0; i < users.length; i++) {
             addressesToExclude.push(users[i]);

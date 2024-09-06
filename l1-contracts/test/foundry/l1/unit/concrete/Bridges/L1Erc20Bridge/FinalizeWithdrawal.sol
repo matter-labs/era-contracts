@@ -7,7 +7,7 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {WithdrawalAlreadyFinalized} from "contracts/common/L1ContractErrors.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {FinalizeWithdrawalParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
@@ -46,7 +46,7 @@ contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
         uint256 amount = 999;
 
         assertFalse(bridge.isWithdrawalFinalized(l2BatchNumber, l2MessageIndex));
-        FinalizeWithdrawalParams memory finalizeWithdrawalParams = FinalizeWithdrawalParams({
+        FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
             chainId: eraChainId,
             l2BatchNumber: l2BatchNumber,
             l2MessageIndex: l2MessageIndex,

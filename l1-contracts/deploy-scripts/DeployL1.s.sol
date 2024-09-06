@@ -7,7 +7,6 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {Verifier} from "contracts/state-transition/Verifier.sol";
@@ -202,6 +201,10 @@ contract DeployL1Script is Script {
 
     function getSharedBridgeProxyAddress() public view returns (address) {
         return addresses.bridges.sharedBridgeProxy;
+    }
+
+    function getNativeTokenVaultProxyAddress() public view returns (address) {
+        return addresses.vaults.l1NativeTokenVaultProxy;
     }
 
     function getL1NullifierProxyAddress() public view returns (address) {
@@ -760,9 +763,7 @@ contract DeployL1Script is Script {
                 config.tokens.tokenWethAddress,
                 addresses.bridges.sharedBridgeProxy,
                 config.eraChainId,
-                addresses.bridges.l1NullifierProxy,
-                type(BeaconProxy).creationCode,
-                Utils.ETH_ADDRESS_IN_CONTRACTS
+                addresses.bridges.l1NullifierProxy
             )
         );
         address contractAddress = deployViaCreate2(bytecode);

@@ -55,12 +55,12 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_transferTokenToNTV_wrongCaller() public {
-        vm.expectRevert("L1AR: not NTV");
+        vm.expectRevert("L1N: not NTV");
         l1Nullifier.transferTokenToNTV(address(token));
     }
 
     function test_nullifyChainBalanceByNTV_wrongCaller() public {
-        vm.expectRevert("L1AR: not NTV");
+        vm.expectRevert("L1N: not NTV");
         l1Nullifier.nullifyChainBalanceByNTV(chainId, address(token));
     }
 
@@ -102,7 +102,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     //     address refundRecipient = address(0);
 
     //     vm.prank(alice);
-    //     vm.expectRevert("L1AR: only ADT or owner");
+    //     vm.expectRevert("L1N: only ADT or owner");
     //     sharedBridge.setAssetHandlerAddressOnCounterpart(
     //         eraChainId,
     //         mintValue,
@@ -117,14 +117,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     // function test_transferFundsToSharedBridge_Eth_CallFailed() public {
     //     vm.mockCall(address(nativeTokenVault), "0x", abi.encode(""));
     //     vm.prank(address(nativeTokenVault));
-    //     vm.expectRevert("L1AR: eth transfer failed");
+    //     vm.expectRevert("L1N: eth transfer failed");
     //     nativeTokenVault.transferFundsFromSharedBridge(BASE_TOKEN_VIRTUAL_ADDRESS);
     // }
 
     // function test_transferFundsToSharedBridge_Eth_CallFailed() public {
     //     vm.mockCall(address(nativeTokenVault), "0x", abi.encode(""));
     //     vm.prank(address(nativeTokenVault));
-    //     vm.expectRevert("L1AR: eth transfer failed");
+    //     vm.expectRevert("L1N: eth transfer failed");
     //     nativeTokenVault.transferFundsFromSharedBridge(BASE_TOKEN_VIRTUAL_ADDRESS);
     // }
 
@@ -390,7 +390,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert("L1AR: legacy cFD");
+        vm.expectRevert("L1N: legacy cFD");
         vm.mockCall(
             address(bridgehubAddress),
             abi.encodeWithSelector(IBridgehub.proveL1ToL2TransactionStatus.selector),

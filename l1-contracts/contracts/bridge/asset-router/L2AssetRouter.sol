@@ -96,7 +96,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         address,
         uint256
     ) public payable virtual override onlyBridgehub whenNotPaused {
-        // todo in the future we will make all L2->L1 messages go through the bridgehub
+        /// @dev in the future we will make all L2->L1 messages go through the bridgehub
         revert FunctionNotSupported();
     }
 
@@ -115,7 +115,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         whenNotPaused
         returns (L2TransactionRequestTwoBridgesInner memory)
     {
-        // todo in the future we will make all L2->L1 messages go through the bridgehub
+        /// @dev in the future we will make all L2->L1 messages go through the bridgehub
         revert FunctionNotSupported();
     }
 
@@ -192,7 +192,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         });
 
         bytes memory message = _getL1WithdrawMessage(_assetId, _l1bridgeMintData);
-        // kl todo. Do we want to send message to L1 like this or via BH?
         // slither-disable-next-line unused-return
         L2ContractHelper.sendMessageToL1(message);
 

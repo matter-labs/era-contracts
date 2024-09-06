@@ -217,7 +217,8 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         _setBaseTokenAssetId(ETH_TOKEN_ASSET_ID);
 
         bytes memory message = abi.encodePacked(
-            IL1AssetRouter.finalizeWithdrawal.selector,
+            IL1AssetRouter.finalizeDeposit.selector,
+            chainId,
             tokenAssetId,
             abi.encode(amount, alice)
         );
@@ -258,7 +259,8 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         _setBaseTokenAssetId(tokenAssetId);
 
         bytes memory message = abi.encodePacked(
-            IL1AssetRouter.finalizeWithdrawal.selector,
+            IL1AssetRouter.finalizeDeposit.selector,
+            chainId,
             ETH_TOKEN_ASSET_ID,
             abi.encode(amount, alice)
         );
@@ -299,7 +301,8 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         _setBaseTokenAssetId(tokenAssetId);
 
         bytes memory message = abi.encodePacked(
-            IL1AssetRouter.finalizeWithdrawal.selector,
+            IL1AssetRouter.finalizeDeposit.selector,
+            chainId,
             tokenAssetId,
             abi.encode(amount, alice)
         );
@@ -338,7 +341,8 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
 
     function test_finalizeWithdrawal_NonBaseErcOnErc2() public {
         bytes memory message = abi.encodePacked(
-            IL1AssetRouter.finalizeWithdrawal.selector,
+            IL1AssetRouter.finalizeDeposit.selector,
+            chainId,
             tokenAssetId,
             abi.encode(amount, alice)
         );
