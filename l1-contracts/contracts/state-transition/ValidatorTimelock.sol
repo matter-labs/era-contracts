@@ -142,7 +142,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
             uint32 timestamp = uint32(block.timestamp);
             // We disable this check because calldata array length is cheap.
             // solhint-disable-next-line gas-length-in-loops
-            for (uint256 i = _processBatchFrom; i < _processBatchTo; ++i) {
+            for (uint256 i = _processBatchFrom; i <= _processBatchTo; ++i) {
                 committedBatchTimestamp[_chainId].set(i, timestamp);
             }
         }
@@ -167,14 +167,23 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: We don't track the time when batches are proven, since all information about
     /// the batch is known on the commit stage and the proved is not finalized (may be reverted).
-    function proveBatches(bytes calldata) external onlyValidator(ERA_CHAIN_ID) {
+    function proveBatches(
+        uint256, // _processBatchFrom
+        uint256, // _processBatchTo
+        bytes calldata
+    ) external onlyValidator(ERA_CHAIN_ID) {
         _propagateToZkChain(ERA_CHAIN_ID);
     }
 
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: We don't track the time when batches are proven, since all information about
     /// the batch is known on the commit stage and the proved is not finalized (may be reverted).
-    function proveBatchesSharedBridge(uint256 _chainId, bytes calldata) external onlyValidator(_chainId) {
+    function proveBatchesSharedBridge(
+        uint256 _chainId,
+        uint256, // _processBatchFrom
+        uint256, // _processBatchTo
+        bytes calldata
+    ) external onlyValidator(_chainId) {
         _propagateToZkChain(_chainId);
     }
 
@@ -204,7 +213,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         unchecked {
             // We disable this check because calldata array length is cheap.
             // solhint-disable-next-line gas-length-in-loops
-            for (uint256 i = _processBatchFrom; i < _processBatchTo; ++i) {
+            for (uint256 i = _processBatchFrom; i <= _processBatchTo; ++i) {
                 uint256 commitBatchTimestamp = committedBatchTimestamp[_chainId].get(i);
 
                 // Note: if the `commitBatchTimestamp` is zero, that means either:

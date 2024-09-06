@@ -12,7 +12,7 @@ import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "../../../common/L2ContractAddresses.sol";
 import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
-import {BatchNumberMismatch, TimeNotReached, TooManyBlobs, ValueMismatch, InvalidPubdataMode, InvalidPubdataLength, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, MissingSystemLogs, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, PointEvalFailed, EmptyBlobVersionHash, NonEmptyBlobVersionHash, BlobHashCommitmentError, CalldataLengthTooBig, InvalidPubdataHash, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, PubdataCommitmentsEmpty, PointEvalCallFailed, PubdataCommitmentsTooBig, InvalidPubdataCommitmentsSize} from "../../../common/L1ContractErrors.sol";
+import {PubdataIsEmpty, BatchNumberMismatch, TimeNotReached, TooManyBlobs, ValueMismatch, InvalidPubdataMode, InvalidPubdataLength, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, MissingSystemLogs, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, PointEvalFailed, EmptyBlobVersionHash, NonEmptyBlobVersionHash, BlobHashCommitmentError, CalldataLengthTooBig, InvalidPubdataHash, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, PubdataCommitmentsEmpty, PointEvalCallFailed, PubdataCommitmentsTooBig, InvalidPubdataCommitmentsSize} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
@@ -76,6 +76,10 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             // The assembly block is eqvivalent to:
             // keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32]);
             bytes memory batchPubdataCommitment = _newBatch.pubdataCommitments;
+            if (batchPubdataCommitment.length < 33) {
+                revert PubdataIsEmpty();
+            }
+
             assembly {
                 let start := add(batchPubdataCommitment, 33)
                 let length := sub(mload(batchPubdataCommitment), 33)
@@ -304,10 +308,10 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             revert InvalidProtocolVersion();
         }
         (StoredBatchInfo memory lastCommittedBatchData, CommitBatchInfo[] memory newBatchesData) = BatchDecoder
-            .decodeCommitData(_commitData);
+            .decodeAndCheckCommitData(_commitData, _processFrom, _processTo);
 
         // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
-        if (newBatchesData.length != 1 || _processFrom + 1 != _processTo) {
+        if (newBatchesData.length != 1 || _processFrom != _processTo) {
             revert CanOnlyProcessOneBatch();
         }
 
@@ -450,12 +454,9 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     }
 
     function _executeBatches(uint256 _processFrom, uint256 _processTo, bytes calldata _executeData) internal {
-        StoredBatchInfo[] memory batchesData = BatchDecoder.decodeExecuteData(_executeData);
+        StoredBatchInfo[] memory batchesData = BatchDecoder.decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
-        if (batchesData[0].batchNumber != _processFrom || batchesData[nBatches - 1].batchNumber != _processTo) {
-            // TODO: change the error
-            revert CantExecuteUnprovenBatches();
-        }
+
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
             _executeOneBatch(batchesData[i], i);
             emit BlockExecution(batchesData[i].batchNumber, batchesData[i].batchHash, batchesData[i].commitment);
@@ -475,24 +476,30 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
-    function proveBatches(bytes calldata _proofData) external nonReentrant onlyValidator {
-        _proveBatches(_proofData);
+    function proveBatches(
+        uint256 _processBatchFrom, 
+        uint256 _processBatchTo,
+        bytes calldata _proofData
+    ) external nonReentrant onlyValidator {
+        _proveBatches(_proofData, _processBatchFrom, _processBatchTo);
     }
 
     /// @inheritdoc IExecutor
     function proveBatchesSharedBridge(
         uint256, // _chainId
+        uint256 _processBatchFrom, 
+        uint256 _processBatchTo,
         bytes calldata _proofData
     ) external nonReentrant onlyValidator {
-        _proveBatches(_proofData);
+        _proveBatches(_proofData, _processBatchFrom, _processBatchTo);
     }
 
-    function _proveBatches(bytes calldata _proofData) internal {
+    function _proveBatches(bytes calldata _proofData, uint256 _processBatchFrom, uint256 _processBatchTo) internal {
         (
             StoredBatchInfo memory prevBatch,
             StoredBatchInfo[] memory committedBatches,
             uint256[] memory proof
-        ) = BatchDecoder.decodeProofData(_proofData);
+        ) = BatchDecoder.decodeAndCheckProofData(_proofData, _processBatchFrom, _processBatchTo);
 
         // Save the variables into the stack to save gas on reading them later
         uint256 currentTotalBatchesVerified = s.totalBatchesVerified;
