@@ -973,7 +973,11 @@ contract DeployL1Script is Script {
         console.log("kl todo 100 ");
 
         string memory path = string.concat(vm.projectRoot(), vm.envString("L1_OUTPUT"));
+        console.log("kl todo 101 ");
+
         vm.writeToml(toml, path);
+        console.log("kl todo 102 ");
+
     }
 
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
