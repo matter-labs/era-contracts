@@ -13,6 +13,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {Utils} from "./Utils.sol";
 
 /**
@@ -181,7 +182,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
     function prepareRegisterBaseTokenCall() internal view returns (IGovernance.Call memory) {
         Bridgehub bridgehub = Bridgehub(ecosystem.bridgehub);
 
-        bytes memory data = abi.encodeCall(bridgehub.addToken, (config.baseToken));
+        bytes memory data = abi.encodeCall(bridgehub.addTokenAssetId, (DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken)));
 
         return IGovernance.Call({target: ecosystem.bridgehub, value: 0, data: data});
     }

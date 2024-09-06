@@ -3,21 +3,25 @@ pragma solidity 0.8.24;
 import "openzeppelin-contracts/contracts/utils/Strings.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
 import {ZeroAddress, ChainZeroAddress, NotAnAdmin, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
-import {StateTransitionManagerTest} from "test/foundry/unit/concrete/state-transition/StateTransitionManager/_StateTransitionManager_Shared.t.sol";
+import {ChainTypeManagerTest} from "test/foundry/unit/concrete/state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 
-contract PermanentRestrictionTest is StateTransitionManagerTest {
+contract PermanentRestrictionTest is ChainTypeManagerTest {
     ChainAdmin internal chainAdmin;
     AccessControlRestriction internal restriction;
     PermanentRestriction internal permRestriction;
@@ -28,7 +32,7 @@ contract PermanentRestrictionTest is StateTransitionManagerTest {
     function setUp() public {
         deploy();
 
-        createNewChainBridgehub(getDiamondCutData(address(diamondInit)));
+        createNewChainBridgehub();
 
         vm.stopPrank();
 
@@ -191,19 +195,25 @@ contract PermanentRestrictionTest is StateTransitionManagerTest {
         vm.stopPrank();
     }
 
-    function createNewChainBridgehub(Diamond.DiamondCutData memory _diamondCut) internal {
+    function createNewChainBridgehub() internal {
+        bytes[] memory factoryDeps = new bytes[](0);
         vm.stopPrank();
-        vm.startPrank(address(0));
-        bridgehub.addStateTransitionManager(address(chainContractAddress));
-        bridgehub.addToken(baseToken);
-        bridgehub.setSharedBridge(sharedBridge);
+        vm.startPrank(governor);
+        bridgehub.addChainTypeManager(address(chainContractAddress));
+        bridgehub.addTokenAssetId(DataEncoding.encodeNTVAssetId(block.chainid, baseToken));
+        bridgehub.setAddresses(
+            sharedBridge,
+            ICTMDeploymentTracker(address(0)),
+            new MessageRoot(bridgehub)
+        );
         bridgehub.createNewChain({
             _chainId: chainId,
-            _stateTransitionManager: address(chainContractAddress),
-            _baseToken: baseToken,
+            _chainTypeManager: address(chainContractAddress),
+            _baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, baseToken),
             _salt: 0,
             _admin: newChainAdmin,
-            _initData: abi.encode(_diamondCut)
+            _initData: getCTMInitData(),
+            _factoryDeps: factoryDeps
         });
     }
 }

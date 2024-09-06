@@ -36,16 +36,21 @@ contract ChainTypeManagerTest is Test {
     address internal constant sharedBridge = address(0x4040404);
     address internal constant validator = address(0x5050505);
     address internal newChainAdmin;
-    uint256 chainId = block.chainid;
+    uint256 chainId = 112;
     address internal testnetVerifier = address(new TestnetVerifier());
+    bytes internal forceDeploymentsData = hex"";
 
     Diamond.FacetCut[] internal facetCuts;
 
-    function setUp() public {
-        bridgehub = new Bridgehub();
+    function deploy() public {
+        bridgehub = new Bridgehub(
+            block.chainid,
+            governor,
+            type(uint256).max
+        );
         newChainAdmin = makeAddr("chainadmin");
 
-        vm.startPrank(bridgehub);
+        vm.startPrank(address(bridgehub));
         chainTypeManager = new ChainTypeManager(address(IBridgehub(address(bridgehub))));
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new GenesisUpgrade();
@@ -89,7 +94,7 @@ contract ChainTypeManagerTest is Test {
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: bytes("")
+            forceDeploymentsData: forceDeploymentsData
         });
 
         ChainTypeManagerInitializeData memory ctmInitializeDataNoGovernor = ChainTypeManagerInitializeData({
@@ -130,6 +135,10 @@ contract ChainTypeManagerTest is Test {
         bytes memory initCalldata = abi.encode(initializeData);
 
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
+    }
+
+    function getCTMInitData() internal view returns (bytes memory) {
+        return abi.encode(abi.encode(getDiamondCutData(diamondInit)), forceDeploymentsData);
     }
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
