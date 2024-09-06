@@ -9,7 +9,7 @@ import {PermanentRestriction} from "contracts/governance/PermanentRestriction.so
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
 import {ZeroAddress, ChainZeroAddress, NotAnAdmin, UnallowedImplementation, RemovingPermanentRestriction, CallNotAllowed} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
@@ -81,7 +81,7 @@ contract PermanentRestrictionTest is StateTransitionManagerTest {
     }
 
     function test_tryCompareAdminOfAChainNotAnAdmin() public {
-        vm.expectRevert(abi.encodeWithSelector(NotAnAdmin.selector, IZkSyncHyperchain(hyperchain).getAdmin(), owner));
+        vm.expectRevert(abi.encodeWithSelector(NotAnAdmin.selector, IZKChain(hyperchain).getAdmin(), owner));
         permRestriction.tryCompareAdminOfAChain(hyperchain, owner);
     }
 

@@ -10,7 +10,7 @@ import {Call} from "./Common.sol";
 import {IRestriction} from "./IRestriction.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
 import {IPermanentRestriction} from "./IPermanentRestriction.sol";
@@ -172,13 +172,13 @@ contract PermanentRestriction is IRestriction, IPermanentRestriction, Ownable2St
         // - Query it for `chainId`. If it reverts, it is not a ZkSyncHyperchain.
         // - Query the Bridgehub for the Hyperchain with the given `chainId`.
         // - We compare the corresponding addresses
-        uint256 chainId = IZkSyncHyperchain(_chain).getChainId();
-        if (BRIDGE_HUB.getHyperchain(chainId) != _chain) {
+        uint256 chainId = IZKChain(_chain).getChainId();
+        if (BRIDGE_HUB.getZKChain(chainId) != _chain) {
             revert NotAHyperchain(_chain);
         }
 
         // Now, the chain is known to be a hyperchain, so it should implement the corresponding interface
-        address admin = IZkSyncHyperchain(_chain).getAdmin();
+        address admin = IZKChain(_chain).getAdmin();
         if (admin != _potentialAdmin) {
             revert NotAnAdmin(admin, _potentialAdmin);
         }
