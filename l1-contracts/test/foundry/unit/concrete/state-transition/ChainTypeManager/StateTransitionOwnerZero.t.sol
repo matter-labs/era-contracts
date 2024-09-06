@@ -8,6 +8,10 @@ import {ChainTypeManagerInitializeData, ChainCreationParams} from "contracts/sta
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {
+    function setUp() public {
+        deploy();
+    }
+
     function test_InitializingCTMWithGovernorZeroShouldRevert() public {
         ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: address(genesisUpgradeContract),

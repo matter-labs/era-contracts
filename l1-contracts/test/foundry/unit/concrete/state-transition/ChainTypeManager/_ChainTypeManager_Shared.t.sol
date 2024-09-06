@@ -8,6 +8,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -27,7 +28,7 @@ contract ChainTypeManagerTest is Test {
     ChainTypeManager internal chainTypeManager;
     ChainTypeManager internal chainContractAddress;
     GenesisUpgrade internal genesisUpgradeContract;
-    address internal bridgehub;
+    Bridgehub internal bridgehub;
     address internal diamondInit;
     address internal constant governor = address(0x1010101);
     address internal constant admin = address(0x2020202);
@@ -35,17 +36,17 @@ contract ChainTypeManagerTest is Test {
     address internal constant sharedBridge = address(0x4040404);
     address internal constant validator = address(0x5050505);
     address internal newChainAdmin;
-    uint256 chainId = block.chainid;
+    uint256 chainId = 112;
     address internal testnetVerifier = address(new TestnetVerifier());
+    bytes internal forceDeploymentsData = hex"";
 
     Diamond.FacetCut[] internal facetCuts;
 
-    function setUp() public {
-        DummyBridgehub dummyBridgehub = new DummyBridgehub();
-        bridgehub = address(dummyBridgehub);
+    function deploy() public {
+        bridgehub = new Bridgehub(block.chainid, governor, type(uint256).max);
         newChainAdmin = makeAddr("chainadmin");
 
-        vm.startPrank(bridgehub);
+        vm.startPrank(address(bridgehub));
         chainTypeManager = new ChainTypeManager(address(IBridgehub(address(bridgehub))));
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new GenesisUpgrade();
@@ -89,7 +90,7 @@ contract ChainTypeManagerTest is Test {
             genesisIndexRepeatedStorageChanges: 0x01,
             genesisBatchCommitment: bytes32(uint256(0x01)),
             diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: bytes("")
+            forceDeploymentsData: forceDeploymentsData
         });
 
         ChainTypeManagerInitializeData memory ctmInitializeDataNoGovernor = ChainTypeManagerInitializeData({
@@ -132,9 +133,13 @@ contract ChainTypeManagerTest is Test {
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }
 
+    function getCTMInitData() internal view returns (bytes memory) {
+        return abi.encode(abi.encode(getDiamondCutData(diamondInit)), forceDeploymentsData);
+    }
+
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
         vm.stopPrank();
-        vm.startPrank(bridgehub);
+        vm.startPrank(address(bridgehub));
 
         return
             chainContractAddress.createNewChain({

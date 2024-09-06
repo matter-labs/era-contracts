@@ -6,6 +6,10 @@ import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract setValidatorTimelockTest is ChainTypeManagerTest {
+    function setUp() public {
+        deploy();
+    }
+
     function test_SettingValidatorTimelock() public {
         assertEq(
             chainContractAddress.validatorTimelock(),

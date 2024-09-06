@@ -201,7 +201,7 @@ library Utils {
     }
 
     function getGettersSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](30);
+        bytes4[] memory selectors = new bytes4[](31);
         selectors[0] = GettersFacet.getVerifier.selector;
         selectors[1] = GettersFacet.getAdmin.selector;
         selectors[2] = GettersFacet.getPendingAdmin.selector;
@@ -232,6 +232,7 @@ library Utils {
         selectors[27] = GettersFacet.getTotalBatchesExecuted.selector;
         selectors[28] = GettersFacet.getProtocolVersion.selector;
         selectors[29] = GettersFacet.getPriorityTreeRoot.selector;
+        selectors[30] = GettersFacet.getChainId.selector;
         return selectors;
     }
 
