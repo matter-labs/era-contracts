@@ -2,13 +2,8 @@
 pragma solidity 0.8.24;
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-<<<<<<<< HEAD:l1-contracts/test/foundry/l1/integration/_SharedHyperchainDeployer.t.sol
-import {RegisterHyperchainScript} from "deploy-scripts/RegisterHyperchain.s.sol";
-import {BASE_TOKEN_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
-========
 import {RegisterZKChainScript} from "deploy-scripts/RegisterZKChain.s.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
->>>>>>>> cb42ae402af3e3f676003f44a49da4ea37a6811c:l1-contracts/test/foundry/l1/integration/_SharedZKChainDeployer.t.sol
+import {BASE_TOKEN_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
@@ -32,21 +27,12 @@ contract ZKChainDeployer is L1ContractDeployer {
 
     function _deployEra() internal {
         vm.setEnv(
-<<<<<<<< HEAD:l1-contracts/test/foundry/l1/integration/_SharedHyperchainDeployer.t.sol
-            "HYPERCHAIN_CONFIG",
-            "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-hyperchain-era.toml"
-        );
-
-        deployScript = new RegisterHyperchainScript();
-        saveHyperchainConfig(_getDefaultDescription(eraHyperchainId, BASE_TOKEN_VIRTUAL_ADDRESS, eraHyperchainId));
-========
             "ZK_CHAIN_CONFIG",
-            "/test/foundry/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml"
+            "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml"
         );
 
         deployScript = new RegisterZKChainScript();
         saveZKChainConfig(_getDefaultDescription(eraZKChainId, ETH_TOKEN_ADDRESS, eraZKChainId));
->>>>>>>> cb42ae402af3e3f676003f44a49da4ea37a6811c:l1-contracts/test/foundry/l1/integration/_SharedZKChainDeployer.t.sol
         vm.warp(100);
         deployScript.run();
         zkChainIds.push(eraZKChainId);
@@ -56,13 +42,8 @@ contract ZKChainDeployer is L1ContractDeployer {
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
             string.concat(
-<<<<<<<< HEAD:l1-contracts/test/foundry/l1/integration/_SharedHyperchainDeployer.t.sol
-                "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-hyperchain-",
-                Strings.toString(currentHyperChainId),
-========
-                "/test/foundry/integration/deploy-scripts/script-out/output-deploy-zk-chain-",
+                "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-",
                 Strings.toString(currentZKChainId),
->>>>>>>> cb42ae402af3e3f676003f44a49da4ea37a6811c:l1-contracts/test/foundry/l1/integration/_SharedZKChainDeployer.t.sol
                 ".toml"
             )
         );
