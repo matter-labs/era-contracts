@@ -1,27 +1,29 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-// solhint-disable no-console
+// solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {Utils} from "./Utils.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 
 contract RegisterHyperchainScript is Script {
     using stdToml for string;
 
-    address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    bytes32 constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
+    address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+    bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
 
+    // solhint-disable-next-line gas-struct-packing
     struct Config {
         address deployerAddress;
         address ownerAddress;
@@ -44,7 +46,7 @@ contract RegisterHyperchainScript is Script {
         address chainAdmin;
     }
 
-    Config config;
+    Config internal config;
 
     function run() public {
         console.log("Deploying Hyperchain");
@@ -150,8 +152,13 @@ contract RegisterHyperchainScript is Script {
 
     function deployChainAdmin() internal {
         vm.broadcast();
-        ChainAdmin chainAdmin = new ChainAdmin(config.ownerAddress, address(0));
-        console.log("ChainAdmin deployed at:", address(chainAdmin));
+        AccessControlRestriction restriction = new AccessControlRestriction(0, config.ownerAddress);
+
+        address[] memory restrictions = new address[](1);
+        restrictions[0] = address(restriction);
+
+        vm.broadcast();
+        ChainAdmin chainAdmin = new ChainAdmin(restrictions);
         config.chainAdmin = address(chainAdmin);
     }
 
@@ -185,7 +192,8 @@ contract RegisterHyperchainScript is Script {
         // Get new diamond proxy address from emitted events
         Vm.Log[] memory logs = vm.getRecordedLogs();
         address diamondProxyAddress;
-        for (uint256 i = 0; i < logs.length; i++) {
+        uint256 logsLength = logs.length;
+        for (uint256 i = 0; i < logsLength; ++i) {
             if (logs[i].topics[0] == STATE_TRANSITION_NEW_CHAIN_HASH) {
                 diamondProxyAddress = address(uint160(uint256(logs[i].topics[2])));
                 break;

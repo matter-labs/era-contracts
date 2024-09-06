@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.21;
 
 import {Test} from "forge-std/Test.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -18,12 +19,13 @@ import {InitializeDataNewChain} from "contracts/state-transition/chain-interface
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
 import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract StateTransitionManagerTest is Test {
     StateTransitionManager internal stateTransitionManager;
     StateTransitionManager internal chainContractAddress;
     GenesisUpgrade internal genesisUpgradeContract;
-    address internal bridgehub;
+    Bridgehub internal bridgehub;
     address internal diamondInit;
     address internal constant governor = address(0x1010101);
     address internal constant admin = address(0x2020202);
@@ -36,12 +38,12 @@ contract StateTransitionManagerTest is Test {
 
     Diamond.FacetCut[] internal facetCuts;
 
-    function setUp() public {
-        bridgehub = makeAddr("bridgehub");
+    function deploy() public {
+        bridgehub = new Bridgehub();
         newChainAdmin = makeAddr("chainadmin");
 
-        vm.startPrank(bridgehub);
-        stateTransitionManager = new StateTransitionManager(bridgehub, type(uint256).max);
+        vm.startPrank(address(bridgehub));
+        stateTransitionManager = new StateTransitionManager(address(bridgehub), type(uint256).max);
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new GenesisUpgrade();
 
@@ -93,7 +95,7 @@ contract StateTransitionManagerTest is Test {
             protocolVersion: 0
         });
 
-        vm.expectRevert(bytes.concat("STM: owner zero"));
+        vm.expectRevert(ZeroAddress.selector);
         new TransparentUpgradeableProxy(
             address(stateTransitionManager),
             admin,
@@ -118,7 +120,7 @@ contract StateTransitionManagerTest is Test {
         vm.startPrank(governor);
     }
 
-    function getDiamondCutData(address _diamondInit) internal returns (Diamond.DiamondCutData memory) {
+    function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
         InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier);
 
         bytes memory initCalldata = abi.encode(initializeData);
@@ -128,7 +130,7 @@ contract StateTransitionManagerTest is Test {
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal {
         vm.stopPrank();
-        vm.startPrank(bridgehub);
+        vm.startPrank(address(bridgehub));
 
         chainContractAddress.createNewChain({
             _chainId: chainId,

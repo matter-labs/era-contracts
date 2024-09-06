@@ -6,6 +6,7 @@ import {RevertFallback} from "contracts/dev-contracts/RevertFallback.sol";
 import {ReturnSomething} from "contracts/dev-contracts/ReturnSomething.sol";
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DelegateCallFailed, BadReturnData, MalformedCalldata, NonEmptyCalldata} from "contracts/common/L1ContractErrors.sol";
 
 contract InitializationTest is DiamondCutTest {
     address private revertFallbackAddress;
@@ -27,8 +28,8 @@ contract InitializationTest is DiamondCutTest {
             initAddress: revertFallbackAddress,
             initCalldata: bytes("")
         });
-
-        vm.expectRevert(abi.encodePacked("I"));
+        bytes memory emptyBytes;
+        vm.expectRevert(abi.encodeWithSelector(DelegateCallFailed.selector, emptyBytes));
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
@@ -40,8 +41,8 @@ contract InitializationTest is DiamondCutTest {
             initAddress: signerAddress,
             initCalldata: bytes("")
         });
-
-        vm.expectRevert(abi.encodePacked("lp"));
+        bytes memory emptyBytes;
+        vm.expectRevert(abi.encodeWithSelector(DelegateCallFailed.selector, emptyBytes));
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
@@ -54,7 +55,7 @@ contract InitializationTest is DiamondCutTest {
             initCalldata: bytes("0x11")
         });
 
-        vm.expectRevert(abi.encodePacked("H"));
+        vm.expectRevert(NonEmptyCalldata.selector);
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
@@ -66,8 +67,8 @@ contract InitializationTest is DiamondCutTest {
             initAddress: returnSomethingAddress,
             initCalldata: bytes("")
         });
-
-        vm.expectRevert(abi.encodePacked("lp1"));
+        bytes memory returnData = hex"0000000000000000000000000000000000000000000000000000000000000000";
+        vm.expectRevert(abi.encodeWithSelector(DelegateCallFailed.selector, returnData));
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 }

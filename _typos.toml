@@ -5,6 +5,7 @@ extend-exclude = [
     "/l1-contracts/out/",
     "/l1-contracts/node_modules/",
     "/l1-contracts/artifacts",
+    "/l1-contracts-foundry/lib/",
     "/l2-contracts/artifacts-zk",
     "/l2-contracts/cache-zk",
     "/l2-contracts/typechain",

@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {ERROR_ONLY_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
+import {Unauthorized, DiamondFreezeIncorrectState, DiamondNotFrozen} from "contracts/common/L1ContractErrors.sol";
 
 contract UnfreezeDiamondTest is AdminTest {
     event Unfreeze();
@@ -11,8 +11,7 @@ contract UnfreezeDiamondTest is AdminTest {
     function test_revertWhen_calledByNonStateTransitionManager() public {
         address nonStateTransitionManager = makeAddr("nonStateTransitionManager");
 
-        vm.expectRevert(ERROR_ONLY_STATE_TRANSITION_MANAGER);
-
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonStateTransitionManager));
         vm.startPrank(nonStateTransitionManager);
         adminFacet.unfreezeDiamond();
     }
@@ -22,7 +21,7 @@ contract UnfreezeDiamondTest is AdminTest {
 
         utilsFacet.util_setIsFrozen(false);
 
-        vm.expectRevert(bytes.concat("a7"));
+        vm.expectRevert(DiamondNotFrozen.selector);
 
         vm.startPrank(admin);
         adminFacet.unfreezeDiamond();

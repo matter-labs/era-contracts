@@ -26,6 +26,10 @@ contract revertBatchesTest is StateTransitionManagerTest {
     ExecutorFacet internal executorFacet;
     GettersFacet internal gettersFacet;
 
+    function setUp() public {
+        deploy();
+    }
+
     function test_SuccessfulBatchReverting() public {
         createNewChain(getDiamondCutData(diamondInit));
 

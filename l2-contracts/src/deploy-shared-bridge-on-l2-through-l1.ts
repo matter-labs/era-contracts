@@ -148,7 +148,9 @@ export async function deploySharedBridgeProxyOnL2ThroughL1(
   );
 
   /// loading TransparentUpgradeableProxy bytecode
-  const L2_SHARED_BRIDGE_PROXY_BYTECODE = hre.artifacts.readArtifactSync("TransparentUpgradeableProxy").bytecode;
+  const L2_SHARED_BRIDGE_PROXY_BYTECODE = hre.artifacts.readArtifactSync(
+    "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy"
+  ).bytecode;
 
   /// compute L2SharedBridgeProxy address
   const l2SharedBridgeProxyAddress = computeL2Create2Address(

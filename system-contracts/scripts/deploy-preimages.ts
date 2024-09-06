@@ -8,9 +8,9 @@ import { ethers } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
-import type { types } from "zksync-web3";
-import { Provider, Wallet } from "zksync-web3";
-import { hashBytecode } from "zksync-web3/build/src/utils";
+import type { types } from "zksync-ethers";
+import { Provider, Wallet } from "zksync-ethers";
+import { hashBytecode } from "zksync-ethers/build/utils";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
 import type { Dependency, DeployedDependency } from "./utils";
 import { checkMarkers, filterPublishedFactoryDeps, getBytecodes, publishFactoryDeps, readYulBytecode } from "./utils";
@@ -103,7 +103,7 @@ class ZkSyncDeployer {
     this.nonce += 1;
   }
 
-  // Returns the current default account bytecode on zkSync
+  // Returns the current default account bytecode on ZKsync
   async currentDefaultAccountBytecode(): Promise<string> {
     const zkSync = await this.deployer.zkWallet.getMainContract();
     return await zkSync.getL2DefaultAccountBytecodeHash();
@@ -114,7 +114,7 @@ class ZkSyncDeployer {
     const bytecodeHash = ethers.utils.hexlify(hashBytecode(defaultAccountBytecode));
     const currentDefaultAccountBytecode = ethers.utils.hexlify(await this.currentDefaultAccountBytecode());
 
-    // If the bytecode is not the same as the one deployed on zkSync, we need to add it to the deployment
+    // If the bytecode is not the same as the one deployed on ZKsync, we need to add it to the deployment
     if (bytecodeHash.toLowerCase() !== currentDefaultAccountBytecode) {
       this.defaultAccountToUpgrade = {
         name: DEFAULT_ACCOUNT_CONTRACT_NAME,
@@ -161,7 +161,7 @@ class ZkSyncDeployer {
     const bytecodeHash = ethers.utils.hexlify(hashBytecode(bootloaderCode));
     const currentBootloaderBytecode = ethers.utils.hexlify(await this.currentBootloaderBytecode());
 
-    // If the bytecode is not the same as the one deployed on zkSync, we need to add it to the deployment
+    // If the bytecode is not the same as the one deployed on ZKsync, we need to add it to the deployment
     if (bytecodeHash.toLowerCase() !== currentBootloaderBytecode) {
       this.bootloaderToUpgrade = {
         name: BOOTLOADER_CONTRACT_NAME,

@@ -9,6 +9,7 @@ import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {PriorityOperationsRollingHashMismatch, BatchHashMismatch, NonSequentialBatch, CantExecuteUnprovenBatches, QueueIsEmpty, TxHashMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract ExecutingTest is ExecutorTest {
     function setUp() public {
@@ -62,7 +63,7 @@ contract ExecutingTest is ExecutorTest {
         storedBatchInfoArray[0] = wrongNewStoredBatchInfo;
 
         vm.prank(validator);
-        vm.expectRevert(bytes.concat("k"));
+        vm.expectRevert(NonSequentialBatch.selector);
         executor.executeBatches(storedBatchInfoArray);
     }
 
@@ -74,7 +75,13 @@ contract ExecutingTest is ExecutorTest {
         storedBatchInfoArray[0] = wrongNewStoredBatchInfo;
 
         vm.prank(validator);
-        vm.expectRevert(bytes.concat("exe10"));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BatchHashMismatch.selector,
+                keccak256(abi.encode(newStoredBatchInfo)),
+                keccak256(abi.encode(wrongNewStoredBatchInfo))
+            )
+        );
         executor.executeBatches(storedBatchInfoArray);
     }
 
@@ -86,7 +93,7 @@ contract ExecutingTest is ExecutorTest {
         storedBatchInfoArray[0] = newStoredBatchInfo;
 
         vm.prank(validator);
-        vm.expectRevert(bytes.concat("n"));
+        vm.expectRevert(CantExecuteUnprovenBatches.selector);
         executor.executeBatches(storedBatchInfoArray);
     }
 
@@ -143,7 +150,7 @@ contract ExecutingTest is ExecutorTest {
         executor.proveBatches(genesisStoredBatchInfo, correctNewStoredBatchInfoArray, proofInput);
 
         vm.prank(validator);
-        vm.expectRevert(bytes.concat("s"));
+        vm.expectRevert(QueueIsEmpty.selector);
         executor.executeBatches(correctNewStoredBatchInfoArray);
     }
 
@@ -220,7 +227,7 @@ contract ExecutingTest is ExecutorTest {
         });
 
         vm.prank(validator);
-        vm.expectRevert(bytes.concat("x"));
+        vm.expectRevert(PriorityOperationsRollingHashMismatch.selector);
         executor.executeBatches(correctNewStoredBatchInfoArray);
     }
 
@@ -245,8 +252,12 @@ contract ExecutingTest is ExecutorTest {
         IExecutor.StoredBatchInfo memory genesisBlock = genesisStoredBatchInfo;
         genesisBlock.batchHash = wrongPreviousBatchHash;
 
+        bytes32 storedBatchHash = getters.storedBlockHash(1);
+
         vm.prank(validator);
-        vm.expectRevert(bytes.concat("i"));
+        vm.expectRevert(
+            abi.encodeWithSelector(BatchHashMismatch.selector, storedBatchHash, keccak256(abi.encode(genesisBlock)))
+        );
         executor.commitBatches(genesisBlock, correctNewCommitBatchInfoArray);
     }
 

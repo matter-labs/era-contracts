@@ -2,7 +2,6 @@
 node_modules
 
 # l1-contracts
-l1-contracts/lib
 l1-contracts/node_modules
 
 # l1-contracts-foundry
@@ -14,3 +13,8 @@ l2-contracts/node_modules
 # system-contracts
 system-contracts/node_modules
 system-contracts/bootloader/test_infra/target
+
+l1-contracts/lib
+lib/
+l2-contracts/lib
+system-contracts/lib

@@ -5,6 +5,8 @@ pragma solidity 0.8.24;
 import {ZkSyncHyperchainStorage} from "../ZkSyncHyperchainStorage.sol";
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 
+import {Unauthorized} from "../../../common/L1ContractErrors.sol";
+
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -14,44 +16,52 @@ contract ZkSyncHyperchainBase is ReentrancyGuard {
 
     /// @notice Checks that the message sender is an active admin
     modifier onlyAdmin() {
-        require(msg.sender == s.admin, "Hyperchain: not admin");
+        if (msg.sender != s.admin) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     /// @notice Checks if validator is active
     modifier onlyValidator() {
-        require(s.validators[msg.sender], "Hyperchain: not validator");
+        if (!s.validators[msg.sender]) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     modifier onlyStateTransitionManager() {
-        require(msg.sender == s.stateTransitionManager, "Hyperchain: not state transition manager");
+        if (msg.sender != s.stateTransitionManager) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     modifier onlyBridgehub() {
-        require(msg.sender == s.bridgehub, "Hyperchain: not bridgehub");
+        if (msg.sender != s.bridgehub) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     modifier onlyAdminOrStateTransitionManager() {
-        require(
-            msg.sender == s.admin || msg.sender == s.stateTransitionManager,
-            "Hyperchain: Only by admin or state transition manager"
-        );
+        if (msg.sender != s.admin && msg.sender != s.stateTransitionManager) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     modifier onlyValidatorOrStateTransitionManager() {
-        require(
-            s.validators[msg.sender] || msg.sender == s.stateTransitionManager,
-            "Hyperchain: Only by validator or state transition manager"
-        );
+        if (!s.validators[msg.sender] && msg.sender != s.stateTransitionManager) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     modifier onlyBaseTokenBridge() {
-        require(msg.sender == s.baseTokenBridge, "Hyperchain: Only base token bridge can call this function");
+        if (msg.sender != s.baseTokenBridge) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 }

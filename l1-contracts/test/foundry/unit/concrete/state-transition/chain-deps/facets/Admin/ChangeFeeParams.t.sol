@@ -3,9 +3,9 @@
 pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
 
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {Unauthorized, PriorityTxPubdataExceedsMaxPubDataPerBatch} from "contracts/common/L1ContractErrors.sol";
 
 contract ChangeFeeParamsTest is AdminTest {
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
@@ -37,7 +37,7 @@ contract ChangeFeeParamsTest is AdminTest {
         });
 
         vm.startPrank(nonStateTransitionManager);
-        vm.expectRevert(ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonStateTransitionManager));
 
         adminFacet.changeFeeParams(newFeeParams);
     }
@@ -55,7 +55,7 @@ contract ChangeFeeParamsTest is AdminTest {
             minimalL2GasPrice: 250_000_000
         });
 
-        vm.expectRevert(bytes.concat("n6"));
+        vm.expectRevert(PriorityTxPubdataExceedsMaxPubDataPerBatch.selector);
 
         vm.startPrank(stateTransitionManager);
         adminFacet.changeFeeParams(newFeeParams);
