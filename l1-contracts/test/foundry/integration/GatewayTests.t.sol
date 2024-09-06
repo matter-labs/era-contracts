@@ -32,6 +32,8 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+
 contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
@@ -217,6 +219,40 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
             _merkleProof: merkleProof
         });
         vm.stopBroadcast();
+    }
+
+    function test_registerAlreadyDeployedHyperchain() public {
+        gatewayScript.registerGateway();
+        IStateTransitionManager stm = IStateTransitionManager(l1Script.getSTM());
+        IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
+        address owner = Ownable(address(bridgeHub)).owner();
+
+        address chain = _deployZkChain(
+            currentHyperChainId++,
+            ETH_TOKEN_ADDRESS,
+            address(bridgehub.sharedBridge()),
+            owner,
+            stm.protocolVersion(),
+            stm.storedBatchZero()
+        );
+
+        uint256 chainId = currentHyperChainId - 1;
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(chainId, ETH_TOKEN_ADDRESS);
+        address stmAddr = IZkSyncHyperchain(chain).getStateTransitionManager();
+
+        vm.startBroadcast(owner);
+        bridgeHub.addStateTransitionManager(stmAddr);
+        bridgeHub.addTokenAssetId(baseTokenAssetId);
+        bridgeHub.registerAlreadyDeployedHyperchain(chainId, chain);
+        vm.stopBroadcast();
+
+        address bridgeHubStmForChain = bridgeHub.stateTransitionManager(chainId);
+        bytes32 bridgeHubBaseAssetIdForChain = bridgeHub.baseTokenAssetId(chainId);
+        address bridgeHubChainAddressdForChain = bridgeHub.getHyperchain(chainId);
+
+        assertEq(bridgeHubStmForChain, stmAddr);
+        assertEq(bridgeHubBaseAssetIdForChain, baseTokenAssetId);
+        assertEq(bridgeHubChainAddressdForChain, chain);
     }
 
     function finishMoveChain() public {

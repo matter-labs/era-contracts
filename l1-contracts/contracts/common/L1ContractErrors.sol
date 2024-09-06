@@ -7,6 +7,8 @@ error AddressAlreadyUsed(address addr);
 error AddressHasNoCode(address);
 // 0x1eee5481
 error AddressTooLow(address);
+// 0x04a0b7e9
+error AssetIdNotSupported(bytes32 assetId);
 // 0x6afd6c20
 error BadReturnData();
 // 0x6ef9a972
@@ -29,6 +31,12 @@ error CanOnlyProcessOneBatch();
 error CantExecuteUnprovenBatches();
 // 0xe18cb383
 error CantRevertExecutedBatch();
+// 0x24591d89
+error ChainIdAlreadyExists();
+// 0x717a1656
+error ChainIdCantBeCurrentChain();
+// 0xa179f8c9
+error ChainIdMismatch();
 // 0x78d2ed02
 error ChainAlreadyLive();
 // 0x8f620a06
@@ -51,6 +59,8 @@ error DiamondAlreadyFrozen();
 error DiamondFreezeIncorrectState();
 // 0xa7151b9a
 error DiamondNotFrozen();
+// 0x2d4d012f
+error EmptyAssetId();
 // 0xfc7ab1d3
 error EmptyBlobVersionHash(uint256 index);
 // 0x95b66fe9
@@ -305,8 +315,6 @@ error ZeroAddress();
 error ZeroBalance();
 // 0xc84885d4
 error ZeroChainId();
-
-error AssetIdNotSupported(bytes32 assetId);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

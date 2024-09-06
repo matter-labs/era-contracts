@@ -115,6 +115,8 @@ interface IBridgehub is IL1AssetHandler {
 
     function migrationPaused() external view returns (bool);
 
+    function admin() external view returns (address);
+
     /// Mailbox forwarder
 
     function proveL2MessageInclusion(
@@ -223,4 +225,6 @@ interface IBridgehub is IL1AssetHandler {
     function L1_CHAIN_ID() external view returns (uint256);
 
     function setLegacyBaseTokenAssetId(uint256 _chainId) external;
+
+    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external;
 }
