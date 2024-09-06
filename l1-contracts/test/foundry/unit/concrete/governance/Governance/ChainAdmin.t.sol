@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
-import "openzeppelin-contracts/contracts-v4/utils/Strings.sol";
+import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
