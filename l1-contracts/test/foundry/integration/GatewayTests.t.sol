@@ -226,9 +226,6 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         IStateTransitionManager stm = IStateTransitionManager(l1Script.getSTM());
         IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
         address owner = Ownable(address(bridgeHub)).owner();
-        address stmAddr = IZkSyncHyperchain(chain).getStateTransitionManager();
-        uint256 chainId = currentHyperChainId - 1;
-        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(chainId, ETH_TOKEN_ADDRESS);
 
         address chain = _deployZkChain(
             currentHyperChainId++,
@@ -238,6 +235,10 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
             stm.protocolVersion(),
             stm.storedBatchZero()
         );
+        
+        uint256 chainId = currentHyperChainId - 1;
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(chainId, ETH_TOKEN_ADDRESS);
+        address stmAddr = IZkSyncHyperchain(chain).getStateTransitionManager();
 
         vm.startBroadcast(owner);
         bridgeHub.addStateTransitionManager(stmAddr);
