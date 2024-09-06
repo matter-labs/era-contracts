@@ -328,6 +328,18 @@ error ZeroBalance();
 // 0xc84885d4
 error ZeroChainId();
 
+error PubdataIsEmpty();
+
+error EmptyData();
+
+error UnsupportedCommitBatchEncoding(uint8 version);
+
+error UnsupportedProofBatchEncoding(uint8 version);
+
+error UnsupportedExecuteBatchEncoding(uint8 version);
+
+error IncorrectBatchBounds(uint256 processFromExpected, uint256 processToExpected, uint256 processFromProvided, uint256 processToProvided);
+
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,
