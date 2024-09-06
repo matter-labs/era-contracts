@@ -170,7 +170,7 @@ interface IMailbox is IZkSyncHyperchainBase {
     /// @notice New relayed priority request event. It is emitted on a chain that is deployed
     /// on top of the gateway when it receives a request relayed via the Bridgehub.
     /// @dev IMPORTANT: this event most likely will be removed in the future, so
-    /// noone should rely on it for indexing purposes.
+    /// no one should rely on it for indexing purposes.
     /// @param txId Serial number of the priority operation
     /// @param txHash keccak256 hash of encoded transaction representation
     /// @param expirationTimestamp Timestamp up to which priority request should be processed
