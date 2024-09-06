@@ -12,4 +12,7 @@ import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 interface IL1NativeTokenVault {
     /// @notice The L1Nullifier contract
     function L1_NULLIFIER() external view returns (IL1Nullifier);
+
+    event TokenBeaconUpdated(address indexed l2TokenBeacon);
+
 }

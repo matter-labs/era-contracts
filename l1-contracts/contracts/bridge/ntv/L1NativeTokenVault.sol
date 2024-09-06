@@ -69,6 +69,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
 
         bridgedTokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
+        bridgedTokenBeacon.transferOwnership(_owner);
+        emit TokenBeaconUpdated(address(bridgedTokenBeacon));
         _transferOwnership(_owner);
     }
 

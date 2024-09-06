@@ -31,11 +31,13 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
+import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
 
 contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
+    bytes32 public l2TokenAssetId;
 
     // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
@@ -74,22 +76,20 @@ contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeploye
         prepare();
     }
 
-    // Check whether the sum of ETH deposits from tests, updated on each deposit and withdrawal,
-    // equals the balance of L1Shared bridge.
-    function test_DepositToL1() public {
+    function depositToL1(address _tokenAddress) public {
         vm.mockCall(
             address(bridgeHub),
             abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
             abi.encode(true)
         );
         uint256 chainId = eraHyperchainId;
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(chainId, address(1));
+        l2TokenAssetId = DataEncoding.encodeNTVAssetId(chainId, address(1));
         bytes memory transferData = DataEncoding.encodeBridgeMintData({
             _prevMsgSender: BASE_TOKEN_VIRTUAL_ADDRESS,
             _l2Receiver: BASE_TOKEN_VIRTUAL_ADDRESS,
             _l1Token: BASE_TOKEN_VIRTUAL_ADDRESS,
             _amount: 100,
-            _erc20Metadata: BridgeHelper.getERC20Getters(BASE_TOKEN_VIRTUAL_ADDRESS, BASE_TOKEN_VIRTUAL_ADDRESS)
+            _erc20Metadata: BridgeHelper.getERC20Getters(_tokenAddress, BASE_TOKEN_VIRTUAL_ADDRESS)
         });
         l1Nullifier.finalizeDeposit(
             FinalizeL1DepositParams({
@@ -98,10 +98,38 @@ contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeploye
                 l2MessageIndex: 1,
                 l2Sender: L2_ASSET_ROUTER_ADDR,
                 l2TxNumberInBatch: 1,
-                message: abi.encodePacked(IL1AssetRouter.finalizeDeposit.selector, chainId, assetId, transferData),
+                message: abi.encodePacked(IL1AssetRouter.finalizeDeposit.selector, chainId, l2TokenAssetId, transferData),
                 merkleProof: new bytes32[](0)
             })
         );
+    }
+
+
+    function test_DepositToL1() public {
+        depositToL1(BASE_TOKEN_VIRTUAL_ADDRESS);
+    }
+
+    function test_BridgeTokenFunctions() public {
+        depositToL1(BASE_TOKEN_VIRTUAL_ADDRESS);
+        BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
+        assertEq(bridgedToken.name(), "Ether");
+        assertEq(bridgedToken.symbol(), "ETH");
+        assertEq(bridgedToken.decimals(), 18);
+    }
+
+    function test_reinitBridgedToken_Success() public {
+        depositToL1(BASE_TOKEN_VIRTUAL_ADDRESS);
+        BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
+        address owner = l1NativeTokenVault.owner();
+        vm.broadcast(owner);
+        bridgedToken.reinitializeToken(BridgedStandardERC20.ERC20Getters({ignoreName: false, ignoreSymbol: false, ignoreDecimals: false}), "TestnetERC20Token", "TST", 2);
+    }
+
+    function test_reinitBridgedToken_WrongVersion() public {
+        depositToL1(BASE_TOKEN_VIRTUAL_ADDRESS);
+        BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
+        vm.expectRevert(NonSequentialVersion.selector);
+        bridgedToken.reinitializeToken(BridgedStandardERC20.ERC20Getters({ignoreName: false, ignoreSymbol: false, ignoreDecimals: false}), "TestnetERC20Token", "TST", 3);
     }
 
     // add this to be excluded from coverage report
