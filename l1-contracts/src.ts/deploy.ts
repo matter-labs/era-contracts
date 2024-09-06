@@ -935,7 +935,6 @@ export class Deployer {
         this.addresses.Bridges.SharedBridgeProxy,
         eraChainId,
         this.addresses.Bridges.L1NullifierProxy,
-        bridgedTokenProxyBytecode,
       ],
       create2Salt,
       ethTxOptions
