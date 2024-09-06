@@ -226,6 +226,9 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
         IStateTransitionManager stm = IStateTransitionManager(l1Script.getSTM());
         IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
         address owner = Ownable(address(bridgeHub)).owner();
+        address stmAddr = IZkSyncHyperchain(chain).getStateTransitionManager();
+        uint256 chainId = currentHyperChainId - 1;
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(chainId, ETH_TOKEN_ADDRESS);
 
         address chain = _deployZkChain(
             currentHyperChainId++,
@@ -235,15 +238,20 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
             stm.protocolVersion(),
             stm.storedBatchZero()
         );
-        address stmAddr = IZkSyncHyperchain(chain).getStateTransitionManager();
-
-        uint256 chainId = currentHyperChainId - 1;
 
         vm.startBroadcast(owner);
         bridgeHub.addStateTransitionManager(stmAddr);
-        bridgeHub.addTokenAssetId(DataEncoding.encodeNTVAssetId(chainId, ETH_TOKEN_ADDRESS));
+        bridgeHub.addTokenAssetId(baseTokenAssetId);
         bridgeHub.registerAlreadyDeployedHyperchain(chainId, chain);
         vm.stopBroadcast();
+
+        address bridgeHubStmForChain = bridgeHub.stateTransitionManager(chainId);
+        bytes32 bridgeHubBaseAssetIdForChain = bridgeHub.baseTokenAssetId(chainId);
+        address bridgeHubChainAddressdForChain = bridgeHub.getHyperchain(chainId);
+
+        assertEq(bridgeHubStmForChain, stmAddr);
+        assertEq(bridgeHubBaseAssetIdForChain, baseTokenAssetId);
+        assertEq(bridgeHubChainAddressdForChain, chain);
     }
 
     function finishMoveChain() public {
