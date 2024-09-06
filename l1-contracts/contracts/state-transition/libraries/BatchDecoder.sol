@@ -8,15 +8,21 @@ import {IncorrectBatchBounds, EmptyData, UnsupportedCommitBatchEncoding, Unsuppo
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The helper library for
+/// @notice Utility library for decoding and validating batch data.
+/// @dev This library decodes commit, proof, and execution batch data and verifies batch number bounds.
+///      It reverts with custom errors when the data is invalid or unsupported encoding is used.
 library BatchDecoder {
     /// @notice The currently supported encoding version.
     uint8 internal constant SUPPORTED_ENCODING_VERSION = 0;
 
-    function decodeCommitData(
+    /// @notice Decodes commit data from a calldata bytes into the last committed batch data and an array of new batch data.
+    /// @param _commitData The calldata byte array containing the data for committing batches.
+    /// @return lastCommittedBatchData The data for the batch before newly committed batches.
+    /// @return newBatchesData An array containing the newly committed batches.
+    function _decodeCommitData(
         bytes calldata _commitData
     )
-        internal
+        private
         pure
         returns (
             IExecutor.StoredBatchInfo memory lastCommittedBatchData,
@@ -41,9 +47,9 @@ library BatchDecoder {
     /// @notice Decodes the commit data and checks that the provided batch bounds are correct.
     /// @dev Note that it only checks that the last and the first batches in the array correspond to the provided bounds.
     /// The fact that the batches inside the array are provided in the correct order should be checked by the caller.
-    /// @param _commitData The commit data to decode.
-    /// @param _processBatchFrom The expected batch number of the first batch in the array.
-    /// @param _processBatchTo The expected batch number of the last batch in the array.
+    /// @param _commitData The calldata byte array containing the data for committing batches.
+    /// @param _processBatchFrom The expected batch number of the first commit batch in the array.
+    /// @param _processBatchTo The expected batch number of the last commit batch in the array.
     function decodeAndCheckCommitData(
         bytes calldata _commitData,
         uint256 _processBatchFrom,
@@ -56,22 +62,16 @@ library BatchDecoder {
             IExecutor.CommitBatchInfo[] memory newBatchesData
         )
     {
-        (lastCommittedBatchData, newBatchesData) = decodeCommitData(_commitData);
+        (lastCommittedBatchData, newBatchesData) = _decodeCommitData(_commitData);
 
         if (newBatchesData.length == 0) {
             revert EmptyData();
         }
 
-        if (newBatchesData[0].batchNumber != _processBatchFrom) {
-            revert IncorrectBatchBounds(
-                _processBatchFrom,
-                _processBatchTo,
-                newBatchesData[0].batchNumber,
-                newBatchesData[newBatchesData.length - 1].batchNumber
-            );
-        }
-
-        if (newBatchesData[newBatchesData.length - 1].batchNumber != _processBatchTo) {
+        if (
+            newBatchesData[0].batchNumber != _processBatchFrom ||
+            newBatchesData[newBatchesData.length - 1].batchNumber != _processBatchTo
+        ) {
             revert IncorrectBatchBounds(
                 _processBatchFrom,
                 _processBatchTo,
@@ -81,10 +81,15 @@ library BatchDecoder {
         }
     }
 
-    function decodeProofData(
+    /// @notice Decodes proof data from a calldata byte array into the previous batch, an array of proved batches, and a proof array.
+    /// @param _proofData The calldata byte array containing the data for proving batches.
+    /// @return prevBatch The batch information before the batches to be verified.
+    /// @return provedBatches An array containing the the batches to be verified.
+    /// @return proof An array containing the proof for the verifier.
+    function _decodeProofData(
         bytes calldata _proofData
     )
-        internal
+        private
         pure
         returns (
             IExecutor.StoredBatchInfo memory prevBatch,
@@ -126,22 +131,16 @@ library BatchDecoder {
             uint256[] memory proof
         )
     {
-        (prevBatch, provedBatches, proof) = decodeProofData(_proofData);
+        (prevBatch, provedBatches, proof) = _decodeProofData(_proofData);
 
         if (provedBatches.length == 0) {
             revert EmptyData();
         }
 
-        if (provedBatches[0].batchNumber != _processBatchFrom) {
-            revert IncorrectBatchBounds(
-                _processBatchFrom,
-                _processBatchTo,
-                provedBatches[0].batchNumber,
-                provedBatches[provedBatches.length - 1].batchNumber
-            );
-        }
-
-        if (provedBatches[provedBatches.length - 1].batchNumber != _processBatchTo) {
+        if (
+            provedBatches[0].batchNumber != _processBatchFrom ||
+            provedBatches[provedBatches.length - 1].batchNumber != _processBatchTo
+        ) {
             revert IncorrectBatchBounds(
                 _processBatchFrom,
                 _processBatchTo,
@@ -151,9 +150,12 @@ library BatchDecoder {
         }
     }
 
-    function decodeExecuteData(
+    /// @notice Decodes execution data from a calldata byte array into an array of stored batch information.
+    /// @param _executeData The calldata byte array containing the execution data to decode.
+    /// @return executeData An array containing the stored batch information for execution.
+    function _decodeExecuteData(
         bytes calldata _executeData
-    ) internal pure returns (IExecutor.StoredBatchInfo[] memory executeData) {
+    ) private pure returns (IExecutor.StoredBatchInfo[] memory executeData) {
         if (_executeData.length == 0) {
             revert EmptyData();
         }
@@ -169,7 +171,7 @@ library BatchDecoder {
     /// @notice Decodes the execute data and checks that the provided batch bounds are correct.
     /// @dev Note that it only checks that the last and the first batches in the array correspond to the provided bounds.
     /// The fact that the batches inside the array are provided in the correct order should be checked by the caller.
-    /// @param _executeData The execute data to decode.
+    /// @param _executeData The calldata byte array containing the execution data to decode.
     /// @param _processBatchFrom The expected batch number of the first batch in the array.
     /// @param _processBatchTo The expected batch number of the last batch in the array.
     function decodeAndCheckExecuteData(
@@ -177,22 +179,16 @@ library BatchDecoder {
         uint256 _processBatchFrom,
         uint256 _processBatchTo
     ) internal pure returns (IExecutor.StoredBatchInfo[] memory executeData) {
-        executeData = decodeExecuteData(_executeData);
+        executeData = _decodeExecuteData(_executeData);
 
         if (executeData.length == 0) {
             revert EmptyData();
         }
 
-        if (executeData[0].batchNumber != _processBatchFrom) {
-            revert IncorrectBatchBounds(
-                _processBatchFrom,
-                _processBatchTo,
-                executeData[0].batchNumber,
-                executeData[executeData.length - 1].batchNumber
-            );
-        }
-
-        if (executeData[executeData.length - 1].batchNumber != _processBatchTo) {
+        if (
+            executeData[0].batchNumber != _processBatchFrom ||
+            executeData[executeData.length - 1].batchNumber != _processBatchTo
+        ) {
             revert IncorrectBatchBounds(
                 _processBatchFrom,
                 _processBatchTo,

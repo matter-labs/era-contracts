@@ -312,7 +312,9 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             .decodeAndCheckCommitData(_commitData, _processFrom, _processTo);
 
         // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
-        if (newBatchesData.length != 1 || _processFrom != _processTo) {
+        // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
+        // and so the range checked in the `decodeAndCheckCommitData` is enough.
+        if (newBatchesData.length != 1) {
             revert CanOnlyProcessOneBatch();
         }
 
@@ -798,7 +800,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     function _extractOpeningValueCommitmentProof(
         bytes memory _pubdataCommitments,
         uint256 _offset
-    ) internal view returns (uint256[4] memory openingValueCommitmentProof) {
+    ) internal pure returns (uint256[4] memory openingValueCommitmentProof) {
         (openingValueCommitmentProof[0], _offset) = UnsafeBytes.readUint256(_pubdataCommitments, _offset);
         (openingValueCommitmentProof[1], _offset) = UnsafeBytes.readUint256(_pubdataCommitments, _offset);
         (openingValueCommitmentProof[2], _offset) = UnsafeBytes.readUint256(_pubdataCommitments, _offset);
