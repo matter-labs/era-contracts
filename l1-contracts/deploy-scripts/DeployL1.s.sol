@@ -828,6 +828,7 @@ contract DeployL1Script is Script {
     }
 
     function saveOutput() internal {
+        console.log("kl todo 1 ");
         vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
         vm.serializeAddress(
             "bridgehub",
@@ -850,6 +851,7 @@ contract DeployL1Script is Script {
             "bridgehub_implementation_addr",
             addresses.bridgehub.bridgehubImplementation
         );
+        console.log("kl todo 95 ");
 
         vm.serializeAddress(
             "state_transition",
@@ -874,6 +876,7 @@ contract DeployL1Script is Script {
             "diamond_proxy_addr",
             addresses.stateTransition.diamondProxy
         );
+        console.log("kl todo 96 ");
 
         vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);
         vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
@@ -887,6 +890,8 @@ contract DeployL1Script is Script {
             "shared_bridge_proxy_addr",
             addresses.bridges.sharedBridgeProxy
         );
+        console.log("kl todo 97 ");
+
 
         vm.serializeUint(
             "contracts_config",
@@ -941,6 +946,8 @@ contract DeployL1Script is Script {
             config.contracts.diamondCutData
         );
 
+        console.log("kl todo 98 ");
+
         vm.serializeAddress("deployed_addresses", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
         vm.serializeAddress("deployed_addresses", "governance_addr", addresses.governance);
         vm.serializeAddress(
@@ -953,6 +960,7 @@ contract DeployL1Script is Script {
         vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
         vm.serializeString("deployed_addresses", "state_transition", stateTransition);
         string memory deployedAddresses = vm.serializeString("deployed_addresses", "bridges", bridges);
+        console.log("kl todo 99 ");
 
         vm.serializeAddress("root", "create2_factory_addr", addresses.create2Factory);
         vm.serializeBytes32("root", "create2_factory_salt", config.contracts.create2FactorySalt);
@@ -963,6 +971,7 @@ contract DeployL1Script is Script {
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
+        console.log("kl todo 100 ");
 
         string memory path = string.concat(vm.projectRoot(), vm.envString("L1_OUTPUT"));
         vm.writeToml(toml, path);
