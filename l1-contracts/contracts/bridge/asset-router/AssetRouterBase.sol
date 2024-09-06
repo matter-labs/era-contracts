@@ -260,7 +260,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         address _parsedNativeToken,
         uint256 _amount,
         bytes memory _gettersData
-    ) internal view virtual returns (bytes memory) {}
+    ) internal view virtual returns (bytes memory);
 
     /*//////////////////////////////////////////////////////////////
                             Receive transaction Functions
