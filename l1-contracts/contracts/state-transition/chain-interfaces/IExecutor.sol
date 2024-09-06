@@ -141,8 +141,9 @@ interface IExecutor is IZkSyncHyperchainBase {
     /// - Verifying the correctness of their timestamps.
     /// - Processing their L2->L1 logs.
     /// - Storing batch commitments.
-    /// Todoparam  _lastCommittedBatchData Stored data of the last committed batch.
-    /// Todoparam  _newBatchesData Data of the new batches to be committed.
+    /// @param _processFrom The batch number from which the processing starts.
+    /// @param _processTo The batch number at which the processing ends.
+    /// @param _commitData The encoded data of the new batches to be committed.
     function commitBatches(uint256 _processFrom, uint256 _processTo, bytes calldata _commitData) external;
 
     /// @notice same as `commitBatches` but with the chainId so ValidatorTimelock can sort the inputs.
@@ -155,9 +156,9 @@ interface IExecutor is IZkSyncHyperchainBase {
 
     /// @notice Batches commitment verification.
     /// @dev Only verifies batch commitments without any other processing.
-    /// Todoparam  _prevBatch Stored data of the last committed batch.
-    /// Todoparam  _committedBatches Stored data of the committed batches.
-    /// Todoparam  _proof The zero knowledge proof.
+    /// @param _processBatchFrom The batch number from which the verification starts.
+    /// @param _processBatchTo The batch number at which the verification ends.
+    /// @param _proofData The encoded data of the new batches to be verified.
     function proveBatches(uint256 _processBatchFrom, uint256 _processBatchTo, bytes calldata _proofData) external;
 
     /// @notice same as `proveBatches` but with the chainId so ValidatorTimelock can sort the inputs.
@@ -171,7 +172,9 @@ interface IExecutor is IZkSyncHyperchainBase {
     /// @notice The function called by the operator to finalize (execute) batches. It is responsible for:
     /// - Processing all pending operations (commpleting priority requests).
     /// - Finalizing this batch (i.e. allowing to withdraw funds from the system)
-    /// @ Todoparam _batchesData Data of the batches to be executed.
+    /// @param _processFrom The batch number from which the execution starts.
+    /// @param _processTo The batch number at which the execution ends.
+    /// @param _executeData The encoded data of the new batches to be executed.
     function executeBatches(uint256 _processFrom, uint256 _processTo, bytes calldata _executeData) external;
 
     /// @notice same as `executeBatches` but with the chainId so ValidatorTimelock can sort the inputs.

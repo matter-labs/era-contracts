@@ -797,6 +797,13 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         }
     }
 
+    /// @notice Extracts the opening value commitment proof from the pubdata commitments at the specified offset.
+    /// @dev Note that it only extracts the proof from the bytes array at the offset,
+    /// but does NOT check the length of the bytes array, so it can go out of bounds.
+    /// @param _pubdataCommitments The byte array containing the pubdata commitments.
+    /// @param _offset The offset at which the proof data starts within the `_pubdataCommitments`.
+    /// @return openingValueCommitmentProof A 4-element array containing the extracted opening value commitment
+    /// proof from bytes in form of `bytes32(z) || bytes32(y) || bytes48(commitment) || bytes48(proof)`
     function _extractOpeningValueCommitmentProof(
         bytes memory _pubdataCommitments,
         uint256 _offset
