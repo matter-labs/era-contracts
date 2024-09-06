@@ -235,7 +235,7 @@ contract GatewayTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, 
             stm.protocolVersion(),
             stm.storedBatchZero()
         );
-        
+
         uint256 chainId = currentHyperChainId - 1;
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(chainId, ETH_TOKEN_ADDRESS);
         address stmAddr = IZkSyncHyperchain(chain).getStateTransitionManager();
