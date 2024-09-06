@@ -13,7 +13,7 @@ contract manageWhitelistTest is TransactionFiltererTest {
         assertEq(
             transactionFiltererProxy.whitelistedSenders(sender),
             true,
-            "Whitelisting of sender was not successfull"
+            "Whitelisting of sender was not successful"
         );
 
         vm.expectRevert(abi.encodeWithSelector(AlreadyWhitelisted.selector, sender));
@@ -31,7 +31,7 @@ contract manageWhitelistTest is TransactionFiltererTest {
         assertEq(
             transactionFiltererProxy.whitelistedSenders(sender),
             false,
-            "Revoking the sender from whitelist was not successfull"
+            "Revoking the sender from whitelist was not successful"
         );
     }
 }
