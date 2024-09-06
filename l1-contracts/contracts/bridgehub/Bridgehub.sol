@@ -577,10 +577,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) external override onlySettlementLayerRelayedSender {
         require(L1_CHAIN_ID != block.chainid, "BH: not in sync layer mode");
         address zkChain = zkChainMap.get(_chainId);
-        IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(
-            _canonicalTxHash,
-            _expirationTimestamp
-        );
+        IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
