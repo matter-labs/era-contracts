@@ -89,6 +89,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             if (logOutput.pubdataHash != pubdataHash) {
                 revert InvalidPubdataHash(pubdataHash, logOutput.pubdataHash);
             }
+            // slither-disable-next-line unused-return
             (blobCommitments[0], ) = UnsafeBytes.readBytes32(
                 _newBatch.pubdataCommitments,
                 _newBatch.pubdataCommitments.length - 32
@@ -454,7 +455,11 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     }
 
     function _executeBatches(uint256 _processFrom, uint256 _processTo, bytes calldata _executeData) internal {
-        StoredBatchInfo[] memory batchesData = BatchDecoder.decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
+        StoredBatchInfo[] memory batchesData = BatchDecoder.decodeAndCheckExecuteData(
+            _executeData,
+            _processFrom,
+            _processTo
+        );
         uint256 nBatches = batchesData.length;
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
@@ -477,7 +482,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function proveBatches(
-        uint256 _processBatchFrom, 
+        uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _proofData
     ) external nonReentrant onlyValidator {
@@ -487,7 +492,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     /// @inheritdoc IExecutor
     function proveBatchesSharedBridge(
         uint256, // _chainId
-        uint256 _processBatchFrom, 
+        uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _proofData
     ) external nonReentrant onlyValidator {

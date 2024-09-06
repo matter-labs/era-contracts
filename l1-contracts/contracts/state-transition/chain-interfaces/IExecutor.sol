@@ -161,7 +161,12 @@ interface IExecutor is IZkSyncHyperchainBase {
     function proveBatches(uint256 _processBatchFrom, uint256 _processBatchTo, bytes calldata _proofData) external;
 
     /// @notice same as `proveBatches` but with the chainId so ValidatorTimelock can sort the inputs.
-    function proveBatchesSharedBridge(uint256 _chainId, uint256 _processBatchFrom, uint256 _processBatchTo, bytes calldata _proofData) external;
+    function proveBatchesSharedBridge(
+        uint256 _chainId,
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo,
+        bytes calldata _proofData
+    ) external;
 
     /// @notice The function called by the operator to finalize (execute) batches. It is responsible for:
     /// - Processing all pending operations (commpleting priority requests).

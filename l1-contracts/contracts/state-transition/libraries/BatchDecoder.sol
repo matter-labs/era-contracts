@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 
 import {IExecutor} from "../chain-interfaces/IExecutor.sol";
 
-import { IncorrectBatchBounds, EmptyData, UnsupportedCommitBatchEncoding, UnsupportedProofBatchEncoding, UnsupportedExecuteBatchEncoding } from "../../common/L1ContractErrors.sol";
+import {IncorrectBatchBounds, EmptyData, UnsupportedCommitBatchEncoding, UnsupportedProofBatchEncoding, UnsupportedExecuteBatchEncoding} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -48,7 +48,14 @@ library BatchDecoder {
         bytes calldata _commitData,
         uint256 _processBatchFrom,
         uint256 _processBatchTo
-    ) internal pure returns (IExecutor.StoredBatchInfo memory lastCommittedBatchData, IExecutor.CommitBatchInfo[] memory newBatchesData) {
+    )
+        internal
+        pure
+        returns (
+            IExecutor.StoredBatchInfo memory lastCommittedBatchData,
+            IExecutor.CommitBatchInfo[] memory newBatchesData
+        )
+    {
         (lastCommittedBatchData, newBatchesData) = decodeCommitData(_commitData);
 
         if (newBatchesData.length == 0) {
@@ -56,11 +63,21 @@ library BatchDecoder {
         }
 
         if (newBatchesData[0].batchNumber != _processBatchFrom) {
-            revert IncorrectBatchBounds(_processBatchFrom, _processBatchTo, newBatchesData[0].batchNumber, newBatchesData[newBatchesData.length - 1].batchNumber);
+            revert IncorrectBatchBounds(
+                _processBatchFrom,
+                _processBatchTo,
+                newBatchesData[0].batchNumber,
+                newBatchesData[newBatchesData.length - 1].batchNumber
+            );
         }
 
         if (newBatchesData[newBatchesData.length - 1].batchNumber != _processBatchTo) {
-            revert IncorrectBatchBounds(_processBatchFrom, _processBatchTo, newBatchesData[0].batchNumber, newBatchesData[newBatchesData.length - 1].batchNumber);
+            revert IncorrectBatchBounds(
+                _processBatchFrom,
+                _processBatchTo,
+                newBatchesData[0].batchNumber,
+                newBatchesData[newBatchesData.length - 1].batchNumber
+            );
         }
     }
 
@@ -100,11 +117,15 @@ library BatchDecoder {
         bytes calldata _proofData,
         uint256 _processBatchFrom,
         uint256 _processBatchTo
-    ) internal pure returns (
+    )
+        internal
+        pure
+        returns (
             IExecutor.StoredBatchInfo memory prevBatch,
             IExecutor.StoredBatchInfo[] memory provedBatches,
             uint256[] memory proof
-    ) {
+        )
+    {
         (prevBatch, provedBatches, proof) = decodeProofData(_proofData);
 
         if (provedBatches.length == 0) {
@@ -112,11 +133,21 @@ library BatchDecoder {
         }
 
         if (provedBatches[0].batchNumber != _processBatchFrom) {
-            revert IncorrectBatchBounds(_processBatchFrom, _processBatchTo, provedBatches[0].batchNumber, provedBatches[provedBatches.length - 1].batchNumber);
+            revert IncorrectBatchBounds(
+                _processBatchFrom,
+                _processBatchTo,
+                provedBatches[0].batchNumber,
+                provedBatches[provedBatches.length - 1].batchNumber
+            );
         }
 
         if (provedBatches[provedBatches.length - 1].batchNumber != _processBatchTo) {
-            revert IncorrectBatchBounds(_processBatchFrom, _processBatchTo, provedBatches[0].batchNumber, provedBatches[provedBatches.length - 1].batchNumber);
+            revert IncorrectBatchBounds(
+                _processBatchFrom,
+                _processBatchTo,
+                provedBatches[0].batchNumber,
+                provedBatches[provedBatches.length - 1].batchNumber
+            );
         }
     }
 
@@ -153,11 +184,21 @@ library BatchDecoder {
         }
 
         if (executeData[0].batchNumber != _processBatchFrom) {
-            revert IncorrectBatchBounds(_processBatchFrom, _processBatchTo, executeData[0].batchNumber, executeData[executeData.length - 1].batchNumber);
+            revert IncorrectBatchBounds(
+                _processBatchFrom,
+                _processBatchTo,
+                executeData[0].batchNumber,
+                executeData[executeData.length - 1].batchNumber
+            );
         }
 
         if (executeData[executeData.length - 1].batchNumber != _processBatchTo) {
-            revert IncorrectBatchBounds(_processBatchFrom, _processBatchTo, executeData[0].batchNumber, executeData[executeData.length - 1].batchNumber);
+            revert IncorrectBatchBounds(
+                _processBatchFrom,
+                _processBatchTo,
+                executeData[0].batchNumber,
+                executeData[executeData.length - 1].batchNumber
+            );
         }
     }
 }
