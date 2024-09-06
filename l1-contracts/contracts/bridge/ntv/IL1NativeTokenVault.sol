@@ -14,5 +14,4 @@ interface IL1NativeTokenVault {
     function L1_NULLIFIER() external view returns (IL1Nullifier);
 
     event TokenBeaconUpdated(address indexed l2TokenBeacon);
-
 }

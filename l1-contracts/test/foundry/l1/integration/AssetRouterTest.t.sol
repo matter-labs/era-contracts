@@ -28,7 +28,7 @@ import {IL1AssetRouterCombined} from "contracts/bridge/asset-router/IL1AssetRout
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1Nullifier, FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
@@ -98,12 +98,16 @@ contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeploye
                 l2MessageIndex: 1,
                 l2Sender: L2_ASSET_ROUTER_ADDR,
                 l2TxNumberInBatch: 1,
-                message: abi.encodePacked(IL1AssetRouter.finalizeDeposit.selector, chainId, l2TokenAssetId, transferData),
+                message: abi.encodePacked(
+                    IL1AssetRouter.finalizeDeposit.selector,
+                    chainId,
+                    l2TokenAssetId,
+                    transferData
+                ),
                 merkleProof: new bytes32[](0)
             })
         );
     }
-
 
     function test_DepositToL1() public {
         depositToL1(BASE_TOKEN_VIRTUAL_ADDRESS);
@@ -122,14 +126,33 @@ contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeploye
         BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
         address owner = l1NativeTokenVault.owner();
         vm.broadcast(owner);
-        bridgedToken.reinitializeToken(BridgedStandardERC20.ERC20Getters({ignoreName: false, ignoreSymbol: false, ignoreDecimals: false}), "TestnetERC20Token", "TST", 2);
+        bridgedToken.reinitializeToken(
+            BridgedStandardERC20.ERC20Getters({ignoreName: false, ignoreSymbol: false, ignoreDecimals: false}),
+            "TestnetERC20Token",
+            "TST",
+            2
+        );
     }
 
     function test_reinitBridgedToken_WrongVersion() public {
         depositToL1(BASE_TOKEN_VIRTUAL_ADDRESS);
         BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
         vm.expectRevert(NonSequentialVersion.selector);
-        bridgedToken.reinitializeToken(BridgedStandardERC20.ERC20Getters({ignoreName: false, ignoreSymbol: false, ignoreDecimals: false}), "TestnetERC20Token", "TST", 3);
+        bridgedToken.reinitializeToken(
+            BridgedStandardERC20.ERC20Getters({ignoreName: false, ignoreSymbol: false, ignoreDecimals: false}),
+            "TestnetERC20Token",
+            "TST",
+            3
+        );
+    }
+
+    /// @dev We should not test this on the L1, but to get coverage we do.
+    function test_BridgeTokenBurn() public {
+        depositToL1(BASE_TOKEN_VIRTUAL_ADDRESS);
+        BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
+        vm.store(address(bridgedToken), bytes32(uint256(207)), bytes32(0));
+        vm.broadcast(L2_NATIVE_TOKEN_VAULT_ADDR); // kl todo call ntv, or even assetRouter/bridgehub
+        bridgedToken.bridgeBurn(BASE_TOKEN_VIRTUAL_ADDRESS, 100);
     }
 
     // add this to be excluded from coverage report
