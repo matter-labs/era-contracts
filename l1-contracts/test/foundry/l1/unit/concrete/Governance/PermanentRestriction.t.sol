@@ -15,7 +15,7 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
-import {ChainTypeManagerTest} from "test/foundry/unit/concrete/state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
+import {ChainTypeManagerTest} from "test/foundry/l1/unit/concrete/state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";

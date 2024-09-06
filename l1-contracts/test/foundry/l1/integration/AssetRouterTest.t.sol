@@ -14,7 +14,7 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
-import {HyperchainDeployer} from "./_SharedHyperchainDeployer.t.sol";
+import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {BASE_TOKEN_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
@@ -22,8 +22,8 @@ import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol"
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IL1AssetRouterCombined} from "contracts/bridge/asset-router/IL1AssetRouterCombined.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1Nullifier, FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
@@ -33,7 +33,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
 
-contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeployer, L2TxMocker {
+contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -64,11 +64,11 @@ contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeploye
         // _deployHyperchain(tokens[1]);
         // _deployHyperchain(tokens[1]);
 
-        for (uint256 i = 0; i < hyperchainIds.length; i++) {
+        for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
             l2ContractAddresses.push(contractAddress);
 
-            _addL2ChainContract(hyperchainIds[i], contractAddress);
+            _addL2ChainContract(zkChainIds[i], contractAddress);
         }
     }
 
@@ -82,7 +82,7 @@ contract DeploymentTests is L1ContractDeployer, HyperchainDeployer, TokenDeploye
             abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
             abi.encode(true)
         );
-        uint256 chainId = eraHyperchainId;
+        uint256 chainId = eraZKChainId;
         l2TokenAssetId = DataEncoding.encodeNTVAssetId(chainId, address(1));
         bytes memory transferData = DataEncoding.encodeBridgeMintData({
             _prevMsgSender: BASE_TOKEN_VIRTUAL_ADDRESS,

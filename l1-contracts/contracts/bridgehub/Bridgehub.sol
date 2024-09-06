@@ -197,7 +197,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot
     ) external onlyOwner {
-        sharedBridge = IL1AssetRouter(_sharedBridge);
+        sharedBridge = IAssetRouterBase(_sharedBridge);
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
     }
@@ -466,6 +466,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         }
 
         canonicalTxHash = _sendRequest(
+            _request.chainId,
             _request.refundRecipient,
             BridgehubL2TransactionRequest({
                 sender: msg.sender,
@@ -542,6 +543,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         }
 
         canonicalTxHash = _sendRequest(
+            _request.chainId,
             _request.refundRecipient,
             BridgehubL2TransactionRequest({
                 sender: _request.secondBridgeAddress,
@@ -564,12 +566,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     function _sendRequest(
+        uint256 _chainId,
         address _refundRecipient,
         BridgehubL2TransactionRequest memory _request
     ) internal returns (bytes32 canonicalTxHash) {
         address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, msg.sender);
         _request.refundRecipient = refundRecipient;
-        address zkChain = zkChainMap.get(_request.chainId);
+        address zkChain = zkChainMap.get(_chainId);
 
         canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
     }
@@ -758,22 +761,22 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address _depositSender,
         bytes calldata _data
     ) external payable override onlyAssetRouter onlyL1 {
-        BridgehubBurnCTMAssetData memory ctmAssetData = abi.decode(_data, (BridgehubBurnCTMAssetData));
+        BridgehubBurnCTMAssetData memory bridgehubData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
         delete settlementLayer[bridgehubData.chainId];
 
-        IChainTypeManager(chainTypeManager[ctmAssetData.chainId]).forwardedBridgeRecoverFailedTransfer({
-            _chainId: ctmAssetData.chainId,
+        IChainTypeManager(chainTypeManager[bridgehubData.chainId]).forwardedBridgeRecoverFailedTransfer({
+            _chainId: bridgehubData.chainId,
             _assetInfo: _assetId,
             _depositSender: _depositSender,
-            _ctmData: ctmAssetData.ctmData
+            _ctmData: bridgehubData.ctmData
         });
 
-        IZKChain(getZKChain(_chainId)).forwardedBridgeRecoverFailedTransfer({
-            _chainId: ctmAssetData.chainId,
+        IZKChain(getZKChain(bridgehubData.chainId)).forwardedBridgeRecoverFailedTransfer({
+            _chainId: bridgehubData.chainId,
             _assetInfo: _assetId,
             _prevMsgSender: _depositSender,
-            _chainData: ctmAssetData.chainData
+            _chainData: bridgehubData.chainData
         });
     }
 
