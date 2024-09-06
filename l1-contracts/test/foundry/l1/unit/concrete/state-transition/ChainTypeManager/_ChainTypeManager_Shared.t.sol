@@ -7,14 +7,10 @@ import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-<<<<<<<< HEAD:l1-contracts/test/foundry/l1/unit/concrete/state-transition/StateTransitionManager/_StateTransitionManager_Shared.t.sol
+
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
-import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
-========
-import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
->>>>>>>> cb42ae402af3e3f676003f44a49da4ea37a6811c:l1-contracts/test/foundry/unit/concrete/state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol
+import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
