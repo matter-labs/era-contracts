@@ -3,8 +3,8 @@ import * as ethers from "ethers";
 import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
-import type { Bridgehub, StateTransitionManager } from "../../typechain";
-import { BridgehubFactory, StateTransitionManagerFactory } from "../../typechain";
+import type { Bridgehub, ChainTypeManager } from "../../typechain";
+import { BridgehubFactory, ChainTypeManagerFactory } from "../../typechain";
 
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 import { ethTestConfig } from "../../src.ts/utils";
@@ -13,7 +13,7 @@ import type { Deployer } from "../../src.ts/deploy";
 
 describe("Initial deployment test", function () {
   let bridgehub: Bridgehub;
-  let stateTransition: StateTransitionManager;
+  let stateTransition: ChainTypeManager;
   let owner: ethers.Signer;
   let deployer: Deployer;
   // const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
@@ -47,22 +47,22 @@ describe("Initial deployment test", function () {
     // await deploySharedBridgeOnL2ThroughL1(deployer, chainId.toString(), gasPrice);
 
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
-    stateTransition = StateTransitionManagerFactory.connect(
+    stateTransition = ChainTypeManagerFactory.connect(
       deployer.addresses.StateTransition.StateTransitionProxy,
       deployWallet
     );
   });
 
   it("Check addresses", async () => {
-    const stateTransitionManagerAddress1 = deployer.addresses.StateTransition.StateTransitionProxy;
-    const stateTransitionManagerAddress2 = await bridgehub.stateTransitionManager(chainId);
-    expect(stateTransitionManagerAddress1.toLowerCase()).equal(stateTransitionManagerAddress2.toLowerCase());
+    const chainTypeManagerAddress1 = deployer.addresses.StateTransition.StateTransitionProxy;
+    const chainTypeManagerAddress2 = await bridgehub.chainTypeManager(chainId);
+    expect(chainTypeManagerAddress1.toLowerCase()).equal(chainTypeManagerAddress2.toLowerCase());
 
     const stateTransitionAddress1 = deployer.addresses.StateTransition.DiamondProxy;
-    const stateTransitionAddress2 = await stateTransition.getHyperchain(chainId);
+    const stateTransitionAddress2 = await stateTransition.getZKChain(chainId);
     expect(stateTransitionAddress1.toLowerCase()).equal(stateTransitionAddress2.toLowerCase());
 
-    const stateTransitionAddress3 = await bridgehub.getHyperchain(chainId);
+    const stateTransitionAddress3 = await bridgehub.getZKChain(chainId);
     expect(stateTransitionAddress1.toLowerCase()).equal(stateTransitionAddress3.toLowerCase());
   });
 });

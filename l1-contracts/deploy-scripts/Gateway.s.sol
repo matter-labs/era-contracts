@@ -8,12 +8,12 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IBridgehub, BridgehubBurnSTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
-import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 // import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 // import {Governance} from "contracts/governance/Governance.sol";
 // import {Utils} from "./Utils.sol";
-// import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+// import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 // import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
@@ -21,13 +21,13 @@ import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 // import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
 
-import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 contract GatewayScript is Script {
     using stdToml for string;
 
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
+    bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewZKChain(uint256,address)");
 
     // solhint-disable-next-line gas-struct-packing
     struct Config {
@@ -42,7 +42,7 @@ contract GatewayScript is Script {
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
         address bridgehub;
-        address stmDeploymentTracker;
+        address ctmDeploymentTracker;
         address nativeTokenVault;
         address stateTransitionProxy;
         address sharedBridgeProxy;
@@ -67,7 +67,7 @@ contract GatewayScript is Script {
     function initializeConfig() internal {
         // Grab config from output of l1 deployment
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, vm.envString("L1_OUTPUT")); //"/script-config/register-hyperchain.toml");
+        string memory path = string.concat(root, vm.envString("L1_OUTPUT")); //"/script-config/register-zkChain.toml");
         string memory toml = vm.readFile(path);
 
         config.deployerAddress = msg.sender;
@@ -86,10 +86,10 @@ contract GatewayScript is Script {
         config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
-        config.stmDeploymentTracker = toml.readAddress(
-            "$.deployed_addresses.bridgehub.stm_deployment_tracker_proxy_addr"
+        config.ctmDeploymentTracker = toml.readAddress(
+            "$.deployed_addresses.bridgehub.ctm_deployment_tracker_proxy_addr"
         );
-        path = string.concat(root, vm.envString("HYPERCHAIN_CONFIG"));
+        path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
         toml = vm.readFile(path);
 
         config.ownerAddress = toml.readAddress("$.owner_address");
@@ -120,7 +120,7 @@ contract GatewayScript is Script {
         Ownable ownable = Ownable(config.bridgehub);
         vm.prank(ownable.owner());
         bridgehub.registerSettlementLayer(config.gatewayChainId, true);
-        // bytes memory data = abi.encodeCall(stm.registerSettlementLayer, (config.chainChainId, true));
+        // bytes memory data = abi.encodeCall(ctm.registerSettlementLayer, (config.chainChainId, true));
         // Utils.executeUpgrade({
         //     _governor: ownable.owner(),
         //     _salt: bytes32(config.bridgehubCreateNewChainSalt),
@@ -129,7 +129,7 @@ contract GatewayScript is Script {
         //     _value: 0,
         //     _delay: 0
         // });
-        console.log("Gateway registered on STM");
+        console.log("Gateway registered on CTM");
     }
 
     function moveChainToGateway() public {
@@ -149,19 +149,19 @@ contract GatewayScript is Script {
 
         address newAdmin = ownable.owner();
         console.log("newAdmin", newAdmin);
-        IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(config.chainChainId));
-        console.log("chainAdmin", bridgehub.getHyperchain(config.chainChainId), chain.getAdmin());
-        bytes32 stmAssetId = bridgehub.stmAssetIdFromChainId(config.chainChainId);
+        IZKChain chain = IZKChain(bridgehub.getZKChain(config.chainChainId));
+        console.log("chainAdmin", bridgehub.getZKChain(config.chainChainId), chain.getAdmin());
+        bytes32 ctmAssetId = bridgehub.ctmAssetIdFromChainId(config.chainChainId);
         bytes memory diamondCutData = config.diamondCutData; // todo replace with config.zkDiamondCutData;
-        bytes memory stmData = abi.encode(newAdmin, diamondCutData);
+        bytes memory ctmData = abi.encode(newAdmin, diamondCutData);
         bytes memory chainData = abi.encode(chain.getProtocolVersion());
-        BridgehubBurnSTMAssetData memory stmAssetData = BridgehubBurnSTMAssetData({
+        BridgehubBurnCTMAssetData memory ctmAssetData = BridgehubBurnCTMAssetData({
             chainId: config.chainChainId,
-            stmData: stmData,
+            ctmData: ctmData,
             chainData: chainData
         });
-        bytes memory bridgehubData = abi.encode(stmAssetData);
-        bytes memory routerData = bytes.concat(bytes1(0x01), abi.encode(stmAssetId, bridgehubData));
+        bytes memory bridgehubData = abi.encode(ctmAssetData);
+        bytes memory routerData = bytes.concat(bytes1(0x01), abi.encode(ctmAssetId, bridgehubData));
 
         vm.startBroadcast(chain.getAdmin());
         L2TransactionRequestTwoBridgesOuter memory request = L2TransactionRequestTwoBridgesOuter({
@@ -182,8 +182,8 @@ contract GatewayScript is Script {
 
     function registerL2Contracts() public {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        Ownable ownable = Ownable(config.stmDeploymentTracker);
-        // IStateTransitionManager stm = IStateTransitionManager(config.stateTransitionProxy);
+        Ownable ownable = Ownable(config.ctmDeploymentTracker);
+        // IChainTypeManager ctm = IChainTypeManager(config.stateTransitionProxy);
 
         uint256 gasPrice = 10;
         uint256 l2GasLimit = 72000000;
@@ -194,7 +194,7 @@ contract GatewayScript is Script {
             l2GasLimit,
             REQUIRED_L2_GAS_PRICE_PER_PUBDATA
         ) * 2;
-        bytes32 assetId = bridgehub.stmAssetIdFromChainId(config.chainChainId);
+        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(config.chainChainId);
         bytes memory routerData = bytes.concat(bytes1(0x02), abi.encode(assetId, L2_BRIDGEHUB_ADDR));
         L2TransactionRequestTwoBridgesOuter
             memory assetRouterRegistrationRequest = L2TransactionRequestTwoBridgesOuter({
@@ -216,7 +216,7 @@ contract GatewayScript is Script {
             l2GasLimit: l2GasLimit,
             l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             refundRecipient: ownable.owner(),
-            secondBridgeAddress: config.stmDeploymentTracker,
+            secondBridgeAddress: config.ctmDeploymentTracker,
             secondBridgeValue: 0,
             secondBridgeCalldata: bytes.concat(
                 bytes1(0x01),

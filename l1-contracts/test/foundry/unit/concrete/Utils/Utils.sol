@@ -12,8 +12,8 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
@@ -60,7 +60,7 @@ library Utils {
     }
 
     function createSystemLogs(bytes32 _outputHash) public returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](9);
+        bytes[] memory logs = new bytes[](7);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -69,43 +69,36 @@ library Utils {
         );
         logs[1] = constructL2Log(
             true,
-            L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY),
-            0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563
-        );
-        logs[2] = constructL2Log(true, L2_TO_L1_MESSENGER, uint256(SystemLogKey.STATE_DIFF_HASH_KEY), bytes32(""));
-        logs[3] = constructL2Log(
-            true,
             L2_SYSTEM_CONTEXT_ADDRESS,
             uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
             bytes32("")
         );
-        logs[4] = constructL2Log(
+        logs[2] = constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
             uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32("")
         );
-        logs[5] = constructL2Log(
+        logs[3] = constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
             keccak256("")
         );
-        logs[6] = constructL2Log(
+        logs[4] = constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
             bytes32("")
         );
 
-        logs[7] = constructL2Log(
+        logs[5] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
             uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY),
             _outputHash
         );
-        logs[8] = constructL2Log(
+        logs[6] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
             uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
@@ -208,7 +201,7 @@ library Utils {
     }
 
     function getGettersSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](30);
+        bytes4[] memory selectors = new bytes4[](31);
         selectors[0] = GettersFacet.getVerifier.selector;
         selectors[1] = GettersFacet.getAdmin.selector;
         selectors[2] = GettersFacet.getPendingAdmin.selector;
@@ -239,6 +232,7 @@ library Utils {
         selectors[27] = GettersFacet.getTotalBatchesExecuted.selector;
         selectors[28] = GettersFacet.getProtocolVersion.selector;
         selectors[29] = GettersFacet.getPriorityTreeRoot.selector;
+        selectors[30] = GettersFacet.getChainId.selector;
         return selectors;
     }
 
@@ -282,8 +276,8 @@ library Utils {
         selectors[23] = UtilsFacet.util_getValidator.selector;
         selectors[24] = UtilsFacet.util_setZkPorterAvailability.selector;
         selectors[25] = UtilsFacet.util_getZkPorterAvailability.selector;
-        selectors[26] = UtilsFacet.util_setStateTransitionManager.selector;
-        selectors[27] = UtilsFacet.util_getStateTransitionManager.selector;
+        selectors[26] = UtilsFacet.util_setChainTypeManager.selector;
+        selectors[27] = UtilsFacet.util_getChainTypeManager.selector;
         selectors[28] = UtilsFacet.util_setPriorityTxMaxGasLimit.selector;
         selectors[29] = UtilsFacet.util_getPriorityTxMaxGasLimit.selector;
         selectors[30] = UtilsFacet.util_setFeeParams.selector;
@@ -328,7 +322,7 @@ library Utils {
             InitializeData({
                 chainId: 1,
                 bridgehub: address(dummyBridgehub),
-                stateTransitionManager: address(0x1234567890876543567890),
+                chainTypeManager: address(0x1234567890876543567890),
                 protocolVersion: 0,
                 admin: address(0x32149872498357874258787),
                 validatorTimelock: address(0x85430237648403822345345),

@@ -62,7 +62,7 @@
     "test:fork": "TEST_CONTRACTS_FORK=1 yarn run hardhat test test/unit_tests/*.fork.ts --network hardhat",
     "coverage:foundry": "forge coverage --ffi",
     "deploy-no-build": "ts-node scripts/deploy.ts",
-    "register-hyperchain": "ts-node scripts/register-hyperchain.ts",
+    "register-zk-chain": "ts-node scripts/register-zk-chain.ts",
     "deploy-weth-bridges": "ts-node scripts/deploy-weth-bridges.ts",
     "initialize-l2-weth-token": "ts-node scripts/initialize-l2-weth-token.ts",
     "deploy-erc20": "ts-node scripts/deploy-erc20.ts",

@@ -2,12 +2,12 @@
 
 pragma solidity 0.8.24;
 
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {FeeParams} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {ZkSyncHyperchainBase} from "contracts/state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-contract UtilsFacet is ZkSyncHyperchainBase {
+contract UtilsFacet is ZKChainBase {
     function util_setChainId(uint256 _chainId) external {
         s.chainId = _chainId;
     }
@@ -120,12 +120,12 @@ contract UtilsFacet is ZkSyncHyperchainBase {
         return s.zkPorterIsAvailable;
     }
 
-    function util_setStateTransitionManager(address _stateTransitionManager) external {
-        s.stateTransitionManager = _stateTransitionManager;
+    function util_setChainTypeManager(address _chainTypeManager) external {
+        s.chainTypeManager = _chainTypeManager;
     }
 
-    function util_getStateTransitionManager() external view returns (address) {
-        return s.stateTransitionManager;
+    function util_getChainTypeManager() external view returns (address) {
+        return s.chainTypeManager;
     }
 
     function util_setPriorityTxMaxGasLimit(uint256 _priorityTxMaxGasLimit) external {

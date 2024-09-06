@@ -15,17 +15,17 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 contract ExecuteUpgradeTest is AdminTest {
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
 
-    function test_revertWhen_calledByNonGovernorOrStateTransitionManager() public {
-        address nonStateTransitionManager = makeAddr("nonStateTransitionManager");
+    function test_revertWhen_calledByNonGovernorOrChainTypeManager() public {
+        address nonChainTypeManager = makeAddr("nonChainTypeManager");
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
             initAddress: address(0),
             initCalldata: new bytes(0)
         });
 
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonStateTransitionManager));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonChainTypeManager));
 
-        vm.startPrank(nonStateTransitionManager);
+        vm.startPrank(nonChainTypeManager);
         adminFacet.executeUpgrade(diamondCutData);
     }
 
@@ -61,8 +61,8 @@ contract ExecuteUpgradeTest is AdminTest {
             initCalldata: abi.encodeCall(upgrade.upgrade, (proposedUpgrade))
         });
 
-        address stm = utilsFacet.util_getStateTransitionManager();
-        vm.startPrank(stm);
+        address ctm = utilsFacet.util_getChainTypeManager();
+        vm.startPrank(ctm);
 
         adminFacet.executeUpgrade(diamondCutData);
     }

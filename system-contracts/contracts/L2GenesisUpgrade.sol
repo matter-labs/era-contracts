@@ -14,7 +14,7 @@ import {IL2GenesisUpgrade} from "./interfaces/IL2GenesisUpgrade.sol";
 contract L2GenesisUpgrade is IL2GenesisUpgrade {
     function genesisUpgrade(
         uint256 _chainId,
-        address _stmDeployer,
+        address _ctmDeployer,
         bytes calldata _forceDeploymentsData
     ) external payable {
         // solhint-disable-next-line gas-custom-errors
@@ -32,7 +32,7 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
 
         bytes memory data = abi.encodeCall(
             L2_BRIDDGE_HUB.setAddresses,
-            (L2_ASSET_ROUTER, _stmDeployer, address(L2_MESSAGE_ROOT))
+            (L2_ASSET_ROUTER, _ctmDeployer, address(L2_MESSAGE_ROOT))
         );
 
         (bool success, bytes memory returnData) = SystemContractHelper.mimicCall(

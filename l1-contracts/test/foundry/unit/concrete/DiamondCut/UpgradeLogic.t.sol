@@ -6,14 +6,14 @@ import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
+import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {DiamondAlreadyFrozen, Unauthorized, DiamondFreezeIncorrectState, DiamondNotFrozen} from "contracts/common/L1ContractErrors.sol";
@@ -25,7 +25,7 @@ contract UpgradeLogicTest is DiamondCutTest {
     AdminFacet private proxyAsAdmin;
     GettersFacet private proxyAsGetters;
     address private admin;
-    address private stateTransitionManager;
+    address private chainTypeManager;
     address private randomSigner;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
@@ -46,7 +46,7 @@ contract UpgradeLogicTest is DiamondCutTest {
 
     function setUp() public {
         admin = makeAddr("admin");
-        stateTransitionManager = address(new DummyStateTransitionManager());
+        chainTypeManager = address(new DummyChainTypeManager());
         randomSigner = makeAddr("randomSigner");
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
 
@@ -79,7 +79,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             // TODO REVIEW
             chainId: 1,
             bridgehub: address(dummyBridgehub),
-            stateTransitionManager: stateTransitionManager,
+            chainTypeManager: chainTypeManager,
             protocolVersion: 0,
             admin: admin,
             validatorTimelock: makeAddr("validatorTimelock"),
@@ -126,8 +126,8 @@ contract UpgradeLogicTest is DiamondCutTest {
         proxyAsAdmin.freezeDiamond();
     }
 
-    function test_RevertWhen_DoubleFreezingBySTM() public {
-        vm.startPrank(stateTransitionManager);
+    function test_RevertWhen_DoubleFreezingByCTM() public {
+        vm.startPrank(chainTypeManager);
 
         proxyAsAdmin.freezeDiamond();
 
@@ -136,7 +136,7 @@ contract UpgradeLogicTest is DiamondCutTest {
     }
 
     function test_RevertWhen_UnfreezingWhenNotFrozen() public {
-        vm.startPrank(stateTransitionManager);
+        vm.startPrank(chainTypeManager);
 
         vm.expectRevert(DiamondNotFrozen.selector);
         proxyAsAdmin.unfreezeDiamond();
@@ -157,7 +157,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.startPrank(stateTransitionManager);
+        vm.startPrank(chainTypeManager);
 
         proxyAsAdmin.executeUpgrade(diamondCutData);
 
@@ -188,7 +188,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.startPrank(stateTransitionManager);
+        vm.startPrank(chainTypeManager);
 
         proxyAsAdmin.executeUpgrade(diamondCutData);
         proxyAsAdmin.executeUpgrade(diamondCutData);

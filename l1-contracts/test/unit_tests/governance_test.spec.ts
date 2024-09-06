@@ -24,7 +24,7 @@ describe("Admin facet tests", function () {
     randomSigner = (await hardhat.ethers.getSigners())[1];
   });
 
-  it("StateTransitionManager successfully set validator", async () => {
+  it("ChainTypeManager successfully set validator", async () => {
     const validatorAddress = randomAddress();
     await adminFacetTest.setValidator(validatorAddress, true);
 
@@ -40,7 +40,7 @@ describe("Admin facet tests", function () {
     expect(revertReason).contains("Unauthorized");
   });
 
-  it("StateTransitionManager successfully set porter availability", async () => {
+  it("ChainTypeManager successfully set porter availability", async () => {
     await adminFacetTest.setPorterAvailability(true);
 
     const porterAvailability = await adminFacetTest.getPorterAvailability();
@@ -52,7 +52,7 @@ describe("Admin facet tests", function () {
     expect(revertReason).contains("Unauthorized");
   });
 
-  it("StateTransitionManager successfully set priority transaction max gas limit", async () => {
+  it("ChainTypeManager successfully set priority transaction max gas limit", async () => {
     const gasLimit = "12345678";
     await adminFacetTest.setPriorityTxMaxGasLimit(gasLimit);
 
