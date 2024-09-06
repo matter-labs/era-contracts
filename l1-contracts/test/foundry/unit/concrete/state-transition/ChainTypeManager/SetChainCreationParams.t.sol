@@ -8,6 +8,10 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "contracts/common/Config.sol";
 
 contract SetChainCreationParamsTest is ChainTypeManagerTest {
+    function setUp() public {
+        deploy();
+    }
+
     function test_SettingInitialCutHash() public {
         bytes32 initialCutHash = keccak256(abi.encode(getDiamondCutData(address(diamondInit))));
         address randomDiamondInit = address(0x303030303030303030303);

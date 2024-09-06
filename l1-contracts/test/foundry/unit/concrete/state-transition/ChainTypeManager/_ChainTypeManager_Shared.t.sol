@@ -8,6 +8,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -27,7 +28,7 @@ contract ChainTypeManagerTest is Test {
     ChainTypeManager internal chainTypeManager;
     ChainTypeManager internal chainContractAddress;
     GenesisUpgrade internal genesisUpgradeContract;
-    address internal bridgehub;
+    Bridgehub internal bridgehub;
     address internal diamondInit;
     address internal constant governor = address(0x1010101);
     address internal constant admin = address(0x2020202);
@@ -41,8 +42,7 @@ contract ChainTypeManagerTest is Test {
     Diamond.FacetCut[] internal facetCuts;
 
     function setUp() public {
-        DummyBridgehub dummyBridgehub = new DummyBridgehub();
-        bridgehub = address(dummyBridgehub);
+        bridgehub = new Bridgehub();
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(bridgehub);
@@ -134,7 +134,7 @@ contract ChainTypeManagerTest is Test {
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
         vm.stopPrank();
-        vm.startPrank(bridgehub);
+        vm.startPrank(address(bridgehub));
 
         return
             chainContractAddress.createNewChain({

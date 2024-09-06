@@ -7,6 +7,10 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {Unauthorized, HashMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract createNewChainTest is ChainTypeManagerTest {
+    function setUp() public {
+        deploy();
+    }
+
     function test_RevertWhen_InitialDiamondCutHashMismatch() public {
         Diamond.DiamondCutData memory initialDiamondCutData = getDiamondCutData(sharedBridge);
         Diamond.DiamondCutData memory correctDiamondCutData = getDiamondCutData(address(diamondInit));

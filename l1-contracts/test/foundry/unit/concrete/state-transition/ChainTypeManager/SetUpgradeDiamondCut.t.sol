@@ -4,7 +4,15 @@ pragma solidity 0.8.24;
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
+<<<<<<< HEAD:l1-contracts/test/foundry/unit/concrete/state-transition/ChainTypeManager/SetUpgradeDiamondCut.t.sol
 contract setUpgradeDiamondCutTest is ChainTypeManagerTest {
+=======
+contract setUpgradeDiamondCutTest is ChainTypeManagerTest {
+    function setUp() public {
+        deploy();
+    }
+
+>>>>>>> dev:l1-contracts/test/foundry/unit/concrete/state-transition/StateTransitionManager/SetUpgradeDiamondCut.t.sol
     function test_SettingUpgradeDiamondCut() public {
         assertEq(chainContractAddress.protocolVersion(), 0, "Initial protocol version is not correct");
 
