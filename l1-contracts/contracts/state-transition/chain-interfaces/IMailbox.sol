@@ -101,23 +101,14 @@ interface IMailbox is IZkSyncHyperchainBase {
     ) external returns (bytes32 canonicalTxHash);
 
     /// @dev On the Gateway the chain's mailbox receives the tx from the bridgehub.
-    function bridgehubRequestL2TransactionOnGateway(
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external;
+    function bridgehubRequestL2TransactionOnGateway(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) external;
 
     /// @dev On L1 we have to forward to the Gateway's mailbox which sends to the Bridgehub on the Gw
     /// @param _chainId the chainId of the chain
-    /// @param _transaction the transaction to be relayed
-    /// @param _factoryDeps the factory dependencies
     /// @param _canonicalTxHash the canonical transaction hash
     /// @param _expirationTimestamp the expiration timestamp
     function requestL2TransactionToGatewayMailbox(
         uint256 _chainId,
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external returns (bytes32 canonicalTxHash);
@@ -175,4 +166,13 @@ interface IMailbox is IZkSyncHyperchainBase {
         L2CanonicalTransaction transaction,
         bytes[] factoryDeps
     );
+
+    /// @notice New relayed priority request event. It is emitted on a chain that is deployed
+    /// on top of the gateway when it receives a request relayed via the Bridgehub.
+    /// @dev IMPORTANT: this event most likely will be removed in the future, so
+    /// no one should rely on it for indexing purposes.
+    /// @param txId Serial number of the priority operation
+    /// @param txHash keccak256 hash of encoded transaction representation
+    /// @param expirationTimestamp Timestamp up to which priority request should be processed
+    event NewRelayedPriorityTransaction(uint256 txId, bytes32 txHash, uint64 expirationTimestamp);
 }

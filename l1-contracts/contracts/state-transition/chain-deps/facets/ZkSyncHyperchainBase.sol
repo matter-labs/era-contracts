@@ -4,13 +4,17 @@ pragma solidity 0.8.24;
 
 import {ZkSyncHyperchainStorage} from "../ZkSyncHyperchainStorage.sol";
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
-
+import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
+import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {Unauthorized} from "../../../common/L1ContractErrors.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract ZkSyncHyperchainBase is ReentrancyGuard {
+    using PriorityQueue for PriorityQueue.Queue;
+    using PriorityTree for PriorityTree.Tree;
+
     // slither-disable-next-line uninitialized-state
     ZkSyncHyperchainStorage internal s;
 
@@ -63,5 +67,13 @@ contract ZkSyncHyperchainBase is ReentrancyGuard {
             revert Unauthorized(msg.sender);
         }
         _;
+    }
+
+    function _getTotalPriorityTxs() internal view returns (uint256) {
+        if (s.priorityQueue.getFirstUnprocessedPriorityTx() >= s.priorityTree.startIndex) {
+            return s.priorityTree.getTotalPriorityTxs();
+        } else {
+            return s.priorityQueue.getTotalPriorityTxs();
+        }
     }
 }

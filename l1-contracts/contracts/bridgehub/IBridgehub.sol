@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the zkSync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
@@ -207,8 +207,6 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function forwardTransactionOnGateway(
         uint256 _chainId,
-        L2CanonicalTransaction calldata _transaction,
-        bytes[] calldata _factoryDeps,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external;
