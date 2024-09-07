@@ -15,7 +15,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 
-import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {Unauthorized, AssetHandlerDoesNotExist} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs

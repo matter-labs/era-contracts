@@ -2,11 +2,8 @@
 
 pragma solidity 0.8.24;
 
-// import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
-
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
-import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";

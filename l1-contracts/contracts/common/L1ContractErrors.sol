@@ -212,6 +212,8 @@ error NonEmptyMsgValue();
 error NonIncreasingTimestamp();
 // 0x0105f9c0
 error NonSequentialBatch();
+//
+error NonSequentialVersion();
 // 0x4ef79e5a
 error NonZeroAddress(address);
 // 0xdd629f86

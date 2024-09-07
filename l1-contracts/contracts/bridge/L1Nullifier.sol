@@ -300,7 +300,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) public nonReentrant whenNotPaused {
-        _bridgeVerifyFailedTransfer({
+        _verifyAndClearFailedTransfer({
             _chainId: _chainId,
             _depositSender: _depositSender,
             _assetId: _assetId,
@@ -328,7 +328,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent.
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
-    function _bridgeVerifyFailedTransfer(
+    function _verifyAndClearFailedTransfer(
         uint256 _chainId,
         address _depositSender,
         bytes32 _assetId,
@@ -634,7 +634,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         // bytes memory transferData = abi.encode(_amount, _depositSender);
         bytes memory assetData = abi.encode(_amount, address(0));
 
-        _bridgeVerifyFailedTransfer({
+        _verifyAndClearFailedTransfer({
             _depositSender: _depositSender,
             _chainId: _chainId,
             _assetId: assetId,
@@ -691,7 +691,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         /// the legacy bridge can only be used with L1 native tokens.
         bytes32 assetId = INativeTokenVault(address(l1NativeTokenVault)).getAssetId(block.chainid, _l1Asset);
 
-        _bridgeVerifyFailedTransfer({
+        _verifyAndClearFailedTransfer({
             _depositSender: _depositSender,
             _chainId: ERA_CHAIN_ID,
             _assetId: assetId,
