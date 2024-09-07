@@ -70,10 +70,10 @@ library Merkle {
     /// @param _itemHashes Hashes of the elements in the range
     /// @return The Merkle root
     function calculateRootPaths(
-        bytes32[] calldata _startPath,
-        bytes32[] calldata _endPath,
+        bytes32[] memory _startPath,
+        bytes32[] memory _endPath,
         uint256 _startIndex,
-        bytes32[] calldata _itemHashes
+        bytes32[] memory _itemHashes
     ) internal pure returns (bytes32) {
         uint256 pathLength = _startPath.length;
         require(pathLength == _endPath.length, "Merkle: path length mismatch");
