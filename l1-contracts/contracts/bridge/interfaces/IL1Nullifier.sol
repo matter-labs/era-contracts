@@ -71,15 +71,13 @@ interface IL1Nullifier {
 
     function bridgehubConfirmL2TransactionForwarded(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 
-    function hyperbridgingEnabled(uint256 _chainId) external view returns (bool);
-
     function l1NativeTokenVault() external view returns (IL1NativeTokenVault);
 
     function setL1NativeTokenVault(IL1NativeTokenVault _nativeTokenVault) external;
 
     function setL1AssetRouter(address _l1AssetRouter) external;
 
-    function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
+    function __DEPRECATED_chainBalance(uint256 _chainId, address _token) external view returns (uint256);
 
     function transferTokenToNTV(address _token) external;
 

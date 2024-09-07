@@ -224,7 +224,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             // empty deposit amount
             revert EmptyDeposit();
         }
-        uint256 amount = _depositFundsToNTV(msg.sender, IERC20(_l1Token), _amount);
+        uint256 amount = _depositFundsToAssetRouter(msg.sender, IERC20(_l1Token), _amount);
         if (amount != _amount) {
             // The token has non-standard transfer logic
             revert TokensWithFeesNotSupported();
@@ -255,10 +255,10 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev Transfers tokens from the depositor address to the native token vault address.
     /// @return The difference between the contract balance before and after the transferring of funds.
-    function _depositFundsToNTV(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
-        uint256 balanceBefore = _token.balanceOf(address(L1_NATIVE_TOKEN_VAULT));
-        _token.safeTransferFrom(_from, address(L1_NATIVE_TOKEN_VAULT), _amount);
-        uint256 balanceAfter = _token.balanceOf(address(L1_NATIVE_TOKEN_VAULT));
+    function _depositFundsToAssetRouter(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
+        uint256 balanceBefore = _token.balanceOf(address(L1_ASSET_ROUTER));
+        _token.safeTransferFrom(_from, address(L1_ASSET_ROUTER), _amount);
+        uint256 balanceAfter = _token.balanceOf(address(L1_ASSET_ROUTER));
 
         return balanceAfter - balanceBefore;
     }

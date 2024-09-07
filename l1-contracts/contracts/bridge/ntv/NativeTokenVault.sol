@@ -52,6 +52,13 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev A mapping assetId => isTokenBridged
     mapping(bytes32 assetId => bool bridged) public isTokenBridged; // kl todo should we have isTokenNativeInstead
 
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[47] private __gap;
+
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyAssetRouter() {
         if (msg.sender != address(ASSET_ROUTER)) {

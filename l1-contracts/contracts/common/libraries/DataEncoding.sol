@@ -113,5 +113,5 @@ library DataEncoding {
             // In the legacy data hash, the first encoded variable was the address, which is padded with zeros during `abi.encode`.
             txDataHash = keccak256(bytes.concat(_encodingVersion, abi.encode(_prevMsgSender, _assetId, _transferData)));
         }
-    } // kl todo this function
+    }
 }

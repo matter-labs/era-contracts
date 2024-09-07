@@ -7,7 +7,6 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-// import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
@@ -25,9 +24,7 @@ import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {L2Message, TxStatus} from "../common/Messaging.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-// import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {BASE_TOKEN_VIRTUAL_ADDRESS} from "../common/Config.sol";
-// import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
@@ -95,12 +92,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @notice Deprecated. Kept for backwards compatibility.
     /// @dev Indicates whether the hyperbridging is enabled for a given chain.
     // slither-disable-next-line uninitialized-state
-    mapping(uint256 chainId => bool enabled) public hyperbridgingEnabled;
+    mapping(uint256 chainId => bool enabled) private __DEPRECATED_hyperbridgingEnabled;
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chain.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
-    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
+    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public __DEPRECATED_chainBalance;
 
     /// @dev Address of L1 asset router.
     IL1AssetRouter public l1AssetRouter;
@@ -187,9 +184,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @notice Transfers tokens from shared bridge to native token vault.
     /// @dev This function is part of the upgrade process used to transfer liquidity.
     /// @param _token The address of the token to be transferred to NTV.
-    function transferTokenToNTV(address _token) external {
+    function transferTokenToNTV(address _token) external onlyL1NTV {
         address ntvAddress = address(l1NativeTokenVault);
-        require(msg.sender == ntvAddress, "L1N: not NTV");
         if (BASE_TOKEN_VIRTUAL_ADDRESS == _token) {
             uint256 amount = address(this).balance;
             bool callSuccess;
@@ -209,7 +205,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _token The address of the token which was previously deposit to shared bridge.
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external {
         require(msg.sender == address(l1NativeTokenVault), "L1N: not NTV");
-        chainBalance[_chainId][_token] = 0;
+        __DEPRECATED_chainBalance[_chainId][_token] = 0;
     }
 
     /// @notice Legacy function used for migration, do not use!

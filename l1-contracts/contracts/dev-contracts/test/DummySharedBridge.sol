@@ -33,7 +33,6 @@ contract DummySharedBridge is PausableUpgradeable {
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 
     /// @dev Indicates whether the hyperbridging is enabled for a given chain.
-    mapping(uint256 chainId => bool enabled) internal hyperbridgingEnabled;
 
     address l1ReceiverReturnInFinalizeWithdrawal;
     address l1TokenReturnInFinalizeWithdrawal;
@@ -153,9 +152,7 @@ contract DummySharedBridge is PausableUpgradeable {
         // Dummy bridge supports only working with ETH for simplicity.
         require(msg.value == _amount, "L1AR: msg.value not equal to amount");
 
-        if (!hyperbridgingEnabled[_chainId]) {
-            chainBalance[_chainId][address(1)] += _amount;
-        }
+        chainBalance[_chainId][address(1)] += _amount;
 
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
         emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _assetId, _amount);

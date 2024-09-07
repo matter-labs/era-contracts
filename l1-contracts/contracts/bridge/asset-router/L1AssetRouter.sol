@@ -8,6 +8,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
+import {IL2AssetRouter} from "./IL2AssetRouter.sol";
 import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
@@ -32,11 +33,7 @@ import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Bridges assets between L1 and ZK chain, supporting both ETH and ERC20 tokens.
 /// @dev Designed for use with a proxy for upgradability.
-contract L1AssetRouter is
-    AssetRouterBase,
-    IL1AssetRouter, // IL1SharedBridgeLegacy,
-    ReentrancyGuard
-{
+contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token on L1.
@@ -175,7 +172,7 @@ contract L1AssetRouter is
         address _prevMsgSender,
         bytes32 _assetId,
         address _assetHandlerAddressOnCounterpart
-    ) internal view override returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
         IL1AssetDeploymentTracker(assetDeploymentTracker[_assetId]).bridgeCheckCounterpartAddress(
             _chainId,
             _assetId,
@@ -184,7 +181,7 @@ contract L1AssetRouter is
         );
 
         bytes memory l2Calldata = abi.encodeCall(
-            IAssetRouterBase.setAssetHandlerAddress,
+            IL2AssetRouter.setAssetHandlerAddress,
             (block.chainid, _assetId, _assetHandlerAddressOnCounterpart)
         );
         request = L2TransactionRequestTwoBridgesInner({

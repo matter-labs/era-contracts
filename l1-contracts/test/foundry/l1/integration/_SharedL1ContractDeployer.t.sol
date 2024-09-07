@@ -91,7 +91,7 @@ contract L1ContractDeployer is Test {
     function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
         stdstore
             .target(address(l1Nullifier))
-            .sig(l1Nullifier.chainBalance.selector)
+            .sig(l1Nullifier.__DEPRECATED_chainBalance.selector)
             .with_key(_chainId)
             .with_key(_token)
             .checked_write(_value);

@@ -50,6 +50,13 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @dev For the asset and stores respective addresses.
     mapping(bytes32 assetId => address assetDeploymentTracker) public assetDeploymentTracker;
 
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[47] private __gap;
+
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
         if (msg.sender != address(BRIDGE_HUB)) {
@@ -90,22 +97,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         assetHandlerAddress[_assetId] = _assetAddress;
         emit AssetHandlerRegistered(_assetId, _assetAddress);
     }
-
-    /// @dev Used to set the asset handler address on another chain. Not needed for NTV tokens.
-    /// @dev Currently only enabled on L1.
-    function _setAssetHandlerAddressOnCounterpart(
-        uint256 _chainId,
-        address _prevMsgSender,
-        bytes32 _assetId,
-        address _assetHandlerAddressOnCounterpart
-    ) internal virtual returns (L2TransactionRequestTwoBridgesInner memory request) {}
-
-    /// @inheritdoc IAssetRouterBase
-    function setAssetHandlerAddress(
-        uint256 _originChainId,
-        bytes32 _assetId,
-        address _assetAddress
-    ) external virtual override {}
 
     /*//////////////////////////////////////////////////////////////
                             INITIATTE DEPOSIT Functions
