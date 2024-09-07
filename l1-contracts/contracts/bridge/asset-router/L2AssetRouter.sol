@@ -15,13 +15,13 @@ import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 
-import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero, FunctionNotSupported} from "../../common/L1ContractErrors.sol";
+import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -101,46 +101,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /*//////////////////////////////////////////////////////////////
                             INITIATTE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc IAssetRouterBase
-    function bridgehubDepositBaseToken(
-        uint256,
-        bytes32,
-        address,
-        uint256
-    ) public payable virtual override onlyBridgehub whenNotPaused {
-        /// @dev in the future we will make all L2->L1 messages go through the bridgehub
-        revert FunctionNotSupported();
-    }
-
-    /// @inheritdoc IAssetRouterBase
-    function bridgehubDeposit(
-        uint256,
-        address,
-        uint256,
-        bytes calldata
-    )
-        external
-        payable
-        virtual
-        override
-        onlyBridgehub
-        whenNotPaused
-        returns (L2TransactionRequestTwoBridgesInner memory)
-    {
-        /// @dev in the future we will make all L2->L1 messages go through the bridgehub
-        revert FunctionNotSupported();
-    }
-
-    function _getLegacyNTVCalldata(
-        address,
-        address,
-        address,
-        uint256,
-        bytes memory
-    ) internal view override returns (bytes memory) {
-        revert FunctionNotSupported();
-    }
 
     /*//////////////////////////////////////////////////////////////
                             Receive transaction Functions

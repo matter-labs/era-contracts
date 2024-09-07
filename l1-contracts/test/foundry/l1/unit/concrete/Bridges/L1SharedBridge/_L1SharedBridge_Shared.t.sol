@@ -156,10 +156,11 @@ contract L1AssetRouterTest is Test {
             _eraChainId: eraChainId,
             _l1Nullifier: l1Nullifier
         });
+        address tokenBeacon = makeAddr("tokenBeacon");
         TransparentUpgradeableProxy nativeTokenVaultProxy = new TransparentUpgradeableProxy(
             address(nativeTokenVaultImpl),
             admin,
-            abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner)
+            abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner, tokenBeacon)
         );
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
 

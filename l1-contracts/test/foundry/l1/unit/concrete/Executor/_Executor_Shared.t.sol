@@ -285,7 +285,7 @@ contract ExecutorTest is Test {
 
         vm.mockCall(
             address(sharedBridge),
-            abi.encodeWithSelector(IAssetRouterBase.bridgehubDepositBaseToken.selector),
+            abi.encodeWithSelector(IL1AssetRouter.bridgehubDepositBaseToken.selector),
             abi.encode(true)
         );
     }

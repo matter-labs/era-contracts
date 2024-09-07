@@ -54,10 +54,10 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         _generateUserAddresses();
 
         _deployL1Contracts();
-        _deployTokens();
-        _registerNewTokens(tokens);
+        // _deployTokens();
+        // _registerNewTokens(tokens);
 
-        _deployEra();
+        // _deployEra();
         // _deployHyperchain(BASE_TOKEN_VIRTUAL_ADDRESS);
         // _deployHyperchain(BASE_TOKEN_VIRTUAL_ADDRESS);
         // _deployHyperchain(tokens[0]);

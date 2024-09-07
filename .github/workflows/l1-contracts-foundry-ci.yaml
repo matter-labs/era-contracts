@@ -115,10 +115,9 @@ jobs:
         working-directory: ./l1-contracts
         run: forge script ./deploy-scripts/DeployL1.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
 
-      # kl todo reenable
-      # - name: Run DeployErc20 script
-      #   working-directory: ./l1-contracts
-      #   run: forge script ./deploy-scripts/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+      - name: Run DeployErc20 script
+        working-directory: ./l1-contracts
+        run: forge script ./deploy-scripts/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
 # TODO restore scripts verification
 #      - name: Run RegisterZKChain script
 #        working-directory: ./l1-contracts

@@ -6,7 +6,7 @@ import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+// import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetHandler} from "../bridge/interfaces/IAssetHandler.sol";
 
 struct L2TransactionRequestDirect {
@@ -105,7 +105,7 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
-    function sharedBridge() external view returns (IAssetRouterBase);
+    function sharedBridge() external view returns (address);
 
     function messageRoot() external view returns (IMessageRoot);
 

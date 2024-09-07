@@ -50,7 +50,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             address(nativeTokenVaultImpl),
             admin,
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, address(0))
+            abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, address(0), address(0))
         );
     }
 

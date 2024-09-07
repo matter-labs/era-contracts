@@ -115,7 +115,7 @@ interface IChainTypeManager {
     function createNewChain(
         uint256 _chainId,
         bytes32 _baseTokenAssetId,
-        address _sharedBridge,
+        address _assetRouter,
         address _admin,
         bytes calldata _initData,
         bytes[] calldata _factoryDeps

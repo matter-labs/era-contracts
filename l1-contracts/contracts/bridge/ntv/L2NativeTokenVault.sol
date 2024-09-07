@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
 import {INativeTokenVault} from "./INativeTokenVault.sol";
@@ -70,9 +71,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         } else {
             address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
 
-            bridgedTokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
+            UpgradeableBeacon tokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
 
-            bridgedTokenBeacon.transferOwnership(owner());
+            tokenBeacon.transferOwnership(owner());
+            bridgedTokenBeacon = IBeacon(address(tokenBeacon));
             emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
         }
     }

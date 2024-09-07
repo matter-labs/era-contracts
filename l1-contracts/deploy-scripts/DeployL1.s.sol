@@ -7,6 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {Verifier} from "contracts/state-transition/Verifier.sol";
@@ -38,6 +39,7 @@ import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -105,6 +107,8 @@ contract DeployL1Script is Script {
         address sharedBridgeProxy;
         address l1NullifierImplementation;
         address l1NullifierProxy;
+        address bridgedStandardERC20Implementation;
+        address bridgedTokenBeacon;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -176,6 +180,8 @@ contract DeployL1Script is Script {
 
         deployL1NullifierContracts();
         deploySharedBridgeContracts();
+        deployBridgedStandardERC20Implementation();
+        deployBridgedTokenBeacon();
         deployL1NativeTokenVaultImplementation();
         deployL1NativeTokenVaultProxy();
         deployErc20BridgeImplementation();
@@ -760,6 +766,30 @@ contract DeployL1Script is Script {
         console.log("SharedBridge updated with ERC20Bridge address");
     }
 
+    function deployBridgedStandardERC20Implementation() internal {
+        bytes memory bytecode = abi.encodePacked(
+            type(BridgedStandardERC20).creationCode,
+            // solhint-disable-next-line func-named-parameters
+            abi.encode()
+        );
+        address contractAddress = deployViaCreate2(bytecode);
+        console.log("BridgedStandardERC20Implementation deployed at:", contractAddress);
+        addresses.bridges.bridgedStandardERC20Implementation = contractAddress;
+    }
+
+    function deployBridgedTokenBeacon() internal {
+        bytes memory bytecode = abi.encodePacked(
+            type(UpgradeableBeacon).creationCode,
+            // solhint-disable-next-line func-named-parameters
+            abi.encode(addresses.bridges.bridgedStandardERC20Implementation)
+        );
+        UpgradeableBeacon beacon = new UpgradeableBeacon(addresses.bridges.bridgedStandardERC20Implementation);
+        address contractAddress = address(beacon);
+        beacon.transferOwnership(config.ownerAddress);
+        console.log("BridgedTokenBeacon deployed at:", contractAddress);
+        addresses.bridges.bridgedTokenBeacon = contractAddress;
+    }
+
     function deployL1NativeTokenVaultImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(L1NativeTokenVault).creationCode,
@@ -777,7 +807,10 @@ contract DeployL1Script is Script {
     }
 
     function deployL1NativeTokenVaultProxy() internal {
-        bytes memory initCalldata = abi.encodeCall(L1NativeTokenVault.initialize, config.ownerAddress);
+        bytes memory initCalldata = abi.encodeCall(
+            L1NativeTokenVault.initialize,
+            (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
+        );
         bytes memory bytecode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(addresses.vaults.l1NativeTokenVaultImplementation, addresses.transparentProxyAdmin, initCalldata)

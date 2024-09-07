@@ -74,7 +74,6 @@ import { IL1AssetRouterFactory } from "../typechain/IL1AssetRouterFactory";
 import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
 import { IL1NullifierFactory } from "../typechain/IL1NullifierFactory";
 import { ICTMDeploymentTrackerFactory } from "../typechain/ICTMDeploymentTrackerFactory";
-
 import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory";
 
 import { RollupL1DAValidatorFactory } from "../../da-contracts/typechain/RollupL1DAValidatorFactory";
@@ -932,6 +931,47 @@ export class Deployer {
     this.addresses.Bridges.SharedBridgeProxy = contractAddress;
   }
 
+  public async deployBridgedStandardERC20Implementation(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
+    const contractAddress = await this.deployViaCreate2("BridgedStandardERC20", [], create2Salt, ethTxOptions);
+
+    if (this.verbose) {
+      // console.log(`With era chain id ${eraChainId}`);
+      console.log(`CONTRACTS_L1_BRIDGED_STANDARD_ERC20_IMPL_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.Bridges.BridgedStandardERC20Implementation = contractAddress;
+
+    // let bridgedStandardERC20 = BridgedStandardERC20Factory.connect(contractAddress, this.deployWallet);
+    // await bridgedStandardERC20.transferOwnership(this.addresses.Governance);
+  }
+
+  public async deployBridgedTokenBeacon(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    /// Note we cannot use create2 as the deployer is the owner.
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractFactory = await hardhat.ethers.getContractFactory(
+      "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon",
+      {
+        signer: this.deployWallet,
+      }
+    );
+    const beacon = await contractFactory.deploy(
+      ...[this.addresses.Bridges.BridgedStandardERC20Implementation, ethTxOptions]
+    );
+    const rec = await beacon.deployTransaction.wait();
+
+    if (this.verbose) {
+      console.log("Beacon deployed with tx hash", rec.transactionHash);
+      console.log(`CONTRACTS_L1_BRIDGED_TOKEN_BEACON_ADDR=${beacon.address}`);
+    }
+
+    this.addresses.Bridges.BridgedTokenBeacon = beacon.address;
+
+    await beacon.transferOwnership(this.addresses.Governance);
+  }
+
   public async deployNativeTokenVaultImplementation(
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest
@@ -957,7 +997,7 @@ export class Deployer {
   public async deployNativeTokenVaultProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const initCalldata = new Interface(hardhat.artifacts.readArtifactSync("L1NativeTokenVault").abi).encodeFunctionData(
       "initialize",
-      [this.addresses.Governance]
+      [this.addresses.Governance, this.addresses.Bridges.BridgedTokenBeacon]
     );
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
@@ -1524,8 +1564,10 @@ export class Deployer {
     nonce = nonce + 2;
     await this.deploySharedBridgeImplementation(create2Salt, { gasPrice, nonce: nonce });
     await this.deploySharedBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
-
-    await this.deployNativeTokenVaultImplementation(create2Salt, { gasPrice, nonce: nonce + 2 });
+    nonce = nonce + 2;
+    await this.deployBridgedStandardERC20Implementation(create2Salt, { gasPrice, nonce: nonce });
+    await this.deployBridgedTokenBeacon(create2Salt, { gasPrice, nonce: nonce + 1 });
+    await this.deployNativeTokenVaultImplementation(create2Salt, { gasPrice, nonce: nonce + 3 });
     await this.deployNativeTokenVaultProxy(create2Salt, { gasPrice });
     await this.deployCTMDeploymentTrackerImplementation(create2Salt, { gasPrice });
     await this.deployCTMDeploymentTrackerProxy(create2Salt, { gasPrice });

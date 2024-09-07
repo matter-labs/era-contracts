@@ -11,6 +11,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, BridgehubMintCTMAssetData, BridgehubBurnCTMAssetData} from "./IBridgehub.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1BaseTokenAssetHandler} from "../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -46,7 +47,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
 
     /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by this shared Bridge.
-    IAssetRouterBase public sharedBridge;
+    address public assetRouter;
 
     /// @notice ChainTypeManagers that are registered, and ZKchains that use these CTMs can use this bridgehub as settlement layer.
     mapping(address chainTypeManager => bool) public chainTypeManagerIsRegistered;
@@ -123,7 +124,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     modifier onlyAssetRouter() {
-        require(msg.sender == address(sharedBridge), "BH: not asset router");
+        require(msg.sender == assetRouter, "BH: not asset router");
         _;
     }
 
@@ -189,15 +190,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice To set the addresses of some of the ecosystem contracts, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, other contracts, and then we call this.
-    /// @param _sharedBridge the shared bridge address
+    /// @param _assetRouter the shared bridge address
     /// @param _l1CtmDeployer the ctm deployment tracker address. Note, that the address of the L1 CTM deployer is provided.
     /// @param _messageRoot the message root address
     function setAddresses(
-        address _sharedBridge,
+        address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot
     ) external onlyOwner {
-        sharedBridge = IAssetRouterBase(_sharedBridge);
+        assetRouter = _assetRouter;
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
     }
@@ -344,7 +345,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         require(assetIdIsRegistered[_baseTokenAssetId], "BH: asset id not registered");
 
-        if (address(sharedBridge) == address(0)) {
+        if (assetRouter == address(0)) {
             revert SharedBridgeNotSet();
         }
         if (chainTypeManager[_chainId] != address(0)) {
@@ -359,7 +360,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address chainAddress = IChainTypeManager(_chainTypeManager).createNewChain({
             _chainId: _chainId,
             _baseTokenAssetId: _baseTokenAssetId,
-            _sharedBridge: address(sharedBridge),
+            _assetRouter: assetRouter,
             _admin: _admin,
             _initData: _initData,
             _factoryDeps: _factoryDeps
@@ -387,7 +388,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice baseToken function, which takes chainId as input, reads assetHandler from AR, and tokenAddress from AH
     function baseToken(uint256 _chainId) public view returns (address) {
         bytes32 baseTokenAssetId = baseTokenAssetId[_chainId];
-        address assetHandlerAddress = sharedBridge.assetHandlerAddress(baseTokenAssetId);
+        address assetHandlerAddress = IAssetRouterBase(assetRouter).assetHandlerAddress(baseTokenAssetId);
 
         // It is possible that the asset handler is not deployed for a chain on the current layer.
         // In this case we throw an error.
@@ -434,7 +435,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                         Mailbox forwarder
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice the mailbox is called directly after the sharedBridge received the deposit
+    /// @notice the mailbox is called directly after the assetRouter received the deposit
     /// this assumes that either ether is the base token or
     /// the msg.sender has approved mintValue allowance for the nativeTokenVault.
     /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token.
@@ -457,7 +458,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             }
 
             // slither-disable-next-line arbitrary-send-eth
-            sharedBridge.bridgehubDepositBaseToken{value: msg.value}(
+            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -482,7 +483,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         );
     }
 
-    /// @notice After depositing funds to the sharedBridge, the secondBridge is called
+    /// @notice After depositing funds to the assetRouter, the secondBridge is called
     ///  to return the actual L2 message which is sent to the Mailbox.
     ///  This assumes that either ether is the base token or
     ///  the msg.sender has approved the nativeTokenVault with the mintValue,
@@ -517,7 +518,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             }
 
             // slither-disable-next-line arbitrary-send-eth
-            sharedBridge.bridgehubDepositBaseToken{value: baseTokenMsgValue}(
+            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -530,7 +531,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         }
 
         // slither-disable-next-line arbitrary-send-eth
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IAssetRouterBase(_request.secondBridgeAddress)
+        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1AssetRouter(_request.secondBridgeAddress)
             .bridgehubDeposit{value: _request.secondBridgeValue}(
             _request.chainId,
             msg.sender,
@@ -558,7 +559,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             })
         );
 
-        IAssetRouterBase(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
+        IL1AssetRouter(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
             _request.chainId,
             outputRequest.txDataHash,
             canonicalTxHash
@@ -811,5 +812,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice return the ZK chain contract for a chainId
     function getHyperchain(uint256 _chainId) public view returns (address) {
         return getZKChain(_chainId);
+    }
+
+    /// @notice return the asset router
+    function sharedBridge() public view returns (address) {
+        return assetRouter;
     }
 }

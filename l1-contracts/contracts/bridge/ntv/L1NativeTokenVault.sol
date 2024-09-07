@@ -5,12 +5,11 @@ pragma solidity 0.8.24;
 // solhint-disable reason-string, gas-custom-errors
 
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
+import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
-import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 
 import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "./INativeTokenVault.sol";
@@ -63,15 +62,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Initializes a contract for later use. Expected to be used in the proxy
     /// @param _owner Address which can change pause / unpause the NTV
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    function initialize(address _owner) external initializer {
+    function initialize(address _owner, address _bridgedTokenBeacon) external initializer {
         if (_owner == address(0)) {
             revert ZeroAddress();
         }
-        address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
-
-        bridgedTokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
-        bridgedTokenBeacon.transferOwnership(_owner);
-        emit TokenBeaconUpdated(address(bridgedTokenBeacon));
+        bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
         _transferOwnership(_owner);
     }
 
@@ -193,6 +188,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     // kl todo move to beacon proxy here as well
     function _deployBeaconProxy(bytes32 _salt) internal override returns (BeaconProxy proxy) {
         // Use CREATE2 to deploy the BeaconProxy
+
         address proxyAddress = Create2.deploy(
             0,
             _salt,

@@ -134,6 +134,8 @@ export interface DeployedAddresses {
     L2NativeTokenVaultProxy: string;
     NativeTokenVaultImplementation: string;
     NativeTokenVaultProxy: string;
+    BridgedStandardERC20Implementation: string;
+    BridgedTokenBeacon: string;
   };
   BaseTokenAssetId: string;
   BaseToken: string;
@@ -195,6 +197,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       L2SharedBridgeProxy: getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR"),
       NativeTokenVaultImplementation: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_IMPL_ADDR"),
       NativeTokenVaultProxy: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_PROXY_ADDR"),
+      BridgedStandardERC20Implementation: getAddressFromEnv("CONTRACTS_L1_BRIDGED_STANDARD_ERC20_IMPL_ADDR"),
+      BridgedTokenBeacon: getAddressFromEnv("CONTRACTS_L1_BRIDGED_TOKEN_BEACON_ADDR"),
     },
     RollupL1DAValidator: getAddressFromEnv("CONTRACTS_L1_ROLLUP_DA_VALIDATOR"),
     ValidiumL1DAValidator: getAddressFromEnv("CONTRACTS_L1_VALIDIUM_DA_VALIDATOR"),

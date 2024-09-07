@@ -146,7 +146,7 @@ contract ChainTypeManagerTest is Test {
             chainContractAddress.createNewChain({
                 _chainId: chainId,
                 _baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, baseToken),
-                _sharedBridge: sharedBridge,
+                _assetRouter: sharedBridge,
                 _admin: newChainAdmin,
                 _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
                 _factoryDeps: new bytes[](0)

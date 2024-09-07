@@ -7,7 +7,7 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
+import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
@@ -35,7 +35,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
-    UpgradeableBeacon public bridgedTokenBeacon;
+    IBeacon public bridgedTokenBeacon;
 
     /// @dev The address of the WETH token.
     address public immutable override WETH_TOKEN;
@@ -54,7 +54,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
     /// @dev A mapping assetId => isTokenBridged
-    mapping(bytes32 assetId => bool bridged) public isTokenBridged;
+    mapping(bytes32 assetId => bool bridged) public isTokenBridged; // kl todo should we have isTokenNativeInstead
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyAssetRouter() {
@@ -76,14 +76,14 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
     /// @notice Sets token beacon used by bridged ERC20 tokens deployed by NTV.
     /// @dev we don't call this in the constructor, as we need to provide factory deps
-    function setBridgedTokenBeacon() external {
-        if (address(bridgedTokenBeacon) != address(0)) {
-            revert AddressMismatch(address(bridgedTokenBeacon), address(0));
-        }
-        address bridgedStandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
-        bridgedTokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(bridgedStandardToken);
-        bridgedTokenBeacon.transferOwnership(owner());
-    }
+    // function setBridgedTokenBeacon() external {
+    //     if (address(bridgedTokenBeacon) != address(0)) {
+    //         revert AddressMismatch(address(bridgedTokenBeacon), address(0));
+    //     }
+    //     address bridgedStandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
+    //     bridgedTokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(bridgedStandardToken);
+    //     bridgedTokenBeacon.transferOwnership(owner());
+    // }
 
     /// @notice Registers tokens within the NTV.
     /// @dev The goal was to allow bridging native tokens automatically, by registering them on the fly.
@@ -117,19 +117,24 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         // Note: if the chainBalance has not been migrated and is 0, then the assetId check will fail as the token's origin chain is not chain that sent the message.
         // Note: after interop is implemented this will not work.
         address token = tokenAddress[_assetId];
+        address receiver;
+        uint256 amount;
         if (chainBalance[_chainId][token] > 0) {
-            _bridgeMintNativeToken(_chainId, _assetId, _data);
+            (receiver, amount) = _bridgeMintNativeToken(_chainId, _assetId, _data);
         } else {
-            _bridgeMintBridgedToken(_chainId, _assetId, _data);
+            (receiver, amount) = _bridgeMintBridgedToken(_chainId, _assetId, _data);
         }
+        // solhint-disable-next-line func-named-parameters
+        emit BridgeMint(_chainId, _assetId, receiver, amount);
     }
 
-    function _bridgeMintBridgedToken(uint256 _originChainId, bytes32 _assetId, bytes calldata _data) internal virtual {
+    function _bridgeMintBridgedToken(
+        uint256 _originChainId,
+        bytes32 _assetId,
+        bytes calldata _data
+    ) internal virtual returns (address receiver, uint256 amount) {
         // Either it was locked before, therefore is not zero, or it is sent from remote chain and standard erc20 will be deployed
         address token = tokenAddress[_assetId];
-        // address sender;
-        uint256 amount;
-        address receiver;
         bytes memory erc20Data;
         address originToken;
         // slither-disable-next-line unused-return
@@ -145,10 +150,14 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         // emit FinalizeDeposit(sender, receiver, token, amount);
     }
 
-    function _bridgeMintNativeToken(uint256 _originChainId, bytes32 _assetId, bytes calldata _data) internal {
+    function _bridgeMintNativeToken(
+        uint256 _originChainId,
+        bytes32 _assetId,
+        bytes calldata _data
+    ) internal returns (address receiver, uint256 amount) {
         // Either it was locked before, therefore is not zero, or it is sent from remote chain and standard erc20 will be deployed
         address token = tokenAddress[_assetId];
-        (uint256 amount, address receiver) = abi.decode(_data, (uint256, address));
+        (amount, receiver) = abi.decode(_data, (uint256, address));
         // Check that the chain has sufficient balance
         if (chainBalance[_originChainId][token] < amount) {
             revert InsufficientChainBalance();
@@ -168,10 +177,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             // Withdraw funds
             IERC20(token).safeTransfer(receiver, amount);
         }
-        /// backwards compatible event
-        // emit FinalizeDeposit(sender, receiver, token, amount);
-        // solhint-disable-next-line func-named-parameters
-        emit BridgeMint(_originChainId, _assetId, receiver, amount);
     }
 
     /*//////////////////////////////////////////////////////////////
