@@ -13,6 +13,7 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 
 import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
+import {INativeTokenVault} from "./INativeTokenVault.sol";
 import {NativeTokenVault} from "./NativeTokenVault.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
@@ -163,7 +164,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
         address _l1Token
-    ) public view override returns (address) {
+    ) public view override(INativeTokenVault, NativeTokenVault) returns (address) {
         bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
         return
             Create2.computeAddress(

@@ -71,7 +71,7 @@ import { getCurrentFacetCutsForAdd } from "./diamondCut";
 import { BridgehubFactory, ChainAdminFactory, ERC20Factory, ChainTypeManagerFactory } from "../typechain";
 
 import { IL1AssetRouterFactory } from "../typechain/IL1AssetRouterFactory";
-import { IL1NativeTokenVaultCombinedFactory } from "../typechain/IL1NativeTokenVaultCombinedFactory";
+import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
 import { IL1NullifierFactory } from "../typechain/IL1NullifierFactory";
 import { ICTMDeploymentTrackerFactory } from "../typechain/ICTMDeploymentTrackerFactory";
 
@@ -1677,7 +1677,7 @@ export class Deployer {
   }
 
   public nativeTokenVault(signerOrProvider: Signer | providers.Provider) {
-    return IL1NativeTokenVaultCombinedFactory.connect(this.addresses.Bridges.NativeTokenVaultProxy, signerOrProvider);
+    return IL1NativeTokenVaultFactory.connect(this.addresses.Bridges.NativeTokenVaultProxy, signerOrProvider);
   }
 
   public ctmDeploymentTracker(signerOrProvider: Signer | providers.Provider) {

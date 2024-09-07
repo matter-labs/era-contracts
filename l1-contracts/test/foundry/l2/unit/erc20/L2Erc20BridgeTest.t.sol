@@ -9,7 +9,7 @@ import "forge-std/console.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {IL2NativeTokenVaultCombined} from "contracts/bridge/ntv/IL2NativeTokenVaultCombined.sol";
+import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
@@ -85,7 +85,7 @@ contract L2Erc20BridgeTest is Test {
     function initializeTokenByDeposit() internal returns (address l2TokenAddress) {
         performDeposit(makeAddr("someDepositor"), makeAddr("someReeiver"), 1);
 
-        l2TokenAddress = IL2NativeTokenVaultCombined(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
+        l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
         require(l2TokenAddress != address(0), "Token not initialized");
     }
 
@@ -95,9 +95,7 @@ contract L2Erc20BridgeTest is Test {
 
         performDeposit(depositor, receiver, 100);
 
-        address l2TokenAddress = IL2NativeTokenVaultCombined(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(
-            L1_TOKEN_ADDRESS
-        );
+        address l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
 
         assertEq(BridgedStandardERC20(l2TokenAddress).balanceOf(receiver), 100);
         assertEq(BridgedStandardERC20(l2TokenAddress).totalSupply(), 100);

@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
+import {INativeTokenVault} from "./INativeTokenVault.sol";
 import {IL2NativeTokenVault} from "./IL2NativeTokenVault.sol";
 import {NativeTokenVault} from "./NativeTokenVault.sol";
 
@@ -160,7 +161,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
         address _l1Token
-    ) public view override returns (address) {
+    ) public view override(INativeTokenVault, NativeTokenVault) returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
         address deployerAddress = address(L2_LEGACY_SHARED_BRIDGE) == address(0)

@@ -2,9 +2,11 @@
 
 pragma solidity ^0.8.20;
 
+import {INativeTokenVault} from "./INativeTokenVault.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL2NativeTokenVault {
+interface IL2NativeTokenVault is INativeTokenVault {
     event FinalizeDeposit(
         address indexed l1Sender,
         address indexed l2Receiver,

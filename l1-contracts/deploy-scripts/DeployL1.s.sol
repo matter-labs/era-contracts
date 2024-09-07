@@ -977,7 +977,6 @@ contract DeployL1Script is Script {
 
         vm.writeToml(toml, path);
         console.log("kl todo 102 ");
-
     }
 
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {

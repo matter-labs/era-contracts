@@ -206,7 +206,7 @@ contract L1AssetRouter is
         bytes32 _assetId,
         address _prevMsgSender,
         uint256 _amount
-    ) public payable virtual override(AssetRouterBase,IAssetRouterBase) onlyBridgehubOrEra(_chainId) whenNotPaused {
+    ) public payable virtual override(AssetRouterBase, IAssetRouterBase) onlyBridgehubOrEra(_chainId) whenNotPaused {
         _bridgehubDepositBaseToken(_chainId, _assetId, _prevMsgSender, _amount);
     }
 

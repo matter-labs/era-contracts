@@ -10,7 +10,7 @@ import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
-import {IL2NativeTokenVaultCombined} from "../ntv/IL2NativeTokenVaultCombined.sol";
+import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
 
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
@@ -290,7 +290,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @param _l1Token The address of token on L1.
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view returns (address) {
-        IL2NativeTokenVaultCombined l2NativeTokenVault = IL2NativeTokenVaultCombined(L2_NATIVE_TOKEN_VAULT_ADDR);
+        IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
         address currentlyDeployedAddress = l2NativeTokenVault.l2TokenAddress(_l1Token);
 
         if (currentlyDeployedAddress != address(0)) {
