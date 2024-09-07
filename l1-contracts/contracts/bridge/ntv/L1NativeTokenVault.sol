@@ -17,7 +17,7 @@ import {NativeTokenVault} from "./NativeTokenVault.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
-import {IL1AssetRouterCombined} from "../asset-router/IL1AssetRouterCombined.sol";
+import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 
 import {BASE_TOKEN_VIRTUAL_ADDRESS} from "../../common/Config.sol";
 
@@ -118,7 +118,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     ) internal override returns (bytes memory _bridgeMintData) {
         uint256 _depositAmount;
         (_depositAmount, ) = abi.decode(_data, (uint256, address));
-        IL1AssetRouterCombined(address(ASSET_ROUTER)).transferAllowanceToNTV(_assetId, _depositAmount, _prevMsgSender);
+        IL1AssetRouter(address(ASSET_ROUTER)).transferAllowanceToNTV(_assetId, _depositAmount, _prevMsgSender);
         _bridgeMintData = super._bridgeBurnNativeToken(_chainId, _assetId, _prevMsgSender, _data);
     }
 

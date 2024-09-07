@@ -16,8 +16,6 @@ import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
-import {IL1AssetRouterCombined} from "./asset-router/IL1AssetRouterCombined.sol";
-// import {IAssetRouterBase} from "./asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "./ntv/INativeTokenVault.sol";
 
 import {IL1Nullifier, FinalizeL1DepositParams} from "./interfaces/IL1Nullifier.sol";
@@ -103,7 +101,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 
     /// @dev Address of L1 asset router.
-    IL1AssetRouterCombined public l1AssetRouter;
+    IL1AssetRouter public l1AssetRouter;
 
     /// @dev Address of native token vault.
     IL1NativeTokenVault public l1NativeTokenVault;
@@ -250,7 +248,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             revert AddressAlreadyUsed(address(_l1AssetRouter));
         }
         require(_l1AssetRouter != address(0), "ShB: nullifier 0");
-        l1AssetRouter = IL1AssetRouterCombined(_l1AssetRouter);
+        l1AssetRouter = IL1AssetRouter(_l1AssetRouter);
     }
 
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.

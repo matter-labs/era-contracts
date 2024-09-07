@@ -4,11 +4,12 @@ pragma solidity ^0.8.21;
 
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
+import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL1AssetRouter {
+interface IL1AssetRouter is IAssetRouterBase {
     event BridgehubMintData(bytes bridgeMintData);
 
     event BridgehubDepositFinalized(
