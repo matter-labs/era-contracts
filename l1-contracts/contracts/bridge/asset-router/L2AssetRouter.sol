@@ -4,9 +4,9 @@ pragma solidity 0.8.24;
 
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
+import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
-import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
 
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
@@ -80,7 +80,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         if (_l1AssetRouter == address(0)) {
             revert EmptyAddress();
         }
-        nativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
         l1AssetRouter = _l1AssetRouter;
 
         _disableInitializers();
@@ -93,6 +92,14 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         address _assetAddress
     ) external override onlyAssetRouterCounterpart(_originChainId) {
         _setAssetHandlerAddress(_assetId, _assetAddress);
+    }
+
+    /// @inheritdoc IAssetRouterBase
+    function setAssetHandlerAddressThisChain(
+        bytes32 _assetRegistrationData,
+        address _assetHandlerAddress
+    ) external override(AssetRouterBase) {
+        _setAssetHandlerAddressThisChain(L2_NATIVE_TOKEN_VAULT_ADDR, _assetRegistrationData, _assetHandlerAddress);
     }
 
     /*//////////////////////////////////////////////////////////////

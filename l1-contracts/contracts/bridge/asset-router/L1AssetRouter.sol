@@ -45,6 +45,9 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @dev Address of nullifier.
     IL1Nullifier public immutable L1_NULLIFIER;
 
+    /// @dev Address of native token vault.
+    INativeTokenVault public nativeTokenVault;
+
     /// @dev Address of legacy bridge.
     address public legacyBridge;
 
@@ -161,6 +164,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _setAssetHandlerAddress(_assetId, _assetAddress);
     }
 
+    /// @inheritdoc IAssetRouterBase
+    function setAssetHandlerAddressThisChain(
+        bytes32 _assetRegistrationData,
+        address _assetHandlerAddress
+    ) external override(AssetRouterBase, IAssetRouterBase) {
+        _setAssetHandlerAddressThisChain(address(nativeTokenVault), _assetRegistrationData, _assetHandlerAddress);
+    }
+
     /// @notice Used to set the asset handler address for a given asset ID on a remote ZK chain
     /// @dev No access control on the caller, as msg.sender is encoded in the assetId.
     /// @param _chainId The ZK chain ID.
@@ -272,7 +283,13 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             _passValue: true
         });
 
-        bytes32 txDataHash = _encodeTxDataHash(encodingVersion, _prevMsgSender, assetId, transferData);
+        bytes32 txDataHash = _encodeTxDataHash({
+            _nativeTokenVault: address(nativeTokenVault),
+            _encodingVersion: encodingVersion,
+            _prevMsgSender: _prevMsgSender,
+            _assetId: assetId,
+            _transferData: transferData
+        });
 
         request = _requestToBridge({
             _prevMsgSender: _prevMsgSender,
@@ -290,12 +307,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         });
     }
 
-    /// @notice Routes the confirmation to nullifier for backward compatibility.
-    /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
-    /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
-    /// @param _chainId The chain ID of the ZK chain to which confirm the deposit.
-    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
-    /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
+    /// @inheritdoc IL1AssetRouter
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,
@@ -322,12 +334,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Finalize the withdrawal and release funds.
-    /// @param _chainId The chain ID of the transaction to check.
-    /// @param _assetId The bridged asset ID.
-    /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-    /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
-    /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
+    /// @inheritdoc IAssetRouterBase
     function finalizeDeposit(
         uint256 _chainId,
         bytes32 _assetId,
@@ -343,23 +350,13 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                             CLAIM FAILED DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on L2.
-    /// @param _chainId The ZK chain id to which the deposit was initiated.
-    /// @param _depositSender The address of the entity that initiated the deposit.
-    /// @param _assetId The unique identifier of the deposited L1 token.
-    /// @param _assetData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver. Might include extra information.
-    // / @param _l2TxHash The L2 transaction hash of the failed deposit finalization.
-    // / @param _l2BatchNumber The L2 batch number where the deposit finalization was processed.
-    // / @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-    // / @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent.
-    // / @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
-    /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
+    /// @inheritdoc IL1AssetRouter
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         address _depositSender,
         bytes32 _assetId,
         bytes calldata _assetData
-    ) external onlyNullifier nonReentrant whenNotPaused {
+    ) external override onlyNullifier nonReentrant whenNotPaused {
         IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeRecoverFailedTransfer(
             _chainId,
             _assetId,
@@ -399,10 +396,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         }
     }
 
-    /// @notice Transfers allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
-    /// @dev assetId is not the padded address, but the correct encoded id (NTV stores respective format for IDs)
-    /// @param _amount The asset amount to be transferred to native token vault.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
+    /// @inheritdoc IL1AssetRouter
     function transferAllowanceToNTV(
         bytes32 _assetId,
         uint256 _amount,
@@ -478,31 +472,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                      Legacy Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Initiates a deposit by locking funds on the contract and sending the request
-    /// of processing an L2 transaction where tokens would be minted.
-    /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
-    /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
-    /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    /// @param _l2Receiver The account address that should receive funds on L2.
-    /// @param _l1Token The L1 token address which is deposited.
-    /// @param _amount The total amount of tokens to be bridged.
-    /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction.
-    /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction.
-    /// @param _refundRecipient The address on L2 that will receive the refund for the transaction.
-    /// @dev If the L2 deposit finalization transaction fails, the `_refundRecipient` will receive the `_l2Value`.
-    /// Please note, the contract may change the refund recipient's address to eliminate sending funds to addresses
-    /// out of control.
-    /// - If `_refundRecipient` is a contract on L1, the refund will be sent to the aliased `_refundRecipient`.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has NO deployed bytecode on L1, the refund will
-    /// be sent to the `msg.sender` address.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has deployed bytecode on L1, the refund will be
-    /// sent to the aliased `msg.sender` address.
-    /// @dev The address aliasing of L1 contracts as refund recipient on L2 is necessary to guarantee that the funds
-    /// are controllable through the Mailbox, since the Mailbox applies address aliasing to the from address for the
-    /// L2 tx if the L1 msg.sender is a contract. Without address aliasing for L1 contracts as refund recipients they
-    /// would not be able to make proper L2 tx requests through the Mailbox to use or withdraw the funds from L2, and
-    /// the funds would be lost.
-    /// @return txHash The L2 transaction hash of deposit finalization.
+    /// @inheritdoc IL1AssetRouter
     function depositLegacyErc20Bridge(
         address _prevMsgSender,
         address _l2Receiver,
@@ -581,13 +551,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         });
     }
 
-    /// @notice Finalize the withdrawal and release funds
-    /// @param _chainId The chain ID of the transaction to check
-    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
-    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
-    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
+    /// @inheritdoc IL1AssetRouter
     function finalizeWithdrawal(
         uint256 _chainId,
         uint256 _l2BatchNumber,
@@ -595,7 +559,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external {
+    ) external override {
         FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
             chainId: _chainId,
             l2BatchNumber: _l2BatchNumber,

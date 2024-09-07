@@ -10,7 +10,6 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
-import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
@@ -36,9 +35,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
     /// @dev Chain ID of Era for legacy reasons
     uint256 public immutable ERA_CHAIN_ID;
-
-    /// @dev Address of native token vault.
-    INativeTokenVault public nativeTokenVault;
 
     /// @dev Maps asset ID to address of corresponding asset handler.
     /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset.
@@ -74,15 +70,18 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         BASE_TOKEN_ADDRESS = _baseTokenAddress;
     }
 
-    /// @notice Sets the asset handler address for a specified asset ID on the chain of the asset deployment tracker.
-    /// @dev The caller of this function is encoded within the `assetId`, therefore, it should be invoked by the asset deployment tracker contract.
-    /// @dev No access control on the caller, as msg.sender is encoded in the assetId.
-    /// @dev Typically, for most tokens, ADT is the native token vault. However, custom tokens may have their own specific asset deployment trackers.
-    /// @dev `setAssetHandlerAddressOnCounterpart` should be called on L1 to set asset handlers on L2 chains for a specific asset ID.
-    /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
-    /// @param _assetHandlerAddress The address of the asset handler to be set for the provided asset.
-    function setAssetHandlerAddressThisChain(bytes32 _assetRegistrationData, address _assetHandlerAddress) external {
-        bool senderIsNTV = msg.sender == address(nativeTokenVault);
+    /// @inheritdoc IAssetRouterBase
+    function setAssetHandlerAddressThisChain(
+        bytes32 _assetRegistrationData,
+        address _assetHandlerAddress
+    ) external virtual override;
+
+    function _setAssetHandlerAddressThisChain(
+        address _nativeTokenVault,
+        bytes32 _assetRegistrationData,
+        address _assetHandlerAddress
+    ) internal {
+        bool senderIsNTV = msg.sender == address(_nativeTokenVault);
         address sender = senderIsNTV ? L2_NATIVE_TOKEN_VAULT_ADDR : msg.sender;
         bytes32 assetId = DataEncoding.encodeAssetId(block.chainid, _assetRegistrationData, sender);
         if (!senderIsNTV && msg.sender != assetDeploymentTracker[assetId]) {
@@ -106,12 +105,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Finalize the withdrawal and release funds.
-    /// @param _chainId The chain ID of the transaction to check.
-    /// @param _assetId The bridged asset ID.
-    /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-    /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
-    /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
+    /// @inheritdoc IAssetRouterBase
     function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) public virtual; // do we need to?: returns (address l1Receiver, uint256 amount)
 
     function _finalizeDeposit(
@@ -146,6 +140,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
     /// @return txDataHash The resulting encoded transaction data hash.
     function _encodeTxDataHash(
+        address _nativeTokenVault,
         bytes1 _encodingVersion,
         address _prevMsgSender,
         bytes32 _assetId,
@@ -156,7 +151,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
                 _encodingVersion: _encodingVersion,
                 _prevMsgSender: _prevMsgSender,
                 _assetId: _assetId,
-                _nativeTokenVault: address(nativeTokenVault),
+                _nativeTokenVault: address(_nativeTokenVault),
                 _transferData: _transferData
             });
     }
