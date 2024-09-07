@@ -10,7 +10,7 @@ import {IContractDeployer, L2ContractHelper} from "contracts/common/libraries/L2
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 
-address constant ETH_ADDRESS_IN_CONTRACTS = 0x0000000000000000000000000000000000000001;
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 library L2Utils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -136,7 +136,7 @@ library L2Utils {
                 _l2TokenBeacon,
                 _contractsDeployedAlready,
                 address(0),
-                ETH_ADDRESS_IN_CONTRACTS
+                ETH_TOKEN_ADDRESS
             )
         });
 

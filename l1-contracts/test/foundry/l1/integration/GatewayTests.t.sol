@@ -164,8 +164,6 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
                 chainData: chainData
             });
             transferData = abi.encode(data);
-
-            // transferData = abi.encode(migratingChainId, stmData, chainData);
         }
 
         address chainAdmin = IZKChain(bridgehub.getZKChain(migratingChainId)).getAdmin();
@@ -238,8 +236,6 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
             chainData: chainData
         });
         bytes memory bridgehubMintData = abi.encode(data);
-
-        // bytes memory bridgehubMintData = abi.encode(mintChainId, stmData, chainData);
         vm.startBroadcast(address(bridgehub.sharedBridge()));
         uint256 currentChainId = block.chainid;
         vm.chainId(migratingChainId);

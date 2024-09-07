@@ -7,7 +7,6 @@ import {
   BridgehubFactory,
   TestnetERC20TokenFactory,
   MockExecutorFacetFactory,
-  // L1NullifierFactory,
 } from "../../typechain";
 import { L1NativeTokenVaultFactory } from "../../typechain/L1NativeTokenVaultFactory";
 
@@ -26,7 +25,6 @@ describe("Shared Bridge tests", () => {
   let deployer: Deployer;
   let bridgehub: Bridgehub;
   let l1NativeTokenVault: L1NativeTokenVault;
-  // let l1Nullifier: L1Nullifier;
   let proxyAsMockExecutor: MockExecutorFacet;
   let l1SharedBridge: L1AssetRouter;
   let erc20TestToken: ethers.Contract;
@@ -84,7 +82,6 @@ describe("Shared Bridge tests", () => {
       deployer.addresses.Bridges.NativeTokenVaultProxy,
       deployWallet
     );
-    // l1Nullifier = L1NullifierFactory.connect(deployer.addresses.Bridges.L1NullifierProxy, deployWallet);
 
     const tokens = getTokens();
 

@@ -10,8 +10,6 @@ import type { IL1AssetRouter } from "../../typechain/IL1AssetRouter";
 import { IL1AssetRouterFactory } from "../../typechain/IL1AssetRouterFactory";
 import type { IL1NativeTokenVault } from "../../typechain/IL1NativeTokenVault";
 import { IL1NativeTokenVaultFactory } from "../../typechain/IL1NativeTokenVaultFactory";
-// import type { IL1Nullifier } from "../../typechain/IL1Nullifier";
-// import { IL1NullifierFactory } from "../../typechain/IL1NullifierFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
@@ -26,7 +24,6 @@ describe("Custom base token chain and bridge tests", () => {
   let deployWallet: Wallet;
   let deployer: Deployer;
   let l1SharedBridge: IL1AssetRouter;
-  // let l1Nullifier: IL1Nullifier;
   let bridgehub: IBridgehub;
   let nativeTokenVault: IL1NativeTokenVault;
   let baseToken: TestnetERC20Token;
@@ -67,7 +64,6 @@ describe("Custom base token chain and bridge tests", () => {
 
     // prepare the bridge
     l1SharedBridge = IL1AssetRouterFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
-    // l1Nullifier = IL1NullifierFactory.connect(deployer.addresses.Bridges.L1NullifierProxy, deployWallet);
 
     nativeTokenVault = IL1NativeTokenVaultFactory.connect(
       deployer.addresses.Bridges.NativeTokenVaultProxy,

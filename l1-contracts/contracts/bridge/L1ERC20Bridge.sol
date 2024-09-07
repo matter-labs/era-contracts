@@ -28,7 +28,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     IL1Nullifier public immutable override L1_NULLIFIER;
 
     /// @dev The asset router, which holds deposited tokens.
-    IL1AssetRouter public immutable L1_ASSET_ROUTER;
+    IL1AssetRouter public immutable override L1_ASSET_ROUTER;
 
     /// @dev The native token vault, which holds deposited tokens.
     IL1NativeTokenVault public immutable override L1_NATIVE_TOKEN_VAULT;

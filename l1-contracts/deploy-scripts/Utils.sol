@@ -25,7 +25,7 @@ library Utils {
         hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
 
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    address internal constant ETH_ADDRESS_IN_CONTRACTS = ADDRESS_ONE;
+    address internal constant ETH_TOKEN_ADDRESS = ADDRESS_ONE;
     uint256 internal constant MAX_PRIORITY_TX_GAS = 72000000;
 
     /**

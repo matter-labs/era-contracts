@@ -28,6 +28,5 @@ l1-contracts/script-config/*
 !l1-contracts/script-config/artifacts
 l1-contracts/script-out/*
 l1-contracts/test/foundry/l1/integration/deploy-scripts/script-out/*.toml
-l2-contracts/contracts/l1-contracts-imported
 !l1-contracts/script-out/.gitkeep
 *.timestamp

@@ -996,13 +996,9 @@ contract DeployL1Script is Script {
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
-        console.log("kl todo 100 ");
 
         string memory path = string.concat(vm.projectRoot(), vm.envString("L1_OUTPUT"));
-        console.log("kl todo 101 ");
-
         vm.writeToml(toml, path);
-        console.log("kl todo 102 ");
     }
 
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
