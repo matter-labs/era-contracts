@@ -22,8 +22,6 @@ import {BASE_TOKEN_VIRTUAL_ADDRESS} from "../../common/Config.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
-import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
-
 import {EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, WithdrawFailed, InsufficientChainBalance, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
@@ -39,8 +37,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
     /// @dev The address of the WETH token.
     address public immutable override WETH_TOKEN;
-
-    IL2SharedBridgeLegacy public immutable L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
     IAssetRouterBase public immutable override ASSET_ROUTER;

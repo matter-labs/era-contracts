@@ -52,7 +52,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
 
     /// @notice Checks that the message sender is the L1 Asset Router.
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _originChainId) {
-        if (_originChainId == L1_CHAIN_ID) {
+        if (msg.sender == address(this)) {} else if (_originChainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
             if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1AssetRouter) {
                 revert InvalidCaller(msg.sender);
@@ -182,8 +182,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external {
-        // todo: onlyAssetRouterCounterpart(L1_CHAIN_ID) {
+    ) external onlyAssetRouterCounterpart(L1_CHAIN_ID) {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         // solhint-disable-next-line func-named-parameters
         bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);

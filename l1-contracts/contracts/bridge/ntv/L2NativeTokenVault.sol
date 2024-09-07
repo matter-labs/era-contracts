@@ -29,6 +29,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @dev Chain ID of L1 for bridging reasons.
     uint256 public immutable L1_CHAIN_ID;
 
+    IL2SharedBridgeLegacy public immutable L2_LEGACY_SHARED_BRIDGE;
+
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
 
@@ -67,7 +69,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             if (_bridgedTokenBeacon == address(0)) {
                 revert EmptyAddress();
             }
-            bridgedTokenBeacon = UpgradeableBeacon(_bridgedTokenBeacon);
+            bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
         } else {
             address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
 
