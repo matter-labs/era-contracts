@@ -50,6 +50,19 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         _;
     }
 
+    /// @notice Checks that the message sender is the L1 Asset Router.
+    modifier onlyAssetRouterCounterpartOrSelf(uint256 _originChainId) {
+        if (_originChainId == L1_CHAIN_ID) {
+            // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
+            if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1AssetRouter) {
+                revert InvalidCaller(msg.sender);
+            }
+        } else if (msg.sender != address(this)) {
+            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
+        }
+        _;
+    }
+
     /// @notice Checks that the message sender is the legacy L2 bridge.
     modifier onlyLegacyBridge() {
         if (msg.sender != L2_LEGACY_SHARED_BRIDGE) {
@@ -138,37 +151,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken)
     // kl todo. FinalizeDeposit functions.
     function finalizeDeposit(
-        bytes32 _assetId,
-        bytes memory _transferData
-    ) public override onlyAssetRouterCounterpart(L1_CHAIN_ID) {
-        address assetHandler = assetHandlerAddress[_assetId];
-        if (assetHandler != address(0)) {
-            IAssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
-        } else {
-            assetHandlerAddress[_assetId] = L2_NATIVE_TOKEN_VAULT_ADDR;
-            IAssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
-        }
-
-        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, _transferData);
-    }
-
-    /// @notice Finalize the deposit and mint funds
-    /// @param _assetId The encoding of the asset on L2
-    /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken)
-    // kl todo. FinalizeDeposit functions.
-    function finalizeDeposit(
         // solhint-disable-next-line no-unused-vars
         uint256,
         bytes32 _assetId,
-        bytes memory _transferData
-    ) public onlyAssetRouterCounterpart(L1_CHAIN_ID) {
-        address assetHandler = assetHandlerAddress[_assetId];
-        if (assetHandler != address(0)) {
-            IAssetHandler(assetHandler).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
-        } else {
-            assetHandlerAddress[_assetId] = L2_NATIVE_TOKEN_VAULT_ADDR;
-            IAssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeMint(L1_CHAIN_ID, _assetId, _transferData);
-        }
+        bytes calldata _transferData
+    ) public override onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID) {
+        _finalizeDeposit(L1_CHAIN_ID, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
 
         emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, _transferData);
     }
@@ -239,7 +227,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         // solhint-disable-next-line func-named-parameters
         bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);
-        finalizeDeposit(assetId, data);
+        this.finalizeDeposit(L1_CHAIN_ID, assetId, data);
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1

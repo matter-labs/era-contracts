@@ -12,7 +12,6 @@ import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
-import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IL1Nullifier, FinalizeL1DepositParams} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
@@ -252,17 +251,8 @@ contract L1AssetRouter is
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public override onlyNullifier returns (address l1Receiver, uint256 amount) {
-        address assetHandler = assetHandlerAddress[_assetId];
-
-        if (assetHandler != address(0)) {
-            IAssetHandler(assetHandler).bridgeMint(_chainId, _assetId, _transferData);
-        } else {
-            assetHandlerAddress[_assetId] = address(nativeTokenVault);
-            IAssetHandler(address(nativeTokenVault)).bridgeMint(_chainId, _assetId, _transferData); // ToDo: Maybe it's better to receive amount and receiver here? transferData may have different encoding
-        }
-
-        (amount, l1Receiver) = abi.decode(_transferData, (uint256, address));
+    ) public override(AssetRouterBase, IAssetRouterBase) onlyNullifier {
+        _finalizeDeposit(_chainId, _assetId, _transferData, address(nativeTokenVault));
 
         // emit DepositFinalizedAssetRouter(_chainId, l1Receiver, _assetId, amount);
         emit WithdrawalFinalizedAssetRouter(_chainId, _assetId, new bytes(0)); // kl todo
@@ -476,7 +466,7 @@ contract L1AssetRouter is
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external returns (address l1Receiver, address l1Token, uint256 amount) {
+    ) external {
         FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
             chainId: _chainId,
             l2BatchNumber: _l2BatchNumber,
@@ -486,7 +476,7 @@ contract L1AssetRouter is
             message: _message,
             merkleProof: _merkleProof
         });
-        (l1Receiver, l1Token, amount) = L1_NULLIFIER.finalizeWithdrawalLegacyContracts(finalizeWithdrawalParams);
+        L1_NULLIFIER.finalizeWithdrawalLegacyContracts(finalizeWithdrawalParams);
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.

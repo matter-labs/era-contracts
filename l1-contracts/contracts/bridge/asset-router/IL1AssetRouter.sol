@@ -75,11 +75,5 @@ interface IL1AssetRouter is IAssetRouterBase {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external returns (address l1Receiver, address l1Token, uint256 amount);
-
-    function finalizeDeposit(
-        uint256 _chainId,
-        bytes32 _assetId,
-        bytes memory _transferData
-    ) external returns (address l1Receiver, uint256 amount);
+    ) external;
 }

@@ -28,6 +28,7 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1Nullifier, FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
@@ -99,7 +100,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 l2Sender: L2_ASSET_ROUTER_ADDR,
                 l2TxNumberInBatch: 1,
                 message: abi.encodePacked(
-                    IL1AssetRouter.finalizeDeposit.selector,
+                    IAssetRouterBase.finalizeDeposit.selector,
                     chainId,
                     l2TokenAssetId,
                     transferData

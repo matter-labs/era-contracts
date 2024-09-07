@@ -110,4 +110,6 @@ interface IAssetRouterBase {
     /// @dev Used to set the assedAddress for a given assetId.
     /// @dev Will be used by ZK Gateway
     function setAssetHandlerAddress(uint256 _originChainId, bytes32 _assetId, address _assetAddress) external;
+
+    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes memory _transferData) external;
 }

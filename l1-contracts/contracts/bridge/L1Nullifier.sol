@@ -16,6 +16,7 @@ import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "./asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "./ntv/INativeTokenVault.sol";
 
 import {IL1Nullifier, FinalizeL1DepositParams} from "./interfaces/IL1Nullifier.sol";
@@ -27,6 +28,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 // import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {BASE_TOKEN_VIRTUAL_ADDRESS} from "../common/Config.sol";
 // import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
@@ -389,16 +391,20 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @notice Internal function that handles the logic for finalizing withdrawals, supporting both the current bridge system and the legacy ERC20 bridge.
     /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
-    /// @return l1Receiver The address to receive bridged assets.
-    /// @return assetId The bridged asset ID.
-    /// @return amount The amount of asset bridged.
     function _finalizeDeposit(
         FinalizeL1DepositParams calldata _finalizeWithdrawalParams
-    ) internal nonReentrant whenNotPaused returns (address l1Receiver, bytes32 assetId, uint256 amount) {
+    ) internal nonReentrant whenNotPaused {
+        // returns (address l1Receiver, address l1Token, uint256 amount) {
         bytes memory transferData;
+        bytes32 assetId;
         (assetId, transferData) = _verifyAndGetWithdrawalData(_finalizeWithdrawalParams);
-
-        (l1Receiver, amount) = l1AssetRouter.finalizeDeposit(_finalizeWithdrawalParams.chainId, assetId, transferData);
+        l1AssetRouter.finalizeDeposit(_finalizeWithdrawalParams.chainId, assetId, transferData);
+        // if ((l1NativeTokenVault.tokenAddress(assetId) != address(0)) && (!l1NativeTokenVault.isTokenBridged(assetId))){
+        //     l1Receiver = address(l1NativeTokenVault);
+        //     l1Token = address(0);
+        //     amount = transferData[1];
+        //     (l1Receiver, amount) = DataEncoding.decodeTransferData(transferData);
+        // }
     }
 
     /// @notice Internal function that handles the logic for finalizing withdrawals, supporting both the current bridge system and the legacy ERC20 bridge.
@@ -591,7 +597,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
             assetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);
             transferData = abi.encode(amount, l1Receiver);
-        } else if (bytes4(functionSignature) == IL1AssetRouter.finalizeDeposit.selector) {
+        } else if (bytes4(functionSignature) == IAssetRouterBase.finalizeDeposit.selector) {
             // The data is expected to be at least 36 bytes long to contain assetId.
             require(_l2ToL1message.length >= 36, "L1N: wrong msg len"); // wrong message length
             // slither-disable-next-line unused-return
@@ -657,15 +663,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Finalizes the withdrawal for transactions initiated via the legacy ERC20 bridge.
-    /// @return l1Receiver The address on L1 that will receive the withdrawn funds.
-    /// @return l1Asset The address of the L1 token being withdrawn.
-    /// @return amount The amount of the token being withdrawn.
     function finalizeWithdrawalLegacyContracts(
         FinalizeL1DepositParams calldata _finalizeWithdrawalParams
-    ) external onlyAssetRouterOrErc20Bridge returns (address l1Receiver, address l1Asset, uint256 amount) {
-        bytes32 assetId;
-        (l1Receiver, assetId, amount) = _finalizeDeposit(_finalizeWithdrawalParams);
-        l1Asset = INativeTokenVault(address(l1NativeTokenVault)).tokenAddress(assetId);
+    ) external override onlyAssetRouterOrErc20Bridge {
+        _finalizeDeposit(_finalizeWithdrawalParams);
     }
 
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on ZKsync Era chain.

@@ -14,8 +14,6 @@ interface IL2AssetRouter {
         bytes assetData
     );
 
-    function finalizeDeposit(bytes32 _assetId, bytes calldata _transferData) external;
-
     function withdraw(bytes32 _assetId, bytes calldata _transferData) external;
 
     function l1AssetRouter() external view returns (address);

@@ -10,6 +10,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
@@ -287,7 +288,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     function test_finalizeWithdrawal_ErcOnEth() public {
         _setNativeTokenVaultChainBalance(chainId, address(token), amount);
         bytes memory message = abi.encodePacked(
-            IL1AssetRouter.finalizeDeposit.selector,
+            IAssetRouterBase.finalizeDeposit.selector,
             chainId,
             tokenAssetId,
             abi.encode(amount, alice)
@@ -333,7 +334,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         vm.prank(bridgehubAddress);
 
         bytes memory message = abi.encodePacked(
-            IL1AssetRouter.finalizeDeposit.selector,
+            IAssetRouterBase.finalizeDeposit.selector,
             chainId,
             ETH_TOKEN_ASSET_ID,
             abi.encode(amount, alice)
@@ -376,7 +377,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         vm.prank(bridgehubAddress);
 
         bytes memory message = abi.encodePacked(
-            IL1AssetRouter.finalizeDeposit.selector,
+            IAssetRouterBase.finalizeDeposit.selector,
             chainId,
             tokenAssetId,
             abi.encode(amount, alice)
@@ -417,7 +418,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
     function test_finalizeWithdrawal_NonBaseErcOnErc() public {
         bytes memory message = abi.encodePacked(
-            IL1AssetRouter.finalizeDeposit.selector,
+            IAssetRouterBase.finalizeDeposit.selector,
             chainId,
             tokenAssetId,
             abi.encode(amount, alice)

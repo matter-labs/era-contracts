@@ -9,7 +9,6 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
-import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -238,7 +237,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         // First branch covers the case when asset is not registered with NTV (custom asset handler)
         // Second branch handles tokens registered with NTV and uses legacy calldata encoding
         if (nativeTokenVault.tokenAddress(_assetId) == address(0)) {
-            return abi.encodeCall(IL1AssetRouter.finalizeDeposit, (block.chainid, _assetId, _assetData));
+            return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
         } else {
             // slither-disable-next-line unused-return
             (, address _receiver, address _parsedNativeToken, uint256 _amount, bytes memory _gettersData) = DataEncoding
@@ -265,6 +264,30 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /*//////////////////////////////////////////////////////////////
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Finalize the withdrawal and release funds.
+    /// @param _chainId The chain ID of the transaction to check.
+    /// @param _assetId The bridged asset ID.
+    /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+    /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
+    /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
+    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) public virtual; // do we need to?: returns (address l1Receiver, uint256 amount)
+
+    function _finalizeDeposit(
+        uint256 _chainId,
+        bytes32 _assetId,
+        bytes calldata _transferData,
+        address _nativeTokenVault
+    ) internal {
+        address assetHandler = assetHandlerAddress[_assetId];
+
+        if (assetHandler != address(0)) {
+            IAssetHandler(assetHandler).bridgeMint(_chainId, _assetId, _transferData);
+        } else {
+            assetHandlerAddress[_assetId] = _nativeTokenVault;
+            IAssetHandler(_nativeTokenVault).bridgeMint(_chainId, _assetId, _transferData); // ToDo: Maybe it's better to receive amount and receiver here? transferData may have different encoding
+        }
+    }
 
     /*//////////////////////////////////////////////////////////////
                             Internal Functions

@@ -61,9 +61,7 @@ interface IL1Nullifier {
         bytes32[] calldata _merkleProof
     ) external;
 
-    function finalizeWithdrawalLegacyContracts(
-        FinalizeL1DepositParams calldata _finalizeWithdrawalParams
-    ) external returns (address l1Receiver, address l1Token, uint256 amount);
+    function finalizeWithdrawalLegacyContracts(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
 
     function BRIDGE_HUB() external view returns (IBridgehub);
 
