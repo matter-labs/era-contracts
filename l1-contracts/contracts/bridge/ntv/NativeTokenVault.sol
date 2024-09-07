@@ -363,6 +363,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         if (deployedToken != _expectedToken) {
             revert AddressMismatch(_expectedToken, deployedToken);
         }
+
         isTokenBridged[_assetId] = true;
         tokenAddress[_assetId] = _expectedToken;
         return _expectedToken;

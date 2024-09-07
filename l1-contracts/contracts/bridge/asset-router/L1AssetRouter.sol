@@ -22,7 +22,7 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
-import {UnsupportedEncodingVersion, InvalidChainId, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed} from "../../common/L1ContractErrors.sol";
+import {UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
@@ -253,14 +253,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                 );
         } else if (encodingVersion == NEW_ENCODING_VERSION) {
             (assetId, transferData) = abi.decode(_data[1:], (bytes32, bytes));
-            if (assetHandlerAddress[assetId] == address(nativeTokenVault)) {
-                revert UnsupportedEncodingVersion();
-            }
         } else if (encodingVersion == LEGACY_ENCODING_VERSION) {
-            if (block.chainid != L1_CHAIN_ID) {
-                /// @dev Legacy bridging is only supported for L1->L2 native token transfers.
-                revert InvalidChainId();
-            }
             (assetId, transferData) = _handleLegacyData(_data, _prevMsgSender);
         } else {
             revert UnsupportedEncodingVersion();
@@ -280,6 +273,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         });
 
         bytes32 txDataHash = _encodeTxDataHash(encodingVersion, _prevMsgSender, assetId, transferData);
+
         request = _requestToBridge({
             _prevMsgSender: _prevMsgSender,
             _assetId: assetId,
@@ -463,7 +457,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     ) public view override returns (bytes memory) {
         // First branch covers the case when asset is not registered with NTV (custom asset handler)
         // Second branch handles tokens registered with NTV and uses legacy calldata encoding
-        if (nativeTokenVault.tokenAddress(_assetId) == address(0)) {
+        if ((nativeTokenVault.tokenAddress(_assetId) == address(0)) || (nativeTokenVault.isTokenBridged(_assetId))) {
             return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
         } else {
             // slither-disable-next-line unused-return

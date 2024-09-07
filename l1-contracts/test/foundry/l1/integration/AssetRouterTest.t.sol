@@ -28,18 +28,20 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1Nullifier, FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
+import {IBridgedStandardToken} from "contracts/bridge/BridgedStandardERC20.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
     bytes32 public l2TokenAssetId;
-
+    address public tokenL1Address;
     // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
         require(users.length == 0, "Addresses already generated");
@@ -54,10 +56,10 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         _generateUserAddresses();
 
         _deployL1Contracts();
-        // _deployTokens();
-        // _registerNewTokens(tokens);
+        _deployTokens();
+        _registerNewTokens(tokens);
 
-        // _deployEra();
+        _deployEra();
         // _deployHyperchain(ETH_TOKEN_ADDRESS);
         // _deployHyperchain(ETH_TOKEN_ADDRESS);
         // _deployHyperchain(tokens[0]);
@@ -87,7 +89,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         l2TokenAssetId = DataEncoding.encodeNTVAssetId(chainId, address(1));
         bytes memory transferData = DataEncoding.encodeBridgeMintData({
             _prevMsgSender: ETH_TOKEN_ADDRESS,
-            _l2Receiver: ETH_TOKEN_ADDRESS,
+            _l2Receiver: address(this),
             _l1Token: ETH_TOKEN_ADDRESS,
             _amount: 100,
             _erc20Metadata: BridgeHelper.getERC20Getters(_tokenAddress, ETH_TOKEN_ADDRESS)
@@ -108,9 +110,10 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 merkleProof: new bytes32[](0)
             })
         );
+        tokenL1Address = l1NativeTokenVault.tokenAddress(l2TokenAssetId);
     }
 
-    function test_DepositToL1() public {
+    function test_DepositToL1_Success() public {
         depositToL1(ETH_TOKEN_ADDRESS);
     }
 
@@ -153,7 +156,31 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
         vm.store(address(bridgedToken), bytes32(uint256(207)), bytes32(0));
         vm.broadcast(L2_NATIVE_TOKEN_VAULT_ADDR); // kl todo call ntv, or even assetRouter/bridgehub
-        bridgedToken.bridgeBurn(ETH_TOKEN_ADDRESS, 100);
+        bridgedToken.bridgeBurn(address(this), 100);
+    }
+
+    function test_DepositToL1AndWithdraw() public {
+        depositToL1(ETH_TOKEN_ADDRESS);
+        bytes memory secondBridgeCalldata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
+        );
+        IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
+        console.log("kl todo 6", tokenL1Address);
+        console.logBytes32(l2TokenAssetId);
+        bridgeHub.requestL2TransactionTwoBridges{value: 250000000000100}(
+            L2TransactionRequestTwoBridgesOuter({
+                chainId: eraZKChainId,
+                mintValue: 250000000000100,
+                l2Value: 0,
+                l2GasLimit: 1000000,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                refundRecipient: address(0),
+                secondBridgeAddress: address(sharedBridge),
+                secondBridgeValue: 0,
+                secondBridgeCalldata: secondBridgeCalldata
+            })
+        );
     }
 
     // add this to be excluded from coverage report
