@@ -24,7 +24,7 @@ import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {L2Message, TxStatus} from "../common/Messaging.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {BASE_TOKEN_VIRTUAL_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
@@ -186,7 +186,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _token The address of the token to be transferred to NTV.
     function transferTokenToNTV(address _token) external onlyL1NTV {
         address ntvAddress = address(l1NativeTokenVault);
-        if (BASE_TOKEN_VIRTUAL_ADDRESS == _token) {
+        if (ETH_TOKEN_ADDRESS == _token) {
             uint256 amount = address(this).balance;
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)

@@ -16,7 +16,7 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {BASE_TOKEN_VIRTUAL_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {L2Message} from "contracts/common/Messaging.sol";
@@ -59,9 +59,9 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         _registerNewTokens(tokens);
 
         _deployEra();
-        _deployZKChain(BASE_TOKEN_VIRTUAL_ADDRESS);
+        _deployZKChain(ETH_TOKEN_ADDRESS);
         acceptPendingAdmin();
-        _deployZKChain(BASE_TOKEN_VIRTUAL_ADDRESS);
+        _deployZKChain(ETH_TOKEN_ADDRESS);
         acceptPendingAdmin();
         // _deployZKChain(tokens[0]);
         // _deployZKChain(tokens[0]);

@@ -7,7 +7,7 @@ import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/tok
 import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
 import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
 
-import {ZeroAddress, Unauthorized, UnimplementedMessage, BRIDGE_MINT_NOT_IMPLEMENTED, WithdrawFailed} from "../common/L1ContractErrors.sol";
+import {ZeroAddress, Unauthorized, UnimplementedMessage, BridgeMintNotImplemented, WithdrawFailed} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -85,7 +85,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
     /// Note: Use `deposit`/`depositTo` methods instead.
     // solhint-disable-next-line no-unused-vars
     function bridgeMint(address _to, uint256 _amount) external override onlyBridge {
-        revert UnimplementedMessage(BRIDGE_MINT_NOT_IMPLEMENTED);
+        revert BridgeMintNotImplemented();
     }
 
     /// @dev Burn tokens from a given account and send the same amount of Ether to the bridge.

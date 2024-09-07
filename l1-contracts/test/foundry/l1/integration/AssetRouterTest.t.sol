@@ -16,7 +16,7 @@ import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {BASE_TOKEN_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
@@ -58,8 +58,8 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         // _registerNewTokens(tokens);
 
         // _deployEra();
-        // _deployHyperchain(BASE_TOKEN_VIRTUAL_ADDRESS);
-        // _deployHyperchain(BASE_TOKEN_VIRTUAL_ADDRESS);
+        // _deployHyperchain(ETH_TOKEN_ADDRESS);
+        // _deployHyperchain(ETH_TOKEN_ADDRESS);
         // _deployHyperchain(tokens[0]);
         // _deployHyperchain(tokens[0]);
         // _deployHyperchain(tokens[1]);
@@ -86,11 +86,11 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         uint256 chainId = eraZKChainId;
         l2TokenAssetId = DataEncoding.encodeNTVAssetId(chainId, address(1));
         bytes memory transferData = DataEncoding.encodeBridgeMintData({
-            _prevMsgSender: BASE_TOKEN_VIRTUAL_ADDRESS,
-            _l2Receiver: BASE_TOKEN_VIRTUAL_ADDRESS,
-            _l1Token: BASE_TOKEN_VIRTUAL_ADDRESS,
+            _prevMsgSender: ETH_TOKEN_ADDRESS,
+            _l2Receiver: ETH_TOKEN_ADDRESS,
+            _l1Token: ETH_TOKEN_ADDRESS,
             _amount: 100,
-            _erc20Metadata: BridgeHelper.getERC20Getters(_tokenAddress, BASE_TOKEN_VIRTUAL_ADDRESS)
+            _erc20Metadata: BridgeHelper.getERC20Getters(_tokenAddress, ETH_TOKEN_ADDRESS)
         });
         l1Nullifier.finalizeDeposit(
             FinalizeL1DepositParams({
@@ -111,11 +111,11 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
     }
 
     function test_DepositToL1() public {
-        depositToL1(BASE_TOKEN_VIRTUAL_ADDRESS);
+        depositToL1(ETH_TOKEN_ADDRESS);
     }
 
     function test_BridgeTokenFunctions() public {
-        depositToL1(BASE_TOKEN_VIRTUAL_ADDRESS);
+        depositToL1(ETH_TOKEN_ADDRESS);
         BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
         assertEq(bridgedToken.name(), "Ether");
         assertEq(bridgedToken.symbol(), "ETH");
@@ -123,7 +123,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
     }
 
     function test_reinitBridgedToken_Success() public {
-        depositToL1(BASE_TOKEN_VIRTUAL_ADDRESS);
+        depositToL1(ETH_TOKEN_ADDRESS);
         BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
         address owner = l1NativeTokenVault.owner();
         vm.broadcast(owner);
@@ -136,7 +136,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
     }
 
     function test_reinitBridgedToken_WrongVersion() public {
-        depositToL1(BASE_TOKEN_VIRTUAL_ADDRESS);
+        depositToL1(ETH_TOKEN_ADDRESS);
         BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
         vm.expectRevert(NonSequentialVersion.selector);
         bridgedToken.reinitializeToken(
@@ -149,11 +149,11 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
     /// @dev We should not test this on the L1, but to get coverage we do.
     function test_BridgeTokenBurn() public {
-        depositToL1(BASE_TOKEN_VIRTUAL_ADDRESS);
+        depositToL1(ETH_TOKEN_ADDRESS);
         BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
         vm.store(address(bridgedToken), bytes32(uint256(207)), bytes32(0));
         vm.broadcast(L2_NATIVE_TOKEN_VAULT_ADDR); // kl todo call ntv, or even assetRouter/bridgehub
-        bridgedToken.bridgeBurn(BASE_TOKEN_VIRTUAL_ADDRESS, 100);
+        bridgedToken.bridgeBurn(ETH_TOKEN_ADDRESS, 100);
     }
 
     // add this to be excluded from coverage report

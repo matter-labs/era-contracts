@@ -14,7 +14,7 @@ import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {BASE_TOKEN_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
@@ -46,8 +46,8 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         _registerNewTokens(tokens);
 
         _deployEra();
-        // _deployZKChain(BASE_TOKEN_VIRTUAL_ADDRESS);
-        // _deployZKChain(BASE_TOKEN_VIRTUAL_ADDRESS);
+        // _deployZKChain(ETH_TOKEN_ADDRESS);
+        // _deployZKChain(ETH_TOKEN_ADDRESS);
         // _deployZKChain(tokens[0]);
         // _deployZKChain(tokens[0]);
         // _deployZKChain(tokens[1]);

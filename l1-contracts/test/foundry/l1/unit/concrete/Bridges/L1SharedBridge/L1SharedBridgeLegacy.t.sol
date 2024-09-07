@@ -5,7 +5,7 @@ import "forge-std/console.sol";
 
 import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
-import {BASE_TOKEN_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
@@ -53,11 +53,11 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
-        _setNativeTokenVaultChainBalance(eraChainId, BASE_TOKEN_VIRTUAL_ADDRESS, amount);
+        _setNativeTokenVaultChainBalance(eraChainId, ETH_TOKEN_ADDRESS, amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
-            abi.encode(BASE_TOKEN_VIRTUAL_ADDRESS)
+            abi.encode(ETH_TOKEN_ADDRESS)
         );
 
         bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, alice, amount);

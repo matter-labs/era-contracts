@@ -27,7 +27,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {L2TransactionRequestTwoBridgesInner} from "contracts/bridgehub/IBridgehub.sol";
-import {BASE_TOKEN_VIRTUAL_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {ETH_ADDRESS_IN_CONTRACTS} from "../Utils/Utils.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
@@ -58,9 +58,7 @@ contract ExperimentalBridgeTest is Test {
     bytes32 private constant LOCK_FLAG_ADDRESS = 0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4;
 
     bytes32 ETH_TOKEN_ASSET_ID =
-        keccak256(
-            abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(uint160(BASE_TOKEN_VIRTUAL_ADDRESS))))
-        );
+        keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS)))));
 
     TestnetERC20Token testToken6;
     TestnetERC20Token testToken8;
@@ -113,7 +111,7 @@ contract ExperimentalBridgeTest is Test {
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
         testTokenAddress = address(testToken);
         vm.prank(address(ntv));
-        ntv.registerToken(BASE_TOKEN_VIRTUAL_ADDRESS);
+        ntv.registerToken(ETH_TOKEN_ADDRESS);
         ntv.registerToken(address(testToken));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(testToken));
 
@@ -963,9 +961,9 @@ contract ExperimentalBridgeTest is Test {
 
     //     l2TxnReqDirect.chainId = _setUpZKChainForChainId(l2TxnReqDirect.chainId);
 
-    //     assertTrue(!(bridgeHub.baseToken(l2TxnReqDirect.chainId) == BASE_TOKEN_VIRTUAL_ADDRESS));
+    //     assertTrue(!(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS));
     //     _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, true, address(0));
-    //     assertTrue(bridgeHub.baseToken(l2TxnReqDirect.chainId) == BASE_TOKEN_VIRTUAL_ADDRESS);
+    //     assertTrue(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS);
 
     //     _setUpSharedBridge();
     //     _setUpSharedBridgeL2(mockChainId);
@@ -1153,7 +1151,7 @@ contract ExperimentalBridgeTest is Test {
     //     l2TxnReq2BridgeOut.chainId = _setUpZKChainForChainId(l2TxnReq2BridgeOut.chainId);
 
     //     _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true, address(0));
-    //     assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == BASE_TOKEN_VIRTUAL_ADDRESS);
+    //     assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == ETH_TOKEN_ADDRESS);
 
     //     _setUpSharedBridge();
     //     _setUpSharedBridgeL2(chainId);
@@ -1213,7 +1211,7 @@ contract ExperimentalBridgeTest is Test {
     //     l2TxnReq2BridgeOut.chainId = _setUpZKChainForChainId(l2TxnReq2BridgeOut.chainId);
 
     //     _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true, address(0));
-    //     assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == BASE_TOKEN_VIRTUAL_ADDRESS);
+    //     assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == ETH_TOKEN_ADDRESS);
 
     //     _setUpSharedBridge();
     //     _setUpSharedBridgeL2(chainId);
@@ -1349,7 +1347,7 @@ contract ExperimentalBridgeTest is Test {
     //     uint256 randomValue
     // ) public useRandomToken(randomValue) {
     //     secondBridgeValue = bound(secondBridgeValue, 1, type(uint256).max);
-    //     bytes memory secondBridgeCalldata = abi.encode(BASE_TOKEN_VIRTUAL_ADDRESS, 0, l2Receiver);
+    //     bytes memory secondBridgeCalldata = abi.encode(ETH_TOKEN_ADDRESS, 0, l2Receiver);
 
     //     chainId = _setUpZKChainForChainId(chainId);
 
@@ -1530,7 +1528,7 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function _setUpBaseTokenForChainId(uint256 mockChainId, bool tokenIsETH, address token) internal {
-        address baseToken = tokenIsETH ? BASE_TOKEN_VIRTUAL_ADDRESS : token;
+        address baseToken = tokenIsETH ? ETH_TOKEN_ADDRESS : token;
 
         stdstore.target(address(bridgeHub)).sig("baseToken(uint256)").with_key(mockChainId).checked_write(baseToken);
     }

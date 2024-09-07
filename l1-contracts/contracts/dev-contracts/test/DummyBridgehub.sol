@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {BASE_TOKEN_VIRTUAL_ADDRESS} from "../../common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 
@@ -24,7 +24,7 @@ contract DummyBridgehub {
                 abi.encode(
                     block.chainid,
                     L2_NATIVE_TOKEN_VAULT_ADDR,
-                    BASE_TOKEN_VIRTUAL_ADDRESS
+                    ETH_TOKEN_ADDRESS
                     // bytes32(uint256(uint160(IGetters(msg.sender).getBaseToken())))
                 )
             );

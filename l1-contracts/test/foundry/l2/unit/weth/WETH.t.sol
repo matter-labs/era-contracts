@@ -7,7 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {Unauthorized, UnimplementedMessage, BRIDGE_MINT_NOT_IMPLEMENTED} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, UnimplementedMessage, BridgeMintNotImplemented} from "contracts/common/L1ContractErrors.sol";
 
 contract WethTest is Test {
     L2WrappedBaseToken internal weth;
@@ -101,7 +101,7 @@ contract WethTest is Test {
     }
 
     function test_revertWhenCallingBridgeMint() public {
-        vm.expectRevert(abi.encodeWithSelector(UnimplementedMessage.selector, BRIDGE_MINT_NOT_IMPLEMENTED));
+        vm.expectRevert(abi.encodeWithSelector(BridgeMintNotImplemented.selector));
         vm.prank(l2BridgeAddress);
         weth.bridgeMint(address(1), 1);
     }

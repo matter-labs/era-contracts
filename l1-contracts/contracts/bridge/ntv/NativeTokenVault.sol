@@ -17,7 +17,7 @@ import {INativeTokenVault} from "./INativeTokenVault.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {BASE_TOKEN_VIRTUAL_ADDRESS} from "../../common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
@@ -96,7 +96,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         if (_nativeToken == WETH_TOKEN) {
             revert TokenNotSupported(WETH_TOKEN);
         }
-        require(_nativeToken == BASE_TOKEN_VIRTUAL_ADDRESS || _nativeToken.code.length > 0, "NTV: empty token");
+        require(_nativeToken == ETH_TOKEN_ADDRESS || _nativeToken.code.length > 0, "NTV: empty token");
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
         ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
         tokenAddress[assetId] = _nativeToken;
@@ -167,7 +167,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
         chainBalance[_originChainId][token] -= amount;
 
-        if (token == BASE_TOKEN_VIRTUAL_ADDRESS) {
+        if (token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
             assembly {
@@ -238,7 +238,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
         uint256 amount;
         address nativeToken = tokenAddress[_assetId];
-        if (nativeToken == BASE_TOKEN_VIRTUAL_ADDRESS) {
+        if (nativeToken == ETH_TOKEN_ADDRESS) {
             amount = msg.value;
 
             // In the old SDK/contracts the user had to always provide `0` as the deposit amount for ETH token, while
@@ -309,7 +309,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @param _token The address of token of interest.
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function getERC20Getters(address _token) public view override returns (bytes memory) {
-        return BridgeHelper.getERC20Getters(_token, BASE_TOKEN_VIRTUAL_ADDRESS);
+        return BridgeHelper.getERC20Getters(_token, ETH_TOKEN_ADDRESS);
     }
 
     /// @notice Returns the parsed assetId.

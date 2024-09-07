@@ -21,7 +21,7 @@ import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegac
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
-import {TWO_BRIDGES_MAGIC_VALUE, BASE_TOKEN_VIRTUAL_ADDRESS} from "../../common/Config.sol";
+import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {UnsupportedEncodingVersion, InvalidChainId, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, AddressAlreadyUsed} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
 
@@ -97,7 +97,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         address _eraDiamondProxy
     )
         reentrancyGuardInitializer
-        AssetRouterBase(block.chainid, _eraChainId, IBridgehub(_bridgehub), BASE_TOKEN_VIRTUAL_ADDRESS)
+        AssetRouterBase(block.chainid, _eraChainId, IBridgehub(_bridgehub), ETH_TOKEN_ADDRESS)
     {
         _disableInitializers();
         L1_WETH_TOKEN = _l1WethAddress;
@@ -415,7 +415,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         address _prevMsgSender
     ) external onlyNativeTokenVault {
         address l1TokenAddress = INativeTokenVault(address(nativeTokenVault)).tokenAddress(_assetId);
-        if (l1TokenAddress == address(0) || l1TokenAddress == BASE_TOKEN_VIRTUAL_ADDRESS) {
+        if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
             return;
         }
         IERC20 l1Token = IERC20(l1TokenAddress);

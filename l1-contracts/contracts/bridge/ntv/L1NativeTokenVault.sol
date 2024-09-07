@@ -19,7 +19,7 @@ import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 
-import {BASE_TOKEN_VIRTUAL_ADDRESS} from "../../common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 
 import {Unauthorized, ZeroAddress, NoFundsTransferred, InsufficientChainBalance} from "../../common/L1ContractErrors.sol";
 
@@ -75,7 +75,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Calling second time for the same token will revert.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     function transferFundsFromSharedBridge(address _token) external {
-        if (_token == BASE_TOKEN_VIRTUAL_ADDRESS) {
+        if (_token == ETH_TOKEN_ADDRESS) {
             uint256 balanceBefore = address(this).balance;
             L1_NULLIFIER.transferTokenToNTV(_token);
             uint256 balanceAfter = address(this).balance;
@@ -137,7 +137,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         }
         chainBalance[_chainId][l1Token] -= _amount;
 
-        if (l1Token == BASE_TOKEN_VIRTUAL_ADDRESS) {
+        if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
             assembly {
