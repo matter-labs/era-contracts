@@ -70,7 +70,7 @@ import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
 import { BridgehubFactory, ChainAdminFactory, ERC20Factory, ChainTypeManagerFactory } from "../typechain";
 
-import { IL1AssetRouterCombinedFactory } from "../typechain/IL1AssetRouterCombinedFactory";
+import { IL1AssetRouterFactory } from "../typechain/IL1AssetRouterFactory";
 import { IL1NativeTokenVaultCombinedFactory } from "../typechain/IL1NativeTokenVaultCombinedFactory";
 import { IL1NullifierFactory } from "../typechain/IL1NullifierFactory";
 import { ICTMDeploymentTrackerFactory } from "../typechain/ICTMDeploymentTrackerFactory";
@@ -1669,7 +1669,7 @@ export class Deployer {
   }
 
   public defaultSharedBridge(signerOrProvider: Signer | providers.Provider) {
-    return IL1AssetRouterCombinedFactory.connect(this.addresses.Bridges.SharedBridgeProxy, signerOrProvider);
+    return IL1AssetRouterFactory.connect(this.addresses.Bridges.SharedBridgeProxy, signerOrProvider);
   }
 
   public l1NullifierContract(signerOrProvider: Signer | providers.Provider) {

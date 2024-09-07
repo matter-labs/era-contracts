@@ -24,7 +24,6 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IL1AssetRouterCombined} from "contracts/bridge/asset-router/IL1AssetRouterCombined.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -170,7 +169,7 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
         }
 
         address chainAdmin = IZKChain(bridgehub.getZKChain(migratingChainId)).getAdmin();
-        IL1AssetRouterCombined assetRouter = IL1AssetRouterCombined(address(bridgehub.sharedBridge()));
+        IL1AssetRouter assetRouter = IL1AssetRouter(address(bridgehub.sharedBridge()));
         bytes32 l2TxHash = keccak256("l2TxHash");
         uint256 l2BatchNumber = 5;
         uint256 l2MessageIndex = 0;
