@@ -133,33 +133,10 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         address _prevMsgSender
     ) internal virtual returns (bytes32, bytes memory) {}
 
-    /// @dev Calls the internal `_encodeTxDataHash`. Used as a wrapped for try / catch case.
-    /// @param _encodingVersion The version of the encoding.
-    /// @param _prevMsgSender The address of the entity that initiated the deposit.
-    /// @param _assetId The unique identifier of the deposited L1 token.
-    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
-    /// @return txDataHash The resulting encoded transaction data hash.
-    function _encodeTxDataHash(
-        address _nativeTokenVault,
-        bytes1 _encodingVersion,
-        address _prevMsgSender,
-        bytes32 _assetId,
-        bytes memory _transferData
-    ) internal view returns (bytes32 txDataHash) {
-        return
-            DataEncoding.encodeTxDataHash({
-                _encodingVersion: _encodingVersion,
-                _prevMsgSender: _prevMsgSender,
-                _assetId: _assetId,
-                _nativeTokenVault: address(_nativeTokenVault),
-                _transferData: _transferData
-            });
-    }
-
     /// @dev send the burn message to the asset
     /// @notice Forwards the burn request for specific asset to respective asset handler.
     /// @param _chainId The chain ID of the ZK chain to which to deposit.
-    /// @param _msgValue The L2 `msg.value` from the L1 -> L2 deposit transaction.
+    /// @param _nextMsgValue The L2 `msg.value` from the L1 -> L2 deposit transaction.
     /// @param _assetId The deposited asset ID.
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
     /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
@@ -167,7 +144,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @return bridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
     function _burn(
         uint256 _chainId,
-        uint256 _msgValue,
+        uint256 _nextMsgValue,
         bytes32 _assetId,
         address _prevMsgSender,
         bytes memory _transferData,
@@ -181,7 +158,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         uint256 msgValue = _passValue ? msg.value : 0;
         bridgeMintCalldata = IAssetHandler(l1AssetHandler).bridgeBurn{value: msgValue}({
             _chainId: _chainId,
-            _msgValue: _msgValue,
+            _msgValue: _nextMsgValue,
             _assetId: _assetId,
             _prevMsgSender: _prevMsgSender,
             _data: _transferData

@@ -81,10 +81,6 @@ interface IL1AssetRouter is IAssetRouterBase {
 
     function setAssetDeploymentTracker(bytes32 _assetRegistrationData, address _assetDeploymentTracker) external;
 
-    /// @dev Used to set the assedAddress for a given assetId.
-    /// @dev Will be used by ZK Gateway
-    function setAssetHandlerAddress(address _sender, bytes32 _assetId, address _assetAddress) external;
-
     function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external;
 
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on L2.

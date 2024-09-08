@@ -59,13 +59,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _;
     }
 
-    modifier onlyNullifierWithSender(address _expectedSender, address _prevMsgSender) {
-        if (msg.sender != address(L1_NULLIFIER) || _expectedSender != _prevMsgSender) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
@@ -153,15 +146,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         );
         assetDeploymentTracker[assetId] = _assetDeploymentTracker;
         emit AssetDeploymentTrackerSet(assetId, _assetDeploymentTracker, _assetRegistrationData);
-    }
-
-    ///  @inheritdoc IL1AssetRouter
-    function setAssetHandlerAddress(
-        address _prevMsgSender,
-        bytes32 _assetId,
-        address _assetAddress
-    ) external onlyNullifierWithSender(L2_ASSET_ROUTER_ADDR, _prevMsgSender) {
-        _setAssetHandlerAddress(_assetId, _assetAddress);
     }
 
     /// @inheritdoc IAssetRouterBase
@@ -276,14 +260,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
-            _msgValue: _value,
+            _nextMsgValue: _value,
             _assetId: assetId,
             _prevMsgSender: _prevMsgSender,
             _transferData: transferData,
             _passValue: true
         });
 
-        bytes32 txDataHash = _encodeTxDataHash({
+        bytes32 txDataHash = DataEncoding.encodeTxDataHash({
             _nativeTokenVault: address(nativeTokenVault),
             _encodingVersion: encodingVersion,
             _prevMsgSender: _prevMsgSender,
@@ -314,20 +298,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _txHash
     ) external override onlyBridgehub whenNotPaused {
         L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(_chainId, _txDataHash, _txHash);
-    }
-
-    function _getLegacyNTVCalldata(
-        address _sender,
-        address _receiver,
-        address _parsedNativeToken,
-        uint256 _amount,
-        bytes memory _gettersData
-    ) internal view virtual returns (bytes memory) {
-        return
-            abi.encodeCall(
-                IL2SharedBridgeLegacyFunctions.finalizeDeposit,
-                (_sender, _receiver, _parsedNativeToken, _amount, _gettersData)
-            );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -468,6 +438,20 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         }
     }
 
+    function _getLegacyNTVCalldata(
+        address _sender,
+        address _receiver,
+        address _parsedNativeToken,
+        uint256 _amount,
+        bytes memory _gettersData
+    ) internal pure returns (bytes memory) {
+        return
+            abi.encodeCall(
+                IL2SharedBridgeLegacyFunctions.finalizeDeposit,
+                (_sender, _receiver, _parsedNativeToken, _amount, _gettersData)
+            );
+    }
+
     /*//////////////////////////////////////////////////////////////
                      Legacy Functions
     //////////////////////////////////////////////////////////////*/
@@ -494,22 +478,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
             IERC20(_l1Token).forceApprove(address(nativeTokenVault), _amount);
 
-            // solhint-disable-next-line func-named-parameters
-            bridgeMintCalldata = DataEncoding.encodeBridgeMintData({
+            bridgeMintCalldata = _burn({
+                _chainId: ERA_CHAIN_ID,
+                _nextMsgValue: 0,
+                _assetId: _assetId,
                 _prevMsgSender: _prevMsgSender,
-                _l2Receiver: _l2Receiver,
-                _l1Token: _l1Token,
-                _amount: _amount,
-                _erc20Metadata: nativeTokenVault.getERC20Getters(_l1Token)
-            }); // kl todo don't we care about backwards compatibility here?
-            // bridgeMintCalldata = _burn({
-            //     _chainId: ERA_CHAIN_ID,
-            //     _l2Value: 0,
-            //     _assetId: _assetId,
-            //     _prevMsgSender: _prevMsgSender,
-            //     _transferData: abi.encode(_amount, _l2Receiver),
-            //     _passValue: false
-            // });
+                _transferData: abi.encode(_amount, _l2Receiver),
+                _passValue: false
+            });
         }
 
         {
