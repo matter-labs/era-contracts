@@ -137,13 +137,6 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         vm.expectEmit(true, true, false, false, address(sharedBridge));
         emit WithdrawalFinalizedAssetRouter(eraChainId, tokenAssetId, new bytes(0)); // kl todo
         vm.prank(l1ERC20BridgeAddress);
-        // sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
-        //     _l2BatchNumber: l2BatchNumber,
-        //     _l2MessageIndex: l2MessageIndex,
-        //     _l2TxNumberInBatch: l2TxNumberInBatch,
-        //     _message: message,
-        //     _merkleProof: merkleProof
-        // });
         FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
             chainId: eraChainId,
             l2BatchNumber: l2BatchNumber,
