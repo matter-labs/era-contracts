@@ -155,23 +155,46 @@ library Utils {
             });
     }
 
-    function createProofInput() public pure returns (IExecutor.ProofInput memory) {
-        uint256[] memory recursiveAggregationInput;
-        uint256[] memory serializedProof;
-
-        return
-            IExecutor.ProofInput({
-                recursiveAggregationInput: recursiveAggregationInput,
-                serializedProof: serializedProof
-            });
-    }
-
     function encodePacked(bytes[] memory data) public pure returns (bytes memory) {
         bytes memory result;
         for (uint256 i = 0; i < data.length; i++) {
             result = abi.encodePacked(result, data[i]);
         }
         return result;
+    }
+
+    function encodeCommitBatchesData(
+        IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
+        IExecutor.CommitBatchInfo[] memory _newBatchesData
+    ) internal pure returns (uint256, uint256, bytes memory) {
+        return (
+            _newBatchesData[0].batchNumber,
+            _newBatchesData[_newBatchesData.length - 1].batchNumber,
+            bytes.concat(bytes1(0x00), abi.encode(_lastCommittedBatchData, _newBatchesData))
+        );
+    }
+
+    function encodeProveBatchesData(
+        IExecutor.StoredBatchInfo memory _prevBatch,
+        IExecutor.StoredBatchInfo[] memory _committedBatches,
+        uint256[] memory _proof
+    ) internal pure returns (uint256, uint256, bytes memory) {
+        return (
+            _committedBatches[0].batchNumber,
+            _committedBatches[_committedBatches.length - 1].batchNumber,
+            bytes.concat(bytes1(0x00), abi.encode(_prevBatch, _committedBatches, _proof))
+        );
+    }
+
+    function encodeExecuteBatchesData(
+        IExecutor.StoredBatchInfo[] memory _batchesData,
+        PriorityOpsBatchInfo[] memory _priorityOpsData
+    ) internal pure returns (uint256, uint256, bytes memory) {
+        return (
+            _batchesData[0].batchNumber,
+            _batchesData[_batchesData.length - 1].batchNumber,
+            bytes.concat(bytes1(0x00), abi.encode(_batchesData, _priorityOpsData))
+        );
     }
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {

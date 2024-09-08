@@ -530,7 +530,7 @@ contract Verifier is IVerifier {
                     expectedProofLength := 44
                 }
                 default {
-                    expectedProofLength := 46
+                    expectedProofLength := 48
                 }
                 isValid := and(eq(proofLengthInWords, expectedProofLength), isValid)
 

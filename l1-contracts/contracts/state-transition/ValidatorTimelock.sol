@@ -164,7 +164,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         uint256 delay = executionDelay; // uint32
         unchecked {
             // We disable this check because calldata array length is cheap.
-            for (uint256 i = _processBatchFrom; i < _processBatchTo; ++i) {
+            for (uint256 i = _processBatchFrom; i <= _processBatchTo; ++i) {
                 uint256 commitBatchTimestamp = committedBatchTimestamp[_chainId].get(i);
 
                 // Note: if the `commitBatchTimestamp` is zero, that means either:
