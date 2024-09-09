@@ -136,7 +136,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_transferFundsToSharedBridge_Erc_0_AmountTransferred() public {
-        vm.prank(address(sharedBridge));
+        vm.prank(address(l1Nullifier));
         token.transfer(address(1), amount);
         vm.prank(address(nativeTokenVault));
         vm.expectRevert("NTV: 0 amount to transfer");
