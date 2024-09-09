@@ -15,7 +15,7 @@ import {
   L2_BOOTLOADER_BYTECODE_HASH,
   L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
   initialBridgehubDeployment,
-  registerHyperchain,
+  registerZKChain,
 } from "./deploy-process";
 import { deployTokens, getTokens } from "./deploy-token";
 
@@ -125,7 +125,7 @@ export async function registerZKChainWithBridgeRegistration(
   chainId?: string
 ) {
   chainId = chainId ?? deployer.chainId.toString();
-  await registerHyperchain(deployer, onlyVerifier, extraFacets, gasPrice, baseTokenName, chainId, true);
+  await registerZKChain(deployer, onlyVerifier, extraFacets, gasPrice, baseTokenName, chainId, true);
   await registerTestDAValidators(deployer);
 }
 
@@ -235,7 +235,7 @@ export async function initialEraTestnetDeploymentProcess(
   );
   await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZKChainDiamondCut());
 
-  await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString(), true);
+  await registerZKChain(deployer, false, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString(), true);
   return deployer;
 }
 

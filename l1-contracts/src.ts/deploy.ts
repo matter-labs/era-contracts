@@ -1085,7 +1085,7 @@ export class Deployer {
     await this.deployMessageRootProxy(create2Salt, { gasPrice });
   }
 
-  public async deployStateTransitionManagerContract(
+  public async deployChainTypeManagerContract(
     create2Salt: string,
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,
