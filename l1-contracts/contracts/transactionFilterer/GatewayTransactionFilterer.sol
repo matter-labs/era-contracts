@@ -36,7 +36,6 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
         if (_owner == address(0)) {
             revert ZeroAddress();
         }
-        require(_owner != address(0), "TxFilterer: owner 0");
         _transferOwnership(_owner);
     }
 
@@ -62,23 +61,19 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
 
     /// @notice Check if the transaction is allowed
     /// @param sender The sender of the transaction
-    /// @param _contractL2 The L2 receiver address
-    /// @param _mintValue The value of the L1 transaction
-    /// @param _l2Value The msg.value of the L2 transaction
-    /// @param _l2Calldata The calldata of the L2 transaction
-    /// @param _refundRecipient The address to refund the excess value
+    /// @param l2Calldata The calldata of the L2 transaction
     /// @return Whether the transaction is allowed
     function isTransactionAllowed(
         address sender,
-        address _contractL2,
-        uint256 _mintValue,
-        uint256 _l2Value,
-        bytes calldata _l2Calldata,
-        address _refundRecipient
+        address,
+        uint256,
+        uint256,
+        bytes calldata l2Calldata,
+        address
     ) external view returns (bool) {
         address baseTokenBridge = IZkSyncHyperchain(msg.sender).getBaseTokenBridge();
         address bridgeHub = IZkSyncHyperchain(msg.sender).getBridgehub();
-        (bytes32 decodedAssetId, bytes memory decodedAssetData) = abi.decode(_l2Calldata[4:], (bytes32, bytes)); // Decode data first
+        (bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (bytes32, bytes)); // Decode data first
         // Then take the asset id and call the BH
         address stmAddress = IBridgehub(bridgeHub).stmAssetIdToAddress(decodedAssetId);
 
