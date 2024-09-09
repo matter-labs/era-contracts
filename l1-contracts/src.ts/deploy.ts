@@ -49,9 +49,7 @@ import {
   readBytecode,
   applyL1ToL2Alias,
   BRIDGEHUB_CTM_ASSET_DATA_ABI_STRING,
-  // priorityTxMaxGasLimit,
   encodeNTVAssetId,
-  ETH_ADDRESS_IN_CONTRACTS,
   L2_MESSAGE_ROOT_ADDRESS,
 } from "./utils";
 import type { ChainAdminCall } from "./utils";
@@ -1106,14 +1104,6 @@ export class Deployer {
     await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData1);
     if (this.verbose) {
       console.log("Shared bridge was registered in Bridgehub");
-    }
-
-    /// registering ETH as a valid token, with address 1.
-    const baseTokenAssetId = encodeNTVAssetId(this.l1ChainId, ETH_ADDRESS_IN_CONTRACTS);
-    const upgradeData2 = bridgehub.interface.encodeFunctionData("addTokenAssetId", [baseTokenAssetId]);
-    await this.executeUpgrade(this.addresses.Bridgehub.BridgehubProxy, 0, upgradeData2);
-    if (this.verbose) {
-      console.log("ETH token asset id registered in Bridgehub");
     }
   }
 

@@ -152,7 +152,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
-
+        assetIdIsRegistered[ETH_TOKEN_ASSET_ID] = true;
         whitelistedSettlementLayers[L1_CHAIN_ID] = true;
     }
 
@@ -388,6 +388,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice baseToken function, which takes chainId as input, reads assetHandler from AR, and tokenAddress from AH
     function baseToken(uint256 _chainId) public view returns (address) {
         bytes32 baseTokenAssetId = baseTokenAssetId[_chainId];
+        if (baseTokenAssetId == ETH_TOKEN_ASSET_ID) {
+            return ETH_TOKEN_ADDRESS;
+        }
         address assetHandlerAddress = IAssetRouterBase(assetRouter).assetHandlerAddress(baseTokenAssetId);
 
         // It is possible that the asset handler is not deployed for a chain on the current layer.
