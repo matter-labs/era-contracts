@@ -53,6 +53,9 @@ interface IGetters is IZKChainBase {
     /// @return The total number of batches that were committed & verified & executed
     function getTotalBatchesExecuted() external view returns (uint256);
 
+    // @return Address of transaction filterer
+    function getTransactionFilterer() external view returns (address);
+
     /// @return The total number of priority operations that were added to the priority queue, including all processed ones
     function getTotalPriorityTxs() external view returns (uint256);
 

@@ -120,7 +120,8 @@ contract GatewayScript is Script {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         Ownable ownable = Ownable(config.bridgehub);
         Ownable ownableStmDT = Ownable(config.stmDeploymentTracker);
-        IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(config.chainChainId));
+        IZkSyncHyperchain chainL2 = IZkSyncHyperchain(bridgehub.getHyperchain(config.chainChainId));
+        IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(config.gatewayChainId));
         vm.startPrank(chain.getAdmin());
         TransactionFilterer transactionFiltererImplementation = new TransactionFilterer();
         address transactionFiltererProxy = address(
@@ -132,13 +133,14 @@ contract GatewayScript is Script {
         );
         chain.setTransactionFilterer(transactionFiltererProxy);
         vm.stopPrank();
-        vm.startPrank(ownable.owner());
-        require(ownableStmDT.owner() != address(0));
-        TransactionFilterer(transactionFiltererProxy).grantWhitelist(config.sharedBridgeProxy);
-        TransactionFilterer(transactionFiltererProxy).grantWhitelist(config.stmDeploymentTracker);
 
-        console.log("address registered:", ownableStmDT.owner());
+        vm.startPrank(ownable.owner());
+        console.log("ADDRESS TO BE WHITELISTED:", ownableStmDT.owner());
+        TransactionFilterer(transactionFiltererProxy).grantWhitelist(ownableStmDT.owner());
+        TransactionFilterer(transactionFiltererProxy).grantWhitelist(chainL2.getAdmin());
+        TransactionFilterer(transactionFiltererProxy).grantWhitelist(config.sharedBridgeProxy);
         bridgehub.registerSettlementLayer(config.gatewayChainId, true);
+
         vm.stopPrank();
         // bytes memory data = abi.encodeCall(stm.registerSettlementLayer, (config.chainChainId, true));
         // Utils.executeUpgrade({

@@ -389,6 +389,24 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         emit NewRelayedPriorityTransaction(_getTotalPriorityTxs(), _canonicalTxHash, _expirationTimestamp);
     }
 
+    function bridghehubCheckTransactionAllowed(address sender) external override onlyBridgehub nonReentrant {
+        // Check that the transaction is allowed by the filterer (if the filterer is set).
+        if (s.transactionFilterer != address(0)) {
+            if (
+                !ITransactionFilterer(s.transactionFilterer).isTransactionAllowed({
+                    sender: sender,
+                    contractL2: address(0),
+                    mintValue: 0,
+                    l2Value: 0,
+                    l2Calldata: "0x",
+                    refundRecipient: address(0)
+                })
+            ) {
+                revert TransactionNotAllowed();
+            }
+        }
+    }
+
     function _wrapRequest(
         uint256 _chainId,
         bytes32 _canonicalTxHash,

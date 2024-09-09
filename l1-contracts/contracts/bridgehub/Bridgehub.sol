@@ -526,6 +526,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         address zkChain = zkChainMap.get(_request.chainId);
 
+        IZkSyncHyperchain(hyperchain).bridghehubCheckTransactionAllowed(msg.sender);
+
         if (_request.secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
             revert AddressTooLow(_request.secondBridgeAddress);
         }

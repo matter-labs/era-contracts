@@ -124,6 +124,8 @@ interface IMailbox is IZKChainBase {
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
 
+    function bridghehubCheckTransactionAllowed(address sender) external;
+
     /// Proves that a certain leaf was included as part of the log merkle tree.
     function proveL2LeafInclusion(
         uint256 _batchNumber,
