@@ -123,7 +123,10 @@ error PreviousL2BlockHashIsIncorrect(bytes32 correctPrevBlockHash, bytes32 expec
 
 error CannotInitializeFirstVirtualBlock();
 
-error TimestampOfL2BlockMustBeGreaterThanOrEqualToTimestampOfCurrentBatch(uint128 l2BlockTimestamp, uint128 currentBatchTimestamp);
+error TimestampOfL2BlockMustBeGreaterThanOrEqualToTimestampOfCurrentBatch(
+    uint128 l2BlockTimestamp,
+    uint128 currentBatchTimestamp
+);
 
 error ThereMustBeVirtualBlockCreatedAtStartOfBatch();
 
@@ -137,7 +140,10 @@ error CannotCreateVirtualBlocksInMiddleOfMiniblock();
 
 error CurrentL2BlockHashIsIncorrect(bytes32 expectedPrevL2BlockHash, bytes32 pendingL2BlockHash);
 
-error TimestampOfNewL2BlockMustBeGreaterThanTimestampOfPreviousL2Block(uint128 l2BlockTimestamp, uint128 currentL2BlockTimestamp);
+error TimestampOfNewL2BlockMustBeGreaterThanTimestampOfPreviousL2Block(
+    uint128 l2BlockTimestamp,
+    uint128 currentL2BlockTimestamp
+);
 
 error CurrentBatchNumberMustBeGreaterThanZero();
 

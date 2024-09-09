@@ -396,10 +396,16 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
         // just in case
         if (commitment.totalBatchesExecuted > commitment.totalBatchesVerified) {
-            revert VerifiedIsNotConsistentWithExecuted(commitment.totalBatchesExecuted, commitment.totalBatchesVerified);
+            revert VerifiedIsNotConsistentWithExecuted(
+                commitment.totalBatchesExecuted,
+                commitment.totalBatchesVerified
+            );
         }
         if (commitment.totalBatchesVerified > commitment.totalBatchesCommitted) {
-            revert VerifiedIsNotConsistentWithCommitted(commitment.totalBatchesVerified, commitment.totalBatchesCommitted);
+            revert VerifiedIsNotConsistentWithCommitted(
+                commitment.totalBatchesVerified,
+                commitment.totalBatchesCommitted
+            );
         }
 
         uint256 blocksToRemember = commitment.totalBatchesCommitted - commitment.totalBatchesExecuted + 1;
