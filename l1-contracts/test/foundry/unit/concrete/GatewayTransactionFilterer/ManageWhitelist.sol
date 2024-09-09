@@ -5,7 +5,7 @@ import {GatewayTransactionFiltererTest} from "./_GatewayTransactionFilterer_Shar
 
 import {AlreadyWhitelisted, NotWhitelisted} from "contracts/common/L1ContractErrors.sol";
 
-contract manageWhitelistTest is GatewayTransactionFiltererTest {
+contract ManageWhitelistTest is GatewayTransactionFiltererTest {
     function test_GrantingWhitelistToSender() public {
         vm.startPrank(owner);
         transactionFiltererProxy.grantWhitelist(sender);
