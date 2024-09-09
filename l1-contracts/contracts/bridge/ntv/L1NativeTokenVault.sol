@@ -110,7 +110,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         uint256 _chainId,
         bytes32 _assetId,
         address _prevMsgSender,
-        bool,
+        // solhint-disable-next-line no-unused-vars
+        bool _depositChecked,
         bytes calldata _data
     ) internal override returns (bytes memory _bridgeMintData) {
         uint256 _depositAmount;
