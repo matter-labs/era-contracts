@@ -92,7 +92,11 @@ contract ValidatorTimelockTest is Test {
         batchesToCommit[0] = batchToCommit;
 
         vm.prank(alice);
-        validator.commitBatchesSharedBridge(chainId, storedBatch, batchesToCommit);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            storedBatch,
+            batchesToCommit
+        );
+        validator.commitBatchesSharedBridge(chainId, commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_setChainTypeManager() public {
@@ -140,7 +144,11 @@ contract ValidatorTimelockTest is Test {
         batchesToCommit[0] = batchToCommit;
 
         vm.prank(alice);
-        validator.commitBatchesSharedBridge(chainId, storedBatch, batchesToCommit);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            storedBatch,
+            batchesToCommit
+        );
+        validator.commitBatchesSharedBridge(chainId, commitBatchFrom, commitBatchTo, commitData);
 
         assert(validator.getCommittedBatchTimestamp(chainId, batchNumber) == timestamp);
     }
@@ -155,7 +163,11 @@ contract ValidatorTimelockTest is Test {
         batchesToCommit[0] = batchToCommit;
 
         vm.prank(alice);
-        validator.commitBatchesSharedBridge(chainId, storedBatch, batchesToCommit);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            storedBatch,
+            batchesToCommit
+        );
+        validator.commitBatchesSharedBridge(chainId, commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_revertBatchesSharedBridge() public {
@@ -168,7 +180,7 @@ contract ValidatorTimelockTest is Test {
     function test_proveBatchesSharedBridge() public {
         IExecutor.StoredBatchInfo memory prevBatch = Utils.createStoredBatchInfo();
         IExecutor.StoredBatchInfo memory batchToProve = Utils.createStoredBatchInfo();
-        IExecutor.ProofInput memory proof = Utils.createProofInput();
+        uint256[] memory proof = new uint256[](0);
 
         IExecutor.StoredBatchInfo[] memory batchesToProve = new IExecutor.StoredBatchInfo[](1);
         batchesToProve[0] = batchToProve;
@@ -179,7 +191,12 @@ contract ValidatorTimelockTest is Test {
             abi.encode(chainId, prevBatch, batchesToProve, proof)
         );
         vm.prank(alice);
-        validator.proveBatchesSharedBridge(chainId, prevBatch, batchesToProve, proof);
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
+            prevBatch,
+            batchesToProve,
+            proof
+        );
+        validator.proveBatchesSharedBridge(chainId, proveBatchFrom, proveBatchTo, proveData);
     }
 
     function test_executeBatchesSharedBridge() public {
@@ -197,7 +214,11 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(alice);
         vm.warp(timestamp);
-        validator.commitBatchesSharedBridge(chainId, storedBatch1, batchesToCommit);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            storedBatch1,
+            batchesToCommit
+        );
+        validator.commitBatchesSharedBridge(chainId, commitBatchFrom, commitBatchTo, commitData);
 
         // Execute batches
         IExecutor.StoredBatchInfo memory storedBatch2 = Utils.createStoredBatchInfo();
@@ -213,7 +234,11 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(alice);
         vm.warp(timestamp + executionDelay + 1);
-        validator.executeBatchesSharedBridge(chainId, storedBatches, Utils.emptyData());
+        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
+            storedBatches,
+            Utils.emptyData()
+        );
+        validator.executeBatchesSharedBridge(chainId, executeBatchFrom, executeBatchTo, executeData);
     }
 
     function test_RevertWhen_setExecutionDelayNotOwner() public {
@@ -265,7 +290,11 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bob));
-        validator.commitBatchesSharedBridge(chainId, storedBatch, batchesToCommit);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            storedBatch,
+            batchesToCommit
+        );
+        validator.commitBatchesSharedBridge(chainId, commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_setChainTypeManagerNotOwner() public {
@@ -286,14 +315,19 @@ contract ValidatorTimelockTest is Test {
     function test_RevertWhen_proveBatchesSharedBridgeNotValidator() public {
         IExecutor.StoredBatchInfo memory prevBatch = Utils.createStoredBatchInfo();
         IExecutor.StoredBatchInfo memory batchToProve = Utils.createStoredBatchInfo();
-        IExecutor.ProofInput memory proof = Utils.createProofInput();
+        uint256[] memory proof = new uint256[](0);
 
         IExecutor.StoredBatchInfo[] memory batchesToProve = new IExecutor.StoredBatchInfo[](1);
         batchesToProve[0] = batchToProve;
 
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bob));
-        validator.proveBatchesSharedBridge(chainId, prevBatch, batchesToProve, proof);
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
+            prevBatch,
+            batchesToProve,
+            proof
+        );
+        validator.proveBatchesSharedBridge(chainId, proveBatchFrom, proveBatchTo, proveData);
     }
 
     function test_RevertWhen_executeBatchesSharedBridgeNotValidator() public {
@@ -304,7 +338,11 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bob));
-        validator.executeBatchesSharedBridge(chainId, storedBatches, Utils.emptyData());
+        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
+            storedBatches,
+            Utils.emptyData()
+        );
+        validator.executeBatchesSharedBridge(chainId, executeBatchFrom, executeBatchTo, executeData);
     }
 
     function test_RevertWhen_executeBatchesSharedBridgeTooEarly() public {
@@ -322,7 +360,11 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(alice);
         vm.warp(timestamp);
-        validator.commitBatchesSharedBridge(chainId, storedBatch1, batchesToCommit);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            storedBatch1,
+            batchesToCommit
+        );
+        validator.commitBatchesSharedBridge(chainId, commitBatchFrom, commitBatchTo, commitData);
 
         // Execute batches
         IExecutor.StoredBatchInfo memory storedBatch2 = Utils.createStoredBatchInfo();
@@ -335,6 +377,10 @@ contract ValidatorTimelockTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(TimeNotReached.selector, timestamp + executionDelay, timestamp + executionDelay - 1)
         );
-        validator.executeBatchesSharedBridge(chainId, storedBatches, Utils.emptyData());
+        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
+            storedBatches,
+            Utils.emptyData()
+        );
+        validator.executeBatchesSharedBridge(chainId, executeBatchFrom, executeBatchTo, executeData);
     }
 }

@@ -6,7 +6,6 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IChainTypeManager} from "./IChainTypeManager.sol";
-import {PriorityOpsBatchInfo} from "./libraries/PriorityTree.sol";
 import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
@@ -119,32 +118,27 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// a call to the zkChain diamond contract with the same calldata.
     function commitBatchesSharedBridge(
         uint256 _chainId,
-        StoredBatchInfo calldata,
-        CommitBatchInfo[] calldata _newBatchesData
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo,
+        bytes calldata
     ) external onlyValidator(_chainId) {
-        _commitBatchesInner(_chainId, _newBatchesData);
-    }
-
-    function _commitBatchesInner(uint256 _chainId, CommitBatchInfo[] calldata _newBatchesData) internal {
         unchecked {
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
             uint32 timestamp = uint32(block.timestamp);
             // We disable this check because calldata array length is cheap.
-            // solhint-disable-next-line gas-length-in-loops
-            for (uint256 i = 0; i < _newBatchesData.length; ++i) {
-                committedBatchTimestamp[_chainId].set(_newBatchesData[i].batchNumber, timestamp);
+            for (uint256 i = _processBatchFrom; i <= _processBatchTo; ++i) {
+                committedBatchTimestamp[_chainId].set(i, timestamp);
             }
         }
-
-        _propagateToZkSyncZKChain(_chainId);
+        _propagateToZKChain(_chainId);
     }
 
     /// @dev Make a call to the zkChain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
     function revertBatchesSharedBridge(uint256 _chainId, uint256) external onlyValidator(_chainId) {
-        _propagateToZkSyncZKChain(_chainId);
+        _propagateToZKChain(_chainId);
     }
 
     /// @dev Make a call to the zkChain diamond contract with the same calldata.
@@ -152,30 +146,26 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// the batch is known on the commit stage and the proved is not finalized (may be reverted).
     function proveBatchesSharedBridge(
         uint256 _chainId,
-        StoredBatchInfo calldata,
-        StoredBatchInfo[] calldata,
-        ProofInput calldata
+        uint256, // _processBatchFrom
+        uint256, // _processBatchTo
+        bytes calldata
     ) external onlyValidator(_chainId) {
-        _propagateToZkSyncZKChain(_chainId);
+        _propagateToZKChain(_chainId);
     }
 
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the zkChain diamond contract with the same calldata.
     function executeBatchesSharedBridge(
         uint256 _chainId,
-        StoredBatchInfo[] calldata _newBatchesData,
-        PriorityOpsBatchInfo[] calldata
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo,
+        bytes calldata
     ) external onlyValidator(_chainId) {
-        _executeBatchesInner(_chainId, _newBatchesData);
-    }
-
-    function _executeBatchesInner(uint256 _chainId, StoredBatchInfo[] calldata _newBatchesData) internal {
         uint256 delay = executionDelay; // uint32
         unchecked {
             // We disable this check because calldata array length is cheap.
-            // solhint-disable-next-line gas-length-in-loops
-            for (uint256 i = 0; i < _newBatchesData.length; ++i) {
-                uint256 commitBatchTimestamp = committedBatchTimestamp[_chainId].get(_newBatchesData[i].batchNumber);
+            for (uint256 i = _processBatchFrom; i <= _processBatchTo; ++i) {
+                uint256 commitBatchTimestamp = committedBatchTimestamp[_chainId].get(i);
 
                 // Note: if the `commitBatchTimestamp` is zero, that means either:
                 // * The batch was committed, but not through this contract.
@@ -187,12 +177,12 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 }
             }
         }
-        _propagateToZkSyncZKChain(_chainId);
+        _propagateToZKChain(_chainId);
     }
 
     /// @dev Call the zkChain diamond contract with the same calldata as this contract was called.
     /// Note: it is called the zkChain diamond contract, not delegatecalled!
-    function _propagateToZkSyncZKChain(uint256 _chainId) internal {
+    function _propagateToZKChain(uint256 _chainId) internal {
         address contractAddress = chainTypeManager.getZKChain(_chainId);
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position

@@ -45,7 +45,11 @@ contract AuthorizationTest is ExecutorTest {
         vm.prank(randomSigner);
 
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomSigner));
-        executor.commitBatchesSharedBridge(uint256(0), storedBatchInfo, commitBatchInfoArray);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            storedBatchInfo,
+            commitBatchInfoArray
+        );
+        executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_ProvingByUnauthorisedAddress() public {
@@ -55,7 +59,12 @@ contract AuthorizationTest is ExecutorTest {
         vm.prank(owner);
 
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, owner));
-        executor.proveBatchesSharedBridge(uint256(0), storedBatchInfo, storedBatchInfoArray, proofInput);
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
+            storedBatchInfo,
+            storedBatchInfoArray,
+            proofInput
+        );
+        executor.proveBatchesSharedBridge(uint256(0), proveBatchFrom, proveBatchTo, proveData);
     }
 
     function test_RevertWhen_ExecutingByUnauthorizedAddress() public {
@@ -65,6 +74,10 @@ contract AuthorizationTest is ExecutorTest {
         vm.prank(randomSigner);
 
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomSigner));
-        executor.executeBatchesSharedBridge(uint256(0), storedBatchInfoArray, Utils.emptyData());
+        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
+            storedBatchInfoArray,
+            Utils.emptyData()
+        );
+        executor.executeBatchesSharedBridge(uint256(0), executeBatchFrom, executeBatchTo, executeData);
     }
 }

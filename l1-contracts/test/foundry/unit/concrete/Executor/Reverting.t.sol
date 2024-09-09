@@ -40,7 +40,11 @@ contract RevertingTest is ExecutorTest {
         vm.prank(validator);
         vm.blobhashes(blobVersionedHashes);
         vm.recordLogs();
-        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, commitBatchInfoArray);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            commitBatchInfoArray
+        );
+        executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         newStoredBatchInfo = IExecutor.StoredBatchInfo({
@@ -58,8 +62,12 @@ contract RevertingTest is ExecutorTest {
         storedBatchInfoArray[0] = newStoredBatchInfo;
 
         vm.prank(validator);
-
-        executor.proveBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
+            genesisStoredBatchInfo,
+            storedBatchInfoArray,
+            proofInput
+        );
+        executor.proveBatchesSharedBridge(uint256(0), proveBatchFrom, proveBatchTo, proveData);
     }
 
     function setUpCommitBatch() public {

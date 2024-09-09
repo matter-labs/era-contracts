@@ -10,9 +10,16 @@ import type { IMailbox } from "../../typechain/IMailbox";
 import type { ExecutorFacet } from "../../typechain";
 
 import type { FeeParams, L2CanonicalTransaction } from "../../src.ts/utils";
-import { ADDRESS_ONE, PubdataPricingMode, EMPTY_STRING_KECCAK } from "../../src.ts/utils";
+import {
+  ADDRESS_ONE,
+  PubdataPricingMode,
+  EMPTY_STRING_KECCAK,
+  STORED_BATCH_INFO_ABI_STRING,
+  COMMIT_BATCH_INFO_ABI_STRING,
+  PRIORITY_OPS_BATCH_INFO_ABI_STRING,
+} from "../../src.ts/utils";
 import { packSemver } from "../../scripts/utils";
-import { keccak256 } from "ethers/lib/utils";
+import { keccak256, hexConcat, defaultAbiCoder } from "ethers/lib/utils";
 
 export const CONTRACTS_GENESIS_PROTOCOL_VERSION = packSemver(0, 21, 0).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -362,6 +369,12 @@ export interface CommitBatchInfo {
   operatorDAInput: BytesLike;
 }
 
+export interface PriorityOpsBatchInfo {
+  leftPath: Array<BytesLike>;
+  rightPath: Array<BytesLike>;
+  itemHashes: Array<BytesLike>;
+}
+
 export async function depositERC20(
   bridge: IL1ERC20Bridge,
   bridgehubContract: IBridgehub,
@@ -503,14 +516,13 @@ export async function makeExecutedEqualCommitted(
   batchesToExecute = [...batchesToProve, ...batchesToExecute];
 
   await (
-    await proxyExecutor.proveBatchesSharedBridge(0, prevBatchInfo, batchesToProve, {
-      recursiveAggregationInput: [],
-      serializedProof: [],
-    })
+    await proxyExecutor.proveBatchesSharedBridge(0, ...encodeProveBatchesData(prevBatchInfo, batchesToProve, []))
   ).wait();
 
   const dummyMerkleProofs = batchesToExecute.map(() => ({ leftPath: [], rightPath: [], itemHashes: [] }));
-  await (await proxyExecutor.executeBatchesSharedBridge(0, batchesToExecute, dummyMerkleProofs)).wait();
+  await (
+    await proxyExecutor.executeBatchesSharedBridge(0, ...encodeExecuteBatchesData(batchesToExecute, dummyMerkleProofs))
+  ).wait();
 }
 
 export function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: string): StoredBatchInfo {
@@ -524,4 +536,41 @@ export function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: stri
     timestamp: commitInfo.timestamp,
     commitment: commitment,
   };
+}
+
+export function encodeCommitBatchesData(
+  storedBatchInfo: StoredBatchInfo,
+  commitBatchInfos: Array<CommitBatchInfo>
+): [BigNumberish, BigNumberish, string] {
+  const encodedCommitDataWithoutVersion = defaultAbiCoder.encode(
+    [STORED_BATCH_INFO_ABI_STRING, `${COMMIT_BATCH_INFO_ABI_STRING}[]`],
+    [storedBatchInfo, commitBatchInfos]
+  );
+  const commitData = hexConcat(["0x00", encodedCommitDataWithoutVersion]);
+  return [commitBatchInfos[0].batchNumber, commitBatchInfos[commitBatchInfos.length - 1].batchNumber, commitData];
+}
+
+export function encodeProveBatchesData(
+  prevBatch: StoredBatchInfo,
+  committedBatches: Array<StoredBatchInfo>,
+  proof: Array<BigNumberish>
+): [BigNumberish, BigNumberish, string] {
+  const encodedProveDataWithoutVersion = defaultAbiCoder.encode(
+    [STORED_BATCH_INFO_ABI_STRING, `${STORED_BATCH_INFO_ABI_STRING}[]`, "uint256[]"],
+    [prevBatch, committedBatches, proof]
+  );
+  const proveData = hexConcat(["0x00", encodedProveDataWithoutVersion]);
+  return [committedBatches[0].batchNumber, committedBatches[committedBatches.length - 1].batchNumber, proveData];
+}
+
+export function encodeExecuteBatchesData(
+  batchesData: Array<StoredBatchInfo>,
+  priorityOpsBatchInfo: Array<PriorityOpsBatchInfo>
+): [BigNumberish, BigNumberish, string] {
+  const encodedExecuteDataWithoutVersion = defaultAbiCoder.encode(
+    [`${STORED_BATCH_INFO_ABI_STRING}[]`, `${PRIORITY_OPS_BATCH_INFO_ABI_STRING}[]`],
+    [batchesData, priorityOpsBatchInfo]
+  );
+  const executeData = hexConcat(["0x00", encodedExecuteDataWithoutVersion]);
+  return [batchesData[0].batchNumber, batchesData[batchesData.length - 1].batchNumber, executeData];
 }

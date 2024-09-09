@@ -67,7 +67,7 @@ library PriorityTree {
     }
 
     /// @notice Process the priority operations of a batch.
-    function processBatch(Tree storage _tree, PriorityOpsBatchInfo calldata _priorityOpsData) internal {
+    function processBatch(Tree storage _tree, PriorityOpsBatchInfo memory _priorityOpsData) internal {
         if (_priorityOpsData.itemHashes.length > 0) {
             bytes32 expectedRoot = Merkle.calculateRootPaths(
                 _priorityOpsData.leftPath,

@@ -41,7 +41,11 @@ contract ProvingTest is ExecutorTest {
         vm.prank(validator);
         vm.blobhashes(blobVersionedHashes);
         vm.recordLogs();
-        executor.commitBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, commitBatchInfoArray);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            commitBatchInfoArray
+        );
+        executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         newStoredBatchInfo = IExecutor.StoredBatchInfo({
@@ -106,7 +110,12 @@ contract ProvingTest is ExecutorTest {
                 keccak256(abi.encode(wrongPreviousStoredBatchInfo))
             )
         );
-        executor.proveBatchesSharedBridge(uint256(0), wrongPreviousStoredBatchInfo, storedBatchInfoArray, proofInput);
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
+            wrongPreviousStoredBatchInfo,
+            storedBatchInfoArray,
+            proofInput
+        );
+        executor.proveBatchesSharedBridge(uint256(0), proveBatchFrom, proveBatchTo, proveData);
     }
 
     function test_RevertWhen_ProvingWithWrongCommittedBlock() public {
@@ -125,7 +134,12 @@ contract ProvingTest is ExecutorTest {
                 keccak256(abi.encode(wrongNewStoredBatchInfo))
             )
         );
-        executor.proveBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
+            genesisStoredBatchInfo,
+            storedBatchInfoArray,
+            proofInput
+        );
+        executor.proveBatchesSharedBridge(uint256(0), proveBatchFrom, proveBatchTo, proveData);
     }
 
     function test_RevertWhen_ProvingRevertedBlockWithoutCommittingAgain() public {
@@ -138,7 +152,12 @@ contract ProvingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(VerifiedBatchesExceedsCommittedBatches.selector);
-        executor.proveBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
+            genesisStoredBatchInfo,
+            storedBatchInfoArray,
+            proofInput
+        );
+        executor.proveBatchesSharedBridge(uint256(0), proveBatchFrom, proveBatchTo, proveData);
     }
 
     function test_SuccessfulProve() public {
@@ -146,8 +165,12 @@ contract ProvingTest is ExecutorTest {
         storedBatchInfoArray[0] = newStoredBatchInfo;
 
         vm.prank(validator);
-
-        executor.proveBatchesSharedBridge(uint256(0), genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
+            genesisStoredBatchInfo,
+            storedBatchInfoArray,
+            proofInput
+        );
+        executor.proveBatchesSharedBridge(uint256(0), proveBatchFrom, proveBatchTo, proveData);
 
         uint256 totalBlocksVerified = getters.getTotalBlocksVerified();
         assertEq(totalBlocksVerified, 1);

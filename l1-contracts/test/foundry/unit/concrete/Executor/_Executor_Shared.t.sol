@@ -55,7 +55,7 @@ contract ExecutorTest is Test {
     uint256 eraChainId;
 
     IExecutor.StoredBatchInfo internal genesisStoredBatchInfo;
-    IExecutor.ProofInput internal proofInput;
+    uint256[] internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](12);
@@ -258,10 +258,6 @@ contract ExecutorTest is Test {
         admin.setTokenMultiplier(1, 1);
         vm.prank(address(owner));
         admin.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_VALIDATOR_ADDRESS);
-
-        uint256[] memory recursiveAggregationInput;
-        uint256[] memory serializedProof;
-        proofInput = IExecutor.ProofInput(recursiveAggregationInput, serializedProof);
 
         // foundry's default value is 1 for the block's timestamp, it is expected
         // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER + 1

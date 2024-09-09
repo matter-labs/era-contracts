@@ -327,9 +327,26 @@ error ZeroAddress();
 error ZeroBalance();
 // 0xc84885d4
 error ZeroChainId();
-
+// 0x520aa59c
+error PubdataIsEmpty();
+// 0x99d8fec9
+error EmptyData();
+// 0xc99a8360
+error UnsupportedCommitBatchEncoding(uint8 version);
+// 0xe167e4a6
+error UnsupportedProofBatchEncoding(uint8 version);
+// 0xe8e3f6f4
+error UnsupportedExecuteBatchEncoding(uint8 version);
+// 0xd7d93e1f
+error IncorrectBatchBounds(
+    uint256 processFromExpected,
+    uint256 processToExpected,
+    uint256 processFromProvided,
+    uint256 processToProvided
+);
+// 0x04a0b7e9
 error AssetIdNotSupported(bytes32 assetId);
-
+// 0x64107968
 error AssetHandlerNotRegistered(bytes32 assetId);
 
 enum SharedBridgeKey {

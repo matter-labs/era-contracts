@@ -17,11 +17,10 @@ contract VerifierCaller {
 
     function verify(
         uint256[] memory publicInputs,
-        uint256[] memory serializedProof,
-        uint256[] memory recursiveAggregationInput
+        uint256[] memory serializedProof
     ) public view returns (bool result, uint256 gasUsed) {
         uint256 gasBefore = gasleft();
-        result = verifier.verify(publicInputs, serializedProof, recursiveAggregationInput);
+        result = verifier.verify(publicInputs, serializedProof);
         gasUsed = gasBefore - gasleft();
     }
 }
@@ -32,7 +31,6 @@ contract VerifierTestTest is Test {
 
     uint256[] public publicInputs;
     uint256[] public serializedProof;
-    uint256[] public recursiveAggregationInput;
 
     Verifier public verifier;
 
@@ -88,7 +86,7 @@ contract VerifierTestTest is Test {
     }
 
     function testShouldVerify() public view {
-        bool success = verifier.verify(publicInputs, serializedProof, recursiveAggregationInput);
+        bool success = verifier.verify(publicInputs, serializedProof);
         assert(success);
     }
 
@@ -99,7 +97,7 @@ contract VerifierTestTest is Test {
         // - Call the verify function from the VerifierCaller contract and return the gas used
 
         VerifierCaller caller = new VerifierCaller(verifier);
-        (bool success, uint256 gasUsed) = caller.verify(publicInputs, serializedProof, recursiveAggregationInput);
+        (bool success, uint256 gasUsed) = caller.verify(publicInputs, serializedProof);
         assert(success);
 
         console.log("Gas used: %d", gasUsed);
@@ -109,7 +107,7 @@ contract VerifierTestTest is Test {
         uint256[] memory newPublicInputs = publicInputs;
         newPublicInputs[0] += uint256(bytes32(0xe000000000000000000000000000000000000000000000000000000000000000));
 
-        bool success = verifier.verify(newPublicInputs, serializedProof, recursiveAggregationInput);
+        bool success = verifier.verify(newPublicInputs, serializedProof);
         assert(success);
     }
 
@@ -119,7 +117,7 @@ contract VerifierTestTest is Test {
         newSerializedProof[1] += Q_MOD;
         newSerializedProof[1] += Q_MOD;
 
-        bool success = verifier.verify(publicInputs, newSerializedProof, recursiveAggregationInput);
+        bool success = verifier.verify(publicInputs, newSerializedProof);
         assert(success);
     }
 
@@ -127,7 +125,7 @@ contract VerifierTestTest is Test {
         uint256[] memory newSerializedProof = serializedProof;
         newSerializedProof[22] += R_MOD;
 
-        bool success = verifier.verify(publicInputs, newSerializedProof, recursiveAggregationInput);
+        bool success = verifier.verify(publicInputs, newSerializedProof);
         assert(success);
     }
 
@@ -137,14 +135,14 @@ contract VerifierTestTest is Test {
         newPublicInputs[1] = publicInputs[0];
 
         vm.expectRevert(bytes("loadProof: Proof is invalid"));
-        verifier.verify(newPublicInputs, serializedProof, recursiveAggregationInput);
+        verifier.verify(newPublicInputs, serializedProof);
     }
 
     function testEmptyPublicInput_shouldRevert() public {
         uint256[] memory newPublicInputs;
 
         vm.expectRevert(bytes("loadProof: Proof is invalid"));
-        verifier.verify(newPublicInputs, serializedProof, recursiveAggregationInput);
+        verifier.verify(newPublicInputs, serializedProof);
     }
 
     function testMoreThan44WordsProof_shouldRevert() public {
@@ -156,21 +154,25 @@ contract VerifierTestTest is Test {
         newSerializedProof[newSerializedProof.length - 1] = serializedProof[serializedProof.length - 1];
 
         vm.expectRevert(bytes("loadProof: Proof is invalid"));
-        verifier.verify(publicInputs, newSerializedProof, recursiveAggregationInput);
+        verifier.verify(publicInputs, newSerializedProof);
     }
 
     function testEmptyProof_shouldRevert() public {
         uint256[] memory newSerializedProof;
 
         vm.expectRevert(bytes("loadProof: Proof is invalid"));
-        verifier.verify(publicInputs, newSerializedProof, recursiveAggregationInput);
+        verifier.verify(publicInputs, newSerializedProof);
     }
 
-    function testNotEmptyRecursiveAggregationInput_shouldRevert() public {
-        uint256[] memory newRecursiveAggregationInput = publicInputs;
+    function testLongerProofInput_shouldRevert() public {
+        uint256[] memory newSerializedProof = new uint256[](serializedProof.length + 1);
+        for (uint256 i = 0; i < serializedProof.length; i++) {
+            newSerializedProof[i] = serializedProof[i];
+        }
+        newSerializedProof[newSerializedProof.length - 1] = publicInputs[0];
 
         vm.expectRevert(bytes("loadProof: Proof is invalid"));
-        verifier.verify(publicInputs, serializedProof, newRecursiveAggregationInput);
+        verifier.verify(publicInputs, newSerializedProof);
     }
 
     function testEllipticCurvePointAtInfinity_shouldRevert() public {
@@ -179,7 +181,7 @@ contract VerifierTestTest is Test {
         newSerializedProof[1] = 0;
 
         vm.expectRevert(bytes("loadProof: Proof is invalid"));
-        verifier.verify(publicInputs, newSerializedProof, recursiveAggregationInput);
+        verifier.verify(publicInputs, newSerializedProof);
     }
 
     function testInvalidPublicInput_shouldRevert() public {
@@ -187,7 +189,7 @@ contract VerifierTestTest is Test {
         newPublicInputs[0] = 0;
 
         vm.expectRevert(bytes("invalid quotient evaluation"));
-        verifier.verify(newPublicInputs, serializedProof, recursiveAggregationInput);
+        verifier.verify(newPublicInputs, serializedProof);
     }
 
     function testVerificationKeyHash() public virtual {
