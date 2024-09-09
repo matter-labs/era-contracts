@@ -343,7 +343,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @param _data The encoded transfer data (address _l1Token, uint256 _depositAmount, address _l2Receiver).
     // / @param _prevMsgSender The address of the deposit initiator.
     /// @return Tuple of asset ID and encoded transfer data to conform with new encoding standard.
-    function _handleLegacyData(bytes calldata _data, address) internal override returns (bytes32, bytes memory) {
+    function _handleLegacyData(bytes calldata _data, address) internal returns (bytes32, bytes memory) {
         (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
             _data,
             (address, uint256, address)
