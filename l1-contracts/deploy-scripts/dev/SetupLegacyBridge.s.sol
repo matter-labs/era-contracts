@@ -59,6 +59,7 @@ contract SetupLegacyBridge is Script {
         addresses.transparentProxyAdmin = toml.readAddress("$.transparent_proxy_admin");
         addresses.erc20BridgeProxy = toml.readAddress("$.erc20bridge_proxy");
         addresses.tokenWethAddress = toml.readAddress("$.token_weth_address");
+        addresses.create2FactoryAddr = toml.readAddress("$.create2factory_addr");
         config.chainId = toml.readUint("$.chain_id");
         config.l2SharedBridgeAddress = toml.readAddress("$.l2shared_bridge_address");
         config.create2FactorySalt = toml.readBytes32("$.create2factory_salt");
@@ -71,6 +72,10 @@ contract SetupLegacyBridge is Script {
             // solhint-disable-next-line func-named-parameters
             abi.encode(addresses.tokenWethAddress, addresses.bridgehub, config.chainId, addresses.diamondProxy)
         );
+
+        console.logAddress(addresses.tokenWethAddress);
+        console.logAddress(addresses.bridgehub);
+        console.logAddress(addresses.diamondProxy);
         address contractAddress = deployViaCreate2(bytecode);
         console.log("SharedBridgeImplementation deployed at:", contractAddress);
         addresses.sharedBridgeProxyImpl = contractAddress;
@@ -143,13 +148,6 @@ contract SetupLegacyBridge is Script {
         bytes memory constructorargs
     ) internal returns (address create2Address, bytes32 bytecodeHash) {
         bytecodeHash = L2ContractHelper.hashL2Bytecode(bytecode);
-
-        bytes memory deployData = abi.encodeWithSignature(
-            "create2(bytes32,bytes32,bytes)",
-            create2salt,
-            bytecodeHash,
-            constructorargs
-        );
 
         create2Address = L2ContractHelper.computeCreate2Address(
             sender,
