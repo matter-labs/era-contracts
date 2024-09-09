@@ -21,8 +21,8 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {AssetHandlerNotRegistered, ZKChainLimitReached, Unauthorized, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
+import {HyperchainLimitReached, Unauthorized, STMAlreadyRegistered, STMNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -323,32 +323,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
     ) external onlyOwnerOrAdmin nonReentrant whenNotPaused onlyL1 returns (uint256) {
-        if (_chainId == 0) {
-            revert ZeroChainId();
-        }
-        if (_chainId > type(uint48).max) {
-            revert ChainIdTooBig();
-        }
-        require(_chainId != block.chainid, "BH: chain id must not match current chainid");
-        if (_chainTypeManager == address(0)) {
-            revert ZeroAddress();
-        }
-        if (_baseTokenAssetId == bytes32(0)) {
-            revert ZeroAddress();
-        }
-
-        if (!chainTypeManagerIsRegistered[_chainTypeManager]) {
-            revert CTMNotRegistered();
-        }
-
-        require(assetIdIsRegistered[_baseTokenAssetId], "BH: asset id not registered");
-
-        if (address(sharedBridge) == address(0)) {
-            revert SharedBridgeNotSet();
-        }
-        if (chainTypeManager[_chainId] != address(0)) {
-            revert BridgeHubAlreadyRegistered();
-        }
+        _validateChainParams({
+            _chainId: _chainId,
+            _assetId: _baseTokenAssetId,
+            _stateTransitionManager: _stateTransitionManager
+        });
 
         chainTypeManager[_chainId] = _chainTypeManager;
 
@@ -764,6 +743,73 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _prevMsgSender: _depositSender,
             _chainData: ctmAssetData.chainData
         });
+    }
+
+    /// @dev Registers an already deployed chain with the bridgehub
+    /// @param _chainId The chain Id of the chain
+    /// @param _hyperchain Address of the hyperchain
+    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external onlyOwner onlyL1 {
+        if (_hyperchain == address(0)) {
+            revert ZeroAddress();
+        }
+        if (hyperchainMap.contains(_chainId)) {
+            revert ChainIdAlreadyExists();
+        }
+        if (IZkSyncHyperchain(_hyperchain).getChainId() != _chainId) {
+            revert ChainIdMismatch();
+        }
+
+        address stm = IZkSyncHyperchain(_hyperchain).getStateTransitionManager();
+        address chainAdmin = IZkSyncHyperchain(_hyperchain).getAdmin();
+        bytes32 chainBaseTokenAssetId = IZkSyncHyperchain(_hyperchain).getBaseTokenAssetId();
+
+        _validateChainParams({_chainId: _chainId, _assetId: chainBaseTokenAssetId, _stateTransitionManager: stm});
+
+        stateTransitionManager[_chainId] = stm;
+
+        baseTokenAssetId[_chainId] = chainBaseTokenAssetId;
+        settlementLayer[_chainId] = block.chainid;
+
+        _registerNewHyperchain(_chainId, _hyperchain);
+        messageRoot.addNewChain(_chainId);
+
+        emit NewChain(_chainId, stm, chainAdmin);
+    }
+
+    function _validateChainParams(uint256 _chainId, bytes32 _assetId, address _stateTransitionManager) internal view {
+        if (_chainId == 0) {
+            revert ZeroChainId();
+        }
+
+        if (_chainId > type(uint48).max) {
+            revert ChainIdTooBig();
+        }
+
+        if (_chainId == block.chainid) {
+            revert ChainIdCantBeCurrentChain();
+        }
+
+        if (_stateTransitionManager == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_assetId == bytes32(0)) {
+            revert EmptyAssetId();
+        }
+
+        if (!stateTransitionManagerIsRegistered[_stateTransitionManager]) {
+            revert STMNotRegistered();
+        }
+
+        if (!assetIdIsRegistered[_assetId]) {
+            revert AssetIdNotSupported(_assetId);
+        }
+
+        if (address(sharedBridge) == address(0)) {
+            revert SharedBridgeNotSet();
+        }
+        if (stateTransitionManager[_chainId] != address(0)) {
+            revert BridgeHubAlreadyRegistered();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

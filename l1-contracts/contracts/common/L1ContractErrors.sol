@@ -31,6 +31,8 @@ error AddressHasNoCode(address);
 error AddressTooLow(address);
 // 0x0bfcef28
 error AlreadyWhitelisted(address);
+// 0x04a0b7e9
+error AssetIdNotSupported(bytes32 assetId);
 // 0x6afd6c20
 error BadReturnData();
 // 0x6ef9a972
@@ -53,6 +55,12 @@ error CanOnlyProcessOneBatch();
 error CantExecuteUnprovenBatches();
 // 0xe18cb383
 error CantRevertExecutedBatch();
+// 0x24591d89
+error ChainIdAlreadyExists();
+// 0x717a1656
+error ChainIdCantBeCurrentChain();
+// 0xa179f8c9
+error ChainIdMismatch();
 // 0x78d2ed02
 error ChainAlreadyLive();
 // 0x8f620a06
@@ -75,6 +83,8 @@ error DiamondAlreadyFrozen();
 error DiamondFreezeIncorrectState();
 // 0xa7151b9a
 error DiamondNotFrozen();
+// 0x2d4d012f
+error EmptyAssetId();
 // 0xfc7ab1d3
 error EmptyBlobVersionHash(uint256 index);
 // 0x95b66fe9
@@ -331,27 +341,6 @@ error ZeroAddress();
 error ZeroBalance();
 // 0xc84885d4
 error ZeroChainId();
-// 0x520aa59c
-error PubdataIsEmpty();
-// 0x99d8fec9
-error EmptyData();
-// 0xc99a8360
-error UnsupportedCommitBatchEncoding(uint8 version);
-// 0xe167e4a6
-error UnsupportedProofBatchEncoding(uint8 version);
-// 0xe8e3f6f4
-error UnsupportedExecuteBatchEncoding(uint8 version);
-// 0xd7d93e1f
-error IncorrectBatchBounds(
-    uint256 processFromExpected,
-    uint256 processToExpected,
-    uint256 processFromProvided,
-    uint256 processToProvided
-);
-// 0x04a0b7e9
-error AssetIdNotSupported(bytes32 assetId);
-// 0x64107968
-error AssetHandlerNotRegistered(bytes32 assetId);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
