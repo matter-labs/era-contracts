@@ -6,6 +6,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 
 contract GatewayTransactionFiltererTest is Test {
@@ -14,9 +16,11 @@ contract GatewayTransactionFiltererTest is Test {
     address internal constant owner = address(0x1010101);
     address internal constant admin = address(0x2020202);
     address internal constant sender = address(0x3030303);
+    address internal constant bridgehub = address(0x5050505);
+    address internal constant assetRouter = address(0x4040404);
 
     constructor() {
-        transactionFiltererImplementation = new GatewayTransactionFilterer();
+        transactionFiltererImplementation = new GatewayTransactionFilterer(IBridgehub(bridgehub), assetRouter);
 
         transactionFiltererProxy = GatewayTransactionFilterer(
             address(

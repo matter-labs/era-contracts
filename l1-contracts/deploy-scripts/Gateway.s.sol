@@ -123,7 +123,10 @@ contract GatewayScript is Script {
         IZkSyncHyperchain chainL2 = IZkSyncHyperchain(bridgehub.getHyperchain(config.chainChainId));
         IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(config.gatewayChainId));
         vm.startPrank(chain.getAdmin());
-        GatewayTransactionFilterer transactionFiltererImplementation = new GatewayTransactionFilterer();
+        GatewayTransactionFilterer transactionFiltererImplementation = new GatewayTransactionFilterer(
+            IBridgehub(config.bridgehub),
+            config.sharedBridgeProxy
+        );
         address transactionFiltererProxy = address(
             new TransparentUpgradeableProxy(
                 address(transactionFiltererImplementation),

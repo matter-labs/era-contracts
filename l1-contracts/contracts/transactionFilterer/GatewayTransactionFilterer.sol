@@ -5,10 +5,11 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {AlreadyWhitelisted, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IL2Bridge} from "../bridge/interfaces/IL2Bridge.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -21,12 +22,20 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
     /// @dev Event emitted when sender is removed from whitelist
     event WhitelistRevoked(address indexed sender);
 
+    /// @dev Bridgehub is set during construction
+    IBridgehub public immutable bridgeHub;
+
+    /// @dev Asset router is set during construction
+    address public immutable assetRouter;
+
     /// @dev Indicates whether the sender is whitelisted to deposit to Gateway
     mapping(address sender => bool whitelisted) public whitelistedSenders;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor() reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgeHub, address _assetRouter) reentrancyGuardInitializer {
+        bridgeHub = _bridgeHub;
+        assetRouter = _assetRouter;
         _disableInitializers();
     }
 
@@ -71,12 +80,17 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
         bytes calldata l2Calldata,
         address
     ) external view returns (bool) {
-        address baseTokenBridge = IZkSyncHyperchain(msg.sender).getBaseTokenBridge();
-        address bridgeHub = IZkSyncHyperchain(msg.sender).getBridgehub();
-        (bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (bytes32, bytes)); // Decode data first
-        // Then take the asset id and call the BH
-        address stmAddress = IBridgehub(bridgeHub).stmAssetIdToAddress(decodedAssetId);
+        if (sender == assetRouter) {
+            bytes4 l2TxSelector = bytes4(l2Calldata[:4]);
+            if (IL2Bridge.finalizeDeposit.selector != l2TxSelector) {
+                revert InvalidSelector(l2TxSelector);
+            }
+            
+            (bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (bytes32, bytes));
+            address stmAddress = bridgeHub.stmAssetIdToAddress(decodedAssetId);
+            return (stmAddress != address(0));
+        }
 
-        return (whitelistedSenders[sender] && (sender != baseTokenBridge || stmAddress != address(0)));
+        return whitelistedSenders[sender];
     }
 }
