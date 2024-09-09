@@ -13,7 +13,8 @@ import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
-import {EmptyDeposit, WithdrawalAlreadyFinalized, TokensWithFeesNotSupported} from "../common/L1ContractErrors.sol";
+import {EmptyDeposit, WithdrawalAlreadyFinalized, TokensWithFeesNotSupported, ETHDepositNotSupported} from "../common/L1ContractErrors.sol";
+import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -220,6 +221,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         if (_amount == 0) {
             // empty deposit amount
             revert EmptyDeposit();
+        }
+        if (_l1Token == ETH_TOKEN_ADDRESS) {
+            revert ETHDepositNotSupported();
         }
         uint256 amount = _depositFundsToAssetRouter(msg.sender, IERC20(_l1Token), _amount);
         if (amount != _amount) {

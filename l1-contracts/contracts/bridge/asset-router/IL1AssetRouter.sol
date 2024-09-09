@@ -99,11 +99,11 @@ interface IL1AssetRouter is IAssetRouterBase {
         bytes calldata _assetData
     ) external;
 
-    /// @notice Transfers allowance to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
+    /// @notice Transfers funds to Native Token Vault, if the asset is registered with it. Does nothing for ETH or non-registered tokens.
     /// @dev assetId is not the padded address, but the correct encoded id (NTV stores respective format for IDs)
     /// @param _amount The asset amount to be transferred to native token vault.
     /// @param _prevMsgSender The `msg.sender` address from the external call that initiated current one.
-    function transferAllowanceToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) external;
+    function transferFundsToNTV(bytes32 _assetId, uint256 _amount, address _prevMsgSender) external returns (bool);
 
     /// @notice Finalize the withdrawal and release funds
     /// @param _chainId The chain ID of the transaction to check

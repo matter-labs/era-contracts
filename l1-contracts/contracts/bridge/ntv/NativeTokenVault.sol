@@ -186,7 +186,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         if (isTokenBridged[_assetId]) {
             _bridgeMintData = _bridgeBurnBridgedToken(_chainId, _assetId, _prevMsgSender, _data);
         } else {
-            _bridgeMintData = _bridgeBurnNativeToken(_chainId, _assetId, _prevMsgSender, _data);
+            _bridgeMintData = _bridgeBurnNativeToken(_chainId, _assetId, _prevMsgSender, false, _data);
         }
     }
 
@@ -219,6 +219,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         uint256 _chainId,
         bytes32 _assetId,
         address _prevMsgSender,
+        bool _depositChecked,
         bytes calldata _data
     ) internal virtual returns (bytes memory _bridgeMintData) {
         (uint256 _depositAmount, address _receiver) = abi.decode(_data, (uint256, address));
@@ -244,11 +245,12 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             }
 
             amount = _depositAmount;
-
-            uint256 expectedDepositAmount = _depositFunds(_prevMsgSender, IERC20(nativeToken), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
-            // The token has non-standard transfer logic
-            if (amount != expectedDepositAmount) {
-                revert TokensWithFeesNotSupported();
+            if (!_depositChecked) {
+                uint256 expectedDepositAmount = _depositFunds(_prevMsgSender, IERC20(nativeToken), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
+                // The token has non-standard transfer logic
+                if (amount != expectedDepositAmount) {
+                    revert TokensWithFeesNotSupported();
+                }
             }
         }
         if (amount == 0) {

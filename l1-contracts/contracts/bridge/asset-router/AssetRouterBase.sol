@@ -98,15 +98,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     }
 
     /*//////////////////////////////////////////////////////////////
-                            INITIATTE DEPOSIT Functions
-    //////////////////////////////////////////////////////////////*/
-
-    /*//////////////////////////////////////////////////////////////
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetRouterBase
-    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) public virtual; // do we need to?: returns (address l1Receiver, uint256 amount)
+    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) public virtual;
 
     function _finalizeDeposit(
         uint256 _chainId,

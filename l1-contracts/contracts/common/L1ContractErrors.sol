@@ -93,6 +93,8 @@ error EmptyBlobVersionHash(uint256 index);
 error EmptyBytes32();
 // 0x95b66fe9
 error EmptyDeposit();
+// 
+error ETHDepositNotSupported();
 //
 error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
 // 0xac4a3f98

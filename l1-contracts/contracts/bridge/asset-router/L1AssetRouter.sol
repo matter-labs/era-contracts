@@ -349,7 +349,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             (address, uint256, address)
         );
         bytes32 assetId = _ensureTokenRegisteredWithNTV(_l1Token);
-        // L1_NULLIFIER.transferAllowanceToNTV(assetId, _depositAmount, _prevMsgSender);
         return (assetId, abi.encode(_depositAmount, _l2Receiver));
     }
 
@@ -365,14 +364,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @inheritdoc IL1AssetRouter
-    function transferAllowanceToNTV(
+    function transferFundsToNTV(
         bytes32 _assetId,
         uint256 _amount,
         address _prevMsgSender
-    ) external onlyNativeTokenVault {
+    ) external onlyNativeTokenVault returns (bool) {
         address l1TokenAddress = INativeTokenVault(address(nativeTokenVault)).tokenAddress(_assetId);
         if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
-            return;
+            return false;
         }
         IERC20 l1Token = IERC20(l1TokenAddress);
 
@@ -383,9 +382,10 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             l1Token.allowance(_prevMsgSender, address(nativeTokenVault)) < _amount
         ) {
             // slither-disable-next-line arbitrary-send-erc20
-            l1Token.safeTransferFrom(_prevMsgSender, address(this), _amount);
-            l1Token.forceApprove(address(nativeTokenVault), _amount);
+            l1Token.safeTransferFrom(_prevMsgSender, address(nativeTokenVault), _amount);
+            return true;
         }
+        return false;
     }
 
     /// @dev The request data that is passed to the bridgehub.
