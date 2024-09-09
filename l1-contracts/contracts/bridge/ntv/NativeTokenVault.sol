@@ -95,7 +95,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
                             FINISH TRANSACTION FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    ///  @inheritdoc IAssetHandler
+    /// @inheritdoc IAssetHandler
     /// @notice Used when the chain receives a transfer from L1 Shared Bridge and correspondingly mints the asset.
     /// @param _chainId The chainId that the message is from.
     /// @param _assetId The assetId of the asset being bridged.
