@@ -80,7 +80,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
             revert EmptyAddress();
         }
         l1AssetRouter = _l1AssetRouter;
-        assetHandlerAddress[_baseTokenAssetId] = address(L2_NATIVE_TOKEN_VAULT_ADDR);
+        assetHandlerAddress[_baseTokenAssetId] = L2_NATIVE_TOKEN_VAULT_ADDR;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         _disableInitializers();
     }

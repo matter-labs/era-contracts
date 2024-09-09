@@ -70,7 +70,7 @@ library L2Utils {
         address _legacySharedBridge
     ) internal {
         // to ensure that the bytecode is known
-        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS); // kl todo
+        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
         {
             new L2AssetRouter(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId);
         }
@@ -85,7 +85,7 @@ library L2Utils {
             newAddress: L2_ASSET_ROUTER_ADDR,
             callConstructor: true,
             value: 0,
-            input: abi.encode(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge)
+            input: abi.encode(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId)
         });
 
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
@@ -108,7 +108,7 @@ library L2Utils {
         bool _contractsDeployedAlready
     ) internal {
         // to ensure that the bytecode is known
-        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS); // kl todo
+        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
         {
             new L2NativeTokenVault({
                 _l1ChainId: _l1ChainId,
@@ -141,7 +141,7 @@ library L2Utils {
                 _l2TokenBeacon,
                 _contractsDeployedAlready,
                 address(0),
-                ETH_TOKEN_ADDRESS
+                ethAssetId
             )
         });
 
