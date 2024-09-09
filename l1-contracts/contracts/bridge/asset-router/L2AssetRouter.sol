@@ -131,7 +131,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
     /// where tokens would be unlocked
-    /// @notice do not rely on this function, it will be deprecated in the future
+    /// @dev do not rely on this function, it will be deprecated in the future
     /// @param _assetId The asset id of the withdrawn asset
     /// @param _assetData The data that is passed to the asset handler contract
     function withdraw(bytes32 _assetId, bytes memory _assetData) public override {
