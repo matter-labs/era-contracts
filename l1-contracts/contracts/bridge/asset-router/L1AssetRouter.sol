@@ -93,7 +93,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         address _eraDiamondProxy
     )
         reentrancyGuardInitializer
-        AssetRouterBase(block.chainid, _eraChainId, IBridgehub(_bridgehub), ETH_TOKEN_ADDRESS)
+        AssetRouterBase(block.chainid, _eraChainId, IBridgehub(_bridgehub))
     {
         _disableInitializers();
         L1_WETH_TOKEN = _l1WethAddress;
@@ -119,6 +119,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         require(address(nativeTokenVault) == address(0), "AR: native token v already set");
         require(address(_nativeTokenVault) != address(0), "AR: native token vault 0");
         nativeTokenVault = _nativeTokenVault;
+        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
+        assetHandlerAddress[ethAssetId] = address(nativeTokenVault);
     }
 
     /// @notice Sets the L1ERC20Bridge contract address.

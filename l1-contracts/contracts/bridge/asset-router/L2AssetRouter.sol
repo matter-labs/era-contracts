@@ -15,10 +15,10 @@ import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero} from "../../common/L1ContractErrors.sol";
+import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -27,6 +27,9 @@ import {EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero} from "../../co
 contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @dev The address of the L2 legacy shared bridge.
     address public immutable L2_LEGACY_SHARED_BRIDGE;
+
+    /// @dev The asset id of the base token.
+    bytes32 public immutable BASE_TOKEN_ASSET_ID;
 
     /// @dev The address of the L1 asset router counterpart.
     address public override l1AssetRouter;
@@ -69,14 +72,16 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         uint256 _l1ChainId,
         uint256 _eraChainId,
         address _l1AssetRouter,
-        address _legacySharedBridge
-    ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR), L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR) {
+        address _legacySharedBridge,
+        bytes32 _baseTokenAssetId
+    ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR)) {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         if (_l1AssetRouter == address(0)) {
             revert EmptyAddress();
         }
         l1AssetRouter = _l1AssetRouter;
-
+        assetHandlerAddress[_baseTokenAssetId] = address(L2_NATIVE_TOKEN_VAULT_ADDR);
+        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         _disableInitializers();
     }
 
@@ -110,6 +115,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         bytes32 _assetId,
         bytes calldata _transferData
     ) public override onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID) {
+        if (_assetId == BASE_TOKEN_ASSET_ID) {
+            revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
+        }
         _finalizeDeposit(L1_CHAIN_ID, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
 
         emit DepositFinalizedAssetRouter(L1_CHAIN_ID, _assetId, _transferData);

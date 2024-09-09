@@ -17,12 +17,11 @@ import {INativeTokenVault} from "./INativeTokenVault.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
-import {EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, WithdrawFailed, InsufficientChainBalance, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero} from "../../common/L1ContractErrors.sol";
+import {EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, InsufficientChainBalance, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -37,6 +36,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
     IAssetRouterBase public immutable override ASSET_ROUTER;
 
+    /// @dev The assetId of the base token.
+    bytes32 public immutable BASE_TOKEN_ASSET_ID;
+
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
     IBeacon public bridgedTokenBeacon;
@@ -44,7 +46,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
-    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
+    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance; // kl todo maybe assetId is better?
 
     /// @dev A mapping assetId => tokenAddress
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
@@ -71,10 +73,11 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev Disable the initialization to prevent Parity hack.
     /// @param _wethToken Address of WETH on deployed chain
     /// @param _assetRouter Address of assetRouter
-    constructor(address _wethToken, address _assetRouter) {
+    constructor(address _wethToken, address _assetRouter, bytes32 _baseTokenAssetId) {
         _disableInitializers();
         ASSET_ROUTER = IAssetRouterBase(_assetRouter);
         WETH_TOKEN = _wethToken;
+        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
     }
 
     /// @notice Registers tokens within the NTV.
@@ -85,7 +88,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         if (_nativeToken == WETH_TOKEN) {
             revert TokenNotSupported(WETH_TOKEN);
         }
-        require(_nativeToken == ETH_TOKEN_ADDRESS || _nativeToken.code.length > 0, "NTV: empty token");
+        require(_nativeToken.code.length > 0, "NTV: empty token");
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
         ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
         tokenAddress[assetId] = _nativeToken;
@@ -155,21 +158,11 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         }
         chainBalance[_originChainId][token] -= amount;
 
-        if (token == ETH_TOKEN_ADDRESS) {
-            bool callSuccess;
-            // Low-level assembly call, to avoid any memory copying (save gas)
-            assembly {
-                callSuccess := call(gas(), receiver, amount, 0, 0, 0, 0)
-            }
-            if (!callSuccess) {
-                revert WithdrawFailed();
-            }
-        } else {
-            // Withdraw funds
-            IERC20(token).safeTransfer(receiver, amount);
-        }
+        _withdrawFunds(_assetId, receiver, token, amount);
         emit BridgeMint(_originChainId, _assetId, receiver, amount);
     }
+
+    function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal virtual;
 
     /*//////////////////////////////////////////////////////////////
                             Start transaction Functions
@@ -234,7 +227,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
         uint256 amount;
         address nativeToken = tokenAddress[_assetId];
-        if (nativeToken == ETH_TOKEN_ADDRESS) {
+        if (_assetId == BASE_TOKEN_ASSET_ID) {
             amount = msg.value;
 
             // In the old SDK/contracts the user had to always provide `0` as the deposit amount for ETH token, while
@@ -306,7 +299,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @param _token The address of token of interest.
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function getERC20Getters(address _token) public view override returns (bytes memory) {
-        return BridgeHelper.getERC20Getters(_token, ETH_TOKEN_ADDRESS);
+        return BridgeHelper.getERC20Getters(_token);
     }
 
     /// @notice Returns the parsed assetId.

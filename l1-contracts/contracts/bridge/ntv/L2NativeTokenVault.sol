@@ -6,6 +6,9 @@ import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.s
 import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
+
 import {INativeTokenVault} from "./INativeTokenVault.sol";
 import {IL2NativeTokenVault} from "./IL2NativeTokenVault.sol";
 import {NativeTokenVault} from "./NativeTokenVault.sol";
@@ -19,13 +22,15 @@ import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2Cont
 import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed} from "../../common/L1ContractErrors.sol";
+import {EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
+    using SafeERC20 for IERC20;
+
     /// @dev Chain ID of L1 for bridging reasons.
     uint256 public immutable L1_CHAIN_ID;
 
@@ -49,8 +54,9 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         address _legacySharedBridge,
         address _bridgedTokenBeacon,
         bool _contractsDeployedAlready,
-        address _wethToken
-    ) NativeTokenVault(_wethToken, L2_ASSET_ROUTER_ADDR) {
+        address _wethToken,
+        bytes32 _baseTokenAssetId
+    ) NativeTokenVault(_wethToken, L2_ASSET_ROUTER_ADDR, _baseTokenAssetId) {
         L1_CHAIN_ID = _l1ChainId;
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
@@ -151,6 +157,15 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             // Deploy the beacon proxy for the L2 token
             address l2TokenAddr = L2_LEGACY_SHARED_BRIDGE.deployBeaconProxy(_salt);
             proxy = BeaconProxy(payable(l2TokenAddr));
+        }
+    }
+
+    function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal override{
+        if (_assetId == BASE_TOKEN_ASSET_ID) {
+            revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
+        } else {
+            // Withdraw funds
+            IERC20(_token).safeTransfer(_to, _amount);
         }
     }
 

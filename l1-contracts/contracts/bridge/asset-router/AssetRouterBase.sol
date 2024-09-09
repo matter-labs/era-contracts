@@ -27,9 +27,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
-    /// @dev Base token address.
-    address public immutable override BASE_TOKEN_ADDRESS;
-
     /// @dev Chain ID of L1 for bridging reasons
     uint256 public immutable L1_CHAIN_ID;
 
@@ -63,11 +60,10 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(uint256 _l1ChainId, uint256 _eraChainId, IBridgehub _bridgehub, address _baseTokenAddress) {
+    constructor(uint256 _l1ChainId, uint256 _eraChainId, IBridgehub _bridgehub) {
         L1_CHAIN_ID = _l1ChainId;
         ERA_CHAIN_ID = _eraChainId;
         BRIDGE_HUB = _bridgehub;
-        BASE_TOKEN_ADDRESS = _baseTokenAddress;
     }
 
     /// @inheritdoc IAssetRouterBase

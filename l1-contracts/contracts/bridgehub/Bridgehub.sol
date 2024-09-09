@@ -35,7 +35,7 @@ import {AssetHandlerNotRegistered, ZKChainLimitReached, Unauthorized, CTMAlready
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
-    /// @notice the asset id of Eth
+    /// @notice the asset id of Eth. This is only used on L1.
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
