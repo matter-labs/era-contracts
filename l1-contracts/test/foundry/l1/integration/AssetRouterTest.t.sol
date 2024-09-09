@@ -92,7 +92,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             _l2Receiver: address(this),
             _l1Token: ETH_TOKEN_ADDRESS,
             _amount: 100,
-            _erc20Metadata: BridgeHelper.getERC20Getters(_tokenAddress, ETH_TOKEN_ADDRESS)
+            _erc20Metadata: BridgeHelper.getERC20Getters(_tokenAddress)
         });
         l1Nullifier.finalizeDeposit(
             FinalizeL1DepositParams({

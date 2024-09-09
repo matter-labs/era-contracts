@@ -110,7 +110,7 @@ contract ExperimentalBridgeTest is Test {
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
         testTokenAddress = address(testToken);
         vm.prank(address(ntv));
-        ntv.registerToken(ETH_TOKEN_ADDRESS);
+        // ntv.registerToken(ETH_TOKEN_ADDRESS);
         ntv.registerToken(address(testToken));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(testToken));
 

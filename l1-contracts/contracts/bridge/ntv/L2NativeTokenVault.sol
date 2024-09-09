@@ -160,7 +160,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
     }
 
-    function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal override{
+    function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal override {
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
         } else {

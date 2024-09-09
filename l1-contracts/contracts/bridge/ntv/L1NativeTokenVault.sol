@@ -48,7 +48,13 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address _l1AssetRouter,
         uint256 _eraChainId,
         IL1Nullifier _l1Nullifier
-    ) NativeTokenVault(_l1WethAddress, _l1AssetRouter, DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS)) {
+    )
+        NativeTokenVault(
+            _l1WethAddress,
+            _l1AssetRouter,
+            DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS)
+        )
+    {
         ERA_CHAIN_ID = _eraChainId;
         L1_NULLIFIER = _l1Nullifier;
     }
@@ -198,7 +204,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return super._depositFunds(from, _token, _amount);
     }
 
-    function _withdrawFunds(bytes32 _assetId, address _to , address _token, uint256 _amount ) internal override{
+    function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal override {
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)

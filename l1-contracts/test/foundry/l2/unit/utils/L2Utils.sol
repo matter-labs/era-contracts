@@ -12,6 +12,8 @@ import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+
 library L2Utils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     Vm internal constant vm = Vm(VM_ADDRESS);
@@ -68,8 +70,9 @@ library L2Utils {
         address _legacySharedBridge
     ) internal {
         // to ensure that the bytecode is known
+        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS); // kl todo
         {
-            new L2AssetRouter(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge);
+            new L2AssetRouter(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId);
         }
 
         bytes memory bytecode = readEraBytecode("L2AssetRouter");
@@ -105,6 +108,7 @@ library L2Utils {
         bool _contractsDeployedAlready
     ) internal {
         // to ensure that the bytecode is known
+        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS); // kl todo
         {
             new L2NativeTokenVault({
                 _l1ChainId: _l1ChainId,
@@ -113,7 +117,8 @@ library L2Utils {
                 _legacySharedBridge: _legacySharedBridge,
                 _bridgedTokenBeacon: _l2TokenBeacon,
                 _contractsDeployedAlready: _contractsDeployedAlready,
-                _wethToken: address(0)
+                _wethToken: address(0),
+                _baseTokenAssetId: ethAssetId
             });
         }
 

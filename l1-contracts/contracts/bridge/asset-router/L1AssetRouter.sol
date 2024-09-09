@@ -91,10 +91,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         address _l1Nullifier,
         uint256 _eraChainId,
         address _eraDiamondProxy
-    )
-        reentrancyGuardInitializer
-        AssetRouterBase(block.chainid, _eraChainId, IBridgehub(_bridgehub))
-    {
+    ) reentrancyGuardInitializer AssetRouterBase(block.chainid, _eraChainId, IBridgehub(_bridgehub)) {
         _disableInitializers();
         L1_WETH_TOKEN = _l1WethAddress;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;

@@ -19,6 +19,8 @@ import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainS
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+
 contract RegisterZKChainScript is Script {
     using stdToml for string;
 
@@ -156,7 +158,7 @@ contract RegisterZKChainScript is Script {
         // Ownable ownable = Ownable(config.nativeTokenVault);
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
         config.baseTokenAssetId = baseTokenAssetId;
-        if (ntv.tokenAddress(baseTokenAssetId) != address(0)) {
+        if (ntv.tokenAddress(baseTokenAssetId) != address(0) || config.baseToken == ETH_TOKEN_ADDRESS) {
             console.log("Token already registered on NTV");
         } else {
             // bytes memory data = abi.encodeCall(ntv.registerToken, (config.baseToken));
