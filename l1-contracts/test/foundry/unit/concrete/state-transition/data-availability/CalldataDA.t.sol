@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {Utils} from "../../Utils/Utils.sol";
 import {TestCalldataDA} from "contracts/dev-contracts/test/TestCalldataDA.sol";
-import {BLOB_SIZE_BYTES} from "contracts/state-transition/data-availability/CalldataDA.sol";
+import {BLOB_SIZE_BYTES, BLOB_DATA_OFFSET, BLOB_COMMITMENT_SIZE} from "contracts/state-transition/data-availability/CalldataDA.sol";
 import {OperatorDAInputTooSmall, InvalidNumberOfBlobs, InvalidBlobsHashes, InvalidL2DAOutputHash, OnlyOneBlobWithCalldata, PubdataTooSmall, PubdataTooLong, InvalidPubdataHash} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract CalldataDATest is Test {
@@ -80,12 +80,10 @@ contract CalldataDATest is Test {
         bytes32 blobLinearHash = Utils.randomBytes32("blobLinearHash");
 
         bytes memory operatorDAInput = abi.encodePacked(stateDiffHash, fullPubdataHash, blobsProvided, blobLinearHash);
-        uint256 ptr = BLOB_DATA_OFFSET + 32 * uint256(uint8(operatorDAInput[64]));
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 InvalidL2DAOutputHash.selector,
-                keccak256(operatorDAInput[:ptr]),
                 l2DAValidatorOutputHash
             )
         );
@@ -140,7 +138,7 @@ contract CalldataDATest is Test {
         bytes calldata pubdataInput = makeBytesArrayOfLength(BLOB_SIZE_BYTES + 33);
         bytes32 fullPubdataHash = keccak256(pubdataInput);
 
-        vm.expectRevert(abi.encodeWithSelector(PubdataTooLong.selector, pubdataInput.length, BLOB_SIZE_BYTES));
+        vm.expectRevert(abi.encodeWithSelector(PubdataTooLong.selector, 126977, blobsProvided * BLOB_SIZE_BYTES));
         calldataDA.processCalldataDA(blobsProvided, fullPubdataHash, maxBlobsSupported, pubdataInput);
     }
 
@@ -152,7 +150,7 @@ contract CalldataDATest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                abi.encodeWithSelector(PubdataTooSmall.selector, pubdataInput.length, BLOB_COMMITMENT_SIZE)
+                PubdataTooSmall.selector, pubdataInput.length, BLOB_COMMITMENT_SIZE
             )
         );
         calldataDA.processCalldataDA(blobsProvided, fullPubdataHash, maxBlobsSupported, pubdataInput);

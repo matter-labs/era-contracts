@@ -14,7 +14,7 @@ import {IBridgehub, IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.so
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
-import {OnlyBridgehub, CtmNotRegistered, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart, WrongEncodingVersion} from "./L1BridgehubErrors.sol";
+import {OnlyBridgehub, CtmNotRegistered, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart} from "./L1BridgehubErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -69,8 +69,8 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         if (!BRIDGE_HUB.chainTypeManagerIsRegistered(_ctmAddress)) {
             revert CtmNotRegistered();
         }
-        L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_stmAddress))), address(BRIDGE_HUB));
-        BRIDGE_HUB.setAssetHandlerAddress(bytes32(uint256(uint160(_stmAddress))), _stmAddress);
+        L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_ctmAddress))), address(BRIDGE_HUB));
+        BRIDGE_HUB.setAssetHandlerAddress(bytes32(uint256(uint160(_ctmAddress))), _ctmAddress);
     }
 
     /// @notice The function responsible for registering the L2 counterpart of an CTM asset on the L2 Bridgehub.

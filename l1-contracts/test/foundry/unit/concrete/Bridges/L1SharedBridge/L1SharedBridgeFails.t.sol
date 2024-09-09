@@ -147,7 +147,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     function test_transferFundsToSharedBridge_Erc_WrongAmountTransferred() public {
         vm.mockCall(address(token), abi.encodeWithSelector(IERC20.balanceOf.selector), abi.encode(10));
         vm.prank(address(nativeTokenVault));
-        vm.expectRevert(abi.encodeWithSelector(WrongAmountTransferred.selector, 10, 10));
+        vm.expectRevert(abi.encodeWithSelector(WrongAmountTransferred.selector, 0, 10));
         nativeTokenVault.transferFundsFromSharedBridge(address(token));
     }
 

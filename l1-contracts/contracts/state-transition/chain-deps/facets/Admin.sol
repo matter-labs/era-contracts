@@ -268,7 +268,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         uint256 protocolVersion = abi.decode(_data, (uint256));
 
         uint256 currentProtocolVersion = s.protocolVersion;
-        uint256 protocolVersion = stm.protocolVersion();
+        // uint256 protocolVersion = stm.protocolVersion();
 
         if (currentProtocolVersion != protocolVersion) {
             revert ProtocolVersionNotUpToDate(currentProtocolVersion, protocolVersion);
