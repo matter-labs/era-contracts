@@ -52,7 +52,7 @@ error InvalidNumberOfBlobs(uint256 blobsProvided, uint256 maxBlobsSupported);
 
 error InvalidBlobsHashes(uint256 operatorDAInputLength, uint256 minNumberOfBlobHashes);
 
-error InvalidL2DAOutputHash(bytes32 operatorDAOutputHash, bytes32 l2DAValidatorOutputHash);
+error InvalidL2DAOutputHash(bytes32 l2DAValidatorOutputHash);
 
 error OnlyOneBlobWithCalldata();
 
