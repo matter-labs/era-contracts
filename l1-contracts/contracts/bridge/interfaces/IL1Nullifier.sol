@@ -79,6 +79,8 @@ interface IL1Nullifier {
 
     function __DEPRECATED_chainBalance(uint256 _chainId, address _token) external view returns (uint256);
 
+    function __DEPRECATED_l2BridgeAddress(uint256 _chainId) external view returns (address);
+
     function transferTokenToNTV(address _token) external;
 
     function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external;
