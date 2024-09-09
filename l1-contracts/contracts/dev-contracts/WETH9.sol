@@ -30,7 +30,7 @@ contract WETH9 {
     function withdraw(uint256 wad) public {
         require(balanceOf[msg.sender] >= wad, "weth9, 1");
         balanceOf[msg.sender] -= wad;
-        // kl todo FIXME: this is a hack so that zkfoundry works, but we are deploying WETH9 on L2 as well.
+        // this is a hack so that zkfoundry works, but we are deploying WETH9 on L2 as well.
         // payable(msg.sender).transfer(wad);
         bool callSuccess;
         address sender = msg.sender;

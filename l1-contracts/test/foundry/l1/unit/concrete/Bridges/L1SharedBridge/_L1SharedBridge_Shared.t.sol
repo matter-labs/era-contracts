@@ -45,7 +45,7 @@ contract L1AssetRouterTest is Test {
         bytes32 indexed l2DepositTxHash
     );
 
-    event WithdrawalFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
+    event DepositFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
     event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
@@ -57,8 +57,6 @@ contract L1AssetRouterTest is Test {
         address l1Token,
         uint256 amount
     );
-
-    event DepositFinalizedAssetRouter(uint256 chainId, address receiver, bytes32 indexed assetId, uint256 amount);
 
     L1AssetRouter sharedBridgeImpl;
     L1AssetRouter sharedBridge;

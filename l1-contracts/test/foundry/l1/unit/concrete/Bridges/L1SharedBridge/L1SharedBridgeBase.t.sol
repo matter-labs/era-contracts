@@ -269,7 +269,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit WithdrawalFinalizedAssetRouter(chainId, ETH_TOKEN_ASSET_ID, message);
+        emit DepositFinalizedAssetRouter(chainId, ETH_TOKEN_ASSET_ID, message);
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
@@ -310,7 +310,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit WithdrawalFinalizedAssetRouter(chainId, tokenAssetId, message);
+        emit DepositFinalizedAssetRouter(chainId, tokenAssetId, message);
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
@@ -356,7 +356,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit WithdrawalFinalizedAssetRouter(chainId, ETH_TOKEN_ASSET_ID, message);
+        emit DepositFinalizedAssetRouter(chainId, ETH_TOKEN_ASSET_ID, message);
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
@@ -398,8 +398,8 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         );
 
         // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit WithdrawalFinalizedAssetRouter(chainId, tokenAssetId, message);
+        vm.expectEmit(true, true, true, true, address(sharedBridge));
+        emit DepositFinalizedAssetRouter(chainId, tokenAssetId, abi.encode(amount, alice));
 
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
@@ -446,7 +446,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        emit WithdrawalFinalizedAssetRouter(chainId, tokenAssetId, message);
+        emit DepositFinalizedAssetRouter(chainId, tokenAssetId, message);
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
