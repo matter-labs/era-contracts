@@ -25,6 +25,8 @@ error RemovingPermanentRestriction();
 error UnallowedImplementation(bytes32 implementationHash);
 // 0x1ff9d522
 error AddressAlreadyUsed(address addr);
+//
+error AddressAlreadySet(address addr);
 // 0x86bb51b8
 error AddressHasNoCode(address);
 //

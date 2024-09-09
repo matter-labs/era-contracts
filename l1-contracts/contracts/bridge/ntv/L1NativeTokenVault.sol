@@ -93,11 +93,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             }
         } else {
             uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
-            uint256 sharedBridgeChainBalance = IERC20(_token).balanceOf(address(ASSET_ROUTER));
-            require(sharedBridgeChainBalance > 0, "NTV: 0 amount to transfer");
+            uint256 nullifierChainBalance = IERC20(_token).balanceOf(address(L1_NULLIFIER));
+            require(nullifierChainBalance > 0, "NTV: 0 amount to transfer");
             L1_NULLIFIER.transferTokenToNTV(_token);
             uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
-            require(balanceAfter - balanceBefore >= sharedBridgeChainBalance, "NTV: wrong amount transferred");
+            require(balanceAfter - balanceBefore >= nullifierChainBalance, "NTV: wrong amount transferred");
         }
     }
 
@@ -106,9 +106,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     /// @param _targetChainId The chain ID of the corresponding ZK chain.
     function updateChainBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
-        uint256 sharedBridgeChainBalance = L1_NULLIFIER.__DEPRECATED_chainBalance(_targetChainId, _token);
+        uint256 nullifierChainBalance = L1_NULLIFIER.__DEPRECATED_chainBalance(_targetChainId, _token);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
-        chainBalance[_targetChainId][assetId] = chainBalance[_targetChainId][assetId] + sharedBridgeChainBalance;
+        chainBalance[_targetChainId][assetId] = chainBalance[_targetChainId][assetId] + nullifierChainBalance;
         L1_NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
     }
 

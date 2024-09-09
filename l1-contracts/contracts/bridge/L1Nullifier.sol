@@ -30,7 +30,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {Unauthorized, SharedBridgeKey, DepositExists, AddressAlreadyUsed, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {Unauthorized, SharedBridgeKey, DepositExists, AddressAlreadySet, InvalidProof, DepositDoesNotExist, SharedBridgeValueNotSet, WithdrawalAlreadyFinalized, L2WithdrawalMessageWrongLength, InvalidSelector, SharedBridgeValueNotSet, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -221,7 +221,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _legacyBridge The address of the legacy bridge.
     function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
         if (address(legacyBridge) != address(0)) {
-            revert AddressAlreadyUsed(address(legacyBridge));
+            revert AddressAlreadySet(address(legacyBridge));
         }
         if (_legacyBridge == address(0)) {
             revert ZeroAddress();
@@ -243,7 +243,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _l1AssetRouter The address of the asset router.
     function setL1AssetRouter(address _l1AssetRouter) external onlyOwner {
         if (address(l1AssetRouter) != address(0)) {
-            revert AddressAlreadyUsed(address(_l1AssetRouter));
+            revert AddressAlreadySet(address(_l1AssetRouter));
         }
         require(_l1AssetRouter != address(0), "ShB: nullifier 0");
         l1AssetRouter = IL1AssetRouter(_l1AssetRouter);

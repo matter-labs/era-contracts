@@ -36,11 +36,13 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @dev Maps asset ID to address of corresponding asset handler.
     /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset.
     /// @dev P.S. this liquidity was locked directly in SharedBridge before.
+    /// @dev Current AssetHandlers: NTV for tokens, Bridgehub for chains.
     mapping(bytes32 assetId => address assetHandlerAddress) public assetHandlerAddress;
 
     /// @dev Maps asset ID to the asset deployment tracker address.
     /// @dev Tracks the address of Deployment Tracker contract on L1, which sets Asset Handlers on L2s (ZK chain).
     /// @dev For the asset and stores respective addresses.
+    /// @dev Current AssetDeploymentTrackers: NTV for tokens, CTMDeploymentTracker for chains.
     mapping(bytes32 assetId => address assetDeploymentTracker) public assetDeploymentTracker;
 
     /**
