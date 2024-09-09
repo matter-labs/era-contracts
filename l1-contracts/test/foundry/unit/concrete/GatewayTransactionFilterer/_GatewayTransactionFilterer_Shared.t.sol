@@ -6,24 +6,24 @@ import {Test} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {TransactionFilterer} from "contracts/transactionFilterer/TransactionFilterer.sol";
+import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 
-contract TransactionFiltererTest is Test {
-    TransactionFilterer internal transactionFiltererProxy;
-    TransactionFilterer internal transactionFiltererImplementation;
+contract GatewayTransactionFiltererTest is Test {
+    GatewayTransactionFilterer internal transactionFiltererProxy;
+    GatewayTransactionFilterer internal transactionFiltererImplementation;
     address internal constant owner = address(0x1010101);
     address internal constant admin = address(0x2020202);
     address internal constant sender = address(0x3030303);
 
     constructor() {
-        transactionFiltererImplementation = new TransactionFilterer();
+        transactionFiltererImplementation = new GatewayTransactionFilterer();
 
-        transactionFiltererProxy = TransactionFilterer(
+        transactionFiltererProxy = GatewayTransactionFilterer(
             address(
                 new TransparentUpgradeableProxy(
                     address(transactionFiltererImplementation),
                     admin,
-                    abi.encodeCall(TransactionFilterer.initialize, owner)
+                    abi.encodeCall(GatewayTransactionFilterer.initialize, owner)
                 )
             )
         );

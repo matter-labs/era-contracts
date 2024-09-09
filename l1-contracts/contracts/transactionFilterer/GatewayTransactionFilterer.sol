@@ -7,17 +7,19 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {AlreadyWhitelisted, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
+import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Filters transactions received by the Mailbox
 /// @dev Only allows whitelisted senders to deposit to Gateway
-contract TransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ownable2StepUpgradeable {
+contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ownable2StepUpgradeable {
     /// @dev Event emitted when sender is whitelisted
-    event whitelistGranted(address indexed sender);
+    event WhitelistGranted(address indexed sender);
 
     /// @dev Event emitted when sender is removed from whitelist
-    event whitelistRevoked(address indexed sender);
+    event WhitelistRevoked(address indexed sender);
 
     /// @dev Indicates whether the sender is whitelisted to deposit to Gateway
     mapping(address sender => bool whitelisted) public whitelistedSenders;
@@ -45,7 +47,7 @@ contract TransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ownable2S
             revert AlreadyWhitelisted(sender);
         }
         whitelistedSenders[sender] = true;
-        emit whitelistGranted(sender);
+        emit WhitelistGranted(sender);
     }
 
     /// @dev Revoke the sender from whitelist.
@@ -55,7 +57,7 @@ contract TransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ownable2S
             revert NotWhitelisted(sender);
         }
         whitelistedSenders[sender] = false;
-        emit whitelistRevoked(sender);
+        emit WhitelistRevoked(sender);
     }
 
     /// @notice Check if the transaction is allowed
@@ -71,9 +73,15 @@ contract TransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ownable2S
         address _contractL2,
         uint256 _mintValue,
         uint256 _l2Value,
-        bytes memory _l2Calldata,
+        bytes calldata _l2Calldata,
         address _refundRecipient
     ) external view returns (bool) {
-        return whitelistedSenders[sender];
+        address baseTokenBridge = IZkSyncHyperchain(msg.sender).getBaseTokenBridge();
+        address bridgeHub = IZkSyncHyperchain(msg.sender).getBridgehub();
+        (bytes32 decodedAssetId, bytes memory decodedAssetData) = abi.decode(_l2Calldata[4:], (bytes32, bytes)); // Decode data first
+        // Then take the asset id and call the BH
+        address stmAddress = IBridgehub(bridgeHub).stmAssetIdToAddress(decodedAssetId);
+
+        return (whitelistedSenders[sender] && (sender != baseTokenBridge || stmAddress != address(0)));
     }
 }

@@ -112,6 +112,10 @@ export async function initialTestnetDeploymentProcess(
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false);
   await registerZKChainWithBridgeRegistration(deployer, false, extraFacets, gasPrice, baseTokenName);
   await registerTestDAValidators(deployer);
+<<<<<<< HEAD
+=======
+  await initialGatewayTransactionFiltererDeployment(deployer, gasPrice);
+>>>>>>> 4b87a23b ((feat): rename txFilterer, add update implementation)
   return deployer;
 }
 

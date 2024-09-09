@@ -133,7 +133,7 @@ export interface DeployedAddresses {
     NativeTokenVaultImplementation: string;
     NativeTokenVaultProxy: string;
   };
-  TransactionFilterer: {
+  GatewayTransactionFilterer: {
     TxFiltererImplementation: string;
     TxFiltererProxy: string;
   };
@@ -196,7 +196,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       NativeTokenVaultImplementation: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_IMPL_ADDR"),
       NativeTokenVaultProxy: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_PROXY_ADDR"),
     },
-    TransactionFilterer: {
+    GatewayTransactionFilterer: {
       TxFiltererImplementation: getAddressFromEnv("CONTRACTS_TX_FILTERER_IMPL_ADDR"),
       TxFiltererProxy: getAddressFromEnv("CONTRACTS_TX_FILTERER_PROXY_ADDR"),
     },

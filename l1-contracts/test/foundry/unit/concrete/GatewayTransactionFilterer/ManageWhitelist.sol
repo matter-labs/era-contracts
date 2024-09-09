@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {TransactionFiltererTest} from "./_TransactionFilterer_Shared.t.sol";
+import {GatewayTransactionFiltererTest} from "./_GatewayTransactionFilterer_Shared.t.sol";
 
 import {AlreadyWhitelisted, NotWhitelisted} from "contracts/common/L1ContractErrors.sol";
 
-contract manageWhitelistTest is TransactionFiltererTest {
+contract manageWhitelistTest is GatewayTransactionFiltererTest {
     function test_GrantingWhitelistToSender() public {
         vm.startPrank(owner);
         transactionFiltererProxy.grantWhitelist(sender);
