@@ -46,7 +46,6 @@ contract DeployL2Script is Script {
         deploy(false);
     }
 
-
     function runWithLegacyBridge() public {
         deploy(true);
     }
@@ -68,7 +67,6 @@ contract DeployL2Script is Script {
 
     function runDeployLegacySharedBridge() public {
         deploySharedBridge(true);
-
     }
 
     function runDeploySharedBridge() public {
@@ -85,7 +83,6 @@ contract DeployL2Script is Script {
         initializeChain();
 
         saveOutput();
-
     }
 
     function runDefaultUpgrader() public {
@@ -121,7 +118,7 @@ contract DeployL2Script is Script {
 
         if (legacyBridge) {
             contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
-                "/../l2-contracts/artifacts-zk/contracts/dev-contracts/DevL2SharedBridge.sol/L2SharedBridge.json"
+                "/../l2-contracts/artifacts-zk/contracts/dev-contracts/DevL2SharedBridge.sol/DevL2SharedBridge.json"
             );
         } else {
             contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
