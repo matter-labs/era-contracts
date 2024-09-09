@@ -21,8 +21,6 @@ interface IL1AssetRouter is IAssetRouterBase {
 
     event ClaimedFailedDepositAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
-    event WithdrawalFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
-
     event AssetDeploymentTrackerSet(
         bytes32 indexed assetId,
         address indexed assetDeploymentTracker,

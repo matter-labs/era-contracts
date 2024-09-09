@@ -313,8 +313,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         });
 
         l1AssetRouter.bridgeRecoverFailedTransfer(_chainId, _depositSender, _assetId, _assetData);
-
-        // TODO: emit event
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
@@ -390,17 +388,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     function _finalizeDeposit(
         FinalizeL1DepositParams calldata _finalizeWithdrawalParams
     ) internal nonReentrant whenNotPaused {
-        // returns (address l1Receiver, address l1Token, uint256 amount) {
         bytes memory transferData;
         bytes32 assetId;
         (assetId, transferData) = _verifyAndGetWithdrawalData(_finalizeWithdrawalParams);
         l1AssetRouter.finalizeDeposit(_finalizeWithdrawalParams.chainId, assetId, transferData);
-        // if ((l1NativeTokenVault.tokenAddress(assetId) != address(0)) && (!l1NativeTokenVault.isTokenBridged(assetId))){
-        //     l1Receiver = address(l1NativeTokenVault);
-        //     l1Token = address(0);
-        //     amount = transferData[1];
-        //     (l1Receiver, amount) = DataEncoding.decodeTransferData(transferData);
-        // }
     }
 
     /// @notice Internal function that handles the logic for finalizing withdrawals, supporting both the current bridge system and the legacy ERC20 bridge.
@@ -431,7 +422,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             "L1N: legacy token withdrawal"
         );
 
-        (assetId, transferData) = _checkWithdrawal(_finalizeWithdrawalParams);
+        (assetId, transferData) = _verifyWithdrawal(_finalizeWithdrawalParams);
     }
 
     /// @dev Determines if an eth withdrawal was initiated on ZKsync Era before the upgrade to the Shared Bridge.
@@ -501,7 +492,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
     /// @return assetId The ID of the bridged asset.
     /// @return transferData The transfer data used to finalize withdawal.
-    function _checkWithdrawal(
+    function _verifyWithdrawal(
         FinalizeL1DepositParams calldata _finalizeWithdrawalParams
     ) internal view returns (bytes32 assetId, bytes memory transferData) {
         (assetId, transferData) = _parseL2WithdrawalMessage(

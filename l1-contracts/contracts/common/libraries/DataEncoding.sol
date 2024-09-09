@@ -3,8 +3,9 @@
 pragma solidity 0.8.24;
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../L2ContractAddresses.sol";
-import {LEGACY_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
+import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../../bridge/ntv/INativeTokenVault.sol";
+import {UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -108,10 +109,12 @@ library DataEncoding {
             address tokenAddress = INativeTokenVault(_nativeTokenVault).tokenAddress(_assetId);
             (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
             txDataHash = keccak256(abi.encode(_prevMsgSender, tokenAddress, depositAmount));
-        } else {
+        } else if (_encodingVersion == NEW_ENCODING_VERSION) {
             // Similarly to calldata, the txDataHash is collision-resistant.
             // In the legacy data hash, the first encoded variable was the address, which is padded with zeros during `abi.encode`.
             txDataHash = keccak256(bytes.concat(_encodingVersion, abi.encode(_prevMsgSender, _assetId, _transferData)));
+        } else {
+            revert UnsupportedEncodingVersion();
         }
     }
 }
