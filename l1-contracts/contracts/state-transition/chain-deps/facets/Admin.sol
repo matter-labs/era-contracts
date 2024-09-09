@@ -14,7 +14,7 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, ChainAlreadyLive, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen} from "../../../common/L1ContractErrors.sol";
-import {AdminFacetNotL1, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, AlreadyMigrated, NotChainAdmin, ProtocolVersionNotUpToDate, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, PriorityQueueNotReady, VerifiedIsNotConsistentWithExecuted, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
+import {NotL1, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, AlreadyMigrated, NotChainAdmin, ProtocolVersionNotUpToDate, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, PriorityQueueNotReady, VerifiedIsNotConsistentWithExecuted, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -39,7 +39,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     modifier onlyL1() {
         if (block.chainid != L1_CHAIN_ID) {
-            revert AdminFacetNotL1();
+            revert NotL1(block.chainid);
         }
         _;
     }
@@ -262,7 +262,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert AlreadyMigrated();
         }
         if (_prevMsgSender != s.admin) {
-            revert NotChainAdmin();
+            revert NotChainAdmin(_prevMsgSender, s.admin);
         }
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
         uint256 protocolVersion = abi.decode(_data, (uint256));
@@ -271,7 +271,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         uint256 protocolVersion = stm.protocolVersion();
 
         if (currentProtocolVersion != protocolVersion) {
-            revert ProtocolVersionNotUpToDate();
+            revert ProtocolVersionNotUpToDate(currentProtocolVersion, protocolVersion);
         }
 
         if (block.chainid != L1_CHAIN_ID) {
@@ -307,17 +307,17 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
         // Some consistency checks just in case.
         if (batchesExecuted > batchesVerified) {
-            revert ExecutedIsNotConsistentWithVerified();
+            revert ExecutedIsNotConsistentWithVerified(batchesExecuted, batchesVerified);
         }
         if (batchesVerified > batchesCommitted) {
-            revert VerifiedIsNotConsistentWithCommitted();
+            revert VerifiedIsNotConsistentWithCommitted(batchesVerified, batchesCommitted);
         }
 
         // In the worst case, we may need to revert all the committed batches that were not executed.
         // This means that the stored batch hashes should be stored for [batchesExecuted; batchesCommitted] batches, i.e.
         // there should be batchesCommitted - batchesExecuted + 1 hashes.
         if (_commitment.batchHashes.length != batchesCommitted - batchesExecuted + 1) {
-            revert InvalidNumberOfBatchHashes();
+            revert InvalidNumberOfBatchHashes(_commitment.batchHashes.length, batchesCommitted - batchesExecuted + 1);
         }
 
         // Note that this part is done in O(N), i.e. it is the responsibility of the admin of the chain to ensure that the total number of
@@ -396,10 +396,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
         // just in case
         if (commitment.totalBatchesExecuted > commitment.totalBatchesVerified) {
-            revert VerifiedIsNotConsistentWithExecuted();
+            revert VerifiedIsNotConsistentWithExecuted(commitment.totalBatchesExecuted, commitment.totalBatchesVerified);
         }
         if (commitment.totalBatchesVerified > commitment.totalBatchesCommitted) {
-            revert VerifiedIsNotConsistentWithCommitted();
+            revert VerifiedIsNotConsistentWithCommitted(commitment.totalBatchesVerified, commitment.totalBatchesCommitted);
         }
 
         uint256 blocksToRemember = commitment.totalBatchesCommitted - commitment.totalBatchesExecuted + 1;

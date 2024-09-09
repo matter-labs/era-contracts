@@ -258,7 +258,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         unchecked {
             bytes32 correctPrevBlockHash = _calculateLegacyL2BlockHash(_l2BlockNumber - 1);
             if (correctPrevBlockHash != _expectedPrevL2BlockHash) {
-                revert PreviousL2BlockHashIsIncorrect();
+                revert PreviousL2BlockHashIsIncorrect(correctPrevBlockHash, _expectedPrevL2BlockHash);
             }
 
             // Whenever we'll be queried about the hashes of the blocks before the upgrade,
@@ -365,7 +365,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         if (_isFirstInBatch) {
             uint128 currentBatchTimestamp = currentBatchInfo.timestamp;
             if (_l2BlockTimestamp < currentBatchTimestamp) {
-                revert TimestampOfL2BlockMustBeGreaterThanOrEqualToTimestampOfCurrentBatch();
+                revert TimestampOfL2BlockMustBeGreaterThanOrEqualToTimestampOfCurrentBatch(_l2BlockTimestamp, currentBatchTimestamp);
             }
             if (_maxVirtualBlocksToCreate <= 0) {
                 revert ThereMustBeVirtualBlockCreatedAtStartOfBatch();
@@ -385,10 +385,10 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
                 revert CannotReuseL2BlockNumberFromPreviousBatch();
             }
             if (currentL2BlockTimestamp != _l2BlockTimestamp) {
-                revert TimestampOfSameL2BlockMustBeSame();
+                revert TimestampOfSameL2BlockMustBeSame( _l2BlockTimestamp, currentL2BlockTimestamp);
             }
             if (_expectedPrevL2BlockHash != _getLatest257L2blockHash(_l2BlockNumber - 1)) {
-                revert PreviousHashOfSameL2BlockMustBeSame();
+                revert PreviousHashOfSameL2BlockMustBeSame(_expectedPrevL2BlockHash, _getLatest257L2blockHash(_l2BlockNumber - 1));
             }
             if (_maxVirtualBlocksToCreate != 0) {
                 revert CannotCreateVirtualBlocksInMiddleOfMiniblock();
@@ -405,10 +405,10 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
             );
 
             if (_expectedPrevL2BlockHash != pendingL2BlockHash) {
-                revert CurrentL2BlockHashIsIncorrect();
+                revert CurrentL2BlockHashIsIncorrect(_expectedPrevL2BlockHash, pendingL2BlockHash);
             }
             if (_l2BlockTimestamp <= currentL2BlockTimestamp) {
-                revert TimestampOfNewL2BlockMustBeGreaterThanTimestampOfPreviousL2Block();
+                revert TimestampOfNewL2BlockMustBeGreaterThanTimestampOfPreviousL2Block(_l2BlockTimestamp, currentL2BlockTimestamp);
             }
 
             // Since the new block is created, we'll clear out the rolling hash
@@ -452,7 +452,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     function _ensureBatchConsistentWithL2Block(uint128 _newTimestamp) internal view {
         uint128 currentBlockTimestamp = currentL2BlockInfo.timestamp;
         if (_newTimestamp <= currentBlockTimestamp) {
-            revert TimestampOfBatchMustBeGreaterThanTimestampOfPreviousBlock();
+            revert TimestampOfBatchMustBeGreaterThanTimestampOfPreviousBlock(_newTimestamp, currentBlockTimestamp);
         }
     }
 
@@ -473,10 +473,10 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     ) external onlyCallFromBootloader {
         (uint128 previousBatchNumber, uint128 previousBatchTimestamp) = getBatchNumberAndTimestamp();
         if (_newTimestamp <= previousBatchTimestamp) {
-            revert TimestampsShouldBeIncremental();
+            revert TimestampsShouldBeIncremental(_newTimestamp, previousBatchTimestamp);
         }
         if (previousBatchNumber + 1 != _expectedNewNumber) {
-            revert ProvidedBatchNumberIsNotCorrect();
+            revert ProvidedBatchNumberIsNotCorrect(previousBatchNumber + 1, _expectedNewNumber);
         }
 
         _ensureBatchConsistentWithL2Block(_newTimestamp);

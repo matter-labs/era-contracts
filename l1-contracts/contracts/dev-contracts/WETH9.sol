@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.24;
 
-import {Weth9WithdrawMoreThenBalance, Weth9WithdrawMoreThenAllowance} from "./L1DevContractsErrors.sol";
-
 contract WETH9 {
     // add this to be excluded from coverage report
     function test() internal virtual {}
@@ -30,9 +28,7 @@ contract WETH9 {
     }
 
     function withdraw(uint256 wad) public {
-        if (balanceOf[msg.sender] < wad) {
-            revert Weth9WithdrawMoreThenBalance();
-        }
+        require(balanceOf[msg.sender] >= wad, "weth9, 1");
         balanceOf[msg.sender] -= wad;
         payable(msg.sender).transfer(wad);
         emit Withdrawal(msg.sender, wad);
@@ -53,13 +49,9 @@ contract WETH9 {
     }
 
     function transferFrom(address src, address dst, uint256 wad) public returns (bool) {
-        if (balanceOf[src] < wad) {
-            revert Weth9WithdrawMoreThenBalance();
-        }
+        require(balanceOf[src] >= wad, "weth9, 2");
         if (src != msg.sender || allowance[src][msg.sender] != type(uint256).max) {
-            if (allowance[src][msg.sender] < wad) {
-                revert Weth9WithdrawMoreThenAllowance();
-            }
+            require(allowance[src][msg.sender] >= wad, "weth9, 3");
             allowance[src][msg.sender] -= wad;
         }
 

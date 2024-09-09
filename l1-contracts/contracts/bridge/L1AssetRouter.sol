@@ -26,7 +26,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
-import {NotNTV, EthTransferFailed, NativeTokenVaultAlreadySet, NativeTokenVault0, LegacycFD, LegacyEthWithdrawal, LegacyTokenWithdrawal, WrongMsgLength, NotNTVorADT, AssetHandlerNotSet, NewEncodingFormatNotYetSupportedForNTV, AssetHandlerDoesNotExistForAssetId} from "./L1BridgeContractErrors.sol";
+import {NotNTV, EthTransferFailed, NativeTokenVaultAlreadySet, NativeTokenVaultZeroAddress, LegacyClaimDepositNotSupported, LegacyEthWithdrawalNotSupported, LegacyTokenWithdrawal, WrongMsgLength, NotNTVorADT, AssetHandlerNotSet, NewEncodingFormatNotYetSupportedForNTV, AssetHandlerDoesNotExistForAssetId} from "./L1BridgeContractErrors.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
@@ -264,7 +264,7 @@ contract L1AssetRouter is
             revert NativeTokenVaultAlreadySet();
         }
         if (address(_nativeTokenVault) == address(0)) {
-            revert NativeTokenVault0();
+            revert NativeTokenVaultZeroAddress();
         }
         nativeTokenVault = _nativeTokenVault;
     }
@@ -294,7 +294,7 @@ contract L1AssetRouter is
         address sender = senderIsNTV ? L2_NATIVE_TOKEN_VAULT_ADDR : msg.sender;
         bytes32 assetId = DataEncoding.encodeAssetId(block.chainid, _assetRegistrationData, sender);
         if (!senderIsNTV && msg.sender != assetDeploymentTracker[assetId]) {
-            revert NotNTVorADT();
+            revert NotNTVorADT(msg.sender, assetDeploymentTracker[assetId]);
         }
         assetHandlerAddress[assetId] = _assetHandlerAddress;
         if (senderIsNTV) {
@@ -403,7 +403,7 @@ contract L1AssetRouter is
         } else if (encodingVersion == NEW_ENCODING_VERSION) {
             (assetId, transferData) = abi.decode(_data[1:], (bytes32, bytes));
             if (assetHandlerAddress[assetId] == address(nativeTokenVault)) {
-                revert NewEncodingFormatNotYetSupportedForNTV();
+                revert NewEncodingFormatNotYetSupportedForNTV(assetHandlerAddress[assetId], address(nativeTokenVault));
             }
         } else {
             (assetId, transferData) = _handleLegacyData(_data, _prevMsgSender);
@@ -534,7 +534,7 @@ contract L1AssetRouter is
         }
 
         if (_isEraLegacyDeposit(_chainId, _l2BatchNumber, _l2TxNumberInBatch)) {
-            revert LegacycFD();
+            revert LegacyClaimDepositNotSupported();
         }
         {
             bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
@@ -629,7 +629,7 @@ contract L1AssetRouter is
 
         // Handling special case for withdrawal from ZKsync Era initiated before Shared Bridge.
         if (_isEraLegacyEthWithdrawal(_chainId, _l2BatchNumber)) {
-            revert LegacyEthWithdrawal();
+            revert LegacyEthWithdrawalNotSupported();
         }
         if (_isEraLegacyTokenWithdrawal(_chainId, _l2BatchNumber)) {
             revert LegacyTokenWithdrawal();
@@ -916,7 +916,7 @@ contract L1AssetRouter is
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
             // The data is expected to be at least 36 bytes long to contain assetId.
             if (_l2ToL1message.length < 36) {
-                revert WrongMsgLength();
+                revert WrongMsgLength(36, _l2ToL1message.length);
             }
             (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
             transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);

@@ -14,7 +14,7 @@ import {IBridgehub, IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.so
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
-import {OnlyBridgehub, StmNotRegistered, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart, WrongEncodingVersion} from "./L1BridgehubErrors.sol";
+import {OnlyBridgehub, CtmNotRegistered, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart, WrongEncodingVersion} from "./L1BridgehubErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -33,7 +33,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     modifier onlyBridgehub() {
         // solhint-disable-next-line gas-custom-errors
         if (msg.sender != address(BRIDGE_HUB)) {
-            revert OnlyBridgehub();
+            revert OnlyBridgehub(msg.sender, address(BRIDGE_HUB));
         }
         _;
     }
@@ -42,7 +42,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     modifier onlyOwnerViaRouter(address _prevMsgSender) {
         // solhint-disable-next-line gas-custom-errors
         if (msg.sender != address(L1_ASSET_ROUTER) || _prevMsgSender != owner()) {
-            revert NotOwnerViaRouter();
+            revert NotOwnerViaRouter(msg.sender);
         }
         _;
     }
@@ -67,7 +67,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         // solhint-disable-next-line gas-custom-errors
 
         if (!BRIDGE_HUB.chainTypeManagerIsRegistered(_ctmAddress)) {
-            revert StmNotRegistered();
+            revert CtmNotRegistered();
         }
         L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_stmAddress))), address(BRIDGE_HUB));
         BRIDGE_HUB.setAssetHandlerAddress(bytes32(uint256(uint160(_stmAddress))), _stmAddress);
@@ -101,7 +101,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         // solhint-disable-next-line gas-custom-errors
 
         if (_prevMsgSender != owner()) {
-            revert NotOwner();
+            revert NotOwner(_prevMsgSender, owner());
         }
         bytes1 encodingVersion = _data[0];
         require(encodingVersion == ENCODING_VERSION, "CTMDT: wrong encoding version");
@@ -124,7 +124,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
         address _assetHandlerAddressOnCounterpart
     ) external view override onlyOwnerViaRouter(_prevMsgSender) {
         if (_assetHandlerAddressOnCounterpart != L2_BRIDGEHUB_ADDR) {
-            revert WrongCounterPart();
+            revert WrongCounterPart(_assetHandlerAddressOnCounterpart, L2_BRIDGEHUB_ADDR);
         }
     }
 

@@ -15,7 +15,7 @@ import {IL1AssetHandler} from "./interfaces/IL1AssetHandler.sol";
 import {IL1AssetRouter} from "./interfaces/IL1AssetRouter.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {EthOnlyAcceptedFromSharedBridge, ZeroAmountToTransfer, WrongAmountTransferred, EmptyToken, ClaimFailedDepositFailed} from "./L1BridgeContractErrors.sol";
+import {EthOnlyAcceptedFromSharedBridge, ZeroAmountToTransfer, WrongAmountTransferred, EmptyToken, ClaimDepositFailed} from "./L1BridgeContractErrors.sol";
 
 import {BridgeHelper} from "./BridgeHelper.sol";
 
@@ -61,7 +61,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
     /// @dev Accepts ether only from the Shared Bridge.
     receive() external payable {
         if (address(L1_SHARED_BRIDGE) != msg.sender) {
-            revert EthOnlyAcceptedFromSharedBridge();
+            revert EthOnlyAcceptedFromSharedBridge(address(L1_SHARED_BRIDGE), msg.sender);
         }
     }
 
@@ -96,7 +96,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
             L1_SHARED_BRIDGE.transferTokenToNTV(_token);
             uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
             if (balanceAfter - balanceBefore < sharedBridgeChainBalance) {
-                revert WrongAmountTransferred();
+                revert WrongAmountTransferred(balanceAfter - balanceBefore, sharedBridgeChainBalance);
             }
         }
     }
@@ -120,7 +120,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
             revert TokenNotSupported(L1_WETH_TOKEN);
         }
         if (_l1Token != ETH_TOKEN_ADDRESS && _l1Token.code.length <= 0) {
-            revert EmptyToken();
+            revert EmptyToken(_l1Token, ETH_TOKEN_ADDRESS);
         }
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
         L1_SHARED_BRIDGE.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_l1Token))), address(this));
@@ -248,7 +248,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, Ownable2StepUpgradeable, Pau
                 callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
             }
             if (!callSuccess) {
-                revert ClaimFailedDepositFailed();
+                revert ClaimDepositFailed();
             }
         } else {
             IERC20(l1Token).safeTransfer(_depositSender, _amount);

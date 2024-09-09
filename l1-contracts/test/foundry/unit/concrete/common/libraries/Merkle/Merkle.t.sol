@@ -97,7 +97,7 @@ contract MerkleTestTest is Test {
         (, bytes32[] memory right, bytes32[] memory leaves) = prepareRangeProof(10, 13);
         bytes32[] memory leftShortened = new bytes32[](right.length - 1);
 
-        vm.expectRevert(MerklePathLengthMismatch.selector);
+        vm.expectRevert(abi.encodeWithSelector(MerklePathLengthMismatch.selector, 10, 10));
         merkleTest.calculateRoot(leftShortened, right, 10, leaves);
     }
 

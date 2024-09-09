@@ -4,7 +4,6 @@ pragma solidity 0.8.20;
 
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
 import {ISystemContext} from "./ISystemContext.sol";
-import {GasLimitIsTooLow, NotEnoughGasForPubdata} from "contracts/test-contracts/GasBoundCallerErrors.sol";
 
 ISystemContext constant SYSTEM_CONTEXT_CONTRACT = ISystemContext(address(0x800b));
 
@@ -46,9 +45,7 @@ contract GasBoundCaller {
         // This require is more of a safety protection for the users that call this function with incorrect parameters.
         //
         // Ultimately, the entire `gas` sent to this call can be spent on compute regardless of the `_maxTotalGas` parameter.
-        if (_maxTotalGas < gasleft()) {
-            revert GasLimitIsTooLow();
-        }
+        require(_maxTotalGas >= gasleft(), "Gas limit is too low");
 
         // This is the amount of gas that can be spent *exclusively* on pubdata in addition to the `gas` provided to this function.
         uint256 pubdataAllowance = _maxTotalGas > expectedForCompute ? _maxTotalGas - expectedForCompute : 0;
@@ -93,9 +90,7 @@ contract GasBoundCaller {
         if (pubdataGas != 0) {
             // Here we double check that the additional cost is not higher than the maximum allowed.
             // Note, that the `gasleft()` can be spent on pubdata too.
-            if (pubdataAllowance + gasleft() < pubdataGas + CALL_RETURN_OVERHEAD) {
-                revert NotEnoughGasForPubdata();
-            }
+            require(pubdataAllowance + gasleft() >= pubdataGas + CALL_RETURN_OVERHEAD, "Not enough gas for pubdata");
         }
 
         assembly {

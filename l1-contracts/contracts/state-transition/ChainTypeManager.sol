@@ -423,7 +423,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             // check input
             bytes32 forceDeploymentHash = keccak256(abi.encode(_forceDeploymentData));
             if (forceDeploymentHash != initialForceDeploymentHash) {
-                revert InitialForceDeploymentMismatch();
+                revert InitialForceDeploymentMismatch(forceDeploymentHash, initialForceDeploymentHash);
             }
         }
         // genesis upgrade, deploys some contracts, sets chainId
@@ -444,7 +444,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @param _isWhitelisted whether the chain is whitelisted
     function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external onlyOwner {
         if (_newSettlementLayerChainId == 0) {
-            revert BadChainId();
+            revert ZeroChainId();
         }
 
         // Currently, we require that the sync layer is deployed by the same STM.
@@ -473,7 +473,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // related to different protocol version support.
         address zkChain = getZKChain(_chainId);
         if (IZkSyncHyperchain(hyperchain).getProtocolVersion() != protocolVersion) {
-            revert OutdatedProtocolVersion();
+            revert OutdatedProtocolVersion(IZkSyncHyperchain(hyperchain).getProtocolVersion(), protocolVersion);
         }
 
         return
@@ -500,7 +500,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
         if (_protocolVersion != protocolVersion) {
-            revert OutdatedProtocolVersion();
+            revert OutdatedProtocolVersion(_protocolVersion, protocolVersion);
         }
         chainAddress = _deployNewChain({
             _chainId: _chainId,

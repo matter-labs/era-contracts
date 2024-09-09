@@ -78,7 +78,7 @@ library FullMerkle {
         // solhint-disable-next-line gas-custom-errors
         uint256 maxNodeNumber = self._leafNumber - 1;
         if (_index > maxNodeNumber) {
-            revert MerkleWrongIndex();
+            revert MerkleWrongIndex(_index, maxNodeNumber);
         }
         self._nodes[0][_index] = _itemHash;
         bytes32 currentHash = _itemHash;
@@ -105,7 +105,7 @@ library FullMerkle {
     function updateAllLeaves(FullTree storage self, bytes32[] memory _newLeaves) internal returns (bytes32) {
         // solhint-disable-next-line gas-custom-errors
         if (_newLeaves.length != self._leafNumber) {
-            revert MerkleWrongLength();
+            revert MerkleWrongLength(_newLeaves.length, self._leafNumber);
         }
         return updateAllNodesAtHeight(self, 0, _newLeaves);
     }

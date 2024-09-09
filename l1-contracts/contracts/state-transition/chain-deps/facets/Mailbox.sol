@@ -28,7 +28,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDG
 import {IL1AssetRouter} from "../../../bridge/interfaces/IL1AssetRouter.sol";
 
 import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow} from "../../../common/L1ContractErrors.sol";
-import {MailboxFacetNotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBeZero, MailboxWrongStateTransitionManager, NotSettlementLayers, NotHyperchain} from "../../L1StateTransitionErrors.sol";
+import {NotL1, UnsupportedProofMetadataVersion, LocalRootIsZero, LocalRootMustBeZero, MailboxWrongStateTransitionManager, NotSettlementLayers, NotHyperchain} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -53,7 +53,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
 
     modifier onlyL1() {
         if (block.chainid != L1_CHAIN_ID) {
-            revert MailboxFacetNotL1();
+            revert NotL1(block.chainid );
         }
         _;
     }
@@ -154,7 +154,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             // It is the new version
             bytes1 metadataVersion = bytes1(proofMetadata);
             if (uint256(uint8(metadataVersion)) != SUPPORTED_PROOF_METADATA_VERSION) {
-                revert UnsupportedProofMetadataVersion();
+                revert UnsupportedProofMetadataVersion(uint256(uint8(metadataVersion)));
             }
 
             proofStartIndex = 1;

@@ -8,21 +8,21 @@ error L2DAValidatorAddressIsZero();
 
 error AlreadyMigrated();
 
-error NotChainAdmin();
+error NotChainAdmin(address prevMsgSender, address admin);
 
-error ProtocolVersionNotUpToDate();
+error ProtocolVersionNotUpToDate(uint256 currentProtocolVersion, uint256 protocolVersion);
 
-error ExecutedIsNotConsistentWithVerified();
+error ExecutedIsNotConsistentWithVerified(uint256 batchesExecuted, uint256 batchesVerified);
 
-error VerifiedIsNotConsistentWithCommitted();
+error VerifiedIsNotConsistentWithCommitted(uint256 batchesVerified, uint256 batchesCommitted);
 
-error InvalidNumberOfBatchHashes();
+error InvalidNumberOfBatchHashes(uint256 batchHashesLength, uint256 expected);
 
 error PriorityQueueNotReady();
 
-error VerifiedIsNotConsistentWithExecuted();
+error VerifiedIsNotConsistentWithExecuted(uint256 totalBatchesExecuted, uint256 totalBatchesVerified);
 
-error UnsupportedProofMetadataVersion();
+error UnsupportedProofMetadataVersion(uint256 metadataVersion);
 
 error LocalRootIsZero();
 
@@ -36,11 +36,9 @@ error NotHyperchain();
 
 error MismatchL2DAValidator();
 
-error InvalidExpectedSystemContractUpgradeTXHashKey();
+error MismatchNumberOfLayer1Txs(uint256 numberOfLayer1Txs, uint256 expectedLength);
 
-error MismatchNumberOfLayer1Txs();
-
-error InvalidBatchesDataLength();
+error InvalidBatchesDataLength(uint256 batchesDataLength, uint256 priorityOpsDataLength);
 
 error PriorityOpsDataLeftPathLengthIsNotZero();
 
@@ -48,42 +46,40 @@ error PriorityOpsDataRightPathLengthIsNotZero();
 
 error PriorityOpsDataItemHashesLengthIsNotZero();
 
-error OperatorDAInputTooSmall();
+error OperatorDAInputTooSmall(uint256 operatorDAInputLength, uint256 BlobDataOffset);
 
-error InvalidNumberOfBlobs();
+error InvalidNumberOfBlobs(uint256 blobsProvided, uint256 maxBlobsSupported);
 
-error InvalidBlobsHashes();
+error InvalidBlobsHashes(uint256 operatorDAInputLength, uint256 minNumberOfBlobHashes);
 
-error InvalidL2DAOutputHash();
+error InvalidL2DAOutputHash(bytes32 operatorDAOutputHash, bytes32 l2DAValidatorOutputHash);
 
 error OnlyOneBlobWithCalldata();
 
-error PubdataTooSmall();
+error PubdataTooSmall(uint256 pubdataInputLength, uint256 blobCommitmentSize);
 
-error PubdataTooLong();
+error PubdataTooLong(uint256 pubdataLength, uint256 blobSizeBytes);
 
 error InvalidPubdataHash();
 
 error BlobHashBlobCommitmentMismatchValue();
 
-error L1DAValidatorInvalidSender();
+error L1DAValidatorInvalidSender(address msgSender);
 
 error RootMismatch();
 
 error InvalidCommitment();
 
-error InitialForceDeploymentMismatch();
+error InitialForceDeploymentMismatch(bytes32 forceDeploymentHash, bytes32 initialForceDeploymentHash);
 
-error BadChainId();
+error ZeroChainId();
 
 error SyncLayerNotRegistered();
 
 error AdminZero();
 
-error OutdatedProtocolVersion();
+error OutdatedProtocolVersion(uint256 protocolVersion, uint256 currentProtocolVersion);
 
 error ChainWasMigrated();
 
-error MailboxFacetNotL1();
-
-error AdminFacetNotL1();
+error NotL1(uint256 blockChainId);

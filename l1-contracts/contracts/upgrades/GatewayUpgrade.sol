@@ -11,7 +11,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {PriorityQueue} from "../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../state-transition/libraries/PriorityTree.sol";
-import {GatewayUpgradeUpgradeExternal, GatewayUpgradeUpgradeFailed} from "./ZkSyncUpgradeErrors.sol";
+import {GatewayUpgradeInvalidMsgSender, GatewayUpgradeFailed} from "./ZkSyncUpgradeErrors.sol";
 
 import {IGatewayUpgrade} from "./IGatewayUpgrade.sol";
 import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
@@ -55,7 +55,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
         );
         // solhint-disable-next-line gas-custom-errors
         if (!success) {
-            revert GatewayUpgradeUpgradeFailed();
+            revert GatewayUpgradeFailed();
         }
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
@@ -64,7 +64,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, Initializable {
     function upgradeExternal(ProposedUpgrade calldata _proposedUpgrade) external {
         // solhint-disable-next-line gas-custom-errors
         if (msg.sender != address(this)) {
-            revert GatewayUpgradeUpgradeExternal();
+            revert GatewayUpgradeInvalidMsgSender();
         }
         super.upgrade(_proposedUpgrade);
     }

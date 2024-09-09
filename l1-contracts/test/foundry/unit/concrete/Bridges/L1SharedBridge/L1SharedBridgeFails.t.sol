@@ -22,7 +22,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {AddressAlreadyUsed, WithdrawFailed, Unauthorized, AssetIdNotSupported, SharedBridgeKey, SharedBridgeValueNotSet, L2WithdrawalMessageWrongLength, InsufficientChainBalance, ZeroAddress, ValueMismatch, NonEmptyMsgValue, DepositExists, ValueMismatch, NonEmptyMsgValue, TokenNotSupported, EmptyDeposit, L2BridgeNotDeployed, DepositIncorrectAmount, InvalidProof, NoFundsTransferred, InsufficientFunds, DepositDoesNotExist, WithdrawalAlreadyFinalized, InsufficientFunds, MalformedMessage, InvalidSelector, TokensWithFeesNotSupported} from "contracts/common/L1ContractErrors.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
-import {NotNTV, EmptyToken, NativeTokenVaultAlreadySet, NativeTokenVault0, ZeroAmountToTransfer, WrongAmountTransferred, ClaimFailedDepositFailed, LegacycFD, LegacyTokenWithdrawal} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {NotNTV, EmptyToken, NativeTokenVaultAlreadySet, NativeTokenVaultZeroAddress, ZeroAmountToTransfer, WrongAmountTransferred, ClaimDepositFailed, LegacyClaimDepositNotSupported, LegacyTokenWithdrawal} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 /// We are testing all the specified revert and require cases.
 contract L1AssetRouterFailTest is L1AssetRouterTest {
@@ -66,7 +66,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_registerToken_noCode() public {
-        vm.expectRevert(EmptyToken.selector);
+        vm.expectRevert(abi.encodeWithSelector(EmptyToken.selector, address(0), ETH_TOKEN_ADDRESS));
         nativeTokenVault.registerToken(address(0));
     }
 
@@ -93,7 +93,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     function test_setNativeTokenVault_emptyAddressProvided() public {
         stdstore.target(address(sharedBridge)).sig(sharedBridge.nativeTokenVault.selector).checked_write(address(0));
         vm.prank(owner);
-        vm.expectRevert(NativeTokenVault0.selector);
+        vm.expectRevert(NativeTokenVaultZeroAddress.selector);
         sharedBridge.setNativeTokenVault(IL1NativeTokenVault(address(0)));
     }
 
@@ -147,7 +147,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     function test_transferFundsToSharedBridge_Erc_WrongAmountTransferred() public {
         vm.mockCall(address(token), abi.encodeWithSelector(IERC20.balanceOf.selector), abi.encode(10));
         vm.prank(address(nativeTokenVault));
-        vm.expectRevert(WrongAmountTransferred.selector);
+        vm.expectRevert(abi.encodeWithSelector(WrongAmountTransferred.selector, 10, 10));
         nativeTokenVault.transferFundsFromSharedBridge(address(token));
     }
 
@@ -313,7 +313,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert(ClaimFailedDepositFailed.selector);
+        vm.expectRevert(ClaimDepositFailed.selector);
         sharedBridge.bridgeRecoverFailedTransfer({
             _chainId: chainId,
             _depositSender: alice,
@@ -396,7 +396,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert(LegacycFD.selector);
+        vm.expectRevert(LegacyClaimDepositNotSupported.selector);
         sharedBridge.bridgeRecoverFailedTransfer({
             _chainId: eraChainId,
             _depositSender: alice,

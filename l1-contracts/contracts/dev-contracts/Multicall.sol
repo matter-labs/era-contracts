@@ -20,8 +20,6 @@ copies or substantial portions of the Software.
 
 pragma solidity 0.8.24;
 
-import {MulticallFailed} from "./L1DevContractsErrors.sol";
-
 /// @title Multicall - Aggregate results from multiple read-only function calls
 contract Multicall {
     // add this to be excluded from coverage report
@@ -38,9 +36,7 @@ contract Multicall {
         uint256 callsLength = calls.length;
         for (uint256 i = 0; i < callsLength; ++i) {
             (bool success, bytes memory ret) = calls[i].target.call(calls[i].callData);
-            if (!success) {
-                revert MulticallFailed();
-            }
+            require(success, "multicall 1");
             returnData[i] = ret;
         }
     }
