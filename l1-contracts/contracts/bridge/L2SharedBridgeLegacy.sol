@@ -159,6 +159,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
     }
 
     function sendMessageToL1(bytes calldata _message) external override onlyAssetRouter {
+        // slither-disable-next-line unused-return
         L2ContractHelper.sendMessageToL1(_message);
     }
 }

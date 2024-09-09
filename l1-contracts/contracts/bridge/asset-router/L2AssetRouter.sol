@@ -154,8 +154,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         });
 
         bytes memory message = _getL1WithdrawMessage(_assetId, _l1bridgeMintData);
-        // slither-disable-next-line unused-return
         if (L2_LEGACY_SHARED_BRIDGE != address(0)) {
+            // slither-disable-next-line unused-return
             L2ContractHelper.sendMessageToL1(message);
         } else {
             IL2SharedBridgeLegacy(L2_LEGACY_SHARED_BRIDGE).sendMessageToL1(message);
