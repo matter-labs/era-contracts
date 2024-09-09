@@ -85,7 +85,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         _disableInitializers();
     }
 
-    ///  @inheritdoc IL2AssetRouter
+    /// @inheritdoc IL2AssetRouter
     function setAssetHandlerAddress(
         uint256 _originChainId,
         bytes32 _assetId,
