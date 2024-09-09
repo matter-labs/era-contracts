@@ -12,7 +12,6 @@ import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
 
 import {EmptyDeposit, WithdrawalAlreadyFinalized, TokensWithFeesNotSupported} from "../common/L1ContractErrors.sol";
 
@@ -177,7 +176,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             chainId: ERA_CHAIN_ID,
             l2BatchNumber: _l2BatchNumber,
             l2MessageIndex: _l2MessageIndex,
-            l2Sender: L2_ASSET_ROUTER_ADDR,
+            l2Sender: l2Bridge,
             l2TxNumberInBatch: _l2TxNumberInBatch,
             message: _message,
             merkleProof: _merkleProof
