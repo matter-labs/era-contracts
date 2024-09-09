@@ -131,7 +131,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     function _handleLegacyData(
         bytes calldata _data,
         address _prevMsgSender
-    ) internal virtual returns (bytes32, bytes memory) {}
+    ) internal virtual returns (bytes32, bytes memory);
 
     /// @dev send the burn message to the asset
     /// @notice Forwards the burn request for specific asset to respective asset handler.
