@@ -495,45 +495,6 @@ export class Deployer {
     this.addresses.Bridgehub.BridgehubProxy = contractAddress;
   }
 
-  public async deployGatewayTransactionFiltererImplementation(
-    create2Salt: string,
-    ethTxOptions: ethers.providers.TransactionRequest
-  ) {
-    const contractAddress = await this.deployViaCreate2("GatewayTransactionFilterer", [], create2Salt, ethTxOptions);
-
-    if (this.verbose) {
-      console.log(`CONTRACTS_TX_FILTERER_IMPL_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.GatewayTransactionFilterer.TxFiltererImplementation = contractAddress;
-  }
-
-  public async deployGatewayTransactionFiltererProxy(
-    create2Salt: string,
-    ethTxOptions: ethers.providers.TransactionRequest
-  ) {
-    const bridgehub = new Interface(hardhat.artifacts.readArtifactSync("GatewayTransactionFilterer").abi);
-
-    const initCalldata = bridgehub.encodeFunctionData("initialize", [this.deployWallet.address]);
-
-    const contractAddress = await this.deployViaCreate2(
-      "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
-      [
-        this.addresses.GatewayTransactionFilterer.TxFiltererImplementation,
-        this.addresses.TransparentProxyAdmin,
-        initCalldata,
-      ],
-      create2Salt,
-      ethTxOptions
-    );
-
-    if (this.verbose) {
-      console.log(`CONTRACTS_TX_FILTERER_PROXY_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.GatewayTransactionFilterer.TxFiltererProxy = contractAddress;
-  }
-
   public async deployMessageRootImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const contractAddress = await this.deployViaCreate2(
       "MessageRoot",
@@ -1124,7 +1085,7 @@ export class Deployer {
     await this.deployMessageRootProxy(create2Salt, { gasPrice });
   }
 
-  public async deployChainTypeManagerContract(
+  public async deployStateTransitionManagerContract(
     create2Salt: string,
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,

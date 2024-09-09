@@ -15,7 +15,7 @@ import {
   L2_BOOTLOADER_BYTECODE_HASH,
   L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
   initialBridgehubDeployment,
-  registerZKChain,
+  registerHyperchain,
 } from "./deploy-process";
 import { deployTokens, getTokens } from "./deploy-token";
 
@@ -112,10 +112,7 @@ export async function initialTestnetDeploymentProcess(
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false);
   await registerZKChainWithBridgeRegistration(deployer, false, extraFacets, gasPrice, baseTokenName);
   await registerTestDAValidators(deployer);
-<<<<<<< HEAD
-=======
-  await initialGatewayTransactionFiltererDeployment(deployer, gasPrice);
->>>>>>> 4b87a23b ((feat): rename txFilterer, add update implementation)
+
   return deployer;
 }
 
@@ -128,7 +125,7 @@ export async function registerZKChainWithBridgeRegistration(
   chainId?: string
 ) {
   chainId = chainId ?? deployer.chainId.toString();
-  await registerZKChain(deployer, onlyVerifier, extraFacets, gasPrice, baseTokenName, chainId, true);
+  await registerHyperchain(deployer, onlyVerifier, extraFacets, gasPrice, baseTokenName, chainId, true);
   await registerTestDAValidators(deployer);
 }
 
@@ -238,7 +235,7 @@ export async function initialEraTestnetDeploymentProcess(
   );
   await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZKChainDiamondCut());
 
-  await registerZKChain(deployer, false, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString(), true);
+  await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString(), true);
   return deployer;
 }
 

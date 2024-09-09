@@ -98,7 +98,7 @@ export async function initialBridgehubDeployment(
   await deployer.setChainTypeManagerInValidatorTimelock({ gasPrice });
 }
 
-export async function registerZKChain(
+export async function registerHyperchain(
   deployer: Deployer,
   validiumMode: boolean,
   extraFacets: FacetCut[],
