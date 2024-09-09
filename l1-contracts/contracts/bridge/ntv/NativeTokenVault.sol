@@ -31,15 +31,15 @@ import {EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupporte
 abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
-    /// @dev Contract that stores the implementation address for token.
-    /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
-    IBeacon public bridgedTokenBeacon;
-
     /// @dev The address of the WETH token.
     address public immutable override WETH_TOKEN;
 
     /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
     IAssetRouterBase public immutable override ASSET_ROUTER;
+
+    /// @dev Contract that stores the implementation address for token.
+    /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
+    IBeacon public bridgedTokenBeacon;
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
@@ -105,6 +105,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes32 _assetId,
         bytes calldata _data
     ) external payable override onlyAssetRouter whenNotPaused {
+        // We use chainBalance too differentiate between native and bridged tokens.
         // Either it was locked before, therefore is not zero, or it is sent from remote chain and standard erc20 will be deployed
         // Note: if the chainBalance has not been migrated and is 0, then the assetId check will fail as the token's origin chain is not chain that sent the message.
         // Note: after interop is implemented this will not work.
@@ -112,6 +113,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         address receiver;
         uint256 amount;
         if (chainBalance[_chainId][token] > 0) {
+            // kl todo we will implement chainBalance for bridged tokens as well. Rewrite this.
             (receiver, amount) = _bridgeMintNativeToken(_chainId, _assetId, _data);
         } else {
             (receiver, amount) = _bridgeMintBridgedToken(_chainId, _assetId, _data);
@@ -125,7 +127,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes32 _assetId,
         bytes calldata _data
     ) internal virtual returns (address receiver, uint256 amount) {
-        // Either it was locked before, therefore is not zero, or it is sent from remote chain and standard erc20 will be deployed
+        // Either it was bridged before, therefore address is not zero, or it is first time bridging and standard erc20 will be deployed
         address token = tokenAddress[_assetId];
         bytes memory erc20Data;
         address originToken;
@@ -145,7 +147,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes32 _assetId,
         bytes calldata _data
     ) internal returns (address receiver, uint256 amount) {
-        // Either it was locked before, therefore is not zero, or it is sent from remote chain and standard erc20 will be deployed
         address token = tokenAddress[_assetId];
         (amount, receiver) = abi.decode(_data, (uint256, address));
         // Check that the chain has sufficient balance
@@ -167,6 +168,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             // Withdraw funds
             IERC20(token).safeTransfer(receiver, amount);
         }
+        emit BridgeMint(_originChainId, _assetId, receiver, amount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -323,9 +325,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes32 _assetId,
         address _originToken,
         bytes memory _erc20Data
-    ) internal virtual returns (address _token) {
-        address expectedToken = _assetIdCheck(_originChainId, _assetId, _originToken);
-        _token = _ensureTokenDeployedInner({
+    ) internal virtual returns (address expectedToken) {
+        expectedToken = _assetIdCheck(_originChainId, _assetId, _originToken);
+        _ensureTokenDeployedInner({
             _originChainId: _originChainId,
             _assetId: _assetId,
             _originToken: _originToken,
@@ -353,7 +355,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         address _originToken,
         bytes memory _erc20Data,
         address _expectedToken
-    ) internal returns (address) {
+    ) internal {
         address deployedToken = _deployBridgedToken(_originChainId, _originToken, _erc20Data);
         if (deployedToken != _expectedToken) {
             revert AddressMismatch(_expectedToken, deployedToken);
@@ -361,7 +363,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
         isTokenBridged[_assetId] = true;
         tokenAddress[_assetId] = _expectedToken;
-        return _expectedToken;
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.

@@ -30,7 +30,7 @@ interface IAssetHandler {
     /// @notice Burns bridged tokens and returns the calldata for L2 -> L1 message.
     /// @dev In case of native token vault _data is the tuple of _depositAmount and _l2Receiver.
     /// @param _chainId the chainId that the message will be sent to
-    /// @param _msgValue the msg.value of the L2 transaction
+    /// @param _msgValue the msg.value of the L2 transaction. For now it is always 0.
     /// @param _assetId the assetId of the asset being bridged
     /// @param _prevMsgSender the original caller of the Bridgehub,
     /// @param _data the actual data specified for the function

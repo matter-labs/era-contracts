@@ -46,13 +46,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
 
     /// @notice Checks that the message sender is the L1 Asset Router.
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _originChainId) {
-        if (msg.sender == address(this)) {} else if (_originChainId == L1_CHAIN_ID) {
+        if (_originChainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1AssetRouter) {
+            if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1AssetRouter) && (msg.sender != address(this))) {
                 revert InvalidCaller(msg.sender);
             }
-        } else if (msg.sender != address(this)) {
-            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
         }
         _;
     }

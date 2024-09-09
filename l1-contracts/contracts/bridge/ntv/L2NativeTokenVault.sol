@@ -93,14 +93,14 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @param _assetId The asset ID.
     /// @param _originToken The origin token address.
     /// @param _erc20Data The ERC20 data.
-    /// @return _token The token address.
+    /// @return expectedToken The token address.
     function _ensureTokenDeployed(
         uint256 _originChainId,
         bytes32 _assetId,
         address _originToken,
         bytes memory _erc20Data
-    ) internal override returns (address _token) {
-        address expectedToken = _assetIdCheck(_originChainId, _assetId, _originToken);
+    ) internal override returns (address expectedToken) {
+        expectedToken = _assetIdCheck(_originChainId, _assetId, _originToken);
         address l1LegacyToken;
         if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
             l1LegacyToken = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(expectedToken); // kl todo
@@ -112,9 +112,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
                 revert AddressMismatch(_originToken, l1LegacyToken);
             }
             tokenAddress[_assetId] = expectedToken;
-            _token = expectedToken;
         } else {
-            _token = super._ensureTokenDeployedInner({
+            super._ensureTokenDeployedInner({
                 _originChainId: _originChainId,
                 _assetId: _assetId,
                 _originToken: _originToken,
