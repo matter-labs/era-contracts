@@ -75,6 +75,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         }
         bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
         tokenAddress[BASE_TOKEN_ASSET_ID] = ETH_TOKEN_ADDRESS;
+        isTokenNative[BASE_TOKEN_ASSET_ID] = true;
         _transferOwnership(_owner);
     }
 
@@ -106,7 +107,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _targetChainId The chain ID of the corresponding ZK chain.
     function updateChainBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
         uint256 sharedBridgeChainBalance = L1_NULLIFIER.__DEPRECATED_chainBalance(_targetChainId, _token);
-        chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + sharedBridgeChainBalance;
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
+        chainBalance[_targetChainId][assetId] = chainBalance[_targetChainId][assetId] + sharedBridgeChainBalance;
         L1_NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
     }
 
@@ -152,10 +154,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         }
 
         // check that the chain has sufficient balance
-        if (chainBalance[_chainId][l1Token] < _amount) {
+        if (chainBalance[_chainId][_assetId] < _amount) {
             revert InsufficientChainBalance();
         }
-        chainBalance[_chainId][l1Token] -= _amount;
+        chainBalance[_chainId][_assetId] -= _amount;
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;

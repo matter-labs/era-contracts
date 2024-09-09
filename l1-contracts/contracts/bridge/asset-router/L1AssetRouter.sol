@@ -419,7 +419,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         // First branch covers the case when asset is not registered with NTV (custom asset handler)
         // Second branch handles tokens registered with NTV and uses legacy calldata encoding
         // We need to use the legacy encoding to support the old SDK, which relies on a specific encoding of the data.
-        if ((nativeTokenVault.tokenAddress(_assetId) == address(0)) || (nativeTokenVault.isTokenBridged(_assetId))) {
+        if ((nativeTokenVault.tokenAddress(_assetId) == address(0)) || (!nativeTokenVault.isTokenNative(_assetId))) {
             return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
         } else {
             // slither-disable-next-line unused-return

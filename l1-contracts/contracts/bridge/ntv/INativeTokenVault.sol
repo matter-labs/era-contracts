@@ -18,10 +18,10 @@ interface INativeTokenVault {
     function ASSET_ROUTER() external view returns (IAssetRouterBase);
 
     /// @notice Returns the total number of specific tokens locked for some chain
-    function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
+    function chainBalance(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 
     /// @notice Returns if the bridged version of bridged token has been deployed
-    function isTokenBridged(bytes32 assetId) external view returns (bool);
+    function isTokenNative(bytes32 assetId) external view returns (bool);
 
     /// @notice Used to register a token in the vault
     function registerToken(address _l1Token) external;

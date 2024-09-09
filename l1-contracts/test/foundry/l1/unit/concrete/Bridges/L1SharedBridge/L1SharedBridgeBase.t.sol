@@ -17,6 +17,7 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "contract
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 contract L1AssetRouterTestBase is L1AssetRouterTest {
     using stdStorage for StdStorage;
@@ -458,22 +459,23 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     }
 
     function test_safeTransferFundsFromSharedBridge_Erc() public {
-        uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, address(token));
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
+        uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, assetId);
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, false, true, address(token));
         emit IERC20.Transfer(address(l1Nullifier), address(nativeTokenVault), amount);
         nativeTokenVault.transferFundsFromSharedBridge(address(token));
         nativeTokenVault.updateChainBalancesFromSharedBridge(address(token), chainId);
-        uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, address(token));
+        uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, assetId);
         assertEq(endBalanceNtv - startBalanceNtv, amount);
     }
 
     function test_safeTransferFundsFromSharedBridge_Eth() public {
         uint256 startEthBalanceNtv = address(nativeTokenVault).balance;
-        uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ADDRESS);
+        uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ASSET_ID);
         nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
         nativeTokenVault.updateChainBalancesFromSharedBridge(ETH_TOKEN_ADDRESS, chainId);
-        uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ADDRESS);
+        uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ASSET_ID);
         uint256 endEthBalanceNtv = address(nativeTokenVault).balance;
         assertEq(endBalanceNtv - startBalanceNtv, amount);
         assertEq(endEthBalanceNtv - startEthBalanceNtv, amount);

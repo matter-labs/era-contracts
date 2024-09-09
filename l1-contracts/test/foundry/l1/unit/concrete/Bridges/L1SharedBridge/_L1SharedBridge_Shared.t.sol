@@ -259,11 +259,12 @@ contract L1AssetRouterTest is Test {
     }
 
     function _setNativeTokenVaultChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
         stdstore
             .target(address(nativeTokenVault))
             .sig(nativeTokenVault.chainBalance.selector)
             .with_key(_chainId)
-            .with_key(_token)
+            .with_key(assetId)
             .checked_write(_value);
     }
 

@@ -46,13 +46,13 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
-    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance; // kl todo maybe assetId is better?
+    mapping(uint256 chainId => mapping(bytes32 token => uint256 balance)) public chainBalance;
 
     /// @dev A mapping assetId => tokenAddress
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
     /// @dev A mapping assetId => isTokenBridged
-    mapping(bytes32 assetId => bool bridged) public isTokenBridged; // kl todo should we have isTokenNativeInstead
+    mapping(bytes32 assetId => bool bridged) public isTokenNative;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -92,6 +92,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
         ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
         tokenAddress[assetId] = _nativeToken;
+        isTokenNative[assetId] = true;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -108,15 +109,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes32 _assetId,
         bytes calldata _data
     ) external payable override onlyAssetRouter whenNotPaused {
-        // We use chainBalance too differentiate between native and bridged tokens.
-        // Either it was locked before, therefore is not zero, or it is sent from remote chain and standard erc20 will be deployed
-        // Note: if the chainBalance has not been migrated and is 0, then the assetId check will fail as the token's origin chain is not chain that sent the message.
-        // Note: after interop is implemented this will not work.
-        address token = tokenAddress[_assetId];
         address receiver;
         uint256 amount;
-        if (chainBalance[_chainId][token] > 0) {
-            // kl todo we will implement chainBalance for bridged tokens as well. Rewrite this.
+        if (isTokenNative[_assetId]) {
             (receiver, amount) = _bridgeMintNativeToken(_chainId, _assetId, _data);
         } else {
             (receiver, amount) = _bridgeMintBridgedToken(_chainId, _assetId, _data);
@@ -153,10 +148,10 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         address token = tokenAddress[_assetId];
         (amount, receiver) = abi.decode(_data, (uint256, address));
         // Check that the chain has sufficient balance
-        if (chainBalance[_originChainId][token] < amount) {
+        if (chainBalance[_originChainId][_assetId] < amount) {
             revert InsufficientChainBalance();
         }
-        chainBalance[_originChainId][token] -= amount;
+        chainBalance[_originChainId][_assetId] -= amount;
 
         _withdrawFunds(_assetId, receiver, token, amount);
         emit BridgeMint(_originChainId, _assetId, receiver, amount);
@@ -178,7 +173,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         address _prevMsgSender,
         bytes calldata _data
     ) external payable override onlyAssetRouter whenNotPaused returns (bytes memory _bridgeMintData) {
-        if (isTokenBridged[_assetId]) {
+        if (!isTokenNative[_assetId]) {
             _bridgeMintData = _bridgeBurnBridgedToken(_chainId, _assetId, _prevMsgSender, _data);
         } else {
             _bridgeMintData = _bridgeBurnNativeToken({
@@ -259,7 +254,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             revert EmptyDeposit();
         }
 
-        chainBalance[_chainId][nativeToken] += amount;
+        chainBalance[_chainId][_assetId] += amount;
 
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
             _prevMsgSender: _prevMsgSender,
@@ -354,7 +349,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             revert AddressMismatch(_expectedToken, deployedToken);
         }
 
-        isTokenBridged[_assetId] = true;
         tokenAddress[_assetId] = _expectedToken;
     }
 

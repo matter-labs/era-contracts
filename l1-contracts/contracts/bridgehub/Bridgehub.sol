@@ -566,6 +566,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         );
     }
 
+    /// @notice This function is used to send a request to the ZK chain.
+    /// @param _chainId the chainId of the chain
+    /// @param _refundRecipient the refund recipient
+    /// @param _request the request
+    /// @return canonicalTxHash the canonical transaction hash
     function _sendRequest(
         uint256 _chainId,
         address _refundRecipient,

@@ -941,9 +941,6 @@ export class Deployer {
     }
 
     this.addresses.Bridges.BridgedStandardERC20Implementation = contractAddress;
-
-    // let bridgedStandardERC20 = BridgedStandardERC20Factory.connect(contractAddress, this.deployWallet);
-    // await bridgedStandardERC20.transferOwnership(this.addresses.Governance);
   }
 
   public async deployBridgedTokenBeacon(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {

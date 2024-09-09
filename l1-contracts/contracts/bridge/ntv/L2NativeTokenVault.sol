@@ -60,7 +60,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         L1_CHAIN_ID = _l1ChainId;
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
-        _disableInitializers();
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
             revert EmptyBytes32();
         }
@@ -182,16 +181,17 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     ) public view override(INativeTokenVault, NativeTokenVault) returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
-        address deployerAddress = address(L2_LEGACY_SHARED_BRIDGE) == address(0)
-            ? address(this)
-            : address(L2_LEGACY_SHARED_BRIDGE);
-        return
-            L2ContractHelper.computeCreate2Address(
-                deployerAddress,
-                salt,
-                l2TokenProxyBytecodeHash,
-                constructorInputHash
-            );
+        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
+            return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_l1Token);
+        } else {
+            return
+                L2ContractHelper.computeCreate2Address(
+                    address(this),
+                    salt,
+                    l2TokenProxyBytecodeHash,
+                    constructorInputHash
+                );
+        }
     }
 
     /// @notice Calculates the salt for the Create2 deployment of the L2 token.

@@ -610,7 +610,6 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         if (s.chainId != ERA_CHAIN_ID) {
             revert OnlyEraSupported();
         }
-        // slither-disable-next-line unused-return
         IL1AssetRouter(s.baseTokenBridge).finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
             _l2BatchNumber: _l2BatchNumber,
