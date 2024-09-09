@@ -8,7 +8,7 @@ import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
-
+import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 
@@ -155,7 +155,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
 
         bytes memory message = _getL1WithdrawMessage(_assetId, _l1bridgeMintData);
         // slither-disable-next-line unused-return
-        L2ContractHelper.sendMessageToL1(message);
+        if (L2_LEGACY_SHARED_BRIDGE != address(0)) {
+            L2ContractHelper.sendMessageToL1(message);
+        } else {
+            IL2SharedBridgeLegacy(L2_LEGACY_SHARED_BRIDGE).sendMessageToL1(message);
+        }
 
         emit WithdrawalInitiatedAssetRouter(L1_CHAIN_ID, _sender, _assetId, _assetData);
     }

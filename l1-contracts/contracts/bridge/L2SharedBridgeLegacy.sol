@@ -50,6 +50,13 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         _;
     }
 
+    modifier onlyAssetRouter() {
+        if (msg.sender != L2_ASSET_ROUTER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     constructor(uint256 _eraChainId) {
         ERA_CHAIN_ID = _eraChainId;
         _disableInitializers();
@@ -149,5 +156,9 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
             revert DeployFailed();
         }
         proxy = abi.decode(returndata, (address));
+    }
+
+    function sendMessageToL1(bytes calldata _message) external override onlyAssetRouter {
+        L2ContractHelper.sendMessageToL1(_message);
     }
 }

@@ -16,4 +16,6 @@ interface IL2SharedBridgeLegacy {
     function l1SharedBridge() external view returns (address);
 
     function deployBeaconProxy(bytes32 _salt) external returns (address);
+
+    function sendMessageToL1(bytes calldata _message) external;
 }
