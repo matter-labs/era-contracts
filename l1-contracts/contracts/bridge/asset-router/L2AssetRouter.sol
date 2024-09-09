@@ -31,9 +31,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     /// @dev The address of the L1 asset router counterpart.
     address public override l1AssetRouter;
 
-    /// @dev A mapping of asset ID to asset handler address
-    // mapping(bytes32 assetId => address assetHandlerAddress) public override assetHandlerAddress;
-
     /// @notice Checks that the message sender is the L1 Asset Router.
     modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
         if (_originChainId == L1_CHAIN_ID) {
@@ -103,17 +100,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            INITIATTE DEPOSIT Functions
-    //////////////////////////////////////////////////////////////*/
-
-    /*//////////////////////////////////////////////////////////////
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Finalize the deposit and mint funds
     /// @param _assetId The encoding of the asset on L2
     /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken)
-    // kl todo. FinalizeDeposit functions.
     function finalizeDeposit(
         // solhint-disable-next-line no-unused-vars
         uint256,

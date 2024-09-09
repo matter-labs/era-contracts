@@ -419,6 +419,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     ) public view override returns (bytes memory) {
         // First branch covers the case when asset is not registered with NTV (custom asset handler)
         // Second branch handles tokens registered with NTV and uses legacy calldata encoding
+        // We need to use the legacy encoding to support the old SDK, which relies on a specific encoding of the data.
         if ((nativeTokenVault.tokenAddress(_assetId) == address(0)) || (nativeTokenVault.isTokenBridged(_assetId))) {
             return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
         } else {
@@ -534,6 +535,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override {
+        /// @dev We use a deprecated field to support L2->L1 legacy withdrawals, which were started
+        /// by the legacy bridge.
         address legacyL2Bridge = L1_NULLIFIER.__DEPRECATED_l2BridgeAddress(_chainId);
         FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
             chainId: _chainId,
