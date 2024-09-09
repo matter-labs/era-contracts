@@ -11,8 +11,6 @@ import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 interface INativeTokenVault {
     event BridgedTokenBeaconUpdated(address bridgedTokenBeacon, bytes32 bridgedTokenProxyBytecodeHash);
 
-    // function setBridgedTokenBeacon() external;
-
     /// @notice The Weth token address
     function WETH_TOKEN() external view returns (address);
 

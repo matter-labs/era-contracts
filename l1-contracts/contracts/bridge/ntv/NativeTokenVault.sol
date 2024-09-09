@@ -77,17 +77,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         WETH_TOKEN = _wethToken;
     }
 
-    /// @notice Sets token beacon used by bridged ERC20 tokens deployed by NTV.
-    /// @dev we don't call this in the constructor, as we need to provide factory deps
-    // function setBridgedTokenBeacon() external {
-    //     if (address(bridgedTokenBeacon) != address(0)) {
-    //         revert AddressMismatch(address(bridgedTokenBeacon), address(0));
-    //     }
-    //     address bridgedStandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
-    //     bridgedTokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(bridgedStandardToken);
-    //     bridgedTokenBeacon.transferOwnership(owner());
-    // }
-
     /// @notice Registers tokens within the NTV.
     /// @dev The goal was to allow bridging native tokens automatically, by registering them on the fly.
     /// @notice Allows the bridge to register a token address for the vault.
@@ -149,8 +138,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
         IBridgedStandardToken(token).bridgeMint(receiver, amount);
         emit BridgeMint(_originChainId, _assetId, receiver, amount);
-        /// backwards compatible event
-        // emit FinalizeDeposit(sender, receiver, token, amount);
     }
 
     function _bridgeMintNativeToken(

@@ -50,6 +50,8 @@ interface IAssetRouterBase {
 
     event AssetHandlerRegistered(bytes32 indexed assetId, address indexed _assetAddress);
 
+    event DepositFinalizedAssetRouter(uint256 chainId, bytes32 indexed assetId, bytes assetData);
+
     function BRIDGE_HUB() external view returns (IBridgehub);
 
     function BASE_TOKEN_ADDRESS() external view returns (address);

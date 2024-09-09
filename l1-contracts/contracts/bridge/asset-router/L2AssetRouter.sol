@@ -122,7 +122,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
     ) public override onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID) {
         _finalizeDeposit(L1_CHAIN_ID, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
 
-        emit FinalizeDepositSharedBridge(L1_CHAIN_ID, _assetId, _transferData);
+        emit DepositFinalizedAssetRouter(L1_CHAIN_ID, _assetId, _transferData);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -157,7 +157,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter {
         // slither-disable-next-line unused-return
         L2ContractHelper.sendMessageToL1(message);
 
-        emit WithdrawalInitiatedSharedBridge(L1_CHAIN_ID, _sender, _assetId, _assetData);
+        emit WithdrawalInitiatedAssetRouter(L1_CHAIN_ID, _sender, _assetId, _assetData);
     }
 
     /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.

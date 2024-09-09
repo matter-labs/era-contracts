@@ -311,9 +311,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes calldata _transferData
     ) public override(AssetRouterBase, IAssetRouterBase) onlyNullifier {
         _finalizeDeposit(_chainId, _assetId, _transferData, address(nativeTokenVault));
-
-        // emit DepositFinalizedAssetRouter(_chainId, l1Receiver, _assetId, amount);
-        emit WithdrawalFinalizedAssetRouter(_chainId, _assetId, new bytes(0)); // kl todo
+        emit DepositFinalizedAssetRouter(_chainId, _assetId, _transferData);
     }
 
     /*//////////////////////////////////////////////////////////////
