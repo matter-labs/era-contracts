@@ -135,7 +135,6 @@ contract GatewayScript is Script {
         vm.stopPrank();
 
         vm.startPrank(ownable.owner());
-        console.log("ADDRESS TO BE WHITELISTED:", ownableStmDT.owner());
         GatewayTransactionFilterer(transactionFiltererProxy).grantWhitelist(ownableStmDT.owner());
         GatewayTransactionFilterer(transactionFiltererProxy).grantWhitelist(chainL2.getAdmin());
         GatewayTransactionFilterer(transactionFiltererProxy).grantWhitelist(config.sharedBridgeProxy);
@@ -204,8 +203,8 @@ contract GatewayScript is Script {
 
     function registerL2Contracts() public {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        Ownable ownable = Ownable(config.ctmDeploymentTracker);
-        // IChainTypeManager ctm = IChainTypeManager(config.stateTransitionProxy);
+        Ownable ownable = Ownable(config.stmDeploymentTracker);
+        // IStateTransitionManager stm = IStateTransitionManager(config.stateTransitionProxy);
 
         uint256 gasPrice = 10;
         uint256 l2GasLimit = 72000000;
