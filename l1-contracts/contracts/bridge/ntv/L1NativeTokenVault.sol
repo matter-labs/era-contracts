@@ -115,8 +115,18 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     ) internal override returns (bytes memory _bridgeMintData) {
         uint256 _depositAmount;
         (_depositAmount, ) = abi.decode(_data, (uint256, address));
-        bool depositChecked = IL1AssetRouter(address(ASSET_ROUTER)).transferFundsToNTV(_assetId, _depositAmount, _prevMsgSender);
-        _bridgeMintData = super._bridgeBurnNativeToken(_chainId, _assetId, _prevMsgSender, depositChecked, _data);
+        bool depositChecked = IL1AssetRouter(address(ASSET_ROUTER)).transferFundsToNTV(
+            _assetId,
+            _depositAmount,
+            _prevMsgSender
+        );
+        _bridgeMintData = super._bridgeBurnNativeToken({
+            _chainId: _chainId,
+            _assetId: _assetId,
+            _prevMsgSender: _prevMsgSender,
+            _depositChecked: depositChecked,
+            _data: _data
+        });
     }
 
     ///  @inheritdoc IL1AssetHandler

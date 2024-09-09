@@ -186,7 +186,13 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         if (isTokenBridged[_assetId]) {
             _bridgeMintData = _bridgeBurnBridgedToken(_chainId, _assetId, _prevMsgSender, _data);
         } else {
-            _bridgeMintData = _bridgeBurnNativeToken(_chainId, _assetId, _prevMsgSender, false, _data);
+            _bridgeMintData = _bridgeBurnNativeToken({
+                _chainId: _chainId,
+                _assetId: _assetId,
+                _prevMsgSender: _prevMsgSender,
+                _depositChecked: false,
+                _data: _data
+            });
         }
     }
 
