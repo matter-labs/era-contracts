@@ -133,6 +133,10 @@ export interface DeployedAddresses {
     NativeTokenVaultImplementation: string;
     NativeTokenVaultProxy: string;
   };
+  TransactionFilterer: {
+    TxFiltererImplementation: string;
+    TxFiltererProxy: string;
+  };
   BaseTokenAssetId: string;
   BaseToken: string;
   TransparentProxyAdmin: string;
@@ -191,6 +195,10 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       L2SharedBridgeProxy: getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR"),
       NativeTokenVaultImplementation: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_IMPL_ADDR"),
       NativeTokenVaultProxy: getAddressFromEnv("CONTRACTS_L1_NATIVE_TOKEN_VAULT_PROXY_ADDR"),
+    },
+    TransactionFilterer: {
+      TxFiltererImplementation: getAddressFromEnv("CONTRACTS_TX_FILTERER_IMPL_ADDR"),
+      TxFiltererProxy: getAddressFromEnv("CONTRACTS_TX_FILTERER_PROXY_ADDR"),
     },
     RollupL1DAValidator: getAddressFromEnv("CONTRACTS_L1_ROLLUP_DA_VALIDATOR"),
     ValidiumL1DAValidator: getAddressFromEnv("CONTRACTS_L1_VALIDIUM_DA_VALIDATOR"),
