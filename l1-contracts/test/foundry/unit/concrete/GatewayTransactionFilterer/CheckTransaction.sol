@@ -73,7 +73,7 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
         vm.stopPrank();
     }
 
-    function test_TransactionFailesWithInvalidSelectorEvenIfTheSenderIsAR() public {
+    function test_TransactionFailsWithInvalidSelectorEvenIfTheSenderIsAR() public {
         bytes memory txCalladata = abi.encodeCall(IL2Bridge.withdraw, (bytes32("0x12345"), bytes("0x23456")));
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, IL2Bridge.withdraw.selector));

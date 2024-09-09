@@ -85,7 +85,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
             if (IL2Bridge.finalizeDeposit.selector != l2TxSelector) {
                 revert InvalidSelector(l2TxSelector);
             }
-            
+
             (bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (bytes32, bytes));
             address stmAddress = bridgeHub.stmAssetIdToAddress(decodedAssetId);
             return (stmAddress != address(0));
