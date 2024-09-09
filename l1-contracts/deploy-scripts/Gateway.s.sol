@@ -119,9 +119,9 @@ contract GatewayScript is Script {
     function registerGateway() public {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         Ownable ownable = Ownable(config.bridgehub);
-        Ownable ownableStmDT = Ownable(config.stmDeploymentTracker);
-        IZkSyncHyperchain chainL2 = IZkSyncHyperchain(bridgehub.getHyperchain(config.chainChainId));
-        IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(config.gatewayChainId));
+        Ownable ownableStmDT = Ownable(config.ctmDeploymentTracker);
+        IZKChain chainL2 = IZKChain(bridgehub.getZKChain(config.chainChainId));
+        IZKChain chain = IZKChain(bridgehub.getZKChain(config.gatewayChainId));
         vm.startPrank(chain.getAdmin());
         GatewayTransactionFilterer transactionFiltererImplementation = new GatewayTransactionFilterer(
             IBridgehub(config.bridgehub),
@@ -206,7 +206,7 @@ contract GatewayScript is Script {
 
     function registerL2Contracts() public {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        Ownable ownable = Ownable(config.stmDeploymentTracker);
+        Ownable ownable = Ownable(config.ctmDeploymentTracker);
         // IStateTransitionManager stm = IStateTransitionManager(config.stateTransitionProxy);
 
         uint256 gasPrice = 10;

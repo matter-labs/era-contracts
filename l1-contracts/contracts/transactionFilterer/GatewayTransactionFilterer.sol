@@ -7,7 +7,6 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
-import {IZkSyncHyperchain} from "../state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IL2Bridge} from "../bridge/interfaces/IL2Bridge.sol";
 
@@ -87,7 +86,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
             }
 
             (bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (bytes32, bytes));
-            address stmAddress = bridgeHub.stmAssetIdToAddress(decodedAssetId);
+            address stmAddress = bridgeHub.ctmAssetIdToAddress(decodedAssetId);
             return (stmAddress != address(0));
         }
 

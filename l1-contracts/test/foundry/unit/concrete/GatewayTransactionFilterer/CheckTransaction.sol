@@ -14,7 +14,7 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
         vm.startPrank(owner);
         vm.mockCall(
             bridgehub,
-            abi.encodeWithSelector(IBridgehub.stmAssetIdToAddress.selector),
+            abi.encodeWithSelector(IBridgehub.ctmAssetIdToAddress.selector),
             abi.encode(address(0)) // Return any address
         );
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
@@ -54,7 +54,7 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
         vm.startPrank(owner);
         vm.mockCall(
             bridgehub,
-            abi.encodeWithSelector(IBridgehub.stmAssetIdToAddress.selector),
+            abi.encodeWithSelector(IBridgehub.ctmAssetIdToAddress.selector),
             abi.encode(stm) // Return random address
         );
 
