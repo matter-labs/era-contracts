@@ -55,7 +55,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
 
     modifier onlyL1() {
         if (block.chainid != L1_CHAIN_ID) {
-            revert NotL1(block.chainid );
+            revert NotL1(block.chainid);
         }
         _;
     }

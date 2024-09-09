@@ -365,7 +365,10 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         if (_isFirstInBatch) {
             uint128 currentBatchTimestamp = currentBatchInfo.timestamp;
             if (_l2BlockTimestamp < currentBatchTimestamp) {
-                revert TimestampOfL2BlockMustBeGreaterThanOrEqualToTimestampOfCurrentBatch(_l2BlockTimestamp, currentBatchTimestamp);
+                revert TimestampOfL2BlockMustBeGreaterThanOrEqualToTimestampOfCurrentBatch(
+                    _l2BlockTimestamp,
+                    currentBatchTimestamp
+                );
             }
             if (_maxVirtualBlocksToCreate <= 0) {
                 revert ThereMustBeVirtualBlockCreatedAtStartOfBatch();
@@ -385,10 +388,13 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
                 revert CannotReuseL2BlockNumberFromPreviousBatch();
             }
             if (currentL2BlockTimestamp != _l2BlockTimestamp) {
-                revert TimestampOfSameL2BlockMustBeSame( _l2BlockTimestamp, currentL2BlockTimestamp);
+                revert TimestampOfSameL2BlockMustBeSame(_l2BlockTimestamp, currentL2BlockTimestamp);
             }
             if (_expectedPrevL2BlockHash != _getLatest257L2blockHash(_l2BlockNumber - 1)) {
-                revert PreviousHashOfSameL2BlockMustBeSame(_expectedPrevL2BlockHash, _getLatest257L2blockHash(_l2BlockNumber - 1));
+                revert PreviousHashOfSameL2BlockMustBeSame(
+                    _expectedPrevL2BlockHash,
+                    _getLatest257L2blockHash(_l2BlockNumber - 1)
+                );
             }
             if (_maxVirtualBlocksToCreate != 0) {
                 revert CannotCreateVirtualBlocksInMiddleOfMiniblock();
@@ -408,7 +414,10 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
                 revert CurrentL2BlockHashIsIncorrect(_expectedPrevL2BlockHash, pendingL2BlockHash);
             }
             if (_l2BlockTimestamp <= currentL2BlockTimestamp) {
-                revert TimestampOfNewL2BlockMustBeGreaterThanTimestampOfPreviousL2Block(_l2BlockTimestamp, currentL2BlockTimestamp);
+                revert TimestampOfNewL2BlockMustBeGreaterThanTimestampOfPreviousL2Block(
+                    _l2BlockTimestamp,
+                    currentL2BlockTimestamp
+                );
             }
 
             // Since the new block is created, we'll clear out the rolling hash
