@@ -9,7 +9,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {PriorityQueue} from "../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../state-transition/libraries/PriorityTree.sol";
-import {GatewayUpgradeUpgradeExternal, GatewayUpgradeUpgradeFailed} from "./ZkSyncUpgradeErrors.sol";
+import {GatewayUpgradeInvalidMsgSender, GatewayUpgradeFailed} from "./ZkSyncUpgradeErrors.sol";
 
 import {IGatewayUpgrade} from "./IGatewayUpgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
@@ -79,7 +79,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade {
         );
         // solhint-disable-next-line gas-custom-errors
         if (!success) {
-            revert GatewayUpgradeUpgradeFailed();
+            revert GatewayUpgradeFailed();
         }
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }

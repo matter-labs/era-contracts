@@ -18,22 +18,22 @@ error PointEvalCallFailed(bytes);
 // 0x4daa985d
 error PointEvalFailed(bytes);
 
-error OperatorDAInputLengthTooSmall();
+error OperatorDAInputLengthTooSmall(uint256 operatorDAInputLength, uint256 blobDataOffset);
 
-error InvalidNumberOfBlobs();
+error InvalidNumberOfBlobs(uint256 blobsProvided, uint256 maxBlobsSupported);
 
-error InvalidBlobsHashes();
+error InvalidBlobsHashes(uint256 operatorDAInputLength, uint256 blobsProvided);
 
 error InvalidL2DAOutputHash();
 
 error OneBlobWithCalldata();
 
-error PubdataInputTooSmall();
+error PubdataInputTooSmall(uint256 pubdataInputLength, uint256 blobCommitmentSize);
 
-error PubdataLengthTooBig();
+error PubdataLengthTooBig(uint256 pubdataLength, uint256 blobSizeBytes);
 
-error InvalidPubdataHash();
+error InvalidPubdataHash(bytes32 fullPubdataHash , bytes32 pubdata);
 
 error BlobCommitmentNotPublished();
 
-error ValL1DAWrongInputLength();
+error ValL1DAWrongInputLength(uint256 operatorDAInputLength, uint256 expected);

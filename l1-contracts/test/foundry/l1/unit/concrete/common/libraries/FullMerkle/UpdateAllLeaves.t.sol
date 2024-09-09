@@ -19,7 +19,7 @@ contract UpdateAllLeavesTest is FullMerkleTest {
         newLeaves[2] = keccak256("New Leaf 2");
 
         // Updating all leaves with wrong length
-        vm.expectRevert(MerkleWrongLength.selector);
+        vm.expectRevert(abi.encodeWithSelector(MerkleWrongLength.selector, newLeaves.length, 10));
         merkleTest.updateAllLeaves(newLeaves);
     }
 

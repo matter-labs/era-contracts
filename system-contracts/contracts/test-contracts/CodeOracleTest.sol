@@ -27,7 +27,7 @@ contract CodeOracleTest {
 
         // Check the returned bytecode
         if (keccak256(returnedBytecode) != _expectedBytecodeHash) {
-            revert ReturnedBytecodeDoesNotMatchExpectedHash();
+            revert ReturnedBytecodeDoesNotMatchExpectedHash(keccak256(returnedBytecode), _expectedBytecodeHash);
         }
     }
 
@@ -39,10 +39,10 @@ contract CodeOracleTest {
         uint256 thirdCallCost = this.callCodeOracle(_versionedHash, _expectedBytecodeHash);
 
         if (secondCallCost >= firstCallCost) {
-            revert SecondCallShouldHaveCostLessGas();
+            revert SecondCallShouldHaveCostLessGas(secondCallCost, firstCallCost);
         }
         if (thirdCallCost != secondCallCost) {
-            revert ThirdCallShouldHaveSameGasCostAsSecondCall();
+            revert ThirdCallShouldHaveSameGasCostAsSecondCall(thirdCallCost, secondCallCost);
         }
     }
 }

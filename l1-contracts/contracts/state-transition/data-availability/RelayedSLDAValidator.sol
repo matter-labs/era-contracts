@@ -24,7 +24,7 @@ contract RelayedSLDAValidator is IL1DAValidator, CalldataDAGateway {
         // Note that this contract is only supposed to be deployed on L2, where the
         // bridgehub is predeployed at `L2_BRIDGEHUB_ADDR` address.
         if (IBridgehub(L2_BRIDGEHUB_ADDR).getZKChain(_chainId) != msg.sender) {
-            revert L1DAValidatorInvalidSender();
+            revert L1DAValidatorInvalidSender(msg.sender);
         }
     }
 

@@ -8,30 +8,30 @@ error EthTransferFailed();
 
 error NativeTokenVaultAlreadySet();
 
-error NativeTokenVault0();
+error NativeTokenVaultZeroAddress();
 
-error LegacycFD();
+error LegacyClaimDepositNotSupported();
 
-error LegacyEthWithdrawal();
+error LegacyEthWithdrawalNotSupported();
 
 error LegacyTokenWithdrawal();
 
-error WrongMsgLength();
+error WrongMsgLength(uint256 expected, uint256 length);
 
-error NotNTVorADT();
+error NotNTVorADT(address msgSender, address deploymentTracker);
 
 error AssetHandlerNotSet();
 
-error NewEncodingFormatNotYetSupportedForNTV();
+error NewEncodingFormatNotYetSupportedForNTV(address deploymentTracker, address nativeTokenVault);
 
 error AssetHandlerDoesNotExistForAssetId();
 
-error EthOnlyAcceptedFromSharedBridge();
+error EthOnlyAcceptedFromSharedBridge(address sharedBridge, address msgSender);
 
 error ZeroAmountToTransfer();
 
-error WrongAmountTransferred();
+error WrongAmountTransferred(uint256 balance, uint256 sharedBridgeBalance);
 
-error EmptyToken();
+error EmptyToken(address token, address ethTokenAddress);
 
-error ClaimFailedDepositFailed();
+error ClaimDepositFailed();

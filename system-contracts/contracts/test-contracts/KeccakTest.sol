@@ -72,7 +72,7 @@ contract KeccakTest {
             returndataSize := returndatasize()
         }
         if (returndataSize != 32) {
-            revert KeccakReturnDataSizeShouldBe32Bytes();
+            revert KeccakReturnDataSizeShouldBe32Bytes(returndataSize);
         }
 
         bytes32 result;
@@ -82,7 +82,7 @@ contract KeccakTest {
         }
 
         if (result != EMPTY_STRING_KECCAK) {
-            revert KeccakResultIsNotCorrect();
+            revert KeccakResultIsNotCorrect(result);
         }
     }
 
@@ -144,7 +144,7 @@ contract KeccakTest {
         bytes32[] calldata expectedOutputs
     ) external {
         if (testInputs.length != expectedOutputs.length) {
-            revert KeccakMismatchBetweenNumberOfInputsAndOutputs();
+            revert KeccakMismatchBetweenNumberOfInputsAndOutputs(testInputs.length, expectedOutputs.length);
         }
 
         // Firstly, we upgrade keccak256 bytecode to the correct version.
@@ -166,7 +166,7 @@ contract KeccakTest {
 
         for (uint256 i = 0; i < result.length; i++) {
             if (result[i] != expectedOutputs[i]) {
-                revert KeccakHashWasNotCalculatedCorrectly();
+                revert KeccakHashWasNotCalculatedCorrectly(result[i], expectedOutputs[i]);
             }
         }
 

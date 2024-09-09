@@ -18,7 +18,7 @@ contract ValidiumL1DAValidator is IL1DAValidator {
         // For Validiums, we expect the operator to just provide the data for us.
         // We don't need to do any checks with regard to the l2DAValidatorOutputHash.
         if (_operatorDAInput.length != 32) {
-            revert ValL1DAWrongInputLength();
+            revert ValL1DAWrongInputLength(_operatorDAInput.length, 32);
         }
         bytes32 stateDiffHash = abi.decode(_operatorDAInput, (bytes32));
 

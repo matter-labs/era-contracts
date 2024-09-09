@@ -47,7 +47,7 @@ abstract contract CalldataDA {
 
         // Check that it accommodates enough pubdata for the state diff hash, hash of pubdata + the number of blobs.
         if (_operatorDAInput.length < BLOB_DATA_OFFSET) {
-            revert OperatorDAInputTooSmall();
+            revert OperatorDAInputTooSmall(_operatorDAInput.length, BLOB_DATA_OFFSET);
         }
 
         stateDiffHash = bytes32(_operatorDAInput[:32]);
@@ -55,7 +55,7 @@ abstract contract CalldataDA {
         blobsProvided = uint256(uint8(_operatorDAInput[64]));
 
         if (blobsProvided > _maxBlobsSupported) {
-            revert InvalidNumberOfBlobs();
+            revert InvalidNumberOfBlobs(blobsProvided, _maxBlobsSupported);
         }
 
         // Note that the API of the contract requires that the returned blobs linear hashes have length of
@@ -63,7 +63,7 @@ abstract contract CalldataDA {
         blobsLinearHashes = new bytes32[](_maxBlobsSupported);
 
         if (_operatorDAInput.length < BLOB_DATA_OFFSET + 32 * blobsProvided) {
-            revert InvalidBlobsHashes();
+            revert InvalidBlobsHashes(_operatorDAInput.length, BLOB_DATA_OFFSET + 32 * blobsProvided);
         }
 
         _cloneCalldata(blobsLinearHashes, _operatorDAInput[BLOB_DATA_OFFSET:], blobsProvided);
@@ -72,7 +72,7 @@ abstract contract CalldataDA {
 
         // Now, we need to double check that the provided input was indeed returned by the L2 DA validator.
         if (keccak256(_operatorDAInput[:ptr]) != _l2DAValidatorOutputHash) {
-            revert InvalidL2DAOutputHash();
+            revert InvalidL2DAOutputHash(keccak256(_operatorDAInput[:ptr]), _l2DAValidatorOutputHash);
         }
 
         // The rest of the output was provided specifically by the operator
@@ -95,7 +95,7 @@ abstract contract CalldataDA {
             revert OnlyOneBlobWithCalldata();
         }
         if (_pubdataInput.length < BLOB_COMMITMENT_SIZE) {
-            revert PubdataTooSmall();
+            revert PubdataTooSmall(_pubdataInput.length, BLOB_COMMITMENT_SIZE);
         }
 
         // We typically do not know whether we'll use calldata or blobs at the time when
@@ -106,7 +106,7 @@ abstract contract CalldataDA {
         _pubdata = _pubdataInput[:_pubdataInput.length - BLOB_COMMITMENT_SIZE];
 
         if (_pubdata.length > BLOB_SIZE_BYTES) {
-            revert PubdataTooLong();
+            revert PubdataTooLong(_pubdata.length, BLOB_SIZE_BYTES);
         }
         if (_fullPubdataHash != keccak256(_pubdata)) {
             revert InvalidPubdataHash();

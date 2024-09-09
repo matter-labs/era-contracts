@@ -2,68 +2,66 @@
 
 pragma solidity ^0.8.21;
 
-error NotChainStm();
+error NotChainStm(address msgSender, address chainTypeManager);
 
-error NotRelayedSenser();
+error NotRelayedSender(address msgSender, address settlementLayerRelaySender);
 
-error NotAssetRouter();
+error NotAssetRouter(address msgSender, address sharedBridge);
 
 error TokenNotSet();
 
-error ChainNotLegacy();
+error ChainAlreadyPresent();
 
-error ChainAlreadyMigrated();
+error ChainIdAlreadyPresent();
 
-error ChainNotLegacy2();
+error ChainNotPresentInSTM();
 
 error AssetIdAlreadyRegistered();
 
-error NotStmDeployer();
+error NotCtmDeployer(address sender, address l1CtmDeployer);
 
-error StmNotRegistered();
+error CtmNotRegistered();
 
-error ChainIdMustNotMatchCurrentChainId();
+error ChainIdMustNotMatchCurrentChainId(uint256 chainId, uint256 blockChainId);
 
 error AssetIdNotRegistered();
 
 error ChainIdNotRegistered();
 
-error SecondBridgeAddressTooLow();
+error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 
-error NotInSyncLayerMode();
+error NotInGatewayMode();
 
 error SLNotWhitelisted();
 
-error AssetInfo1();
+error AssetInfo1(bytes32 assetId, bytes32 assetIdFromChainId);
 
-error NotCurrentSL();
+error NotCurrentSL(uint256 settlementLayerChainId, uint256 blockChainId);
 
 error HyperchainNotRegistered();
 
-error IncorrectSender();
+error IncorrectSender(address prevMsgSender, address chainAdmin);
 
 error AssetInfo2();
 
-error AlreadyCurrentSL();
+error AlreadyCurrentSL(uint256 blockChainId);
 
 error ChainExists();
 
 error MessageRootNotRegistered();
 
-error ChainIdIsThisChain();
-
-error TooManyChains();
+error TooManyChains(uint256 cachedChainCount, uint256 maxNumberOfChains);
 
 error NoEthAllowed();
 
-error NotOwner();
+error NotOwner(address sender, address owner);
 
-error WrongCounterPart();
+error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
 
-error NotL1();
+error NotL1(uint256 l1ChainId, uint256 blockChainId);
 
-error OnlyBridgehub();
+error OnlyBridgehub(address msgSender, address bridgehub);
 
-error OnlyChain();
+error OnlyChain(address msgSender, address zkChainAddress);
 
-error NotOwnerViaRouter();
+error NotOwnerViaRouter(address msgSender);

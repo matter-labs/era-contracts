@@ -74,7 +74,7 @@ contract RelayedSLDAValidatorTest is Test {
         bytes memory operatorDAInput = abi.encodePacked(daInput, pubdataSource, l1DaInput);
 
         vm.prank(CHAIN_ADDRESS);
-        vm.expectRevert(PubdataTooSmall.selector);
+        vm.expectRevert(abi.encodeWithSelector(PubdataTooSmall.selector));
         daValidator.checkDA(CHAIN_ID, 0, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
     }
 
@@ -96,7 +96,7 @@ contract RelayedSLDAValidatorTest is Test {
 
         bytes memory operatorDAInput = abi.encodePacked(daInput, pubdataSource, l1DaInput);
 
-        vm.expectRevert(L1DAValidatorInvalidSender.selector);
+        vm.expectRevert(abi.encodeWithSelector(L1DAValidatorInvalidSender.selector, this.address));
         daValidator.checkDA(CHAIN_ID, 0, l2DAValidatorOutputHash, operatorDAInput, maxBlobsSupported);
     }
 

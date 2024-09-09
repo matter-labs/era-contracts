@@ -119,69 +119,53 @@ error UpgradeTransactionMustBeFirst();
 
 error L2BlockNumberIsNeverExpectedToBeZero();
 
-error PreviousL2BlockHashIsIncorrect();
+error PreviousL2BlockHashIsIncorrect(bytes32 correctPrevBlockHash, bytes32 expectedPrevL2BlockHash);
 
 error CannotInitializeFirstVirtualBlock();
 
-error TimestampOfL2BlockMustBeGreaterThanOrEqualToTimestampOfCurrentBatch();
+error TimestampOfL2BlockMustBeGreaterThanOrEqualToTimestampOfCurrentBatch(uint128 l2BlockTimestamp, uint128 currentBatchTimestamp);
 
 error ThereMustBeVirtualBlockCreatedAtStartOfBatch();
 
 error CannotReuseL2BlockNumberFromPreviousBatch();
 
-error TimestampOfSameL2BlockMustBeSame();
+error TimestampOfSameL2BlockMustBeSame(uint128 l2BlockTimestamp, uint128 currentL2BlockTimestamp);
 
-error PreviousHashOfSameL2BlockMustBeSame();
+error PreviousHashOfSameL2BlockMustBeSame(bytes32 expectedPrevL2BlockHash, bytes32 latestL2blockHash);
 
 error CannotCreateVirtualBlocksInMiddleOfMiniblock();
 
-error CurrentL2BlockHashIsIncorrect();
+error CurrentL2BlockHashIsIncorrect(bytes32 expectedPrevL2BlockHash, bytes32 pendingL2BlockHash);
 
-error TimestampOfNewL2BlockMustBeGreaterThanTimestampOfPreviousL2Block();
+error TimestampOfNewL2BlockMustBeGreaterThanTimestampOfPreviousL2Block(uint128 l2BlockTimestamp, uint128 currentL2BlockTimestamp);
 
 error CurrentBatchNumberMustBeGreaterThanZero();
 
-error TimestampOfBatchMustBeGreaterThanTimestampOfPreviousBlock();
+error TimestampOfBatchMustBeGreaterThanTimestampOfPreviousBlock(uint128 newTimestamp, uint128 currentBlockTimestamp);
 
-error TimestampsShouldBeIncremental();
+error TimestampsShouldBeIncremental(uint128 newTimestamp, uint128 previousBatchTimestamp);
 
-error ProvidedBatchNumberIsNotCorrect();
-
-error SafeERC20ApproveFromNonZeroToNonZeroAllowance();
-
-error SafeERC20DecreasedAllowanceBelowZero();
-
-error SafeERC20PermitDidNotSucceed();
-
-error SafeERC20OperationDidNotSucceed();
-
-error AddressInsufficientBalance();
-
-error AddressUnableToSendValue();
-
-error AddressInsufficientBalanceForCall();
-
-error AddressCallToNonContract();
+error ProvidedBatchNumberIsNotCorrect(uint128 previousBatchNumber, uint128 _expectedNewNumber);
 
 error CodeOracleCallFailed();
 
-error ReturnedBytecodeDoesNotMatchExpectedHash();
+error ReturnedBytecodeDoesNotMatchExpectedHash(bytes32 returnedBytecode, bytes32 expectedBytecodeHash);
 
-error SecondCallShouldHaveCostLessGas();
+error SecondCallShouldHaveCostLessGas(uint256 secondCallCost, uint256 firstCallCost);
 
-error ThirdCallShouldHaveSameGasCostAsSecondCall();
+error ThirdCallShouldHaveSameGasCostAsSecondCall(uint256 thirdCallCost, uint256 secondCallCost);
 
 error CallToKeccakShouldHaveSucceeded();
 
-error KeccakReturnDataSizeShouldBe32Bytes();
+error KeccakReturnDataSizeShouldBe32Bytes(uint256 returnDataSize);
 
-error KeccakResultIsNotCorrect();
+error KeccakResultIsNotCorrect(bytes32 result);
 
 error KeccakShouldStartWorkingAgain();
 
-error KeccakMismatchBetweenNumberOfInputsAndOutputs();
+error KeccakMismatchBetweenNumberOfInputsAndOutputs(uint256 testInputsLength, uint256 expectedOutputsLength);
 
-error KeccakHashWasNotCalculatedCorrectly();
+error KeccakHashWasNotCalculatedCorrectly(bytes32 result, bytes32 expectedOutputs);
 
 error TransactionFailed();
 

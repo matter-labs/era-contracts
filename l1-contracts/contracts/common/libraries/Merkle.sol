@@ -77,7 +77,7 @@ library Merkle {
     ) internal pure returns (bytes32) {
         uint256 pathLength = _startPath.length;
         if (pathLength != _endPath.length) {
-            revert MerklePathLengthMismatch();
+            revert MerklePathLengthMismatch(pathLength, _endPath.length);
         }
         if (pathLength >= 256) {
             revert MerklePathOutOfBounds();

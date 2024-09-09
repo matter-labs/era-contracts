@@ -24,7 +24,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {MigrationPaused, AssetIdAlreadyRegistered, ChainAlreadyLive, ChainNotLegacy, CTMNotRegistered, ChainIdNotRegistered, AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
-import {NotChainStm, NotL1, NotRelayedSenser, NotAssetRouter, TokenNotSet, ChainNotLegacy, ChainAlreadyMigrated, ChainNotLegacy2, AssetIdAlreadyRegistered, NotStmDeployer, StmNotRegistered, ChainIdMustNotMatchCurrentChainId, AssetIdNotRegistered, ChainIdNotRegistered, SecondBridgeAddressTooLow, NotInSyncLayerMode, SLNotWhitelisted, AssetInfo1, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AssetInfo2, AlreadyCurrentSL} from "./L1BridgehubErrors.sol";
+import {NotChainStm, NotL1, NotRelayedSender, NotAssetRouter, TokenNotSet, ChainAlreadyPresent, ChainIdAlreadyPresent, ChainNotPresentInSTM, AssetIdAlreadyRegistered, NotCtmDeployer, CtmNotRegistered, ChainIdMustNotMatchCurrentChainId, AssetIdNotRegistered, ChainIdNotRegistered, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, AssetInfo1, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AssetInfo2, AlreadyCurrentSL} from "./L1BridgehubErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -242,14 +242,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function setLegacyChainAddress(uint256 _chainId) external override {
         address ctm = chainTypeManager[_chainId];
         if (ctm == address(0)) {
-            revert ChainNotLegacy();
+            revert ChainAlreadyPresent();
         }
         if (zkChainMap.contains(_chainId)) {
-            revert ChainAlreadyLive();
+            revert ChainIdAlreadyPresent();
         }
         address chainAddress = IChainTypeManager(ctm).getZKChainLegacy(_chainId);
         if (chainAddress == address(0)) {
-            revert ChainNotLegacy();
+            revert ChainNotPresentInSTM();
         }
         _registerNewZKChain(_chainId, chainAddress);
     }
@@ -598,7 +598,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint64 _expirationTimestamp
     ) external override onlySettlementLayerRelayedSender {
         if (L1_CHAIN_ID == block.chainid) {
-            revert NotInSyncLayerMode();
+            revert NotInGatewayMode();
         }
         address zkChain = zkChainMap.get(_chainId);
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
@@ -705,10 +705,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         BridgehubBurnCTMAssetData memory bridgehubData = abi.decode(_data, (BridgehubBurnCTMAssetData));
         if (_assetId != ctmAssetIdFromChainId(bridgehubData.chainId)) {
-            revert AssetInfo1();
+            revert AssetInfo1(_assetId, ctmAssetIdFromChainId(bridgeData.chainId));
         }
         if (settlementLayer[bridgehubData.chainId] != block.chainid) {
-            revert NotCurrentSL();
+            revert NotCurrentSL(settlementLayer[bridgeData.chainId], block.chainid);
         }
         settlementLayer[bridgehubData.chainId] = _settlementChainId;
 
@@ -717,7 +717,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             revert HyperchainNotRegistered();
         }
         if (_originalCaller != IZKChain(zkChain).getAdmin()) {
-            revert IncorrectSender();
+            revert IncorrectSender(_originalCaller, IZKChain(zkChain).getAdmin());
         }
 
         bytes memory ctmMintData = IChainTypeManager(chainTypeManager[bridgehubData.chainId]).forwardedBridgeBurn(
@@ -755,7 +755,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             revert AssetInfo2();
         }
         if (settlementLayer[bridgehubData.chainId] == block.chainid) {
-            revert AlreadyCurrentSL();
+            revert AlreadyCurrentSL(block.chainid);
         }
 
         settlementLayer[bridgehubData.chainId] = block.chainid;

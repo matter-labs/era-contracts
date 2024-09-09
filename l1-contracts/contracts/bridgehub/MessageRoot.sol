@@ -9,7 +9,7 @@ import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMe
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered, ChainIdIsThisChain, TooManyChains} from "./L1BridgehubErrors.sol";
+import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered, TooManyChains} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
@@ -60,7 +60,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
         if (msg.sender != address(BRIDGE_HUB)) {
-            revert OnlyBridgehub();
+            revert OnlyBridgehub(msg.sender, address(BRIDGE_HUB));
         }
         _;
     }
@@ -69,7 +69,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     /// @param _chainId the chainId of the chain
     modifier onlyChain(uint256 _chainId) {
         if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
-            revert OnlyChain();
+            revert OnlyChain(msg.sender, BRIDGE_HUB.getZKChain(_chainId));
         }
         _;
     }
@@ -154,7 +154,7 @@ contract MessageRoot is IMessageRoot, ReentrancyGuard {
     function _addNewChain(uint256 _chainId) internal {
         uint256 cachedChainCount = chainCount;
         if (cachedChainCount >= MAX_NUMBER_OF_ZK_CHAINS) {
-            revert TooManyChains();
+            revert TooManyChains(cachedChainCount, MAX_NUMBER_OF_ZK_CHAINS);
         }
 
         ++chainCount;

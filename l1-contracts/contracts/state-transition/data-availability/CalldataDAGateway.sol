@@ -18,7 +18,7 @@ abstract contract CalldataDAGateway is CalldataDA {
         bytes calldata _pubdataInput
     ) internal pure override returns (bytes32[] memory blobCommitments, bytes calldata _pubdata) {
         if (_pubdataInput.length < _blobsProvided * BLOB_COMMITMENT_SIZE) {
-            revert PubdataTooSmall();
+            revert PubdataTooSmall(_pubdataInput.length, _blobsProvided * BLOB_COMMITMENT_SIZE);
         }
 
         // We typically do not know whether we'll use calldata or blobs at the time when
@@ -28,7 +28,7 @@ abstract contract CalldataDAGateway is CalldataDA {
         _pubdata = _pubdataInput[:_pubdataInput.length - _blobsProvided * BLOB_COMMITMENT_SIZE];
 
         if (_pubdata.length > _blobsProvided * BLOB_SIZE_BYTES) {
-            revert PubdataTooLong();
+            revert PubdataTooLong(_pubdata.length, _blobsProvided * BLOB_SIZE_BYTES);
         }
         if (_fullPubdataHash != keccak256(_pubdata)) {
             revert InvalidPubdataHash();
