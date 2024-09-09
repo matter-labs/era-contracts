@@ -34,6 +34,12 @@ const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate
 export const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
 
 const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
+export const STORED_BATCH_INFO_ABI_STRING =
+  "tuple(uint64 batchNumber, bytes32 batchHash, uint64 indexRepeatedStorageChanges, uint256 numberOfLayer1Txs, bytes32 priorityOperationsHash, bytes32 l2LogsTreeRoot, uint256 timestamp, bytes32 commitment)";
+export const COMMIT_BATCH_INFO_ABI_STRING =
+  "tuple(uint64 batchNumber, uint64 timestamp, uint64 indexRepeatedStorageChanges, bytes32 newStateRoot, uint256 numberOfLayer1Txs, bytes32 priorityOperationsHash, bytes32 bootloaderHeapInitialContentsHash, bytes32 eventsQueueStateHash, bytes systemLogs, bytes operatorDAInput)";
+export const PRIORITY_OPS_BATCH_INFO_ABI_STRING =
+  "tuple(bytes32[] leftPath, bytes32[] rightPath, bytes32[] itemHashes)";
 export const DIAMOND_CUT_DATA_ABI_STRING =
   "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)";
 export const FORCE_DEPLOYMENT_ABI_STRING =

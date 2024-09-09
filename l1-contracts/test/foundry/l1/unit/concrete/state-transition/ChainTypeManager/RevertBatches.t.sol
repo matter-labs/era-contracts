@@ -19,7 +19,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
     IExecutor.CommitBatchInfo internal newCommitBatchInfo;
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
     IExecutor.StoredBatchInfo internal genesisStoredBatchInfo;
-    IExecutor.ProofInput internal proofInput;
+    uint256[] internal proofInput;
 
     // Facets exposing the diamond
     AdminFacet internal adminFacet;

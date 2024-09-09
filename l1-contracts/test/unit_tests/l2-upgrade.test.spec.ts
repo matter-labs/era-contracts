@@ -27,6 +27,7 @@ import { diamondCut, Action, facetCut } from "../../src.ts/diamondCut";
 
 import type { CommitBatchInfo, StoredBatchInfo, CommitBatchInfoWithTimestamp } from "./utils";
 import {
+  encodeCommitBatchesData,
   L2_BOOTLOADER_ADDRESS,
   L2_SYSTEM_CONTEXT_ADDRESS,
   SYSTEM_LOG_KEYS,
@@ -135,9 +136,11 @@ describe("L2 upgrade test", function () {
     );
 
     const commitReceipt = await (
-      await proxyExecutor.commitBatchesSharedBridge(chainId, genesisStoredBatchInfo(), [batch1InfoChainIdUpgrade])
+      await proxyExecutor.commitBatchesSharedBridge(
+        chainId,
+        ...encodeCommitBatchesData(genesisStoredBatchInfo(), [batch1InfoChainIdUpgrade])
+      )
     ).wait();
-
     const commitment = commitReceipt.events[0].args.commitment;
     storedBatch1InfoChainIdUpgrade = getBatchStoredInfo(batch1InfoChainIdUpgrade, commitment);
     await makeExecutedEqualCommitted(proxyExecutor, genesisStoredBatchInfo(), [storedBatch1InfoChainIdUpgrade], []);
@@ -151,7 +154,10 @@ describe("L2 upgrade test", function () {
     });
 
     const commitReceipt = await (
-      await proxyExecutor.commitBatchesSharedBridge(chainId, storedBatch1InfoChainIdUpgrade, [batch2Info])
+      await proxyExecutor.commitBatchesSharedBridge(
+        chainId,
+        ...encodeCommitBatchesData(storedBatch1InfoChainIdUpgrade, [batch2Info])
+      )
     ).wait();
     const commitment = commitReceipt.events[0].args.commitment;
 
@@ -628,7 +634,7 @@ describe("L2 upgrade test", function () {
   //     batchNumber: 3,
   //   });
   //   const revertReason = await getCallRevertReason(
-  //     proxyExecutor.commitBatchesSharedBridge(storedBatch2Info, [batch3InfoNoUpgradeTx])
+  //     proxyExecutor.commitBatchesSharedBridge(chainId, ...encodeCommitBatchesData(storedBatch2Info, [batch3InfoNoUpgradeTx]))
   //   );
   //   expect(revertReason).to.contains("MissingSystemLogs");
   // });
@@ -670,8 +676,12 @@ describe("L2 upgrade test", function () {
       },
       systemLogs
     );
+
     const revertReason = await getCallRevertReason(
-      proxyExecutor.commitBatchesSharedBridge(chainId, storedBatch2Info, [batch3InfoNoUpgradeTx])
+      proxyExecutor.commitBatchesSharedBridge(
+        chainId,
+        ...encodeCommitBatchesData(storedBatch2Info, [batch3InfoNoUpgradeTx])
+      )
     );
     expect(revertReason).to.contains("LogAlreadyProcessed");
   });
@@ -704,7 +714,10 @@ describe("L2 upgrade test", function () {
     );
 
     const revertReason = await getCallRevertReason(
-      proxyExecutor.commitBatchesSharedBridge(chainId, storedBatch2Info, [batch3InfoTwoUpgradeTx])
+      proxyExecutor.commitBatchesSharedBridge(
+        chainId,
+        ...encodeCommitBatchesData(storedBatch2Info, [batch3InfoTwoUpgradeTx])
+      )
     );
     expect(revertReason).to.contains("TxHashMismatch");
   });
@@ -736,7 +749,12 @@ describe("L2 upgrade test", function () {
       systemLogs
     );
 
-    await (await proxyExecutor.commitBatchesSharedBridge(chainId, storedBatch2Info, [batch3InfoTwoUpgradeTx])).wait();
+    await (
+      await proxyExecutor.commitBatchesSharedBridge(
+        chainId,
+        ...encodeCommitBatchesData(storedBatch2Info, [batch3InfoTwoUpgradeTx])
+      )
+    ).wait();
 
     expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(3);
   });
@@ -770,7 +788,10 @@ describe("L2 upgrade test", function () {
     );
 
     const commitReceipt = await (
-      await proxyExecutor.commitBatchesSharedBridge(chainId, storedBatch2Info, [batch3InfoTwoUpgradeTx])
+      await proxyExecutor.commitBatchesSharedBridge(
+        chainId,
+        ...encodeCommitBatchesData(storedBatch2Info, [batch3InfoTwoUpgradeTx])
+      )
     ).wait();
 
     expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(3);
@@ -809,7 +830,10 @@ describe("L2 upgrade test", function () {
     );
 
     const commitReceipt = await (
-      await proxyExecutor.commitBatchesSharedBridge(chainId, storedBatch2Info, [batch4InfoTwoUpgradeTx])
+      await proxyExecutor.commitBatchesSharedBridge(
+        chainId,
+        ...encodeCommitBatchesData(storedBatch2Info, [batch4InfoTwoUpgradeTx])
+      )
     ).wait();
     const commitment = commitReceipt.events[0].args.commitment;
     const newBatchStoredInfo = getBatchStoredInfo(batch4InfoTwoUpgradeTx, commitment);
@@ -865,7 +889,10 @@ describe("L2 upgrade test", function () {
     );
 
     const commitReceipt = await (
-      await proxyExecutor.commitBatchesSharedBridge(chainId, storedBatch2Info, [batch5InfoTwoUpgradeTx])
+      await proxyExecutor.commitBatchesSharedBridge(
+        chainId,
+        ...encodeCommitBatchesData(storedBatch2Info, [batch5InfoTwoUpgradeTx])
+      )
     ).wait();
     const commitment = commitReceipt.events[0].args.commitment;
     const newBatchStoredInfo = getBatchStoredInfo(batch5InfoTwoUpgradeTx, commitment);
