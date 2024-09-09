@@ -7,9 +7,12 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 // import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {TransactionFilterer} from "contracts/transactionFilterer/TransactionFilterer.sol";
 // import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 // import {Governance} from "contracts/governance/Governance.sol";
 // import {Utils} from "./Utils.sol";
@@ -20,8 +23,6 @@ import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehu
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 // import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
-
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 contract GatewayScript is Script {
     using stdToml for string;
@@ -118,9 +119,28 @@ contract GatewayScript is Script {
     function registerGateway() public {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         Ownable ownable = Ownable(config.bridgehub);
-        vm.prank(ownable.owner());
+        Ownable ownableStmDT = Ownable(config.stmDeploymentTracker);
+        IZkSyncHyperchain chain = IZkSyncHyperchain(bridgehub.getHyperchain(config.chainChainId));
+        vm.startPrank(chain.getAdmin());
+        TransactionFilterer transactionFiltererImplementation = new TransactionFilterer();
+        address transactionFiltererProxy = address(
+            new TransparentUpgradeableProxy(
+                address(transactionFiltererImplementation),
+                chain.getAdmin(),
+                abi.encodeCall(TransactionFilterer.initialize, ownable.owner())
+            )
+        );
+        chain.setTransactionFilterer(transactionFiltererProxy);
+        vm.stopPrank();
+        vm.startPrank(ownable.owner());
+        require(ownableStmDT.owner() != address(0));
+        TransactionFilterer(transactionFiltererProxy).grantWhitelist(config.sharedBridgeProxy);
+        TransactionFilterer(transactionFiltererProxy).grantWhitelist(config.stmDeploymentTracker);
+
+        console.log("address registered:", ownableStmDT.owner());
         bridgehub.registerSettlementLayer(config.gatewayChainId, true);
-        // bytes memory data = abi.encodeCall(ctm.registerSettlementLayer, (config.chainChainId, true));
+        vm.stopPrank();
+        // bytes memory data = abi.encodeCall(stm.registerSettlementLayer, (config.chainChainId, true));
         // Utils.executeUpgrade({
         //     _governor: ownable.owner(),
         //     _salt: bytes32(config.bridgehubCreateNewChainSalt),
