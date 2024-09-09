@@ -144,13 +144,13 @@ contract HyperchainDeployer is L1ContractDeployer {
 
     function _deployZkChain(
         uint256 _chainId,
-        address _baseTokenAddress,
+        bytes32 _baseTokenAssetId,
         address _sharedBridge,
         address _admin,
         uint256 _protocolVersion,
-        bytes32 _storedBatchZero
+        bytes32 _storedBatchZero,
+        address _bridgeHub
     ) internal returns (address) {
-        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(_chainId, _baseTokenAddress);
         Diamond.DiamondCutData memory diamondCut = abi.decode(
             l1Script.getInitialDiamondCutData(),
             (Diamond.DiamondCutData)
@@ -161,12 +161,12 @@ contract HyperchainDeployer is L1ContractDeployer {
             initData = bytes.concat(
                 IDiamondInit.initialize.selector,
                 bytes32(_chainId),
-                bytes32(uint256(uint160(address(bridgeHub)))),
+                bytes32(uint256(uint160(address(_bridgeHub)))),
                 bytes32(uint256(uint160(address(this)))),
                 bytes32(_protocolVersion),
                 bytes32(uint256(uint160(_admin))),
                 bytes32(uint256(uint160(address(0x1337)))),
-                baseTokenAssetId,
+                _baseTokenAssetId,
                 bytes32(uint256(uint160(_sharedBridge))),
                 _storedBatchZero,
                 diamondCut.initCalldata
