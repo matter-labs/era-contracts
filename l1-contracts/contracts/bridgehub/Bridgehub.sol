@@ -22,7 +22,7 @@ import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ISTMDeploymentTracker} from "./ISTMDeploymentTracker.sol";
-import {HyperchainLimitReached, Unauthorized, STMAlreadyRegistered, STMNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported} from "../common/L1ContractErrors.sol";
+import {HyperchainLimitReached, Unauthorized, STMAlreadyRegistered, STMNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -750,6 +750,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address stm = IZkSyncHyperchain(_hyperchain).getStateTransitionManager();
         address chainAdmin = IZkSyncHyperchain(_hyperchain).getAdmin();
         bytes32 chainBaseTokenAssetId = IZkSyncHyperchain(_hyperchain).getBaseTokenAssetId();
+        address bridgeHub = IZkSyncHyperchain(_hyperchain).getBridgehub();
+
+        if (bridgeHub != address(this)) {
+            revert IncorrectBridgeHubAddress(bridgeHub);
+        }
 
         _validateChainParams({_chainId: _chainId, _assetId: chainBaseTokenAssetId, _stateTransitionManager: stm});
 

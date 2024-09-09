@@ -85,6 +85,8 @@ error HashedLogIsDefault();
 error HashMismatch(bytes32 expected, bytes32 actual);
 // 0xb615c2b1
 error HyperchainLimitReached();
+// 0xdd381a4c
+error IncorrectBridgeHubAddress(address bridgehub);
 // 0x826fb11e
 error InsufficientChainBalance();
 // 0x356680b7
