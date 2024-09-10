@@ -14,5 +14,8 @@ interface IL1NativeTokenVault is INativeTokenVault {
     /// @notice The L1Nullifier contract
     function L1_NULLIFIER() external view returns (IL1Nullifier);
 
+    /// @notice Returns the total number of specific tokens locked for some chain
+    function chainBalance(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
+
     event TokenBeaconUpdated(address indexed l2TokenBeacon);
 }

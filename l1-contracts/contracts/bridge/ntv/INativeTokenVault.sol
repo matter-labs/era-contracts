@@ -17,11 +17,11 @@ interface INativeTokenVault {
     /// @notice The AssetRouter contract
     function ASSET_ROUTER() external view returns (IAssetRouterBase);
 
-    /// @notice Returns the total number of specific tokens locked for some chain
-    function chainBalance(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
-
     /// @notice Returns if the bridged version of bridged token has been deployed
-    function isTokenNative(bytes32 assetId) external view returns (bool);
+    // function isTokenNative(bytes32 assetId) external view returns (bool);
+
+    /// @notice Returns the chain ID of the origin chain for a given asset ID
+    function originChainId(bytes32 assetId) external view returns (uint256);
 
     /// @notice Registers tokens within the NTV.
     /// @dev The goal is to allow bridging native tokens automatically, by registering them on the fly.

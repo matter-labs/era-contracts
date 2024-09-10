@@ -37,6 +37,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Era's chainID
     uint256 public immutable ERA_CHAIN_ID;
 
+    /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
+    /// This serves as a security measure until hyperbridging is implemented.
+    /// NOTE: this function may be removed in the future, don't rely on it!
+    mapping(uint256 chainId => mapping(bytes32 token => uint256 balance)) public chainBalance;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @param _l1WethAddress Address of WETH on deployed chain
@@ -75,7 +80,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         }
         bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
         tokenAddress[BASE_TOKEN_ASSET_ID] = ETH_TOKEN_ADDRESS;
-        isTokenNative[BASE_TOKEN_ASSET_ID] = true;
+        originChainId[BASE_TOKEN_ASSET_ID] = block.chainid;
         _transferOwnership(_owner);
     }
 
@@ -164,11 +169,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             revert NoFundsTransferred();
         }
 
-        // check that the chain has sufficient balance
-        if (chainBalance[_chainId][_assetId] < _amount) {
-            revert InsufficientChainBalance();
-        }
-        chainBalance[_chainId][_assetId] -= _amount;
+        _handleChainBalanceDecrease(_chainId, _assetId, _amount, false);
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
@@ -242,5 +243,31 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, ""))
         );
         return BeaconProxy(payable(proxyAddress));
+    }
+
+    function _handleChainBalanceIncrease(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        bool _isNative
+    ) internal override {
+        if ((_isNative) || (originChainId[_assetId] != _chainId)) {
+            chainBalance[_chainId][_assetId] += _amount;
+        }
+    }
+
+    function _handleChainBalanceDecrease(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        bool _isNative
+    ) internal override {
+        if ((_isNative) || (originChainId[_assetId] != _chainId)) {
+            // Check that the chain has sufficient balance
+            if (chainBalance[_chainId][_assetId] < _amount) {
+                revert InsufficientChainBalance();
+            }
+            chainBalance[_chainId][_assetId] -= _amount;
+        }
     }
 }

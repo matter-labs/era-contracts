@@ -201,6 +201,24 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             : keccak256(abi.encode(_originChainId, _l1Token));
     }
 
+    function _handleChainBalanceIncrease(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        bool _isNative
+    ) internal override {
+        // on L2s we don't track the balance
+    }
+
+    function _handleChainBalanceDecrease(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        bool _isNative
+    ) internal override {
+        // on L2s we don't track the balance
+    }
+
     /*//////////////////////////////////////////////////////////////
                             LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
