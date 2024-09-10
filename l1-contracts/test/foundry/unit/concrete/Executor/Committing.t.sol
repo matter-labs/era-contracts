@@ -226,8 +226,10 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
 
         vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 127, 125));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) =
-             Utils.encodeCommitBatchesData(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            wrongNewCommitBatchInfoArray
+        );
         executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
@@ -423,8 +425,10 @@ contract CommittingTest is ExecutorTest {
 
             uint256 allLogsProcessed = uint256(127);
             vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 127, allLogsProcessed ^ (1 << i)));
-            (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) =
-                 Utils.encodeCommitBatchesData(genesisStoredBatchInfo, wrongNewCommitBatchInfoArray);
+            (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+                genesisStoredBatchInfo,
+                wrongNewCommitBatchInfoArray
+            );
             executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
         }
     }
@@ -655,9 +659,11 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert("too small");
-    (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) =
-        Utils.encodeCommitBatchesData(genesisStoredBatchInfo, correctCommitBatchInfoArray);
-    executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            correctCommitBatchInfoArray
+        );
+        executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_PartialPubdataCommitment() public {
@@ -693,9 +699,11 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
 
         vm.expectRevert(InvalidPubdataCommitmentsSize.selector);
-    (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) =
-        Utils.encodeCommitBatchesData(genesisStoredBatchInfo, correctCommitBatchInfoArray);
-    executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            correctCommitBatchInfoArray
+        );
+        executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_TooManyPubdataCommitments() public {
@@ -885,9 +893,11 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(abi.encodeWithSelector(BlobHashCommitmentError.selector, uint256(1), true, false));
-    (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) =
-        Utils.encodeCommitBatchesData(genesisStoredBatchInfo, correctCommitBatchInfoArray);
-    executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            correctCommitBatchInfoArray
+        );
+        executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_SecondBlobLinearHashNotZeroWithEmptyCommitment() public {
@@ -897,7 +907,7 @@ contract CommittingTest is ExecutorTest {
         bytes32[] memory blobsLinearHashes = new bytes32[](2);
         blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes1");
         blobsLinearHashes[1] = Utils.randomBytes32("blobsLinearHashes2");
-    
+
         bytes memory operatorDAInput = abi.encodePacked(
             uncompressedStateDiffHash,
             totalL2PubdataHash,
@@ -939,8 +949,10 @@ contract CommittingTest is ExecutorTest {
 
         // It will just panic with array out of bounds
         vm.expectRevert();
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) =
-            Utils.encodeCommitBatchesData(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            correctCommitBatchInfoArray
+        );
         executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
     }
 }

@@ -37,5 +37,5 @@ contract IncrementalMerkleTest {
         return tree._zeros[_index];
     }
 
-    // function getRoot() 
+    // function getRoot()
 }

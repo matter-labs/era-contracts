@@ -176,7 +176,6 @@ contract ExperimentalBridgeTest is Test {
         secondBridgeAddress = address(sharedBridge);
     }
 
-
     function _useMockSharedBridge() internal {
         sharedBridgeAddress = address(mockSharedBridge);
     }
@@ -450,55 +449,44 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function test_setAddresses(address randomAssetRouter, address randomCTMDeployer, address randomMessageRoot) public {
-        assertTrue(
-            bridgeHub.sharedBridge() == IL1AssetRouter(address(0)),
-            "Shared bridge is already there"
-        );
-        assertTrue(
-            bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)),
-            "L1 CTM deployer is already ther"
-        );
-        assertTrue(
-            bridgeHub.messageRoot() == IMessageRoot(address(0)),
-            "Message root is already ther"
-        );
+        assertTrue(bridgeHub.sharedBridge() == IL1AssetRouter(address(0)), "Shared bridge is already there");
+        assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already ther");
+        assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already ther");
 
         vm.prank(bridgeOwner);
-        bridgeHub.setAddresses(randomAssetRouter, ICTMDeploymentTracker(randomCTMDeployer), IMessageRoot(randomMessageRoot));
-
-        assertTrue(
-            bridgeHub.sharedBridge() == IL1AssetRouter(randomAssetRouter),
-            "Shared bridge is already there"
+        bridgeHub.setAddresses(
+            randomAssetRouter,
+            ICTMDeploymentTracker(randomCTMDeployer),
+            IMessageRoot(randomMessageRoot)
         );
+
+        assertTrue(bridgeHub.sharedBridge() == IL1AssetRouter(randomAssetRouter), "Shared bridge is already there");
         assertTrue(
             bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(randomCTMDeployer),
             "L1 CTM deployer is already ther"
         );
-        assertTrue(
-            bridgeHub.messageRoot() == IMessageRoot(randomMessageRoot),
-            "Message root is already ther"
-        );
+        assertTrue(bridgeHub.messageRoot() == IMessageRoot(randomMessageRoot), "Message root is already ther");
     }
 
-    function test_setAddresses_cannotBeCalledByRandomAddress(address randomCaller, address randomAssetRouter, address randomCTMDeployer, address randomMessageRoot) public {
+    function test_setAddresses_cannotBeCalledByRandomAddress(
+        address randomCaller,
+        address randomAssetRouter,
+        address randomCTMDeployer,
+        address randomMessageRoot
+    ) public {
         vm.assume(randomCaller != bridgeOwner);
-        
+
         vm.prank(randomCaller);
         vm.expectRevert(bytes("Ownable: caller is not the owner"));
-        bridgeHub.setAddresses(randomAssetRouter, ICTMDeploymentTracker(randomCTMDeployer), IMessageRoot(randomMessageRoot));
+        bridgeHub.setAddresses(
+            randomAssetRouter,
+            ICTMDeploymentTracker(randomCTMDeployer),
+            IMessageRoot(randomMessageRoot)
+        );
 
-        assertTrue(
-            bridgeHub.sharedBridge() == IL1AssetRouter(address(0)),
-            "Shared bridge is already there"
-        );
-        assertTrue(
-            bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)),
-            "L1 CTM deployer is already ther"
-        );
-        assertTrue(
-            bridgeHub.messageRoot() == IMessageRoot(address(0)),
-            "Message root is already ther"
-        );
+        assertTrue(bridgeHub.sharedBridge() == IL1AssetRouter(address(0)), "Shared bridge is already there");
+        assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already ther");
+        assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already ther");
     }
 
     uint256 newChainId;
@@ -730,12 +718,11 @@ contract ExperimentalBridgeTest is Test {
         uint256 salt,
         uint256 randomValue,
         address newChainAddress
-    ) public useRandomToken(randomValue) {    
+    ) public useRandomToken(randomValue) {
         admin = makeAddr("NEW_CHAIN_ADMIN");
         chainId = bound(chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
         vm.assume(randomCaller != deployerAddress && randomCaller != bridgeOwner);
-
 
         _initializeBridgehub();
 
@@ -1580,7 +1567,7 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function _setUpBaseTokenForChainId(uint256 mockChainId, bool tokenIsETH, address token) internal {
-        if(tokenIsETH) {
+        if (tokenIsETH) {
             token = ETH_TOKEN_ADDRESS;
         }
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, token);
@@ -1592,8 +1579,9 @@ contract ExperimentalBridgeTest is Test {
         console.log("bridge = ", address(bridgeHub.sharedBridge()));
         console.log("bridge = ", address(bridgeHub.sharedBridge().assetHandlerAddress(baseTokenAssetId)));
 
-
-        stdstore.target(address(bridgeHub)).sig("baseTokenAssetId(uint256)").with_key(mockChainId).checked_write(baseTokenAssetId);        
+        stdstore.target(address(bridgeHub)).sig("baseTokenAssetId(uint256)").with_key(mockChainId).checked_write(
+            baseTokenAssetId
+        );
     }
 
     function _createMockL2TransactionRequestDirect(
