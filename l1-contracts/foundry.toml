@@ -17,11 +17,13 @@ fs_permissions = [
     { access = "read", path = "./script-config" },
     { access = "read-write", path = "./script-out" },
     { access = "read", path = "./out" },
-    { access = "read", path = "./test/foundry/integration/deploy-scripts/script-config/" },
-    { access = "read-write", path = "./test/foundry/integration/deploy-scripts/script-out/" },
+    { access = "read", path = "./test/foundry/l1/integration/deploy-scripts/script-config/" },
+    { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-out/" },
+    { access = "read", path = "zkout" },
 ]
 ignored_error_codes = ["missing-receive-ether", "code-size"]
 ignored_warnings_from = ["test", "contracts/dev-contracts"]
+suppressed_warnings = ["txorigin"]
 remappings = [
     "forge-std/=lib/forge-std/src/",
     "murky/=lib/murky/src/",
@@ -33,3 +35,6 @@ remappings = [
 ]
 optimizer = true
 optimizer_runs = 9999999
+[profile.default.zksync] 
+enable_eravm_extensions = true
+zksolc = "1.5.3"

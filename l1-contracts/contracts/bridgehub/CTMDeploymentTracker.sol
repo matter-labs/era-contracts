@@ -7,10 +7,10 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 
-import {IBridgehub, IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
@@ -23,7 +23,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
     IBridgehub public immutable override BRIDGE_HUB;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    IL1AssetRouter public immutable override L1_ASSET_ROUTER;
+    IAssetRouterBase public immutable override L1_ASSET_ROUTER;
 
     /// @dev The encoding version of the data.
     bytes1 internal constant ENCODING_VERSION = 0x01;
@@ -44,7 +44,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, ReentrancyGuard, Ownable
 
     /// @dev Contract is expected to be used as proxy implementation on L1.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub, IL1AssetRouter _sharedBridge) reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgehub, IAssetRouterBase _sharedBridge) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
         L1_ASSET_ROUTER = _sharedBridge;

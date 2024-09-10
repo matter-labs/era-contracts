@@ -25,8 +25,10 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_PROOF_METADATA_VERSION} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR} from "../../../common/L2ContractAddresses.sol";
 
-import {IL1AssetRouter} from "../../../bridge/interfaces/IL1AssetRouter.sol";
+import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
+import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {MerklePathEmpty, OnlyEraSupported, BatchNotExecuted, HashedLogIsDefault, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow} from "../../../common/L1ContractErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -604,7 +606,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external nonReentrant {
+    ) external nonReentrant onlyL1 {
         if (s.chainId != ERA_CHAIN_ID) {
             revert OnlyEraSupported();
         }

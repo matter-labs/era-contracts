@@ -25,10 +25,26 @@ error RemovingPermanentRestriction();
 error UnallowedImplementation(bytes32 implementationHash);
 // 0x1ff9d522
 error AddressAlreadyUsed(address addr);
+//
+error AddressAlreadySet(address addr);
 // 0x86bb51b8
 error AddressHasNoCode(address);
+//
+error AddressMismatch(address expected, address supplied);
 // 0x1eee5481
 error AddressTooLow(address);
+//
+error AmountMustBeGreaterThanZero();
+//
+error AssetHandlerDoesNotExist(bytes32 assetId);
+//
+error AssetIdMismatch(bytes32 expected, bytes32 supplied);
+//
+error AssetIdAlreadyRegistered();
+// 0x0bfcef28
+error AlreadyWhitelisted(address);
+// 0x04a0b7e9
+error AssetIdNotSupported(bytes32 assetId);
 // 0x6afd6c20
 error BadReturnData();
 // 0x6ef9a972
@@ -43,6 +59,8 @@ error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumb
 error BlobHashCommitmentError(uint256 index, bool blobHashEmpty, bool blobCommitmentEmpty);
 // 0x6cf12312
 error BridgeHubAlreadyRegistered();
+//
+error BridgeMintNotImplemented();
 // 0xcf102c5a
 error CalldataLengthTooBig();
 // 0xe85392f9
@@ -51,6 +69,16 @@ error CanOnlyProcessOneBatch();
 error CantExecuteUnprovenBatches();
 // 0xe18cb383
 error CantRevertExecutedBatch();
+// 0x24591d89
+error ChainIdAlreadyExists();
+// 0x717a1656
+error ChainIdCantBeCurrentChain();
+// 0xa179f8c9
+error ChainIdMismatch();
+//
+error ChainIdNotRegistered(uint256 chainId);
+//
+error ChainNotLegacy();
 // 0x78d2ed02
 error ChainAlreadyLive();
 // 0x8f620a06
@@ -59,6 +87,8 @@ error ChainIdTooBig();
 error DelegateCallFailed(bytes returnData);
 // 0x0a8ed92c
 error DenominatorIsZero();
+//
+error DeployFailed();
 // 0xc7c9660f
 error DepositDoesNotExist();
 // 0xad2fa98e
@@ -73,14 +103,25 @@ error DiamondAlreadyFrozen();
 error DiamondFreezeIncorrectState();
 // 0xa7151b9a
 error DiamondNotFrozen();
+//
+error EmptyAddress();
+// 0x2d4d012f
+error EmptyAssetId();
 // 0xfc7ab1d3
 error EmptyBlobVersionHash(uint256 index);
+//
+error EmptyBytes32();
 // 0x95b66fe9
 error EmptyDeposit();
+//
+error ETHDepositNotSupported();
+//
+error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
 // 0x79e12cc3
 error FacetIsFrozen(bytes4 func);
+error FunctionNotSupported();
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
 // 0x6d4a7df8
@@ -97,16 +138,24 @@ error HashedLogIsDefault();
 error HashMismatch(bytes32 expected, bytes32 actual);
 // 0xb615c2b1
 error ZKChainLimitReached();
+//
+error InsufficientAllowance(uint256 providedAllowance, uint256 requiredAmount);
+// 0xdd381a4c
+error IncorrectBridgeHubAddress(address bridgehub);
 // 0x826fb11e
 error InsufficientChainBalance();
 // 0x356680b7
 error InsufficientFunds();
+//
+error InvalidCaller(address);
 // 0x7a47c9a2
 error InvalidChainId();
 // 0x4fbe5dba
 error InvalidDelay();
 // 0x0af806e0
 error InvalidHash();
+//
+error InvalidInput();
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
 // 0xd8e9405c
@@ -163,6 +212,8 @@ error MerkleIndexOutOfBounds();
 error MerklePathEmpty();
 // 0x1c500385
 error MerklePathOutOfBounds();
+//
+error MigrationPaused();
 // 0xfa44b527
 error MissingSystemLogs(uint256 expected, uint256 actual);
 // 0x4a094431
@@ -187,12 +238,16 @@ error NonEmptyMsgValue();
 error NonIncreasingTimestamp();
 // 0x0105f9c0
 error NonSequentialBatch();
+//
+error NonSequentialVersion();
 // 0x4ef79e5a
 error NonZeroAddress(address);
 // 0xdd629f86
 error NotEnoughGas();
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
+// 0xdf17e316
+error NotWhitelisted(address);
 // 0xf3ed9dfa
 error OnlyEraSupported();
 // 0x1a21feed
@@ -303,8 +358,14 @@ error UndefinedDiamondCutAction();
 error UnexpectedNumberOfFactoryDeps();
 // 0x6aa39880
 error UnexpectedSystemLog(uint256 logKey);
+//
+error UnimplementedMessage(string);
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
+//
+error UnsupportedEncodingVersion();
+//
+error UnsupportedPaymasterFlow();
 // 0x47b3b145
 error ValidateTxnNotEnoughGas();
 // 0x626ade30
@@ -344,8 +405,6 @@ error IncorrectBatchBounds(
     uint256 processFromProvided,
     uint256 processToProvided
 );
-// 0x04a0b7e9
-error AssetIdNotSupported(bytes32 assetId);
 // 0x64107968
 error AssetHandlerNotRegistered(bytes32 assetId);
 

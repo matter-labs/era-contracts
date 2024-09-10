@@ -117,7 +117,9 @@ export async function registerZKChain(
   if (!(await deployer.bridgehubContract(deployer.deployWallet).assetIdIsRegistered(baseTokenAssetId))) {
     await deployer.registerTokenBridgehub(baseTokenAddress, useGovernance);
   }
-  await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
+  if (baseTokenAddress !== ADDRESS_ONE) {
+    await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
+  }
   await deployer.registerZKChain(
     encodeNTVAssetId(deployer.l1ChainId, ethers.utils.hexZeroPad(baseTokenAddress, 32)),
     validiumMode,
