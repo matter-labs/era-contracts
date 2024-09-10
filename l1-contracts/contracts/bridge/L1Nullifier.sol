@@ -388,9 +388,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     function _finalizeDeposit(
         FinalizeL1DepositParams calldata _finalizeWithdrawalParams
     ) internal nonReentrant whenNotPaused {
-        bytes memory transferData;
-        bytes32 assetId;
-        (assetId, transferData) = _verifyAndGetWithdrawalData(_finalizeWithdrawalParams);
+        (bytes32 assetId, bytes memory transferData) = _verifyAndGetWithdrawalData(_finalizeWithdrawalParams);
         l1AssetRouter.finalizeDeposit(_finalizeWithdrawalParams.chainId, assetId, transferData);
     }
 
