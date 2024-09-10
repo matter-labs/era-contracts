@@ -9,7 +9,7 @@ const INPUT_DIR = "evm-interpreter";
 
 async function main() {
   process.chdir(`${INPUT_DIR}`);
-  const interpreterSource = readFileSync(`EvmInterpreter.template.yul`).toString();
+  const interpreterSource = readFileSync("EvmInterpreter.template.yul").toString();
 
   console.log("Preprocessing Interpreter");
   const interpreter = preprocess.preprocess(interpreterSource);
