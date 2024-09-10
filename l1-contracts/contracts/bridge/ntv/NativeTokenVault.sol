@@ -21,7 +21,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
-import {EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero} from "../../common/L1ContractErrors.sol";
+import {EmptyDeposit, Unauthorized, TokensWithFeesNotSupported, TokenNotSupported, NonEmptyMsgValue, ValueMismatch, AddressMismatch, AssetIdMismatch, AmountMustBeGreaterThanZero, ZeroAddress} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -208,13 +208,24 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         {
             // we set all originChainId for all already bridged tokens with the setLegacyTokenAssetId and updateChainBalancesFromSharedBridge functions.
             // for native tokens the originChainId is set when they register.
-            erc20Metadata = getERC20Getters(bridgedToken, originChainId[_assetId]);
+            uint256 originChainId = originChainId[_assetId];
+            if (originChainId == 0) {
+                revert ZeroAddress();
+            }
+            erc20Metadata = getERC20Getters(bridgedToken, originChainId);
+        }
+        address originToken;
+        {
+            originToken = IBridgedStandardToken(bridgedToken).originToken();
+            if (originToken == address(0)) {
+                revert ZeroAddress();
+            }
         }
 
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
             _prevMsgSender: _prevMsgSender,
             _l2Receiver: _receiver,
-            _l1Token: IBridgedStandardToken(bridgedToken).originToken(),
+            _l1Token: originToken,
             _amount: _amount,
             _erc20Metadata: erc20Metadata
         });
