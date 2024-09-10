@@ -5,9 +5,14 @@ pragma solidity 0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
+<<<<<<< HEAD
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 // import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+=======
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
@@ -16,8 +21,13 @@ import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
+<<<<<<< HEAD
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+=======
+import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {GenesisUpgrade} from "contracts/upgrades/GenesisUpgrade.sol";
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
@@ -351,7 +361,14 @@ contract DeployL1Script is Script {
     }
 
     function deployChainAdmin() internal {
+<<<<<<< HEAD
         bytes memory bytecode = abi.encodePacked(type(ChainAdmin).creationCode, abi.encode(config.ownerAddress));
+=======
+        bytes memory bytecode = abi.encodePacked(
+            type(ChainAdmin).creationCode,
+            abi.encode(config.ownerAddress, address(0))
+        );
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
         address contractAddress = deployViaCreate2(bytecode);
         console.log("ChainAdmin deployed at:", contractAddress);
         addresses.chainAdmin = contractAddress;
@@ -552,7 +569,7 @@ contract DeployL1Script is Script {
         });
 
         StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
-            owner: config.ownerAddress,
+            owner: msg.sender,
             validatorTimelock: addresses.validatorTimelock,
             chainCreationParams: chainCreationParams,
             protocolVersion: config.contracts.latestProtocolVersion
@@ -753,8 +770,10 @@ contract DeployL1Script is Script {
         L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
         sharedBridge.transferOwnership(addresses.governance);
 
-        vm.stopBroadcast();
+        StateTransitionManager stm = StateTransitionManager(addresses.stateTransition.stateTransitionProxy);
+        stm.transferOwnership(addresses.governance);
 
+        vm.stopBroadcast();
         console.log("Owners updated");
     }
 

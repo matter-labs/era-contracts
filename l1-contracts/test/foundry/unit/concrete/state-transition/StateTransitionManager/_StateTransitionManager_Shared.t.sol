@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.21;
 
 import {Test} from "forge-std/Test.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
@@ -19,7 +19,11 @@ import {InitializeDataNewChain} from "contracts/state-transition/chain-interface
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
 import {StateTransitionManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IStateTransitionManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
+<<<<<<< HEAD
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+=======
+import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 
 contract StateTransitionManagerTest is Test {
     StateTransitionManager internal stateTransitionManager;
@@ -97,7 +101,7 @@ contract StateTransitionManagerTest is Test {
             protocolVersion: 0
         });
 
-        vm.expectRevert(bytes.concat("STM: owner zero"));
+        vm.expectRevert(ZeroAddress.selector);
         new TransparentUpgradeableProxy(
             address(stateTransitionManager),
             admin,

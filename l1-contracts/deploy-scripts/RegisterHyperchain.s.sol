@@ -7,7 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
@@ -174,7 +174,11 @@ contract RegisterHyperchainScript is Script {
 
     function deployChainAdmin() internal {
         vm.broadcast();
+<<<<<<< HEAD
         ChainAdmin chainAdmin = new ChainAdmin(config.ownerAddress);
+=======
+        ChainAdmin chainAdmin = new ChainAdmin(config.ownerAddress, address(0));
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
         console.log("ChainAdmin deployed at:", address(chainAdmin));
         config.chainAdmin = address(chainAdmin);
     }
@@ -254,9 +258,14 @@ contract RegisterHyperchainScript is Script {
     function setPendingAdmin() internal {
         IZkSyncHyperchain hyperchain = IZkSyncHyperchain(config.newDiamondProxy);
 
+<<<<<<< HEAD
         vm.startBroadcast(msg.sender);
         hyperchain.setPendingAdmin(config.chainAdmin);
         vm.stopBroadcast();
+=======
+        vm.broadcast();
+        hyperchain.setPendingAdmin(config.chainAdmin);
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
         console.log("Owner for ", config.newDiamondProxy, "set to", config.chainAdmin);
     }
 

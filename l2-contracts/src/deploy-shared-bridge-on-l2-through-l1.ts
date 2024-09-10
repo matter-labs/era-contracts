@@ -35,8 +35,166 @@ export async function publishL2NativeTokenVaultDependencyBytecodesOnL2(
   const L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE = hre.artifacts.readArtifactSync("UpgradeableBeacon").bytecode;
   const L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE = hre.artifacts.readArtifactSync("L2StandardERC20").bytecode;
 
+<<<<<<< HEAD
   const receipt = await (
     await publishBytecodeFromL1(
+=======
+  await publishBytecodeFromL1(
+    chainId,
+    deployer.deployWallet,
+    [
+      L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
+      L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
+      L2_STANDARD_TOKEN_PROXY_BYTECODE,
+    ],
+    gasPrice
+  );
+
+  if (deployer.verbose) {
+    console.log("Bytecodes published on L2");
+  }
+}
+
+export async function deploySharedBridgeImplOnL2ThroughL1(
+  deployer: Deployer,
+  chainId: string,
+  gasPrice: BigNumberish,
+  localLegacyBridgeTesting: boolean = false
+) {
+  if (deployer.verbose) {
+    console.log("Deploying L2SharedBridge Implementation");
+  }
+  const eraChainId = process.env.CONTRACTS_ERA_CHAIN_ID;
+
+  const l2SharedBridgeImplementationBytecode = localLegacyBridgeTesting
+    ? hre.artifacts.readArtifactSync("DevL2SharedBridge").bytecode
+    : hre.artifacts.readArtifactSync("L2SharedBridge").bytecode;
+
+  if (!l2SharedBridgeImplementationBytecode) {
+    throw new Error("l2SharedBridgeImplementationBytecode not found");
+  }
+  if (deployer.verbose) {
+    console.log("l2SharedBridgeImplementationBytecode loaded");
+
+    console.log("Computing L2SharedBridge Implementation Address");
+  }
+  const l2SharedBridgeImplAddress = computeL2Create2Address(
+    deployer.deployWallet,
+    l2SharedBridgeImplementationBytecode,
+    defaultAbiCoder.encode(["uint256"], [eraChainId]),
+    ethers.constants.HashZero
+  );
+  deployer.addresses.Bridges.L2SharedBridgeImplementation = l2SharedBridgeImplAddress;
+  if (deployer.verbose) {
+    console.log(`L2SharedBridge Implementation Address: ${l2SharedBridgeImplAddress}`);
+
+    console.log("Deploying L2SharedBridge Implementation");
+  }
+
+  /// L2StandardTokenProxy bytecode. We need this bytecode to be accessible on the L2, it is enough to add to factoryDeps
+  const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
+
+  // TODO: request from API how many L2 gas needs for the transaction.
+  const tx2 = await create2DeployFromL1(
+    chainId,
+    deployer.deployWallet,
+    l2SharedBridgeImplementationBytecode,
+    defaultAbiCoder.encode(["uint256"], [eraChainId]),
+    ethers.constants.HashZero,
+    priorityTxMaxGasLimit,
+    gasPrice,
+    [L2_STANDARD_TOKEN_PROXY_BYTECODE]
+  );
+
+  await tx2.wait();
+  if (deployer.verbose) {
+    console.log("Deployed L2SharedBridge Implementation");
+    console.log(`CONTRACTS_L2_SHARED_BRIDGE_IMPL_ADDR=${l2SharedBridgeImplAddress}`);
+  }
+}
+
+export async function deploySharedBridgeProxyOnL2ThroughL1(
+  deployer: Deployer,
+  chainId: string,
+  gasPrice: BigNumberish,
+  localLegacyBridgeTesting: boolean = false
+) {
+  const l1SharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
+  if (deployer.verbose) {
+    console.log("Deploying L2SharedBridge Proxy");
+  }
+  /// prepare proxyInitializationParams
+  const l2GovernorAddress = applyL1ToL2Alias(deployer.addresses.Governance);
+
+  let proxyInitializationParams;
+  if (localLegacyBridgeTesting) {
+    const l2SharedBridgeInterface = new Interface(hre.artifacts.readArtifactSync("DevL2SharedBridge").abi);
+    proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initializeDevBridge", [
+      l1SharedBridge.address,
+      deployer.addresses.Bridges.ERC20BridgeProxy,
+      hashL2Bytecode(L2_STANDARD_TOKEN_PROXY_BYTECODE),
+      l2GovernorAddress,
+    ]);
+  } else {
+    const l2SharedBridgeInterface = new Interface(hre.artifacts.readArtifactSync("L2SharedBridge").abi);
+    proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
+      l1SharedBridge.address,
+      deployer.addresses.Bridges.ERC20BridgeProxy,
+      hashL2Bytecode(L2_STANDARD_TOKEN_PROXY_BYTECODE),
+      l2GovernorAddress,
+    ]);
+  }
+
+  /// prepare constructor data
+  const l2SharedBridgeProxyConstructorData = ethers.utils.arrayify(
+    new ethers.utils.AbiCoder().encode(
+      ["address", "address", "bytes"],
+      [deployer.addresses.Bridges.L2SharedBridgeImplementation, l2GovernorAddress, proxyInitializationParams]
+    )
+  );
+
+  /// loading TransparentUpgradeableProxy bytecode
+  const L2_SHARED_BRIDGE_PROXY_BYTECODE = hre.artifacts.readArtifactSync(
+    "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy"
+  ).bytecode;
+
+  /// compute L2SharedBridgeProxy address
+  const l2SharedBridgeProxyAddress = computeL2Create2Address(
+    deployer.deployWallet,
+    L2_SHARED_BRIDGE_PROXY_BYTECODE,
+    l2SharedBridgeProxyConstructorData,
+    ethers.constants.HashZero
+  );
+  deployer.addresses.Bridges.L2SharedBridgeProxy = l2SharedBridgeProxyAddress;
+
+  /// deploy L2SharedBridgeProxy
+  // TODO: request from API how many L2 gas needs for the transaction.
+  const tx3 = await create2DeployFromL1(
+    chainId,
+    deployer.deployWallet,
+    L2_SHARED_BRIDGE_PROXY_BYTECODE,
+    l2SharedBridgeProxyConstructorData,
+    ethers.constants.HashZero,
+    priorityTxMaxGasLimit,
+    gasPrice
+  );
+  await tx3.wait();
+  if (deployer.verbose) {
+    console.log(`CONTRACTS_L2_SHARED_BRIDGE_ADDR=${l2SharedBridgeProxyAddress}`);
+  }
+}
+
+export async function initializeChainGovernance(deployer: Deployer, chainId: string) {
+  const l1SharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
+
+  if (deployer.verbose) {
+    console.log("Initializing chain governance");
+  }
+  await deployer.executeUpgrade(
+    l1SharedBridge.address,
+    0,
+    l1SharedBridge.interface.encodeFunctionData("initializeChainGovernance", [
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
       chainId,
       deployer.deployWallet,
       [

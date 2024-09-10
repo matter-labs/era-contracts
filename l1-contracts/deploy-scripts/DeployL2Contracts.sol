@@ -1,4 +1,6 @@
-pragma solidity ^0.8.24;
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.21;
 
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
@@ -43,6 +45,10 @@ contract DeployL2Script is Script {
         deployFactoryDeps();
         deploySharedBridge();
         deploySharedBridgeProxy();
+<<<<<<< HEAD
+=======
+        initializeChain();
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
         deployForceDeployer();
 
         saveOutput();
@@ -55,6 +61,10 @@ contract DeployL2Script is Script {
         deployFactoryDeps();
         deploySharedBridge();
         deploySharedBridgeProxy();
+<<<<<<< HEAD
+=======
+        initializeChain();
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 
         saveOutput();
     }
@@ -71,21 +81,24 @@ contract DeployL2Script is Script {
     function loadContracts() internal {
         //HACK: Meanwhile we are not integrated foundry zksync we use contracts that has been built using hardhat
         contracts.l2StandardErc20FactoryBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
+            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
         );
         contracts.beaconProxy = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
+            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
         );
         contracts.l2StandardErc20Bytecode = Utils.readHardhatBytecode(
             "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
         );
 
-        contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/L2SharedBridge.sol/L2SharedBridge.json"
+        contracts.l2SharedBridgeBytecode = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/L2SharedBridge.sol/L2SharedBridge.json"
         );
 
         contracts.l2SharedBridgeProxyBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
+            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
+        );
+        contracts.forceDeployUpgrader = Utils.readFoundryBytecode(
+            "/../l2-contracts/zkout/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
         );
         contracts.forceDeployUpgrader = Utils.readHardhatBytecode(
             "/../l2-contracts/artifacts-zk/contracts/ForceDeployUpgrader.sol/ForceDeployUpgrader.json"
@@ -183,4 +196,20 @@ contract DeployL2Script is Script {
             l1SharedBridgeProxy: config.l1SharedBridgeProxy
         });
     }
+<<<<<<< HEAD
+=======
+
+    function initializeChain() internal {
+        L1SharedBridge bridge = L1SharedBridge(config.l1SharedBridgeProxy);
+
+        Utils.executeUpgrade({
+            _governor: bridge.owner(),
+            _salt: bytes32(0),
+            _target: config.l1SharedBridgeProxy,
+            _data: abi.encodeCall(bridge.initializeChainGovernance, (config.chainId, config.l2SharedBridgeProxy)),
+            _value: 0,
+            _delay: 0
+        });
+    }
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 }

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
+import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
 
 import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 
-import {EmptyAddress, Unauthorized, UnimplementedMessage, BRIDGE_MINT_NOT_IMPLEMENTED, WithdrawFailed} from "../L2ContractErrors.sol";
+import {ZeroAddress, Unauthorized, UnimplementedMessage, BRIDGE_MINT_NOT_IMPLEMENTED, WithdrawFailed} from "../errors/L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -62,11 +62,11 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2S
         address _l1Address
     ) external reinitializer(2) {
         if (_l2Bridge == address(0)) {
-            revert EmptyAddress();
+            revert ZeroAddress();
         }
 
         if (_l1Address == address(0)) {
-            revert EmptyAddress();
+            revert ZeroAddress();
         }
         l2Bridge = _l2Bridge;
         l1Address = _l1Address;
@@ -80,6 +80,16 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2S
         emit Initialize(name_, symbol_, 18);
     }
 
+<<<<<<< HEAD
+=======
+    modifier onlyBridge() {
+        if (msg.sender != l2Bridge) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
     /// @notice Function for minting tokens on L2, implemented only to be compatible with IL2StandardToken interface.
     /// Always reverts instead of minting anything!
     /// Note: Use `deposit`/`depositTo` methods instead.

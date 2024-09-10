@@ -128,6 +128,7 @@ contract DeployErc20Script is Script {
         if (mint > 0) {
             vm.broadcast();
             additionalAddressesForMinting.push(config.deployerAddress);
+<<<<<<< HEAD
             // solhint-disable-next-line gas-length-in-loops
             for (uint256 i = 0; i < additionalAddressesForMinting.length; ++i) {
                 (bool success, ) = tokenAddress.call(
@@ -137,6 +138,17 @@ contract DeployErc20Script is Script {
                 if (!success) {
                     revert MintFailed();
                 }
+=======
+            uint256 addressMintListLength = additionalAddressesForMinting.length;
+            for (uint256 i = 0; i < addressMintListLength; ++i) {
+                (bool success, ) = tokenAddress.call(
+                    abi.encodeWithSignature("mint(address,uint256)", additionalAddressesForMinting[i], mint)
+                );
+                if (!success) {
+                    revert MintFailed();
+                }
+                console.log("Minting to:", additionalAddressesForMinting[i]);
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
             }
         }
 

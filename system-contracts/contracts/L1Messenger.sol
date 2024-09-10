@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
+<<<<<<< HEAD
 import {IL1Messenger, L2ToL1Log, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE} from "./interfaces/IL1Messenger.sol";
 
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
+=======
+import {IL1Messenger, L2ToL1Log, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE, STATE_DIFF_COMPRESSION_VERSION_NUMBER} from "./interfaces/IL1Messenger.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
@@ -25,7 +30,7 @@ import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
  * - The contract on L1 accepts all sent messages and if the message came from this system contract
  * it requires that the preimage of `value` be provided.
  */
-contract L1Messenger is IL1Messenger, ISystemContract {
+contract L1Messenger is IL1Messenger, SystemContractBase {
     /// @notice Sequential hash of logs sent in the current block.
     /// @dev Will be reset at the end of the block to zero value.
     bytes32 internal chainedLogsHash;
@@ -90,7 +95,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         // - at most 1 time keccakGasCost(64) when building the Merkle tree (as merkle tree can contain
         // ~2*N nodes, where the first N nodes are leaves the hash of which is calculated on the previous step).
         uint256 gasToPay = keccakGasCost(L2_TO_L1_LOG_SERIALIZE_SIZE) + 2 * keccakGasCost(64);
-        SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), 0);
+        SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), uint32(L2_TO_L1_LOG_SERIALIZE_SIZE));
     }
 
     /// @notice Internal function to send L2ToL1Log.
@@ -260,7 +265,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         calldataPtr += 4;
 
         bytes32[] memory l2ToL1LogsTreeArray = new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES);
-        bytes32 reconstructedChainedLogsHash;
+        bytes32 reconstructedChainedLogsHash = bytes32(0);
         for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
             bytes32 hashedLog = EfficientCall.keccak(
                 _operatorInput[calldataPtr:calldataPtr + L2_TO_L1_LOG_SERIALIZE_SIZE]
@@ -286,6 +291,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         }
         bytes32 localLogsRootHash = l2ToL1LogsTreeArray[0];
 
+<<<<<<< HEAD
         bytes32 aggregatedRootHash = L2_MESSAGE_ROOT.getAggregatedRoot();
         bytes32 fullRootHash = keccak256(bytes.concat(localLogsRootHash, aggregatedRootHash));
 
@@ -304,6 +310,43 @@ contract L1Messenger is IL1Messenger, ISystemContract {
             });
 
             l2DAValidatorOutputhash = abi.decode(returnData, (bytes32));
+=======
+        /// Check messages
+        uint32 numberOfMessages = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
+        calldataPtr += 4;
+        bytes32 reconstructedChainedMessagesHash = bytes32(0);
+        for (uint256 i = 0; i < numberOfMessages; ++i) {
+            uint32 currentMessageLength = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
+            calldataPtr += 4;
+            bytes32 hashedMessage = EfficientCall.keccak(
+                _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentMessageLength]
+            );
+            calldataPtr += currentMessageLength;
+            reconstructedChainedMessagesHash = keccak256(abi.encode(reconstructedChainedMessagesHash, hashedMessage));
+        }
+        if (reconstructedChainedMessagesHash != chainedMessagesHash) {
+            revert ReconstructionMismatch(PubdataField.MsgHash, chainedMessagesHash, reconstructedChainedMessagesHash);
+        }
+
+        /// Check bytecodes
+        uint32 numberOfBytecodes = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
+        calldataPtr += 4;
+        bytes32 reconstructedChainedL1BytecodesRevealDataHash = bytes32(0);
+        for (uint256 i = 0; i < numberOfBytecodes; ++i) {
+            uint32 currentBytecodeLength = uint32(
+                bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4])
+            );
+            calldataPtr += 4;
+            reconstructedChainedL1BytecodesRevealDataHash = keccak256(
+                abi.encode(
+                    reconstructedChainedL1BytecodesRevealDataHash,
+                    Utils.hashL2Bytecode(
+                        _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentBytecodeLength]
+                    )
+                )
+            );
+            calldataPtr += currentBytecodeLength;
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
         }
 
         /// Native (VM) L2 to L1 log

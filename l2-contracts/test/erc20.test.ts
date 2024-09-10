@@ -54,6 +54,7 @@ describe("ERC20Bridge", function () {
 
     // While we formally don't need to deploy the token and the beacon proxy, it is a neat way to have the bytecode published
     const l2TokenImplAddress = await deployer.deploy(await deployer.loadArtifact("L2StandardERC20"));
+<<<<<<< HEAD
     const l2Erc20TokenBeacon = await deployer.deploy(await deployer.loadArtifact("UpgradeableBeacon"), [
       l2TokenImplAddress.address,
     ]);
@@ -70,6 +71,19 @@ describe("ERC20Bridge", function () {
       (await deployer.loadArtifact("L2AssetRouter")).bytecode,
       true,
       constructorArgs
+=======
+    const l2Erc20TokenBeacon = await deployer.deploy(
+      await deployer.loadArtifact("@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon"),
+      [l2TokenImplAddress.address]
+    );
+    await deployer.deploy(
+      await deployer.loadArtifact("@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol:BeaconProxy"),
+      [l2Erc20TokenBeacon.address, "0x"]
+    );
+
+    const beaconProxyBytecodeHash = hashBytecode(
+      (await deployer.loadArtifact("@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol:BeaconProxy")).bytecode
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
     );
 
     erc20Bridge = L2AssetRouterFactory.connect(L2_ASSET_ROUTER_ADDRESS, deployerWallet);
@@ -87,9 +101,20 @@ describe("ERC20Bridge", function () {
       constructorArgs
     );
 
+<<<<<<< HEAD
     erc20NativeTokenVault = L2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, l1BridgeWallet);
     const governorNTV = L2NativeTokenVaultFactory.connect(L2_NATIVE_TOKEN_VAULT_ADDRESS, governorWallet);
     await governorNTV.configureL2TokenBeacon(false, ethers.constants.AddressZero);
+=======
+    const erc20BridgeProxy = await deployer.deploy(
+      await deployer.loadArtifact(
+        "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy"
+      ),
+      [erc20BridgeImpl.address, governorWallet.address, bridgeInitializeData]
+    );
+
+    erc20Bridge = L2SharedBridgeFactory.connect(erc20BridgeProxy.address, deployerWallet);
+>>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   });
 
   it("Should finalize deposit ERC20 deposit", async function () {

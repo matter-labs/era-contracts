@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {ICompressor, OPERATION_BITMASK, LENGTH_BITS_OFFSET, MAX_ENUMERATION_INDEX_SIZE} from "./interfaces/ICompressor.sol";
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {UnsafeBytesCalldata} from "./libraries/UnsafeBytesCalldata.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {L1_MESSENGER_CONTRACT, STATE_DIFF_ENTRY_SIZE, KNOWN_CODE_STORAGE_CONTRACT} from "./Constants.sol";
-import {MalformedBytecode, BytecodeError, IndexOutOfBounds, IndexSizeError, ValuesNotEqual, UnsupportedOperation} from "./SystemContractErrors.sol";
+import {DerivedKeyNotEqualToCompressedValue, EncodedAndRealBytecodeChunkNotEqual, DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo, EncodedLengthNotFourTimesSmallerThanOriginal, IndexOutOfBounds, IndexSizeError, UnsupportedOperation, CompressorInitialWritesProcessedNotEqual, CompressorEnumIndexNotEqual, StateDiffLengthMismatch, CompressionValueTransformError, CompressionValueAddError, CompressionValueSubError} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -20,7 +20,7 @@ import {MalformedBytecode, BytecodeError, IndexOutOfBounds, IndexSizeError, Valu
  * Or the user may compress the bytecode and publish it instead (fewer data onchain!). At the end of every L1 Batch
  * we publish pubdata, part of which contains the state diffs that occurred within the batch.
  */
-contract Compressor is ICompressor, ISystemContract {
+contract Compressor is ICompressor, SystemContractBase {
     using UnsafeBytesCalldata for bytes;
 
     /// @notice Verify the compressed bytecode and publish it on the L1.
@@ -50,13 +50,14 @@ contract Compressor is ICompressor, ISystemContract {
             (bytes calldata dictionary, bytes calldata encodedData) = _decodeRawBytecode(_rawCompressedData);
 
             if (encodedData.length * 4 != _bytecode.length) {
-                revert MalformedBytecode(BytecodeError.Length);
+                revert EncodedLengthNotFourTimesSmallerThanOriginal();
             }
 
             if (dictionary.length / 8 > encodedData.length / 2) {
-                revert MalformedBytecode(BytecodeError.DictionaryLength);
+                revert DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo();
             }
 
+            // We disable this check because calldata array length is cheap.
             // solhint-disable-next-line gas-length-in-loops
             for (uint256 encodedDataPointer = 0; encodedDataPointer < encodedData.length; encodedDataPointer += 2) {
                 uint256 indexOfEncodedChunk = uint256(encodedData.readUint16(encodedDataPointer)) * 8;
@@ -68,7 +69,7 @@ contract Compressor is ICompressor, ISystemContract {
                 uint64 realChunk = _bytecode.readUint64(encodedDataPointer * 4);
 
                 if (encodedChunk != realChunk) {
-                    revert ValuesNotEqual(realChunk, encodedChunk);
+                    revert EncodedAndRealBytecodeChunkNotEqual(realChunk, encodedChunk);
                 }
             }
         }
@@ -143,8 +144,9 @@ contract Compressor is ICompressor, ISystemContract {
             bytes32 derivedKey = stateDiff.readBytes32(52);
             uint256 initValue = stateDiff.readUint256(92);
             uint256 finalValue = stateDiff.readUint256(124);
-            if (derivedKey != _compressedStateDiffs.readBytes32(stateDiffPtr)) {
-                revert ValuesNotEqual(uint256(derivedKey), _compressedStateDiffs.readUint256(stateDiffPtr));
+            bytes32 compressedDerivedKey = _compressedStateDiffs.readBytes32(stateDiffPtr);
+            if (derivedKey != compressedDerivedKey) {
+                revert DerivedKeyNotEqualToCompressedValue(derivedKey, compressedDerivedKey);
             }
             stateDiffPtr += 32;
 
@@ -162,7 +164,7 @@ contract Compressor is ICompressor, ISystemContract {
         }
 
         if (numInitialWritesProcessed != numberOfInitialWrites) {
-            revert ValuesNotEqual(numberOfInitialWrites, numInitialWritesProcessed);
+            revert CompressorInitialWritesProcessedNotEqual(numberOfInitialWrites, numInitialWritesProcessed);
         }
 
         // Process repeated writes
@@ -179,7 +181,7 @@ contract Compressor is ICompressor, ISystemContract {
                 _compressedStateDiffs[stateDiffPtr:stateDiffPtr + _enumerationIndexSize]
             );
             if (enumIndex != compressedEnumIndex) {
-                revert ValuesNotEqual(enumIndex, compressedEnumIndex);
+                revert CompressorEnumIndexNotEqual(enumIndex, compressedEnumIndex);
             }
             stateDiffPtr += _enumerationIndexSize;
 
@@ -197,7 +199,7 @@ contract Compressor is ICompressor, ISystemContract {
         }
 
         if (stateDiffPtr != _compressedStateDiffs.length) {
-            revert ValuesNotEqual(stateDiffPtr, _compressedStateDiffs.length);
+            revert StateDiffLengthMismatch();
         }
 
         stateDiffHash = EfficientCall.keccak(_stateDiffs);
@@ -242,15 +244,15 @@ contract Compressor is ICompressor, ISystemContract {
         unchecked {
             if (_operation == 0 || _operation == 3) {
                 if (convertedValue != _finalValue) {
-                    revert ValuesNotEqual(_finalValue, convertedValue);
+                    revert CompressionValueTransformError(_finalValue, convertedValue);
                 }
             } else if (_operation == 1) {
                 if (_initialValue + convertedValue != _finalValue) {
-                    revert ValuesNotEqual(_finalValue, _initialValue + convertedValue);
+                    revert CompressionValueAddError(_finalValue, _initialValue + convertedValue);
                 }
             } else if (_operation == 2) {
                 if (_initialValue - convertedValue != _finalValue) {
-                    revert ValuesNotEqual(_finalValue, _initialValue - convertedValue);
+                    revert CompressionValueSubError(_finalValue, _initialValue - convertedValue);
                 }
             } else {
                 revert UnsupportedOperation();

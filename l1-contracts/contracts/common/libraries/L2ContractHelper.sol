@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
 
-pragma solidity 0.8.24;
-
-// solhint-disable gas-custom-errors
+import {BytecodeError, MalformedBytecode, LengthIsNotDivisibleBy32} from "../L1ContractErrors.sol";
 
 import {UncheckedMath} from "./UncheckedMath.sol";
 
@@ -26,11 +26,19 @@ library L2ContractHelper {
     /// - Bytecode words length is not odd
     function hashL2Bytecode(bytes memory _bytecode) internal pure returns (bytes32 hashedBytecode) {
         // Note that the length of the bytecode must be provided in 32-byte words.
-        require(_bytecode.length % 32 == 0, "pq");
+        if (_bytecode.length % 32 != 0) {
+            revert LengthIsNotDivisibleBy32(_bytecode.length);
+        }
 
         uint256 bytecodeLenInWords = _bytecode.length / 32;
-        require(bytecodeLenInWords < 2 ** 16, "pp"); // bytecode length must be less than 2^16 words
-        require(bytecodeLenInWords % 2 == 1, "ps"); // bytecode length in words must be odd
+        // bytecode length must be less than 2^16 words
+        if (bytecodeLenInWords >= 2 ** 16) {
+            revert MalformedBytecode(BytecodeError.NumberOfWords);
+        }
+        // bytecode length in words must be odd
+        if (bytecodeLenInWords % 2 == 0) {
+            revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
+        }
         hashedBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
         // Setting the version of the hash
         hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));
@@ -44,9 +52,15 @@ library L2ContractHelper {
     /// @param _bytecodeHash The hash of the bytecode to validate.
     function validateBytecodeHash(bytes32 _bytecodeHash) internal pure {
         uint8 version = uint8(_bytecodeHash[0]);
-        require(version == 1 && _bytecodeHash[1] == bytes1(0), "zf"); // Incorrectly formatted bytecodeHash
+        // Incorrectly formatted bytecodeHash
+        if (version != 1 || _bytecodeHash[1] != bytes1(0)) {
+            revert MalformedBytecode(BytecodeError.Version);
+        }
 
-        require(bytecodeLen(_bytecodeHash) % 2 == 1, "uy"); // Code length in words must be odd
+        // Code length in words must be odd
+        if (bytecodeLen(_bytecodeHash) % 2 == 0) {
+            revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
+        }
     }
 
     /// @notice Returns the length of the bytecode associated with the given hash.

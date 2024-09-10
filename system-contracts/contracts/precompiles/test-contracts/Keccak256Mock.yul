@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * @author Matter Labs
  * @notice The contract used to emulate EVM's keccak256 opcode.
