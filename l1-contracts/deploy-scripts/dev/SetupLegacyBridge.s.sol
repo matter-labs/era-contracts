@@ -28,7 +28,6 @@ contract SetupLegacyBridge is Script {
     struct Addresses {
         address create2FactoryAddr;
         address bridgehub;
-        address proxyAdmin;
         address diamondProxy;
         address sharedBridgeProxy;
         address transparentProxyAdmin;
@@ -53,7 +52,6 @@ contract SetupLegacyBridge is Script {
         string memory toml = vm.readFile(path);
 
         addresses.bridgehub = toml.readAddress("$.bridgehub");
-        addresses.proxyAdmin = toml.readAddress("$.proxy_admin");
         addresses.diamondProxy = toml.readAddress("$.diamond_proxy");
         addresses.sharedBridgeProxy = toml.readAddress("$.shared_bridge_proxy");
         addresses.transparentProxyAdmin = toml.readAddress("$.transparent_proxy_admin");
@@ -73,9 +71,6 @@ contract SetupLegacyBridge is Script {
             abi.encode(addresses.tokenWethAddress, addresses.bridgehub, config.chainId, addresses.diamondProxy)
         );
 
-        console.logAddress(addresses.tokenWethAddress);
-        console.logAddress(addresses.bridgehub);
-        console.logAddress(addresses.diamondProxy);
         address contractAddress = deployViaCreate2(bytecode);
         console.log("SharedBridgeImplementation deployed at:", contractAddress);
         addresses.sharedBridgeProxyImpl = contractAddress;
@@ -96,13 +91,13 @@ contract SetupLegacyBridge is Script {
             ProxyAdmin.upgrade,
             (ITransparentUpgradeableProxy(proxy), implementation)
         );
-        ProxyAdmin _proxyAdmin = ProxyAdmin(addresses.proxyAdmin);
+        ProxyAdmin _proxyAdmin = ProxyAdmin(addresses.transparentProxyAdmin);
         address governance = _proxyAdmin.owner();
 
         Utils.executeUpgrade({
             _governor: address(governance),
             _salt: bytes32(0),
-            _target: address(addresses.proxyAdmin),
+            _target: address(addresses.transparentProxyAdmin),
             _data: proxyAdminUpgradeData,
             _value: 0,
             _delay: 0
@@ -120,7 +115,7 @@ contract SetupLegacyBridge is Script {
     returns (address tokenBeaconAddress, bytes32 tokenBeaconBytecodeHash)
     {
         bytes memory l2StandardTokenCode = Utils.readHardhatBytecode(
-            "/../../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
+            "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
         );
         (address l2StandardToken, bytes32 l2StandardTokenBytecodeHash) = calculateL2Create2Address(
             config.l2SharedBridgeAddress,
@@ -130,7 +125,7 @@ contract SetupLegacyBridge is Script {
         );
 
         bytes memory beaconProxy = Utils.readHardhatBytecode(
-            "/../../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
+            "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json"
         );
 
         (tokenBeaconAddress, tokenBeaconBytecodeHash) = calculateL2Create2Address(
