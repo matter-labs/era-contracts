@@ -374,7 +374,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes memory _erc20Data,
         address _expectedToken
     ) internal {
-        (address deployedToken, ) = _deployBridgedToken(_originChainId, _originToken, _erc20Data);
+        address deployedToken = _deployBridgedToken(_originChainId, _originToken, _erc20Data);
         if (deployedToken != _expectedToken) {
             revert AddressMismatch(_expectedToken, deployedToken);
         }
@@ -398,13 +398,13 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         uint256 _originChainId,
         address _originToken,
         bytes memory _erc20Data
-    ) internal virtual returns (address, uint256) {
+    ) internal returns (address) {
         bytes32 salt = _getCreate2Salt(_originChainId, _originToken);
 
         BeaconProxy l2Token = _deployBeaconProxy(salt);
         uint256 tokenOriginChainId = BridgedStandardERC20(address(l2Token)).bridgeInitialize(_originToken, _erc20Data);
-
-        return (address(l2Token), tokenOriginChainId);
+        originChainId[DataEncoding.encodeNTVAssetId(tokenOriginChainId, _originToken)] = tokenOriginChainId;
+        return address(l2Token);
     }
 
     /// @notice Converts the L1 token address to the create2 salt of deployed L2 token.
