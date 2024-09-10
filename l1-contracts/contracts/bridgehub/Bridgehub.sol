@@ -495,11 +495,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
-        require(
-            _request.secondBridgeAddress > BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
-            "BH: second bridge address too low"
-        ); // to avoid calls to precompiles
-
         {
             bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
             uint256 baseTokenMsgValue;
