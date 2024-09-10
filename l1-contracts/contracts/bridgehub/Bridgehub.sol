@@ -229,7 +229,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function setLegacyChainAddress(uint256 _chainId) external {
         address ctm = chainTypeManager[_chainId];
         if (ctm == address(0)) {
-            revert CTMNotRegistered();
+            revert ChainNotLegacy();
         }
         if (zkChainMap.contains(_chainId)) {
             revert ChainAlreadyLive();
