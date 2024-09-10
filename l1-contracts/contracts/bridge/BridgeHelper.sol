@@ -33,7 +33,7 @@ library BridgeHelper {
         return
             DataEncoding.encodeTokenData({
                 _legacy: _legacy,
-                _originChainId: _originChainId,
+                _chainId: _originChainId,
                 _name: data1,
                 _symbol: data2,
                 _decimals: data3
