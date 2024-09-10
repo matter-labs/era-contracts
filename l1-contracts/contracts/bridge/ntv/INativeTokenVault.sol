@@ -16,10 +16,6 @@ interface INativeTokenVault {
 
     /// @notice The AssetRouter contract
     function ASSET_ROUTER() external view returns (IAssetRouterBase);
-
-    /// @notice Returns if the bridged version of bridged token has been deployed
-    // function isTokenNative(bytes32 assetId) external view returns (bool);
-
     /// @notice Returns the chain ID of the origin chain for a given asset ID
     function originChainId(bytes32 assetId) external view returns (uint256);
 

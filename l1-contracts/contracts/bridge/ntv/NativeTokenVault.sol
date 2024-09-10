@@ -49,9 +49,6 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev A mapping assetId => tokenAddress
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
-    // /// @dev A mapping assetId => isTokenBridged
-    // mapping(bytes32 assetId => bool bridged) public isTokenNative;
-
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
