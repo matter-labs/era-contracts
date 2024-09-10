@@ -23,7 +23,7 @@ import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
+import {MigrationPaused, AssetIdAlreadyRegistered, ChainAlreadyLive, ChainNotLegacy, CTMNotRegistered, ChainIdNotRegistered, AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -108,28 +108,38 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     modifier onlyChainCTM(uint256 _chainId) {
-        require(msg.sender == chainTypeManager[_chainId], "BH: not chain CTM");
+        if (msg.sender != chainTypeManager[_chainId]) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     modifier onlyL1() {
-        require(L1_CHAIN_ID == block.chainid, "BH: not L1");
+        if (L1_CHAIN_ID != block.chainid) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     modifier onlySettlementLayerRelayedSender() {
         /// There is no sender for the wrapping, we use a virtual address.
-        require(msg.sender == SETTLEMENT_LAYER_RELAY_SENDER, "BH: not relayed senser");
+        if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     modifier onlyAssetRouter() {
-        require(msg.sender == assetRouter, "BH: not asset router");
+        if (msg.sender != assetRouter) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     modifier whenMigrationsNotPaused() {
-        require(!migrationPaused, "BH: migrations paused");
+        if (migrationPaused) {
+            revert MigrationPaused();
+        }
         _;
     }
 
@@ -218,11 +228,16 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _chainId The chainId of the legacy chain we are migrating.
     function setLegacyChainAddress(uint256 _chainId) external {
         address ctm = chainTypeManager[_chainId];
-        require(ctm != address(0), "BH: chain not legacy");
-        require(!zkChainMap.contains(_chainId), "BH: chain already migrated");
-        /// Note we have to do this before CTM is upgraded.
+        if (ctm == address(0)) {
+            revert CTMNotRegistered();
+        }
+        if (zkChainMap.contains(_chainId)) {
+            revert ChainAlreadyLive();
+        }
         address chainAddress = IChainTypeManager(ctm).getZKChainLegacy(_chainId);
-        require(chainAddress != address(0), "BH: chain not legacy 2");
+        if (chainAddress == address(0)) {
+            revert ChainNotLegacy();
+        }
         _registerNewZKChain(_chainId, chainAddress);
     }
 
@@ -260,7 +275,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice asset id can represent any token contract with the appropriate interface/functionality
     /// @param _baseTokenAssetId asset id of base token to be registered
     function addTokenAssetId(bytes32 _baseTokenAssetId) external onlyOwner {
-        require(!assetIdIsRegistered[_baseTokenAssetId], "BH: asset id already registered");
+        if (assetIdIsRegistered[_baseTokenAssetId]) {
+            revert AssetIdAlreadyRegistered();
+        }
         assetIdIsRegistered[_baseTokenAssetId] = true;
 
         emit BaseTokenAssetIdRegistered(_baseTokenAssetId);
@@ -294,8 +311,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         address sender = L1_CHAIN_ID == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);
         // This method can be accessed by l1CtmDeployer only
-        require(sender == address(l1CtmDeployer), "BH: not ctm deployer");
-        require(chainTypeManagerIsRegistered[_assetAddress], "CTM not registered");
+        if (sender != address(l1CtmDeployer)) {
+            revert Unauthorized(sender);
+        }
+        if (!chainTypeManagerIsRegistered[_assetAddress]) {
+            revert CTMNotRegistered();
+        }
 
         bytes32 assetInfo = keccak256(abi.encode(L1_CHAIN_ID, sender, _additionalData));
         ctmAssetIdToAddress[assetInfo] = _assetAddress;
@@ -398,7 +419,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     function ctmAssetIdFromChainId(uint256 _chainId) public view override returns (bytes32) {
         address ctmAddress = chainTypeManager[_chainId];
-        require(ctmAddress != address(0), "chain id not registered");
+        if (ctmAddress == address(0)) {
+            revert ChainIdNotRegistered(_chainId);
+        }
         return ctmAssetId(chainTypeManager[_chainId]);
     }
 

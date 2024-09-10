@@ -39,6 +39,8 @@ error AmountMustBeGreaterThanZero();
 error AssetHandlerDoesNotExist(bytes32 assetId);
 //
 error AssetIdMismatch(bytes32 expected, bytes32 supplied);
+//
+error AssetIdAlreadyRegistered();
 // 0x0bfcef28
 error AlreadyWhitelisted(address);
 // 0x04a0b7e9
@@ -73,6 +75,10 @@ error ChainIdAlreadyExists();
 error ChainIdCantBeCurrentChain();
 // 0xa179f8c9
 error ChainIdMismatch();
+//
+error ChainIdNotRegistered(uint256 chainId);
+//
+error ChainNotLegacy();
 // 0x78d2ed02
 error ChainAlreadyLive();
 // 0x8f620a06
@@ -206,6 +212,8 @@ error MerkleIndexOutOfBounds();
 error MerklePathEmpty();
 // 0x1c500385
 error MerklePathOutOfBounds();
+//
+error MigrationPaused();
 // 0xfa44b527
 error MissingSystemLogs(uint256 expected, uint256 actual);
 // 0x4a094431
