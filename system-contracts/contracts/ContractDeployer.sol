@@ -543,7 +543,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             }
         }
 
-
         bytes32 codeHash = _getEvmCodeHash(_newAddress);
         require(codeHash != 0x0, "The code hash must be set after the constructor call");
         emit ContractDeployed(_sender, codeHash, _newAddress);
