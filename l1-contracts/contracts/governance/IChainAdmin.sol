@@ -2,11 +2,8 @@
 
 pragma solidity 0.8.24;
 
-<<<<<<< HEAD
-=======
 import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 /// @title ChainAdmin contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -25,9 +22,6 @@ interface IChainAdmin {
     event UpdateUpgradeTimestamp(uint256 indexed _protocolVersion, uint256 _upgradeTimestamp);
 
     /// @notice Emitted when the call is executed from the contract.
-<<<<<<< HEAD
-    event CallExecuted(Call _call, bool success, bytes returnData);
-=======
     event CallExecuted(Call _call, bool _success, bytes _returnData);
 
     /// @notice Emitted when the new token multiplier address is set.
@@ -40,5 +34,4 @@ interface IChainAdmin {
     function multicall(Call[] calldata _calls, bool _requireSuccess) external payable;
 
     function setTokenMultiplier(IAdmin _chainContract, uint128 _nominator, uint128 _denominator) external;
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 }

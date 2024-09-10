@@ -174,11 +174,7 @@ contract RegisterHyperchainScript is Script {
 
     function deployChainAdmin() internal {
         vm.broadcast();
-<<<<<<< HEAD
-        ChainAdmin chainAdmin = new ChainAdmin(config.ownerAddress);
-=======
         ChainAdmin chainAdmin = new ChainAdmin(config.ownerAddress, address(0));
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
         console.log("ChainAdmin deployed at:", address(chainAdmin));
         config.chainAdmin = address(chainAdmin);
     }
@@ -258,14 +254,8 @@ contract RegisterHyperchainScript is Script {
     function setPendingAdmin() internal {
         IZkSyncHyperchain hyperchain = IZkSyncHyperchain(config.newDiamondProxy);
 
-<<<<<<< HEAD
-        vm.startBroadcast(msg.sender);
-        hyperchain.setPendingAdmin(config.chainAdmin);
-        vm.stopBroadcast();
-=======
         vm.broadcast();
         hyperchain.setPendingAdmin(config.chainAdmin);
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
         console.log("Owner for ", config.newDiamondProxy, "set to", config.chainAdmin);
     }
 

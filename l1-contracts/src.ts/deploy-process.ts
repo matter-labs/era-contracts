@@ -61,7 +61,6 @@ export async function initialBridgehubDeployment(
   await deployer.deployChainAdmin(create2Salt, { gasPrice });
   await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
 
-<<<<<<< HEAD
   if (!deployer.isZkMode()) {
     // proxy admin is already deployed when SL's L2SharedBridge is registered
     await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
@@ -89,15 +88,6 @@ export async function initialBridgehubDeployment(
   } else {
     await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
   }
-=======
-  await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
-  nonce++;
-
-  await deployer.deployChainAdmin(create2Salt, { gasPrice, nonce });
-  await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
-  await deployer.deployBridgehubContract(create2Salt, gasPrice);
-  await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   await deployer.deployStateTransitionManagerContract(create2Salt, extraFacets, gasPrice);
   await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
 }

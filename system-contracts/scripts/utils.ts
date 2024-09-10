@@ -16,6 +16,7 @@ import path from "path";
 import { spawn as _spawn } from "child_process";
 import { createHash } from "crypto";
 import { CompilerDownloader } from "hardhat/internal/solidity/compiler/downloader";
+import  fetch from 'node-fetch';
 
 export type HttpMethod = "POST" | "GET";
 
@@ -326,8 +327,6 @@ export async function isFolderEmpty(folderPath: string): Promise<boolean> {
   } catch (error) {
     console.error("No target folder with artifacts.");
     return true; // Return true if an error, as folder doesn't exist.
-<<<<<<< HEAD
-=======
   }
 }
 /**
@@ -371,6 +370,5 @@ export async function query(
       error: "Could not decode JSON in response",
       status: `${response.status} ${response.statusText}`,
     };
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   }
 }

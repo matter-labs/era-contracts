@@ -2,40 +2,22 @@
 
 pragma solidity 0.8.24;
 
-<<<<<<< HEAD
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {IChainAdmin} from "./IChainAdmin.sol";
-=======
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
 import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 import {NoCallsProvided, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The contract is designed to hold the `admin` role in ZKSync Chain (State Transition) contracts.
 /// The owner of the contract can perform any external calls and also save the information needed for
-<<<<<<< HEAD
-/// the blockchain node to accept the protocol upgrade.
-contract ChainAdmin is IChainAdmin, Ownable2Step {
-    constructor(address _initialOwner) {
-        // solhint-disable-next-line gas-custom-errors, reason-string
-        require(_initialOwner != address(0), "Initial owner should be non zero address");
-        _transferOwnership(_initialOwner);
-    }
-
-=======
 /// the blockchain node to accept the protocol upgrade. Another role - `tokenMultiplierSetter` can be used in the contract
 /// to change the base token gas price in the Chain contract.
 contract ChainAdmin is IChainAdmin, Ownable2Step {
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
     /// @notice Mapping of protocol versions to their expected upgrade timestamps.
     /// @dev Needed for the offchain node administration to know when to start building batches with the new protocol version.
     mapping(uint256 protocolVersion => uint256 upgradeTimestamp) public protocolVersionToUpgradeTimestamp;
 
-<<<<<<< HEAD
-=======
     /// @notice The address which can call `setTokenMultiplier` function to change the base token gas price in the Chain contract.
     /// @dev The token base price can be changed quite often, so the private key for this role is supposed to be stored in the node
     /// and used by the automated service in a way similar to the sequencer workflow.
@@ -58,7 +40,6 @@ contract ChainAdmin is IChainAdmin, Ownable2Step {
         tokenMultiplierSetter = _tokenMultiplierSetter;
     }
 
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
     /// @notice Set the expected upgrade timestamp for a specific protocol version.
     /// @param _protocolVersion The ZKsync chain protocol version.
     /// @param _upgradeTimestamp The timestamp at which the chain node should expect the upgrade to happen.
@@ -72,14 +53,9 @@ contract ChainAdmin is IChainAdmin, Ownable2Step {
     /// @param _requireSuccess If true, reverts transaction on any call failure.
     /// @dev Intended for batch processing of contract interactions, managing gas efficiency and atomicity of operations.
     function multicall(Call[] calldata _calls, bool _requireSuccess) external payable onlyOwner {
-<<<<<<< HEAD
-        // solhint-disable-next-line gas-custom-errors
-        require(_calls.length > 0, "No calls provided");
-=======
         if (_calls.length == 0) {
             revert NoCallsProvided();
         }
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _calls.length; ++i) {
             // slither-disable-next-line arbitrary-send-eth
@@ -94,8 +70,6 @@ contract ChainAdmin is IChainAdmin, Ownable2Step {
         }
     }
 
-<<<<<<< HEAD
-=======
     /// @notice Sets the token multiplier in the specified Chain contract.
     /// @param _chainContract The chain contract address where the token multiplier will be set.
     /// @param _nominator The numerator part of the token multiplier.
@@ -107,7 +81,6 @@ contract ChainAdmin is IChainAdmin, Ownable2Step {
         _chainContract.setTokenMultiplier(_nominator, _denominator);
     }
 
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
     /// @dev Contract might receive/hold ETH as part of the maintenance process.
     receive() external payable {}
 }

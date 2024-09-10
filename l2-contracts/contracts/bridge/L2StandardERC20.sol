@@ -147,25 +147,6 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
         emit BridgeInitialize(l1Address, _newName, _newSymbol, decimals_);
     }
 
-<<<<<<< HEAD
-=======
-    modifier onlyBridge() {
-        if (msg.sender != l2Bridge) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    modifier onlyNextVersion(uint8 _version) {
-        // The version should be incremented by 1. Otherwise, the governor risks disabling
-        // future reinitialization of the token by providing too large a version.
-        if (_version != _getInitializedVersion() + 1) {
-            revert NonSequentialVersion();
-        }
-        _;
-    }
-
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
     /// @dev Mint tokens to a given account.
     /// @param _to The account that will receive the created tokens.
     /// @param _amount The amount that will be created.

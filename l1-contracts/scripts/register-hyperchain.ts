@@ -66,12 +66,8 @@ async function main() {
     .option("--validium-mode")
     .option("--base-token-name <base-token-name>")
     .option("--base-token-address <base-token-address>")
-<<<<<<< HEAD
-    .option("--use-governance")
-=======
     .option("--use-governance <use-governance>")
     .option("--token-multiplier-setter-address <token-multiplier-setter-address>")
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -105,7 +101,6 @@ async function main() {
       if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
         await deployer.registerTokenBridgehub(baseTokenAddress, cmd.useGovernance);
       }
-<<<<<<< HEAD
       await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
       await deployer.registerHyperchain(
         baseTokenAddress,
@@ -117,16 +112,13 @@ async function main() {
         null,
         cmd.useGovernance
       );
-=======
 
       const tokenMultiplierSetterAddress = cmd.tokenMultiplierSetterAddress || "";
 
-      await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice, useGovernance);
       if (tokenMultiplierSetterAddress != "") {
         console.log(`Using token multiplier setter address: ${tokenMultiplierSetterAddress}`);
         await deployer.setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress);
       }
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
       await deployer.transferAdminFromDeployerToChainAdmin();
     });
 

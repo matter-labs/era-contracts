@@ -6,11 +6,8 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager} from "./IStateTransitionManager.sol";
-<<<<<<< HEAD
 import {PriorityOpsBatchInfo} from "./libraries/PriorityTree.sol";
-=======
 import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErrors.sol";
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

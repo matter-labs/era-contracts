@@ -1,15 +1,4 @@
 [profile.default]
-<<<<<<< HEAD
-src = 'contracts'
-out = 'out'
-libs = ['node_modules', 'lib', '../da-contracts/']
-remappings = [
-    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
-    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
-    "l2-contracts/=../l2-contracts/contracts/",
-    "da-contracts/=../da-contracts/contracts/"
-]
-=======
 src = "contracts"
 out = "out"
 libs = ["lib"]
@@ -17,18 +6,14 @@ cache_path = "cache-forge"
 test = "test/foundry"
 solc_version = "0.8.24"
 evm_version = "cancun"
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 allow_paths = ["../l2-contracts/contracts"]
 fs_permissions = [
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
     { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed" },
     { access = "read", path = "../l2-contracts/artifacts-zk/" },
-<<<<<<< HEAD
     { access = "read", path = "../da-contracts/" },
-=======
     { access = "read", path = "../l2-contracts/zkout/" },
     { access = "read", path = "../system-contracts/zkout/" },
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
     { access = "read", path = "./script-config" },
     { access = "read-write", path = "./script-out" },
     { access = "read", path = "./out" },
@@ -43,4 +28,6 @@ remappings = [
     "foundry-test/=test/foundry/",
     "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
     "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
+    "l2-contracts/=../l2-contracts/contracts/",
+    "da-contracts/=../da-contracts/contracts/"
 ]

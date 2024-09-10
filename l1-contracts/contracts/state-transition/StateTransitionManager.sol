@@ -13,11 +13,6 @@ import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager, StateTransitionManagerInitializeData, ChainCreationParams} from "./IStateTransitionManager.sol";
 import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
-<<<<<<< HEAD
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
-=======
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
@@ -26,7 +21,6 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
 import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
 import {Unauthorized, ZeroAddress, HashMismatch, HyperchainLimitReached, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero} from "../common/L1ContractErrors.sol";
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
@@ -393,41 +387,16 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // check not registered
         Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));
 
-<<<<<<< HEAD
-        {
-            // check input
-            bytes32 cutHashInput = keccak256(_diamondCut);
-            require(cutHashInput == initialCutHash, "STM: initial cutHash mismatch");
-        }
-        bytes memory mandatoryInitData;
-        {
-            // solhint-disable-next-line func-named-parameters
-            mandatoryInitData = bytes.concat(
-                bytes32(_chainId),
-                bytes32(uint256(uint160(BRIDGE_HUB))),
-                bytes32(uint256(uint160(address(this)))),
-                bytes32(protocolVersion),
-                bytes32(uint256(uint160(_admin))),
-                bytes32(uint256(uint160(validatorTimelock))),
-                bytes32(uint256(uint160(_baseToken))),
-                bytes32(uint256(uint160(_sharedBridge))),
-                storedBatchZero
-            );
-=======
         // check input
         bytes32 cutHashInput = keccak256(_diamondCut);
         if (cutHashInput != initialCutHash) {
             revert HashMismatch(initialCutHash, cutHashInput);
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
         }
 
         // construct init data
         bytes memory initData;
         /// all together 4+9*32=292 bytes for the selector + mandatory data
         // solhint-disable-next-line func-named-parameters
-<<<<<<< HEAD
-        initData = bytes.concat(IDiamondInit.initialize.selector, mandatoryInitData, diamondCut.initCalldata);
-=======
         initData = bytes.concat(
             IDiamondInit.initialize.selector,
             bytes32(_chainId),
@@ -441,7 +410,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             storedBatchZero,
             diamondCut.initCalldata
         );
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 
         diamondCut.initCalldata = initData;
         // deploy hyperchainContract

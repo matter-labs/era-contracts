@@ -16,7 +16,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, L2_NATIVE_TOKEN_VAULT} from "../L2ContractHelper.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
-import {EmptyAddress, InvalidCaller} from "../L2ContractErrors.sol";
+import {EmptyAddress, InvalidCaller} from "../errors/L2ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

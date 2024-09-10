@@ -49,20 +49,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     }
 
     /// @inheritdoc IMailbox
-<<<<<<< HEAD
-=======
-    function transferEthToSharedBridge() external onlyBaseTokenBridge {
-        if (s.chainId != ERA_CHAIN_ID) {
-            revert OnlyEraSupported();
-        }
-
-        uint256 amount = address(this).balance;
-        address baseTokenBridgeAddress = s.baseTokenBridge;
-        IL1SharedBridge(baseTokenBridgeAddress).receiveEth{value: amount}(ERA_CHAIN_ID);
-    }
-
-    /// @notice when requesting transactions through the bridgehub
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
     ) external onlyBridgehub returns (bytes32 canonicalTxHash) {
@@ -235,13 +221,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         L2Log memory _log,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-<<<<<<< HEAD
         // require(_batchNumber <= s.totalBatchesExecuted, "xx");
-=======
-        if (_batchNumber > s.totalBatchesExecuted) {
-            revert BatchNotExecuted(_batchNumber);
-        }
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 
         bytes32 hashedLog = keccak256(
             // solhint-disable-next-line func-named-parameters
@@ -315,7 +295,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     }
 
     /// @inheritdoc IMailbox
-<<<<<<< HEAD
     function requestL2TransactionToGatewayMailbox(
         uint256 _chainId,
         L2CanonicalTransaction calldata _transaction,
@@ -335,25 +314,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             _factoryDeps: _factoryDeps,
             _canonicalTxHash: _canonicalTxHash,
             _expirationTimestamp: _expirationTimestamp
-=======
-    function finalizeEthWithdrawal(
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external nonReentrant {
-        if (s.chainId != ERA_CHAIN_ID) {
-            revert OnlyEraSupported();
-        }
-        IL1SharedBridge(s.baseTokenBridge).finalizeWithdrawal({
-            _chainId: ERA_CHAIN_ID,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _message: _message,
-            _merkleProof: _merkleProof
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
         });
         canonicalTxHash = _requestL2TransactionToGatewayFree(wrappedRequest);
     }
@@ -362,7 +322,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     function bridgehubRequestL2TransactionOnGateway(
         L2CanonicalTransaction calldata _transaction,
         bytes[] calldata _factoryDeps,
-<<<<<<< HEAD
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external override onlyBridgehub {
@@ -382,14 +341,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             (_chainId, _transaction, _factoryDeps, _canonicalTxHash, _expirationTimestamp)
         );
         return
-=======
-        address _refundRecipient
-    ) external payable returns (bytes32 canonicalTxHash) {
-        if (s.chainId != ERA_CHAIN_ID) {
-            revert OnlyEraSupported();
-        }
-        canonicalTxHash = _requestL2TransactionSender(
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
             BridgehubL2TransactionRequest({
                 /// There is no sender for the wrapping, we use a virtual address.
                 sender: VIRTUAL_SENDER_ALIASED_ZERO_ADDRESS,
@@ -443,15 +394,10 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
         BridgehubL2TransactionRequest memory request = _params.request;
 
-<<<<<<< HEAD
-        require(request.factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
-        _params.txId = _nextPriorityTxId();
-=======
         if (request.factoryDeps.length > MAX_NEW_FACTORY_DEPS) {
             revert TooManyFactoryDeps();
         }
-        _params.txId = s.priorityQueue.getTotalPriorityTxs();
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
+        _params.txId = _nextPriorityTxId();
 
         // Checking that the user provided enough ether to pay for the transaction.
         _params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, request.l2GasPerPubdataByteLimit);
@@ -463,10 +409,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         request.refundRecipient = AddressAliasHelper.actualRefundRecipient(request.refundRecipient, request.sender);
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently ZKsync address derivation is different from Ethereum one, but it may be changed in the future.
-<<<<<<< HEAD
-=======
         // solhint-disable avoid-tx-origin
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
         // slither-disable-next-line tx-origin
         if (request.sender != tx.origin) {
             request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
@@ -602,7 +545,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
-        require(s.chainId == ERA_CHAIN_ID, "Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
+        if (s.chainId != ERA_CHAIN_ID) {
+            revert OnlyEraSupported();
+        }
         IL1AssetRouter(s.baseTokenBridge).finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
             _l2BatchNumber: _l2BatchNumber,
@@ -623,7 +568,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash) {
-        require(s.chainId == ERA_CHAIN_ID, "Mailbox: legacy interface only available for Era");
+        if (s.chainId != ERA_CHAIN_ID) {
+            revert OnlyEraSupported();
+        }
         canonicalTxHash = _requestL2TransactionSender(
             BridgehubL2TransactionRequest({
                 sender: msg.sender,

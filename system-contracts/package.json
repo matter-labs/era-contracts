@@ -63,12 +63,8 @@
     "deploy-preimages": "ts-node scripts/deploy-preimages.ts",
     "copy:typechain": "mkdir -p ../l2-contracts/typechain && cp ./typechain/ContractDeployerFactory.ts ../l2-contracts/typechain/",
     "preprocess:bootloader": "rm -rf ./bootloader/build && yarn ts-node scripts/preprocess-bootloader.ts",
-<<<<<<< HEAD
-    "preprocess:system-contracts": "ts-node scripts/preprocess-system-contracts.ts",
-=======
     "preprocess:system-contracts": "rm -rf ./contracts-preprocessed && ts-node scripts/preprocess-system-contracts.ts",
     "verify-on-explorer": "hardhat run scripts/verify-on-explorer.ts",
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
     "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode",
     "test-node": "hardhat node-zksync --tag v0.0.1-vm1.5.0",
     "test:bootloader": "cd bootloader/test_infra && cargo run"

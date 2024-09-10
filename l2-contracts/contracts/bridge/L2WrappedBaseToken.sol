@@ -80,16 +80,6 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2S
         emit Initialize(name_, symbol_, 18);
     }
 
-<<<<<<< HEAD
-=======
-    modifier onlyBridge() {
-        if (msg.sender != l2Bridge) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
     /// @notice Function for minting tokens on L2, implemented only to be compatible with IL2StandardToken interface.
     /// Always reverts instead of minting anything!
     /// Note: Use `deposit`/`depositTo` methods instead.

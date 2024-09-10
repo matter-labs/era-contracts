@@ -2,14 +2,7 @@
 pragma solidity 0.8.24;
 
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
-<<<<<<< HEAD
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {BLOB_SIZE_BYTES, MAX_NUMBER_OF_BLOBS} from "./Constants.sol";
-=======
-import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {L1_MESSENGER_CONTRACT, BLOB_SIZE_BYTES, MAX_NUMBER_OF_BLOBS, SystemLogKey} from "./Constants.sol";
-import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 import {TooMuchPubdata} from "./SystemContractErrors.sol";
 
 /**

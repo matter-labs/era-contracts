@@ -4,11 +4,8 @@ pragma solidity ^0.8.20;
 
 // 0x1f73225f
 error AddressMismatch(address expected, address supplied);
-<<<<<<< HEAD:l2-contracts/contracts/L2ContractErrors.sol
 error AssetIdMismatch(bytes32 expected, bytes32 supplied);
-=======
 // 0x5e85ae73
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe:l2-contracts/contracts/errors/L2ContractErrors.sol
 error AmountMustBeGreaterThanZero();
 // 0xb4f54111
 error DeployFailed();
@@ -36,7 +33,6 @@ error UnimplementedMessage(string message);
 error UnsupportedPaymasterFlow();
 // 0x750b219c
 error WithdrawFailed();
-<<<<<<< HEAD:l2-contracts/contracts/L2ContractErrors.sol
 error MalformedBytecode(BytecodeError);
 
 enum BytecodeError {
@@ -46,9 +42,7 @@ enum BytecodeError {
     WordsMustBeOdd,
     DictionaryLength
 }
-=======
 // 0xd92e233d
 error ZeroAddress();
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe:l2-contracts/contracts/errors/L2ContractErrors.sol
 
 string constant BRIDGE_MINT_NOT_IMPLEMENTED = "bridgeMint is not implemented! Use deposit/depositTo methods instead.";

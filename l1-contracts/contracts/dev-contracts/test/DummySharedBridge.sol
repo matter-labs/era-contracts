@@ -5,24 +5,18 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
-<<<<<<< HEAD
-import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
-import {IL1NativeTokenVault} from "../../bridge/L1NativeTokenVault.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../../common/L2ContractAddresses.sol";
-
-contract DummySharedBridge {
-    IL1NativeTokenVault public nativeTokenVault;
-
-=======
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {IL1NativeTokenVault} from "../../bridge/L1NativeTokenVault.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDRESS} from "../../common/L2ContractAddresses.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 import {IL2Bridge} from "../../bridge/interfaces/IL2Bridge.sol";
 
 contract DummySharedBridge is PausableUpgradeable {
     using SafeERC20 for IERC20;
 
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
+    IL1NativeTokenVault public nativeTokenVault;
+
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,
         address indexed from,
@@ -203,10 +197,12 @@ contract DummySharedBridge is PausableUpgradeable {
             require(withdrawAmount == _depositAmount, "5T"); // The token has non-standard transfer logic
         }
 
-        bytes memory l2TxCalldata = abi.encodeCall(
-            IL2Bridge.finalizeDeposit,
-            (_prevMsgSender, _l2Receiver, _l1Token, amount, new bytes(0))
-        );
+        // TODO: restore
+        bytes memory l2TxCalldata = hex""; 
+        // abi.encodeCall(
+        //     IL2Bridge.finalizeDeposit,
+        //     (_prevMsgSender, _l2Receiver, _l1Token, amount, new bytes(0))
+        // );
         bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
 
         request = L2TransactionRequestTwoBridgesInner({

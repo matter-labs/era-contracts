@@ -8,11 +8,7 @@ import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
 /// @title L1 Bridge contract legacy interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-<<<<<<< HEAD
 /// @notice Legacy Bridge interface before ZK chain migration, used for backward compatibility with ZKsync Era
-=======
-/// @notice Legacy Bridge interface before hyperchain migration, used for backward compatibility with ZKsync Era
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 interface IL1ERC20Bridge {
     event DepositInitiated(
         bytes32 indexed l2DepositTxHash,

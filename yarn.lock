@@ -763,7 +763,6 @@
     sinon-chai "^3.7.0"
     undici "^5.14.0"
 
-<<<<<<< HEAD
 "@matterlabs/hardhat-zksync-solc@^0.3.15":
   version "0.3.17"
   resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-solc/-/hardhat-zksync-solc-0.3.17.tgz#72f199544dc89b268d7bfc06d022a311042752fd"
@@ -773,8 +772,6 @@
     chalk "4.1.2"
     dockerode "^3.3.4"
 
-=======
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 "@matterlabs/hardhat-zksync-verify@0.6.1":
   version "0.6.1"
   resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-verify/-/hardhat-zksync-verify-0.6.1.tgz#3fd83f4177ac0b138656ed93d4756ec27f1d329d"
@@ -1219,12 +1216,12 @@
   resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-waffle/-/hardhat-waffle-2.0.6.tgz#d11cb063a5f61a77806053e54009c40ddee49a54"
   integrity sha512-+Wz0hwmJGSI17B+BhU/qFRZ1l6/xMW82QGXE/Gi+WTmwgJrQefuBs1lIf7hzQ1hLk6hpkvb/zwcNkpVKRYTQYg==
 
-"@openzeppelin/contracts-upgradeable-v4@npm:@openzeppelin/contracts-upgradeable@4.9.5":
+"@openzeppelin/contracts-upgradeable-v4@npm:@openzeppelin/contracts-upgradeable@4.9.5", "@openzeppelin/contracts-upgradeable@4.9.5":
   version "4.9.5"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts-upgradeable/-/contracts-upgradeable-4.9.5.tgz#572b5da102fc9be1d73f34968e0ca56765969812"
   integrity sha512-f7L1//4sLlflAN7fVzJLoRedrf5Na3Oal5PZfIq55NFcVZ90EpV1q5xOvL4lFvg3MNICSDr2hH0JUBxwlxcoPg==
 
-"@openzeppelin/contracts-v4@npm:@openzeppelin/contracts@4.9.5":
+"@openzeppelin/contracts-v4@npm:@openzeppelin/contracts@4.9.5", "@openzeppelin/contracts@4.9.5":
   version "4.9.5"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.9.5.tgz#1eed23d4844c861a1835b5d33507c1017fa98de8"
   integrity sha512-ZK+W5mVhRppff9BE6YdR8CC52C8zAvsVAiWhEtQ5+oNxFE6h1WdeWo+FJSF8KKvtxxVYZ7MTP/5KoVpAU3aSWg==
@@ -4444,9 +4441,6 @@ hardhat@=2.22.2:
     uuid "^8.3.2"
     ws "^7.4.6"
 
-<<<<<<< HEAD
-hardhat@^2.14.0, hardhat@^2.19.4:
-=======
 hardhat@^2.14.0:
   version "2.22.7"
   resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.22.7.tgz#3de0ce5074063cf468876c5e62f84c66d2408e8e"
@@ -4497,7 +4491,6 @@ hardhat@^2.14.0:
     ws "^7.4.6"
 
 hardhat@^2.19.4:
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   version "2.22.5"
   resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.22.5.tgz#7e1a4311fa9e34a1cfe337784eae06706f6469a5"
   integrity sha512-9Zq+HonbXCSy6/a13GY1cgHglQRfh4qkzmj1tpPlhxJDwNVnhxlReV6K7hCWFKlOrV13EQwsdcD0rjcaQKWRZw==
@@ -7925,7 +7918,6 @@ yocto-queue@^1.0.0:
   resolved "https://registry.yarnpkg.com/yocto-queue/-/yocto-queue-1.0.0.tgz#7f816433fb2cbc511ec8bf7d263c3b58a1a3c251"
   integrity sha512-9bnSc/HEW2uRy67wc+T8UwauLuPJVn28jb+GtJY16iiKWyvmYJRXVT4UamsAEGQfPohgr2q4Tq0sQbQlxTfi1g==
 
-<<<<<<< HEAD
 zksync-ethers@5.8.0-beta.5:
   version "5.8.0-beta.5"
   resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.8.0-beta.5.tgz#4f70193a86bd1e41b25b0aa5aa32f6d41d52f7c6"
@@ -7933,11 +7925,6 @@ zksync-ethers@5.8.0-beta.5:
   dependencies:
     ethers "~5.7.0"
 
-zksync-ethers@^5.0.0:
-  version "5.7.2"
-  resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.7.2.tgz#e965a9926e6f8168963ab565dd6ad0d38c4f7f18"
-  integrity sha512-D+wn4nkGixUOek9ZsVvIZ/MHponQ5xvw74FSbDJDv6SLCI4LZALOAc8lF3b1ml8nOkpeE2pGV0VKmHTSquRNJg==
-=======
 zksync-ethers@^5.0.0:
   version "5.8.0"
   resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.8.0.tgz#ff054345048f851c33cb6efcf2094f40d4da6063"
@@ -7949,6 +7936,5 @@ zksync-ethers@^5.9.0:
   version "5.9.0"
   resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.9.0.tgz#96dc29e4eaaf0aa70d927886fd6e1e4c545786e3"
   integrity sha512-VnRUesrBcPBmiTYTAp+WreIazK2qCIJEHE7j8BiK+cDApHzjAfIXX+x8SXXJpG1npGJANxiJKnPwA5wjGZtCRg==
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   dependencies:
     ethers "~5.7.0"

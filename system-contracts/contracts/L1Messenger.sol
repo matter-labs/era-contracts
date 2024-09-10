@@ -2,14 +2,9 @@
 
 pragma solidity 0.8.24;
 
-<<<<<<< HEAD
 import {IL1Messenger, L2ToL1Log, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE} from "./interfaces/IL1Messenger.sol";
 
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
-=======
-import {IL1Messenger, L2ToL1Log, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE, STATE_DIFF_COMPRESSION_VERSION_NUMBER} from "./interfaces/IL1Messenger.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
@@ -291,7 +286,6 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         }
         bytes32 localLogsRootHash = l2ToL1LogsTreeArray[0];
 
-<<<<<<< HEAD
         bytes32 aggregatedRootHash = L2_MESSAGE_ROOT.getAggregatedRoot();
         bytes32 fullRootHash = keccak256(bytes.concat(localLogsRootHash, aggregatedRootHash));
 
@@ -310,43 +304,6 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             });
 
             l2DAValidatorOutputhash = abi.decode(returnData, (bytes32));
-=======
-        /// Check messages
-        uint32 numberOfMessages = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-        calldataPtr += 4;
-        bytes32 reconstructedChainedMessagesHash = bytes32(0);
-        for (uint256 i = 0; i < numberOfMessages; ++i) {
-            uint32 currentMessageLength = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-            calldataPtr += 4;
-            bytes32 hashedMessage = EfficientCall.keccak(
-                _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentMessageLength]
-            );
-            calldataPtr += currentMessageLength;
-            reconstructedChainedMessagesHash = keccak256(abi.encode(reconstructedChainedMessagesHash, hashedMessage));
-        }
-        if (reconstructedChainedMessagesHash != chainedMessagesHash) {
-            revert ReconstructionMismatch(PubdataField.MsgHash, chainedMessagesHash, reconstructedChainedMessagesHash);
-        }
-
-        /// Check bytecodes
-        uint32 numberOfBytecodes = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-        calldataPtr += 4;
-        bytes32 reconstructedChainedL1BytecodesRevealDataHash = bytes32(0);
-        for (uint256 i = 0; i < numberOfBytecodes; ++i) {
-            uint32 currentBytecodeLength = uint32(
-                bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4])
-            );
-            calldataPtr += 4;
-            reconstructedChainedL1BytecodesRevealDataHash = keccak256(
-                abi.encode(
-                    reconstructedChainedL1BytecodesRevealDataHash,
-                    Utils.hashL2Bytecode(
-                        _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentBytecodeLength]
-                    )
-                )
-            );
-            calldataPtr += currentBytecodeLength;
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
         }
 
         /// Native (VM) L2 to L1 log

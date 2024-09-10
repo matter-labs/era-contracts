@@ -16,11 +16,7 @@ import {Unauthorized, EmptyDeposit, TokensWithFeesNotSupported, WithdrawalAlread
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-<<<<<<< HEAD
 /// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to ZK chains
-=======
-/// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to hyperchains
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 /// @dev It is a legacy bridge from ZKsync Era, that was deprecated in favour of shared bridge.
 /// It is needed for backward compatibility with already integrated projects.
 contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
@@ -46,11 +42,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     mapping(address account => mapping(address l1Token => mapping(bytes32 depositL2TxHash => uint256 amount)))
         public depositAmount;
 
-<<<<<<< HEAD
-    /// @dev The address that is used as a L2 Shared Bridge in ZKsync Era.
-=======
     /// @dev The address that is used as a L2 bridge counterpart in ZKsync Era.
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
     // slither-disable-next-line uninitialized-state
     address public l2Bridge;
 
@@ -85,17 +77,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
     function initialize() external reentrancyGuardInitializer {}
-
-<<<<<<< HEAD
-=======
-    /// @dev transfer token to shared bridge as part of upgrade
-    function transferTokenToSharedBridge(address _token) external {
-        if (msg.sender != address(SHARED_BRIDGE)) {
-            revert Unauthorized(msg.sender);
-        }
-        uint256 amount = IERC20(_token).balanceOf(address(this));
-        IERC20(_token).safeTransfer(address(SHARED_BRIDGE), amount);
-    }
 
     /*//////////////////////////////////////////////////////////////
                             ERA LEGACY GETTERS
@@ -186,7 +167,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         }
 
         l2TxHash = SHARED_BRIDGE.depositLegacyErc20Bridge{value: msg.value}({
-            _msgSender: msg.sender,
+            _prevMsgSender: msg.sender,
             _l2Receiver: _l2Receiver,
             _l1Token: _l1Token,
             _amount: _amount,
@@ -214,7 +195,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         return balanceAfter - balanceBefore;
     }
 
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// @param _depositSender The address of the deposit initiator
     /// @param _l1Token The address of the deposited L1 ERC20 token
@@ -257,35 +237,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
                             ERA LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Legacy deposit method with refunding the fee to the caller, use another `deposit` method instead.
-    /// @dev Initiates a deposit by locking funds on the contract and sending the request
-    /// of processing an L2 transaction where tokens would be minted.
-    /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
-    /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
-    /// @param _l2Receiver The account address that should receive funds on L2
-    /// @param _l1Token The L1 token address which is deposited
-    /// @param _amount The total amount of tokens to be bridged
-    /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction
-    /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
-    /// @return txHash The L2 transaction hash of deposit finalization
-    /// NOTE: the function doesn't use `nonreentrant` modifier, because the inner method does.
-    function deposit(
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByte
-    ) external payable returns (bytes32 txHash) {
-        txHash = deposit({
-            _l2Receiver: _l2Receiver,
-            _l1Token: _l1Token,
-            _amount: _amount,
-            _l2TxGasLimit: _l2TxGasLimit,
-            _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
-            _refundRecipient: address(0)
-        });
-    }
-
     /// @notice Finalize the withdrawal and release funds
     /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
@@ -312,82 +263,5 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             _merkleProof: _merkleProof
         });
         emit WithdrawalFinalized(l1Receiver, l1Token, amount);
-    }
-
-    /// @notice Initiates a deposit by locking funds on the contract and sending the request
-    /// @dev Initiates a deposit by locking funds on the contract and sending the request
-    /// of processing an L2 transaction where tokens would be minted
-    /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
-    /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
-    /// @param _l2Receiver The account address that should receive funds on L2
-    /// @param _l1Token The L1 token address which is deposited
-    /// @param _amount The total amount of tokens to be bridged
-    /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction
-    /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
-    /// @param _refundRecipient The address on L2 that will receive the refund for the transaction.
-    /// @dev If the L2 deposit finalization transaction fails, the `_refundRecipient` will receive the `_l2Value`.
-    /// Please note, the contract may change the refund recipient's address to eliminate sending funds to addresses
-    /// out of control.
-    /// - If `_refundRecipient` is a contract on L1, the refund will be sent to the aliased `_refundRecipient`.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has NO deployed bytecode on L1, the refund will
-    /// be sent to the `msg.sender` address.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has deployed bytecode on L1, the refund will be
-    /// sent to the aliased `msg.sender` address.
-    /// @dev The address aliasing of L1 contracts as refund recipient on L2 is necessary to guarantee that the funds
-    /// are controllable through the Mailbox, since the Mailbox applies address aliasing to the from address for the
-    /// L2 tx if the L1 msg.sender is a contract. Without address aliasing for L1 contracts as refund recipients they
-    /// would not be able to make proper L2 tx requests through the Mailbox to use or withdraw the funds from L2, and
-    /// the funds would be lost.
-    /// @return txHash The L2 transaction hash of deposit finalization
-    function deposit(
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByte,
-        address _refundRecipient
-    ) public payable nonReentrant returns (bytes32 txHash) {
-        require(_amount != 0, "0T"); // empty deposit
-        uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
-        require(amount == _amount, "3T"); // The token has non-standard transfer logic
-
-        txHash = SHARED_BRIDGE.depositLegacyErc20Bridge{value: msg.value}({
-            _prevMsgSender: msg.sender,
-            _l2Receiver: _l2Receiver,
-            _l1Token: _l1Token,
-            _amount: _amount,
-            _l2TxGasLimit: _l2TxGasLimit,
-            _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
-            _refundRecipient: _refundRecipient
-        });
-        depositAmount[msg.sender][_l1Token][txHash] = _amount;
-        emit DepositInitiated({
-            l2DepositTxHash: txHash,
-            from: msg.sender,
-            to: _l2Receiver,
-            l1Token: _l1Token,
-            amount: _amount
-        });
-    }
-
-    /// @dev Transfers tokens from the depositor address to the shared bridge address.
-    /// @return The difference between the contract balance before and after the transferring of funds.
-    function _depositFundsToSharedBridge(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
-        uint256 balanceBefore = _token.balanceOf(address(SHARED_BRIDGE));
-        _token.safeTransferFrom(_from, address(SHARED_BRIDGE), _amount);
-        uint256 balanceAfter = _token.balanceOf(address(SHARED_BRIDGE));
-        return balanceAfter - balanceBefore;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            ERA LEGACY GETTERS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @return The L2 token address that would be minted for deposit of the given L1 token on zkSync Era.
-    function l2TokenAddress(address _l1Token) external view returns (address) {
-        bytes32 constructorInputHash = keccak256(abi.encode(l2TokenBeacon, ""));
-        bytes32 salt = bytes32(uint256(uint160(_l1Token)));
-
-        return L2ContractHelper.computeCreate2Address(l2Bridge, salt, l2TokenProxyBytecodeHash, constructorInputHash);
     }
 }

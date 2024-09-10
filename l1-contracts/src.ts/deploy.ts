@@ -63,7 +63,6 @@ import type { FacetCut } from "./diamondCut";
 import { getCurrentFacetCutsForAdd } from "./diamondCut";
 
 import { ChainAdminFactory, ERC20Factory, StateTransitionManagerFactory } from "../typechain";
-<<<<<<< HEAD
 
 import { IL1AssetRouterFactory } from "../typechain/IL1AssetRouterFactory";
 import { IL1NativeTokenVaultFactory } from "../typechain/IL1NativeTokenVaultFactory";
@@ -73,9 +72,6 @@ import { TestnetERC20TokenFactory } from "../typechain/TestnetERC20TokenFactory"
 
 import { RollupL1DAValidatorFactory } from "../../da-contracts/typechain/RollupL1DAValidatorFactory";
 import { ValidiumL1DAValidatorFactory } from "../../da-contracts/typechain/ValidiumL1DAValidatorFactory";
-=======
-import type { Contract, Overrides } from "@ethersproject/contracts";
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -356,8 +352,6 @@ export class Deployer {
   }
 
   public async deployChainAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-<<<<<<< HEAD
-=======
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "ChainAdmin",
@@ -371,32 +365,13 @@ export class Deployer {
     this.addresses.ChainAdmin = contractAddress;
   }
 
-  public async deployBridgehubImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
-    ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("ChainAdmin", [this.ownerAddress], create2Salt, ethTxOptions);
-    if (this.verbose) {
-      console.log(`CONTRACTS_CHAIN_ADMIN_ADDR=${contractAddress}`);
-    }
-    this.addresses.ChainAdmin = contractAddress;
-  }
-
   public async deployTransparentProxyAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     if (this.verbose) {
       console.log("Deploying Proxy Admin");
     }
     // Note: we cannot deploy using Create2, as the owner of the ProxyAdmin is msg.sender
-<<<<<<< HEAD
     let proxyAdmin;
     let rec;
-=======
-    const contractFactory = await hardhat.ethers.getContractFactory(
-      "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol:ProxyAdmin",
-      {
-        signer: this.deployWallet,
-      }
-    );
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 
     if (this.isZkMode()) {
       // @ts-ignore
@@ -1327,7 +1302,6 @@ export class Deployer {
     }
   }
 
-<<<<<<< HEAD
   public async executeChainAdminMulticall(calls: ChainAdminCall[], requireSuccess: boolean = true) {
     const chainAdmin = ChainAdminFactory.connect(this.addresses.ChainAdmin, this.deployWallet);
 
@@ -1335,7 +1309,7 @@ export class Deployer {
 
     const multicallTx = await chainAdmin.multicall(calls, requireSuccess, { value: totalValue });
     return await multicallTx.wait();
-=======
+  }
   public async setTokenMultiplierSetterAddress(tokenMultiplierSetterAddress: string) {
     const chainAdmin = ChainAdminFactory.connect(this.addresses.ChainAdmin, this.deployWallet);
 
@@ -1345,7 +1319,6 @@ export class Deployer {
         `Token multiplier setter set as ${tokenMultiplierSetterAddress}, gas used: ${receipt.gasUsed.toString()}`
       );
     }
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
   }
 
   public async transferAdminFromDeployerToChainAdmin() {
@@ -1358,7 +1331,6 @@ export class Deployer {
       console.log(`ChainAdmin set as pending admin, gas used: ${receipt.gasUsed.toString()}`);
     }
 
-<<<<<<< HEAD
     // await this.executeUpgrade(
     //   hyperchain.address,
     //   0,
@@ -1374,21 +1346,6 @@ export class Deployer {
         data: acceptAdminData,
       },
     ]);
-=======
-    const acceptAdminData = hyperchain.interface.encodeFunctionData("acceptAdmin");
-    const chainAdmin = ChainAdminFactory.connect(this.addresses.ChainAdmin, this.deployWallet);
-    const multicallTx = await chainAdmin.multicall(
-      [
-        {
-          target: hyperchain.address,
-          value: 0,
-          data: acceptAdminData,
-        },
-      ],
-      true
-    );
-    await multicallTx.wait();
->>>>>>> 874bc6ba940de9d37b474d1e3dda2fe4e869dfbe
 
     if (this.verbose) {
       console.log("Pending admin successfully accepted");
