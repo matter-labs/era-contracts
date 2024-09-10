@@ -134,23 +134,17 @@ library DataEncoding {
     }
 
     /// @notice Encodes the token data by combining chain id, asset deployment tracker and asset data.
-    /// @param _legacy Whether to use the legacy encoding version.
     /// @param _chainId The id of the chain token is native to.
     /// @param _name The name of the token.
     /// @param _symbol The symbol of the token.
     /// @param _decimals The decimals of the token.
     /// @return The encoded token data.
     function encodeTokenData(
-        bool _legacy,
         uint256 _chainId,
         bytes memory _name,
         bytes memory _symbol,
         bytes memory _decimals
     ) internal pure returns (bytes memory) {
-        if (_legacy) {
-            return abi.encode(_name, _symbol, _decimals);
-        } else {
-            return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_chainId, _name, _symbol, _decimals));
-        }
+        return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_chainId, _name, _symbol, _decimals));
     }
 }

@@ -29,7 +29,7 @@ interface INativeTokenVault {
     function getAssetId(uint256 _chainId, address _tokenAddress) external view returns (bytes32);
 
     /// @notice Used to get the the ERC20 data for a token
-    function getERC20Getters(address _token, bool _legacy, uint256 _originChainId) external view returns (bytes memory);
+    function getERC20Getters(address _token, uint256 _originChainId) external view returns (bytes memory);
 
     /// @notice Used to get the token address of an assetId
     function tokenAddress(bytes32 assetId) external view returns (address);

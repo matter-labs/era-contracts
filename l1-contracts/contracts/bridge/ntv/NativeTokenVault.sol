@@ -39,6 +39,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev The assetId of the base token.
     bytes32 public immutable BASE_TOKEN_ASSET_ID;
 
+    /// @dev Chain ID of L1 for bridging reasons.
+    uint256 public immutable L1_CHAIN_ID;
+
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
     IBeacon public bridgedTokenBeacon;
@@ -68,8 +71,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev Disable the initialization to prevent Parity hack.
     /// @param _wethToken Address of WETH on deployed chain
     /// @param _assetRouter Address of assetRouter
-    constructor(address _wethToken, address _assetRouter, bytes32 _baseTokenAssetId) {
+    constructor(address _wethToken, address _assetRouter, bytes32 _baseTokenAssetId, uint256 _l1ChainId) {
         _disableInitializers();
+        L1_CHAIN_ID = _l1ChainId;
         ASSET_ROUTER = IAssetRouterBase(_assetRouter);
         WETH_TOKEN = _wethToken;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
@@ -204,7 +208,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         {
             // we set all originChainId for all already bridged tokens with the setLegacyTokenAssetId and updateChainBalancesFromSharedBridge functions.
             // for native tokens the originChainId is set when they register.
-            erc20Metadata = getERC20Getters(bridgedToken, true, originChainId[_assetId]);
+            erc20Metadata = getERC20Getters(bridgedToken, originChainId[_assetId]);
         }
 
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
@@ -261,7 +265,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
         bytes memory erc20Metadata;
         {
-            erc20Metadata = getERC20Getters(nativeToken, true, originChainId[_assetId]);
+            erc20Metadata = getERC20Getters(nativeToken, originChainId[_assetId]);
         }
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
             _prevMsgSender: _prevMsgSender,
@@ -300,12 +304,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
     /// @param _token The address of token of interest.
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
-    function getERC20Getters(
-        address _token,
-        bool _legacy,
-        uint256 _originChainId
-    ) public view override returns (bytes memory) {
-        return BridgeHelper.getERC20Getters(_token, _legacy, _originChainId);
+    function getERC20Getters(address _token, uint256 _originChainId) public view override returns (bytes memory) {
+        return BridgeHelper.getERC20Getters(_token, _originChainId);
     }
 
     /// @notice Returns the parsed assetId.
@@ -408,6 +408,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
         BeaconProxy l2Token = _deployBeaconProxy(salt);
         uint256 tokenOriginChainId = BridgedStandardERC20(address(l2Token)).bridgeInitialize(_originToken, _erc20Data);
+        tokenOriginChainId = tokenOriginChainId == 0 ? L1_CHAIN_ID : tokenOriginChainId;
         originChainId[DataEncoding.encodeNTVAssetId(tokenOriginChainId, _originToken)] = tokenOriginChainId;
         return address(l2Token);
     }

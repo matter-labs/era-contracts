@@ -72,10 +72,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
             bob,
             address(ETH_TOKEN_ADDRESS),
             amount,
-            nativeTokenVault.getERC20Getters(address(ETH_TOKEN_ADDRESS), true, chainId)
+            nativeTokenVault.getERC20Getters(address(ETH_TOKEN_ADDRESS), chainId)
         );
         // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, true, address(sharedBridge));
+        vm.expectEmit(true, true, true, false, address(sharedBridge));
         vm.prank(bridgehubAddress);
         emit BridgehubDepositInitiated({
             chainId: chainId,

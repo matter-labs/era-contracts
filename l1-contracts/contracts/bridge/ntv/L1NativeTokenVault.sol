@@ -57,7 +57,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         NativeTokenVault(
             _l1WethAddress,
             _l1AssetRouter,
-            DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS)
+            DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
+            block.chainid
         )
     {
         ERA_CHAIN_ID = _eraChainId;

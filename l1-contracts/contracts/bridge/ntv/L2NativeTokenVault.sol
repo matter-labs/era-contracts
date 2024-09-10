@@ -31,9 +31,6 @@ import {EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSup
 contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     using SafeERC20 for IERC20;
 
-    /// @dev Chain ID of L1 for bridging reasons.
-    uint256 public immutable L1_CHAIN_ID;
-
     IL2SharedBridgeLegacy public immutable L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
@@ -56,8 +53,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bool _contractsDeployedAlready,
         address _wethToken,
         bytes32 _baseTokenAssetId
-    ) NativeTokenVault(_wethToken, L2_ASSET_ROUTER_ADDR, _baseTokenAssetId) {
-        L1_CHAIN_ID = _l1ChainId;
+    ) NativeTokenVault(_wethToken, L2_ASSET_ROUTER_ADDR, _baseTokenAssetId, _l1ChainId) {
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
