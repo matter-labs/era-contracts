@@ -178,9 +178,6 @@ contract L1AssetRouterTest is Test {
         nativeTokenVault.registerToken(address(token));
         nativeTokenVault.registerEthToken();
         vm.prank(owner);
-        sharedBridge.setPendingAdmin(admin);
-        vm.prank(admin);
-        sharedBridge.acceptAdmin();
 
         vm.store(
             address(sharedBridge),

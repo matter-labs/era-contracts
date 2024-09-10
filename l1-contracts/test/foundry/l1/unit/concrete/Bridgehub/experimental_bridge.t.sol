@@ -456,26 +456,17 @@ contract ExperimentalBridgeTest is Test {
         address randomCaller,
         uint256 randomValue
     ) public useRandomToken(randomValue) {
-<<<<<<< HEAD:l1-contracts/test/foundry/l1/unit/concrete/Bridgehub/experimental_bridge.t.sol
         vm.startPrank(bridgeOwner);
         bridgeHub.setAddresses(address(mockSharedBridge), ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)));
         vm.stopPrank();
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, testTokenAddress);
 
-        if (randomCaller != bridgeOwner) {
-            vm.prank(randomCaller);
-            vm.expectRevert(bytes("Ownable: caller is not the owner"));
-            bridgeHub.addTokenAssetId(assetId);
-        }
-=======
         vm.assume(randomCaller != bridgeOwner);
         vm.assume(randomCaller != bridgeHub.admin());
-
         vm.prank(randomCaller);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
-        bridgeHub.addToken(randomAddress);
->>>>>>> b653ac8044f78956d81625dd7ee409d7c9651685:l1-contracts/test/foundry/unit/concrete/Bridgehub/experimental_bridge.t.sol
+        bridgeHub.addTokenAssetId(assetId);
 
         assertTrue(!bridgeHub.assetIdIsRegistered(assetId), "This random address is not registered as a token");
 
