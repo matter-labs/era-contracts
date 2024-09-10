@@ -34,7 +34,6 @@ import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.s
 import {AssetIdNotSupported, ZeroChainId, ChainAlreadyLive, AssetIdAlreadyRegistered, AddressTooLow, ChainIdTooBig, WrongMagicValue, SharedBridgeNotSet, TokenNotRegistered, BridgeHubAlreadyRegistered, MsgValueMismatch, SlotOccupied, CTMAlreadyRegistered, TokenAlreadyRegistered, Unauthorized, NonEmptyMsgValue, CTMNotRegistered, InvalidChainId} from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
 
@@ -107,7 +106,6 @@ contract ExperimentalBridgeTest is Test {
         mockCTM = new DummyChainTypeManagerWBH(address(bridgeHub));
         mockChainContract = new DummyZKChain(address(bridgeHub), eraChainId, block.chainid);
 
-
         mockL2Contract = makeAddr("mockL2Contract");
         // mocks to use in bridges instead of using a dummy one
         address mockL1WethAddress = makeAddr("Weth");
@@ -118,7 +116,7 @@ contract ExperimentalBridgeTest is Test {
 
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
-       
+
         ntv = _deployNTV(address(mockSharedBridge));
 
         mockSecondSharedBridge.setNativeTokenVault(ntv);
@@ -130,14 +128,26 @@ contract ExperimentalBridgeTest is Test {
 
         messageRoot = new MessageRoot(bridgeHub);
 
-        sharedBridge = new L1AssetRouter(mockL1WethAddress, address(bridgeHub), l1NullifierAddress, eraChainId, eraDiamondProxy);
+        sharedBridge = new L1AssetRouter(
+            mockL1WethAddress,
+            address(bridgeHub),
+            l1NullifierAddress,
+            eraChainId,
+            eraDiamondProxy
+        );
         address defaultOwner = sharedBridge.owner();
         vm.prank(defaultOwner);
         sharedBridge.transferOwnership(bridgeOwner);
         vm.prank(bridgeOwner);
         sharedBridge.acceptOwnership();
 
-        secondBridge = new L1AssetRouter(mockL1WethAddress, address(bridgeHub), l1NullifierAddress, eraChainId, eraDiamondProxy);
+        secondBridge = new L1AssetRouter(
+            mockL1WethAddress,
+            address(bridgeHub),
+            l1NullifierAddress,
+            eraChainId,
+            eraDiamondProxy
+        );
         defaultOwner = secondBridge.owner();
         vm.prank(defaultOwner);
         secondBridge.transferOwnership(bridgeOwner);
@@ -180,10 +190,11 @@ contract ExperimentalBridgeTest is Test {
 
     function _deployNTV(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
         L1NativeTokenVault ntvImpl = new L1NativeTokenVault(weth, _sharedBridgeAddr, eraChainId, l1Nullifier);
-        TransparentUpgradeableProxy ntvProxy = new TransparentUpgradeableProxy(address(ntvImpl), address(bridgeOwner), abi.encodeCall(
-            ntvImpl.initialize,
-            (bridgeOwner, address(0))
-        ));
+        TransparentUpgradeableProxy ntvProxy = new TransparentUpgradeableProxy(
+            address(ntvImpl),
+            address(bridgeOwner),
+            abi.encodeCall(ntvImpl.initialize, (bridgeOwner, address(0)))
+        );
         addr = L1NativeTokenVault(payable(ntvProxy));
 
         vm.prank(bridgeOwner);
@@ -1409,7 +1420,7 @@ contract ExperimentalBridgeTest is Test {
         uint256 randomValue
     ) public useRandomToken(randomValue) {
         _useFullSharedBridge();
-        _initializeBridgehub();        
+        _initializeBridgehub();
         vm.assume(mintValue > 0);
 
         secondBridgeValue = bound(secondBridgeValue, 1, type(uint256).max);

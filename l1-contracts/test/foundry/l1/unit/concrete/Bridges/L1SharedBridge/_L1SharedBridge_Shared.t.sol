@@ -175,7 +175,7 @@ contract L1AssetRouterTest is Test {
         vm.prank(address(nativeTokenVault));
         nativeTokenVault.registerToken(address(token));
         nativeTokenVault.registerEthToken();
-        
+
         vm.store(
             address(sharedBridge),
             bytes32(isWithdrawalFinalizedStorageLocation),
