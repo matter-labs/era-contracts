@@ -106,6 +106,11 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
+    function getTransactionFilterer() external view returns (address) {
+        return s.transactionFilterer;
+    }
+
+    /// @inheritdoc IGetters
     function getTotalPriorityTxs() external view returns (uint256) {
         return _getTotalPriorityTxs();
     }

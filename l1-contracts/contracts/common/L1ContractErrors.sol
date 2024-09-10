@@ -29,6 +29,8 @@ error AddressAlreadyUsed(address addr);
 error AddressHasNoCode(address);
 // 0x1eee5481
 error AddressTooLow(address);
+// 0x0bfcef28
+error AlreadyWhitelisted(address);
 // 0x6afd6c20
 error BadReturnData();
 // 0x6ef9a972
@@ -193,6 +195,8 @@ error NonZeroAddress(address);
 error NotEnoughGas();
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
+// 0xdf17e316
+error NotWhitelisted(address);
 // 0xf3ed9dfa
 error OnlyEraSupported();
 // 0x1a21feed

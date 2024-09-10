@@ -112,6 +112,7 @@ export async function initialTestnetDeploymentProcess(
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false);
   await registerZKChainWithBridgeRegistration(deployer, false, extraFacets, gasPrice, baseTokenName);
   await registerTestDAValidators(deployer);
+
   return deployer;
 }
 
