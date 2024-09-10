@@ -39,8 +39,12 @@ error AmountMustBeGreaterThanZero();
 error AssetHandlerDoesNotExist(bytes32 assetId);
 //
 error AssetIdMismatch(bytes32 expected, bytes32 supplied);
+//
+error AssetIdAlreadyRegistered();
 // 0x0bfcef28
 error AlreadyWhitelisted(address);
+// 0x04a0b7e9
+error AssetIdNotSupported(bytes32 assetId);
 // 0x6afd6c20
 error BadReturnData();
 // 0x6ef9a972
@@ -65,6 +69,16 @@ error CanOnlyProcessOneBatch();
 error CantExecuteUnprovenBatches();
 // 0xe18cb383
 error CantRevertExecutedBatch();
+// 0x24591d89
+error ChainIdAlreadyExists();
+// 0x717a1656
+error ChainIdCantBeCurrentChain();
+// 0xa179f8c9
+error ChainIdMismatch();
+//
+error ChainIdNotRegistered(uint256 chainId);
+//
+error ChainNotLegacy();
 // 0x78d2ed02
 error ChainAlreadyLive();
 // 0x8f620a06
@@ -91,6 +105,8 @@ error DiamondFreezeIncorrectState();
 error DiamondNotFrozen();
 //
 error EmptyAddress();
+// 0x2d4d012f
+error EmptyAssetId();
 // 0xfc7ab1d3
 error EmptyBlobVersionHash(uint256 index);
 //
@@ -124,6 +140,8 @@ error HashMismatch(bytes32 expected, bytes32 actual);
 error ZKChainLimitReached();
 //
 error InsufficientAllowance(uint256 providedAllowance, uint256 requiredAmount);
+// 0xdd381a4c
+error IncorrectBridgeHubAddress(address bridgehub);
 // 0x826fb11e
 error InsufficientChainBalance();
 // 0x356680b7
@@ -194,6 +212,8 @@ error MerkleIndexOutOfBounds();
 error MerklePathEmpty();
 // 0x1c500385
 error MerklePathOutOfBounds();
+//
+error MigrationPaused();
 // 0xfa44b527
 error MissingSystemLogs(uint256 expected, uint256 actual);
 // 0x4a094431
@@ -385,8 +405,6 @@ error IncorrectBatchBounds(
     uint256 processFromProvided,
     uint256 processToProvided
 );
-// 0x04a0b7e9
-error AssetIdNotSupported(bytes32 assetId);
 // 0x64107968
 error AssetHandlerNotRegistered(bytes32 assetId);
 

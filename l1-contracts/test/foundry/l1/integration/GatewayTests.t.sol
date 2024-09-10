@@ -31,6 +31,8 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -213,6 +215,70 @@ contract GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2T
             _merkleProof: merkleProof
         });
         vm.stopBroadcast();
+    }
+
+    function test_registerAlreadyDeployedZKChain() public {
+        gatewayScript.registerGateway();
+        IChainTypeManager stm = IChainTypeManager(l1Script.getCTM());
+        IBridgehub bridgehub = IBridgehub(l1Script.getBridgehubProxyAddress());
+        address owner = Ownable(address(bridgeHub)).owner();
+
+        {
+            uint256 chainId = currentZKChainId++;
+            bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(chainId, ETH_TOKEN_ADDRESS);
+
+            address chain = _deployZkChain(
+                chainId,
+                baseTokenAssetId,
+                address(bridgehub.sharedBridge()),
+                owner,
+                stm.protocolVersion(),
+                stm.storedBatchZero(),
+                address(bridgehub)
+            );
+
+            address stmAddr = IZKChain(chain).getChainTypeManager();
+
+            vm.startBroadcast(owner);
+            bridgeHub.addChainTypeManager(stmAddr);
+            bridgeHub.addTokenAssetId(baseTokenAssetId);
+            bridgeHub.registerAlreadyDeployedZKChain(chainId, chain);
+            vm.stopBroadcast();
+
+            address bridgeHubStmForChain = bridgeHub.chainTypeManager(chainId);
+            bytes32 bridgeHubBaseAssetIdForChain = bridgeHub.baseTokenAssetId(chainId);
+            address bridgeHubChainAddressdForChain = bridgeHub.getZKChain(chainId);
+            address bhAddr = IZKChain(chain).getBridgehub();
+
+            assertEq(bridgeHubStmForChain, stmAddr);
+            assertEq(bridgeHubBaseAssetIdForChain, baseTokenAssetId);
+            assertEq(bridgeHubChainAddressdForChain, chain);
+            assertEq(bhAddr, address(bridgeHub));
+        }
+
+        {
+            uint256 chainId = currentZKChainId++;
+            bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(chainId, ETH_TOKEN_ADDRESS);
+            address chain = _deployZkChain(
+                chainId,
+                baseTokenAssetId,
+                address(bridgehub.sharedBridge()),
+                owner,
+                stm.protocolVersion(),
+                stm.storedBatchZero(),
+                address(bridgehub.sharedBridge())
+            );
+
+            address stmAddr = IZKChain(chain).getChainTypeManager();
+
+            vm.startBroadcast(owner);
+            bridgeHub.addTokenAssetId(baseTokenAssetId);
+            vm.expectRevert(
+                abi.encodeWithSelector(IncorrectBridgeHubAddress.selector, address(bridgehub.sharedBridge()))
+            );
+            bridgeHub.registerAlreadyDeployedZKChain(chainId, chain);
+            vm.stopBroadcast();
+        }
     }
 
     function finishMoveChain() public {
