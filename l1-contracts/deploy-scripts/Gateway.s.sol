@@ -7,9 +7,12 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 // import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 // import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 // import {Governance} from "contracts/governance/Governance.sol";
 // import {Utils} from "./Utils.sol";
@@ -20,8 +23,6 @@ import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehu
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 // import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 contract GatewayScript is Script {
     using stdToml for string;
@@ -118,9 +119,32 @@ contract GatewayScript is Script {
     function registerGateway() public {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         Ownable ownable = Ownable(config.bridgehub);
-        vm.prank(ownable.owner());
+        Ownable ownableStmDT = Ownable(config.ctmDeploymentTracker);
+        IZKChain chainL2 = IZKChain(bridgehub.getZKChain(config.chainChainId));
+        IZKChain chain = IZKChain(bridgehub.getZKChain(config.gatewayChainId));
+        vm.startPrank(chain.getAdmin());
+        GatewayTransactionFilterer transactionFiltererImplementation = new GatewayTransactionFilterer(
+            IBridgehub(config.bridgehub),
+            config.sharedBridgeProxy
+        );
+        address transactionFiltererProxy = address(
+            new TransparentUpgradeableProxy(
+                address(transactionFiltererImplementation),
+                chain.getAdmin(),
+                abi.encodeCall(GatewayTransactionFilterer.initialize, ownable.owner())
+            )
+        );
+        chain.setTransactionFilterer(transactionFiltererProxy);
+        vm.stopPrank();
+
+        vm.startPrank(ownable.owner());
+        GatewayTransactionFilterer(transactionFiltererProxy).grantWhitelist(ownableStmDT.owner());
+        GatewayTransactionFilterer(transactionFiltererProxy).grantWhitelist(chainL2.getAdmin());
+        GatewayTransactionFilterer(transactionFiltererProxy).grantWhitelist(config.sharedBridgeProxy);
         bridgehub.registerSettlementLayer(config.gatewayChainId, true);
-        // bytes memory data = abi.encodeCall(ctm.registerSettlementLayer, (config.chainChainId, true));
+
+        vm.stopPrank();
+        // bytes memory data = abi.encodeCall(stm.registerSettlementLayer, (config.chainChainId, true));
         // Utils.executeUpgrade({
         //     _governor: ownable.owner(),
         //     _salt: bytes32(config.bridgehubCreateNewChainSalt),
@@ -183,7 +207,7 @@ contract GatewayScript is Script {
     function registerL2Contracts() public {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         Ownable ownable = Ownable(config.ctmDeploymentTracker);
-        // IChainTypeManager ctm = IChainTypeManager(config.stateTransitionProxy);
+        // IStateTransitionManager stm = IStateTransitionManager(config.stateTransitionProxy);
 
         uint256 gasPrice = 10;
         uint256 l2GasLimit = 72000000;
