@@ -4,16 +4,17 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
 const preprocess = require("preprocess");
 /* eslint-enable@typescript-eslint/no-var-requires */
 
-const OUTPUT_DIR = "contracts/";
+const OUTPUT_DIR = "contracts";
+const INPUT_DIR = "evm-interpreter";
 
 async function main() {
-  process.chdir(`${OUTPUT_DIR}`);
+  process.chdir(`${INPUT_DIR}`);
   const interpreterSource = readFileSync(`EvmInterpreter.template.yul`).toString();
 
   console.log("Preprocessing Interpreter");
   const interpreter = preprocess.preprocess(interpreterSource);
 
-  writeFileSync(`EvmInterpreter.yul`, interpreter);
+  writeFileSync(`../${OUTPUT_DIR}/EvmInterpreter.yul`, interpreter);
 
   console.log("Intepreter preprocessing done!");
 }
