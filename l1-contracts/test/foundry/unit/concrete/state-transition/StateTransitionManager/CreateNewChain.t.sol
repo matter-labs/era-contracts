@@ -6,6 +6,10 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Unauthorized, HashMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract createNewChainTest is StateTransitionManagerTest {
+    function setUp() public {
+        deploy();
+    }
+
     function test_RevertWhen_InitialDiamondCutHashMismatch() public {
         Diamond.DiamondCutData memory initialDiamondCutData = getDiamondCutData(sharedBridge);
         Diamond.DiamondCutData memory correctDiamondCutData = getDiamondCutData(address(diamondInit));

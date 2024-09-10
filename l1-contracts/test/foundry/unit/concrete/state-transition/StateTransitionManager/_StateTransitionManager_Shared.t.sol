@@ -7,6 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -24,7 +25,7 @@ contract StateTransitionManagerTest is Test {
     StateTransitionManager internal stateTransitionManager;
     StateTransitionManager internal chainContractAddress;
     GenesisUpgrade internal genesisUpgradeContract;
-    address internal bridgehub;
+    Bridgehub internal bridgehub;
     address internal diamondInit;
     address internal constant governor = address(0x1010101);
     address internal constant admin = address(0x2020202);
@@ -37,12 +38,12 @@ contract StateTransitionManagerTest is Test {
 
     Diamond.FacetCut[] internal facetCuts;
 
-    function setUp() public {
-        bridgehub = makeAddr("bridgehub");
+    function deploy() public {
+        bridgehub = new Bridgehub();
         newChainAdmin = makeAddr("chainadmin");
 
-        vm.startPrank(bridgehub);
-        stateTransitionManager = new StateTransitionManager(bridgehub, type(uint256).max);
+        vm.startPrank(address(bridgehub));
+        stateTransitionManager = new StateTransitionManager(address(bridgehub), type(uint256).max);
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new GenesisUpgrade();
 
@@ -129,7 +130,7 @@ contract StateTransitionManagerTest is Test {
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal {
         vm.stopPrank();
-        vm.startPrank(bridgehub);
+        vm.startPrank(address(bridgehub));
 
         chainContractAddress.createNewChain({
             _chainId: chainId,

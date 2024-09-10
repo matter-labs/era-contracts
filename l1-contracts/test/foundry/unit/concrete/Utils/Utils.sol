@@ -241,6 +241,7 @@ library Utils {
         selectors[27] = GettersFacet.getTotalBatchesVerified.selector;
         selectors[28] = GettersFacet.getTotalBatchesExecuted.selector;
         selectors[29] = GettersFacet.getL2SystemContractsUpgradeTxHash.selector;
+        selectors[30] = GettersFacet.getChainId.selector;
         return selectors;
     }
 
