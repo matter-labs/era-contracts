@@ -121,12 +121,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         L1_NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
     }
 
-    /// @inheritdoc INativeTokenVault
-    function registerToken(address _nativeToken) external override(INativeTokenVault, NativeTokenVault) {
-        originChainId[DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken)] = block.chainid;
-        _registerToken(_nativeToken);
-    }
-
     /*//////////////////////////////////////////////////////////////
                             Start transaction Functions
     //////////////////////////////////////////////////////////////*/
@@ -236,15 +230,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             // Withdraw funds
             IERC20(_token).safeTransfer(_to, _amount);
         }
-    }
-
-    function _deployBridgedToken(
-        uint256 _originChainId,
-        address _originToken,
-        bytes memory _erc20Data
-    ) internal virtual override returns (address, uint256) {
-        originChainId[DataEncoding.encodeNTVAssetId(_originChainId, _originToken)] = _originChainId;
-        return super._deployBridgedToken(_originChainId, _originToken, _erc20Data);
     }
 
     function _deployBeaconProxy(bytes32 _salt) internal override returns (BeaconProxy proxy) {
