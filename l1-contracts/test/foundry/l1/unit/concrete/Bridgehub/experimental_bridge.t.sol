@@ -488,8 +488,8 @@ contract ExperimentalBridgeTest is Test {
 
     function test_setAddresses(address randomAssetRouter, address randomCTMDeployer, address randomMessageRoot) public {
         assertTrue(bridgeHub.sharedBridge() == address(0), "Shared bridge is already there");
-        assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already ther");
-        assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already ther");
+        assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
+        assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
 
         vm.prank(bridgeOwner);
         bridgeHub.setAddresses(
@@ -501,9 +501,9 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(bridgeHub.sharedBridge() == randomAssetRouter, "Shared bridge is already there");
         assertTrue(
             bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(randomCTMDeployer),
-            "L1 CTM deployer is already ther"
+            "L1 CTM deployer is already there"
         );
-        assertTrue(bridgeHub.messageRoot() == IMessageRoot(randomMessageRoot), "Message root is already ther");
+        assertTrue(bridgeHub.messageRoot() == IMessageRoot(randomMessageRoot), "Message root is already there");
     }
 
     function test_setAddresses_cannotBeCalledByRandomAddress(
@@ -523,8 +523,8 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(bridgeHub.sharedBridge() == address(0), "Shared bridge is already there");
-        assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already ther");
-        assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already ther");
+        assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
+        assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
     }
 
     uint256 newChainId;
@@ -1114,13 +1114,13 @@ contract ExperimentalBridgeTest is Test {
             randomCaller: randomCaller
         });
 
-        // vm.deal(randomCaller, l2TxnReqDirect.mintValue);
-        // gasPrice = bound(gasPrice, 1_000, 50_000_000);
-        // vm.txGasPrice(gasPrice * 1 gwei);
-        // vm.prank(randomCaller);
-        // bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
+        vm.deal(randomCaller, l2TxnReqDirect.mintValue);
+        gasPrice = bound(gasPrice, 1_000, 50_000_000);
+        vm.txGasPrice(gasPrice * 1 gwei);
+        vm.prank(randomCaller);
+        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
 
-        // assertTrue(resultantHash == hash);
+        assertTrue(resultantHash == hash);
     }
 
     function test_requestL2TransactionDirect_NonETHCase(

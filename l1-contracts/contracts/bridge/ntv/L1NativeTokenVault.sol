@@ -77,6 +77,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         _transferOwnership(_owner);
     }
 
+    /// @inheritdoc IL1NativeTokenVault
     function registerEthToken() external {
         _unsafeRegisterNativeToken(ETH_TOKEN_ADDRESS);
     }

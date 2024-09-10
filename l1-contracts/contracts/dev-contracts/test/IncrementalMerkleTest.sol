@@ -36,6 +36,4 @@ contract IncrementalMerkleTest {
     function zeros(uint256 _index) external view returns (bytes32) {
         return tree._zeros[_index];
     }
-
-    // function getRoot()
 }
