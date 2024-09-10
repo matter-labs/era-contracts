@@ -763,22 +763,22 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @dev Registers an already deployed chain with the bridgehub
     /// @param _chainId The chain Id of the chain
-    /// @param _hyperchain Address of the hyperchain
-    function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external onlyOwner onlyL1 {
-        if (_hyperchain == address(0)) {
+    /// @param _zkChain Address of the zkChain
+    function registerAlreadyDeployedZKChain(uint256 _chainId, address _zkChain) external onlyOwner onlyL1 {
+        if (_zkChain == address(0)) {
             revert ZeroAddress();
         }
         if (zkChainMap.contains(_chainId)) {
             revert ChainIdAlreadyExists();
         }
-        if (IZKChain(_hyperchain).getChainId() != _chainId) {
+        if (IZKChain(_zkChain).getChainId() != _chainId) {
             revert ChainIdMismatch();
         }
 
-        address ctm = IZKChain(_hyperchain).getChainTypeManager();
-        address chainAdmin = IZKChain(_hyperchain).getAdmin();
-        bytes32 chainBaseTokenAssetId = IZKChain(_hyperchain).getBaseTokenAssetId();
-        address bridgeHub = IZKChain(_hyperchain).getBridgehub();
+        address ctm = IZKChain(_zkChain).getChainTypeManager();
+        address chainAdmin = IZKChain(_zkChain).getAdmin();
+        bytes32 chainBaseTokenAssetId = IZKChain(_zkChain).getBaseTokenAssetId();
+        address bridgeHub = IZKChain(_zkChain).getBridgehub();
 
         if (bridgeHub != address(this)) {
             revert IncorrectBridgeHubAddress(bridgeHub);
@@ -791,7 +791,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         baseTokenAssetId[_chainId] = chainBaseTokenAssetId;
         settlementLayer[_chainId] = block.chainid;
 
-        _registerNewZKChain(_chainId, _hyperchain);
+        _registerNewZKChain(_chainId, _zkChain);
         messageRoot.addNewChain(_chainId);
 
         emit NewChain(_chainId, ctm, chainAdmin);
