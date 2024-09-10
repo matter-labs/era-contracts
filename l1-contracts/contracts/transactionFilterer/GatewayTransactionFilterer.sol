@@ -15,30 +15,30 @@ import {IL2Bridge} from "../bridge/interfaces/IL2Bridge.sol";
 /// @dev Filters transactions received by the Mailbox
 /// @dev Only allows whitelisted senders to deposit to Gateway
 contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ownable2StepUpgradeable {
-    /// @dev Event emitted when sender is whitelisted
+    /// @notice Event emitted when sender is whitelisted
     event WhitelistGranted(address indexed sender);
 
-    /// @dev Event emitted when sender is removed from whitelist
+    /// @notice Event emitted when sender is removed from whitelist
     event WhitelistRevoked(address indexed sender);
 
-    /// @dev Bridgehub is set during construction
-    IBridgehub public immutable bridgeHub;
+    /// @notice The ecosystem's Bridgehub
+    IBridgehub public immutable BRIDGE_HUB;
 
-    /// @dev Asset router is set during construction
-    address public immutable assetRouter;
+    /// @notice The L1 asset router
+    address public immutable L1_ASSET_ROUTER;
 
-    /// @dev Indicates whether the sender is whitelisted to deposit to Gateway
+    /// @notice Indicates whether the sender is whitelisted to deposit to Gateway
     mapping(address sender => bool whitelisted) public whitelistedSenders;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(IBridgehub _bridgeHub, address _assetRouter) reentrancyGuardInitializer {
-        bridgeHub = _bridgeHub;
-        assetRouter = _assetRouter;
+        BRIDGE_HUB = _bridgeHub;
+        L1_ASSET_ROUTER = _assetRouter;
         _disableInitializers();
     }
 
-    /// @dev Initializes a contract filterer for later use. Expected to be used in the proxy.
+    /// @notice Initializes a contract filterer for later use. Expected to be used in the proxy.
     /// @param _owner The address which can upgrade the implementation.
     function initialize(address _owner) external reentrancyGuardInitializer initializer {
         if (_owner == address(0)) {
@@ -47,7 +47,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
         _transferOwnership(_owner);
     }
 
-    /// @dev Whitelist the sender.
+    /// @notice Whitelists the sender.
     /// @param sender Address of the tx sender.
     function grantWhitelist(address sender) external onlyOwner {
         if (whitelistedSenders[sender]) {
@@ -57,7 +57,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
         emit WhitelistGranted(sender);
     }
 
-    /// @dev Revoke the sender from whitelist.
+    /// @notice Revoke the sender from whitelist.
     /// @param sender Address of the tx sender.
     function revokeWhitelist(address sender) external onlyOwner {
         if (!whitelistedSenders[sender]) {
@@ -67,7 +67,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
         emit WhitelistRevoked(sender);
     }
 
-    /// @notice Check if the transaction is allowed
+    /// @notice Checks if the transaction is allowed
     /// @param sender The sender of the transaction
     /// @param l2Calldata The calldata of the L2 transaction
     /// @return Whether the transaction is allowed
@@ -79,14 +79,14 @@ contract GatewayTransactionFilterer is ITransactionFilterer, ReentrancyGuard, Ow
         bytes calldata l2Calldata,
         address
     ) external view returns (bool) {
-        if (sender == assetRouter) {
+        if (sender == L1_ASSET_ROUTER) {
             bytes4 l2TxSelector = bytes4(l2Calldata[:4]);
             if (IL2Bridge.finalizeDeposit.selector != l2TxSelector) {
                 revert InvalidSelector(l2TxSelector);
             }
 
             (bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (bytes32, bytes));
-            address stmAddress = bridgeHub.ctmAssetIdToAddress(decodedAssetId);
+            address stmAddress = BRIDGE_HUB.ctmAssetIdToAddress(decodedAssetId);
             return (stmAddress != address(0));
         }
 
