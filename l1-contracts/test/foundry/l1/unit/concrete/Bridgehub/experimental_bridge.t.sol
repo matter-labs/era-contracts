@@ -202,13 +202,6 @@ contract ExperimentalBridgeTest is Test {
         sharedBridgeAddress = address(mockSharedBridge);
     }
 
-    function _initializeL1Nullifier() internal {
-        vm.prank(l1Nullifier.owner());
-        l1Nullifier.setL1NativeTokenVault(ntv);
-        vm.prank(l1Nullifier.owner());
-        l1Nullifier.setL1AssetRouter(sharedBridgeAddress);
-    }
-
     function _initializeBridgehub() internal {
         vm.prank(bridgeOwner);
         bridgeHub.setPendingAdmin(deployerAddress);
@@ -220,6 +213,11 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub.addTokenAssetId(tokenAssetId);
         bridgeHub.setAddresses(sharedBridgeAddress, ICTMDeploymentTracker(address(0)), messageRoot);
         vm.stopPrank();
+
+        vm.prank(l1Nullifier.owner());
+        l1Nullifier.setL1NativeTokenVault(ntv);
+        vm.prank(l1Nullifier.owner());
+        l1Nullifier.setL1AssetRouter(sharedBridgeAddress);
     }
 
     function test_newPendingAdminReplacesPrevious(address randomDeployer, address otherRandomDeployer) public {
@@ -1335,8 +1333,6 @@ contract ExperimentalBridgeTest is Test {
     ) public useRandomToken(randomValue) {
         _useFullSharedBridge();
         _initializeBridgehub();
-        _initializeL1Nullifier();
-
         vm.assume(mintValue > 0);
 
         // create another token, to avoid base token
@@ -1413,9 +1409,7 @@ contract ExperimentalBridgeTest is Test {
         uint256 randomValue
     ) public useRandomToken(randomValue) {
         _useFullSharedBridge();
-        _initializeBridgehub();
-        _initializeL1Nullifier();
-        
+        _initializeBridgehub();        
         vm.assume(mintValue > 0);
 
         secondBridgeValue = bound(secondBridgeValue, 1, type(uint256).max);
