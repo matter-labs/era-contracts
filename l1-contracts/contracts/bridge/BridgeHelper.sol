@@ -30,6 +30,13 @@ library BridgeHelper {
         (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
         (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
         (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
-        return DataEncoding.encodeTokenData(_legacy, _originChainId, data1, data2, data3);
+        return
+            DataEncoding.encodeTokenData({
+                _legacy: _legacy,
+                _originChainId: _originChainId,
+                _name: data1,
+                _symbol: data2,
+                _decimals: data3
+            });
     }
 }

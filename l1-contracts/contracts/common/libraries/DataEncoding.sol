@@ -133,16 +133,16 @@ library DataEncoding {
     }
 
     function encodeTokenData(
-        bool legacy,
-        uint256 chainId,
-        bytes memory name,
-        bytes memory symbol,
-        bytes memory decimals
+        bool _legacy,
+        uint256 _chainId,
+        bytes memory _name,
+        bytes memory _symbol,
+        bytes memory _decimals
     ) internal pure returns (bytes memory) {
-        if (legacy) {
-            return abi.encode(name, symbol, decimals);
+        if (_legacy) {
+            return abi.encode(_name, _symbol, _decimals);
         } else {
-            return bytes.concat(NEW_ENCODING_VERSION, abi.encode(chainId, name, symbol, decimals));
+            return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_chainId, _name, _symbol, _decimals));
         }
     }
 }

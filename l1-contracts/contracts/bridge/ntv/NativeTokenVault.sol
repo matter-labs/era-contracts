@@ -145,7 +145,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes calldata _data
     ) internal returns (address receiver, uint256 amount) {
         address token = tokenAddress[_assetId];
-        (amount, receiver) = abi.decode(_data, (uint256, address));
+        // slither-disable-next-line unused-return
+        (, receiver, , amount, ) = DataEncoding.decodeBridgeMintData(_data);
 
         _handleChainBalanceDecrease(_originChainId, _assetId, amount, true);
         _withdrawFunds(_assetId, receiver, token, amount);
