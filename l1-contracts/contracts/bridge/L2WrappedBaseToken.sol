@@ -127,4 +127,8 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
             revert WithdrawFailed();
         }
     }
+
+    function originToken() external view override returns (address) {
+        return l1Address;
+    }
 }

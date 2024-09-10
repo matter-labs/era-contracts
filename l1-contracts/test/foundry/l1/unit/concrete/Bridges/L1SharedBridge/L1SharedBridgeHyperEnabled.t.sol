@@ -221,7 +221,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
             IAssetRouterBase.finalizeDeposit.selector,
             chainId,
             tokenAssetId,
-            abi.encode(amount, alice)
+            abi.encode(0, alice, 0, amount, new bytes(0))
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
@@ -263,7 +263,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
             IAssetRouterBase.finalizeDeposit.selector,
             chainId,
             ETH_TOKEN_ASSET_ID,
-            abi.encode(amount, alice)
+            abi.encode(0, alice, 0, amount, new bytes(0))
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
@@ -305,7 +305,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
             IAssetRouterBase.finalizeDeposit.selector,
             chainId,
             tokenAssetId,
-            abi.encode(amount, alice)
+            abi.encode(0, alice, 0, amount, new bytes(0))
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
@@ -345,7 +345,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
             IAssetRouterBase.finalizeDeposit.selector,
             chainId,
             tokenAssetId,
-            abi.encode(amount, alice)
+            abi.encode(0, alice, 0, amount, new bytes(0))
         );
         _setBaseTokenAssetId(bytes32(uint256(2))); //alt base token
         L2Message memory l2ToL1Message = L2Message({

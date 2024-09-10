@@ -247,6 +247,12 @@ contract L1AssetRouterTest is Test {
             abi.encodeWithSelector(IL1BaseTokenAssetHandler.tokenAddress.selector, ETH_TOKEN_ASSET_ID),
             abi.encode(address(ETH_TOKEN_ADDRESS))
         );
+        vm.mockCall(
+            bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(IBridgehub.baseToken.selector, chainId),
+            abi.encode(ETH_TOKEN_ADDRESS)
+        );
     }
 
     function _setSharedBridgeDepositHappened(uint256 _chainId, bytes32 _txHash, bytes32 _txDataHash) internal {

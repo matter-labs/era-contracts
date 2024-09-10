@@ -117,4 +117,34 @@ library DataEncoding {
             revert UnsupportedEncodingVersion();
         }
     }
+
+    /// @notice Decodes the token data by combining chain id, asset deployment tracker and asset data.
+    function decodeTokenData(
+        bytes calldata _tokenData
+    ) internal pure returns (uint256 chainId, bytes memory name, bytes memory symbol, bytes memory decimals) {
+        bytes1 encodingVersion = _tokenData[0];
+        // kl todo check correct
+        if (encodingVersion == LEGACY_ENCODING_VERSION) {
+            (name, symbol, decimals) = abi.decode(_tokenData, (bytes, bytes, bytes));
+        } else if (encodingVersion == NEW_ENCODING_VERSION) {
+            return abi.decode(_tokenData[1:], (uint256, bytes, bytes, bytes));
+        } else {
+            revert UnsupportedEncodingVersion();
+        }
+    }
+
+    /// @notice Encodes the token data by combining chain id, asset deployment tracker and asset data.
+    /// @param _chainId The id of the chain token is native to.
+    /// @param _name The name of the token.
+    /// @param _symbol The symbol of the token.
+    /// @param _decimals The decimals of the token.
+    /// @return The encoded token data.
+    function encodeTokenData(
+        uint256 _chainId,
+        bytes memory _name,
+        bytes memory _symbol,
+        bytes memory _decimals
+    ) internal pure returns (bytes memory) {
+        return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_chainId, _name, _symbol, _decimals));
+    }
 }

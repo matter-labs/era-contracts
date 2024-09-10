@@ -72,10 +72,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
             bob,
             address(ETH_TOKEN_ADDRESS),
             amount,
-            nativeTokenVault.getERC20Getters(address(ETH_TOKEN_ADDRESS))
+            nativeTokenVault.getERC20Getters(address(ETH_TOKEN_ADDRESS), chainId)
         );
         // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, true, address(sharedBridge));
+        vm.expectEmit(true, true, true, false, address(sharedBridge));
         vm.prank(bridgehubAddress);
         emit BridgehubDepositInitiated({
             chainId: chainId,
@@ -287,7 +287,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
             IAssetRouterBase.finalizeDeposit.selector,
             chainId,
             tokenAssetId,
-            abi.encode(amount, alice)
+            abi.encode(0, alice, 0, amount, new bytes(0))
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
@@ -333,7 +333,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
             IAssetRouterBase.finalizeDeposit.selector,
             chainId,
             ETH_TOKEN_ASSET_ID,
-            abi.encode(amount, alice)
+            abi.encode(0, alice, 0, amount, new bytes(0))
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
@@ -376,7 +376,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
             IAssetRouterBase.finalizeDeposit.selector,
             chainId,
             tokenAssetId,
-            abi.encode(amount, alice)
+            abi.encode(0, alice, 0, amount, new bytes(0))
         );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
@@ -399,9 +399,8 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         );
 
         // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, true, address(sharedBridge));
+        vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit DepositFinalizedAssetRouter(chainId, tokenAssetId, abi.encode(amount, alice));
-
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
@@ -417,7 +416,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
             IAssetRouterBase.finalizeDeposit.selector,
             chainId,
             tokenAssetId,
-            abi.encode(amount, alice)
+            abi.encode(0, alice, 0, amount, new bytes(0))
         );
         vm.mockCall(
             bridgehubAddress,
