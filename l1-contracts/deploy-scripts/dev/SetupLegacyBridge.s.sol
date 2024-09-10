@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "./../Utils.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {DummyL1ERC20Bridge} from "contracts/dev-contracts/DummyL1ERC20Bridge.sol";
-import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
@@ -72,7 +70,6 @@ contract SetupLegacyBridge is Script {
         );
 
         address contractAddress = deployViaCreate2(bytecode);
-        console.log("SharedBridgeImplementation deployed at:", contractAddress);
         addresses.sharedBridgeProxyImpl = contractAddress;
     }
 
@@ -111,13 +108,13 @@ contract SetupLegacyBridge is Script {
     }
 
     function calculateTokenBeaconAddress()
-    internal
-    returns (address tokenBeaconAddress, bytes32 tokenBeaconBytecodeHash)
+        internal
+        returns (address tokenBeaconAddress, bytes32 tokenBeaconBytecodeHash)
     {
         bytes memory l2StandardTokenCode = Utils.readHardhatBytecode(
             "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
         );
-        (address l2StandardToken, bytes32 l2StandardTokenBytecodeHash) = calculateL2Create2Address(
+        (address l2StandardToken, ) = calculateL2Create2Address(
             config.l2SharedBridgeAddress,
             l2StandardTokenCode,
             bytes32(0),
