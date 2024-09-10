@@ -113,8 +113,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         L1_NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
     }
 
+    /// @inheritdoc INativeTokenVault
+    function registerToken(address _nativeToken) external override(INativeTokenVault, NativeTokenVault) {
+        originChainId[DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken)] = block.chainid;
+        _registerToken(_nativeToken);
+    }
+
     /*//////////////////////////////////////////////////////////////
-                            L1 SPECIFIC FUNCTIONS
+                            Start transaction Functions
     //////////////////////////////////////////////////////////////*/
 
     function _bridgeBurnNativeToken(
@@ -140,6 +146,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             _data: _data
         });
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            L1 SPECIFIC FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     ///  @inheritdoc IL1AssetHandler
     function bridgeRecoverFailedTransfer(
@@ -226,7 +236,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     function _deployBeaconProxy(bytes32 _salt) internal override returns (BeaconProxy proxy) {
         // Use CREATE2 to deploy the BeaconProxy
-
         address proxyAddress = Create2.deploy(
             0,
             _salt,

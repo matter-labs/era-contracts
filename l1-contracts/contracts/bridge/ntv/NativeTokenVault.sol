@@ -43,6 +43,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
     IBeacon public bridgedTokenBeacon;
 
+    /// @dev A mapping assetId => tokenAddress
+    mapping(bytes32 assetId => uint256 chainId) public originChainId;
+
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
@@ -80,11 +83,12 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
     }
 
-    /// @notice Registers tokens within the NTV.
-    /// @dev The goal was to allow bridging native tokens automatically, by registering them on the fly.
-    /// @notice Allows the bridge to register a token address for the vault.
-    /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
-    function registerToken(address _nativeToken) external {
+    /// @inheritdoc INativeTokenVault
+    function registerToken(address _nativeToken) external virtual {
+        _registerToken(_nativeToken);
+    }
+    
+    function _registerToken(address _nativeToken) internal {
         if (_nativeToken == WETH_TOKEN) {
             revert TokenNotSupported(WETH_TOKEN);
         }
@@ -172,11 +176,11 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override onlyAssetRouter whenNotPaused returns (bytes memory _bridgeMintData) {
+    ) external payable override onlyAssetRouter whenNotPaused returns (bytes memory bridgeMintData) {
         if (!isTokenNative[_assetId]) {
-            _bridgeMintData = _bridgeBurnBridgedToken(_chainId, _assetId, _prevMsgSender, _data);
+            bridgeMintData = _bridgeBurnBridgedToken(_chainId, _assetId, _prevMsgSender, _data);
         } else {
-            _bridgeMintData = _bridgeBurnNativeToken({
+            bridgeMintData = _bridgeBurnNativeToken({
                 _chainId: _chainId,
                 _assetId: _assetId,
                 _prevMsgSender: _prevMsgSender,
@@ -191,24 +195,25 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes32 _assetId,
         address _prevMsgSender,
         bytes calldata _data
-    ) internal returns (bytes memory _bridgeMintData) {
-        (uint256 _amount, address _receiver) = abi.decode(_data, (uint256, address));
-        if (_amount == 0) {
+    ) internal returns (bytes memory bridgeMintData) {
+        (uint256 amount, address receiver) = abi.decode(_data, (uint256, address));
+        if (amount == 0) {
             // "Amount cannot be zero");
             revert AmountMustBeGreaterThanZero();
         }
 
         address bridgedToken = tokenAddress[_assetId];
-        IBridgedStandardToken(bridgedToken).bridgeBurn(_prevMsgSender, _amount);
+        
+        IBridgedStandardToken(bridgedToken).bridgeBurn(_prevMsgSender, amount);
 
         emit BridgeBurn({
             chainId: _chainId,
             assetId: _assetId,
             sender: _prevMsgSender,
-            receiver: _receiver,
-            amount: _amount
+            receiver: receiver,
+            amount: amount
         });
-        _bridgeMintData = _data;
+        bridgeMintData = _data;
     }
 
     function _bridgeBurnNativeToken(
@@ -217,10 +222,9 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         address _prevMsgSender,
         bool _depositChecked,
         bytes calldata _data
-    ) internal virtual returns (bytes memory _bridgeMintData) {
+    ) internal virtual returns (uint256 amount, bytes memory bridgeMintData) {
         (uint256 _depositAmount, address _receiver) = abi.decode(_data, (uint256, address));
 
-        uint256 amount;
         address nativeToken = tokenAddress[_assetId];
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             amount = msg.value;
@@ -230,7 +234,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             if (_depositAmount == 0) {
                 _depositAmount = amount;
             }
-
+            _handleChainBalanceIncrease(_chainId, _assetId, amount);
             if (_depositAmount != amount) {
                 revert ValueMismatch(amount, msg.value);
             }
@@ -239,7 +243,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             if (msg.value != 0) {
                 revert NonEmptyMsgValue();
             }
-
+            _handleChainBalanceIncrease(_chainId, _assetId, amount);
             amount = _depositAmount;
             if (!_depositChecked) {
                 uint256 expectedDepositAmount = _depositFunds(_prevMsgSender, IERC20(nativeToken), _depositAmount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
@@ -254,9 +258,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             revert EmptyDeposit();
         }
 
-        chainBalance[_chainId][_assetId] += amount;
-
-        _bridgeMintData = DataEncoding.encodeBridgeMintData({
+        bridgeMintData = DataEncoding.encodeBridgeMintData({
             _prevMsgSender: _prevMsgSender,
             _l2Receiver: _receiver,
             _l1Token: nativeToken,

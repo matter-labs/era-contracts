@@ -23,7 +23,10 @@ interface INativeTokenVault {
     /// @notice Returns if the bridged version of bridged token has been deployed
     function isTokenNative(bytes32 assetId) external view returns (bool);
 
-    /// @notice Used to register a token in the vault
+    /// @notice Registers tokens within the NTV.
+    /// @dev The goal is to allow bridging native tokens automatically, by registering them on the fly.
+    /// @notice Allows the bridge to register a token address for the vault.
+    /// @notice No access control is ok, since the bridging of tokens should be permissionless. This requires permissionless registration.
     function registerToken(address _l1Token) external;
 
     /// @notice Used to get the assetId of a token
