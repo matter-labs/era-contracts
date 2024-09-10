@@ -494,18 +494,16 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         L2Message memory l2ToL1Message;
         {
             bool baseTokenWithdrawal = (assetId == BRIDGE_HUB.baseTokenAssetId(_finalizeWithdrawalParams.chainId));
-            if (baseTokenWithdrawal) {
-                require(
-                    /// @dev for legacy function calls we hardcode the sender as the L2AssetRouter as we don't know if it is
-                    /// a base token or erc20 token withdrawal beforehand,
-                    /// so we have to allow that option even if we override it.
-                    _finalizeWithdrawalParams.l2Sender == L2_ASSET_ROUTER_ADDR ||
-                        _finalizeWithdrawalParams.l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR ||
-                        _finalizeWithdrawalParams.l2Sender ==
-                        __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId],
-                    "L1N: wrong l2 sender"
-                );
-            }
+            require(
+                /// @dev for legacy function calls we hardcode the sender as the L2AssetRouter as we don't know if it is
+                /// a base token or erc20 token withdrawal beforehand,
+                /// so we have to allow that option even if we override it.
+                _finalizeWithdrawalParams.l2Sender == L2_ASSET_ROUTER_ADDR ||
+                    _finalizeWithdrawalParams.l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR ||
+                    _finalizeWithdrawalParams.l2Sender ==
+                    __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId],
+                "L1N: wrong l2 sender"
+            );
 
             l2ToL1Message = L2Message({
                 txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
