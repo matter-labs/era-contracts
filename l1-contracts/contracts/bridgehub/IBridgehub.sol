@@ -2,11 +2,11 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IL1AssetRouter} from "../bridge/interfaces/IL1AssetRouter.sol";
 import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
+import {IAssetHandler} from "../bridge/interfaces/IAssetHandler.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -55,7 +55,7 @@ struct BridgehubBurnCTMAssetData {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IBridgehub is IL1AssetHandler {
+interface IBridgehub is IAssetHandler, IL1AssetHandler {
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
@@ -104,7 +104,7 @@ interface IBridgehub is IL1AssetHandler {
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
-    function sharedBridge() external view returns (IL1AssetRouter);
+    function sharedBridge() external view returns (address);
 
     function messageRoot() external view returns (IMessageRoot);
 
@@ -115,6 +115,8 @@ interface IBridgehub is IL1AssetHandler {
     function getAllZKChainChainIDs() external view returns (uint256[] memory);
 
     function migrationPaused() external view returns (bool);
+
+    function admin() external view returns (address);
 
     /// Mailbox forwarder
 
@@ -224,4 +226,8 @@ interface IBridgehub is IL1AssetHandler {
     function L1_CHAIN_ID() external view returns (uint256);
 
     function setLegacyBaseTokenAssetId(uint256 _chainId) external;
+
+    function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external;
+
+    function setLegacyChainAddress(uint256 _chainId) external;
 }

@@ -401,7 +401,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice called by Bridgehub when a chain registers
     /// @param _chainId the chain's id
     /// @param _baseTokenAssetId the base token asset id used to pay for gas fees
-    /// @param _sharedBridge the shared bridge address, used as base token bridge
+    /// @param _assetRouter the shared bridge address, used as base token bridge
     /// @param _admin the chain's admin address
     /// @param _initData the diamond cut data, force deployments and factoryDeps encoded
     /// @param _factoryDeps the factory dependencies used for the genesis upgrade
@@ -409,7 +409,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     function createNewChain(
         uint256 _chainId,
         bytes32 _baseTokenAssetId,
-        address _sharedBridge,
+        address _assetRouter,
         address _admin,
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
@@ -417,7 +417,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         (bytes memory _diamondCut, bytes memory _forceDeploymentData) = abi.decode(_initData, (bytes, bytes));
 
         // solhint-disable-next-line func-named-parameters
-        zkChainAddress = _deployNewChain(_chainId, _baseTokenAssetId, _sharedBridge, _admin, _diamondCut);
+        zkChainAddress = _deployNewChain(_chainId, _baseTokenAssetId, _assetRouter, _admin, _diamondCut);
 
         {
             // check input

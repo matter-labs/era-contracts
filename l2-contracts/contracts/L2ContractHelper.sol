@@ -3,8 +3,6 @@
 pragma solidity ^0.8.20;
 
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
-import {IL2AssetRouter} from "./bridge/interfaces/IL2AssetRouter.sol";
-import {IL2NativeTokenVault} from "./bridge/interfaces/IL2NativeTokenVault.sol";
 import {MalformedBytecode, BytecodeError} from "./errors/L2ContractErrors.sol";
 
 /**
@@ -114,11 +112,6 @@ address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0
 address constant DEPLOYER_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x06);
 
 address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
-
-IL2AssetRouter constant L2_ASSET_ROUTER = IL2AssetRouter(address(USER_CONTRACTS_OFFSET + 0x03));
-
-/// @dev The contract responsible for handling tokens native to a single chain.
-IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(address(USER_CONTRACTS_OFFSET + 0x04));
 
 uint256 constant L1_CHAIN_ID = 1;
 

@@ -3,6 +3,9 @@
 pragma solidity 0.8.24;
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../L2ContractAddresses.sol";
+import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
+import {INativeTokenVault} from "../../bridge/ntv/INativeTokenVault.sol";
+import {UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -86,5 +89,62 @@ library DataEncoding {
     /// @return The encoded asset data.
     function encodeNTVAssetId(uint256 _chainId, address _tokenAddress) internal pure returns (bytes32) {
         return keccak256(abi.encode(_chainId, L2_NATIVE_TOKEN_VAULT_ADDR, _tokenAddress));
+    }
+
+    /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
+    /// @param _encodingVersion EncodingVersion.
+    /// @param _prevMsgSender The address of the entity that initiated the deposit.
+    /// @param _assetId The unique identifier of the deposited L1 token.
+    /// @param _nativeTokenVault The address of the token, only used if the encoding version is legacy.
+    /// @param _transferData The encoded transfer data, which includes both the deposit amount and the address of the L2 receiver.
+    /// @return txDataHash The resulting encoded transaction data hash.
+    function encodeTxDataHash(
+        bytes1 _encodingVersion,
+        address _prevMsgSender,
+        bytes32 _assetId,
+        address _nativeTokenVault,
+        bytes memory _transferData
+    ) internal view returns (bytes32 txDataHash) {
+        if (_encodingVersion == LEGACY_ENCODING_VERSION) {
+            address tokenAddress = INativeTokenVault(_nativeTokenVault).tokenAddress(_assetId);
+            (uint256 depositAmount, ) = abi.decode(_transferData, (uint256, address));
+            txDataHash = keccak256(abi.encode(_prevMsgSender, tokenAddress, depositAmount));
+        } else if (_encodingVersion == NEW_ENCODING_VERSION) {
+            // Similarly to calldata, the txDataHash is collision-resistant.
+            // In the legacy data hash, the first encoded variable was the address, which is padded with zeros during `abi.encode`.
+            txDataHash = keccak256(bytes.concat(_encodingVersion, abi.encode(_prevMsgSender, _assetId, _transferData)));
+        } else {
+            revert UnsupportedEncodingVersion();
+        }
+    }
+
+    /// @notice Decodes the token data by combining chain id, asset deployment tracker and asset data.
+    function decodeTokenData(
+        bytes calldata _tokenData
+    ) internal pure returns (uint256 chainId, bytes memory name, bytes memory symbol, bytes memory decimals) {
+        bytes1 encodingVersion = _tokenData[0];
+        // kl todo check correct
+        if (encodingVersion == LEGACY_ENCODING_VERSION) {
+            (name, symbol, decimals) = abi.decode(_tokenData, (bytes, bytes, bytes));
+        } else if (encodingVersion == NEW_ENCODING_VERSION) {
+            return abi.decode(_tokenData[1:], (uint256, bytes, bytes, bytes));
+        } else {
+            revert UnsupportedEncodingVersion();
+        }
+    }
+
+    /// @notice Encodes the token data by combining chain id, asset deployment tracker and asset data.
+    /// @param _chainId The id of the chain token is native to.
+    /// @param _name The name of the token.
+    /// @param _symbol The symbol of the token.
+    /// @param _decimals The decimals of the token.
+    /// @return The encoded token data.
+    function encodeTokenData(
+        uint256 _chainId,
+        bytes memory _name,
+        bytes memory _symbol,
+        bytes memory _decimals
+    ) internal pure returns (bytes memory) {
+        return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_chainId, _name, _symbol, _decimals));
     }
 }

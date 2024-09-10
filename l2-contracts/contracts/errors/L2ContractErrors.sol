@@ -44,5 +44,3 @@ enum BytecodeError {
 }
 // 0xd92e233d
 error ZeroAddress();
-
-string constant BRIDGE_MINT_NOT_IMPLEMENTED = "bridgeMint is not implemented! Use deposit/depositTo methods instead.";

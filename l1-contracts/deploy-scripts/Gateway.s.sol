@@ -17,12 +17,12 @@ import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayT
 // import {Governance} from "contracts/governance/Governance.sol";
 // import {Utils} from "./Utils.sol";
 // import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-// import {IL1NativeTokenVault} from "contracts/bridge/interfaces/IL1NativeTokenVault.sol";
+// import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
-// import {IL1AssetRouter} from "contracts/bridge/interfaces/IL1AssetRouter.sol";
+// import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 contract GatewayScript is Script {
     using stdToml for string;

@@ -5,8 +5,7 @@ pragma solidity 0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
 
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
+import {L2TransactionRequestDirect, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
@@ -237,7 +236,7 @@ library Utils {
         address bridgehubAddress,
         address l1SharedBridgeProxy
     ) internal {
-        Bridgehub bridgehub = Bridgehub(bridgehubAddress);
+        IBridgehub bridgehub = IBridgehub(bridgehubAddress);
         uint256 gasPrice = bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
 
         uint256 requiredValueToDeploy = bridgehub.l2TransactionBaseCost(

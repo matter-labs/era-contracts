@@ -7,11 +7,12 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
-import {IL1NativeTokenVault} from "../../bridge/interfaces/IL1NativeTokenVault.sol";
+import {IL1NativeTokenVault} from "../../bridge/ntv/L1NativeTokenVault.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 import {IL2Bridge} from "../../bridge/interfaces/IL2Bridge.sol";
-import {IL2BridgeLegacy} from "../../bridge/interfaces/IL2BridgeLegacy.sol";
+import {IL2SharedBridgeLegacy} from "../../bridge/interfaces/IL2SharedBridgeLegacy.sol";
+import {IL2SharedBridgeLegacyFunctions} from "../../bridge/interfaces/IL2SharedBridgeLegacyFunctions.sol";
 
 contract DummySharedBridge is PausableUpgradeable {
     using SafeERC20 for IERC20;
@@ -32,7 +33,6 @@ contract DummySharedBridge is PausableUpgradeable {
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 
     /// @dev Indicates whether the hyperbridging is enabled for a given chain.
-    mapping(uint256 chainId => bool enabled) internal hyperbridgingEnabled;
 
     address l1ReceiverReturnInFinalizeWithdrawal;
     address l1TokenReturnInFinalizeWithdrawal;
@@ -127,8 +127,8 @@ contract DummySharedBridge is PausableUpgradeable {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external {
-        (address l1Receiver, address l1Token, uint256 amount) = _parseL2WithdrawalMessage(_message);
+    ) external returns (address l1Receiver, address l1Token, uint256 amount) {
+        (l1Receiver, l1Token, amount) = _parseL2WithdrawalMessage(_message);
 
         if (l1Token == address(1)) {
             bool callSuccess;
@@ -152,9 +152,7 @@ contract DummySharedBridge is PausableUpgradeable {
         // Dummy bridge supports only working with ETH for simplicity.
         require(msg.value == _amount, "L1AR: msg.value not equal to amount");
 
-        if (!hyperbridgingEnabled[_chainId]) {
-            chainBalance[_chainId][address(1)] += _amount;
-        }
+        chainBalance[_chainId][address(1)] += _amount;
 
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
         emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _assetId, _amount);
@@ -192,7 +190,7 @@ contract DummySharedBridge is PausableUpgradeable {
         }
 
         bytes memory l2TxCalldata = abi.encodeCall(
-            IL2BridgeLegacy.finalizeDeposit,
+            IL2SharedBridgeLegacyFunctions.finalizeDeposit,
             (_prevMsgSender, _l2Receiver, _l1Token, amount, new bytes(0))
         );
         bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
