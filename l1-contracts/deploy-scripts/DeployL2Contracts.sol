@@ -43,12 +43,20 @@ contract DeployL2Script is Script {
     }
 
     function run() public {
+        deploy(false);
+    }
+
+    function runWithLegacyBridge() public {
+        deploy(true);
+    }
+
+    function deploy(bool legacyBridge) public {
         initializeConfig();
-        loadContracts();
+        loadContracts(legacyBridge);
 
         deployFactoryDeps();
         deploySharedBridge();
-        deploySharedBridgeProxy();
+        deploySharedBridgeProxy(legacyBridge);
         initializeChain();
         deployForceDeployer();
         deployConsensusRegistry();
@@ -57,13 +65,21 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
+    function runDeployLegacySharedBridge() public {
+        deploySharedBridge(true);
+    }
+
     function runDeploySharedBridge() public {
+        deploySharedBridge(false);
+    }
+
+    function deploySharedBridge(bool legacyBridge) internal {
         initializeConfig();
-        loadContracts();
+        loadContracts(legacyBridge);
 
         deployFactoryDeps();
         deploySharedBridge();
-        deploySharedBridgeProxy();
+        deploySharedBridgeProxy(legacyBridge);
         initializeChain();
 
         saveOutput();
@@ -71,7 +87,7 @@ contract DeployL2Script is Script {
 
     function runDefaultUpgrader() public {
         initializeConfig();
-        loadContracts();
+        loadContracts(false);
 
         deployForceDeployer();
 
@@ -80,7 +96,7 @@ contract DeployL2Script is Script {
 
     function runDeployConsensusRegistry() public {
         initializeConfig();
-        loadContracts();
+        loadContracts(false);
 
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
@@ -88,7 +104,7 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
-    function loadContracts() internal {
+    function loadContracts(bool legacyBridge) internal {
         //HACK: Meanwhile we are not integrated foundry zksync we use contracts that has been built using hardhat
         contracts.l2StandardErc20FactoryBytecode = Utils.readHardhatBytecode(
             "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol/UpgradeableBeacon.json"
@@ -100,9 +116,16 @@ contract DeployL2Script is Script {
             "/../l2-contracts/artifacts-zk/contracts/bridge/L2StandardERC20.sol/L2StandardERC20.json"
         );
 
-        contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
-            "/../l2-contracts/artifacts-zk/contracts/bridge/L2SharedBridge.sol/L2SharedBridge.json"
-        );
+        if (legacyBridge) {
+            contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
+                "/../l2-contracts/artifacts-zk/contracts/dev-contracts/DevL2SharedBridge.sol/DevL2SharedBridge.json"
+            );
+        } else {
+            contracts.l2SharedBridgeBytecode = Utils.readHardhatBytecode(
+                "/../l2-contracts/artifacts-zk/contracts/bridge/L2SharedBridge.sol/L2SharedBridge.json"
+            );
+        }
+
         contracts.l2SharedBridgeProxyBytecode = Utils.readHardhatBytecode(
             "/../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json"
         );
@@ -183,13 +206,20 @@ contract DeployL2Script is Script {
         });
     }
 
-    function deploySharedBridgeProxy() internal {
+    function deploySharedBridgeProxy(bool legacyBridge) internal {
         address l2GovernorAddress = AddressAliasHelper.applyL1ToL2Alias(config.governance);
         bytes32 l2StandardErc20BytecodeHash = L2ContractHelper.hashL2Bytecode(contracts.beaconProxy);
 
+        string memory functionSignature;
+
+        if (legacyBridge) {
+            functionSignature = "initializeDevBridge(address,address,bytes32,address)";
+        } else {
+            functionSignature = "initialize(address,address,bytes32,address)";
+        }
         // solhint-disable-next-line func-named-parameters
         bytes memory proxyInitializationParams = abi.encodeWithSignature(
-            "initialize(address,address,bytes32,address)",
+            functionSignature,
             config.l1SharedBridgeProxy,
             config.erc20BridgeProxy,
             l2StandardErc20BytecodeHash,
