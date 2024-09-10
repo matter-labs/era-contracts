@@ -31,8 +31,8 @@
     "contractName": "ContractDeployer",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/ContractDeployer.sol/ContractDeployer.json",
     "sourceCodePath": "contracts-preprocessed/ContractDeployer.sol",
-    "bytecodeHash": "0x01000765b21f3e93da0beb7987904f82bd64d691146fcd9326735f10ea62e533",
-    "sourceCodeHash": "0x20d42c32468d61bf57fe2067ba5ebaa70d4060583b339e2df2958e72e7869650"
+    "bytecodeHash": "0x01000759065941e6d7ebd04e39da2ebe0fabfed0acb1eebdbb6a388bbde4317a",
+    "sourceCodeHash": "0xd089b964a7ad23bf7e53907a778d592a589b451363a902aeebc14abfe559d94b"
   },
   {
     "contractName": "Create2Factory",
@@ -129,8 +129,8 @@
     "contractName": "EvmInterpreter",
     "bytecodePath": "contracts-preprocessed/artifacts/EvmInterpreter.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/EvmInterpreter.yul",
-    "bytecodeHash": "0x01000e53aa35d9d19fa99341c2e2901cf93b3668f01569dd5c6ca409c7696b91",
-    "sourceCodeHash": "0x4e16a8c65c4c5c3124dcfa2871da72a0c15744e524086a8c9dc46d7be164d539"
+    "bytecodeHash": "0x01000ccb740e2345754450eda583f59b31a346920a22f968dfcfc63feae303ee",
+    "sourceCodeHash": "0xfc91734d4d37538b19c94be0da51364edd4f6664f0fee383cc2e3b5eeb95336a"
   },
   {
     "contractName": "CodeOracle",

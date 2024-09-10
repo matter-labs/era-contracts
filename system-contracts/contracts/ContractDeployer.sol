@@ -35,7 +35,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         Deployed
     }
 
-    uint256 constant EVM_HASHES_PREFIX = 1 << 254;
+    uint256 private constant EVM_HASHES_PREFIX = 1 << 254;
 
     uint256 public constructorReturnGas;
 

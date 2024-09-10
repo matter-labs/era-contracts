@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
+import { writeFileSync, readFileSync } from "fs";
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 const preprocess = require("preprocess");
@@ -16,7 +16,7 @@ async function main() {
 
   writeFileSync(`../${OUTPUT_DIR}/EvmInterpreter.yul`, interpreter);
 
-  console.log("Intepreter preprocessing done!");
+  console.log("Interpreter preprocessing done!");
 }
 
 main();
