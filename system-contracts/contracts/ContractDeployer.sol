@@ -35,7 +35,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         Deployed
     }
 
-    mapping(address => bytes32) public evmCodeHash;
+    uint256 constant EVM_HASHES_PREFIX = 1 << 254;
 
     uint256 public constructorReturnGas;
 
@@ -51,7 +51,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         uint256 bytecodeLen = uint256(bytes32(paddedNewDeployedCode[:32]));
         bytes memory trueBytecode = paddedNewDeployedCode[32:32 + bytecodeLen];
 
-        evmCodeHash[msg.sender] = keccak256(trueBytecode);
+        _setEvmCodeHash(msg.sender, keccak256(trueBytecode));
         constructorReturnGas = constructorGasLeft;
 
         // ToDO: use efficient call
@@ -66,6 +66,10 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             revert Unauthorized(msg.sender);
         }
         _;
+    }
+
+    function evmCodeHash(address _address) external view returns (bytes32 _hash) {
+        _hash = _getEvmCodeHash(_address);
     }
 
     /// @notice Returns information about a certain account.
@@ -539,7 +543,23 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             }
         }
 
-        require(evmCodeHash[_newAddress] != 0x0, "The code hash must be set after the constructor call");
-        emit ContractDeployed(_sender, evmCodeHash[_newAddress], _newAddress);
+
+        bytes32 codeHash = _getEvmCodeHash(_newAddress);
+        require(codeHash != 0x0, "The code hash must be set after the constructor call");
+        emit ContractDeployed(_sender, codeHash, _newAddress);
+    }
+
+    function _setEvmCodeHash(address _address, bytes32 _hash) internal {
+        assembly {
+            let slot := or(EVM_HASHES_PREFIX, _address)
+            sstore(slot, _hash)
+        }
+    }
+
+    function _getEvmCodeHash(address _address) internal view returns (bytes32 _hash) {
+        assembly {
+            let slot := or(EVM_HASHES_PREFIX, _address)
+            _hash := sload(slot)
+        }
     }
 }
