@@ -51,24 +51,24 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after Diamond proxy upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade Eth withdrawals. Withdrawals from batches older
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
-    uint256 internal _eraPostDiamondUpgradeFirstBatch;
+    uint256 internal eraPostDiamondUpgradeFirstBatch;
 
     /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after L1ERC20 Bridge upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade ERC20 withdrawals. Withdrawals from batches older
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
-    uint256 internal _eraPostLegacyBridgeUpgradeFirstBatch;
+    uint256 internal eraPostLegacyBridgeUpgradeFirstBatch;
 
     /// @dev Stores the ZKsync Era batch number that processes the last deposit tx initiated by the legacy bridge
-    /// This variable (together with _eraLegacyBridgeLastDepositTxNumber) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older batches
+    /// This variable (together with eraLegacyBridgeLastDepositTxNumber) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older batches
     /// than this value are considered to have been processed prior to the upgrade and handled separately.
     /// We use this both for Eth and erc20 token deposits, so we need to update the diamond and bridge simultaneously.
-    uint256 internal _eraLegacyBridgeLastDepositBatch;
+    uint256 internal eraLegacyBridgeLastDepositBatch;
 
-    /// @dev The tx number in the __eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge.
-    /// This variable (together with _eraLegacyBridgeLastDepositBatch) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older txs
+    /// @dev The tx number in the _eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge.
+    /// This variable (together with eraLegacyBridgeLastDepositBatch) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older txs
     /// than this value are considered to have been processed prior to the upgrade and handled separately.
     /// We use this both for Eth and erc20 token deposits, so we need to update the diamond and bridge simultaneously.
-    uint256 internal _eraLegacyBridgeLastDepositTxNumber;
+    uint256 internal eraLegacyBridgeLastDepositTxNumber;
 
     /// @dev Legacy bridge smart contract that used to hold ERC20 tokens.
     address public override legacyBridge;
@@ -158,26 +158,26 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Used for testing purposes only, as the contract has been initialized on mainnet.
     /// @param _owner The address which can change L2 token implementation and upgrade the bridge implementation.
     /// The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    /// @param __eraPostDiamondUpgradeFirstBatch The first batch number on the ZKsync Era Diamond Proxy that was settled after diamond proxy upgrade.
-    /// @param __eraPostLegacyBridgeUpgradeFirstBatch The first batch number on the ZKsync Era Diamond Proxy that was settled after legacy bridge upgrade.
-    /// @param __eraLegacyBridgeLastDepositBatch The the ZKsync Era batch number that processes the last deposit tx initiated by the legacy bridge.
-    /// @param __eraLegacyBridgeLastDepositTxNumber The tx number in the __eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge.
+    /// @param _eraPostDiamondUpgradeFirstBatch The first batch number on the ZKsync Era Diamond Proxy that was settled after diamond proxy upgrade.
+    /// @param _eraPostLegacyBridgeUpgradeFirstBatch The first batch number on the ZKsync Era Diamond Proxy that was settled after legacy bridge upgrade.
+    /// @param _eraLegacyBridgeLastDepositBatch The the ZKsync Era batch number that processes the last deposit tx initiated by the legacy bridge.
+    /// @param _eraLegacyBridgeLastDepositTxNumber The tx number in the _eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge.
     function initialize(
         address _owner,
-        uint256 __eraPostDiamondUpgradeFirstBatch,
-        uint256 __eraPostLegacyBridgeUpgradeFirstBatch,
-        uint256 __eraLegacyBridgeLastDepositBatch,
-        uint256 __eraLegacyBridgeLastDepositTxNumber
+        uint256 _eraPostDiamondUpgradeFirstBatch,
+        uint256 _eraPostLegacyBridgeUpgradeFirstBatch,
+        uint256 _eraLegacyBridgeLastDepositBatch,
+        uint256 _eraLegacyBridgeLastDepositTxNumber
     ) external reentrancyGuardInitializer initializer {
         if (_owner == address(0)) {
             revert ZeroAddress();
         }
         _transferOwnership(_owner);
-        if (_eraPostDiamondUpgradeFirstBatch == 0) {
-            _eraPostDiamondUpgradeFirstBatch = __eraPostDiamondUpgradeFirstBatch;
-            _eraPostLegacyBridgeUpgradeFirstBatch = __eraPostLegacyBridgeUpgradeFirstBatch;
-            _eraLegacyBridgeLastDepositBatch = __eraLegacyBridgeLastDepositBatch;
-            _eraLegacyBridgeLastDepositTxNumber = __eraLegacyBridgeLastDepositTxNumber;
+        if (eraPostDiamondUpgradeFirstBatch == 0) {
+            eraPostDiamondUpgradeFirstBatch = _eraPostDiamondUpgradeFirstBatch;
+            eraPostLegacyBridgeUpgradeFirstBatch = _eraPostLegacyBridgeUpgradeFirstBatch;
+            eraLegacyBridgeLastDepositBatch = _eraLegacyBridgeLastDepositBatch;
+            eraLegacyBridgeLastDepositTxNumber = _eraLegacyBridgeLastDepositTxNumber;
         }
     }
 
@@ -430,10 +430,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
     /// @return Whether withdrawal was initiated on ZKsync Era before diamond proxy upgrade.
     function _isEraLegacyEthWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
-        if ((_chainId == ERA_CHAIN_ID) && _eraPostDiamondUpgradeFirstBatch == 0) {
+        if ((_chainId == ERA_CHAIN_ID) && eraPostDiamondUpgradeFirstBatch == 0) {
             revert SharedBridgeValueNotSet(SharedBridgeKey.PostUpgradeFirstBatch);
         }
-        return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < _eraPostDiamondUpgradeFirstBatch);
+        return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostDiamondUpgradeFirstBatch);
     }
 
     /// @dev Determines if a token withdrawal was initiated on ZKsync Era before the upgrade to the Shared Bridge.
@@ -441,10 +441,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
     /// @return Whether withdrawal was initiated on ZKsync Era before Legacy Bridge upgrade.
     function _isEraLegacyTokenWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
-        if ((_chainId == ERA_CHAIN_ID) && _eraPostLegacyBridgeUpgradeFirstBatch == 0) {
+        if ((_chainId == ERA_CHAIN_ID) && eraPostLegacyBridgeUpgradeFirstBatch == 0) {
             revert SharedBridgeValueNotSet(SharedBridgeKey.LegacyBridgeFirstBatch);
         }
-        return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < _eraPostLegacyBridgeUpgradeFirstBatch);
+        return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraPostLegacyBridgeUpgradeFirstBatch);
     }
 
     /// @dev Determines if the provided data for a failed deposit corresponds to a legacy failed deposit.
@@ -478,14 +478,14 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint256 _l2BatchNumber,
         uint256 _l2TxNumberInBatch
     ) internal view returns (bool) {
-        if ((_chainId == ERA_CHAIN_ID) && (_eraLegacyBridgeLastDepositBatch == 0)) {
+        if ((_chainId == ERA_CHAIN_ID) && (eraLegacyBridgeLastDepositBatch == 0)) {
             revert SharedBridgeValueNotSet(SharedBridgeKey.LegacyBridgeLastDepositBatch);
         }
         return
             (_chainId == ERA_CHAIN_ID) &&
-            (_l2BatchNumber < _eraLegacyBridgeLastDepositBatch ||
-                (_l2TxNumberInBatch <= _eraLegacyBridgeLastDepositTxNumber &&
-                    _l2BatchNumber == _eraLegacyBridgeLastDepositBatch));
+            (_l2BatchNumber < eraLegacyBridgeLastDepositBatch ||
+                (_l2TxNumberInBatch <= eraLegacyBridgeLastDepositTxNumber &&
+                    _l2BatchNumber == eraLegacyBridgeLastDepositBatch));
     }
 
     /// @notice Verifies the validity of a withdrawal message from L2 and returns withdrawal details.
