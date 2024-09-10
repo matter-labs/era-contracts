@@ -748,9 +748,6 @@ contract ExperimentalBridgeTest is Test {
     function test_createNewChain(
         address randomCaller,
         uint256 chainId,
-        bool isFreezable,
-        bytes4[] memory mockSelectors,
-        address mockInitAddress,
         bytes memory mockInitCalldata,
         bytes[] memory factoryDeps,
         uint256 salt,
@@ -777,12 +774,6 @@ contract ExperimentalBridgeTest is Test {
         });
 
         vm.prank(mockCTM.owner());
-        bytes memory _newChainInitData = _createNewChainInitData(
-            isFreezable,
-            mockSelectors,
-            mockInitAddress,
-            mockInitCalldata
-        );
 
         // bridgeHub.createNewChain => chainTypeManager.createNewChain => this function sets the stateTransition mapping
         // of `chainId`, let's emulate that using foundry cheatcodes or let's just use the extra function we introduced in our mockCTM
@@ -798,7 +789,7 @@ contract ExperimentalBridgeTest is Test {
                 tokenAssetId,
                 sharedBridgeAddress,
                 admin,
-                _newChainInitData,
+                mockInitCalldata,
                 factoryDeps
             ),
             abi.encode(newChainAddress)
@@ -807,22 +798,22 @@ contract ExperimentalBridgeTest is Test {
         vm.expectEmit(true, true, true, true, address(bridgeHub));
         emit NewChain(chainId, address(mockCTM), admin);
 
-        newChainId = bridgeHub.createNewChain({
+        bridgeHub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
             _salt: uint256(chainId * 2),
             _admin: admin,
-            _initData: _newChainInitData,
+            _initData: mockInitCalldata,
             _factoryDeps: factoryDeps
         });
 
         vm.stopPrank();
         vm.clearMockedCalls();
 
-        assertTrue(bridgeHub.chainTypeManager(newChainId) == address(mockCTM));
-        assertTrue(bridgeHub.baseTokenAssetId(newChainId) == tokenAssetId);
-        assertTrue(bridgeHub.getZKChain(newChainId) == newChainAddress);
+        assertTrue(bridgeHub.chainTypeManager(chainId) == address(mockCTM));
+        assertTrue(bridgeHub.baseTokenAssetId(chainId) == tokenAssetId);
+        assertTrue(bridgeHub.getZKChain(chainId) == newChainAddress);
     }
 
     function test_proveL2MessageInclusion(
