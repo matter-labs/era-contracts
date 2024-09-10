@@ -27,13 +27,6 @@ struct FinalizeL1DepositParams {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL1Nullifier {
-    enum WithdrawalType {
-        None,
-        BaseToken,
-        LegacyTokenBridgeOrSharedBridge,
-        AssetRouter
-    }
-
     event BridgehubDepositFinalized(
         uint256 indexed chainId,
         bytes32 indexed txDataHash,

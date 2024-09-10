@@ -302,6 +302,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32[] calldata _merkleProof
     ) public nonReentrant {
         _verifyAndClearFailedTransfer({
+            _checkedInLegacyBridge: false,
             _chainId: _chainId,
             _depositSender: _depositSender,
             _assetId: _assetId,
@@ -328,6 +329,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
     function _verifyAndClearFailedTransfer(
+        bool _checkedInLegacyBridge,
         uint256 _chainId,
         address _depositSender,
         bytes32 _assetId,
@@ -353,8 +355,17 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             }
         }
 
-        require(!_isPreSharedBridgeDepositOnEra(_chainId, _l2BatchNumber, _l2TxNumberInBatch), "L1N: legacy cFD");
+        bool notCheckedInLegacyBridgeOrWeCanCheckDeposit;
         {
+            // Deposits that happened before the upgrade cannot be checked here, they have to be claimed and checked in the legacyBridge
+            bool weCanCheckDepositHere = !_isPreSharedBridgeDepositOnEra(_chainId, _l2BatchNumber, _l2TxNumberInBatch);
+            // Double claims are not possible, as depositHappened is checked here for all except legacy deposits (which have to happen through the legacy bridge)
+            // Funds claimed before the update will still be recorded in the legacy bridge
+            // Note we double check NEW deposits if they are called from the legacy bridge
+            notCheckedInLegacyBridgeOrWeCanCheckDeposit = (!_checkedInLegacyBridge) || weCanCheckDepositHere;
+        }
+
+        if (notCheckedInLegacyBridgeOrWeCanCheckDeposit) {
             bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
             // Determine if the given dataHash matches the calculated legacy transaction hash.
             bool isLegacyTxDataHash = _isLegacyTxDataHash(_depositSender, _assetId, _assetData, dataHash);
@@ -398,17 +409,16 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         isWithdrawalFinalized[chainId][l2BatchNumber][l2MessageIndex] = true;
 
         // Handling special case for withdrawal from ZKsync Era initiated before Shared Bridge.
-        (bytes32 assetId, bytes memory transferData, WithdrawalType withdrawalType) = _verifyWithdrawal(
-            _finalizeWithdrawalParams
-        );
+        (bytes32 assetId, bytes memory transferData) = _verifyWithdrawal(_finalizeWithdrawalParams);
 
         // Handling special case for withdrawal from zkSync Era initiated before Shared Bridge.
-        if (withdrawalType == WithdrawalType.BaseToken && _isPreSharedBridgeEraEthWithdrawal(chainId, l2BatchNumber)) {
+        if (_isPreSharedBridgeEraEthWithdrawal(chainId, l2BatchNumber)) {
             // Checks that the withdrawal wasn't finalized already.
             bool alreadyFinalized = IGetters(ERA_DIAMOND_PROXY).isEthWithdrawalFinalized(l2BatchNumber, l2MessageIndex);
-            require(!alreadyFinalized, "Withdrawal is already finalized 2");
-        } else if (withdrawalType == WithdrawalType.LegacyTokenBridgeOrSharedBridge) {
-            require(!legacyBridge.isWithdrawalFinalized(l2BatchNumber, l2MessageIndex), "ShB: legacy withdrawal");
+            require(!alreadyFinalized, "L1N: Withdrawal is already finalized 2");
+        }
+        if (_isPreSharedBridgeEraTokenWithdrawal(chainId, l2BatchNumber)) {
+            require(!legacyBridge.isWithdrawalFinalized(l2BatchNumber, l2MessageIndex), "L1N: legacy withdrawal");
         }
 
         l1AssetRouter.finalizeDeposit(chainId, assetId, transferData);
@@ -486,8 +496,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @return transferData The transfer data used to finalize withdawal.
     function _verifyWithdrawal(
         FinalizeL1DepositParams calldata _finalizeWithdrawalParams
-    ) internal view returns (bytes32 assetId, bytes memory transferData, WithdrawalType withdrawalType) {
-        (assetId, transferData, withdrawalType) = _parseL2WithdrawalMessage(
+    ) internal view returns (bytes32 assetId, bytes memory transferData) {
+        (assetId, transferData) = _parseL2WithdrawalMessage(
             _finalizeWithdrawalParams.chainId,
             _finalizeWithdrawalParams.message
         );
@@ -495,20 +505,15 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         {
             address l2Sender = _finalizeWithdrawalParams.l2Sender;
             bool baseTokenWithdrawal = (assetId == BRIDGE_HUB.baseTokenAssetId(_finalizeWithdrawalParams.chainId));
-            if (withdrawalType == WithdrawalType.BaseToken) {
-                require(baseTokenWithdrawal, "L1N: token withdrawal from base token");
-                require(l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, "L1N: wrong l2 sender 1");
-            } else if (withdrawalType == WithdrawalType.LegacyTokenBridgeOrSharedBridge) {
-                require(!baseTokenWithdrawal, "L1N: base token withdrawal from token bridge");
-                require(
+            require(
+                /// @dev for legacy function calls we hardcode the sender as the L2AssetRouter as we don't know if it is
+                /// a base token or erc20 token withdrawal beforehand,
+                /// so we have to allow that option even if we override it.
+                l2Sender == L2_ASSET_ROUTER_ADDR ||
+                    l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR ||
                     l2Sender == __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId],
-                    "L1N: wrong l2 sender 2"
-                );
-            } else if (withdrawalType == WithdrawalType.AssetRouter) {
-                require(l2Sender == L2_ASSET_ROUTER_ADDR, "L1N: wrong l2 sender 3");
-            } else {
-                revert("L1N: wrong withdrawal type");
-            }
+                "L1N: wrong l2 sender"
+            );
 
             l2ToL1Message = L2Message({
                 txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
@@ -540,13 +545,11 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     function _parseL2WithdrawalMessage(
         uint256 _chainId,
         bytes memory _l2ToL1message
-    ) internal view returns (bytes32 assetId, bytes memory transferData, WithdrawalType withdrawalType) {
-        // We check that the message is long enough to read the data.
+    ) internal view returns (bytes32 assetId, bytes memory transferData) {
         // Please note that there are three versions of the message:
-        // 1. The message that is sent by `withdraw(address _l1Receiver)` on `L2BaseToken`
-        // It should be equal to the length of the bytes4 function signature + address l1Receiver + uint256 amount = 4 + 20 + 32 = 56 (bytes).
-        // 2. The message that is encoded by `getL1WithdrawMessage(bytes32 _assetId, bytes memory _bridgeMintData)`
-        // No length is assume. The assetId is decoded and the mintData is passed to respective assetHandler
+        // 1. The message that is sent from `L2BaseToken` to withdraw base token.
+        // 2. The message that is sent from L2 Legacy Shared Bridge to withdraw ERC20 tokens or base token.
+        // 3. The message that is sent from L2 Asset Router to withdraw ERC20 tokens or base token.
 
         uint256 amount;
         address l1Receiver;
@@ -557,7 +560,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             if (_l2ToL1message.length < 56) {
                 revert L2WithdrawalMessageWrongLength(_l2ToL1message.length);
             }
-            withdrawalType = WithdrawalType.BaseToken;
             // this message is a base token withdrawal
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             // slither-disable-next-line unused-return
@@ -565,7 +567,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             assetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
             transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) {
-            withdrawalType = WithdrawalType.LegacyTokenBridgeOrSharedBridge;
             // this message is a token withdrawal
 
             // Check that the message length is correct.
@@ -584,7 +585,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             assetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);
             transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == IAssetRouterBase.finalizeDeposit.selector) {
-            withdrawalType = WithdrawalType.AssetRouter;
             // The data is expected to be at least 36 bytes long to contain assetId.
             require(_l2ToL1message.length >= 36, "L1N: wrong msg len"); // wrong message length
             // slither-disable-next-line unused-return
@@ -626,6 +626,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes memory assetData = abi.encode(_amount, address(0));
 
         _verifyAndClearFailedTransfer({
+            _checkedInLegacyBridge: false,
             _depositSender: _depositSender,
             _chainId: _chainId,
             _assetId: assetId,
@@ -683,6 +684,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32 assetId = INativeTokenVault(address(l1NativeTokenVault)).getAssetId(block.chainid, _l1Asset);
 
         _verifyAndClearFailedTransfer({
+            _checkedInLegacyBridge: true,
             _depositSender: _depositSender,
             _chainId: ERA_CHAIN_ID,
             _assetId: assetId,

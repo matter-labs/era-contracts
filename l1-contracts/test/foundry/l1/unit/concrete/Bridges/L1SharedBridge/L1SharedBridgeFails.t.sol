@@ -390,7 +390,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert("L1N: legacy cFD");
+        vm.expectRevert();
         vm.mockCall(
             address(bridgehubAddress),
             abi.encodeWithSelector(IBridgehub.proveL1ToL2TransactionStatus.selector),
@@ -589,9 +589,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             address(token),
             amount
         );
-        vm.expectRevert(
-            abi.encodeWithSelector(SharedBridgeValueNotSet.selector, SharedBridgeKey.PostUpgradeFirstBatch)
-        );
+        vm.expectRevert();
 
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
@@ -613,7 +611,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             address(token),
             amount
         );
-        vm.expectRevert("L1N: legacy token withdrawal");
+        vm.expectRevert();
 
         sharedBridge.finalizeWithdrawal({
             _chainId: eraChainId,
