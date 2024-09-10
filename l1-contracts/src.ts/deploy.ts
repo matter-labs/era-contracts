@@ -1033,6 +1033,8 @@ export class Deployer {
     if (this.verbose) {
       console.log("Asset router set in nullifier");
     }
+
+    await (await this.nativeTokenVault(this.deployWallet).registerEthToken()).wait();
   }
 
   public async deployCTMDeploymentTrackerImplementation(
