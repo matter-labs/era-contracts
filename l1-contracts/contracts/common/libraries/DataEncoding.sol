@@ -118,6 +118,7 @@ library DataEncoding {
         }
     }
 
+    /// @notice Decodes the token data by combining chain id, asset deployment tracker and asset data.
     function decodeTokenData(
         bytes calldata _tokenData
     ) internal pure returns (uint256 chainId, bytes memory name, bytes memory symbol, bytes memory decimals) {
@@ -132,6 +133,13 @@ library DataEncoding {
         }
     }
 
+    /// @notice Encodes the token data by combining chain id, asset deployment tracker and asset data.
+    /// @param _legacy Whether to use the legacy encoding version.
+    /// @param _chainId The id of the chain token is native to.
+    /// @param _name The name of the token.
+    /// @param _symbol The symbol of the token.
+    /// @param _decimals The decimals of the token.
+    /// @return The encoded token data.
     function encodeTokenData(
         bool _legacy,
         uint256 _chainId,

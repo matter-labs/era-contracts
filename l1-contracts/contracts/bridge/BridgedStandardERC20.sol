@@ -37,7 +37,7 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
     /// @dev Address of the L2 bridge that is used as trustee who can mint/burn tokens
     address public override l2Bridge;
 
-    /// @dev Address of the L1 token that can be deposited to mint this L2 token
+    /// @dev Address of the token on its origin chain that can be deposited to mint this bridged token
     address public override originToken;
 
     /// @dev Address of the native token vault that is used as trustee who can mint/burn tokens
@@ -212,6 +212,8 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
                             LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Returns the address of the token on its native chain.
+    /// Legacy for the l2 bridge. 
     function l1Address() public view override returns (address) {
         return originToken;
     }

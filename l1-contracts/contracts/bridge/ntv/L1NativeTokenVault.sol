@@ -40,7 +40,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
-    mapping(uint256 chainId => mapping(bytes32 token => uint256 balance)) public chainBalance;
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
