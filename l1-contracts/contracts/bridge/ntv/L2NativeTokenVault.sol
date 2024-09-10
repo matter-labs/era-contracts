@@ -108,7 +108,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         expectedToken = _assetIdCheck(_originChainId, _assetId, _originToken);
         address l1LegacyToken;
         if (address(L2_LEGACY_SHARED_BRIDGE) != address(0)) {
-            l1LegacyToken = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(expectedToken); // kl todo
+            l1LegacyToken = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(expectedToken);
         }
 
         if (l1LegacyToken != address(0)) {

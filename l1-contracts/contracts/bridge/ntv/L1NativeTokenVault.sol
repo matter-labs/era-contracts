@@ -80,6 +80,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     }
 
     /// @notice Transfers tokens from shared bridge as part of the migration process.
+    /// The shared bridge becomes the L1Nullifier contract.
     /// @dev Both ETH and ERC20 tokens can be transferred. Exhausts balance of shared bridge after the first call.
     /// @dev Calling second time for the same token will revert.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
@@ -223,7 +224,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         }
     }
 
-    // kl todo move to beacon proxy here as well
     function _deployBeaconProxy(bytes32 _salt) internal override returns (BeaconProxy proxy) {
         // Use CREATE2 to deploy the BeaconProxy
 
