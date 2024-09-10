@@ -91,6 +91,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1TokenAddress);
         tokenAddress[assetId] = _l2TokenAddress;
+        originChainId[assetId] = L1_CHAIN_ID;
     }
 
     /// @notice Ensures that the token is deployed.

@@ -118,6 +118,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         uint256 nullifierChainBalance = L1_NULLIFIER.__DEPRECATED_chainBalance(_targetChainId, _token);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
         chainBalance[_targetChainId][assetId] = chainBalance[_targetChainId][assetId] + nullifierChainBalance;
+        originChainId[assetId] = block.chainid;
         L1_NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
     }
 

@@ -104,6 +104,8 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     ) external payable override onlyAssetRouter whenNotPaused {
         address receiver;
         uint256 amount;
+        // we set all originChainId for all already bridged tokens with the setLegacyTokenAssetId and updateChainBalancesFromSharedBridge functions.
+        // for tokens that are bridged for the first time, the originChainId will be 0.
         if (originChainId[_assetId] == block.chainid) {
             (receiver, amount) = _bridgeMintNativeToken(_chainId, _assetId, _data);
         } else {
@@ -200,8 +202,11 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         });
         bytes memory erc20Metadata;
         {
+            // we set all originChainId for all already bridged tokens with the setLegacyTokenAssetId and updateChainBalancesFromSharedBridge functions.
+            // for native tokens the originChainId is set when they register.
             erc20Metadata = getERC20Getters(bridgedToken, true, originChainId[_assetId]);
         }
+
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
             _prevMsgSender: _prevMsgSender,
             _l2Receiver: _receiver,
