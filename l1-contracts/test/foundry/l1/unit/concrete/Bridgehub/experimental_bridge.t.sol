@@ -107,10 +107,14 @@ contract ExperimentalBridgeTest is Test {
         mockCTM = new DummyChainTypeManagerWBH(address(bridgeHub));
         mockChainContract = new DummyZKChain(address(bridgeHub), eraChainId, block.chainid);
 
+
         mockL2Contract = makeAddr("mockL2Contract");
         // mocks to use in bridges instead of using a dummy one
         address mockL1WethAddress = makeAddr("Weth");
         address eraDiamondProxy = makeAddr("eraDiamondProxy");
+
+        l1Nullifier = new L1Nullifier(bridgeHub, eraChainId, eraDiamondProxy);
+        l1NullifierAddress = address(l1Nullifier);
 
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
@@ -196,6 +200,13 @@ contract ExperimentalBridgeTest is Test {
 
     function _useMockSharedBridge() internal {
         sharedBridgeAddress = address(mockSharedBridge);
+    }
+
+    function _initializeL1Nullifier() internal {
+        vm.prank(l1Nullifier.owner());
+        l1Nullifier.setL1NativeTokenVault(ntv);
+        vm.prank(l1Nullifier.owner());
+        l1Nullifier.setL1AssetRouter(sharedBridgeAddress);
     }
 
     function _initializeBridgehub() internal {
@@ -1324,6 +1335,8 @@ contract ExperimentalBridgeTest is Test {
     ) public useRandomToken(randomValue) {
         _useFullSharedBridge();
         _initializeBridgehub();
+        _initializeL1Nullifier();
+
         vm.assume(mintValue > 0);
 
         // create another token, to avoid base token
@@ -1401,6 +1414,8 @@ contract ExperimentalBridgeTest is Test {
     ) public useRandomToken(randomValue) {
         _useFullSharedBridge();
         _initializeBridgehub();
+        _initializeL1Nullifier();
+        
         vm.assume(mintValue > 0);
 
         secondBridgeValue = bound(secondBridgeValue, 1, type(uint256).max);
