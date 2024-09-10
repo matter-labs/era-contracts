@@ -4,10 +4,10 @@ pragma solidity 0.8.24;
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
-/// @dev The encoding version used for new txs.
+/// @dev The encoding version used for legacy txs.
 bytes1 constant LEGACY_ENCODING_VERSION = 0x00;
 
-/// @dev The encoding version used for legacy txs.
+/// @dev The encoding version used for new txs.
 bytes1 constant NEW_ENCODING_VERSION = 0x01;
 
 /// @dev The encoding version used for txs that set the asset handler on the counterpart contract.
