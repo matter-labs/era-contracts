@@ -85,43 +85,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
     function initialize() external reentrancyGuardInitializer {}
 
-    /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
-    /// @param _depositSender The address of the deposit initiator
-    /// @param _l1Token The address of the deposited L1 ERC20 token
-    /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization
-    /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent
-    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization
-    function claimFailedDeposit(
-        address _depositSender,
-        address _l1Token,
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
-    ) external nonReentrant {
-        uint256 amount = depositAmount[_depositSender][_l1Token][_l2TxHash];
-        // empty deposit
-        if (amount == 0) {
-            revert EmptyDeposit();
-        }
-        delete depositAmount[_depositSender][_l1Token][_l2TxHash];
-
-        L1_NULLIFIER.claimFailedDepositLegacyErc20Bridge({
-            _depositSender: _depositSender,
-            _l1Token: _l1Token,
-            _amount: amount,
-            _l2TxHash: _l2TxHash,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _merkleProof: _merkleProof
-        });
-        emit ClaimedFailedDeposit(_depositSender, _l1Token, amount);
-    }
-
     /*//////////////////////////////////////////////////////////////
                             ERA LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -262,6 +225,43 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 balanceAfter = _token.balanceOf(address(L1_ASSET_ROUTER));
 
         return balanceAfter - balanceBefore;
+    }
+
+    /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
+    /// @param _depositSender The address of the deposit initiator
+    /// @param _l1Token The address of the deposited L1 ERC20 token
+    /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization
+    /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent
+    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization
+    function claimFailedDeposit(
+        address _depositSender,
+        address _l1Token,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external nonReentrant {
+        uint256 amount = depositAmount[_depositSender][_l1Token][_l2TxHash];
+        // empty deposit
+        if (amount == 0) {
+            revert EmptyDeposit();
+        }
+        delete depositAmount[_depositSender][_l1Token][_l2TxHash];
+
+        L1_NULLIFIER.claimFailedDepositLegacyErc20Bridge({
+            _depositSender: _depositSender,
+            _l1Token: _l1Token,
+            _amount: amount,
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _merkleProof: _merkleProof
+        });
+        emit ClaimedFailedDeposit(_depositSender, _l1Token, amount);
     }
 
     /*//////////////////////////////////////////////////////////////
