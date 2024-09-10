@@ -762,7 +762,7 @@ contract DeployL1Script is Script {
     function updateSharedBridge() internal {
         L1AssetRouter sharedBridge = L1AssetRouter(addresses.bridges.sharedBridgeProxy);
         vm.broadcast(msg.sender);
-        sharedBridge.setL1Erc20Bridge(addresses.bridges.erc20BridgeProxy);
+        sharedBridge.setL1Erc20Bridge(L1ERC20Bridge(addresses.bridges.erc20BridgeProxy));
         console.log("SharedBridge updated with ERC20Bridge address");
     }
 

@@ -41,7 +41,7 @@ address constant L2_GENESIS_UPGRADE_ADDR = address(0x10001);
 /// @dev The address of the L2 bridge hub system contract, used to start L2<>L2 transactions
 address constant L2_BRIDGEHUB_ADDR = address(0x10002);
 
-/// @dev the address of the l2 asse3t router.
+/// @dev the address of the l2 asset router.
 address constant L2_ASSET_ROUTER_ADDR = address(0x10003);
 
 /**

@@ -14,21 +14,21 @@ import {UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
  */
 library DataEncoding {
     /// @notice Abi.encodes the data required for bridgeMint on remote chain.
-    /// @param _prevMsgSender The address which initiated the transfer.
+    /// @param _account The address which initiated the transfer.
     /// @param _l2Receiver The address which to receive tokens on remote chain.
     /// @param _l1Token The transferred token address.
     /// @param _amount The amount of token to be transferred.
     /// @param _erc20Metadata The transferred token metadata.
     /// @return The encoded bridgeMint data
     function encodeBridgeMintData(
-        address _prevMsgSender,
+        address _account,
         address _l2Receiver,
         address _l1Token,
         uint256 _amount,
         bytes memory _erc20Metadata
     ) internal pure returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encode(_prevMsgSender, _l2Receiver, _l1Token, _amount, _erc20Metadata);
+        return abi.encode(_account, _l2Receiver, _l1Token, _amount, _erc20Metadata);
     }
 
     /// @notice Function decoding transfer data previously encoded with this library.

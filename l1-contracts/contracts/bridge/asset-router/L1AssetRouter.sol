@@ -13,6 +13,7 @@ import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASS
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
+import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IL1Nullifier, FinalizeL1DepositParams} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
@@ -49,7 +50,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     INativeTokenVault public nativeTokenVault;
 
     /// @dev Address of legacy bridge.
-    address public legacyBridge;
+    IL1ERC20Bridge public legacyBridge;
 
     /// @notice Checks that the message sender is the nullifier.
     modifier onlyNullifier() {
@@ -123,11 +124,11 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
-    function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
+    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external onlyOwner {
         if (address(legacyBridge) != address(0)) {
             revert AddressAlreadyUsed(address(legacyBridge));
         }
-        if (_legacyBridge == address(0)) {
+        if (address(_legacyBridge) == address(0)) {
             revert ZeroAddress();
         }
         legacyBridge = _legacyBridge;

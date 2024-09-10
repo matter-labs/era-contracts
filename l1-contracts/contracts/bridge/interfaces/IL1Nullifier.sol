@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
+import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 
 /// @param chainId The chain ID of the transaction to check.
 /// @param l2BatchNumber The L2 batch number where the withdrawal was processed.
@@ -26,6 +27,13 @@ struct FinalizeL1DepositParams {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL1Nullifier {
+    enum WithdrawalType {
+        None,
+        BaseToken,
+        LegacyTokenBridgeOrSharedBridge,
+        AssetRouter
+    }
+
     event BridgehubDepositFinalized(
         uint256 indexed chainId,
         bytes32 indexed txDataHash,
@@ -65,7 +73,7 @@ interface IL1Nullifier {
 
     function BRIDGE_HUB() external view returns (IBridgehub);
 
-    function legacyBridge() external view returns (address);
+    function legacyBridge() external view returns (IL1ERC20Bridge);
 
     function depositHappened(uint256 _chainId, bytes32 _l2TxHash) external view returns (bytes32);
 

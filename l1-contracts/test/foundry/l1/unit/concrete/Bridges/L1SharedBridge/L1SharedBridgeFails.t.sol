@@ -73,14 +73,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         address currentBridge = address(sharedBridge.legacyBridge());
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(AddressAlreadyUsed.selector, currentBridge));
-        sharedBridge.setL1Erc20Bridge(address(0));
+        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(address(0)));
     }
 
     function test_setL1Erc20Bridge_emptyAddressProvided() public {
         stdstore.target(address(sharedBridge)).sig(sharedBridge.legacyBridge.selector).checked_write(address(0));
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
-        sharedBridge.setL1Erc20Bridge(address(0));
+        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(address(0)));
     }
 
     function test_setNativeTokenVault_alreadySet() public {

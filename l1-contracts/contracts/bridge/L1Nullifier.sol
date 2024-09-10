@@ -20,6 +20,7 @@ import {INativeTokenVault} from "./ntv/INativeTokenVault.sol";
 
 import {IL1Nullifier, FinalizeL1DepositParams} from "./interfaces/IL1Nullifier.sol";
 
+import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {L2Message, TxStatus} from "../common/Messaging.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
@@ -71,7 +72,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     uint256 internal eraLegacyBridgeLastDepositTxNumber;
 
     /// @dev Legacy bridge smart contract that used to hold ERC20 tokens.
-    address public override legacyBridge;
+    IL1ERC20Bridge public override legacyBridge;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
     // slither-disable-next-line uninitialized-state
@@ -131,7 +132,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @notice Checks that the message sender is the legacy bridge.
     modifier onlyLegacyBridge() {
-        if (msg.sender != legacyBridge) {
+        if (msg.sender != address(legacyBridge)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -139,7 +140,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @notice Checks that the message sender is the legacy bridge.
     modifier onlyAssetRouterOrErc20Bridge() {
-        if (msg.sender != address(l1AssetRouter) && msg.sender != legacyBridge) {
+        if (msg.sender != address(l1AssetRouter) && msg.sender != address(legacyBridge)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -219,11 +220,11 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @notice Sets the L1ERC20Bridge contract address.
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
-    function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
+    function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external onlyOwner {
         if (address(legacyBridge) != address(0)) {
             revert AddressAlreadySet(address(legacyBridge));
         }
-        if (_legacyBridge == address(0)) {
+        if (address(_legacyBridge) == address(0)) {
             revert ZeroAddress();
         }
         legacyBridge = _legacyBridge;
@@ -379,7 +380,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
     /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
     /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
-    function finalizeDeposit(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) public {
+    function finalizeDeposit(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
         _finalizeDeposit(_finalizeWithdrawalParams);
     }
 
@@ -388,17 +389,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     function _finalizeDeposit(
         FinalizeL1DepositParams calldata _finalizeWithdrawalParams
     ) internal nonReentrant whenNotPaused {
-        (bytes32 assetId, bytes memory transferData) = _verifyAndGetWithdrawalData(_finalizeWithdrawalParams);
-        l1AssetRouter.finalizeDeposit(_finalizeWithdrawalParams.chainId, assetId, transferData);
-    }
-
-    /// @notice Internal function that handles the logic for finalizing withdrawals, supporting both the current bridge system and the legacy ERC20 bridge.
-    /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
-    /// @return assetId The bridged asset ID.
-    /// @return transferData The encoded transfer data.
-    function _verifyAndGetWithdrawalData(
-        FinalizeL1DepositParams calldata _finalizeWithdrawalParams
-    ) internal whenNotPaused returns (bytes32 assetId, bytes memory transferData) {
         uint256 chainId = _finalizeWithdrawalParams.chainId;
         uint256 l2BatchNumber = _finalizeWithdrawalParams.l2BatchNumber;
         uint256 l2MessageIndex = _finalizeWithdrawalParams.l2MessageIndex;
@@ -408,10 +398,20 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         isWithdrawalFinalized[chainId][l2BatchNumber][l2MessageIndex] = true;
 
         // Handling special case for withdrawal from ZKsync Era initiated before Shared Bridge.
-        require(!_isPreSharedBridgeEraEthWithdrawal(chainId, l2BatchNumber), "L1N: legacy eth withdrawal");
-        require(!_isPreSharedBridgeEraTokenWithdrawal(chainId, l2BatchNumber), "L1N: legacy token withdrawal");
+        (bytes32 assetId, bytes memory transferData, WithdrawalType withdrawalType) = _verifyWithdrawal(
+            _finalizeWithdrawalParams
+        );
 
-        (assetId, transferData) = _verifyWithdrawal(_finalizeWithdrawalParams);
+        // Handling special case for withdrawal from zkSync Era initiated before Shared Bridge.
+        if (withdrawalType == WithdrawalType.BaseToken && _isPreSharedBridgeEraEthWithdrawal(chainId, l2BatchNumber)) {
+            // Checks that the withdrawal wasn't finalized already.
+            bool alreadyFinalized = IGetters(ERA_DIAMOND_PROXY).isEthWithdrawalFinalized(l2BatchNumber, l2MessageIndex);
+            require(!alreadyFinalized, "Withdrawal is already finalized 2");
+        } else if (withdrawalType == WithdrawalType.LegacyTokenBridgeOrSharedBridge) {
+            require(!legacyBridge.isWithdrawalFinalized(l2BatchNumber, l2MessageIndex), "ShB: legacy withdrawal");
+        }
+
+        l1AssetRouter.finalizeDeposit(chainId, assetId, transferData);
     }
 
     /// @dev Determines if an eth withdrawal was initiated on ZKsync Era before the upgrade to the Shared Bridge.
@@ -486,24 +486,29 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @return transferData The transfer data used to finalize withdawal.
     function _verifyWithdrawal(
         FinalizeL1DepositParams calldata _finalizeWithdrawalParams
-    ) internal view returns (bytes32 assetId, bytes memory transferData) {
-        (assetId, transferData) = _parseL2WithdrawalMessage(
+    ) internal view returns (bytes32 assetId, bytes memory transferData, WithdrawalType withdrawalType) {
+        (assetId, transferData, withdrawalType) = _parseL2WithdrawalMessage(
             _finalizeWithdrawalParams.chainId,
             _finalizeWithdrawalParams.message
         );
         L2Message memory l2ToL1Message;
         {
+            address l2Sender = _finalizeWithdrawalParams.l2Sender;
             bool baseTokenWithdrawal = (assetId == BRIDGE_HUB.baseTokenAssetId(_finalizeWithdrawalParams.chainId));
-            require(
-                /// @dev for legacy function calls we hardcode the sender as the L2AssetRouter as we don't know if it is
-                /// a base token or erc20 token withdrawal beforehand,
-                /// so we have to allow that option even if we override it.
-                _finalizeWithdrawalParams.l2Sender == L2_ASSET_ROUTER_ADDR ||
-                    _finalizeWithdrawalParams.l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR ||
-                    _finalizeWithdrawalParams.l2Sender ==
-                    __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId],
-                "L1N: wrong l2 sender"
-            );
+            if (withdrawalType == WithdrawalType.BaseToken) {
+                require(baseTokenWithdrawal, "L1N: token withdrawal from base token");
+                require(l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, "L1N: wrong l2 sender 1");
+            } else if (withdrawalType == WithdrawalType.LegacyTokenBridgeOrSharedBridge) {
+                require(!baseTokenWithdrawal, "L1N: base token withdrawal from token bridge");
+                require(
+                    l2Sender == __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId],
+                    "L1N: wrong l2 sender 2"
+                );
+            } else if (withdrawalType == WithdrawalType.AssetRouter) {
+                require(l2Sender == L2_ASSET_ROUTER_ADDR, "L1N: wrong l2 sender 3");
+            } else {
+                revert("L1N: wrong withdrawal type");
+            }
 
             l2ToL1Message = L2Message({
                 txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
@@ -535,23 +540,24 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     function _parseL2WithdrawalMessage(
         uint256 _chainId,
         bytes memory _l2ToL1message
-    ) internal view returns (bytes32 assetId, bytes memory transferData) {
+    ) internal view returns (bytes32 assetId, bytes memory transferData, WithdrawalType withdrawalType) {
         // We check that the message is long enough to read the data.
-        // Please note that there are two versions of the message:
-        // 1. The message that is sent by `withdraw(address _l1Receiver)`
+        // Please note that there are three versions of the message:
+        // 1. The message that is sent by `withdraw(address _l1Receiver)` on `L2BaseToken`
         // It should be equal to the length of the bytes4 function signature + address l1Receiver + uint256 amount = 4 + 20 + 32 = 56 (bytes).
         // 2. The message that is encoded by `getL1WithdrawMessage(bytes32 _assetId, bytes memory _bridgeMintData)`
         // No length is assume. The assetId is decoded and the mintData is passed to respective assetHandler
 
-        // The data is expected to be at least 56 bytes long.
-        if (_l2ToL1message.length < 56) {
-            revert L2WithdrawalMessageWrongLength(_l2ToL1message.length);
-        }
         uint256 amount;
         address l1Receiver;
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {
+            // The data is expected to be at least 56 bytes long.
+            if (_l2ToL1message.length < 56) {
+                revert L2WithdrawalMessageWrongLength(_l2ToL1message.length);
+            }
+            withdrawalType = WithdrawalType.BaseToken;
             // this message is a base token withdrawal
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             // slither-disable-next-line unused-return
@@ -559,8 +565,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             assetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
             transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) {
-            // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
-            address l1Token;
+            withdrawalType = WithdrawalType.LegacyTokenBridgeOrSharedBridge;
             // this message is a token withdrawal
 
             // Check that the message length is correct.
@@ -570,6 +575,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 revert L2WithdrawalMessageWrongLength(_l2ToL1message.length);
             }
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+            // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
+            address l1Token;
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             // slither-disable-next-line unused-return
             (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
@@ -577,6 +584,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             assetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);
             transferData = abi.encode(amount, l1Receiver);
         } else if (bytes4(functionSignature) == IAssetRouterBase.finalizeDeposit.selector) {
+            withdrawalType = WithdrawalType.AssetRouter;
             // The data is expected to be at least 36 bytes long to contain assetId.
             require(_l2ToL1message.length >= 36, "L1N: wrong msg len"); // wrong message length
             // slither-disable-next-line unused-return

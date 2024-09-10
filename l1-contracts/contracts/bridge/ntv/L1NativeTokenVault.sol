@@ -123,7 +123,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     function _bridgeBurnNativeToken(
         uint256 _chainId,
         bytes32 _assetId,
-        address _prevMsgSender,
+        address _account,
         // solhint-disable-next-line no-unused-vars
         bool _depositChecked,
         bytes calldata _data
@@ -133,12 +133,12 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         bool depositChecked = IL1AssetRouter(address(ASSET_ROUTER)).transferFundsToNTV(
             _assetId,
             _depositAmount,
-            _prevMsgSender
+            _account
         );
         _bridgeMintData = super._bridgeBurnNativeToken({
             _chainId: _chainId,
             _assetId: _assetId,
-            _prevMsgSender: _prevMsgSender,
+            _account: _account,
             _depositChecked: depositChecked,
             _data: _data
         });
