@@ -79,9 +79,12 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             revert ZeroAddress();
         }
         bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
-        tokenAddress[BASE_TOKEN_ASSET_ID] = ETH_TOKEN_ADDRESS;
-        originChainId[BASE_TOKEN_ASSET_ID] = block.chainid;
         _transferOwnership(_owner);
+    }
+
+    /// @inheritdoc IL1NativeTokenVault
+    function registerEthToken() external {
+        _unsafeRegisterNativeToken(ETH_TOKEN_ADDRESS);
     }
 
     /// @notice Transfers tokens from shared bridge as part of the migration process.

@@ -72,46 +72,4 @@ contract IncrementalMerkleTestTest is Test {
             merkleTest.push(elements[i]);
         }
     }
-
-    // function testElements(uint256 i) public {
-    //     vm.assume(i < elements.length);
-    //     bytes32 leaf = elements[i];
-    //     bytes32[] memory proof = merkleTree.getProof(elements, i);
-
-    //     bytes32 rootFromContract = merkleTest.calculateRoot(proof, i, leaf);
-
-    //     assertEq(rootFromContract, root);
-    // }
-
-    // function testFirstElement() public {
-    //     testElements(0);
-    // }
-
-    // function testLastElement() public {
-    //     testElements(elements.length - 1);
-    // }
-
-    // function testEmptyProof_shouldRevert() public {
-    //     bytes32 leaf = elements[0];
-    //     bytes32[] memory proof;
-
-    //     vm.expectRevert(bytes("xc"));
-    //     merkleTest.calculateRoot(proof, 0, leaf);
-    // }
-
-    // function testLeafIndexTooBig_shouldRevert() public {
-    //     bytes32 leaf = elements[0];
-    //     bytes32[] memory proof = merkleTree.getProof(elements, 0);
-
-    //     vm.expectRevert(bytes("px"));
-    //     merkleTest.calculateRoot(proof, 2 ** 255, leaf);
-    // }
-
-    // function testProofLengthTooLarge_shouldRevert() public {
-    //     bytes32 leaf = elements[0];
-    //     bytes32[] memory proof = new bytes32[](256);
-
-    //     vm.expectRevert(bytes("bt"));
-    //     merkleTest.calculateRoot(proof, 0, leaf);
-    // }
 }
