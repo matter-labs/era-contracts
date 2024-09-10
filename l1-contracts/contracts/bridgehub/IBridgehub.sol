@@ -224,4 +224,6 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     function L1_CHAIN_ID() external view returns (uint256);
 
     function setLegacyBaseTokenAssetId(uint256 _chainId) external;
+
+    function setLegacyChainAddress(uint256 _chainId) external;
 }
