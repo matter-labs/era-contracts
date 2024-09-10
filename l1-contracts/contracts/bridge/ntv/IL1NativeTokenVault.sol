@@ -14,5 +14,8 @@ interface IL1NativeTokenVault is INativeTokenVault {
     /// @notice The L1Nullifier contract
     function L1_NULLIFIER() external view returns (IL1Nullifier);
 
+    /// @notice Registers ETH token
+    function registerEthToken() external;
+
     event TokenBeaconUpdated(address indexed l2TokenBeacon);
 }

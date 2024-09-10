@@ -830,6 +830,9 @@ contract DeployL1Script is Script {
         vm.broadcast(msg.sender);
         l1Nullifier.setL1AssetRouter(addresses.bridges.sharedBridgeProxy);
 
+        vm.broadcast(msg.sender);
+        IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
+
         // bytes memory data = abi.encodeCall(sharedBridge.setNativeTokenVault, (IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy)));
         // Utils.executeUpgrade({
         //     _governor: ownable.owner(),

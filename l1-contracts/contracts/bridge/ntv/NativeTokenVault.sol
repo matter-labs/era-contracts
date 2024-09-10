@@ -89,10 +89,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             revert TokenNotSupported(WETH_TOKEN);
         }
         require(_nativeToken.code.length > 0, "NTV: empty token");
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
-        ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
-        tokenAddress[assetId] = _nativeToken;
-        isTokenNative[assetId] = true;
+        _unsafeRegisterNativeToken(_nativeToken);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -302,6 +299,16 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     /// @dev Shows the assetId for a given chain and token address
     function getAssetId(uint256 _chainId, address _nativeToken) external pure override returns (bytes32) {
         return DataEncoding.encodeNTVAssetId(_chainId, _nativeToken);
+    }
+
+    /// @notice Registers a native token address for the vault.
+    /// @dev It does not perform any checks for the correctnesss of the token contract.
+    /// @param _nativeToken The address of the token to be registered.
+    function _unsafeRegisterNativeToken(address _nativeToken) internal {
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
+        ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
+        tokenAddress[assetId] = _nativeToken;
+        isTokenNative[assetId] = true;
     }
 
     /*//////////////////////////////////////////////////////////////
