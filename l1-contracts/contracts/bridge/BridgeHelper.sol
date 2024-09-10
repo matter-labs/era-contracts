@@ -6,6 +6,7 @@ pragma solidity 0.8.24;
 
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 /**
  * @author Matter Labs
@@ -14,7 +15,11 @@ import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
  */
 library BridgeHelper {
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
-    function getERC20Getters(address _token) internal view returns (bytes memory) {
+    function getERC20Getters(
+        address _token,
+        bool _legacy,
+        uint256 _originChainId
+    ) internal view returns (bytes memory) {
         if (_token == ETH_TOKEN_ADDRESS) {
             bytes memory name = abi.encode("Ether");
             bytes memory symbol = abi.encode("ETH");
@@ -25,6 +30,6 @@ library BridgeHelper {
         (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
         (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
         (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
-        return abi.encode(data1, data2, data3);
+        return DataEncoding.encodeTokenData(_legacy, _originChainId, data1, data2, data3);
     }
 }

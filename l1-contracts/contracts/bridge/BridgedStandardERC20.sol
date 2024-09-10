@@ -9,6 +9,7 @@ import {ERC1967Upgrade} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Up
 import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
 import {Unauthorized, NonSequentialVersion, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -37,7 +38,7 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
     address public override l2Bridge;
 
     /// @dev Address of the L1 token that can be deposited to mint this L2 token
-    address public override l1Address;
+    address public override originToken;
 
     /// @dev Address of the native token vault that is used as trustee who can mint/burn tokens
     address public nativeTokenVault;
@@ -73,22 +74,20 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
 
     /// @notice Initializes a contract token for later use. Expected to be used in the proxy.
     /// @dev Stores the L1 address of the bridge and set `name`/`symbol`/`decimals` getters that L1 token has.
-    /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 token
+    /// @param _originToken Address of the origin token that can be deposited to mint this bridged token
     /// @param _data The additional data that the L1 bridge provide for initialization.
     /// In this case, it is packed `name`/`symbol`/`decimals` of the L1 token.
-    function bridgeInitialize(address _l1Address, bytes calldata _data) external initializer {
-        if (_l1Address == address(0)) {
+    function bridgeInitialize(address _originToken, bytes calldata _data) external initializer returns (uint256) {
+        if (_originToken == address(0)) {
             revert ZeroAddress();
         }
-        l1Address = _l1Address;
+        originToken = _originToken;
 
         nativeTokenVault = msg.sender;
 
         // We parse the data exactly as they were created on the L1 bridge
-        (bytes memory nameBytes, bytes memory symbolBytes, bytes memory decimalsBytes) = abi.decode(
-            _data,
-            (bytes, bytes, bytes)
-        );
+        (uint256 chainId, bytes memory nameBytes, bytes memory symbolBytes, bytes memory decimalsBytes) = DataEncoding
+            .decodeTokenData(_data);
 
         ERC20Getters memory getters;
         string memory decodedName;
@@ -129,7 +128,8 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         }
 
         availableGetters = getters;
-        emit BridgeInitialize(_l1Address, decodedName, decodedSymbol, decimals_);
+        emit BridgeInitialize(_originToken, decodedName, decodedSymbol, decimals_);
+        return chainId;
     }
 
     /// @notice A method to be called by the governor to update the token's metadata.
@@ -156,7 +156,7 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         __ERC20Permit_init(_newName);
         availableGetters = _availableGetters;
 
-        emit BridgeInitialize(l1Address, _newName, _newSymbol, decimals_);
+        emit BridgeInitialize(originToken, _newName, _newSymbol, decimals_);
     }
 
     /// @dev Mint tokens to a given account.
@@ -206,5 +206,13 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         // solhint-disable-next-line reason-string, gas-custom-errors
         if (availableGetters.ignoreDecimals) revert();
         return decimals_;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            LEGACY FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function l1Address() public view override returns (address) {
+        return originToken;
     }
 }

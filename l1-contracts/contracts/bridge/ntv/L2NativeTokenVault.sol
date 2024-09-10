@@ -128,6 +128,20 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
     }
 
+    function _deployBridgedToken(
+        uint256 _originChainId,
+        address _originToken,
+        bytes memory _erc20Data
+    ) internal virtual override returns (address, uint256) {
+        (address deployedToken, uint256 tokenOriginChainId) = super._deployBridgedToken(
+            _originChainId,
+            _originToken,
+            _erc20Data
+        );
+        originChainId[DataEncoding.encodeNTVAssetId(tokenOriginChainId, _originToken)] = tokenOriginChainId;
+        return (deployedToken, tokenOriginChainId);
+    }
+
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
     /// @dev This function uses raw call to ContractDeployer to make sure that exactly `l2TokenProxyBytecodeHash` is used
     /// for the code of the proxy.

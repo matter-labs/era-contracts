@@ -117,4 +117,32 @@ library DataEncoding {
             revert UnsupportedEncodingVersion();
         }
     }
+
+    function decodeTokenData(
+        bytes calldata _tokenData
+    ) internal pure returns (uint256 chainId, bytes memory name, bytes memory symbol, bytes memory decimals) {
+        bytes1 encodingVersion = _tokenData[0];
+        // kl todo check correct
+        if (encodingVersion == LEGACY_ENCODING_VERSION) {
+            (name, symbol, decimals) = abi.decode(_tokenData, (bytes, bytes, bytes));
+        } else if (encodingVersion == NEW_ENCODING_VERSION) {
+            return abi.decode(_tokenData[1:], (uint256, bytes, bytes, bytes));
+        } else {
+            revert UnsupportedEncodingVersion();
+        }
+    }
+
+    function encodeTokenData(
+        bool legacy,
+        uint256 chainId,
+        bytes memory name,
+        bytes memory symbol,
+        bytes memory decimals
+    ) internal pure returns (bytes memory) {
+        if (legacy) {
+            return abi.encode(name, symbol, decimals);
+        } else {
+            return bytes.concat(NEW_ENCODING_VERSION, abi.encode(chainId, name, symbol, decimals));
+        }
+    }
 }

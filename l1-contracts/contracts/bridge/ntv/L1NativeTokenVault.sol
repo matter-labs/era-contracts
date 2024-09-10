@@ -235,6 +235,15 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         }
     }
 
+    function _deployBridgedToken(
+        uint256 _originChainId,
+        address _originToken,
+        bytes memory _erc20Data
+    ) internal virtual override returns (address, uint256) {
+        originChainId[DataEncoding.encodeNTVAssetId(_originChainId, _originToken)] = _originChainId;
+        return super._deployBridgedToken(_originChainId, _originToken, _erc20Data);
+    }
+
     function _deployBeaconProxy(bytes32 _salt) internal override returns (BeaconProxy proxy) {
         // Use CREATE2 to deploy the BeaconProxy
         address proxyAddress = Create2.deploy(

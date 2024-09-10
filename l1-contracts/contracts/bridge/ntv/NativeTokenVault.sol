@@ -110,7 +110,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     ) external payable override onlyAssetRouter whenNotPaused {
         address receiver;
         uint256 amount;
-        if (originChainId[_assetId] == _chainId) {
+        if (originChainId[_assetId] == block.chainid) {
             (receiver, amount) = _bridgeMintNativeToken(_chainId, _assetId, _data);
         } else {
             (receiver, amount) = _bridgeMintBridgedToken(_chainId, _assetId, _data);
@@ -168,7 +168,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         address _prevMsgSender,
         bytes calldata _data
     ) external payable override onlyAssetRouter whenNotPaused returns (bytes memory _bridgeMintData) {
-        if (originChainId[_assetId] != _chainId) {
+        if (originChainId[_assetId] != block.chainid) {
             _bridgeMintData = _bridgeBurnBridgedToken(_chainId, _assetId, _prevMsgSender, _data);
         } else {
             _bridgeMintData = _bridgeBurnNativeToken({
@@ -203,7 +203,17 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             receiver: _receiver,
             amount: _amount
         });
-        _bridgeMintData = _data;
+        bytes memory erc20Metadata;
+        {
+            erc20Metadata = getERC20Getters(bridgedToken, true, originChainId[_assetId]);
+        }
+        _bridgeMintData = DataEncoding.encodeBridgeMintData({
+            _prevMsgSender: _prevMsgSender,
+            _l2Receiver: _receiver,
+            _l1Token: IBridgedStandardToken(bridgedToken).originToken(),
+            _amount: _amount,
+            _erc20Metadata: erc20Metadata
+        });
     }
 
     function _bridgeBurnNativeToken(
@@ -249,12 +259,16 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
             revert EmptyDeposit();
         }
 
+        bytes memory erc20Metadata;
+        {
+            erc20Metadata = getERC20Getters(nativeToken, true, originChainId[_assetId]);
+        }
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
             _prevMsgSender: _prevMsgSender,
             _l2Receiver: _receiver,
             _l1Token: nativeToken,
             _amount: amount,
-            _erc20Metadata: getERC20Getters(nativeToken)
+            _erc20Metadata: erc20Metadata
         });
 
         emit BridgeBurn({
@@ -286,8 +300,12 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
 
     /// @param _token The address of token of interest.
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
-    function getERC20Getters(address _token) public view override returns (bytes memory) {
-        return BridgeHelper.getERC20Getters(_token);
+    function getERC20Getters(
+        address _token,
+        bool _legacy,
+        uint256 _originChainId
+    ) public view override returns (bytes memory) {
+        return BridgeHelper.getERC20Getters(_token, _legacy, _originChainId);
     }
 
     /// @notice Returns the parsed assetId.
@@ -351,7 +369,7 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
         bytes memory _erc20Data,
         address _expectedToken
     ) internal {
-        address deployedToken = _deployBridgedToken(_originChainId, _originToken, _erc20Data);
+        (address deployedToken, ) = _deployBridgedToken(_originChainId, _originToken, _erc20Data);
         if (deployedToken != _expectedToken) {
             revert AddressMismatch(_expectedToken, deployedToken);
         }
@@ -368,20 +386,20 @@ abstract contract NativeTokenVault is INativeTokenVault, IAssetHandler, Ownable2
     ) public view virtual override returns (address);
 
     /// @notice Deploys and initializes the bridged token for the native counterpart.
-    /// @param _nativeToken The address of native token.
+    /// @param _originToken The address of origin token.
     /// @param _erc20Data The ERC20 metadata of the token deployed.
     /// @return The address of the beacon proxy (bridged token).
     function _deployBridgedToken(
         uint256 _originChainId,
-        address _nativeToken,
+        address _originToken,
         bytes memory _erc20Data
-    ) internal returns (address) {
-        bytes32 salt = _getCreate2Salt(_originChainId, _nativeToken);
+    ) internal virtual returns (address, uint256) {
+        bytes32 salt = _getCreate2Salt(_originChainId, _originToken);
 
         BeaconProxy l2Token = _deployBeaconProxy(salt);
-        BridgedStandardERC20(address(l2Token)).bridgeInitialize(_nativeToken, _erc20Data);
+        uint256 tokenOriginChainId = BridgedStandardERC20(address(l2Token)).bridgeInitialize(_originToken, _erc20Data);
 
-        return address(l2Token);
+        return (address(l2Token), tokenOriginChainId);
     }
 
     /// @notice Converts the L1 token address to the create2 salt of deployed L2 token.
