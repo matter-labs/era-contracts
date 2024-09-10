@@ -23,7 +23,7 @@ import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {AssetHandlerNotRegistered, ZKChainLimitReached, Unauthorized, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, SharedBridgeNotSet, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, AddressTooLow, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -325,32 +325,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
     ) external onlyOwnerOrAdmin nonReentrant whenNotPaused onlyL1 returns (uint256) {
-        if (_chainId == 0) {
-            revert ZeroChainId();
-        }
-        if (_chainId > type(uint48).max) {
-            revert ChainIdTooBig();
-        }
-        require(_chainId != block.chainid, "BH: chain id must not match current chainid");
-        if (_chainTypeManager == address(0)) {
-            revert ZeroAddress();
-        }
-        if (_baseTokenAssetId == bytes32(0)) {
-            revert ZeroAddress();
-        }
-
-        if (!chainTypeManagerIsRegistered[_chainTypeManager]) {
-            revert CTMNotRegistered();
-        }
-
-        require(assetIdIsRegistered[_baseTokenAssetId], "BH: asset id not registered");
-
-        if (assetRouter == address(0)) {
-            revert SharedBridgeNotSet();
-        }
-        if (chainTypeManager[_chainId] != address(0)) {
-            revert BridgeHubAlreadyRegistered();
-        }
+        _validateChainParams({_chainId: _chainId, _assetId: _baseTokenAssetId, _chainTypeManager: _chainTypeManager});
 
         chainTypeManager[_chainId] = _chainTypeManager;
 
@@ -784,6 +759,78 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _prevMsgSender: _depositSender,
             _chainData: bridgehubData.chainData
         });
+    }
+
+    /// @dev Registers an already deployed chain with the bridgehub
+    /// @param _chainId The chain Id of the chain
+    /// @param _hyperchain Address of the hyperchain
+    function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external onlyOwner onlyL1 {
+        if (_hyperchain == address(0)) {
+            revert ZeroAddress();
+        }
+        if (zkChainMap.contains(_chainId)) {
+            revert ChainIdAlreadyExists();
+        }
+        if (IZKChain(_hyperchain).getChainId() != _chainId) {
+            revert ChainIdMismatch();
+        }
+
+        address ctm = IZKChain(_hyperchain).getChainTypeManager();
+        address chainAdmin = IZKChain(_hyperchain).getAdmin();
+        bytes32 chainBaseTokenAssetId = IZKChain(_hyperchain).getBaseTokenAssetId();
+        address bridgeHub = IZKChain(_hyperchain).getBridgehub();
+
+        if (bridgeHub != address(this)) {
+            revert IncorrectBridgeHubAddress(bridgeHub);
+        }
+
+        _validateChainParams({_chainId: _chainId, _assetId: chainBaseTokenAssetId, _chainTypeManager: ctm});
+
+        chainTypeManager[_chainId] = ctm;
+
+        baseTokenAssetId[_chainId] = chainBaseTokenAssetId;
+        settlementLayer[_chainId] = block.chainid;
+
+        _registerNewZKChain(_chainId, _hyperchain);
+        messageRoot.addNewChain(_chainId);
+
+        emit NewChain(_chainId, ctm, chainAdmin);
+    }
+
+    function _validateChainParams(uint256 _chainId, bytes32 _assetId, address _chainTypeManager) internal view {
+        if (_chainId == 0) {
+            revert ZeroChainId();
+        }
+
+        if (_chainId > type(uint48).max) {
+            revert ChainIdTooBig();
+        }
+
+        if (_chainId == block.chainid) {
+            revert ChainIdCantBeCurrentChain();
+        }
+
+        if (_chainTypeManager == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_assetId == bytes32(0)) {
+            revert EmptyAssetId();
+        }
+
+        if (!chainTypeManagerIsRegistered[_chainTypeManager]) {
+            revert CTMNotRegistered();
+        }
+
+        if (!assetIdIsRegistered[_assetId]) {
+            revert AssetIdNotSupported(_assetId);
+        }
+
+        if (assetRouter == address(0)) {
+            revert SharedBridgeNotSet();
+        }
+        if (chainTypeManager[_chainId] != address(0)) {
+            revert BridgeHubAlreadyRegistered();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
