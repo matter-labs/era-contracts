@@ -462,11 +462,11 @@ contract ExperimentalBridgeTest is Test {
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, testTokenAddress);
 
-        if (randomCaller != bridgeOwner) {
-            vm.prank(randomCaller);
-            vm.expectRevert(bytes("Ownable: caller is not the owner"));
-            bridgeHub.addTokenAssetId(assetId);
-        }
+        vm.assume(randomCaller != bridgeOwner);
+        vm.assume(randomCaller != bridgeHub.admin());
+        vm.prank(randomCaller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
+        bridgeHub.addTokenAssetId(assetId);
 
         assertTrue(!bridgeHub.assetIdIsRegistered(assetId), "This random address is not registered as a token");
 

@@ -274,7 +274,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice asset id can represent any token contract with the appropriate interface/functionality
     /// @param _baseTokenAssetId asset id of base token to be registered
-    function addTokenAssetId(bytes32 _baseTokenAssetId) external onlyOwner {
+    function addTokenAssetId(bytes32 _baseTokenAssetId) external onlyOwnerOrAdmin {
         if (assetIdIsRegistered[_baseTokenAssetId]) {
             revert AssetIdAlreadyRegistered();
         }
