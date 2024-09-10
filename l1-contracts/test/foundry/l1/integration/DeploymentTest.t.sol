@@ -100,11 +100,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             abi.encodeWithSelector(IChainTypeManager.getZKChainLegacy.selector, randomChainId),
             abi.encode(address(0x01))
         );
-        vm.store(
-            address(bridgehub),
-            keccak256(abi.encode(randomChainId, 205)),
-            bytes32(uint256(uint160(1)))
-        );
+        vm.store(address(bridgehub), keccak256(abi.encode(randomChainId, 205)), bytes32(uint256(uint160(1))));
         vm.store(
             address(bridgehub),
             keccak256(abi.encode(randomChainId, 204)),
